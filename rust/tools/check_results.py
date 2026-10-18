@@ -69,20 +69,32 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "rust" / "results"
+COMMITTED = RESULTS / "strict.jsonl"  # the committed chain, a source of known games
+BOUNDS = RESULTS / "bounds.jsonl"  # the bounds store, the other (it is not a results file)
 OPTIMAL = REPO / "src" / "main" / "resources" / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
 SCHEMA = 5  # the only format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap"}
-SETTLES_SEARCH = {"exhausted", "cap", "same_search"}  # the proofs a repeat can repeat
+SETTLES_SEARCH = {"exhausted", "cap", "same_search", "known"}  # the proofs a repeat can repeat
 SETS_UP = {"search", "repeat"}  # the methods whose lines have a setup
+NO_BAG = {"prime", "known"}  # the methods whose lines have no in_the_bag: they set no board up
 DIGEST = re.compile("[0-9a-f]{16}")
+PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
 
 
 def assumed_optimal(n):
     """What a proof that rests on optimal.json's game of n assumes."""
     return f"the game of {n} in optimal.json is optimal"
+
+
+U_STATEMENT = "statement U holds at n="
+
+
+def assumed_u(n):
+    """What a bound of the bounds store that rests on statement U at the board n assumes."""
+    return f"{U_STATEMENT}{n}"
 
 
 def is_prime(n):
@@ -149,6 +161,97 @@ def finished_problems(n, moves, divisors):
     return score, found
 
 
+class Sources:
+    """The known sources a line that cites one is checked against: optimal.json, the committed chain and the bounds
+    store, read as they are (their own referees check them: `taxman verify-results`, this script on the chain;
+    `ledger verify-bounds`, `check_bounds.py`).  A source that was not given is empty, and a line that cites it is a
+    problem."""
+
+    def __init__(self, optimal, committed=None, bounds=None):
+        self.optimal = optimal
+        self.committed = {}  # n -> (score, moves, proof, assumptions) of the committed chain's completed games
+        self.lines = {}  # (n, side, value) -> the store's first line of that board, side and value
+        self.lower = {}  # n -> the store's best lower line (the highest value, the later of equals)
+        self.upper = {}  # n -> its best upper line (the lowest value, the later of equals)
+        self.have_store = False
+        for line in self._rows(committed):
+            if line.get("schema") == SCHEMA and line.get("completed"):
+                self.committed[line["n"]] = (line["score"], line["moves"], line["proof"], set(line["assumes"]))
+        if bounds is not None:
+            self.have_store = True
+            for line in self._rows(bounds):
+                n, side, value = line["n"], line["side"], line["value"]
+                self.lines.setdefault((n, side, value), line)
+                best, better = (self.lower, lambda a, b: a <= b) if side == "lower" else (self.upper, lambda a, b: a >= b)
+                if n not in best or better(best[n]["value"], value):
+                    best[n] = line
+
+    @staticmethod
+    def _rows(path):
+        if path is None:
+            return []
+        return [json.loads(text) for text in Path(path).read_text().split("\n") if text.strip()]
+
+    def proven(self, n):
+        """The store's upper line of the board n if its best bounds meet, else None."""
+        lower, upper = self.lower.get(n), self.upper.get(n)
+        return upper if lower and upper and lower["value"] == upper["value"] else None
+
+    def prev_game(self, source, n):
+        """(score, moves or None, proof, assumptions) of the game of n that `source` ("strict" or "bounds") holds, as
+        the game of n-1 of a line is recorded: None if it holds none.  The store's moves are a game the Rust program
+        rebuilds from promotions, which this script cannot, so they are not known (their digest is not checked)."""
+        if source == "strict":
+            return self.committed.get(n)
+        upper = self.proven(n)
+        if upper is None:
+            return None
+        return (upper["value"], None, "known", {assumed_u(board) for board in upper.get("rests_on", [])})
+
+    def cite_problems(self, n, score, cite):
+        """(assumptions, problems) of a line that cites a source: the source holds a game of n that scores `score`, or
+        lines of the store with that value as their bound of n, by the rules and from the runs cited.  The assumptions
+        are what the cited lines make the game assume."""
+        allowed = {"optimal": {"source"}, "strict": {"source"}, "bounds": {"source", "lower", "upper"}}
+        source = cite.get("source")
+        if source not in allowed:
+            return None, [f"known cites the source {source!r}, which is none of optimal, strict and bounds"]
+        extra = sorted(set(cite) - allowed[source])
+        if extra:
+            return None, [f"known has the field {extra[0]!r}, which a citation of {source} does not"]
+        if source == "optimal":
+            entry = self.optimal.get(n)
+            if entry is None or entry["score"] != score:
+                return None, [f"it cites optimal.json, which has no game of {n} scoring {score}"]
+            return {assumed_optimal(n)}, []
+        if source == "strict":
+            game = self.committed.get(n)
+            if game is None or game[0] != score:
+                return None, [f"it cites the committed chain, which has no game of {n} scoring {score}"]
+            return set(game[3]), []
+        if not self.have_store:
+            return None, ["it cites the bounds store, which was not given to the check"]
+        problems = []
+
+        def find(side, wanted):
+            line = self.lines.get((n, side, score))
+            ok = isinstance(wanted, dict) and set(wanted) == {"rule", "source"}
+            if line is None:
+                problems.append(f"the bounds store has no {side} bound of board {n} worth {score}")
+            elif not ok or (line["rule"], line["source"]) != (wanted["rule"], wanted["source"]):
+                problems.append(f"the bounds store's {side} bound of board {n} worth {score} is not the one cited")
+            return line
+
+        if "lower" not in cite or "upper" not in cite:
+            return None, ["a citation of the bounds store has its lower and upper bound (the lower null for a search)"]
+        if cite["lower"] is not None:
+            find("lower", cite["lower"])
+        upper = find("upper", cite["upper"])
+        if problems:
+            return None, problems
+        return {assumed_u(board) for board in upper.get("rests_on", [])}, []
+
+
 def read_lines(path, problems):
     """The parsed lines of a results file as (line number, object); an unparsable last line is torn."""
     raw = path.read_text().split("\n")
@@ -181,10 +284,24 @@ def contradictions(n, row, reached):
             found.append(f"setup.digest {digest!r} is not 16 hexadecimal digits")
         if repeat and setup.get("cap") is not None:
             found.append("a repeat game whose setup has a cap, which only a search has")
-    if (row.get("in_the_bag") is None) != (method == "prime"):
-        found.append(f"a {method} game {'without' if method != 'prime' else 'with'} in_the_bag")
+    if (row.get("in_the_bag") is None) != (method in NO_BAG):
+        found.append(f"a {method} game {'without' if method not in NO_BAG else 'with'} in_the_bag")
     if reached and method != "search":
         found.append(f"a {method} game that reached a cap, which only a search does")
+    known = row.get("known")
+    kind = known.get("source") if isinstance(known, dict) else None
+    if known is None and method == "known":
+        found.append("a known game that cites no source (known)")
+    elif known is not None and not isinstance(known, dict):
+        found.append("known is not an object")
+    elif known is not None and method not in ("known", "search"):
+        found.append(f"a {method} game with a known citation, which only a known or searched game has")
+    elif method == "search" and known is not None and (kind != "bounds" or known.get("lower") is not None):
+        found.append("a searched game that cites something other than the store's upper bound")
+    elif method == "search" and known is not None and reached:
+        found.append("a searched game that reached its cap and cites the store's bound as well")
+    elif method == "known" and kind == "bounds" and known.get("lower") is None:
+        found.append("a known game that cites the store without the lower bound whose game it plays")
     if method == "prime" and not is_prime(n):
         found.append(f"a prime game, but {n} is not prime")
     if method == "trivial" and row["promotions"]:
@@ -199,6 +316,8 @@ def reached_cap(row):
 
 def proof_of(row):
     method = row["method"]
+    if method == "known" or row.get("known") is not None:
+        return "known"
     if method in ("trivial", "prime", "repeat"):
         return {"trivial": "trivial", "prime": "prime_formula", "repeat": "same_search"}[method]
     return "cap" if reached_cap(row) else "exhausted"
@@ -265,7 +384,7 @@ def check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
     unfinished.setdefault(n, []).append((number, best, digest(moves), moves))
 
 
-def check_file(path, optimal, fm, heuristic, divisors, problems):
+def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
     """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
     report's counters, and the board sizes that only an unfinished search is recorded for."""
     rows = read_lines(path, problems)
@@ -361,6 +480,12 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             score_before = entry["score"] if entry is not None else record["score"]
             moves_before = entry["moves"] if entry is not None else None
             prev = (score_before, moves_before, None, {assumed_optimal(n - 1)})
+        elif source in ("strict", "bounds"):
+            # The committed chain's game, or a board the store has proven.
+            prev = sources.prev_game(source, n - 1)
+            if prev is None:
+                fail(f"it was built on the game of n-1 of the {source} source, which holds none")
+                continue
         elif record is not None:
             fail(f"unknown prev.source {source!r}")
         if prev is not None:
@@ -413,8 +538,15 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
         elif proof in RESTS_ON_PREV and not proven:
             fail(f"its proof ({proof}) rests on the game of n-1, which it records as the best game of an unfinished "
                  "search")
+        cited = None  # what the cited source makes the game assume
+        if isinstance(row.get("known"), dict):
+            cited, messages = sources.cite_problems(n, score, row["known"])
+            for message in messages:
+                fail(message)
         if repeated is not None:
             assumes = repeated[3]
+        elif cited is not None:
+            assumes = cited
         else:
             assumes = prev[3] if prev and proof in RESTS_ON_PREV else set()
         if row["proof"] != proof:
@@ -424,7 +556,10 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
 
         done[n] = (score, moves, proof, assumes, number, row)
         counts[proof] += 1
-        assumed.update(assumes)
+        # (Statement U at a board is one assumption of many: counted together, a game once.)
+        assumed.update({s for s in assumes if not s.startswith(U_STATEMENT)})
+        if any(s.startswith(U_STATEMENT) for s in assumes):
+            assumed["statement U at some boards"] += 1
         if not assumes:
             assumed["(nothing)"] += 1
         if prev_score is not None:
@@ -444,11 +579,16 @@ def main():
     ap.add_argument("files", nargs="*", type=Path)
     ap.add_argument("--fm", type=Path, default=FM_BOUND)
     ap.add_argument("--chain", type=Path, default=HEURISTIC_CHAIN)
+    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed chain, a source of known games")
+    ap.add_argument("--bounds", type=Path, default=BOUNDS, help="the bounds store, the other source of known games")
     args = ap.parse_args()
-    files = args.files or sorted(RESULTS.glob("*.jsonl"))
+    # (The bounds store is not a file of results: it is read for the lines that cite it.)
+    files = args.files or sorted(f for f in RESULTS.glob("*.jsonl") if f.name != BOUNDS.name)
     files = [f for f in files if not f.name.endswith(".rejected.jsonl")]
 
     optimal = {entry["n"]: entry for entry in json.loads(OPTIMAL.read_text())}
+    sources = Sources(optimal, args.committed if args.committed.is_file() else None,
+                      args.bounds if args.bounds.is_file() else None)
     fm = json.loads(args.fm.read_text())
     heuristic = {entry["n"]: entry["score"] for entry in json.loads(args.chain.read_text())}
     largest = 2
@@ -465,7 +605,9 @@ def main():
     shared = set()
     for path in files:
         print(f"{path}:")
-        done, counts, assumed, certificates, unfinished = check_file(path, optimal, fm, heuristic, divisors, problems)
+        done, counts, assumed, certificates, unfinished = check_file(
+            path, optimal, fm, heuristic, divisors, problems, sources
+        )
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)
             print(f"  {len(done)} completed games, n = {min(done)}..{max(done)} ({missing} missing)")

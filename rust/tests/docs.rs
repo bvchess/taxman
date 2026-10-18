@@ -17,6 +17,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use taxman::json::Json;
+use taxman::known::KnownSources;
 use taxman::solver::{solve_game, SolveOptions};
 use taxman::tactics::Tactics;
 
@@ -369,9 +370,13 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let complete = keys(85, &opts);
     assert_eq!(keys(12, &opts), complete, "a game with no search has the keys of one with a search");
     // On its own, the default searches 1000 in more than the 1,024 steps after which the engine checks a limit.
-    let stopped = keys(1000, &SolveOptions { node_limit: Some(1), ..opts });
+    let stopped = keys(1000, &SolveOptions { node_limit: Some(1), ..opts.clone() });
     assert!(stopped.contains("best_so_far"), "a game that a limit stopped has best_so_far: {stopped:?}");
-    (complete, stopped)
+    // A game taken from a known source (`--use-prev`) cites it, in a key that only such a line has.
+    let known = SolveOptions { use_prev: true, known: KnownSources { boards: true, ..Default::default() }, ..opts };
+    let cited = keys(85, &known);
+    assert_eq!(cited.difference(&complete).cloned().collect::<Vec<_>>(), ["known"], "a known game has `known`");
+    (complete, stopped.union(&cited).cloned().collect())
 }
 
 #[test]
@@ -387,7 +392,7 @@ fn readme_documents_exactly_the_keys_of_a_result_line() {
     let example = part.split("```").nth(1).expect("the example line is the first code block");
     assert_eq!(top_level_keys(example), complete, "README's example line, and the keys of a finished game");
     assert!(example.contains("\"setup\":{"), "the example is a searched game");
-    assert!(part.contains("null on a `trivial` or `prime` line"), "the table says when `setup` is null");
+    assert!(part.contains("null on a `trivial`, `prime` or `known` line"), "the table says when `setup` is null");
 }
 
 // ---------------------------------------------------------------------------------------------------------

@@ -540,17 +540,18 @@ Game 249 of that run repeated the search of 248; its line has `"method":"repeat"
 | `schema`, `n` | the format of the line (5, the only one this build reads) and the board size |
 | `score`, `moves`, `best_so_far` | the game and its score; for an unfinished search `score` is null and `best_so_far` (a key only such a line has) has the best so far |
 | `promotions` | the promoted numbers, ascending |
-| `method` | `trivial`, `prime`, `repeat`, `search` (how the game was found) |
+| `method` | `trivial`, `prime`, `repeat`, `search`, `known` (how the game was found; `known`: taken from a known source with no search, `--use-prev`) |
 | `completed` | false only if a limit or a signal stopped the search; such a line is an unfinished-search record, and its checkpoint is kept (a `--keep-going` run writes none for a signal) |
-| `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` (section 5); null if incomplete |
+| `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search`, `known` (section 5); null if incomplete |
 | `reached_cap` | the promotions reach `cap`, where the search stops (one started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; DESIGN.md, "What a window changes in the results") |
-| `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n - 1, or the game a repeat repeats): for a game of n - 1 taken from `optimal.json`, "the game of n - 1 in optimal.json is optimal"; `[]`: nothing |
-| `in_the_bag` | what the game with no promotions scores (null for prime shortcuts) |
-| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 5, "What a game had from n - 1") |
+| `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n - 1, or the game a repeat repeats, or the known source a `known` proof cites): for a game of n - 1 or of n taken from `optimal.json`, "the game of n in optimal.json is optimal"; for a bound of the bounds store, "statement U holds at n=4501" for each board its upper bound rests on; `[]`: nothing |
+| `in_the_bag` | what the game with no promotions scores (null for prime shortcuts and known games, which set no board up) |
+| `prev` | the game of n - 1 this one was built from: score, where it came from (`run`, `results`, `optimal`, `strict`, `bounds`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 5, "What a game had from n - 1") |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its board size, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
+| `known` | a key only a line that cites a known source has (section 5, "Known games"): `{"source":"optimal"}` or `{"source":"strict"}` for a game taken from `optimal.json` or the committed chain, or `{"source":"bounds","lower":{"rule":..,"source":..},"upper":{"rule":..,"source":..}}` for the lines of the bounds store whose bound of n is the score (`lower` null when a search found the game and the upper bound stopped it) |
 | `nodes`, `stats` | search steps over all invocations, and the searcher's counters (`match_bounds` is the number of node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled, largest in-memory queue |
-| `setup` | null on a `trivial` or `prime` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
+| `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (ceiling on the promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev`, and, only where given, `keep_going`, `retry`, `retry_improved` (true) and `pass` (the number `--pass` was given) |
@@ -875,11 +876,12 @@ comment that is worth reading first; section 6 above is the map of how the piece
 11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/certify.rs`,
-    `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline, provenance and
-    verification, the bounds store's line and the relations between boards, the certificates of `taxman certify`, the
-    default files.  The range driver is `src/solver/window.rs`, the window of games in flight, and its child
-    `window/allot.rs` how they share the threads.
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
+    `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
+    provenance and verification, the bounds store's line and the relations between boards, the known games that
+    `--use-prev` draws on, the certificates of `taxman certify`, the default files.  The range driver is
+    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` how they share the
+    threads.
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
 15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).

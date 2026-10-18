@@ -38,13 +38,21 @@ use taxman::certify::{certify_game_with, read_upper, CertificateFile, EarlierCer
 use taxman::engine;
 use taxman::game::Optimal;
 use taxman::json::Json;
+use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
 use taxman::paths;
-use taxman::results::{build, verify_files, Build};
+use taxman::results::{build, verify_files_with, Build};
 use taxman::solver::{self, GameResult, Method, Prev, SolveOptions, Wall};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
+}
+
+/// The known sources of the repository (the committed chain and the bounds store in `rust/results`) with `optimal` as
+/// the table, for checking results that cite them; the table alone if there is no repository.
+fn known_in_repository(optimal: &Optimal) -> Result<Known<'_>, CliError> {
+    let sources = KnownSources::in_repository().unwrap_or_default();
+    Known::load(optimal, &sources).map_err(failed)
 }
 
 /// Flags that take a value: the solver's and the command's own.
@@ -139,6 +147,13 @@ pub fn solve(args: &[String]) -> CliResult {
     let mut opts = range_options(&args)?;
     opts.force_search = args.has("--force-search");
     opts.use_prev = args.has("--use-prev");
+    if opts.use_prev {
+        // The known games: optimal.json's, and the committed chain's and the bounds store's in the repository.
+        opts.known = KnownSources::in_repository().unwrap_or_else(|e| {
+            errln!("note: {e}; --use-prev draws on optimal.json alone");
+            KnownSources { boards: true, ..KnownSources::default() }
+        });
+    }
     opts.keep_going = args.has("--keep-going");
     opts.retry = args.has("--retry");
     opts.retry_improved = args.has("--retry-improved");
@@ -551,7 +566,9 @@ pub fn verify_optimal(args: &[String]) -> CliResult {
 
 /// `verify-results [--threads K] FILE...`: checks results files without changing them (`results::verify_files`), their
 /// scores against the built-in `optimal.json`.  The check sets up the search problems of the repeats on K threads,
-/// as many as `solve` takes by default (the CPUs) unless `--threads` says.
+/// as many as `solve` takes by default (the CPUs) unless `--threads` says.  A line that cites a known source (proof
+/// `known`) is checked against it: the table, the committed chain and the bounds store of the repository's
+/// `rust/results` (as `solve --use-prev` draws on them).
 pub fn verify_results(args: &[String]) -> CliResult {
     let args = Args::parse(args, &["--threads"], &[])?;
     if args.positional().is_empty() {
@@ -560,7 +577,8 @@ pub fn verify_results(args: &[String]) -> CliResult {
     let paths: Vec<PathBuf> = args.positional().iter().map(PathBuf::from).collect();
     let threads = solver_options(&args)?.threads;
     let start = Instant::now();
-    let report = verify_files(&paths, Optimal::built_in(), threads).map_err(CliError::Failed)?;
+    let known = known_in_repository(Optimal::built_in())?;
+    let report = verify_files_with(&paths, &known, threads).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
     Ok(())
@@ -592,7 +610,8 @@ pub fn extend_optimal(args: &[String]) -> CliResult {
         None => Optimal::built_in().clone(),
     };
 
-    let contents = taxman::results::read_results_file(results, &optimal, 1).map_err(failed)?;
+    let known = known_in_repository(&optimal)?;
+    let contents = taxman::results::read_results_file_with(results, &known, 1).map_err(failed)?;
     if contents.torn {
         errln!("note: the last line of {} is torn and was ignored", results.display());
     }

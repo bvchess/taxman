@@ -154,13 +154,14 @@
 mod allot;
 
 use super::{
-    ceiling, clock, conclude_game, discard_checkpoint, set_up, shared_spill_dir, stored_prev, stored_unfinished,
-    Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp,
-    SetUp, SolveOptions, Wall,
+    ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev,
+    stored_unfinished, Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev,
+    RangeSummary, SearchSetUp, SetUp, SolveOptions, Wall,
 };
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
+use crate::known::Known as KnownGames;
 use crate::results::{BuiltOn, ResultsFile};
 use crate::search::Problem;
 use allot::{allot, Grant, Load, Need, TICK};
@@ -178,8 +179,8 @@ pub(super) struct Range<'a> {
     pub(super) hi: u32,
     /// The game of `lo − 1`.
     pub(super) before: Before,
-    /// The table the scores are confirmed against.
-    pub(super) optimal: &'a Optimal,
+    /// The known sources: the table the scores are confirmed against, and, with `--use-prev`, what the games draw on.
+    pub(super) known: &'a KnownGames<'a>,
     /// The results file: its completed games are passed over, and the others appended to it.
     pub(super) results: Option<&'a mut ResultsFile>,
 }
@@ -218,10 +219,10 @@ enum Event {
 
 /// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is cancelled
 /// first (the driver drops the sender of the go).
-fn play(n: u32, before: &Before, opts: &SolveOptions, events: &Sender<Event>, go: &Receiver<Go>) {
+fn play(n: u32, before: &Before, opts: &SolveOptions, known: &KnownGames, events: &Sender<Event>, go: &Receiver<Go>) {
     let _unwinding = Unwinding { n, events };
     let start = Instant::now();
-    let set_up = set_up(n, before, opts).map_err(Failure::message);
+    let set_up = set_up(n, before, opts, known).map_err(Failure::message);
     let job = match &set_up {
         Ok(SetUp::Search(set, _)) => Some(Arc::clone(&set.job)),
         _ => None,
@@ -457,6 +458,7 @@ fn sum(numbers: &[u32]) -> u64 {
 struct Window<'a> {
     opts: &'a SolveOptions,
     optimal: &'a Optimal,
+    known: &'a KnownGames<'a>,
     results: Option<&'a mut ResultsFile>,
     earlier: &'a mut Earlier,
     lo: u32,
@@ -494,7 +496,8 @@ impl<'a> Window<'a> {
         };
         Window {
             opts,
-            optimal: range.optimal,
+            optimal: range.known.optimal(),
+            known: range.known,
             results: range.results,
             earlier,
             lo: range.lo,
@@ -759,7 +762,7 @@ impl<'a> Window<'a> {
         let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(_))), .. }) = self.games.get(&n) else {
             return;
         };
-        if let Some(ceiling) = ceiling(n, set.in_the_bag, prev.cap_score(), self.opts) {
+        if let Some(ceiling) = search_cap(set, n, prev.cap_score(), self.opts) {
             set.job.control().set_ceiling(ceiling);
             self.trace(format_args!("told n={n}"));
         }
@@ -789,6 +792,7 @@ impl<'a> Window<'a> {
                 Known::NotYet | Known::None => None,
             },
             Stage::Derived(Derived::Trivial { plain, .. }) => Some(Seed::Moves(plain)),
+            Stage::Derived(Derived::Known { game, .. }) => Some(Seed::Moves(&game.moves)),
             Stage::Search(_, Plan::Search(Search::Done(outcome))) => Some(Seed::Moves(&outcome.moves)),
             Stage::Search(set, _) => self.provisional_promotions(g).map(|promotions| Seed::On(&*set.job, promotions)),
             Stage::Waiting | Stage::SettingUp | Stage::Failed(_) => None,
@@ -950,13 +954,13 @@ impl<'a> Window<'a> {
     {
         let Some(game) = self.games.get_mut(&n) else { return };
         let (go, waits) = mpsc::channel();
-        let (before, opts, events) = (game.before.clone(), self.opts, self.events.clone());
+        let (before, opts, known, events) = (game.before.clone(), self.opts, self.known, self.events.clone());
         // The setup and the search's start ran on the main thread when games were solved one at a time; the stack is
         // reserved address space, committed only as touched.
         let spawned = thread::Builder::new()
             .name(format!("game-{n}"))
             .stack_size(WORKER_STACK_SIZE)
-            .spawn_scoped(scope, move || play(n, &before, opts, &events, &waits));
+            .spawn_scoped(scope, move || play(n, &before, opts, known, &events, &waits));
         match spawned {
             Ok(_) => {
                 game.stage = Stage::SettingUp;
@@ -972,16 +976,17 @@ impl<'a> Window<'a> {
     fn start_search(&mut self, n: u32, threads: usize, now: Instant) {
         let Some(Game { stage: Stage::Search(set, _), .. }) = self.games.get(&n) else { return };
         let seeds = set.job.seeds();
+        // The ceiling is the one that a concluded game before it gives, or the bounds store's upper bound of the board.
         let (seed, cap, given) = match self.known_before(n) {
             Known::Final(prev) => {
-                (seeds.then(|| prev.moves.clone()), ceiling(n, set.in_the_bag, prev.cap_score(), self.opts), None)
+                (seeds.then(|| prev.moves.clone()), search_cap(set, n, prev.cap_score(), self.opts), None)
             }
             Known::Provisional(before) if seeds => {
                 let moves = before.moves();
                 let given = Given { value: before.value(), score: sum(&moves) };
-                (Some(moves), None, Some(given))
+                (Some(moves), search_cap(set, n, None, self.opts), Some(given))
             }
-            Known::Provisional(_) | Known::NotYet | Known::None => (None, None, None),
+            Known::Provisional(_) | Known::NotYet | Known::None => (None, search_cap(set, n, None, self.opts), None),
         };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
         let wall = self.opts.game_limit.is_some();

@@ -457,12 +457,13 @@ fn extend_optimal_stops_at_the_first_game_that_is_not_there() {
     let kept = table_text(12);
 
     // Games that assume a game of the table optimal are appended: 33 is built on optimal.json's game of 32
-    // (`--use-prev`) and reaches its ceiling, which assumes nothing the table does not stand for.
+    // (`use_prev`, with the table alone to draw on: `solve --use-prev` in the repository takes the committed chain's
+    // game of 32, which assumes nothing) and reaches its ceiling, which assumes nothing the table does not stand for.
     let table32 = write_table(&dir, "table32.json", 32);
     let assuming = dir.join("assuming.jsonl");
-    let run = taxman(&["solve", "33-40", "--use-prev", "--threads", "1", "--progress", "0", "--out", path(&assuming)]);
-    assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("assumes the game of 32 in optimal.json is optimal"), "{}", run.stdout);
+    let opts = taxman::solver::SolveOptions { use_prev: true, threads: 1, ..Default::default() };
+    let games = taxman::solver::solve_range(33, 40, &opts, Some(&assuming)).unwrap();
+    assert!(games.iter().any(|g| g.assumes.iter().any(|a| a == "the game of 32 in optimal.json is optimal")));
     let run = taxman(&["extend-optimal", path(&assuming), "--table", &table32, "--out", path(&out)]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("added 8 games (n = 33..=40)"), "{}", run.stdout);
@@ -653,7 +654,7 @@ fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
     let standalone = |args: &[&str]| taxman(&[&["solve", "--threads", "1", "--progress", "0"][..], args].concat());
     let run = standalone(&["40"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    for text in ["note: no previous game for n=40", "standalone", "--use-prev to take optimal.json's game of 39"] {
+    for text in ["note: no previous game for n=40", "standalone", "--use-prev to take the known game of 39"] {
         assert!(run.stderr.contains(text), "{text}: {}", run.stderr);
     }
     assert!(run.stdout.contains("n=40") && !run.stdout.contains("assumes"), "{}", run.stdout);

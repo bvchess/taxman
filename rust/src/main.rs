@@ -22,9 +22,9 @@ usage: taxman <command> [args]
 
 commands:
   solve N|A-B [options]   solve one board size or a range, each from the one before; the first from the game
-                          of A-1 in --out FILE, or with --use-prev in optimal.json (with neither it is solved
-                          standalone, which costs more: no seed from the game before and no ceiling).  Every
-                          score is checked against optimal.json, which is built into this program
+                          of A-1 in --out FILE, or with --use-prev from the known games (with neither it is
+                          solved standalone, which costs more: no seed from the game before and no ceiling).
+                          Every score is checked against optimal.json, which is built into this program
       --threads K              worker threads (default: all CPUs)
       --window K               games of a range in flight at once, sharing the threads: game n+1 is set up, and
                                searched from n's best game so far, while n searches (default 4; 1 is one game after
@@ -59,8 +59,15 @@ commands:
                                line `wall at N after H hours` is printed and the exit status is 4
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
-      --use-prev               take the game of A-1 from optimal.json if --out FILE lacks it; the results
-                               whose proofs rest on it record that they assume it optimal
+      --use-prev               draw on the known games: optimal.json's, the committed chain's
+                               (rust/results/strict.jsonl) and the proven boards of the bounds store
+                               (rust/results/bounds.jsonl).  A board a source has proven is recorded without a
+                               search (proof known), citing the source and what it assumes (optimal.json's games
+                               are assumed optimal; the store's, wherever statement U holds at the boards its
+                               bound rests on); the game of A-1 from them, if --out FILE lacks it, gives the
+                               ceiling and the seed; the store's other boards seed their searches with its lower
+                               bound's game and stop at its upper bound.  --force-search leaves the boards to
+                               their searches
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
                           solve A..N (default 1..400) in memory and check every score against optimal.json
@@ -75,7 +82,8 @@ commands:
                           check results files without changing them: every game replayed and its score checked
                           against optimal.json, the chain from n-1, each line's proof and provenance, and that the
                           files agree; counts games by proof and by what they assume.  K threads set up the
-                          searches of the repeats (default: all CPUs)
+                          searches of the repeats (default: all CPUs).  A line that cites a known source is checked
+                          against optimal.json, the committed chain and the bounds store of rust/results
   extend-optimal RESULTS --out FILE [--table FILE]
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
                           results file RESULTS appended: from the board size after the table's last, each game that
