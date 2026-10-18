@@ -27,6 +27,9 @@ pub const BENCH_HISTORY_IN_REPOSITORY: &str = "rust/bench/history.jsonl";
 /// The committed results of the chain from n = 1, relative to the repository.
 pub const STRICT_RESULTS_IN_REPOSITORY: &str = "rust/results/strict.jsonl";
 
+/// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.
+pub const BOUNDS_STORE_IN_REPOSITORY: &str = "rust/results/bounds.jsonl";
+
 /// The prover's data (the barred bounds, the proofs of the scores), relative to the repository.
 pub const PROVER_DATA_IN_REPOSITORY: &str = "rust/prover/data";
 

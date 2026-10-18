@@ -148,6 +148,27 @@ scores are reproducible, move lists need not be.  The sets of this file differ f
 Each chain that found a set proved its game optimal, so each set is.  `tests/results.rs` pins the games where this file
 differs from the table.
 
+**Lines of proof `known`.**  `strict.jsonl` has none; a results file made with `taxman solve --use-prev` has them
+(schema 5 still: the new field, method and proof are names that a line without them does without, so every file here reads
+as it did).  Such a line is a game taken from a known source, with no search (`"method":"known"`, `"proof":"known"`, no
+`setup`, no `in_the_bag`), or a game found by a search that stopped at the bounds store's upper bound (`"method":"search"`,
+`"proof":"known"`), and its `known` field names the source:
+
+| `known` | the game | `assumes` |
+|---|---|---|
+| `{"source":"optimal"}` | `optimal.json`'s game of n | "the game of n in optimal.json is optimal" |
+| `{"source":"strict"}` | this file's game of n (the committed chain) | what that line assumes (nothing) |
+| `{"source":"bounds","lower":{"rule","source"},"upper":{"rule","source"}}` | the game of the store's lower bound of n, which meets its upper bound | "statement U holds at n=B" for each board B that the upper line's `rests_on` lists |
+| the same, `"lower":null` | a search's game that meets the store's upper bound | the same |
+
+The score of the line is the cited value of board n (a store has one line of a board, side and value, so the board, the
+side and the score name the line; `rule` and `source` are the line's own, as `bounds.jsonl` has them), and both
+referees check that the cited lines exist so and that the game replays to that score; the games before and after are
+checked as ever, so a store that disagrees with the chain is caught at the board where it does.  `prev.source` is
+`strict` or `bounds` when the game before the range was one of these, with that game's proof (`known` for the store's)
+and assumptions.  A proof that rests on such a game (the ceiling, the prime formula, a repeat of a search that stopped at
+the store's bound) inherits what it assumes, as for a game from `optimal.json`.
+
 ## What supports the scores
 
 "Optimal" here means optimal within the frame model, which is opt(n) wherever one open statement about the game,
@@ -254,9 +275,12 @@ results/strict.jsonl` would add the 2140 games of 1301–3440.
 
 The bounds on opt(n) that [the ledger](../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md) finds, kept for
 good, for the boards the chain has not proven.  The first `ledger export` made it, from stage 1 of the ledger past 4400
-(2026-10-18), and each export since appends to it.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, `taxman
-verify-results` and `tools/check_results.py` do not read it, a board that `strict.jsonl` has proven has no line in it,
-and it is not `explore.jsonl`'s kind of file either (that one is the sweep's games).  Its lines are bounds that hold:
+(2026-10-18), and each export since appends to it.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, a board that `strict.jsonl` has proven has no line in it,
+and it is not `explore.jsonl`'s kind of file either (that one is the sweep's games).  `taxman solve --use-prev` draws on
+it (a board it has proven is recorded with no search, and its other boards seed and end the searches, see
+[the README](../README.md#known-games)), and `taxman verify-results` and `tools/check_results.py` read it for the
+results lines that cite it (`known`, above): they look the cited lines up, and do not check it, which its own referees
+do.  Its lines are bounds that hold:
 a lower bound is the score of a finished game that the referee replays, an upper bound is the frame model's, carried
 between boards by the lemmas of [THEORY.md](../../heuristics/THEORY.md#the-ledger-bounds-between-boards).  A board is
 proven when its best lower bound equals its best upper bound, and the file is the record of those proofs.
@@ -282,7 +306,12 @@ names the run (every line records it, with the day); `--checkpoints` is the plac
 `run --bounds` starts the run from the file's best bounds for the boards of its stretch: each lower bound's game is
 replayed by the referee, each upper bound is taken as the file has it, and a board with both needs no map; its lower
 bound's game is its incumbent and the finder's input, as a proven game that is given is.  Run `verify-bounds` on the file
-first: the run takes its upper bounds on its word.
+first: the run takes its upper bounds on its word.  So does `taxman solve --use-prev`, which reads the same best bounds
+(`src/store.rs`, the one copy of the format): a board whose best bounds meet is recorded as the game of its lower bound
+(replayed by the referee), with proof `known`, citing the two lines and assuming U at the boards the upper line rests
+on; a board with one bound or a gap seeds its search with the lower bound's game and stops it at the upper bound.  The
+referees of results files check that the cited lines exist and say what the results line says (rule, run, value); the
+bounds themselves are checked by `ledger verify-bounds` and `tools/check_bounds.py`, not again by them.
 
 **The line.**  One JSON object, with the fields below and no others:
 
@@ -328,7 +357,8 @@ between boards without more, except the upper half of Lemma L4, which rests on U
 boards: a bound of the frame model has its own board alone, a relation has what the bound it comes from rests on (a
 board of the chain that it cites counts as resting on itself), and a repeat adds its own board.  U is certified for
 every n up to 2175 (DESIGN.md, "What optimal means"), so a bound whose list holds only boards up to 2175 rests on no open
-statement; a proven board is opt(n) wherever U holds at the boards of the `rests_on` of its upper bound.
+statement; a proven board is opt(n) wherever U holds at the boards of the `rests_on` of its upper bound.  A results line
+that rests on a proven board assumes that, one statement a board (`"statement U holds at n=4501"`), in its `assumes`.
 
 **Two referees**, as the results files have.  `ledger verify-bounds FILE` (Rust; `examples/ledger/verify.rs`) checks
 every line: its form; that it improves on the lines before it; that every lower bound's game replays under the

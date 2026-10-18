@@ -24,90 +24,14 @@
 //! counterexample to it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use taxman::accelerate::solution_for_promotions;
-use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::game::{complete, largest_prime_at_most, replay_finished};
+use taxman::game::replay_finished;
 use taxman::json::Json;
-use taxman::numtheory::Tables;
 use taxman::search::Problem;
 
-/// How a bound was derived.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Rule {
-    /// The game with no promotions of a board that has nothing to promote: both bounds.
-    Trivial,
-    /// The standalone start incumbent (L) and the root's GF(2) bound (U), as the map has them.
-    Start,
-    Root,
-    /// A search's best game (L); the dual bound of a search that a limit stopped (U); the game of a search that
-    /// completed (U: it explored its tree).
-    Search,
-    Dual,
-    Exhausted,
-    /// A search under a floor F that completed having found no set (U): P* <= F (Lemma F), so U is in_the_bag + F.
-    Floor,
-    /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
-    /// (U): `wall nogoods` makes it; the store takes it on record.
-    Nogoods,
-    /// The game the finder found (L): large neighbourhood search, which is not sound and proves nothing; its game is a
-    /// lower bound because the referee replays it.
-    Lns,
-    /// A proven game given to the ledger: both bounds.
-    Given,
-    /// The relations between boards.
-    Monotone,
-    Ceiling,
-    Prime,
-    Repeat,
-}
-
-impl Rule {
-    pub const ALL: [Rule; 14] = [
-        Rule::Trivial,
-        Rule::Start,
-        Rule::Root,
-        Rule::Search,
-        Rule::Dual,
-        Rule::Exhausted,
-        Rule::Floor,
-        Rule::Nogoods,
-        Rule::Lns,
-        Rule::Given,
-        Rule::Monotone,
-        Rule::Ceiling,
-        Rule::Prime,
-        Rule::Repeat,
-    ];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Rule::Trivial => "trivial",
-            Rule::Start => "start",
-            Rule::Root => "root",
-            Rule::Search => "search",
-            Rule::Dual => "dual",
-            Rule::Exhausted => "exhausted",
-            Rule::Floor => "floor",
-            Rule::Nogoods => "nogoods",
-            Rule::Lns => "lns",
-            Rule::Given => "given",
-            Rule::Monotone => "monotone",
-            Rule::Ceiling => "ceiling",
-            Rule::Prime => "prime",
-            Rule::Repeat => "repeat",
-        }
-    }
-
-    pub fn of(name: &str) -> Option<Rule> {
-        Rule::ALL.into_iter().find(|rule| rule.name() == name)
-    }
-
-    /// Whether the rule relates two boards (its bound has a `from`).
-    pub fn is_relation(self) -> bool {
-        matches!(self, Rule::Monotone | Rule::Ceiling | Rule::Prime | Rule::Repeat)
-    }
-}
+/// The vocabulary of a bound, and the relations between boards, are the bounds store's (`taxman::store`), which
+/// `taxman solve` reads too.
+pub use taxman::store::{carries, carry_game, repeat_game, upper_by, Rule, Side};
 
 /// A lower bound: a finished game of the board (the referee's `replay_finished` accepts it) and its score.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -360,26 +284,6 @@ fn facts_at<const W: usize>(n: u32) -> Result<Facts, String> {
     })
 }
 
-/// Which side of a board's bounds changed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Side {
-    Lower,
-    Upper,
-}
-
-impl Side {
-    pub fn name(self) -> &'static str {
-        match self {
-            Side::Lower => "lower",
-            Side::Upper => "upper",
-        }
-    }
-
-    pub fn of(name: &str) -> Option<Side> {
-        [Side::Lower, Side::Upper].into_iter().find(|side| side.name() == name)
-    }
-}
-
 /// A bound that improved.
 #[derive(Clone, Debug)]
 pub struct Change {
@@ -626,102 +530,6 @@ impl Book {
             changes.push(change);
         }
         Ok(())
-    }
-}
-
-/// Lemma L1: the game of `n` (composite) that the finished game `moves` of n − 1 gives: the same moves, then n if it is
-/// still legal.  (n is the only move that can be left: the legal moves that `complete` adds are n, or none.)
-pub fn monotone_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    complete(n, moves)
-}
-
-/// Lemma L2: the game of `n` that the finished game `moves` of n + 1 (composite) gives: its moves without n + 1, which
-/// stay legal, then the largest legal move as long as there is one.
-pub fn ceiling_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    let without: Vec<u32> = moves.iter().copied().filter(|&m| m != n + 1).collect();
-    complete(n, &without)
-}
-
-/// Lemma L3: the game of the prime `p` that the finished game `moves` of p − 1 gives: its opening move, the largest
-/// prime below p, exchanged for p (`accelerate::prime_shortcut`).
-pub fn prime_up(p: u32, moves: &[u32]) -> Vec<u32> {
-    taxman::accelerate::prime_shortcut(p, moves)
-}
-
-/// Lemma L3: the game of `n` = p − 1 that the finished game `moves` of the prime p gives: its opening move p exchanged
-/// for the largest prime up to n (none for n = 1, whose game has no move).
-pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
-    match largest_prime_at_most(n) {
-        Some(q) => {
-            let mut game = moves.to_vec();
-            if let Some(first) = game.first_mut() {
-                *first = q;
-            }
-            game
-        }
-        None => Vec::new(),
-    }
-}
-
-/// Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `from` to the
-/// board `n`: `Monotone` up a board to a composite, `Ceiling` down a board from a composite, `Prime` across a prime, in
-/// either direction (Lemmas L1 to L3).  The game is made by [`carry_game`].
-pub fn carries(rule: Rule, from: u32, n: u32) -> bool {
-    let prime = |m: u32| largest_prime_at_most(m) == Some(m);
-    match rule {
-        Rule::Monotone => from + 1 == n && !prime(n),
-        Rule::Ceiling => from == n + 1 && !prime(from),
-        Rule::Prime => (from + 1 == n && prime(n)) || (from == n + 1 && prime(from)),
-        _ => false,
-    }
-}
-
-/// The game of `n` that the relation `rule` makes of the finished game `moves` of the board `from` (see [`carries`]).
-///
-/// # Errors
-///
-/// `rule` does not carry a game from `from` to `n`, or the game is not a game of `from`.
-pub fn carry_game(rule: Rule, from: u32, n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
-    if !carries(rule, from, n) {
-        return Err(format!("the {} relation does not carry a game from {from} to {n}", rule.name()));
-    }
-    match rule {
-        Rule::Monotone => monotone_game(n, moves),
-        Rule::Ceiling => ceiling_game(n, moves),
-        _ if from < n => Ok(prime_up(n, moves)),
-        _ => Ok(prime_down(n, moves)),
-    }
-}
-
-/// Lemma L4: `promotions` played on the board of `n` (`solution_for_promotions`).
-pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
-    taxman::with_width!(n, W => solution_for_promotions::<W>(&Tables::new(n), Bits::<W>::from_slice(promotions)))
-}
-
-/// The upper bound that the relation `rule` gives opt(`target`) from the upper bound `value` on opt(`source`): for the
-/// boards next to each other, `Ceiling` (the target is the board after the source: opt(n) <= opt(n − 1) + n),
-/// `Monotone` (the board before: opt(n − 1) <= opt(n)) and `Prime` (either way, across a prime p, q the largest prime
-/// below it: opt(p) = opt(p − 1) + p − q); and for boards with the same search problem, `Repeat`, with their bags
-/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (heuristics/THEORY.md, "The
-/// ledger: bounds between boards"); the book and the store's checkers use this one copy of the arithmetic.
-///
-/// # Errors
-///
-/// `rule` is not a relation, the boards are not so related, or a repeat has no bags.
-pub fn upper_by(rule: Rule, source: u32, target: u32, value: u64, bags: Option<(u64, u64)>) -> Result<u64, String> {
-    let prime_below = |n: u32| u64::from(largest_prime_at_most(n).unwrap_or(0));
-    let is_prime = |n: u32| largest_prime_at_most(n) == Some(n);
-    let (s, t) = (u64::from(source), u64::from(target));
-    match rule {
-        Rule::Ceiling if target == source + 1 => Ok(value + t),
-        Rule::Monotone if source == target + 1 => Ok(value),
-        Rule::Prime if target == source + 1 && is_prime(target) => Ok((value + t).saturating_sub(prime_below(source))),
-        Rule::Prime if source == target + 1 && is_prime(source) => Ok((value + prime_below(target)).saturating_sub(s)),
-        Rule::Repeat if source != target => {
-            let (s_bag, t_bag) = bags.ok_or("a repeat needs the bags of its two boards")?;
-            Ok((value + t_bag).saturating_sub(s_bag))
-        }
-        _ => Err(format!("the {} bound of {target} cannot come from {source}", rule.name())),
     }
 }
 

@@ -3,7 +3,7 @@
 //! scheduler checked against optimal.json.  The runs of the first tests leave the finder off (`lns_seconds` 0), whose
 //! default second a board would make them slow; the finder has tests of its own at the end.
 
-use super::book::{ceiling_game, monotone_game, prime_down, prime_up, Book, Entry, Lower, Rule, Upper};
+use super::book::{Book, Entry, Lower, Rule, Upper};
 use super::report;
 use super::schedule::{
     self, read_ledger, Attempt, Done, Job, Kind, LnsPlan, LnsRun, Running, Scheduler, Seed, SeedFrom, Settings, Way,
@@ -16,6 +16,7 @@ use taxman::board::Board;
 use taxman::engine::Control;
 use taxman::game::{largest_prime_at_most, replay_finished, Optimal};
 use taxman::json::Json;
+use taxman::store::{ceiling_game, monotone_game, prime_down, prime_up};
 
 pub(crate) fn opt(n: u32) -> u64 {
     Optimal::built_in().score(n).expect("a board of optimal.json")

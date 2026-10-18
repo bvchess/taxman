@@ -1,13 +1,13 @@
 //! The scheduler: limited one-thread searches of many boards at once, where a proof looks cheapest, with the
 //! relations applied after each.  The module documentation of `main.rs` says what it does and writes.
 
-use crate::book::{carry_game, facts, Book, Change, Entry, Facts, Lower, Rule, Side, Stalled, Step, Upper};
+use crate::book::{facts, Book, Change, Entry, Facts, Lower, Rule, Side, Stalled, Step, Upper};
 use crate::cost::{self, Plan};
 use crate::counters;
 use crate::known::survivors;
 use crate::lns::{self, Lns};
 use crate::pool;
-use crate::store::{Game, Line, Store};
+use crate::store::{Line, Store};
 use crate::verify::root_upper;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
@@ -17,7 +17,6 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Control, EngineConfig};
@@ -25,6 +24,7 @@ use taxman::game::{replay_finished, Optimal};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::search::{self, dual_bound, Prepared, SearchSpace, SearchTactics};
+pub use taxman::store::{play, refereed, Played};
 
 /// How a run goes.
 #[derive(Clone, Debug)]
@@ -333,19 +333,6 @@ pub struct Done {
     pub sent: Instant,
 }
 
-/// The game of the promotions `set` on `board`, replayed by the referee: its score and moves.  The score must be the
-/// bag and the sum of the promotions, so that a game that is legal but is not the promotions' is refused too.  Every
-/// game a worker offers the ledger, a search's or the finder's, passes through here before it counts.
-pub fn refereed<const W: usize>(board: &Board<W>, set: &Bits<W>) -> Result<(u64, Vec<u32>), String> {
-    let moves = solution_for_promotions(&board.tables, *set);
-    let value = replay_finished(board.n(), &moves)?;
-    if value == board.in_the_bag + set.sum() {
-        Ok((value, moves))
-    } else {
-        Err(format!("scores {value}, not {} and {}", board.in_the_bag, set.sum()))
-    }
-}
-
 /// The finder on `board` from the promotions `start`, for the seconds of the job's plan (less if `stop` is stopped or
 /// the process is told to stop), with the referee's replay of its game: the promotions of the game it found, and what
 /// it did.
@@ -511,48 +498,6 @@ pub fn all_facts(ns: &[u32], workers: usize) -> Result<Vec<Facts>, String> {
     Ok(all)
 }
 
-/// The game of the promotions `set` on the board of `n`, as the referee has it (`refereed`): its score and moves.
-pub fn expand(n: u32, set: &[u32]) -> Result<(u64, Vec<u32>), String> {
-    if set.iter().any(|&member| member < 2 || member > n) {
-        return Err(format!("the promotions are not numbers of the board 1..={n}"));
-    }
-    taxman::with_width!(
-        n,
-        W => refereed(&Board::<W>::for_n(n), &Bits::<W>::from_slice(set)),
-        else Err(format!("n={n} is beyond the widest set"))
-    )
-}
-
-/// A lower bound's game as the referee has it: its moves, and the promotions it was made from if it was.
-pub struct Played {
-    pub moves: Vec<u32>,
-    pub promotions: Option<Vec<u32>>,
-}
-
-/// The game that a line of the store carries (its promotions or its moves), replayed by the referee: it must score the
-/// line's value.  (A line is data from a file: promotions that no board has made would stop the frames' setup, and
-/// that is an error of the line.)  A line that cites the game it is carried from has none: see [`play_all`].
-pub fn play(line: &Line) -> Result<Played, String> {
-    std::panic::catch_unwind(AssertUnwindSafe(|| play_checked(line)))
-        .unwrap_or_else(|_| Err("the frame model's setup stops on these promotions".into()))
-}
-
-fn play_checked(line: &Line) -> Result<Played, String> {
-    let n = line.n;
-    let (score, moves, promotions) = match line.game.as_ref().ok_or("it has no game")? {
-        Game::Promotions(set) => {
-            let (score, moves) = expand(n, set)?;
-            (score, moves, Some(set.clone()))
-        }
-        Game::Moves(moves) => (replay_finished(n, moves)?, moves.clone(), None),
-    };
-    if score == line.value {
-        Ok(Played { moves, promotions })
-    } else {
-        Err(format!("the game scores {score}, not the {} of the line", line.value))
-    }
-}
-
 /// The games of the lower bounds `lines` of a store, in the order of the file, each replayed by the referee at its
 /// value: the promotion sets on `workers` threads, then, in order, the lines that cite the game they are carried from
 /// (by a relation: `carry_game`), each of the game of the earlier line it cites.
@@ -575,13 +520,7 @@ fn carried(line: &Line, index: &HashMap<(u32, u64), usize>, done: &[Result<Playe
         .get(&(from, value))
         .ok_or_else(|| format!("it cites a game of board {from} worth {value}, which no line before it has"))?;
     let source = done[*at].as_ref().map_err(|e| format!("the game it cites (board {from}, {value}): {e}"))?;
-    let moves = carry_game(line.rule, from, line.n, &source.moves)?;
-    let score = replay_finished(line.n, &moves)?;
-    if score == line.value {
-        Ok(Played { moves, promotions: None })
-    } else {
-        Err(format!("the game scores {score}, not the {} of the line", line.value))
-    }
+    taxman::store::carried(line, &source.moves)
 }
 
 /// Offers the book the best bounds of the store `path` for the boards `first..=last`: each lower bound with its game,

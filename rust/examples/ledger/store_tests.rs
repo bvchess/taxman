@@ -22,7 +22,7 @@ fn options() -> Options<'static> {
 /// The optimal game of `n` as promotions: its value, moves and the set.
 fn promoted(n: u32) -> (u64, Vec<u32>, Vec<u32>) {
     let set = taxman::with_width!(n, W => Board::<W>::for_n(n).seed(&opt_game(n)).to_vec());
-    let (value, moves) = schedule::expand(n, &set).unwrap();
+    let (value, moves) = taxman::store::expand(n, &set).unwrap();
     assert_eq!(value, opt(n), "n={n}: the promotions of the optimal game play it");
     (value, moves, set)
 }
