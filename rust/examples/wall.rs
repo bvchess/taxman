@@ -19,6 +19,7 @@
 //!     [--extra K] [--pool value|chosen] N|A-B...
 //! cargo run --release --example wall -- nogoods [--cpu S] [--steps K] [--long K] [--known FILE] [--seed S]
 //!     [--fix LO-HI] [--unit-nodes K] N|A-B...
+//! cargo run --release --example wall -- target [--fractions F,F,...] [--cap S] --known FILE N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -122,6 +123,11 @@
 //! * **nogoods**: whether the nogoods the finder's unit searches learn lower a game's upper bound (a Lagrangian bound
 //!   over them, the root's GF(2) bound as its inner problem), beside the nogoods of the sound search for the same CPU
 //!   time.  Defined in `wall/nogoods.rs`, whose module comment has the options and the lines.
+//! * **target**: how cheaply a search proves a game's upper bound down part of the way.  For a game with a known
+//!   optimum, a one-thread search under a floor ([`taxman::search::search_above`]) that is a share of the gap between
+//!   the root's bound and the optimum below the root's bound, for each share, and the full proof (the sound search
+//!   from the known optimum), each for at most `--cap` CPU seconds; the nodes and CPU seconds of each.  It is defined
+//!   in `wall/finders.rs` too.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -192,14 +198,15 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 10] =
-    ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders", "nogoods"];
+const COMMANDS: [&str; 11] =
+    ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders", "nogoods", "target"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 28] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods"]),
+const OPTIONS: [(&str, &[&str]); 29] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods", "target"]),
     ("--from", &["sound"]),
-    ("--cap", &["sound"]),
+    ("--cap", &["sound", "target"]),
+    ("--fractions", &["target"]),
     ("--cpu", &["sound", "finders", "nogoods"]),
     ("--steps", &["nogoods"]),
     ("--long", &["nogoods"]),
@@ -271,7 +278,7 @@ struct Options {
     down: bool,
     /// `chain` starts afresh, standalone, at every `restart`th game (never, if not given).
     restart: Option<usize>,
-    /// The options of `sound` and `finders`.
+    /// The options of `sound`, `finders` and `target`.
     finders: finders::Params,
     games: Vec<u32>,
 }
@@ -320,8 +327,10 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 
 /// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges =
-        matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods");
+    let ranges = matches!(
+        command,
+        "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods" | "target"
+    );
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -400,6 +409,7 @@ fn parse() -> Result<Options, String> {
             "--restart" => o.restart = Some(number("--restart", value("--restart")?)?),
             "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
             "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
+            "--fractions" => o.finders.fractions = finders::fractions(&value("--fractions")?)?,
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
             "--steps" => o.finders.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
             "--long" => o.finders.long = number("--long", value("--long")?)?,

@@ -1725,6 +1725,36 @@ allow (`bounds::max_additional`), so ΣF ≤ B_u.  ∎
 The root's GF(2) bound, the upper end of `wall landscape`, is the case
 of a search stopped before its first node (one unit, the root).
 
+**Lemma F (the floor).**  Let a search of Π_n start from a *floor* F,
+a promotion sum: an incumbent worth F and no promotion set, so that it
+prunes against F as against a set of that weight, and a set it finds
+heavier than F becomes the incumbent as usual.  If the search completes
+and has found no set, then P\*(Π_n) ≤ F.  If it finds a set, that set
+is a promotion set worth more than F, and if the search completes, the
+last one it found is worth P\*(Π_n).
+
+*Proof.*  Let H be a heaviest promotion set that keeps the inequalities;
+it weighs P\*(Π_n) (Theorem 13).  The incumbent only rises, so it is
+worth at least F at every moment.  Each pruning of the search drops
+only sets no heavier than the incumbent of its time, sets that cannot be
+promoted, and, with the tactic `symmetry`, sets that break an inequality
+every heaviest set keeps (Theorem 13), as in Lemma D; the search reads
+the incumbent's value and never its set, so a value with no set prunes
+as a set of that weight does.  H is not of the last two kinds, so a
+completed search either reached H and offered it, or dropped it as no
+heavier than the incumbent of that time.  Either way ΣH ≤ I, the
+incumbent at the end.  If nothing was found, I = F and P\*(Π_n) = ΣH ≤ F.
+If a set S was found, I = ΣS, and S is a promotion set, so
+ΣS ≤ P\*(Π_n) = ΣH ≤ ΣS.  ∎
+
+A floor at the optimum is a search seeded with the optimum, tree for
+tree; a floor above it prunes more, and a floor below it finds the
+optimum.  A floor at or above the root's bound, or the ceiling, ends the
+search at its first check.  For a search that a limit stopped, Lemma D
+holds with the floor as the incumbent when nothing was found: P\*(Π_n) ≤
+max(I, max_u (ΣP_u + B_u)), I being the larger of F and the weight of
+the heaviest set found.
+
 *In the ledger.*  Every lower bound is a finished game, so L(n) ≤
 opt(n) holds by the referee alone.  Every upper bound is a bound of
 the frame model at some board (a root bound, a dual bound, a completed
@@ -2221,6 +2251,7 @@ and the adversarial experiments: `rust/prover/README.md`.
 | U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
 | opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the committed chain to there (its games 2176..3440 are not yet proven on the whole board) | verified (exact, on the whole board) to 2175 |
 | The ledger's relations between boards (monotone, the ceiling and the game below it, the prime formula both ways from any finished game, repeats) and the dual bound of a stopped search (Lemmas L1-L4, D) | from proven games every tenth board of 2..1300 the relations give every board both bounds, every one on its side of the optimum and every game they make legal, exact at the primes and repeats of the proven boards; so from loose bounds at 1001..1300; the dual bound of stopped one-thread searches of 996, 1020 and 1218 between the optimum and the root's bound and never rising as the node limit doubles, the root's bound at zero steps on 14 boards of 60..1300; the laptop's run of 1301..1500 with the truth hidden proves every board at the optimum (`rust/examples/ledger/`, `rust/src/search/dual.rs`) | proven |
+| A search started from a floor F (an incumbent worth F and no promotion set) that completes having found no set proves P\* ≤ F, and if it finds sets the last one is worth P\* (Lemma F) | on every game of the Java's that needs a search, to 400, with the default tactics: a floor below the optimum finds it, a floor at it or above completes with nothing found, a floor at the root's bound or above ends at its first check; the same on four threads and on the matching path and without the rule of symmetric pairs (every ninth game); the floor at the optimum has the node count of the search seeded with the optimum on games 300-1000; a floor at the ceiling ends the search before it starts; a stopped floor search resumes under its floor and is refused under another (`rust/src/search/tests.rs`); the 154 searches under floors between the root's bound and the optimum on 14 games of 2265-3259 all completed with nothing found, and the one at the optimum is the proof (`rust/bench/target/`) | proven |
 | Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
 | An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
