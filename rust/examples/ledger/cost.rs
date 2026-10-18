@@ -8,9 +8,9 @@
 //! searches-under-a-floor-2026-10.md).  Each board has its own line, `log10(nodes) = intercept + slope · distance`,
 //! fitted from the steps it has had; a board with fewer than two steps of 100 nodes or more has the median slope (the
 //! shortest trees have a floor of their own, at a couple of steps) and, with none, the median intercept; the fit is
-//! pulled to the median slope as a pair of points 100 apart would pull it, so that two steps close together do not
-//! make a slope.  The cost of the board's proof, a search under a floor at its lower bound, is the line at the distance
-//! from the root's bound down to the lower bound.
+//! pulled to the median slope as a pair of points 141 apart on the median line would pull it, so that two steps close
+//! together do not make a slope.  The cost of the board's proof, a search under a floor at its lower bound, is the line
+//! at the distance from the root's bound down to the lower bound.
 //!
 //! The steps of a board go down by a cost, not a distance: a step costs the same factor more than the one before, the
 //! factor of `floor_step` points at the median slope (a tenfold at the default 150), so that a board with a steeper
@@ -31,7 +31,8 @@ pub const MIN_NODES: u64 = 100;
 /// The slopes a fit may have, in decades a point.
 const SLOPES: (f64, f64) = (0.003, 0.012);
 
-/// The weight of the median slope in a fit: the sum of squares of the distances of a pair of points 100 apart, halved.
+/// The weight of the median slope in a fit, in squared points: the sum of squares about their mean of a pair of points
+/// 141 apart.
 const PULL: f64 = 100.0 * 100.0;
 
 /// The steps a board's gap must exceed for a floor step to be taken, else the board goes to its proof.
@@ -77,15 +78,19 @@ fn distance(e: &Entry, floor: u64) -> f64 {
     root(e).map_or(0, |root| root.saturating_sub(floor)) as f64
 }
 
-/// The board's line, from its completed steps of `MIN_NODES` nodes or more.  A stalled step is a lower bound of what
-/// the floor it works under costs: the line is lifted to pass no lower than it.
+/// The points of the board's line: its completed steps of `MIN_NODES` nodes or more, as (distance, log10 of nodes).
+fn points(e: &Entry) -> Vec<(f64, f64)> {
+    let steps = e.steps.iter().filter(|s| s.nodes >= MIN_NODES);
+    steps.map(|s| (distance(e, s.floor), (s.nodes as f64).log10())).collect()
+}
+
+/// The board's line, from its points.  A stalled step is a lower bound of what the floor it works under costs: the line
+/// is lifted to pass no lower than it.
 pub fn line(e: &Entry) -> Line {
-    let log = |nodes: u64| (nodes as f64).log10();
-    let points: Vec<(f64, f64)> =
-        e.steps.iter().filter(|s| s.nodes >= MIN_NODES).map(|s| (distance(e, s.floor), log(s.nodes))).collect();
-    let mut line = Line::fit(&points);
+    let mut line = Line::fit(&points(e));
     if let Some(stalled) = e.stalled.filter(|s| s.nodes >= MIN_NODES) {
-        line.intercept += (log(stalled.nodes) - line.log_nodes(distance(e, stalled.floor))).max(0.0);
+        let cost = (stalled.nodes as f64).log10();
+        line.intercept += (cost - line.log_nodes(distance(e, stalled.floor))).max(0.0);
     }
     line
 }
@@ -99,6 +104,19 @@ pub fn step_points(line: Line, floor_step: u64) -> u64 {
 pub fn spent(e: &Entry) -> (u64, f64) {
     let steps = e.steps.iter().map(|s| (s.nodes, s.seconds)).chain(e.stalled.map(|s| (s.nodes, s.seconds)));
     steps.fold((0, 0.0), |(nodes, seconds), (more, longer)| (nodes + more, seconds + longer))
+}
+
+/// Whether the board has yet to give its line two points: it has a step to take (not its proof), none stalled, and
+/// fewer than two completed steps of `MIN_NODES` nodes or more.  Such steps are cheap (the first four cost under a
+/// second at n = 4500, where a step of 150 points is a few tens of nodes), and a board with no line is forecast by
+/// the median line, which is far off at some n (at 4500 the first points have a slope of 0.0035, not 0.0068, and the
+/// median line forecasts a proof 5 decades too dear); so the scheduler gives every board its two points before it
+/// deepens any, and no board looks dearer than it is because it has not been tried.
+pub fn exploring(e: &Entry, floor_step: u64) -> bool {
+    floor_step > 0
+        && e.stalled.is_none()
+        && points(e).len() < 2
+        && matches!(plan(e, floor_step, 0.0), Plan::Step { .. })
 }
 
 /// The steps a thread of the board makes in a second: its own steps' if they took a second or more, else `pooled`
@@ -144,8 +162,8 @@ pub fn forecast(e: &Entry, pooled: f64) -> Option<Forecast> {
 pub enum Plan {
     /// The proof: the ordinary search, seeded with the best game and capped by the upper bound.
     Proof,
-    /// A step under the floor `score`: `resume` it from its checkpoint (it was stalled, `tries` times), and its forecast
-    /// is `seconds` of one thread.
+    /// A step under the floor `score`: `resume` it from its checkpoint (it was stalled, `tries` times); its forecast is
+    /// `seconds` of one thread.
     Step { score: u64, resume: bool, seconds: f64, tries: u32 },
 }
 
@@ -292,6 +310,27 @@ mod tests {
         assert_eq!(plan(&fresh, 0, 0.0), Plan::Proof);
         // No bounds: nothing to plan.
         assert_eq!(plan(&Entry::default(), 150, 0.0), Plan::Proof);
+    }
+
+    #[test]
+    fn a_board_explores_until_its_line_has_two_points() {
+        let mut e = board(1_000_000, 999_000, 1_000_000, &[]);
+        assert!(exploring(&e, 150));
+        assert!(!exploring(&e, 0), "no floor steps, nothing to explore");
+        // Steps of fewer than 100 nodes are no points; one point is not a line.
+        e.steps =
+            vec![Step { floor: 999_850, nodes: 33, seconds: 0.01 }, Step { floor: 999_700, nodes: 99, seconds: 0.01 }];
+        assert!(exploring(&e, 150));
+        e.steps.push(Step { floor: 999_500, nodes: 400, seconds: 0.1 });
+        assert!(exploring(&e, 150));
+        e.steps.push(Step { floor: 999_400, nodes: 1500, seconds: 0.4 });
+        assert!(!exploring(&e, 150), "two points");
+        // A board with a stalled step has a lifted line already; one whose gap is within two steps goes to its proof.
+        e.steps.truncate(3);
+        e.stalled = Some(Stalled { floor: 999_300, nodes: 10_000, seconds: 3.0, tries: 1 });
+        assert!(!exploring(&e, 150));
+        let near = board(1_000_000, 999_800, 1_000_000, &[]);
+        assert!(!exploring(&near, 150) && plan(&near, 150, 0.0) == Plan::Proof);
     }
 
     #[test]

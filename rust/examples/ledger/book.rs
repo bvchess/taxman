@@ -18,8 +18,8 @@
 //! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound; `floor`, Lemma F, a
 //! search under a floor that completed having found nothing: U is the floor), the finder's games (`lns`: L only),
 //! proven games given (`given`), boards with nothing to promote (`trivial`), and the Lagrangian bound over checked
-//! nogoods (`nogoods`: U only, which `wall nogoods` makes and the ledger's runs do not yet).  Every bound only improves:
-//! L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
+//! nogoods (`nogoods`: U only, which `wall nogoods` makes and the ledger's runs do not yet).  Every bound only
+//! improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
 //! [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on statement U, a
 //! counterexample to it.
 
@@ -197,7 +197,8 @@ pub struct Entry {
     pub attempts: u32,
     pub level: u32,
     pub search_s: f64,
-    /// The steps of the board's ordinary searches and climbs over all runs; the floor steps' are in `steps` and `stalled`.
+    /// The steps of the board's ordinary searches and climbs over all runs; the floor steps' are in `steps` and
+    /// `stalled`.
     pub nodes: u64,
     /// The root's GF(2) bound, as a score: how far below it a floor is measures the cost of the step (`cost.rs`).
     /// Known once the board is mapped; a ledger written before the floor steps has none until a run reads it.

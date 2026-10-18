@@ -113,8 +113,8 @@ fn checkpoint_path(dir: &Path, n: u32) -> PathBuf {
     checkpoint_dir(dir).join(format!("n{n}.ckpt"))
 }
 
-/// The checkpoint of the board's floor step that its limit stopped: good only under that floor, so it is kept beside the
-/// other, whose search it does not continue.
+/// The checkpoint of the board's floor step that its limit stopped: good only under that floor, so it is kept beside
+/// the other, whose search it does not continue.
 fn floor_checkpoint_path(dir: &Path, n: u32) -> PathBuf {
     checkpoint_dir(dir).join(format!("n{n}.floor.ckpt"))
 }
@@ -155,9 +155,9 @@ impl Way {
     }
 }
 
-/// The two boards just outside the repeat class `class` (ascending): below its smallest and above its largest.  A proven
-/// one starts a climb into the class, and its game seeds the class's searches; the other waits while a climb into the
-/// class runs.
+/// The two boards just outside the repeat class `class` (ascending): below its smallest and above its largest.  A
+/// proven one starts a climb into the class, and its game seeds the class's searches; the other waits while a climb
+/// into the class runs.
 fn outside(class: &[u32]) -> [u32; 2] {
     [class[0] - 1, class[class.len() - 1] + 1]
 }
@@ -465,10 +465,11 @@ fn attempt_at<const W: usize>(
     })
 }
 
-/// A floor step: the search under `floor` (`search::search_above`), from the checkpoint in `cfg` if the step was stopped
-/// before and is resumed, else from scratch (an old checkpoint is deleted).  There is no seed and no finder: the floor is
-/// the start, and a set found above it is a game like any other, which the referee replays.  A stopped step gives no
-/// bound (Lemma D would give its dual bound, but the open units of a depth-first search are the root's and near it).
+/// A floor step: the search under `floor` (`search::search_above`), from the checkpoint in `cfg` if the step was
+/// stopped before and is resumed, else from scratch (an old checkpoint is deleted).  There is no seed and no finder:
+/// the floor is the start, and a set found above it is a game like any other, which the referee replays.  A stopped
+/// step gives no bound (Lemma D would give its dual bound, but the open units of a depth-first search are the root's
+/// and near it).
 fn step_at<const W: usize>(
     job: &Job,
     floor: Floor,
@@ -728,10 +729,10 @@ impl Climbs {
     }
 }
 
-/// The floor steps of this run that have ended: all of them, those that completed having found nothing (the floor is the
-/// new upper bound), those that completed having found a set (the board is proven), those that stopped with a set (the
-/// floor is below the lower bound now: the step is dropped), and those the limit stopped with nothing (the step is
-/// kept).  (A step whose board a relation proved meanwhile is none of them.)
+/// The floor steps of this run that have ended: all of them, those that completed having found nothing (the floor is
+/// the new upper bound), those that completed having found a set (the board is proven), those that stopped with a set
+/// (the floor is below the lower bound now: the step is dropped), and those the limit stopped with nothing (the step
+/// is kept).  (A step whose board a relation proved meanwhile, or whose floor the upper bound fell to, is none of them.)
 #[derive(Default)]
 struct StepTally {
     ended: u32,
@@ -1001,20 +1002,24 @@ impl Scheduler {
         })
     }
 
-    /// The boards that wait while a climb runs: those just outside the repeat class of a board being climbed to.  One of
-    /// them is the proven board the climb goes from; the other may be proven within the climb's limit, and then it is
-    /// climbed to with its game (and, going up, its exact ceiling), so it has no ordinary search meanwhile.
+    /// The boards that wait while a climb runs: those just outside the repeat class of a board being climbed to.  One
+    /// of them is the proven board the climb goes from; the other may be proven within the climb's limit, and then it
+    /// is climbed to with its game (and, going up, its exact ceiling), so it has no ordinary search meanwhile.
     fn held(&self) -> HashSet<u32> {
         let climbing = self.running.iter().filter(|(_, run)| matches!(run.kind, Kind::Climb(_)));
         climbing.flat_map(|(&n, _)| outside(&self.book.class(n))).collect()
     }
 
     /// The cost the order of the ordinary searches goes by, the least first: the log of the forecast seconds of the
-    /// board's proof (`cost.rs`), or, with no floor steps, `level + gap / gap_unit`.
+    /// board's proof (`cost.rs`), with the boards that have yet to give their line two points ahead of all (they cost
+    /// a second or so, `cost::exploring`), or, with no floor steps, `level + gap / gap_unit`.
     fn cost(&self, e: &Entry, gap: i64) -> f64 {
         let s = &self.settings;
         if s.floor_step == 0 {
             return f64::from(e.level) + gap as f64 / s.gap_unit;
+        }
+        if cost::exploring(e, s.floor_step) {
+            return f64::NEG_INFINITY;
         }
         cost::forecast(e, self.pooled.rate()).map_or(f64::INFINITY, |forecast| forecast.log_seconds)
     }
@@ -1023,7 +1028,7 @@ impl Scheduler {
     /// the relations have carried them (`settle`) a climb (`next_climb`), else the boards whose bounds a proven
     /// neighbour has just changed, smallest gap first, else the board whose proof is forecast to cost the least
     /// (`cost`).  Only one board of a repeat class is searched, and no prime whose board before it the ledger has.  A
-    /// board next to the class of one that is being climbed to waits (`held`).  The search of an ordinary board is a step
+    /// board next to the class of one that is being climbed to waits (`held`).  The job of an ordinary board is a step
     /// down to a floor (`cost::plan`) unless its gap is within two steps, and then it is the proof, the ordinary search
     /// that doubles its limit.
     pub fn next_job(&self, cpu: f64) -> Option<Job> {
@@ -1062,8 +1067,8 @@ impl Scheduler {
         };
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
         let limit = Duration::from_secs_f64(limit.min(s.max_limit).min(remaining.max(1.0)));
-        // The games that seed a search: those of the boards next to it and, if it is the board of a repeat class, of the
-        // boards just outside the class (the proven one a climb into the class goes from).
+        // The games that seed a search: those of the boards next to it and, if it is the board of a repeat class, of
+        // the boards just outside the class (the proven one a climb into the class goes from).
         let seeds = match floor {
             Some(_) => Vec::new(),
             None => {
@@ -1135,8 +1140,8 @@ impl Scheduler {
         let n = done.n;
         let bounds = |e: &Entry| (e.lower.as_ref().map(|l| l.value), e.upper.map(|u| u.value));
         let was_proven = self.book.entries[&n].proven();
-        // The floor step this one goes on from, if it does (a step whose floor became moot starts again), and the steps of
-        // the search over its earlier runs: the stalled step's, or the board's ordinary searches' and climbs'.
+        // The floor step this one goes on from, if it does (a step whose floor became moot starts again), and the steps
+        // of the search over its earlier runs: the stalled step's, or the board's ordinary searches' and climbs'.
         let resumed = self.book.entries[&n].stalled.filter(|s| done.kind == Kind::Floor && Some(s.floor) == done.floor);
         let before = bounds(&self.book.entries[&n]);
         let nodes_before = match done.kind {
@@ -1283,8 +1288,9 @@ impl Scheduler {
     /// upper bound, and the step is a point of the board's line), `proved` (it completed having found a set, or reached
     /// the ceiling with one: the board is proven), `moot` (a relation proved the board while it went on, or lowered its
     /// upper bound to the floor, which ended the step at the ceiling with nothing explored), `found` (it stopped with a
-    /// set, so the floor is below the lower bound now: the step is dropped, checkpoint and all), or `stalled` (the limit
-    /// stopped it with nothing: it is kept, to be tried again under the same floor with its limit doubled).  `resumed`
+    /// set, so the floor is below the lower bound now: the step is dropped, and its checkpoint, a search from that set,
+    /// is the board's own for the proof if it has none), or `stalled` (the limit stopped it with nothing: it is kept,
+    /// to be tried again under the same floor with its limit doubled).  `resumed`
     /// is the stalled step it went on from.  Returns the outcome's name, as the event has it.
     fn end_step(&mut self, n: u32, step: StepEnd, resumed: Option<Stalled>, was_proven: bool) -> &'static str {
         let StepEnd { floor, held, capped, found, nodes, seconds } = step;
@@ -1304,8 +1310,15 @@ impl Scheduler {
         } else if capped {
             "moot"
         } else if found {
+            // The step has become a search from the set it found, and the proof goes on from its checkpoint if the
+            // board has no other; else it is deleted.
             self.steps.found += 1;
-            let _ = engine::remove_checkpoint(&floor_checkpoint_path(&self.dir, n));
+            let (floor_checkpoint, checkpoint) = (floor_checkpoint_path(&self.dir, n), checkpoint_path(&self.dir, n));
+            if !checkpoint.exists() && fs::rename(&floor_checkpoint, &checkpoint).is_ok() {
+                entry.nodes = nodes;
+            } else {
+                let _ = engine::remove_checkpoint(&floor_checkpoint);
+            }
             "found"
         } else {
             let tries = resumed.map_or(0, |s| s.tries) + 1;
@@ -1398,8 +1411,8 @@ impl Scheduler {
         Ok(())
     }
 
-    /// The open boards that are searched and mapped, by the forecast time of their proofs on one thread: within an hour,
-    /// within a day, longer.
+    /// The open boards that are searched and mapped, by the forecast time of their proofs on one thread: within an
+    /// hour, within a day, longer.
     fn forecasts(&self) -> [usize; 3] {
         let mut counts = [0; 3];
         let open = self.book.entries.values().filter(|e| e.mapped && !e.proven() && self.book.searched(e.n));

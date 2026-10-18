@@ -24,9 +24,9 @@
 //!   matching dive, improved by the local search) and U the dual bound of that search, the root's GF(2) bound, as
 //!   `wall landscape` has them.  *Searches* (`search`, `dual`, `exhausted`): L is a search's best game; U is the dual
 //!   bound of a search a limit stopped (`taxman::search::dual_bound`: the largest of its incumbent and the bounds of
-//!   its open units), or the game of a search that completed.  *Floor steps* (`floor`): U is the floor of a search under
-//!   that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over checked
-//!   nogoods that `wall nogoods` makes; the store accepts it, and nothing in the ledger produces it yet.
+//!   its open units), or the game of a search that completed.  *Floor steps* (`floor`): U is the floor of a search
+//!   under that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over
+//!   checked nogoods that `wall nogoods` makes; the store accepts it, and nothing in the ledger produces it yet.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
 //!   the boards with the same search problem, applied to a fixpoint after every change (heuristics/THEORY.md, "The
@@ -35,8 +35,8 @@
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
 //!   searched, and no prime whose board before it the ledger has (the prime formula gives its bounds both ways).  A
 //!   search is `taxman::search::search` on one thread, as `taxman solve` searches: seeded with the best of the games
-//!   the ledger holds for n − 1, n and n + 1 and, for the board of a repeat class, for the boards just outside the class
-//!   (the one whose candidates keep the largest sum), with the ceiling U(n), so that a game that reaches U proves
+//!   the ledger holds for n − 1, n and n + 1 and, for the board of a repeat class, for the boards just outside the
+//!   class (the one whose candidates keep the largest sum), with the ceiling U(n), so that a game that reaches U proves
 //!   itself, and limited in time: `--base` seconds (default 2) the first time, twice as long each time after, at most
 //!   `--max-limit` (default 3600) and at most the budget left over the workers.  Each search goes on from the
 //!   checkpoint of the last (DIR/ckpt/nN.ckpt), so its work adds up.  This is the board's *proof*, the search of
@@ -52,7 +52,8 @@
 //!   nodes or more; fewer than two points keep the median slope, none the median line).  If it finds a set above the
 //!   floor the set is a game like any other, offered as L after the referee has replayed it, and if the search
 //!   completes the set is the optimum (the board is proven); if the limit stops it with a set, the floor is below L and
-//!   the step is dropped with its checkpoint.  A step that its limit stops with nothing is *stalled*: kept with its
+//!   the step is dropped, its checkpoint (a search from that set) becoming the board's own for its proof if the board
+//!   has none.  A step that its limit stops with nothing is *stalled*: kept with its
 //!   checkpoint (DIR/ckpt/nN.floor.ckpt, apart from the ordinary searches'), tried again under the same floor with the
 //!   limit doubled, and dropped if the bounds move to it.  A board whose gap is within two steps goes to its proof.
 //! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
@@ -111,8 +112,8 @@
 //! has none until a run reads it), `steps` (the floor steps that completed having found nothing, each its `floor`, a
 //! score, `nodes` and `seconds`) and `stalled` (the step its limit stopped: `floor`, `nodes`, `seconds` and `tries`;
 //! null if none; a ledger from before the floor steps has neither field), `lns_score` (see the finder), `mapped` (its
-//! own map is made), `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to it
-//! ended unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu`
+//! own map is made), `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to
+//! it ended unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu`
 //! (the CPU seconds of all runs); a run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`,
 //! `seconds`, `nodes` of this search, `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual
 //! bound, null if it completed or was a floor step), the bounds `before` and `after`, each [L, U]; `lns_s` (the

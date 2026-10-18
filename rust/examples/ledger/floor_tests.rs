@@ -1,7 +1,7 @@
 //! The tests of the floor steps: a step that completes lowers the upper bound by the floor rule, one that finds a set
-//! raises the lower bound with a game the referee replays, one that its limit stops is kept and resumed under its floor,
-//! the boards go by the forecast of their proofs with the climbs first, a climb into a repeat class holds the boards
-//! beside the whole class, and a ledger written before the steps goes on.
+//! raises the lower bound with a game the referee replays, one that its limit stops is kept and resumed under its
+//! floor, the boards go by the forecast of their proofs with the climbs first, a climb into a repeat class holds the
+//! boards beside the whole class, and a ledger written before the steps goes on.
 
 use super::book::{Entry, Lower, Rule, Stalled, Step, Upper};
 use super::report;
@@ -17,9 +17,8 @@ use taxman::engine::Control;
 use taxman::game::replay_finished;
 use taxman::json::Json;
 
-/// A scheduler of the board `n` alone, mapped by hand: `lower` is the score of the optimal game as its lower bound (any
-/// score at most the optimum; the game is the optimal one, which no test of a job of the scheduler replays), `upper` its
-/// upper bound and its root's.
+/// A scheduler of the board `n` alone, mapped by hand: its lower bound worth `lower`, at most the optimum (the game is
+/// the optimal one, which these tests' jobs do not replay), its upper bound and its root's `upper`.
 fn alone(dir: &Path, n: u32, settings: &Settings, lower: u64, upper: u64) -> Scheduler {
     let (mut scheduler, _) = Scheduler::open(n, n, dir, settings, None).unwrap();
     let game = Lower { value: lower, moves: opt_game(n), promotions: None, rule: Rule::Start, from: None };
@@ -55,9 +54,9 @@ fn text(event: &Json, field: &str) -> Option<String> {
     event.get(field).and_then(Json::as_str).map(str::to_owned)
 }
 
-/// A search under a floor above the optimum completes having found nothing and its floor is the board's new upper bound,
-/// by the rule `floor`; it is a point of the board's line, the ledger keeps it, the event says what it was, and a gap
-/// within two steps is then the proof's.
+/// A search under a floor above the optimum completes having found nothing and its floor is the board's new upper
+/// bound, by the rule `floor`; it is a point of the board's line, the ledger keeps it, the event says what it was, and
+/// a gap within two steps is then the proof's.
 #[test]
 fn a_floor_step_that_completes_lowers_the_upper_bound_with_the_floor_rule() {
     let (dir, n) = (TempDir::new("ledger-floor-held"), 1218);
@@ -99,8 +98,8 @@ fn a_floor_step_that_completes_lowers_the_upper_bound_with_the_floor_rule() {
 
 /// A floor below the optimum finds sets, the last of them the optimum, and the search that completes has proven it
 /// (Lemma F): the lower bound is the game it found, which the referee replays, and the upper bound is exhausted.  One
-/// that its limit stops with a set found leaves the lower bound at that game, and its floor, now below it, is dropped
-/// with its checkpoint.
+/// that its limit stops with a set found leaves the lower bound at that game; its floor, now below it, is dropped, and
+/// its checkpoint, a search from that set, becomes the board's own for the proof if the board has none.
 #[test]
 fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_replays() {
     let (dir, n) = (TempDir::new("ledger-floor-found"), 1218);
@@ -122,29 +121,40 @@ fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_
     assert!(!dir.join("ckpt").read_dir().unwrap().any(|_| true), "no checkpoint is left of a proven board");
 
     // A step stopped with a set found, 30 under the optimum: the lower bound is that game; the floor, below it, is
-    // dropped with the stalled step that was there and its checkpoint.
-    let dir = TempDir::new("ledger-floor-found-stopped");
-    let mut scheduler = alone(&dir, n, &quiet(), opt(n) - 204, opt(n) + 100);
-    let floor = opt(n) - 100;
-    scheduler.book.entries.get_mut(&n).unwrap().stalled = Some(Stalled { floor, nodes: 100, seconds: 1.0, tries: 1 });
-    std::fs::create_dir_all(dir.join("ckpt")).unwrap();
-    let checkpoint = dir.join("ckpt").join(format!("n{n}.floor.ckpt"));
-    std::fs::write(&checkpoint, b"a checkpoint").unwrap();
-    let mut done = ended(n, Kind::Floor, false);
-    done.floor = Some(floor);
-    let attempt = done.result.as_mut().unwrap();
-    (attempt.value, attempt.promotions) = (opt(n) - 30, vec![7]);
-    scheduler.finish(done).unwrap();
-    let entry = &scheduler.book.entries[&n];
-    assert_eq!(entry.lower.as_ref().map(|l| (l.value, l.rule)), Some((opt(n) - 30, Rule::Search)));
-    assert!(entry.stalled.is_none() && entry.steps.is_empty() && entry.upper.unwrap().value == opt(n) + 100);
-    assert!(!checkpoint.exists(), "the checkpoint of the dropped step is deleted");
-    assert_eq!(text(&job_events(&dir)[0], "outcome").as_deref(), Some("found"));
+    // dropped with the stalled step that was there; its checkpoint becomes the board's own, unless the board has one,
+    // which stays and the step's is deleted.
+    for ordinary in [false, true] {
+        let dir = TempDir::new("ledger-floor-found-stopped");
+        let mut scheduler = alone(&dir, n, &quiet(), opt(n) - 204, opt(n) + 100);
+        let floor = opt(n) - 100;
+        let stalled = Stalled { floor, nodes: 100, seconds: 1.0, tries: 1 };
+        scheduler.book.entries.get_mut(&n).unwrap().stalled = Some(stalled);
+        std::fs::create_dir_all(dir.join("ckpt")).unwrap();
+        let (step_checkpoint, board_checkpoint) =
+            (dir.join("ckpt").join(format!("n{n}.floor.ckpt")), dir.join("ckpt").join(format!("n{n}.ckpt")));
+        std::fs::write(&step_checkpoint, b"the step's checkpoint").unwrap();
+        if ordinary {
+            std::fs::write(&board_checkpoint, b"the board's checkpoint").unwrap();
+        }
+        let mut done = ended(n, Kind::Floor, false);
+        done.floor = Some(floor);
+        let attempt = done.result.as_mut().unwrap();
+        (attempt.value, attempt.promotions, attempt.nodes) = (opt(n) - 30, vec![7], 5000);
+        scheduler.finish(done).unwrap();
+        let entry = &scheduler.book.entries[&n];
+        assert_eq!(entry.lower.as_ref().map(|l| (l.value, l.rule)), Some((opt(n) - 30, Rule::Search)));
+        assert!(entry.stalled.is_none() && entry.steps.is_empty() && entry.upper.unwrap().value == opt(n) + 100);
+        assert!(!step_checkpoint.exists(), "the step's checkpoint is gone");
+        let expected: &[u8] = if ordinary { b"the board's checkpoint" } else { b"the step's checkpoint" };
+        assert_eq!(std::fs::read(&board_checkpoint).unwrap(), expected, "ordinary: {ordinary}");
+        assert_eq!(entry.nodes, if ordinary { 0 } else { 5000 }, "the steps of the search the checkpoint holds");
+        assert_eq!(text(&job_events(&dir)[0], "outcome").as_deref(), Some("found"));
+    }
 }
 
-/// A step that its limit stops with nothing found is kept: the board remembers its floor, its steps and its seconds, and
-/// the next job of the board is that step again, resumed under its floor with the limit doubled; it completes where it
-/// left off.  The checkpoint of a step is not the checkpoint of the board's ordinary searches.
+/// A step that its limit stops with nothing found is kept: the board remembers its floor, its steps and its seconds,
+/// and the next job of the board is that step again, resumed under its floor with the limit doubled; it completes
+/// where it left off.  The checkpoint of a step is not the checkpoint of the board's ordinary searches.
 #[test]
 fn a_floor_step_that_its_limit_stops_is_kept_and_resumed_under_its_floor() {
     let (dir, n) = (TempDir::new("ledger-floor-stalled"), 1218);
@@ -201,9 +211,9 @@ fn a_floor_step_ended_by_the_ceiling_at_its_floor_is_moot() {
     assert_eq!(text(&job_events(&dir)[0], "outcome").as_deref(), Some("moot"));
 }
 
-/// The climbs go first; then the boards whose bounds a proven neighbour changed; then the board whose proof is forecast to
-/// cost the least, by the line of its own steps (a board with none has the median line); the ordinary search of a board with a
-/// wide gap is a step to a floor a step below its upper bound.
+/// The climbs go first; then the boards whose bounds a proven neighbour changed; then the boards that have yet to give
+/// their line two points, each a step; then the board whose proof is forecast to cost the least, by the line of its own
+/// steps; the ordinary job of a board with a wide gap is a step to a floor a step below its upper bound.
 #[test]
 fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
     let dir = TempDir::new("ledger-floor-order");
@@ -223,9 +233,10 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
     scheduler.book.entries.get_mut(&950).unwrap().steps = steps_of(-1.0, 0.007, 950);
     scheduler.book.entries.get_mut(&954).unwrap().steps = steps_of(1.0, 0.007, 954);
     scheduler.book.entries.get_mut(&940).unwrap().boosted = true;
-    // Board 948 has no steps, but its ordinary searches have spent 10^13 steps without finishing: it is forecast dearer
-    // than any line.
-    scheduler.book.entries.get_mut(&948).unwrap().nodes = 10u64.pow(13);
+    // Board 948 has the cheap line too, but its ordinary searches have spent 10^13 steps without finishing: it is
+    // forecast dearer than any line.
+    let entry = scheduler.book.entries.get_mut(&948).unwrap();
+    (entry.steps, entry.nodes) = (steps_of(-1.0, 0.007, 948), 10u64.pow(13));
     // Board 930, a gap of 1, goes to its proof, not a step; its root is as far above as the others'.
     scheduler.book.entries.get_mut(&930).unwrap().root = Some(opt(930) + 1400);
 
@@ -235,13 +246,16 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
         jobs.push(job);
     }
     let order: Vec<(Kind, u32)> = jobs.iter().map(|job| (job.kind, job.n)).collect();
-    // The climbs of the two wedges, the board that was boosted, then the cheapest line and the rest by n.
+    // The climbs of the two wedges, the board that was boosted, the boards with no line yet by n, and then the boards
+    // with one by the forecast: 950 on the cheap line, 930 (its proof, by the median line), 954 on the dear line, and
+    // 948, whose searches spent the most.
     assert_eq!(order[..2], [(Kind::Climb(Way::Up), 909), (Kind::Climb(Way::Down), 903)], "{order:?}");
     let ordinary = &jobs[2..];
     assert_eq!((ordinary[0].kind, ordinary[0].n), (Kind::Floor, 940), "the boosted board first");
-    assert_eq!((ordinary[1].kind, ordinary[1].n), (Kind::Floor, 950), "then the cheapest forecast: {order:?}");
-    let last_two: Vec<u32> = ordinary[ordinary.len() - 2..].iter().map(|job| job.n).collect();
-    assert_eq!(last_two, [954, 948], "the dearest forecasts last, the spent searches' the last: {order:?}");
+    let (explored, tail) = ordinary[1..].split_at(ordinary.len() - 1 - 4);
+    let tail: Vec<u32> = tail.iter().map(|job| job.n).collect();
+    assert_eq!(tail, [950, 930, 954, 948], "{order:?}");
+    assert!(explored.len() > 10 && explored.windows(2).all(|pair| pair[0].n < pair[1].n), "{order:?}");
     for job in ordinary {
         let kind = if job.n == 930 { Kind::Search } else { Kind::Floor };
         assert_eq!(job.kind, kind, "n={}: a gap of {:?}", job.n, scheduler.book.entries[&job.n].gap());
@@ -255,8 +269,8 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
 }
 
 /// A climb into the repeat class {925, 926} holds the boards beside the whole class, 924 and 927, not just the
-/// neighbours of the board searched; and a climb down into it from 927 is seeded with 927's game, which is not beside the
-/// board searched.
+/// neighbours of the board searched; and a climb down into it from 927 is seeded with 927's game, which is not beside
+/// the board searched.
 #[test]
 fn a_climb_into_a_class_holds_the_boards_beside_it_and_is_seeded_from_the_far_side() {
     let dir = TempDir::new("ledger-class-hold");
@@ -335,8 +349,8 @@ fn a_run_with_floor_steps_proves_the_stretch_and_the_events_and_the_report_say_h
 #[test]
 fn a_ledger_from_before_the_floor_steps_goes_on() {
     let (dir, n) = (TempDir::new("ledger-old-format"), 1218);
-    // What the earlier build left: the board mapped (the start game, the root's bound), and the file as that build wrote
-    // it, none of the three new fields.
+    // What the earlier build left: the board mapped (the start game, the root's bound), and the file as that build
+    // wrote it, none of the three new fields.
     let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(0.0, None)));
     let bag = taxman::with_width!(n, W => Board::<W>::for_n(n).in_the_bag);
     let entry = Entry {
