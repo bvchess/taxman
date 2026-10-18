@@ -61,7 +61,7 @@ pub struct Params {
     pub a1_seconds: f64,
     /// `decompose`: the pauses of the game's proof that supply nodes, the steps between them, the steps at which a
     /// node's subtree solve and its best-completion solve are stopped (`--pauses`, `--span`, `--unit-cap`,
-    /// `--best-cap`; no cap on the subtree, no best completion, by default), and the evaluations at which the OR
+    /// `--best-cap`; no limit on the subtree, no best completion, by default), and the evaluations at which the OR
     /// part of the AND/OR search stops, for the nodes of at least `and_or_min` steps (`--and-or-cap`, `--and-or-min`;
     /// the search is not run by default).
     pub pauses: usize,

@@ -13,11 +13,15 @@
 //! others below (*touch-left*) or above (*touch-right*), only at `h` (*touch-only*), below and above (*cross*, which
 //! no conflict does; a count that is not zero would be a bug), or none open (*decided*).
 //!
-//! * `wall decompose --known FILE [--fixtures DIR [--keep K]] [--pauses P --span STEPS] [--unit-cap STEPS]
-//!   [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N...`: for each game `N` with a known optimum, a line
-//!   `{"kind":"game",...}`, a line `{"kind":"node",...}` for each node of the sources below, and a closing line
-//!   with the counts.  The incumbent a node must beat is the known optimum, so the nodes are those of a proof, as the
-//!   probe's are.  Build it with `--profile test` (opt-level 2, no LTO): the proof of 2170 takes a minute.
+//! ```text
+//! wall decompose --known FILE [--fixtures DIR [--keep K]] [--pauses P --span STEPS] [--unit-cap STEPS]
+//!     [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N...
+//! ```
+//!
+//! * For each game `N` with a known optimum, a line `{"kind":"game",...}`, a line `{"kind":"node",...}` for each node
+//!   of the sources below, and a closing line with the counts.  The incumbent a node must beat is the known optimum,
+//!   so the nodes are those of a proof, as the probe's are.  Build it with `--profile test` (opt-level 2, no LTO):
+//!   the proof of 2170 takes a minute.
 //! * The nodes: `--fixtures DIR` (the probe's `nNNNN.nodes`, thinned to `--keep K`) and the *pauses* of the game's
 //!   proof: the proof from the optimum on one thread, stopped after every `--span` steps (the engine counts in blocks
 //!   of 1,024), `--pauses P` times, each pause's open units read from its checkpoint (the stack the proof was working
@@ -72,7 +76,7 @@ use taxman::search::{payload_of, TaxSearcher, TaxUnit};
 
 /// The cores of a node's heaviest set that are looked for in each frame.
 const CORES_PER_FRAME: usize = 6;
-/// The steps at which the solve of one side of a survivor of the AND/OR search is stopped (it then counts for the cap).
+/// The steps at which the solve of one side of a survivor of the AND/OR search is stopped (it then counts for the limit).
 const SIDE_CAP: u64 = 300_000;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -323,7 +327,7 @@ struct Or<'t, 'g, 'c, const W: usize> {
 
 impl<const W: usize> Or<'_, '_, '_, W> {
     /// Decides the home's candidates `undecided` in the node of `state` and `promoted`, whose sides' candidates are
-    /// `others`.  Stops when the cap on evaluations is reached.
+    /// `others`.  Stops when the limit on evaluations is reached.
     fn decide(&mut self, state: &FrameSet<W>, promoted: &Bits<W>, undecided: Bits<W>, others: &Bits<W>) {
         if self.nodes >= self.cap {
             return;
@@ -407,7 +411,7 @@ struct Separator {
 
 /// The AND/OR search with a separator on the node `unit`, deciding the home's candidates largest first or by
 /// conflict: see [`Or`].  The line has the evaluations of the OR part
-/// (`or_nodes`; `complete` false if the cap stopped it, then a lower bound), its survivors, the steps of the sides of a
+/// (`or_nodes`; `complete` false if the limit stopped it, then a lower bound), its survivors, the steps of the sides of a
 /// sample of them, and the estimate of the whole: the evaluations plus the survivors times the sample's mean.
 fn and_or<const W: usize>(
     case: &Case<'_, W>,
@@ -779,7 +783,7 @@ mod tests {
     /// The root of game 936 and some of the probe's nodes, measured: no conflict crosses a separator (the program
     /// refuses a line if one does), the bound's error by home sums to the root's gap to the optimum, the root's
     /// subtree is its ideal proof, the oracle separators' sides have gaps of the bound over their parts of the
-    /// optimum, and the AND/OR search stops at its cap.
+    /// optimum, and the AND/OR search stops at its limit.
     #[test]
     fn the_root_of_936_and_some_probe_nodes_are_measured() {
         let board = Board::<16>::for_n(936);
