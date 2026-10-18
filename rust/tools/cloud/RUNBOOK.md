@@ -312,9 +312,11 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
    tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and
    run `setup.sh` from inside it: it then works on that tree and does not pull (results record no commit, then).
    `setup.sh` installs packages, installs Rust with rustup if there is none (stable, at least 1.89), builds with
-   `RUSTFLAGS="-C target-cpu=native"`, replays `optimal.json`, runs both result verifiers on the committed files, runs
-   `taxman regress --to 400`, and runs `cargo test -- --test-threads=4`.  Its output is also in
-   `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick up new commits.
+   `RUSTFLAGS="-C target-cpu=native"` (the solver and the examples `ledger`, `perf` and `ladder`; `STUDIES=1` adds the
+   study tools `tune`, `extended`, `structure` and `wall`, which a default build skips), replays `optimal.json`, runs
+   both result verifiers on the committed files, runs `taxman regress --to 400`, and runs `cargo test --
+   --test-threads=4`.  Its output is also in `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick
+   up new commits.
 3. In `tmux new -s tx` (detach with Ctrl-b d, return with `tmux attach -t tx`), run the sweep:
 
    ```

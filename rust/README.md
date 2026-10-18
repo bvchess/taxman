@@ -143,11 +143,15 @@ Python 3 (standard library only) for `tools/check_results.py`.
 ```
 cd rust
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
-cargo build --release --examples   # also the ladder (scaling and progress harness), the probe, the tuning
-                                   # benchmark, the census of the frames, the extended problem's chain, the wall
-                                   # regime's measurements and the ledger
+cargo build --release --examples   # also the ladder (scaling and progress harness), the probe and the ledger
+cargo build --release --examples --features studies   # and the study tools: the tuning benchmark, the census of
+                                   # the frames, the extended problem's chain and the wall regime's measurements
 ./target/release/taxman help
 ```
+
+The study tools (the examples `tune`, `extended`, `structure` and `wall`) are behind the feature `studies`, which is
+off by default, so that a build, `cargo test` and `cargo clippy --all-targets` do not compile them; a command that names
+one (`cargo build --release --example wall`) needs `--features studies` too.
 
 The build is long for a program of this size because the search is compiled once for every set width
 ([DESIGN.md](DESIGN.md#3-architecture), "Width dispatch").
@@ -172,8 +176,8 @@ cargo test                         # the quick check: the long tests are skipped
 cargo test --release               # the full suite
 ```
 
-Both run as many test threads as the machine has CPUs.  What each takes, and when each is run, is in
-[DESIGN.md](DESIGN.md#9-testing).
+Both run as many test threads as the machine has CPUs, and neither builds the study tools (`--features studies` adds
+them and their tests).  What each takes, and when each is run, is in [DESIGN.md](DESIGN.md#9-testing).
 
 The ignored tests are for large machines and long runs: `cargo test --release --test engine -- --ignored
 many_threads` (64 and 192 worker threads), `TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored

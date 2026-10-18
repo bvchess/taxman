@@ -296,7 +296,7 @@ def parse(argv=None):
     p.add_argument("--suite", default=HERE / "suite.jsonl", type=Path, help="the suite (default: suite.jsonl here)")
     p.add_argument("--known", default=CRATE / "results" / "strict.jsonl", type=Path, help="the known games")
     p.add_argument("--bin", default=CRATE / "target" / "release" / "examples" / "tune", type=Path,
-                   help="the tune example (cargo build --release --example tune)")
+                   help="the tune example (cargo build --release --features studies --example tune)")
     p.add_argument("--workers", type=int, default=os.cpu_count() or 1, help="jobs at once, one thread each")
     p.add_argument("--nice", type=int, default=0, help="run the jobs under nice -n N (default 0: not niced)")
     p.add_argument("--seed", type=int, default=1, help="seed of the random third of the suite (default 1)")
@@ -319,7 +319,7 @@ def main(argv=None):
         report(done, ordered, problems)
         return
     if not args.bin.exists() and not args.dry_run:
-        raise SystemExit(f"{args.bin} does not exist: cargo build --release --example tune")
+        raise SystemExit(f"{args.bin} does not exist: cargo build --release --features studies --example tune")
     halve(args, configs, problems)
 
 

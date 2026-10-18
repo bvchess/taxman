@@ -74,7 +74,7 @@ holds the units taken from them.  To enlarge the suite, make a checkpoint, `tune
 ## The driver
 
 ```text
-cargo build --release --example tune
+cargo build --release --features studies --example tune
 python3 -I bench/tuning/tune.py --configs CONFIGS.json --results RESULTS.jsonl [--workers P] [--nice N]
 python3 -I bench/tuning/tune.py --configs CONFIGS.json --results RESULTS.jsonl --report
 ```

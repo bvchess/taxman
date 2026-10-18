@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Scaling to 192 threads (2026-10-15): the measurements of rust/bench/wall/README.md, "For a cloud machine", items 7,
-# 8a, 8b, 1, 3 and 4, on a c8g.48xlarge.  Run as ec2-user in tmux after tools/cloud/setup.sh.  Every output goes under
+# 8a, 8b, 1, 3 and 4, on a c8g.48xlarge.  Run as ec2-user in tmux after STUDIES=1 tools/cloud/setup.sh (it runs `wall`,
+# a study tool that a default build skips).  Every output goes under
 # $OUT and is copied to S3 after each item; the copies of the results files (9 MB each) stay in $WORK, and only their
 # new lines go to $OUT.  The 64-thread runs of item 8 are bound to 64 CPUs of NUMA node 0 (a stand-in for the
 # one-node c8g.16xlarge); item 1 runs beside them on the last CPU, one thread.

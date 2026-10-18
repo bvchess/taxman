@@ -975,11 +975,12 @@ is about log-linear in the floor's distance below the root's bound, so each boar
 steps, which forecasts its proof; each step costs a tenfold more than the depth already proven, the board goes to its proof
 (the ordinary search, seeded and capped) when its gap is within two steps, and the boards go, after the climbs and those
 a proven neighbour has changed, by the forecast seconds of their proofs, cheapest first (`examples/ledger/cost.rs`; with no
-floor steps, by least `level + gap / gap_unit`, which finds the boards proven with no help from below).  The *finder*, large neighbourhood search
-(`examples/common/lns.rs`, which `wall finders` measures), is not sound and proves nothing, but a lower bound needs only
-a legal game: for `--lns-seconds` seconds of a worker it runs after a board's map and before a search whose best seed
-has changed since it last ran on the board (a climb's always has), and its game, which the referee replays like every
-lower bound, is offered as the board's L and seeds the search if it is better.  A proven board of the
+floor steps, by least `level + gap / gap_unit`, which finds the boards proven with no help from below).  The *finder*,
+large neighbourhood search (`examples/common/lns.rs`, measured in
+docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md), is not sound and proves nothing, but a lower
+bound needs only a legal game: for `--lns-seconds` seconds of a worker it runs after a board's map and before a search
+whose best seed has changed since it last ran on the board (a climb's always has), and its game, which the referee
+replays like every lower bound, is offered as the board's L and seeds the search if it is better.  A proven board of the
 ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
 through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 
@@ -1207,6 +1208,10 @@ fmt --check`: about 12 s to rebuild after a one-line change and about 16 s of te
 verifies most merges, a refactoring included.  The *full suite* is `cargo test --release`: every test, the long ones
 too (about 3 minutes of tests, after a build of 6 minutes).  It runs before a cloud run, after any change that changes
 search trees or results, and in the gates (the one-thread re-solve of 1301-2175).
+A default build (and so every run above, and the cloud setup) covers the library, the binary, the tests and the examples
+`ledger`, `perf` and `ladder`; the study tools, the examples `tune`, `extended`, `structure` and `wall` with the tests
+of `tune` and `wall`, are behind the Cargo feature `studies`: build them with `--features studies`, and run `cargo test
+--features studies` and `cargo clippy --all-targets --features studies` after a change to the library that they read.
 
 **Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
 below, the probe in section 10):

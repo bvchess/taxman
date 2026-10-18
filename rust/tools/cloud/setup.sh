@@ -16,6 +16,8 @@
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
 #   PROVER_ONLY=1 build and check only the prover (what prover.sh runs), not the solver: a few minutes less
+#   STUDIES=1     also build the study tools (tune, extended, structure, wall: cargo's feature `studies`); the default
+#                 build, with the ladder, the probe and the ledger, skips them
 #   TAXMAN_WORK     where results, checkpoints and logs live (see env.sh)
 #   RUSTFLAGS       default "-C target-cpu=native" (see env.sh)
 
@@ -138,7 +140,10 @@ exec > >(tee -a "$LOGS/setup.log") 2>&1
 # --- the build ---------------------------------------------------------------------------------------------------
 if [ "${PROVER_ONLY:-0}" != 1 ]; then
     say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (the ladder among them)"
-    (cd "$CRATE" && cargo build --release --bins --examples)
+    studies=""
+    if [ "${STUDIES:-0}" = 1 ]; then studies="--features studies"; fi
+    # shellcheck disable=SC2086 # an option, or nothing
+    (cd "$CRATE" && cargo build --release --bins --examples $studies)
     [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
     [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
 fi

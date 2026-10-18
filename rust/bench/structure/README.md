@@ -3,7 +3,7 @@
 What the census checks and why: the module comment of `examples/structure.rs` (it defines every field of a line) and
 heuristics/THEORY.md, "The frame model: what is proven and what remains" (Lemma Ω, N and Theorem M, whose hypotheses
 it checks).  It ran on the M1 Max, `nice -n 10`, on the code of commit 631e027 (`cargo build --release --example
-structure`, from `rust/`).
+structure`, from `rust/`; since the feature `studies` was added, `--features studies` too).
 
 | file | command | what it is |
 |---|---|---|
