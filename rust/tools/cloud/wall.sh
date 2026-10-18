@@ -43,6 +43,10 @@
 #   --checkpoint-interval S               seconds between checkpoints (CHECKPOINT_INTERVAL, chain.sh) default 300
 #   --continue                            go on with a run that has ended or been stopped (its S3 state is kept; the
 #                                         ended and stop objects are removed, the config is written again)
+# The build cache (RUNBOOK.md, section 15), by environment variables only; the config carries them to each machine's
+# setup.sh: RELEASE_TESTS=1 (a machine whose cache has no tested build of the commit builds it, runs the release suite
+# and, if it passes, stores the binaries; if it fails the run ends with RELEASE_TESTS_FAILED in $S3_DEST),
+# REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
 # Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1), BUCKET,
 # AWS_PROFILE and AWS_DEFAULT_REGION (us-east-1), DRY_RUN, AWS_CLI, and WALL_DIR (default ~/taxman-wall/RUN): where the
 # files that the commands take are written and kept (the user data, the launch template's data, the config).  The
@@ -252,7 +256,7 @@ write_config() {
     local file="$1" name
     : >"$file"
     for name in COMMIT INSTANCE_TYPE CHAIN_TO WINDOW GAME_HOURS BUDGET_HOURS THREADS EXTRA_ARGS CHECKPOINT_INTERVAL \
-        SAVE_EVERY LEDGER_MARGIN MAX_INSTANCES PRICE; do
+        SAVE_EVERY LEDGER_MARGIN MAX_INSTANCES PRICE RELEASE_TESTS REQUIRE_CACHED; do
         [ -z "${!name}" ] || printf '%s=%s\n' "$name" "${!name}" >>"$file"
     done
     printf 'RUN_UNTIL=%s\n' "$UNTIL_EPOCH" >>"$file"
@@ -276,6 +280,8 @@ launch() {
     MAX_INSTANCES="${MAX_INSTANCES:-20}"
     SAVE_EVERY="${SAVE_EVERY:-}"
     CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-}"
+    RELEASE_TESTS="${RELEASE_TESTS:-}"
+    REQUIRE_CACHED="${REQUIRE_CACHED:-}"
     local continuing=0 number
     while [ "$#" -gt 0 ]; do
         case "$1" in
