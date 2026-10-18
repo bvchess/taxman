@@ -4,7 +4,7 @@
 
 use super::book::{ceiling_game, monotone_game, prime_down, prime_up, Book, Entry, Lower, Rule, Upper};
 use super::report;
-use super::schedule::{self, read_ledger, Attempt, Done, Job, Kind, Running, Scheduler, Settings};
+use super::schedule::{self, read_ledger, Attempt, Done, Job, Kind, Running, Scheduler, Settings, Way};
 use super::support::TempDir;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -273,7 +273,7 @@ fn start(scheduler: &mut Scheduler, job: &Job) {
 
 /// A search that ended: the optimal game of `n`, proven by the search if `proven`; else a search that stopped, with a
 /// game scoring 1 less than the optimum (the moves are the optimal game's: nothing here replays them) and a dual bound
-/// 1 above it.
+/// at the optimum, so that the gap is 1.
 fn ended(n: u32, kind: Kind, proven: bool) -> Done {
     let attempt = Attempt {
         completed: proven,
@@ -281,7 +281,7 @@ fn ended(n: u32, kind: Kind, proven: bool) -> Done {
         value: if proven { opt(n) } else { opt(n) - 1 },
         moves: opt_game(n),
         promotions: Vec::new(),
-        upper: (!proven).then(|| opt(n) + 1),
+        upper: (!proven).then(|| opt(n)),
         nodes: 1000,
         seconds: 3.0,
     };
@@ -309,7 +309,7 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
     let mut climbed = Vec::new();
     for _ in 0..2 {
         let job = scheduler.next_job(0.0).unwrap();
-        assert_eq!(job.kind, Kind::Climb, "n={}", job.n);
+        assert_eq!(job.kind, Kind::Climb(Way::Up), "n={}", job.n);
         assert_eq!(job.limit, Duration::from_secs(60));
         let (below, entry) = (&scheduler.book.entries[&(job.n - 1)], &scheduler.book.entries[&job.n]);
         assert!(below.proven() && !entry.proven());
@@ -331,10 +331,10 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
     assert_eq!((ordinary.kind, ordinary.n), (Kind::Search, 930));
 
     // The climb to 909 proves it: 910 is climbed to next, with the game of 909.
-    scheduler.finish(ended(909, Kind::Climb, true)).unwrap();
+    scheduler.finish(ended(909, Kind::Climb(Way::Up), true)).unwrap();
     assert!(scheduler.book.entries[&909].proven());
     let next = scheduler.next_job(0.0).unwrap();
-    assert_eq!((next.kind, next.n), (Kind::Climb, 910));
+    assert_eq!((next.kind, next.n), (Kind::Climb(Way::Up), 910));
     assert!(next.seeds.contains(&scheduler.book.entries[&909].lower.as_ref().unwrap().moves));
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     let climb = events.lines().find(|line| line.contains("\"job\":\"climb\"")).expect("an event of the climb");
@@ -346,11 +346,11 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
 #[test]
 fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
     let dir = TempDir::new("ledger-climb-park");
-    let mut scheduler = climbing(&dir, &[906], &quiet());
+    let mut scheduler = climbing(&dir, &[906], &Settings { climb_down: false, ..quiet() });
     let job = scheduler.next_job(0.0).unwrap();
-    assert_eq!((job.kind, job.n), (Kind::Climb, 909));
+    assert_eq!((job.kind, job.n), (Kind::Climb(Way::Up), 909));
     start(&mut scheduler, &job);
-    scheduler.finish(ended(909, Kind::Climb, false)).unwrap();
+    scheduler.finish(ended(909, Kind::Climb(Way::Up), false)).unwrap();
 
     let entry = &scheduler.book.entries[&909];
     assert!(!entry.proven() && entry.parked, "{entry:?}");
@@ -365,21 +365,81 @@ fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     assert!(events.contains("\"job\":\"climb\"") && events.contains("\"outcome\":\"parked\""), "{events}");
 
-    let off = Settings { climb_limit: 0.0, ..quiet() };
-    let dir = TempDir::new("ledger-climb-off");
-    let scheduler = climbing(&dir, &[906], &off);
-    let job = scheduler.next_job(0.0).unwrap();
-    assert_eq!(job.kind, Kind::Search, "n={}", job.n);
+    for off in [Settings { climb_limit: 0.0, ..quiet() }, Settings { climb_up: false, climb_down: false, ..quiet() }] {
+        let dir = TempDir::new("ledger-climb-off");
+        let job = climbing(&dir, &[906], &off).next_job(0.0).unwrap();
+        assert_eq!(job.kind, Kind::Search, "n={}", job.n);
+    }
 }
 
-/// A run given the proven game of 900 climbs from it, with climbs of a few milliseconds some of which stop: every
-/// board is proven at its optimum, each board is climbed to at most once, a climb that ended unproven left its board
-/// parked in the ledger, and the report counts the climbs.  With `climb_limit` 0 no climb is made.
+/// With the game of 906 given, 909 is climbed to up and 903 down (904-908 are proven; 902 is not searched, 901 being
+/// the board of its class): the climb up goes first, the climb down is seeded with the proven game above, and a
+/// climb down that stops parks its board like one up, with the way in its event.  The ways are settable: the climb down
+/// alone goes first, the climb up alone has no climb down after it, and with neither there are none.  A board next to
+/// one that is climbed to, either way, has no ordinary search meanwhile.
+#[test]
+fn a_proven_board_is_climbed_down_from_after_the_climbs_up() {
+    let dir = TempDir::new("ledger-climb-down");
+    let mut scheduler = climbing(&dir, &[906], &quiet());
+    let up = scheduler.next_job(0.0).unwrap();
+    assert_eq!((up.kind, up.n), (Kind::Climb(Way::Up), 909), "the climbs up have priority");
+    start(&mut scheduler, &up);
+    let down = scheduler.next_job(0.0).unwrap();
+    assert_eq!((down.kind, down.n, down.limit), (Kind::Climb(Way::Down), 903, Duration::from_secs(60)));
+    let above = &scheduler.book.entries[&904];
+    assert!(above.proven() && down.seeds.contains(&above.lower.as_ref().unwrap().moves), "seeded with the game above");
+    assert_eq!(down.cap, scheduler.book.entries[&903].upper.map(|u| u.value), "capped by the ledger's bound");
+    start(&mut scheduler, &down);
+    scheduler.finish(ended(903, Kind::Climb(Way::Down), false)).unwrap();
+
+    let entry = &scheduler.book.entries[&903];
+    assert!(!entry.proven() && entry.parked && (entry.attempts, entry.level) == (1, 0), "{entry:?}");
+    let next = scheduler.next_job(0.0).unwrap();
+    assert_eq!((next.kind, next.n), (Kind::Search, 903), "the parked board is the cheapest ordinary search");
+    let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
+    let climb = events.lines().find(|line| line.contains("\"job\":\"climb\"")).expect("an event of the climb");
+    assert!(climb.contains("\"way\":\"down\"") && climb.contains("\"outcome\":\"parked\""), "{climb}");
+
+    // The ways alone: the climb down first when it is the only way, no climb down after the climb up when only up.
+    let only = |climb_up, climb_down| Settings { climb_up, climb_down, ..quiet() };
+    let dir = TempDir::new("ledger-climb-down-only");
+    let first = climbing(&dir, &[906], &only(false, true)).next_job(0.0).unwrap();
+    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Down), 903));
+    let dir = TempDir::new("ledger-climb-up-only");
+    let mut scheduler = climbing(&dir, &[906], &only(true, false));
+    let first = scheduler.next_job(0.0).unwrap();
+    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Up), 909));
+    start(&mut scheduler, &first);
+    assert_eq!(scheduler.next_job(0.0).unwrap().kind, Kind::Search, "no climb down");
+}
+
+/// The board below one that is being climbed to down has no ordinary search meanwhile, as the board above one climbed
+/// to up has none: 924 and 925 are both searched boards (the smallest of their repeat classes), 924 one of the
+/// cheapest of the ordinary order.
+#[test]
+fn a_board_next_to_a_climb_down_waits_as_one_next_to_a_climb_up_does() {
+    let dir = TempDir::new("ledger-climb-hold-down");
+    let mut scheduler = climbing(&dir, &[], &Settings { climb_limit: 0.0, ..quiet() });
+    let lower = Lower { value: opt(924), moves: opt_game(924), promotions: None, rule: Rule::Start, from: None };
+    scheduler.book.offer_lower(924, lower, false).unwrap();
+    scheduler.book.offer_upper(924, Upper { value: opt(924) + 1, rule: Rule::Root, from: None }, false).unwrap();
+    assert_eq!(scheduler.next_job(0.0).unwrap().n, 924, "the cheapest board, tied with 930, the lower");
+    let running = Running { kind: Kind::Climb(Way::Down), control: Control::new() };
+    scheduler.running.insert(925, running);
+    assert_eq!(scheduler.next_job(0.0).unwrap().n, 930, "924 waits for the climb down to 925");
+    scheduler.running.remove(&925);
+    assert_eq!(scheduler.next_job(0.0).unwrap().n, 924);
+}
+
+/// A run given the proven game of 906 climbs from it both ways, with climbs of a few milliseconds some of which stop:
+/// every board is proven at its optimum, each board is climbed to at most once, a climb that ended unproven left its
+/// board parked in the ledger, and the report counts the climbs of each way.  With one way only or with `climb_limit`
+/// 0, only the climbs that are asked for are made.
 #[test]
 fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
     let dir = TempDir::new("ledger-climb-run");
     let results = dir.join("given.jsonl");
-    write_results(&results, &[900]);
+    write_results(&results, &[906]);
     let settings = Settings {
         workers: 3,
         cpu_budget: 1e9,
@@ -396,26 +456,42 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     let events: Vec<Json> = events.lines().map(|line| Json::parse(line).unwrap()).collect();
     let text = |e: &Json, field: &str| e.get(field).and_then(Json::as_str).map(str::to_owned);
+    let number = |e: &Json| e.get("n").and_then(Json::as_u32).unwrap();
     let climbs: Vec<&Json> = events.iter().filter(|e| text(e, "job").as_deref() == Some("climb")).collect();
-    // 901 and 902 are proven by the relations with 900 (one repeat class): the first board to climb to is 903.
-    assert!(climbs.iter().any(|e| e.get("n").and_then(Json::as_u32) == Some(903)), "903 is climbed to");
-    let mut boards: Vec<u32> = climbs.iter().map(|e| e.get("n").and_then(Json::as_u32).unwrap()).collect();
+    let by_way = |way: &str| climbs.iter().filter(|e| text(e, "way").as_deref() == Some(way)).count();
+    // 904-908 are proven by the relations with 906 (one repeat class): the climb down is to 903.
+    let climbed = |n: u32, way: &str| climbs.iter().any(|e| number(e) == n && text(e, "way").as_deref() == Some(way));
+    let summary: Vec<String> = climbs
+        .iter()
+        .map(|e| format!("{} {} {}", number(e), text(e, "way").unwrap(), text(e, "outcome").unwrap()))
+        .collect();
+    assert!(climbed(903, "down") && by_way("up") > 0, "{summary:?}");
+    let mut boards: Vec<u32> = climbs.iter().map(|e| number(e)).collect();
     boards.sort_unstable();
     boards.dedup();
     assert_eq!(boards.len(), climbs.len(), "a board is climbed to once");
     for e in &climbs {
-        let n = e.get("n").and_then(Json::as_u32).unwrap();
         let outcome = text(e, "outcome").expect("a climb has its outcome");
         assert!(["proved", "parked", "moot"].contains(&outcome.as_str()), "{outcome}");
-        assert_eq!(entries.iter().find(|x| x.n == n).unwrap().parked, outcome == "parked", "n={n}: {outcome}");
+        let parked = entries.iter().find(|x| x.n == number(e)).unwrap().parked;
+        assert_eq!(parked, outcome == "parked", "n={}: {outcome}", number(e));
     }
     assert!(events.iter().any(|e| text(e, "job").as_deref() == Some("ordinary")), "ordinary searches too");
     let (report, ok) = report::report(&dir, &[]).unwrap();
-    assert!(ok && report.contains(&format!("climbs: {} among the searches", climbs.len())), "{report}");
+    assert!(ok, "{report}");
+    for way in ["up", "down"] {
+        assert!(report.contains(&format!("climbs {way}: {} among the searches", by_way(way))), "{report}");
+    }
 
-    let dir = TempDir::new("ledger-climb-run-off");
-    let settings = Settings { climb_limit: 0.0, ..settings };
-    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
-    let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
-    assert!(events.contains("\"job\":\"ordinary\"") && !events.contains("\"job\":\"climb\""), "climbs are off");
+    // One way, or none: only the climbs asked for are made.
+    let climbs_of = |settings: &Settings| {
+        let dir = TempDir::new("ledger-climb-run-ways");
+        assert_eq!(schedule::run(901, 960, &dir, settings, Some(&results)).unwrap(), "all proven");
+        let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
+        (events.contains("\"way\":\"up\""), events.contains("\"way\":\"down\""), events.contains("\"job\":\"climb\""))
+    };
+    assert_eq!(climbs_of(&Settings { climb_down: false, ..settings.clone() }), (true, false, true));
+    assert_eq!(climbs_of(&Settings { climb_up: false, ..settings.clone() }), (false, true, true));
+    assert!(!climbs_of(&Settings { climb_up: false, climb_down: false, ..settings.clone() }).2);
+    assert!(!climbs_of(&Settings { climb_limit: 0.0, ..settings }).2, "climbs are off");
 }

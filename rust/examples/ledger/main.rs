@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
-//!     [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]
+//!     [--climb up|down|both|off] [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]
 //! cargo run --release --example ledger -- report DIR [--known FILE]...
 //! ```
 //!
@@ -41,17 +41,21 @@
 //!   of the cost (the chain's steps rise a decade with about 580 of the standalone gap, `bench/landscape/`).
 //!   `--workers` searches at once (default all CPUs).  When a board is proven, its search is stopped if one is going,
 //!   and its checkpoint deleted; a search whose U falls is given the lower ceiling.
-//! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from the board below.  A search
-//!   whose board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
+//! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
+//!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
 //!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A
 //!   board that is searched, not proven, not parked, and has its board below proven (however that was proven, and
-//!   however many boards between were settled by the relations) gets a climb ahead of every other job: its search,
+//!   however many boards between were settled by the relations) gets a climb *up* ahead of every other job: its search,
 //!   as above (so seeded with the proven game), for `--climb-limit` seconds (default 60; 0: no climbs), resumed from its
 //!   checkpoint if it has one, and not counted among its ordinary searches (its `level` and so its next limit stay).
-//!   If the climb proves the board, the board above it is climbed to next, and so on.  If it stops at its limit the
-//!   board is *parked* (`parked` in the ledger): it goes by the ordinary order, with its checkpoint, and the climb from
-//!   that wedge ends.  Climbs from different wedges run side by side.  A board whose board below is being climbed to
-//!   waits (no ordinary search of it starts), as the climb may prove the board below within its limit.
+//!   If the climb proves the board, the board above it is climbed to next, and so on.  A board with its board *above*
+//!   proven gets a climb *down*, after the climbs up: seeded with that game (the game below it that Lemma L2 makes from
+//!   it is the optimum for n − 1 in about 35% of the composite pairs), but with the ledger's ceiling, which is loose
+//!   (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.  `--climb` picks the ways (`up`, `down`,
+//!   `both`, the default, or `off`).  If a climb stops at its limit the board is *parked* (`parked` in the ledger): it
+//!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
+//!   run side by side.  A board next to one that is being climbed to waits (no ordinary search of it starts), as the
+//!   climb may prove that board within its limit.
 //! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
 //!   result is small beside a search, `settle` aside.  A relation's upper bound is arithmetic; its lower bound is a game,
 //!   made once for each lower bound of its source, not at all when its score cannot beat the target's (the prime
@@ -70,7 +74,7 @@
 //! run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`, `seconds`, `nodes` of this search,
 //! `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual bound, null if it completed), the
 //! bounds `before` and `after`, each [L, U]; a search also has its `job`, `ordinary` or `climb`, and a climb its
-//! `outcome`: `proved` (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
+//! `way` (`up` or `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved` (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
 //! went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
 //! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
 //! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
@@ -105,8 +109,8 @@ use std::path::PathBuf;
 
 fn usage() -> ! {
     eprintln!(
-        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--climb-limit S] \
-         [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR [--known FILE]..."
+        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--climb up|down|both|off] \
+         [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR [--known FILE]..."
     );
     std::process::exit(2)
 }
@@ -135,6 +139,15 @@ fn main() {
             "--base" => settings.base = number(&arg, args.next()),
             "--max-limit" => settings.max_limit = number(&arg, args.next()),
             "--climb-limit" => settings.climb_limit = number(&arg, args.next()),
+            "--climb" => {
+                (settings.climb_up, settings.climb_down) = match args.next().as_deref() {
+                    Some("up") => (true, false),
+                    Some("down") => (false, true),
+                    Some("both") => (true, true),
+                    Some("off") => (false, false),
+                    _ => usage(),
+                }
+            }
             "--gap-unit" => settings.gap_unit = number(&arg, args.next()),
             "--save-every" => settings.save_every = number(&arg, args.next()),
             flag if flag.starts_with("--") => usage(),
