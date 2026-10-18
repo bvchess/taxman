@@ -139,4 +139,10 @@ nodes).  It is in `wall finders`, `wall sound` and the ledger (below), not in th
   seeded each search.  Dry runs: every board proven, 0 violations; 1301..1500 in 612 CPU s and 122 s against 557 and
   145 without it (its game ends as the lower bound of 51 of the 89 boards searched); 2576..2700 at 900 CPU s proves 61
   boards on or off.  Next (Brian approved $1, 2026-10-17): 2176..3440 again with everything on, to learn what sets up a
-  run past 3440 best ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
+  run past 3440 best ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).  **The bounds
+  store** (built the same day; not yet made): `results/bounds.jsonl`, the bounds a run finds kept for good, append-only,
+  a line each, for the boards the chain has not proven (`ledger export`; `run --bounds` starts from it, a board with both
+  bounds needing no map; `verify-bounds` and `tools/check_bounds.py` are its two referees; 778 bytes a board in the dry
+  run).  The first real export, of the run past 3440, waits for review
+  ([the entry's section](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-bounds-store),
+  [results/README](../results/README.md#boundsjsonl)).

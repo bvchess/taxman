@@ -5,8 +5,13 @@
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
-//!     [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--save-every S]
+//!     [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--bounds FILE]
+//!     [--save-every S]
 //! cargo run --release --example ledger -- report DIR [--known FILE]...
+//! cargo run --release --example ledger -- export DIR --bounds FILE --source NAME [--checkpoints PREFIX]
+//!     [--strict FILE] [--date YYYY-MM-DD]
+//! cargo run --release --example ledger -- verify-bounds FILE [--strict FILE] [--workers P]
+//! cargo run --release --example ledger -- games FILE [--workers P]
 //! ```
 //!
 //! **run** keeps the ledger of the boards A..B in DIR and works on it until every board is proven, the CPU budget of
@@ -105,6 +110,20 @@
 //! proven against CPU, the gaps left, and the check of every board against the known optima (optimal.json and the
 //! completed games of each `--known FILE`): every game replays to its L, L <= opt <= U, and a proven value is the
 //! optimum.  It exits with status 1 if the check finds anything wrong.
+//!
+//! **The bounds store** (`store.rs` the line and its checks, `export.rs`, `verify.rs`; results/README.md, "bounds.jsonl",
+//! has the format).  The bounds a run finds are kept in a file of their own, `results/bounds.jsonl`, one JSON line a
+//! bound, appended and never changed; a line is added only when it improves the file's best bound of its board and
+//! side, and a board is proven when its best lower bound is its best upper bound.  **export** appends to `--bounds`
+//! (created if it is not there) the bounds of the run in DIR that improve on its best, for the boards that `--strict`
+//! (default results/strict.jsonl) has not proven, and prints what it appended and which boards are newly proven: a
+//! lower bound with its game (the promotion set when the game was made from one; cited, the line of the game it was
+//! carried from, when a relation carried it), an upper bound with its rule, the board and value it was derived from,
+//! and the boards at which it assumes statement U; `--source` names the run,
+//! `--checkpoints` the place (a prefix, with `nN.ckpt` under it) of the checkpoints of the searches that gave the dual
+//! bounds.  **run --bounds** starts a run from the file's best bounds of its stretch, each game replayed by the
+//! referee, and a board with both bounds there is not mapped.  **verify-bounds** is the Rust referee of the file (see
+//! `verify.rs`); **games** writes the moves of its promotion sets for the Python referee, tools/check_bounds.py.
 
 #[allow(dead_code, unused_imports)] // the ledger reads only the process's CPU time
 #[path = "../common/counters.rs"]
@@ -124,19 +143,33 @@ mod rng;
 mod support;
 
 mod book;
+mod export;
+mod pool;
 mod report;
 mod schedule;
+mod store;
+mod verify;
 
 use schedule::Settings;
 use std::path::PathBuf;
+
+/// The committed chain, whose games the bounds store cites and leaves out.
+const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/strict.jsonl");
 
 fn usage() -> ! {
     eprintln!(
         "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] \
          [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] \
-         [--save-every S]\n       ledger report DIR [--known FILE]..."
+         [--bounds FILE] [--save-every S]\n       ledger report DIR [--known FILE]...\n       \
+         ledger export DIR --bounds FILE --source NAME [--checkpoints PREFIX] [--strict FILE] [--date YYYY-MM-DD]\n       \
+         ledger verify-bounds FILE [--strict FILE] [--workers P]\n       ledger games FILE [--workers P]"
     );
     std::process::exit(2)
+}
+
+/// The text of a flag's value that must not be missing.
+fn text(value: Option<String>) -> String {
+    value.unwrap_or_else(|| usage())
 }
 
 fn number<T: std::str::FromStr>(name: &str, value: Option<String>) -> T {
@@ -152,12 +185,19 @@ fn main() {
     let command = args.next().unwrap_or_else(|| usage());
     let mut positional = Vec::new();
     let (mut dir, mut proven, mut known, mut cpu_hours) = (None, None, Vec::new(), None);
+    let (mut bounds, mut source, mut checkpoints, mut date) = (None, None, None, None);
+    let mut strict = PathBuf::from(STRICT);
     let mut settings = Settings { signals: true, ..Settings::default() };
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--dir" => dir = args.next().map(PathBuf::from),
             "--proven" => proven = args.next().map(PathBuf::from),
-            "--known" => known.push(PathBuf::from(args.next().unwrap_or_else(|| usage()))),
+            "--known" => known.push(PathBuf::from(text(args.next()))),
+            "--bounds" => bounds = args.next().map(PathBuf::from),
+            "--strict" => strict = PathBuf::from(text(args.next())),
+            "--source" => source = args.next(),
+            "--checkpoints" => checkpoints = args.next(),
+            "--date" => date = args.next(),
             "--cpu-hours" => cpu_hours = Some(number::<f64>(&arg, args.next())),
             "--workers" => settings.workers = number(&arg, args.next()),
             "--base" => settings.base = number(&arg, args.next()),
@@ -197,6 +237,7 @@ fn main() {
                 usage();
             }
             settings.cpu_budget = hours * 3600.0;
+            settings.bounds = bounds;
             schedule::run(first, last, &dir, &settings, proven.as_deref()).map(|reason| println!("ledger: {reason}"))
         }
         "report" => {
@@ -212,6 +253,31 @@ fn main() {
                 Err(e) => Err(e),
             }
         }
+        "export" => {
+            let ([run_dir], Some(bounds), Some(source)) = (positional.as_slice(), bounds, source) else { usage() };
+            let date = date.unwrap_or_else(export::today);
+            if !store::is_date(&date) {
+                usage();
+            }
+            let options = export::Options { source: &source, date: &date, checkpoints: checkpoints.as_deref() };
+            export::export(&PathBuf::from(run_dir), &bounds, &strict, &options)
+                .map(|summary| println!("ledger export: appended to {}: {summary}", bounds.display()))
+        }
+        "verify-bounds" => {
+            let [file] = positional.as_slice() else { usage() };
+            verify::verify(&PathBuf::from(file), &strict, settings.workers).map(|(text, ok)| {
+                print!("{text}");
+                if !ok {
+                    std::process::exit(1);
+                }
+            })
+        }
+        "games" => {
+            let [file] = positional.as_slice() else { usage() };
+            let mut out = std::io::BufWriter::new(std::io::stdout().lock());
+            verify::games(&PathBuf::from(file), &mut out, settings.workers)
+                .map(|count| eprintln!("ledger games: {count} games"))
+        }
         _ => usage(),
     };
     if let Err(e) = result {
@@ -220,5 +286,7 @@ fn main() {
     }
 }
 
+#[cfg(test)]
+mod store_tests;
 #[cfg(test)]
 mod tests;

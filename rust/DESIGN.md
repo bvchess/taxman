@@ -967,6 +967,22 @@ lower bound, is offered as the board's L and seeds the search if it is better.  
 ledger is proven within the frame model like a game of the chain past 2175 (given U at the boards its upper bound came
 through); the ledger is not a results file and nothing of it goes into `results/strict.jsonl`.
 
+The bounds a run finds are kept for good in the **bounds store**, `results/bounds.jsonl` (`examples/ledger/store.rs`;
+the format, the commands and the referees are in [results/README, "bounds.jsonl"](results/README.md#boundsjsonl)): one
+JSON line a bound, schema 1, appended and never changed, a line added only when it improves the file's best bound of its
+board and side, and none for a board the chain has proven.  A lower bound is a game (its promotions where it was made
+from them, which `solution_for_promotions` turns into moves; cited, `from` and `from_value`, where a relation made it
+from the game of another line; else its moves) that the referee replays at the line's value.  An upper bound has its rule,
+the bound and board it was derived from (`from`, `from_value`, and for a repeat the two bags) and `rests_on`, the boards
+at which it assumes statement U: its own board for a bound of the frame model, what the bound it comes from rests on for
+a relation, and its own board added for a repeat (Lemma L4's inequality between upper bounds).  `ledger export` appends a run's improvements,
+`ledger run --bounds` starts a run from the file's best bounds (a board with both needs no map), `ledger verify-bounds`
+is the Rust referee (it replays every game, recomputes every root bound and every repeat's bags and search problem, and
+checks every relation's arithmetic against the line it cites) and `tools/check_bounds.py` the Python one (it replays the
+games, cited ones rebuilt by its own constructions and promotion sets from the moves that `ledger games` writes, and
+checks the arithmetic).  The store holds only bounds that hold; the finder's games are in it because the referee has
+replayed them.
+
 ### Same search
 
 Consecutive boards often pose exactly the same search problem with another ceiling: of the 2946 games of the committed

@@ -134,6 +134,21 @@ def referee(n, moves, divisors):
     return score, left
 
 
+def finished_problems(n, moves, divisors):
+    """(score, problems) of a game that claims to be finished: the replayed score (None if the game is illegal, and
+    then the one problem says why) and what else is wrong with it: not over, or not opening with the largest prime."""
+    try:
+        score, left = referee(n, moves, divisors)
+    except ValueError as e:
+        return None, [f"illegal: {e}"]
+    found = []
+    if left:
+        found.append(f"not over: legal moves left {left[:8]}")
+    if n >= 2 and (not moves or moves[0] != largest_prime_at_most(n)):
+        found.append(f"opens with {moves[:1]}, not the largest prime {largest_prime_at_most(n)}")
+    return score, found
+
+
 def read_lines(path, problems):
     """The parsed lines of a results file as (line number, object); an unparsable last line is torn."""
     raw = path.read_text().split("\n")
@@ -285,17 +300,14 @@ def check_file(path, optimal, fm, heuristic, divisors, problems):
             problems.append(f"{path.name} line {number} (n={n}): {message}")
 
         moves, promotions = row["moves"], row["promotions"]
-        try:
-            score, left = referee(n, moves, divisors)
-        except ValueError as e:
-            fail(f"illegal: {e}")
+        score, found = finished_problems(n, moves, divisors)
+        if score is None:
+            fail(found[0])
             continue
         if score != row["score"]:
             fail(f"replays to {score}, not the recorded {row['score']}")
-        if left:
-            fail(f"not over: legal moves left {left[:8]}")
-        if n >= 2 and (not moves or moves[0] != largest_prime_at_most(n)):
-            fail(f"opens with {moves[:1]}, not the largest prime {largest_prime_at_most(n)}")
+        for message in found:
+            fail(message)
         if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
             fail("the promotions are not moves in ascending order")
         if n in optimal and score != optimal[n]["score"]:

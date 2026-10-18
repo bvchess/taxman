@@ -3,7 +3,8 @@
 One JSON line per game, as `taxman solve --out` writes it (the fields are described in `src/results.rs` and in
 [../README.md](../README.md#a-results-line---out-schema-5)).  This page says what each file is, how it was made, and
 what supports the scores in it.  The counts in it are pinned by `tests/results.rs`, so changing a file means updating
-both together.
+both together.  The one file of another kind, `bounds.jsonl` (bounds on opt(n), a line each, for boards the chain has
+not proven), is described at the end.
 
 ## The files
 
@@ -248,3 +249,105 @@ starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reprodu
 tactic on: 416 repeats, 311 exhausted, 92 at the ceiling, 168 prime and 13 trivial, 7.5 s of search in all on 8 threads,
 the slowest n = 992 at 0.7 s.  The table has not been extended past 1300, and stays there: `taxman extend-optimal
 results/strict.jsonl` would add the 2140 games of 1301–3440.
+
+## bounds.jsonl
+
+The bounds on opt(n) that [the ledger](../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md) finds, kept for
+good, for the boards the chain has not proven.  The file is made by the first `ledger export` and is not in the tree
+until then.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, `taxman
+verify-results` and `tools/check_results.py` do not read it, a board that `strict.jsonl` has proven has no line in it,
+and it is not `explore.jsonl`'s kind of file either (that one is the sweep's games).  Its lines are bounds that hold:
+a lower bound is the score of a finished game that the referee replays, an upper bound is the frame model's, carried
+between boards by the lemmas of [THEORY.md](../../heuristics/THEORY.md#the-ledger-bounds-between-boards).  A board is
+proven when its best lower bound equals its best upper bound, and the file is the record of those proofs.
+
+**Append-only.**  A line is never changed or removed.  A new line is added only when it improves the file's best bound
+of its board and side (a lower bound above every earlier lower bound of the board, an upper bound below every earlier
+one), so a second export of the same ledger appends nothing; both checkers refuse a line that improves nothing.
+
+**The commands** (from `rust/`; the program is the example `ledger`, built with `cargo build --profile test --example
+ledger` on the laptop; its module comment, `examples/ledger/main.rs`, has every flag):
+
+    ledger export RUN_DIR --bounds results/bounds.jsonl --source NAME [--checkpoints S3_PREFIX]
+    ledger run A-B --dir DIR --cpu-hours H ... --bounds results/bounds.jsonl
+    ledger verify-bounds results/bounds.jsonl
+    ledger games results/bounds.jsonl > games.jsonl
+    python3 -I tools/check_bounds.py results/bounds.jsonl --games games.jsonl
+
+`export` appends the bounds of the run's `ledger.jsonl` that improve on the file's best, for the boards not already
+games of `results/strict.jsonl` (`--strict` names another file), creating the file if there is none, and prints what it
+appended: boards, lower and upper bounds that are first of their board or improve one, boards newly proven.  `--source`
+names the run (every line records it, with the day); `--checkpoints` is the place of the run's checkpoints (the prefix of
+`nN.ckpt`, for instance `s3://BUCKET/ledger-DATE/out/run/ckpt`), recorded on the dual bounds of the boards not proven.
+`run --bounds` starts the run from the file's best bounds for the boards of its stretch: each lower bound's game is
+replayed by the referee, each upper bound is taken as the file has it, and a board with both needs no map; its lower
+bound's game is its incumbent and the finder's input, as a proven game that is given is.  Run `verify-bounds` on the file
+first: the run takes its upper bounds on its word.
+
+**The line.**  One JSON object, with the fields below and no others:
+
+| field | on | meaning |
+|---|---|---|
+| `schema` | every line | 1 |
+| `n`, `side`, `value`, `rule` | every line | the board, `lower` or `upper`, the bound on opt(n), and how it was derived |
+| `from` | the relations | the board the bound came from |
+| `from_value` | an upper bound by a relation; a lower bound whose game is cited | the value of the upper bound of `from` it was derived from; the lower bound of `from` whose game the line carries across |
+| `bag`, `from_bag` | an upper bound by `repeat` | `in_the_bag` of `n` and of `from` |
+| `rests_on` | an upper bound | the boards at which statement U is assumed, ascending |
+| `checkpoint` | a `dual` upper bound | where the checkpoint of the search that gave it is, if the export was told |
+| `source`, `date` | every line | the run (`--source`) and the day of the export, `YYYY-MM-DD` |
+| `promotions` or `moves` | a lower bound with its game | the game: the promotions it was made from, or its moves |
+
+The rules of a lower bound: `start` (the standalone start incumbent of the board's map), `search` (a search's best
+game), `lns` (the finder's game), `given` (a proven game given to the run); and the relations, `monotone` (the game of
+n − 1 followed by n), `ceiling` (the game of n + 1 without the move n + 1, completed), `prime` (the game of the board
+next to a prime with its opening exchanged) and `repeat` (the promotions of the game of a board with the same search
+problem, played on this board).  The rules of an upper bound: `root` (the GF(2) bound of the root), `dual` (the dual
+bound of a search that a limit stopped), `exhausted` (a search that explored its whole tree), `given`, and the relations
+`ceiling` (U(n) ≤ U(n − 1) + n), `monotone` (U(n − 1) ≤ U(n)), `prime` (U(p) = U(p − 1) + p − q, q the largest prime
+below p, both ways) and `repeat` (U(n) − bag(n) ≤ U(m) − bag(m)).  A line of 4501 might read:
+
+    {"schema":1,"n":4501,"side":"upper","value":9051234,"rule":"ceiling","from":4500,"from_value":9046733,"rests_on":[4500],"source":"ledger-4400-8191","date":"2026-10-18"}
+
+**A lower bound's game** is given in one of three forms, the most compact that is possible.  A game made from promotions
+(a search's, the finder's, the start's, a repeat of such a game) is its `promotions`, ascending, which
+`solution_for_promotions` turns into moves (about 330 bytes at n = 900, about 1.1 kilobytes at n = 3440, where the
+moves would take 9).  A game that a relation (`monotone`, `ceiling`, `prime`) made from the game of another board is
+not written but cited: the line has `from` and `from_value` and no game, and its game is the lemma's construction
+applied to the game of the lower bound of `from` that is worth `from_value`, which a line before it gives (a game of
+the chain is never cited: a run need not have the chain).  Any other game is its `moves`.
+
+**What an upper bound rests on.**  Every upper bound is a bound of the frame model at some board (a root bound, a dual
+bound, a completed search, a given game), which is opt(n) where statement U holds at that board; the lemmas carry it
+between boards without more, except the upper half of Lemma L4, which rests on U at the board it is carried to
+([THEORY.md, "In the ledger"](../../heuristics/THEORY.md#the-ledger-bounds-between-boards)).  `rests_on` lists the
+boards: a bound of the frame model has its own board alone, a relation has what the bound it comes from rests on (a
+board of the chain that it cites counts as resting on itself), and a repeat adds its own board.  U is certified for
+every n up to 2175 (DESIGN.md, "What optimal means"), so a bound whose list holds only boards up to 2175 rests on no open
+statement; a proven board is opt(n) wherever U holds at the boards of the `rests_on` of its upper bound.
+
+**Two referees**, as the results files have.  `ledger verify-bounds FILE` (Rust; `examples/ledger/verify.rs`) checks
+every line: its form; that it improves on the lines before it; that every lower bound's game replays under the
+referee (`replay_finished`: legal, over, opening with the largest prime) at the value of the line, a cited game made
+from the one it cites; that every `root` bound is recomputed and equal; that every repeat's bags and search problems
+are recomputed and equal to its source's; that every relation's arithmetic holds against the line it cites (a line
+before it with a bound of that board at most `from_value`, or a game of the chain) and rests on what that line rests on;
+and that where the chain has a game of a board, the file's bounds enclose its score.  It reports the proven boards, and
+lists the bounds it takes on their record: the `exhausted` and `dual` bounds of searches, which no check short of the
+search recomputes, and the `given` games.  `tools/check_bounds.py` (Python, standard library only, run with `python3
+-I`) is the second referee of the games and of the arithmetic: it shares no code with the Rust crate, loads the rules
+of the game from `tools/check_results.py`, and writes out the arithmetic of the lemmas and the constructions of the
+cited games again.  It cannot rebuild a game from promotions, which needs the frame model, so `ledger games FILE` writes
+the moves of every promotion set (the game that `solution_for_promotions` makes of it) and the checker replays those by
+its own rules and checks that they contain the promotions and score the line's value: whatever the frame model did to
+make them, a game that is not a game of its value is refused, and the link between the promotions and the moves is the
+Rust program's.  What the Python referee takes on the line's record, because only the Rust one can compute it: root
+bounds, a repeat's bags and the identity of its two search problems, and the bounds of searches.  Both exit with status 1
+if any check fails and name the line (`line K (n=N)`).
+
+**Size**, from the laptop's dry run of 901..960 with the truth hidden ([bench/ledger/store/](../bench/ledger/store/)):
+58 boards of the stretch not in the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a
+board, from lines of 330 bytes for a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155
+for an upper bound.  At the end of the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, a cited
+game and an upper bound about 150 and 220 bytes: of the order of 3 kilobytes a board in a first export (about 12
+megabytes for 3,800 boards), less than `strict.jsonl`'s 5 (17.7 megabytes for 3,440 games).

@@ -1906,6 +1906,16 @@ a proof, and its game is a lower bound once the referee has replayed it.  Its ev
 `seed_from`, `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line are what the
 run is for: what sets up a run past 3440 best.
 
+**The bounds store.**  The bounds a run finds are kept in `results/bounds.jsonl` ([results/README, "bounds.jsonl"](../../results/README.md#boundsjsonl)).
+`BOUNDS=results/bounds.jsonl` (an option of `bench/ledger/cloud.sh`, with the file in the checkout the machine cloned)
+starts the run from the file's best bounds of its stretch, and a board with both needs no map (the maps of 3441..8191
+cost about 65 core-hours); run `ledger verify-bounds` on the file first.  After the run, on the laptop with the results
+home (below), `ledger export bench/ledger/cloud-DATE/run --bounds results/bounds.jsonl --source NAME --checkpoints
+s3://BUCKET/ledger-DATE/out/run/ckpt` appends what improved and prints it; `ledger verify-bounds results/bounds.jsonl`
+and `ledger games results/bounds.jsonl > games.jsonl; python3 -I tools/check_bounds.py results/bounds.jsonl --games
+games.jsonl` check the file with both referees, and the file is then committed.  The checkpoints are in S3 only for the
+searches that are still going: a board proven has none.
+
 **Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
 searches going, the climbs of each way ended, those that proved their board and those that stopped at their limit
 (parked), and how long the main thread has been busy and results waited for it; after the maps the CPU spent should rise by nearly

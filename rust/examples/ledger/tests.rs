@@ -17,22 +17,22 @@ use taxman::engine::Control;
 use taxman::game::{largest_prime_at_most, replay_finished, Optimal};
 use taxman::json::Json;
 
-fn opt(n: u32) -> u64 {
+pub(crate) fn opt(n: u32) -> u64 {
     Optimal::built_in().score(n).expect("a board of optimal.json")
 }
 
-fn opt_game(n: u32) -> Vec<u32> {
+pub(crate) fn opt_game(n: u32) -> Vec<u32> {
     Optimal::built_in().moves(n).expect("a board of optimal.json").to_vec()
 }
 
 /// A book of the boards `ns`, with no bounds but those of the trivial boards.
-fn book_of(ns: impl Iterator<Item = u32>) -> Book {
+pub(crate) fn book_of(ns: impl Iterator<Item = u32>) -> Book {
     let ns: Vec<u32> = ns.collect();
     Book::new(schedule::all_facts(&ns, 8).expect("the boards' facts"))
 }
 
 /// Gives the book the optimal game of `n` as proven.
-fn give(book: &mut Book, n: u32) {
+pub(crate) fn give(book: &mut Book, n: u32) {
     let lower = Lower { value: opt(n), moves: opt_game(n), promotions: None, rule: Rule::Given, from: None };
     book.offer_lower(n, lower, true).unwrap();
     book.offer_upper(n, Upper { value: opt(n), rule: Rule::Given, from: None }, true).unwrap();
@@ -223,7 +223,7 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
 }
 
 /// Writes a results file of the optimal games of `ns` to `path`, to give a run as proven.
-fn write_results(path: &Path, ns: &[u32]) {
+pub(crate) fn write_results(path: &Path, ns: &[u32]) {
     let line = |n: u32| {
         let moves: Vec<String> = opt_game(n).iter().map(u32::to_string).collect();
         format!("{{\"n\":{n},\"score\":{},\"moves\":[{}],\"completed\":true}}\n", opt(n), moves.join(","))

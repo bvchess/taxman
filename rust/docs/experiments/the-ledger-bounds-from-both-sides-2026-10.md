@@ -412,3 +412,114 @@ with the board (the start incumbent alone costs 1 to 7 s there); skipping it bef
 
 **Commits.**  4621d97 (the finder in the ledger and its tests), then this record.
 
+## Later (2026-10-17): the bounds store
+
+**Why.**  A run on 4400..8191 is going, and what it finds is knowledge even where no game is proven: for every board a
+game worth L and a bound U, with how each was derived.  Those lived only in a run's directory (`ledger.jsonl`), on the
+laptop or in S3, and the maps of 3441..8191 alone cost about 65 core-hours.  The owner wants a durable, committed place
+for them, and future runs that start from it.  A board is proven when its best L equals its best U, so the store is the
+record of those proofs too, and `explore.jsonl` stays the home of `taxman solve --keep-going`.
+
+**What was built** (`examples/ledger/`: `store.rs` the line and its checks, `export.rs`, `verify.rs`, `pool.rs`;
+`tools/check_bounds.py`; the format is in [results/README, "bounds.jsonl"](../../results/README.md#boundsjsonl), the
+commands in the module comment of `main.rs`):
+
+* **The file** `results/bounds.jsonl`, append-only, one line a bound, a new line only when it improves the file's best
+  of its board and side; not created (the first real export is the lead's, after review).
+* **`ledger export RUN_DIR --bounds FILE --source NAME [--checkpoints PREFIX]`**: appends what improves on the file's
+  best, for the boards `results/strict.jsonl` has not proven, lower bounds first and each upper bound after the bounds it
+  cites; prints the lines, boards, first and improved bounds of each side, and the boards newly proven.  It checks its
+  lines with the checker's own `Chain` before it writes them.  **`ledger run ... --bounds FILE`** starts from the file's
+  best bounds of the stretch (each game replayed by the referee, a board with both bounds not mapped).
+  **`ledger verify-bounds FILE`**, **`ledger games FILE`** and **`tools/check_bounds.py FILE --games G`**: the two
+  referees (below).
+* `book::upper_by`, `carries` and `carry_game`: the arithmetic of Lemmas L1 to L4 and the constructions of L1 to L3, one
+  copy each, which the book's relations (`derive`) use as the store's checks do.
+
+**Choices.**
+
+* **A lower bound's game in the most compact form there is.**  Promotions, where the game was made from them (a
+  search's, the finder's, the start's; a repeat of such a game): about 330 bytes at n = 900 and 1.1 kilobytes at n = 3440,
+  against 1.7 and 9 for the moves.  A game that a relation made of another board's game (monotone, ceiling, prime) is
+  *cited*, not written: `from` and `from_value`, no game, its game the lemma's construction applied to the game of the
+  line before it that gives `from` that value (135 bytes).  Everything else, a repeat of a game that had no promotions
+  and a game given from a results file, is its moves.  Without the cited form the dry run's file was 75 kilobytes, not 45
+  (1,299 bytes a board, not 778: 26 of its 72 games in moves, against 7 and 19 cited), and the file of the boards past
+  the chain would have been of the order of 26 megabytes, not 12; the file cannot be rewritten once it is committed,
+  so the form had to be there from the first export.
+  The exporter cites only when the ledger's game *is* the construction applied to the ledger's lower bound of `from` and
+  the file has that line by then (else it writes the moves), and never cites a game of the chain (a run need not have it).
+* **The Python referee and promotions.**  A game made from promotions needs the frame model to become moves, which the
+  Python referee does not have and should not (it shares no code with the crate).  So `ledger games FILE` writes the moves
+  of every promotion set, and `check_bounds.py` replays those by its own rules (loaded from `check_results.py`, the
+  results files' referee: one copy of "legal, over, opens with the largest prime") and checks that they contain the
+  promotions and score the line's value.  Whatever the frame model did to make them, a game that is not a game of its value
+  is refused; the link between the promotions and the moves (that `solution_for_promotions` made them) is the Rust
+  referee's, which replays the same promotion sets.  The cited games it rebuilds itself, with its own port of `complete`
+  and the prime exchange, so it checks the constructions of L1 to L3 on the data.  The line carries nothing for the
+  Python referee beyond that: the alternative, moves beside every promotion set, would have made the file several times
+  larger.
+* **What an upper bound rests on** is `rests_on`, the boards at which statement U is assumed: its own board for a root,
+  dual or exhausted bound or a given game, what the bound it comes from rests on for a relation, and its own board added
+  for a repeat (Lemma L4's upper half).  A board of the chain that a bound cites counts as resting on itself (the
+  chain's proof of it may rest on the boards before it as well; its lines say so).  A relation's line cites the bound it
+  came from, `from` and `from_value`, and the checkers require a line before it (or a game of the chain) with a bound of
+  that board at most `from_value`, and that its `rests_on` holds what that line's does; its value may be above what the
+  arithmetic gives (a weaker bound is a bound), never below.
+* **The export cites what there is.**  The final ledger holds each bound's `from` but not the value of the source it was
+  derived from; the export takes the source's value from the file after the export, so that a line derived from a bound
+  the file has since bettered cites the better one, and says so with a smaller value (still a bound the lemma gives).
+  The ledger of a run that started from the file has the file's bounds as its own, so a second export appends only what
+  that run improved.
+* **The chain bounds the file.**  Where the chain has a game of a board that the file also has bounds of (a board that
+  entered the chain later), both referees require L ≤ score ≤ U.  A run on boards the chain has proven is then a test:
+  the dry run's proven values are the chain's scores.
+
+**Tests (the quick suite)**, `store_tests.rs`: a line is written and read back, and a malformed one is refused (a field
+not in the format, no `rests_on`, a rule of the other side, a relation with no board or the wrong boards, a game on an
+upper bound, promotions out of order, a game both written and cited, a repeat or a wrong direction cited); the dates
+(`civil_date` at known days); `upper_by` against the lemmas and the boards it refuses; `append` refuses a torn file and
+keeps every old byte; an export of a hand-made ledger of 901..960 (with the chain's games of 920 and 940, three found
+boards, every rule of both sides, loose bounds, the root bound recomputed) puts lower bounds first and each line after
+the line it cites, cites games, leaves out the chain's boards, records `rests_on`, `checkpoint`; a second export appends
+nothing; after more is found an export appends exactly the improvements, each strictly better, in an order the checker
+accepts, and the old bytes are untouched; the export of a real run of 901..960 (the chain's 900 and 930 given, the rest
+hidden) proves 59 boards and a second export appends nothing and changes no byte; `verify-bounds` and the Python referee
+accept it (the Python one with `ledger games`' output, and refuse it without: "was not replayed"); a chain of three
+thousand boards, each citing the next, is exported in order and checked by both referees (the export keeps the boards
+that wait for a cited line on a worklist, not in recursive calls, so the depth of a chain costs heap, and the test runs
+on a 2 MB thread under Python's default limit of 1,000 calls); and tampered copies
+are refused by both and the line named: a game of moves with its first two moves swapped, a promotion set's value
+raised, a ceiling bound lowered by one, a line a relation cites removed, the board a repeat rests on dropped, its own
+board dropped, a line that improves nothing, a bound below the chain's score, a value that a carried game cites changed,
+a carried game moved before the line it cites, the game another line cites made not a game; and two that only the
+Rust referee finds, a root bound lowered by one (it recomputes it) and a repeat's bag changed.  A run that starts from a
+by-hand file with the loose bounds of every board of 910..960 maps none of them (the same run without it maps them),
+proves every board at the optimum, and a file whose game is not a game stops the run at its start, naming the board (or,
+if other lines cite the game, a board that cites it).
+
+**The dry run** ([bench/ledger/store/](../../bench/ledger/store/)).  901..960 on the laptop with the truth hidden
+(except the chain's lines of 900, 930 and 945, which the export leaves out): 6 CPU s proved 15 of 60 boards, and the
+export appended 116 lines for 58 boards (17 proven; 600 bytes a board); a second run, 3 CPU s from the file, proved all
+60, and its export appended the 55 lines that improved (41 boards newly proven).  The file: 171 lines of 45 kilobytes,
+58 proven boards, **778 bytes a board**; by kind, 46 games of promotions (329 bytes each), 19 cited (135), 7 of moves
+(1.7 kilobytes), 99 upper bounds (155).  `verify-bounds` takes 0.2 s (4 workers) and the Python referee 0.1 s; both
+accept the file against the real `results/strict.jsonl`, where the 58 boards are games of the chain, and the proven
+values are its scores.  The root bounds of n = 3000, 5000 and 8000 take 0.45 CPU s in all, so `verify-bounds` on a file of
+3,800 boards is a matter of a few minutes of one thread (the games' frame setups are the most of it), and the Python referee
+replays a game of n = 3440 in 0.6 ms.  A second dry run at larger boards, 2900..2939 for 108 CPU s (mostly maps and the
+finder; 8 boards proven, by relations, at the chain's scores): 38 boards, 76 lines, 70 kilobytes, 1,834 bytes a board; a
+promotion set 870 bytes, a game of moves 6.4 kilobytes, a cited game 140, an upper bound 182; both referees accept it
+against the real chain, `verify-bounds` in 0.4 s of 6 workers.  Past the chain (4400..8191) a promotion set is about 2
+kilobytes, a game of moves about 15, a cited game about 150 bytes and an upper bound about 220: the first export of 3,800
+boards of the order of 12 megabytes (3 kilobytes a board), against 26 megabytes without the cited form.
+
+**Not done.**  The first real export, and its commit (the lead's, after review); a run from the committed file on the
+cloud (`BOUNDS=` in `bench/ledger/cloud.sh`, which needs Brian's approval to launch).  A repeat of a game that had no
+promotions could be cited too (its game is the source's moves filtered by the candidates, played on the board), but needs
+the frame model on both sides; it is 7 of 72 games here.  The check of a `dual` or `exhausted` bound against its
+checkpoint, which `--checkpoints` records but nothing reads.
+
+**Commits.**  14f36d6 (the store, its commands, the Python referee and the tests), e93d035 (the export on a thread with a big
+stack, a workaround), then the commit that follows citations with a worklist and drops the thread, and this record.
+

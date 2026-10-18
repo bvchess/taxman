@@ -1,18 +1,19 @@
 //! The scheduler: limited one-thread searches of many boards at once, where a proof looks cheapest, with the
 //! relations applied after each.  The module documentation of `main.rs` says what it does and writes.
 
-use crate::book::{facts, Book, Change, Entry, Facts, Lower, Rule, Upper};
+use crate::book::{carry_game, facts, Book, Change, Entry, Facts, Lower, Rule, Side, Upper};
 use crate::counters;
 use crate::known::survivors;
 use crate::lns::{self, Lns};
-use std::collections::HashMap;
+use crate::pool;
+use crate::store::{Game, Line, Store};
+use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
@@ -56,6 +57,8 @@ pub struct Settings {
     pub checkpoint_every: f64,
     /// Stop on SIGINT or SIGTERM (`engine::stop_on_signals`), as the command does; tests leave the handlers alone.
     pub signals: bool,
+    /// A bounds store (results/bounds.jsonl) whose best bounds the run starts from, for the boards of its stretch.
+    pub bounds: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -73,6 +76,7 @@ impl Default for Settings {
             save_every: 30.0,
             checkpoint_every: 60.0,
             signals: false,
+            bounds: None,
         }
     }
 }
@@ -400,22 +404,122 @@ fn attempt_at<const W: usize>(
 
 /// The facts of the boards `ns`, on `workers` threads.
 pub fn all_facts(ns: &[u32], workers: usize) -> Result<Vec<Facts>, String> {
-    let next = AtomicUsize::new(0);
-    let out = Mutex::new(Vec::with_capacity(ns.len()));
-    std::thread::scope(|scope| {
-        for _ in 0..workers.clamp(1, ns.len().max(1)) {
-            scope.spawn(|| {
-                while let Some(&n) = ns.get(next.fetch_add(1, Ordering::Relaxed)) {
-                    let f = facts(n);
-                    out.lock().unwrap_or_else(PoisonError::into_inner).push(f);
-                }
-            });
-        }
-    });
-    let mut all =
-        out.into_inner().unwrap_or_else(PoisonError::into_inner).into_iter().collect::<Result<Vec<_>, _>>()?;
+    let mut all = pool::map(ns, workers, |&n| facts(n)).into_iter().collect::<Result<Vec<_>, _>>()?;
     all.sort_by_key(|f| f.n);
     Ok(all)
+}
+
+/// The game of the promotions `set` on the board of `n`, as the referee has it (`refereed`): its score and moves.
+pub fn expand(n: u32, set: &[u32]) -> Result<(u64, Vec<u32>), String> {
+    if set.iter().any(|&member| member < 2 || member > n) {
+        return Err(format!("the promotions are not numbers of the board 1..={n}"));
+    }
+    taxman::with_width!(
+        n,
+        W => refereed(&Board::<W>::for_n(n), &Bits::<W>::from_slice(set)),
+        else Err(format!("n={n} is beyond the widest set"))
+    )
+}
+
+/// A lower bound's game as the referee has it: its moves, and the promotions it was made from if it was.
+pub struct Played {
+    pub moves: Vec<u32>,
+    pub promotions: Option<Vec<u32>>,
+}
+
+/// The game that a line of the store carries (its promotions or its moves), replayed by the referee: it must score the
+/// line's value.  (A line is data from a file: promotions that no board has made would stop the frames' setup, and
+/// that is an error of the line.)  A line that cites the game it is carried from has none: see [`play_all`].
+pub fn play(line: &Line) -> Result<Played, String> {
+    std::panic::catch_unwind(AssertUnwindSafe(|| play_checked(line)))
+        .unwrap_or_else(|_| Err("the frame model's setup stops on these promotions".into()))
+}
+
+fn play_checked(line: &Line) -> Result<Played, String> {
+    let n = line.n;
+    let (score, moves, promotions) = match line.game.as_ref().ok_or("it has no game")? {
+        Game::Promotions(set) => {
+            let (score, moves) = expand(n, set)?;
+            (score, moves, Some(set.clone()))
+        }
+        Game::Moves(moves) => (replay_finished(n, moves)?, moves.clone(), None),
+    };
+    if score == line.value {
+        Ok(Played { moves, promotions })
+    } else {
+        Err(format!("the game scores {score}, not the {} of the line", line.value))
+    }
+}
+
+/// The games of the lower bounds `lines` of a store, in the order of the file, each replayed by the referee at its
+/// value: the promotion sets on `workers` threads, then, in order, the lines that cite the game they are carried from
+/// (by a relation: `carry_game`), each of the game of the earlier line it cites.
+pub fn play_all(lines: &[&Line], workers: usize) -> Vec<Result<Played, String>> {
+    let direct = pool::map(lines, workers, |&line| line.game.is_some().then(|| play(line)));
+    let mut index: HashMap<(u32, u64), usize> = HashMap::new();
+    let mut done: Vec<Result<Played, String>> = Vec::with_capacity(lines.len());
+    for (i, (line, direct)) in lines.iter().zip(direct).enumerate() {
+        let played = direct.unwrap_or_else(|| carried(line, &index, &done));
+        index.insert((line.n, line.value), i);
+        done.push(played);
+    }
+    done
+}
+
+/// The game of `line`, which cites its source, carried from it and replayed at the line's value.
+fn carried(line: &Line, index: &HashMap<(u32, u64), usize>, done: &[Result<Played, String>]) -> Result<Played, String> {
+    let (from, value) = line.from.zip(line.from_value).ok_or("it has no game and cites none")?;
+    let at = index
+        .get(&(from, value))
+        .ok_or_else(|| format!("it cites a game of board {from} worth {value}, which no line before it has"))?;
+    let source = done[*at].as_ref().map_err(|e| format!("the game it cites (board {from}, {value}): {e}"))?;
+    let moves = carry_game(line.rule, from, line.n, &source.moves)?;
+    let score = replay_finished(line.n, &moves)?;
+    if score == line.value {
+        Ok(Played { moves, promotions: None })
+    } else {
+        Err(format!("the game scores {score}, not the {} of the line", line.value))
+    }
+}
+
+/// Offers the book the best bounds of the store `path` for the boards `first..=last`: each lower bound with its game,
+/// played by the referee (with the games it cites), and each upper bound as the store has it (`ledger verify-bounds`
+/// checks them: this reads the store as given, as the run reads a results file it is given).  A board with both
+/// bounds there needs no map.
+fn start_from(book: &mut Book, path: &Path, first: u32, last: u32, workers: usize) -> Result<Vec<Change>, String> {
+    let store = Store::read(path)?;
+    let best = store.best();
+    let lower_lines = || store.lines.iter().enumerate().filter(|(_, line)| line.side == Side::Lower);
+    let index: HashMap<(u32, u64), usize> = lower_lines().map(|(i, line)| ((line.n, line.value), i)).collect();
+    // The lines to play: the best of the boards, and the lines they cite, and so on.
+    let mut needed = BTreeSet::new();
+    let mut pending: Vec<usize> =
+        best.lower.range(first..=last).map(|(_, line)| index[&(line.n, line.value)]).collect();
+    while let Some(i) = pending.pop() {
+        let line = &store.lines[i];
+        if needed.insert(i) && line.game.is_none() {
+            pending.extend(line.from.zip(line.from_value).and_then(|cited| index.get(&cited)));
+        }
+    }
+    let positions: Vec<usize> = needed.into_iter().collect();
+    let lines: Vec<&Line> = positions.iter().map(|&i| &store.lines[i]).collect();
+    let mut games: Vec<Option<Result<Played, String>>> = play_all(&lines, workers).into_iter().map(Some).collect();
+    let mut changes = Vec::new();
+    for (_, line) in best.lower.range(first..=last) {
+        let at = positions.binary_search(&index[&(line.n, line.value)]).expect("a line to play");
+        let played = games[at].take().expect("a game played once");
+        let Played { moves, promotions } =
+            played.map_err(|e| format!("{}: n={}: the game: {e}", path.display(), line.n))?;
+        let lower = Lower { value: line.value, moves, promotions, rule: line.rule, from: line.from };
+        changes.extend(book.offer_lower(line.n, lower, false)?);
+    }
+    for (&n, line) in best.upper.range(first..=last) {
+        changes.extend(book.offer_upper(n, Upper { value: line.value, rule: line.rule, from: line.from }, false)?);
+        if best.lower.contains_key(&n) {
+            book.entries.get_mut(&n).expect("a board of the stretch").mapped = true;
+        }
+    }
+    Ok(changes)
 }
 
 /// The proven games of the results file `path` in `first - 1..=last`, each checked by the referee.
@@ -432,12 +536,14 @@ fn given_games(path: &Path, first: u32, last: u32) -> Result<Vec<(u32, u64, Vec<
     Ok(games)
 }
 
-/// The book of a run: set up from the boards, with what an earlier run's ledger holds and the games given.
+/// The book of a run: set up from the boards, with what an earlier run's ledger holds, the games given and the best
+/// bounds of the store `bounds`, if the run has one.
 pub fn open_book(
     dir: &Path,
     first: u32,
     last: u32,
     proven: Option<&Path>,
+    bounds: Option<&Path>,
     workers: usize,
 ) -> Result<(Book, Vec<Change>), String> {
     let given = proven.map(|path| given_games(path, first, last)).transpose()?.unwrap_or_default();
@@ -463,6 +569,9 @@ pub fn open_book(
         let lower = Lower { value: score, moves, promotions: None, rule: Rule::Given, from: None };
         changes.extend(book.offer_lower(n, lower, true)?);
         changes.extend(book.offer_upper(n, Upper { value: score, rule: Rule::Given, from: None }, true)?);
+    }
+    if let Some(path) = bounds {
+        changes.extend(start_from(&mut book, path, first, last, workers)?);
     }
     let bounded: Vec<u32> =
         book.entries.values().filter(|e| e.lower.is_some() || e.upper.is_some()).map(|e| e.n).collect();
@@ -577,7 +686,7 @@ impl Scheduler {
     ) -> Result<(Scheduler, Vec<Change>), String> {
         let cpu_before = earlier_cpu(&events_path(dir));
         let (cpu_at_start, t0) = (process_cpu(), Instant::now());
-        let (book, changes) = open_book(dir, first, last, proven, settings.workers)?;
+        let (book, changes) = open_book(dir, first, last, proven, settings.bounds.as_deref(), settings.workers)?;
         let events = OpenOptions::new()
             .create(true)
             .append(true)
@@ -1118,6 +1227,7 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
         ("lns_s", Json::from(s.lns_seconds)),
         ("gap_unit", Json::from(s.gap_unit)),
         ("proven_file", proven.map_or(Json::Null, |p| Json::from(p.display().to_string()))),
+        ("bounds_file", s.bounds.as_ref().map_or(Json::Null, |p| Json::from(p.display().to_string()))),
     ];
     scheduler.event("start", None, fields)?;
     scheduler.log_changes(&changes)?;
