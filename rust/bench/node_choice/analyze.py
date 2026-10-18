@@ -7,8 +7,10 @@
 A line is a node that today's bound leaves open (`gap` >= 0), with the subtree today's search makes of it (`subtree`,
 the engine's steps) and the strong bound refitted at it: the Lagrangian bound over nogoods, `--node-steps` subgradient
 steps from the root's multipliers (`strong`; `sub` with the nogoods of the node's own solve too, which is hindsight;
-`root` below is the first step alone, the root's multipliers kept at the node).  A node on the way to the optimum
-(`source` path) only checks the bound's validity and is left out.
+`root` below is the first step alone, the root's multipliers kept at the node), and with `--a1` the two A1 bounds
+(`a1`: `a1r2` below is the warm refit of at most 20 pricings, `a1full` the node's own master with the exact checks and
+the separation, within its seconds; a node where it ran out of them without cutting is *capped*).  A node on the way
+to the optimum (`source` path) only checks the bound's validity and is left out.
 
 A *policy* computes the strong bound at the nodes whose subtree is forecast above N steps, and only there.  The
 forecast is log10(subtree) = a + b * gap, `--model fit` (a and b fitted to the nodes whose solve completed) or `floor`
@@ -17,7 +19,8 @@ above N is a gap above a threshold.  Each node is a problem of its own: its sear
 game's seconds a step, from its completed solves), and the policy replaces that by the strong bound's cost (the
 matroids built afresh and the steps of the fit, up to the cut) when the bound cuts the node, and adds it when not.  So
 the *net saving* of a policy over a set of nodes is the CPU seconds of the subtrees it cuts less the CPU seconds of
-every strong bound it computes, and its *share* is that over what searching every node costs.  The nodes are a sample
+every strong bound it computes (an A1 bound's cost is its frame matroids, `a1.build_s`, and its `s`), and its *share*
+is that over what searching every node costs.  The nodes are a sample
 (of a proof's nodes, spread over gaps), so the shares are of the sample, and the sample's mix is the lab's: see the
 README.  A solve that `--cap` stopped counts for the steps it made (a lower bound on its subtree).
 """
@@ -31,6 +34,8 @@ from pathlib import Path
 
 FLOOR_SLOPE = 1 / 147
 VARIANTS = ("root", "strong", "sub")
+A1_VARIANTS = ("a1r2", "a1full")
+ALL_VARIANTS = VARIANTS + A1_VARIANTS
 GRID = [0] + [10 ** (k / 2) for k in range(2, 15)]
 
 
@@ -58,6 +63,12 @@ def outcome(line, fit, steps):
     cut = next((i + 1 for i, low in enumerate(lows) if low < line["need"]), None)
     taken = cut or len(lows)
     return cut is not None, line["graph_s"] + fit["s"] * ts[taken - 1] / (ts[-1] or 1e-12)
+
+
+def a1_outcome(line, name):
+    """Whether the A1 bound `name` (`r2` or `full`) cuts the node, and the CPU seconds it cost with its matroids."""
+    bound = line["a1"][name]
+    return bound["cut"], line["a1"]["build_s"] + bound["s"]
 
 
 def population(line):
@@ -90,6 +101,9 @@ def nodes_of(lines, steps):
         node["outcomes"]["strong"] = outcome(line, line["strong"], steps)
         if line.get("sub"):
             node["outcomes"]["sub"] = outcome(line, line["sub"], steps)
+        if line.get("a1"):
+            node["outcomes"]["a1r2"] = a1_outcome(line, "r2")
+            node["outcomes"]["a1full"] = a1_outcome(line, "full")
         nodes.append(node)
     rate = rates(nodes)
     for node in nodes:
@@ -163,6 +177,11 @@ def sizes(nodes):
           header, rows)
 
 
+def spent_by(nodes, variant):
+    """The CPU seconds of `variant` at the nodes that have it."""
+    return [n["outcomes"][variant][1] for n in nodes if variant in n["outcomes"]]
+
+
 def by_gap(nodes):
     edges = [0, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 10 ** 9]
     rows = []
@@ -172,10 +191,11 @@ def by_gap(nodes):
             done = [n["subtree"] for n in group if n["completed"]]
             spent = [n["outcomes"]["strong"][1] for n in group]
             rows.append([f"{lo}+" if hi > 10 ** 8 else f"{lo}-{hi - 1}", len(group)]
-                        + [percent(share(group, v)) for v in VARIANTS]
-                        + [f"{median(done):.0f}", seconds(median(spent))])
+                        + [percent(share(group, v)) for v in ALL_VARIANTS]
+                        + [f"{median(done):.0f}", seconds(median(spent))]
+                        + [seconds(median(spent_by(group, v))) for v in A1_VARIANTS])
     table("Share of the open nodes each strong bound cuts, by gap",
-          ["gap", "nodes", *VARIANTS, "subtree med", "strong s med"], rows)
+          ["gap", "nodes", *ALL_VARIANTS, "subtree med", "strong s med", *(f"{v} s med" for v in A1_VARIANTS)], rows)
 
 
 def by_subtree(nodes):
@@ -183,10 +203,10 @@ def by_subtree(nodes):
     for k in range(8):
         group = [n for n in nodes if 10 ** k <= n["subtree"] < 10 ** (k + 1)]
         if group:
-            rows.append([f"1e{k}", len(group)] + [percent(share(group, v)) for v in VARIANTS]
+            rows.append([f"1e{k}", len(group)] + [percent(share(group, v)) for v in ALL_VARIANTS]
                         + [f"{median([n['gap'] for n in group]):.0f}"])
     table("Share of the open nodes each strong bound cuts, by the decade of their subtree",
-          ["subtree", "nodes", *VARIANTS, "gap med"], rows)
+          ["subtree", "nodes", *ALL_VARIANTS, "gap med"], rows)
 
 
 def gap_above(threshold, model):
@@ -203,30 +223,61 @@ def evaluate(nodes, variant, floor):
     return len(applied), len(cut), sum(n["search_s"] for n in cut) - sum(n["outcomes"][variant][1] for n in applied)
 
 
-def policies(nodes, model, label):
-    """The policies N = GRID over `nodes`: for each variant the nodes it cuts and its net saving, and the best N."""
+def policies(nodes, model, label, variants=VARIANTS):
+    """The policies N = GRID over `nodes`: for each of `variants` the nodes it cuts and its net saving, and the best N."""
     total = sum(n["search_s"] for n in nodes)
-    if total <= 0:
+    if total <= 0 or not any(v in n["outcomes"] for n in nodes for v in variants):
         return
-    rows, best = [], {v: (0.0, None) for v in VARIANTS}
+    rows, best = [], {v: (0.0, None) for v in variants}
     for threshold in GRID:
         floor = gap_above(threshold, model)
         row = [f"{threshold:.0e}" if threshold else "0", f"{floor:.0f}" if threshold else "-"]
-        row.append(evaluate(nodes, "strong", floor)[0])
-        for variant in VARIANTS:
+        row.append(evaluate(nodes, variants[0], floor)[0])
+        for variant in variants:
             _, cut, net = evaluate(nodes, variant, floor)
             row += [cut, seconds(net), percent(net / total)]
             if net > best[variant][0]:
                 best[variant] = (net, threshold)
         rows.append(row)
-    header = ["N", "gap above", "applied"] + [f"{v} {col}" for v in VARIANTS for col in ("cut", "net s", "share")]
+    header = ["N", "gap above", "applied"] + [f"{v} {col}" for v in variants for col in ("cut", "net s", "share")]
     table(f"Policies: the strong bound where the forecast subtree exceeds N ({label}: {len(nodes)} nodes, searching "
-          f"them all costs {seconds(total)} CPU s)", header, rows)
-    for variant in VARIANTS:
+          f"them all costs {seconds(total)} CPU s; applied: the nodes {variants[0]} is computed at)", header, rows)
+    for variant in variants:
         net, threshold = best[variant]
         text = "none (every policy loses)" if threshold is None else (
             f"N = {threshold:.0e}, a net saving of {seconds(net)} CPU s, {percent(net / total)} of the total")
         print(f"best for {variant}: {text}")
+
+
+def closed(node, name):
+    """The share of the node's excess over a cut (`gap + 1`) that the A1 bound `name` takes off today's bound, at most 1."""
+    return min(1.0, (node["today"] - node["a1"][name]["bound"]) / (node["gap"] + 1))
+
+
+def a1_ends(nodes):
+    """How the A1 bounds ended at the open nodes, by gap: cut, capped (out of seconds or pricings, not cut), and the
+    median share of the excess they close; and the CPU seconds of the dearest."""
+    have = [n for n in nodes if n.get("a1")]
+    if not have:
+        return
+    edges = [0, 50, 100, 200, 300, 400, 500, 700, 10 ** 9]
+    rows = []
+    for lo, hi in zip(edges, edges[1:]):
+        group = [n for n in have if lo <= n["gap"] < hi]
+        if not group:
+            continue
+        row = [f"{lo}+" if hi > 10 ** 8 else f"{lo}-{hi - 1}", len(group)]
+        for name in ("r2", "full"):
+            ends = [n["a1"][name] for n in group]
+            row += [percent(sum(e["cut"] for e in ends) / len(ends)),
+                    percent(sum(e["capped"] and not e["cut"] for e in ends) / len(ends)),
+                    percent(median([closed(n, name) for n in group])),
+                    seconds(max(e["s"] for e in ends))]
+        rows.append(row)
+    table("The A1 bounds: share of the open nodes cut, capped without a cut, the median share of the excess closed, "
+          "the dearest bound's CPU s, by gap",
+          ["gap", "nodes", *(f"{name} {col}" for name in ("r2", "full") for col in ("cut", "capped", "closed", "max s"))],
+          rows)
 
 
 def report(lines, steps, model_name):
@@ -242,9 +293,11 @@ def report(lines, steps, model_name):
     sizes(nodes)
     by_gap(nodes)
     by_subtree(nodes)
-    policies(nodes, model, "all")
-    for label in sorted({n["population"] for n in nodes}):
-        policies([n for n in nodes if n["population"] == label], model, label)
+    a1_ends(nodes)
+    for variants in (VARIANTS, A1_VARIANTS):
+        policies(nodes, model, "all", variants)
+        for label in sorted({n["population"] for n in nodes}):
+            policies([n for n in nodes if n["population"] == label], model, label, variants)
 
 
 def main():

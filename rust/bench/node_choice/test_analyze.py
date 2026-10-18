@@ -26,7 +26,35 @@ def line(id_, gap, subtree, lows, solve_s, n=3300, source="suite", sub=None):
             "solve_cpu_s": solve_s, "today_s": 0.001, "graph_s": 0.01, "strong": fit(lows, 0.5), "sub": sub}
 
 
+def a1(r2, full, build_s=0.001):
+    """The A1 bounds of a node needing 85 with today's bound `gap + 85`: each given as (bound, CPU s, capped)."""
+    one = lambda bound, s, capped=False: {"bound": bound, "cut": bound < 85, "capped": capped, "s": s}  # noqa: E731
+    return {"build_s": build_s, "r2": one(*r2), "full": one(*full)}
+
+
 class Analysis(unittest.TestCase):
+    def test_the_a1_bounds_are_two_more_variants_that_cost_their_matroids_and_their_seconds(self):
+        # Gap 100: today's bound 185, so a bound of 85 closes 100 of the 101 above a cut.
+        cut = dict(line("a", 100, 1000, [100], 1.0), today=185, a1=a1((80, 0.02), (84, 1.5)))
+        capped = dict(line("b", 100, 1000, [100], 1.0), today=185, a1=a1((130, 0.02), (95, 30.0, True)))
+        without = dict(line("c", 100, 1000, [100], 1.0), today=185)
+        nodes = analyze.nodes_of([cut, capped, without], 99)
+        self.assertEqual(len(nodes), 3)
+        self.assertEqual(nodes[0]["outcomes"]["a1r2"], (True, 0.021))
+        self.assertEqual(nodes[1]["outcomes"]["a1full"], (False, 30.001))
+        self.assertNotIn("a1r2", nodes[2]["outcomes"])
+        # The share cut counts the nodes that have the variant only; a policy applies it to those only.
+        self.assertEqual(analyze.share(nodes, "a1r2"), 0.5)
+        self.assertEqual(analyze.share(nodes, "a1full"), 0.5)
+        applied, cuts, net = analyze.evaluate(nodes, "a1r2", analyze.gap_above(0, (0.0, 0.01, 1.0)))
+        self.assertEqual((applied, cuts), (2, 1))
+        # Searching the cut node costs 1000 steps at 1 ms; both nodes pay 0.021 s for the bound.
+        self.assertAlmostEqual(net, 1.0 - 2 * 0.021)
+        # How much of the excess over a cut a bound closes: all of it when it cuts, a part otherwise.
+        self.assertEqual(analyze.closed(nodes[0], "full"), 1.0)
+        self.assertAlmostEqual(analyze.closed(nodes[1], "full"), 90 / 101)
+        self.assertEqual(analyze.closed(nodes[1], "r2"), 55 / 101)
+
     def test_the_cost_of_a_fit_is_the_matroids_and_the_steps_up_to_the_cut(self):
         node = line("a", 100, 10, [100, 90, 80, 70, 60], 0.0)
         cut, cost = analyze.outcome(node, node["strong"], 99)
