@@ -1,6 +1,6 @@
 # The frame model by layer, and the extended problem (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The second consultation of 2026-10-15, after "The frame model on a proven footing", set the goal (its
 steps 2B-2D are the entry above): every game past 2175 that
@@ -27,7 +27,7 @@ numbering was not clean; by layer it is.
 No tree changed: the probe's fingerprints 7e8e724717d26545 and f3deaac0dbdc030a (`gf2=on`), its cycles 4.732 G and
 5.770 G; `cargo test --release` with the tripwires; `taxman regress --to 1000 --threads 1` (9.2 s); the chain 1..1300
 on one thread line for line equal to the base commit's (290,503 nodes) but for times and the build; and the census
-`examples/structure.rs 2 8191` on one thread, every line equal to `bench/structure/`'s but for the seconds (605 s
+`examples/structure.rs 2 8191` on one thread, every line equal to `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`'s but for the seconds (605 s
 summed against 624).  `examples/sacrifice validate 52` is exact on all 1,378 punctured boards (40.7 s), the boards
 with an empty frame among them.  THEORY.md's "Clean numbering" is now "Numbering by layer"; Theorem M and its
 corollary lose the hypothesis; a paragraph covers boards with holes, where the model is exact given the sources setup

@@ -1,20 +1,20 @@
 # The ledger: bounds from both sides (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Brian's idea (2026-10-17): instead of proving opt(n) one game at a time from a proven opt(n − 1), keep
 for every n of a stretch a lower bound L(n), the score of a game held, and an upper bound U(n), tighten both across
 many games at once, and spend the effort where progress is cheapest; a game is proven when L(n) = U(n).  Does it prove
 much of a stretch for a small share of what the chain spends there?  This entry builds it and runs it on the laptop on
 1301..1500 with the truth hidden; the experiment of the design, 2176..3440 for an hour of a `c8g.16xlarge`, is ready
-and not run ([RUNBOOK section 14](../../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
+and not run ([RUNBOOK section 14](../../docs/RUNBOOK.md#14-the-ledgers-experiment)).
 
 **What was built.**
 
 * **The dual bound of a stopped search** (`search::dual_bound`, `src/search/dual.rs`): the largest of the incumbent and,
   over the open units of the final checkpoint, each node's promotion sum plus the GF(2) bound the search computes when
   it starts the unit (`search::NodeBound`, which `examples/tune.rs` now reads its units' bounds through).  Valid by the
-  search's exactness and Theorem 11 (heuristics/THEORY.md, Lemma D); until now a stopped search threw it away.
+  search's exactness and Theorem 11 (docs/THEORY.md, Lemma D); until now a stopped search threw it away.
 * **The relations, proven** (THEORY.md, "The ledger: bounds between boards"): L1 monotone, opt(n − 1) ≤ opt(n), with
   the game of n − 1 followed by n if still legal; L2 the ceiling, opt(n) ≤ opt(n − 1) + n, with the game below it (the
   game of n without the move n stays legal, a pot-inclusion argument, then completed); L3 the prime formula both ways,
@@ -36,11 +36,11 @@ and not run ([RUNBOOK section 14](../../tools/cloud/RUNBOOK.md#14-the-ledgers-ex
   class is searched, and no prime whose board before it is in the ledger.  The order: boards whose bounds a proven
   neighbour has changed (the ceiling and the prime formula next to a proven board are exact), smallest gap first; then
   least `level + gap / 175` (a decade of the chain's steps per about 580 of standalone gap,
-  [the landscape](the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)).  After each search the
+  [the landscape](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)).  After each search the
   relations run to a fixpoint; every game they make is replayed, L > U stops the run; a proven board's search is stopped
   and its checkpoint deleted, a falling U is given to a running search as its ceiling.  The ledger file and the event
   log let a run go on after an interruption, and the CPU budget counts all runs.
-* **The cloud script** `bench/ledger/cloud.sh` (the run with no proven game, then `ledger report --known
+* **The cloud script** `solver/tools/ledger/cloud.sh` (the run with no proven game, then `ledger report --known
   results/strict.jsonl`, synced to S3), with RUNBOOK section 14's user data.  For 2176..3440 at an hour of 64 CPUs:
   about 1.3 instance-hours with the build, **about $0.9 at spot**, $3.3 on demand.
 
@@ -58,7 +58,7 @@ from millisecond searches is proven at the optimum, by stopped and completed sea
 checkpoint left, and a second run on the same directory finds nothing to do and keeps every bound; given proven games
 are fixed points.
 
-**The dry run** (`bench/ledger/`: data, commands and the script of the numbers).  1301..1500 on the laptop, the
+**The dry run** (`dry/`: data, commands and the script of the numbers).  1301..1500 on the laptop, the
 non-release build, six workers, a budget of 2 CPU-hours, no proven game (optimal.json and `results/strict.jsonl` only
 for the check afterwards), through `cloud.sh`.  It ended with every board proven after **595 CPU seconds** (145 s of
 wall time), and the check found **0 violations**: every game replays to its L, L <= opt <= U at all 200 boards, and all
@@ -87,7 +87,7 @@ wall time), and the check found **0 violations**: every game replays to its L, L
   the boards both searched to the end, searched here in pieces and at first without the seed and ceiling of a proven
   neighbour; and the 20 s of maps.  (The committed
   chain's one-thread re-solve of 1301..2175, with the release build of ee03872, spent 461 s of search on 1301..1500,
-  `bench/wall/resolved_1301_2175.jsonl`.)
+  `solver/notebook/the-gap-past-2175-2026-10/resolved_1301_2175.jsonl`.)
 * A first dry run of the same stretch, before the map was forced, made only 6 maps: the relations gave every board both
   bounds (a ceiling carried up, a game carried across) before its map came due, and the scheduler took a board with
   bounds as mapped.  It also proved every board at the optimum, in 590 CPU seconds; each board searched now gets its own
@@ -112,10 +112,10 @@ stretch where searches do not finish; other values of `--base` and `--gap-unit`;
 
 ## Later (2026-10-17): the first cloud attempt, stopped, and the fix
 
-**The attempt.**  `bench/ledger/cloud.sh 2176-3440` on a `c8g.16xlarge` with 64 workers (20:31 UTC), stopped by a signal
+**The attempt.**  `solver/tools/ledger/cloud.sh 2176-3440` on a `c8g.16xlarge` with 64 workers (20:31 UTC), stopped by a signal
 after 9 minutes at 1,299 CPU s (0.36 core-hours, about $0.18).  The machine was 95% idle (the run used 2.3 of its 64
 CPUs), the ledger's main thread at 100% and the workers waiting on it: 390 of the 1,265 boards had their map, no search
-had finished, no board was proven ([the files](../../bench/ledger/cloud-20261017-stopped/); the 21 MB events file and
+had finished, no board was proven ([cloud-20261017-stopped/](cloud-20261017-stopped/); the 21 MB events file and
 the 8 MB ledger are not kept).
 
 **The cause, measured.**  The first map was in at 1.45 s, and the relations of that one result ran until 59.1 s: 2,863
@@ -164,7 +164,7 @@ grows is boards times maps.
   waited 0.05 s in all.  The map phase used 96 to 98% of the CPUs.  The settle, 5.4 s for 1,767 changes on the whole
   stretch (the cascade of the first map alone took 58 s in the cloud), is the one pause: most of it, probably, the
   about 550 repeat games at 7 to 12 ms.
-* The dry run again (1301..1500, six workers, the truth hidden, [bench/ledger/dry](../../bench/ledger/dry/), whose
+* The dry run again (1301..1500, six workers, the truth hidden, [dry/](dry/), whose
   files are now this run's; the first run's are in d7390e1): all 200 boards proven, **0 violations**, **573 CPU s in
   133 s** (595 and 145 s before), the main thread busy 0.7 s.  The workers used 97% of their CPU in the first minute;
   the stretch ends with the long searches of a few boards (1475 alone), so the whole run's 4.3 of 6 CPUs (4.1 before) is
@@ -212,7 +212,7 @@ the lead asked for the other direction too, for the next cloud run (whose purpos
   count, and the relations have put it in the ledger already), and its ceiling is the ledger's, which is loose (U(n − 1) ≤ opt(n)); the
   same limit, and a proof brings the climb to the board below.  The climbs up go first when both wait; a board next to
   a proven one on both sides is climbed to up.  `--climb up|down|both|off` picks the ways (default both;
-  `CLIMB=` in `bench/ledger/cloud.sh`), and `--climb-limit 0` turns every climb off.
+  `CLIMB=` in `solver/tools/ledger/cloud.sh`), and `--climb-limit 0` turns every climb off.
 * **Park.**  A climb that ends with the board unproven (it stopped at its limit) *parks* the board: `parked` in its
   ledger line (so a resumed run does not climb to it again, either way), and it goes by the ordinary order with its
   checkpoint.  The climb from that wedge ends there; the board next to it is climbed to when that board is proven, by
@@ -229,8 +229,8 @@ the lead asked for the other direction too, for the next cloud run (whose purpos
   climbs have ended, how many proved their board and how many parked; `ledger report` has a line for each way (how
   many, their seconds, the outcomes).
 
-**The default, 60 s.**  From the second cloud run's events ([climb_limit.txt](../../bench/ledger/climb_limit.txt), made
-by `bench/ledger/climb_limit.py`): 565 boards were searched, 371 finished by a search, 194 not.  A climb of a given
+**The default, 60 s.**  From the second cloud run's events ([climb_limit.txt](climb_limit.txt), made
+by `solver/notebook/the-ledger-bounds-from-both-sides-2026-10/climb_limit.py`): 565 boards were searched, 371 finished by a search, 194 not.  A climb of a given
 limit on every one of them, costing a board its total search seconds in the run (the limit if that is less or if the
 board was not finished), would have made
 
@@ -265,7 +265,7 @@ to 903 and climbs up, the report counting each way, and with one way only, neith
 asked for.
 
 **The dry runs** (the laptop, the non-release build, the truth hidden, through `cloud.sh`, the files in
-[bench/ledger/climb/](../../bench/ledger/climb/)).  The runs of one stretch were made back to back: first with the climbs
+[climb/](climb/)).  The runs of one stretch were made back to back: first with the climbs
 up only (`up`: the build of eb9dc9c, before the climbs down were added) and without (`off`), then, with the build that
 has both ways (55d2b2a), with both and with the climbs down only.  Wall times are not clean: the searches of the
 2576..2700 runs took a fifth more wall seconds than they used CPU, so the laptop had other work, and the 1301..1500 run
@@ -320,7 +320,7 @@ be shorter).
 
 ## Later (2026-10-17): the finder in the ledger
 
-**Why.**  The finders experiment ([the entry](finders-for-good-games-that-are-not-sound-2026-10.md)) found that large
+**Why.**  The finders experiment ([the entry](../finders-for-good-games-that-are-not-sound-2026-10/README.md)) found that large
 neighbourhood search (LNS: keep a random 70-90% of the incumbent's promotions, search the rest exactly as a unit, repeat)
 reaches the optimum of 64% of the games of 2176..3440 in 5 CPU seconds of one thread, against 21% for the sound search in
 the same time, and that the sound search seeded with 1 second of its game costs 0.48 of the CPU, finder included (cheaper
@@ -352,7 +352,7 @@ Nothing LNS finds is a proof: the upper bounds are what they were.  The next clo
   `below_proven` and `above_proven` (whether n − 1 and n + 1 were proven when the job started); the `start` event has
   `lns_s`.  `ledger report` has a `finder:` line (the runs, their seconds, how many found a better game and by how much in
   all, the boards whose final lower bound is its game and how many of those are proven), and the status line says how
-  many runs and improvements; `bench/ledger/events.py` adds the finder's line, the games that seeded the searches, and the
+  many runs and improvements; `solver/tools/ledger/events.py` adds the finder's line, the games that seeded the searches, and the
   searches by whether n − 1 and n + 1 were proven.
 
 **Tests (the quick suite).**  A map is followed by the finder from the start incumbent and the game it returns replays at
@@ -367,7 +367,7 @@ no event, board or report shows any, and the jobs the scheduler hands out are th
 tests set `lns_seconds` to 0, which also keeps them as fast as they were.
 
 **The dry runs** (the laptop, the non-release build of 4621d97 under `nice -n 10`, the truth hidden, through `cloud.sh`,
-the files in [bench/ledger/finder/](../../bench/ledger/finder/)).  1301..1500 on six workers with the finder at 1 s
+the files in [finder/](finder/)).  1301..1500 on six workers with the finder at 1 s
 (`dry-on`) and, back to back, without it (`dry-off`, the same build and the climbs both ways); 2576..2700 on eight workers
 with a budget of 900 CPU s, four runs in the order on, off, off, on.  The earlier dry runs of these stretches are in
 [wedge and climb](#later-2026-10-17-wedge-and-climb) (another session, so another load on the laptop).
@@ -421,7 +421,7 @@ for them, and future runs that start from it.  A board is proven when its best L
 record of those proofs too, and `explore.jsonl` stays the home of `taxman solve --keep-going`.
 
 **What was built** (`examples/ledger/`: `store.rs` the line and its checks, `export.rs`, `verify.rs`, `pool.rs`;
-`tools/check_bounds.py`; the format is in [results/README, "bounds.jsonl"](../../results/README.md#boundsjsonl), the
+`solver/tools/check_bounds.py`; the format is in [results/README, "bounds.jsonl"](../../../results/README.md#boundsjsonl), the
 commands in the module comment of `main.rs`):
 
 * **The file** `results/bounds.jsonl`, append-only, one line a bound, a new line only when it improves the file's best
@@ -431,7 +431,7 @@ commands in the module comment of `main.rs`):
   cites; prints the lines, boards, first and improved bounds of each side, and the boards newly proven.  It checks its
   lines with the checker's own `Chain` before it writes them.  **`ledger run ... --bounds FILE`** starts from the file's
   best bounds of the stretch (each game replayed by the referee, a board with both bounds not mapped).
-  **`ledger verify-bounds FILE`**, **`ledger games FILE`** and **`tools/check_bounds.py FILE --games G`**: the two
+  **`ledger verify-bounds FILE`**, **`ledger games FILE`** and **`solver/tools/check_bounds.py FILE --games G`**: the two
   referees (below).
 * `book::upper_by`, `carries` and `carry_game`: the arithmetic of Lemmas L1 to L4 and the constructions of L1 to L3, one
   copy each, which the book's relations (`derive`) use as the store's checks do.
@@ -498,7 +498,7 @@ by-hand file with the loose bounds of every board of 910..960 maps none of them 
 proves every board at the optimum, and a file whose game is not a game stops the run at its start, naming the board (or,
 if other lines cite the game, a board that cites it).
 
-**The dry run** ([bench/ledger/store/](../../bench/ledger/store/)).  901..960 on the laptop with the truth hidden
+**The dry run** ([store/](store/)).  901..960 on the laptop with the truth hidden
 (except the chain's lines of 900, 930 and 945, which the export leaves out): 6 CPU s proved 15 of 60 boards, and the
 export appended 116 lines for 58 boards (17 proven; 600 bytes a board); a second run, 3 CPU s from the file, proved all
 60, and its export appended the 55 lines that improved (41 boards newly proven).  The file: 171 lines of 45 kilobytes,
@@ -515,7 +515,7 @@ kilobytes, a game of moves about 15, a cited game about 150 bytes and an upper b
 boards of the order of 12 megabytes (3 kilobytes a board), against 26 megabytes without the cited form.
 
 **Not done.**  The first real export, and its commit (the lead's, after review); a run from the committed file on the
-cloud (`BOUNDS=` in `bench/ledger/cloud.sh`, which needs Brian's approval to launch).  A repeat of a game that had no
+cloud (`BOUNDS=` in `solver/tools/ledger/cloud.sh`, which needs Brian's approval to launch).  A repeat of a game that had no
 promotions could be cited too (its game is the source's moves filtered by the candidates, played on the board), but needs
 the frame model on both sides; it is 7 of 72 games here.  The check of a `dual` or `exhausted` bound against its
 checkpoint, which `--checkpoints` records but nothing reads.
@@ -533,7 +533,7 @@ prove games the run to the wall will not reach: find the easiest spots past 4500
 **The run.**  4400..8191 (3,792 boards) on one `c8g.16xlarge`, commit b3ed8ac, 64 workers, the finder 10 s, climbs both
 ways with a limit of 1 hour, nothing given; 360 core-hours (about $3.80), 2026-10-18 02:41-08:22 UTC
 (`s3://taxman-013764204840-us-east-1/ledger-frontier/out`).  The run data kept in the repository for the cloud runs
-of this entry is described in [bench/ledger/README.md](../../bench/ledger/README.md).
+of this entry is described in [solver/notebook/the-ledger-bounds-from-both-sides-2026-10/README.md](README.md).
 
 **Results.**  Every board was mapped and given the finder's game (it improved 1,720 of 2,042 runs) within about 50
 minutes; then 242 boards were proven: 4446-4475, 4477-4507, 4540-4542, 4554-4622, 4626-4639, 4664-4757 and 4779,
@@ -551,7 +551,7 @@ to `ledger-frontier-2`), commit afe4513.
 **Why.**  The ordinary search of an open board doubles its limit and resumes its checkpoint, and until it finishes it
 leaves little on the upper side (the dual bound of a stopped depth-first search is the root's bound or near it); and the
 order, `level + gap / gap_unit`, has no idea what a board's proof will cost.  A search under a floor F
-([the entry](proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10.md), `search::search_above`) that
+([the entry](../proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md), `search::search_above`) that
 completes having found nothing proves "nothing weighs more than F" (THEORY.md, Lemma F), and its cost is log-linear in
 the distance below the root's bound: a decade of nodes per 147 points (a median over 14 games of 2265-3259; 0.53 to
 0.89 decades per 100 a game), a quarter of the gap for 1/20,000 of the proof.  So a step leaves a proven upper bound
@@ -584,7 +584,7 @@ results; the module comment of `main.rs` has the fields, the events and the sett
   the depth already proven.  The steps cost a share of the proof that falls by a factor of ten each step at best, and
   a half if the last lands close to the proof; so the board goes to its proof when its gap is within *two* steps
   (`PROOF_STEPS`), not one.  On the 14 measured games, laid on their measured costs from the root's bound
-  (`bench/ledger/floor/ladder.py`), the steps and the proof cost together a median 1.05 times the proof alone (1.06 by
+  (`solver/notebook/the-ledger-bounds-from-both-sides-2026-10/floor/ladder.py`), the steps and the proof cost together a median 1.05 times the proof alone (1.06 by
   nodes; steps of 100 points 1.14, of 200 1.01), and 1.49 (1.60) if the proof comes only when the gap is within one
   step.  The proof is the ordinary search as before: seeded with the best game, capped by U, the finder first, resuming
   `nN.ckpt` if the board has one.
@@ -615,7 +615,7 @@ results; the module comment of `main.rs` has the fields, the events and the sett
   board searched).
 * **The store** accepts the upper rules `floor` and `nogoods` on record, as `exhausted` and `dual` are (a bound of the
   frame model at its own board, `rests_on` that board): `store.rs`, the export (no change: it writes them as the
-  ledger has them), `verify-bounds` and `tools/check_bounds.py` list them among the bounds they take on their record,
+  ledger has them), `verify-bounds` and `solver/tools/check_bounds.py` list them among the bounds they take on their record,
   and `results/README.md` defines them.  `nogoods` is the Lagrangian bound over checked nogoods that `wall nogoods`
   makes; nothing in the ledger makes it.
 * **Resume.**  A ledger written before the steps goes on: `root`, `steps` and `stalled` default when absent; the root
@@ -644,7 +644,7 @@ and proves its board.  `store_tests.rs`: the hand-made books have `floor` and `n
 accept and list.  The earlier tests of the order of the jobs run with `floor_step` 0.
 
 **The dry runs** (the laptop, the non-release builds under `nice -n 10`, the truth hidden, through `cloud.sh`; the
-commands and files are in [bench/ledger/floor/](../../bench/ledger/floor/)): `base` is the scheduler before this change
+commands and files are in [floor/](floor/)): `base` is the scheduler before this change
 (93056fd), `first` the build of f775cc0 and `new` the build of 26c5c71 (the same with the boards exploring first and the
 checkpoint of a step that found a set kept), each stretch run for each in turn, the new builds first.  "Searches" counts
 every job after the maps, the floor steps and climbs among them; the wall times are of a shared laptop and say little.
@@ -734,7 +734,7 @@ at the hours a game costs there.  Brian's brief was `taxman solve --bounds FILE`
 option and to extend the flag that already means "use what is known", `--use-prev`, to every proven game the repository
 holds: `optimal.json`, the committed chain and the store.
 
-**What was built** ([README, "Known games"](../../README.md#known-games); DESIGN.md, section 8):
+**What was built** ([README, "Known games"](../../frame/README.md#known-games); DESIGN.md, section 8):
 
 * *One copy of the store's format.*  The line, the file, the best bounds, the relations between boards and the referee's
   replay of a lower bound's game moved from `examples/ledger/` to `src/store.rs`; the ledger re-exports them and keeps the
@@ -748,9 +748,9 @@ holds: `optimal.json`, the committed chain and the store.
   bound of the store holds wherever statement U holds at the boards its upper bound rests on, one assumption a board
   (`statement U holds at n=B`), inherited by the games that rest on it.  A game found by a search that stopped at the
   store's bound is proven by it, and settles its search problem for a later repeat.
-* *The referees.*  Both look the cited lines up in the sources (the repository's `rust/results`, by default) and refuse a
+* *The referees.*  Both look the cited lines up in the sources (the repository's `results`, by default) and refuse a
   missing, changed or other line, a citation that is not there, other assumptions, and a store that was not given; neither
-  checks the sources again.  `tools/check_results.py` no longer reads `bounds.jsonl` as a file of results when it is run
+  checks the sources again.  `solver/tools/check_results.py` no longer reads `bounds.jsonl` as a file of results when it is run
   with no argument (it did since the store was added, and failed).
 * *Schema 5 stays.*  The new key is there only on a line that has one, and the new method and proof are new names; every
   committed file reads as it did.
@@ -774,3 +774,31 @@ upper bounds on its word: `ledger verify-bounds` comes first.
 
 **Commits.**  The move of the format into the library, then `--use-prev` with the known games, their referees and the
 tests (`tests/known.rs`), then the documents and this record.
+
+## Files
+
+The program is `examples/ledger/` (its module comment defines every field of `ledger.jsonl` and `events.jsonl`), run
+from the top of the repository with the non-release build of the laptop (`cargo build --profile test --example ledger
+--bin taxman` in `solver/frame`: opt-level 2, debug assertions on), so `ledger` is
+`solver/frame/target/debug/examples/ledger` and `taxman` `solver/frame/target/debug/taxman`.
+Everything here ran under `nice -n 10`.
+
+### Files and the commands that made them
+
+| file | command | what it is |
+|---|---|---|
+| `dry/` | `OUT=DIR LEDGER_BIN=target/debug/examples/ledger WORKERS=6 CPU_HOURS=2 solver/tools/ledger/cloud.sh 1301-1500` (2026-10-17, 21:11:44 to 21:13:57 UTC, after the fix of the first cloud attempt), with DIR a scratch directory whose files were copied here | the laptop's dry run of 1301..1500, the truth hidden (the run before the fix, 20:01:50 to 20:04:16 UTC, took 595 CPU s and 145 s; its files are in d7390e1): `run/ledger.jsonl.gz` and `run/events.jsonl.gz` (gzipped after the run; the checkpoints were all deleted, every board being proven), `run.err` (its status lines), `log` (the stages' times); `report.txt` is the run's own (`cloud.sh` makes it) |
+| `dry/chain.jsonl.gz` | `taxman solve 1301-1500 --threads 1 --window 1 --progress 0 --out dry/chain.jsonl`, then gzipped | the chain over the same stretch on one thread with the same build, standalone at 1301 (no game of 1300), for the comparison: 447.5 s in all (`/usr/bin/time`: 449 s wall, 446.7 s user) |
+| `dry/events.txt` | `./events.py dry/run dry/chain.jsonl` | the output the entry quotes |
+| `climb/` | runs of one stretch back to back (2026-10-17 and 18, 23:43 to 00:36 UTC), the non-release build, the truth hidden: `OUT=DIR LEDGER_BIN=target/debug/examples/ledger WORKERS=6 CPU_HOURS=2 [CLIMB=up\|down\|both\|off] solver/tools/ledger/cloud.sh 1301-1500` (`dry-*`), `WORKERS=8 CPU_HOURS=0.1667 ... 2576-2700` (`mid-*`), `CPU_HOURS=0.5` (`long-*`); `*-up` and `*-off` are the climbs up only (the build of eb9dc9c, the default then: `CLIMB_LIMIT` unset, 60 s) and none (`CLIMB_LIMIT=0`), `*-both` and `*-down` the build of 55d2b2a | wedge and climb, [the entry's section](README.md#later-2026-10-17-wedge-and-climb); each directory has `report.txt` (the run's own; before 55d2b2a it has one line of climbs, and for the runs without any it reads "-0 s", a rounding the report no longer makes), `log`, `run.err`, `events.txt` (`./events.py` on `run`) and `run/ledger.jsonl.gz`, `run/events.jsonl.gz` |
+| `finder/` | runs back to back (2026-10-18, 01:01 to 01:15 UTC), the non-release build of 4621d97, the truth hidden: `OUT=DIR LEDGER_BIN=target/debug/examples/ledger WORKERS=6 CPU_HOURS=2 LNS_SECONDS=1 solver/tools/ledger/cloud.sh 1301-1500` (`dry-on`, and `dry-off` with `LNS_SECONDS=0`, last), `WORKERS=8 CPU_HOURS=0.25 LNS_SECONDS=1\|0 ... 2576-2700` (`mid-on-a`, `mid-off-a`, `mid-off-b`, `mid-on-b`, in this order) | the finder in the ledger, [the entry's section](README.md#later-2026-10-17-the-finder-in-the-ledger); each directory has `report.txt`, `log`, `run.err`, `events.txt` (`./events.py` on `run`) and `run/ledger.jsonl.gz`, `run/events.jsonl.gz` |
+| `store/` | the laptop (2026-10-17, evening), the non-release build: `ledger run 901-960 --dir run1 --cpu-hours 0.0015 --workers 4 --lns-seconds 0.1 --base 0.05` (15 of 60 boards proven, 6 CPU s), `ledger export run1 --bounds bounds.jsonl --source dry-1 --checkpoints s3://bucket/ledger/out/run/ckpt --strict S` (S: the chain's lines of 900, 930 and 945 only, so that the other boards got lines); then `ledger run 901-960 --dir run2 --cpu-hours 0.01 --workers 4 --lns-seconds 0.1 --base 0.05 --bounds bounds.jsonl` (all 60 proven in 3 CPU s, from the file) and `ledger export run2 --bounds bounds.jsonl --source dry-2 --strict S --date 2026-10-18` | the bounds store ([the entry's section](README.md#later-2026-10-17-the-bounds-store), [results/README, "bounds.jsonl"](../../../results/README.md#boundsjsonl)): `bounds.jsonl` (the file the two exports made: 171 lines, 45 kilobytes), `verify.txt` (`ledger verify-bounds bounds.jsonl --strict results/strict.jsonl`) and `check.txt` (`python3 -I solver/tools/check_bounds.py bounds.jsonl --games G --strict results/strict.jsonl`, G the output of `ledger games`): both referees accept the file, and the 58 boards it proves are the chain's games at the chain's scores |
+| `floor/` | the laptop (2026-10-18), the non-release builds (`cargo build --profile test --example ledger`), the truth hidden, each `OUT=DIR LEDGER_BIN=BIN WORKERS=W CPU_HOURS=H nice -n 10 solver/tools/ledger/cloud.sh RANGE`: `*-dry` with W=6, H=2 on 1301-1500, `*-mid` with W=8, H=0.25 on 2576-2700, `*-hard` with W=8, H=0.25 on 3076-3200, `*-mid2` with W=8, H=0.5 on 2576-2700, `*-scale` with W=4, H=0.15 and `LNS_SECONDS=1` on 4500-4523, `first-scale1` with W=1, H=0.05 on 4500-4500; `base-*` is the scheduler before the floor steps (93056fd), `first-*` the build of f775cc0 and `new-*` that of 26c5c71 (the boards exploring first), the new builds run before the base | floor-guided drilling, [the entry's section](README.md#later-2026-10-18-floor-guided-drilling); each directory has `report.txt` (the run's own), `log`, `run.err` (its status lines), `events.txt` (`./events.py` on `run`) and `run/ledger.jsonl.gz`, `run/events.jsonl.gz`; `ladder.py` and `ladder.txt` (`./floor/ladder.py > floor/ladder.txt`) lay the steps on the 14 games measured under floors (`../target/target.jsonl`): the steps and the proof cost a median 1.05 times the proof alone, and the forecast's error by the points of the line |
+| `climb_limit.py`, `climb_limit.txt` | `./climb_limit.py cloud-20261017/run` (the second cloud run: 2176..3440, 48 core-hours on 64 workers; its events file is kept there gzipped, its 9 MB ledger is not) | what a longer climb limit would cost, from that run's events: the table the default of 60 s rests on |
+| `cloud-20261017-stopped/` | `solver/tools/ledger/cloud.sh 2176-3440` on a `c8g.16xlarge` with 64 workers (2026-10-17, 20:31:21 to 20:40:21 UTC, stopped by a signal after 9 minutes), the three small files of `~/ledger` and the output of `./events.py` on its run | the first cloud attempt, before the fix: `report.txt` (nothing proven, 1,299 CPU s), `log`, `run.err` (its status lines), `events.txt`; the 21 MB events file and the 8 MB ledger are not kept |
+| `cloud-20261017/` | `solver/tools/ledger/cloud.sh 2176-3440` with `WORKERS=64 CPU_HOURS=48` on a `c8g.16xlarge` (2026-10-17, 22:04:55 to 22:50:11 UTC), after the fix of the first attempt: the truth hidden, nothing given, no climbs, no finder (the second cloud run) | `report.txt` (916 of the 1,265 boards proven, every one at the optimum, 0 violations, 48.02 core-hours), `log`, `run.err` (its status lines), `events.txt` (`./events.py` on `run`, made while the ledger was at hand), `run/events.jsonl.gz` (the 1.8 MB events gzipped; `climb_limit.py` reads it); `results.html`, the page of the run (the games proven against core-hours, the same games both ways against the chain's cost, where the ledger proved games, what is left open, every game's bounds, what proved the games), made by `report_page.py RUN_DIR results.html` with RUN_DIR holding the run's `events.jsonl` and `ledger.jsonl` (the 8.4 MB ledger is not kept, so the page is the record; the script reads the chain's cost per game from `solver/notebook/the-run-to-the-wall-2026-10/reproof.jsonl.gz`, the optima from `results/strict.jsonl` and the quick bounds from `solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/cal.jsonl`); the checkpoints are not kept |
+| `cloud-20261018-prep/` | the prep run: `cloud.sh 2176-3440` as two ledgers at once on one machine, each `WORKERS=32 CPU_HOURS=24`, the games to 2175 given and the climbs both ways, the truth of 2176..3440 hidden (2026-10-18, 01:30:04 to 02:15:31 UTC): `a/` with the finder (1,042 runs), `b/` without (`LNS_SECONDS=0`) | in `a/` and `b/` `report.txt` (877 and 838 boards proven, 876 and 837 besides the given 2175, all at the optimum, 0 violations), `log`, `run.err`, `events.txt` (`./events.py` on `run`) and `run/events.jsonl.gz`; `compare.html`, made by `./compare_page.py compare.html` from the events of the three runs (this one's `a/` and `b/` and `../cloud-20261017/`): the proofs against core-hours, the climbs and the finder, stretch by stretch; the ledgers (8.4 MB each) and the checkpoints are not kept |
+| `past4300/` | `./past4300/past_chart.py LEDGER OUT.html` and `./past4300/where_chart.py LEDGER ../../results/strict.jsonl OUT.html`, with LEDGER a `ledger.jsonl` | the survey of the boards past 3900 (2026-10-18), two pages made as they are, with their scripts.  `bounds-stage2-midway.html`: every board of 4300..4999, where its bounds started (the quick bounds of `../landscape/map.jsonl.gz`) and where they stood midway through stage 2 (304 of 700 proven; stage 2's final ledger has 343).  `where-3899-5000.html`: games 3899..5000 proven or open, the gap of each open game and two forecasts of the search left for each (the floor-step line, and the chain's model, log10 core-seconds = 1.89 + gap / 553), from the survey's ledger (3900..4999, floor steps) when the chain's file stood at 3905 games, so that its chain row ends there (with today's file, at 3914).  The ledgers (8-12 MB) are not kept: the bounds are in `../../results/bounds.jsonl` and the pages are the record |
+
+
+The launcher `cloud.sh` and the reader of the events, `events.py`, are tools of the repository: [solver/tools/ledger/](../../tools/ledger/README.md).

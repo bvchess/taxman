@@ -1,6 +1,6 @@
 # Certificates past 2175: the same problem, the work list, the verifier (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  S1 and S2 of the fourth consultation of the theory track (2026-10-15), what the campaign of certificates
 on 2176-3440 needs before the owner approves it: can a game whose extended problem an earlier certified game posed be
@@ -24,7 +24,7 @@ of the very problem m's certificate bounds, so the strict case is treated as the
   of search saved; 39 s for the whole range against 45 s), each equal to a search of it (verdict, digest, sizes,
   score), each resting on the latest game of the window whose problem is the same (found independently in the test by
   comparing the problems): 62 on n − 1, 17 on n − 2, 2 on n − 3, and 1260 → 1261 → 1263 a chain of them.  The file is
-  committed (`bench/certify/certificates_600_1300.jsonl`).
+  committed (`results/certificates/certificates_600_1300.jsonl`).
 * *Past 2175*, with the committed chain: the problems file (below) finds 114 such games in 1301..2175, 129 in 2176..3314
   and 16 in 3315..3440, every one of equal worth.  Five pairs past 2175 certified both ways on one thread (2248 → 2249,
   2610 → 2611, 2613 → 2615, 2622 → 2623, 2652 → 2653): the rule's certificate is the direct search's (digest, sizes,
@@ -37,11 +37,11 @@ of the very problem m's certificate bounds, so the strict case is treated as the
   is an error and a raised one makes n searched; the window never looks past 8 sizes.
 
 *S2.1, the barred bounds of 3315-3440* (ed526a4): `upper --from 3315 --to 3440` on the committed chain, one thread,
-277 s, into the new file `prover/data/upper_3315_3440.jsonl`: 126 games, 73 needing a certificate, 3424, 3425 and 3440
+277 s, into the new file `solver/noframe/data/upper_3315_3440.jsonl`: 126 games, 73 needing a certificate, 3424, 3425 and 3440
 among them (each an exhausted search below its ceiling, so each rests on the frame model); 19.9% of the members of
 U\*_{≥3} open (172 to 271 a game, against 14.9% on 2176-3314), the root's gap 1,103 to 1,555, the root's heaviest set
 holding all of U\*_{≥3} in every one.  The same games' root gaps from the solver's GF(2) bound (`wall nodes --nodes 1`,
-111 s, `bench/wall/gaps_chain_3313_3440.jsonl`: the 58 searched games of 3315..3440) equal the barred bounds' at all 48
+111 s, `solver/notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/gaps_chain_3313_3440.jsonl`: the 58 searched games of 3315..3440) equal the barred bounds' at all 48
 games both have.
 
 *S2.3-S2.5* (35c614b): `taxman certify --list FILE` takes the boards of a file in its order, so that the campaign can
@@ -51,15 +51,15 @@ function), the width (now one function), Π⁺(O) set up again reproducing the d
 with no counterexample, a `same_problem` line resting on an earlier certified line of its file with the rule applied
 again (the same function `certify` applies) and the two problems equal whole, a `beaten` line's game refereed and in
 the counterexample file, no contradictory verdicts; a search's verdict is taken on trust, as an exhausted proof is.
-Then how far the proofs reach: every game to N is proven by the prover (`prover/data/exact_*.jsonl`, the rule of
-`prover/tools/summarize.py`), by a certificate that passed, or by a ceiling or the prime formula above a proven game.
+Then how far the proofs reach: every game to N is proven by the prover (`solver/noframe/data/exact_*.jsonl`, the rule of
+`solver/noframe/tools/summarize.py`), by a certificate that passed, or by a ceiling or the prime formula above a proven game.
 On the committed files it is 2175, the first game that is not proven 2176 (it needs a certificate); the certificates of
 600..1300 change nothing (the prover proved those games already); the five pairs past 2175 above add 13 games past
 2176 (the ten certified and three at a ceiling above them).  `examples/extended.rs problems` sets each game's Π⁺(O) up
 without a search and writes its sizes, worth, width, digest and the latest game of the window with the same problem
-(`bench/certify/problems_600_3440.jsonl`, 1,575 games, 79 s; three need the widest set width: 3175, 3176 and 3440).
+(`solver/tools/certify/problems_600_3440.jsonl`, 1,575 games, 79 s; three need the widest set width: 3175, 3176 and 3440).
 
-*S2.2, the work list and the estimate* (`tools/certify_plan.py`, standard library only; `bench/certify/plan.md`, the
+*S2.2, the work list and the estimate* (`solver/tools/certify_plan.py`, standard library only; `solver/tools/certify/plan.md`, the
 summary for the approval, `plan.jsonl` and the list files).  The chain ran several searches at once (a window of 16 to
 3310, then 4), so a game's recorded search seconds are the time it shared the machine: summed, they are 3.27 times the
 run's wall time × 64 threads over 2176..3310 and 1.55 times over 3311..3440.  The plan prices a search by its nodes
@@ -104,3 +104,11 @@ equal to the base commit's binary (4f1c35b), both suites, clippy and fmt.  The p
 `certify`'s own lines on 600..1300 (the games that need one, their open and rejected sources, the 81 the rule settles),
 and `verify-certificates` passes the committed certificates.  The laptop only ran setups and searches of seconds, one
 thread at a time; nothing ran on AWS.
+
+## Files
+
+The chain's games past 2175 and the root gaps of 3313-3440 that the work list read:
+
+| file | command | what it is |
+|---|---|---|
+| `gaps_chain_3313_3440.jsonl` | the same with `SNAPSHOT` the committed `results/strict.jsonl` (games 1..3440) and the games past 3312 only, `wall` built from 35c614b, one thread, 111 s | the rest of the committed chain in the same form, for the work list of the certificates (`../certify/`): the 58 searched games of 3315..3440 (48 `exhausted`, 10 `cap`), root gaps 1,103 to 1,555 (the exhausted ones' mean 1,265), equal to the barred bounds' gaps at the roles of Theorem B (`solver/noframe/data/upper_3315_3440.jsonl`) where both have the game |

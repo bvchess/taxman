@@ -1,18 +1,18 @@
 # Finders for good games that are not sound (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Brian's: the ledger keeps a lower bound L(n), a real game the referee replays, and an upper bound U(n),
 for many boards.  A lower bound needs only a legal game, so any method may find it, sound or not; only an upper bound
 has to be proven.  Can searches that are not sound (they may miss the optimum) find better games quickly, and does a
 better starting game make the sound search much cheaper?  The start incumbent falls short of the optimum by a median 227
-on 2176-3440 ([the landscape](the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)), a neighbour's
-heuristic game closes 40% of that ([seeding](seeding-the-start-from-a-neighbours-heuristic-game-2026-10.md)), and a
+on 2176-3440 ([the landscape](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)), a neighbour's
+heuristic game closes 40% of that ([seeding](../seeding-the-start-from-a-neighbours-heuristic-game-2026-10/README.md)), and a
 standalone search finds its optimum after a median 77% of its time, so stopping it early is no cheap way to a good game.
 
 **What was run.**  On the laptop on 2026-10-17, with the test-profile build of `wall`, one process a game and four at
 once under `nice -n 10`, in three stages (the data, commands and tables are in
-[bench/finders/](../../bench/finders/README.md); the commands `wall sound` and `wall finders`, new in commit fa3127a,
+[solver/notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md](README.md); the commands `wall sound` and `wall finders`, new in commit fa3127a,
 are defined in `examples/wall/finders.rs`).  Times are CPU seconds of the process.  The laptop searched at about 7
 thousand steps a second a thread, as the cloud did in the landscape's searches (6.8 thousand).
 
@@ -130,13 +130,44 @@ the tuning runs are not in its CPU.
 
 **Used in the ledger.**  LNS is the ledger's finder since 2026-10-17 (`--lns-seconds`, 1 s by default; its code moved to
 `examples/common/lns.rs`, which `wall finders` shares): [the finder in the
-ledger](the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-finder-in-the-ledger).
+ledger](../the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger).
 
 **Commits.**  fa3127a (the commands `sound` and `finders`, their tests, and `examples/common/known.rs` and `rng.rs`,
-which `tune` and `wall` share); this entry adds the data and the scripts in `bench/finders/`.
+which `tune` and `wall` share); this entry adds the data and the scripts in this entry's folder.
 
 ## Later (2026-10): the commands removed from master
 
 The commands `wall sound` and `wall finders` were removed from the tree on 2026-10-18.  They build at commit 9d9dae3
 (`git show 9d9dae3:rust/examples/wall/finders.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall`
 in `rust/`.  The finder itself stays in `examples/common/lns.rs`, which the ledger uses.
+
+## Files
+
+The runs were
+made on the laptop on 2026-10-17, one process a game and four at once under `nice -n 10`, with the test-profile build
+of `wall` (`cargo build --profile test --example wall` in `rust/`), from `rust/`, against the committed chain
+(`results/strict.jsonl`).  The commands `sound` and `finders` were removed from master on 2026-10-18; they build at
+commit 9d9dae3 (`git checkout 9d9dae3` first), where they are defined in the module comment of
+`examples/wall/finders.rs`, which defines every field of a line.  Every time is the CPU seconds of the process (the
+laptop was shared with other work, so the wall time says little), and the searches are compared by their nodes as well.
+
+`run.py` runs a command over a list of games, four processes at a time, and appends each game's line to the stage's
+file as it ends; a run that is interrupted goes on where it was.  `tables.py` makes the tables of the entry from the
+files and `../landscape/cal.jsonl`; its output is `tables.txt`.
+
+### Files and the commands that made them
+
+`GAMES1` is the 40 games of stage 1: 2180 2196 2200 2264 2312 2397 2416 2430 2440 2451 2478 2556 2560 2565 2592 2601
+2632 2640 2691 2696 2700 2704 2712 2720 2799 2849 2891 2925 2964 2976 3000 3003 3010 3064 3128 3129 3213 3260 3267
+3272.  The 22 of them in `../landscape/sa/` were picked by the time of their standalone search there (5 to 300 s, no
+primes or repeats; four have a start that is already the optimum, as 13% of the games do); the 18 others, of every band
+of 250 in n, by the nodes of the chain's search of them (100,000 to 1,200,000), with a start short of the optimum.
+
+| file | command | what it is |
+|---|---|---|
+| `stage1.jsonl` | `./bench/finders/run.py sound stage1.jsonl --from opt --cap 600 --shuffle GAMES1`, then the same with `--from start --cap 900` | stage 1: the sound search of each of the 40 games, one thread, no seed from n − 1 and no ceiling, from the known optimum (`from` is `opt`: (ii)) and from today's start (`start`: (i)); 80 lines |
+| `stage2.jsonl` | `./bench/finders/run.py finders stage2.jsonl --cpu 5 --shuffle 2176-3440/5` | stage 2: the three methods and the start, each of the 253 games 2176, 2181, ..., 3436, 5 CPU s a method (it predates the field `lns_found_ms`) |
+| `stage2-20s.jsonl` | `./bench/finders/run.py finders stage2-20s.jsonl --cpu 20 --shuffle 2176-3440/25` | the same, 20 CPU s a method, on every 25th game (51) |
+| `stage3-lns-5s.jsonl`, `stage3-lns-1s.jsonl` | `./bench/finders/run.py sound stage3-lns-5s.jsonl --from lns --cpu 5 --cap 900 --shuffle GAMES1`, and with `--cpu 1` | stage 3: the sound search of the 40 games seeded with the game the LNS finder returns after 5 and after 1 CPU s |
+| `tuning/*.jsonl` | `./bench/finders/run.py sound tuning/NAME.jsonl --from lns --cap 0.01 --cpu 5 2178-3428/50 [--fix LO-HI] [--unit-nodes K]`, and `--from restricted` with `[--extra K] [--pool value|chosen]` (`value` was the default while the `value` files were made; `chosen` is the default now) | the light tuning on 26 games n = 2178 + 50k, which stage 2 does not play (n = 3 mod 5); the name says the setting, the file the game's line (`--cap 0.01` stops the sound search after the finder, whose game is the line's `lns` or `restricted`) |
+| `tables.py`, `tables.txt` | `./bench/finders/tables.py > tables.txt` | the tables the entry quotes |

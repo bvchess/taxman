@@ -1,6 +1,6 @@
 # The port and its first improvements
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 The Rust solver reimplements the algorithm of the Java solver rather than translating it (DESIGN.md, "The Java
 solver and this one").  Its setup had to reproduce the Java's values exactly (the golden data in

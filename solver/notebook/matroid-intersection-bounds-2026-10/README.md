@@ -1,8 +1,8 @@
 # Matroid intersection bounds (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  The slope of the cost curve is the growth of the root's gap ([slope](what-drives-the-slope-2026-10.md)),
+*Question.*  The slope of the cost curve is the growth of the root's gap ([slope](../what-drives-the-slope-2026-10/README.md)),
 so a bound whose gap grows more slowly changes it.  The matching bound relaxes winnability to distinct factors.
 THEORY.md's Theorem 7 shows that playable sets are linearly independent over GF(2), which made the upper half exact.
 Does that structure give a bound on the promotions, how much of the gap does it close at the root and at search
@@ -46,14 +46,14 @@ Bellman–Ford lexicographic in length and arcs; the reference `intersect`), a f
 (`intersect_fast`: rows by pivot with slot masks, the arcs from or to an element independent of the set relaxed through
 one minimum, a start from the heaviest uncontended elements), warm starts checked extreme (`intersect_warm`) and the
 weight split (`split`).  `examples/matroid.rs` builds the frame matroids of any state and runs the measurements;
-`bench/matroid/` holds the data and `matroid.py`, which makes the tables below (`matroid_output.md`).  The commands (all
+`solver/notebook/matroid-intersection-bounds-2026-10/` holds the data and `matroid.py`, which makes the tables below (`matroid_output.md`).  The commands (all
 `cargo run --release --example matroid --`, one thread, at most two processes, on the laptop shared with other agents,
 so the times are indicative):
 
-* `roots --opts bench/curve/slope_roots.jsonl 880-1310 1350-1352` (`roots.jsonl`; the matching and Lagrangian bounds
+* `roots --opts solver/notebook/what-drives-the-slope-2026-10/slope_roots.jsonl 880-1310 1350-1352` (`roots.jsonl`; the matching and Lagrangian bounds
   are those of the slope study's `slope_roots.jsonl`, whose Lagrangian is fitted with up to 8,000 steps over the
   root's own conflicts);
-* `bnb --opts bench/curve/slope_roots.jsonl --bounds gf2 --limit 400000` and the 146 games that
+* `bnb --opts solver/notebook/what-drives-the-slope-2026-10/slope_roots.jsonl --bounds gf2 --limit 400000` and the 146 games that
   `slope_proofs.jsonl` proves at δ = 0 (`bnb.jsonl`, run before the start from the heaviest elements was added:
   the same trees, about 20% more time than now), and `bnb --bounds matching --limit 200000 880 936`
   (`bnb_matching.jsonl`);
@@ -203,7 +203,7 @@ with three or more live factors, over as many factors as movers or a few more.
 | 1201-1300 | 85 | 167.0 | 176 | 282 | 0 | 545 |
 
 The model-free matching bound's gap is 140-430 around 500-700 and 650-1,200 from 800 on
-([prover 3](../../prover/README.md#3-the-proofs-of-optn)); this one's is a tenth of that, from the
+([prover 3](../../noframe/README.md#3-the-proofs-of-optn)); this one's is a tenth of that, from the
 reference algorithm in half a second at 1300.  That the two constructions agree at every root of 880-1300 checks
 each against the other.
 

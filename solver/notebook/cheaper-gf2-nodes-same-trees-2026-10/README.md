@@ -1,9 +1,9 @@
 # Cheaper GF(2) nodes, same trees (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The profile of a search at the end of the chain (game 3441 resumed from the cloud run's checkpoint,
-[bench/chain_end](../../bench/chain_end/README.md)) put about 92% of a node in the GF(2) bound: tableaux built again
+[solver/notebook/the-calibration-for-the-run-to-4000-2026-10/README.md](../the-calibration-for-the-run-to-4000-2026-10/README.md)) put about 92% of a node in the GF(2) bound: tableaux built again
 after a solve 25-28%, the weight split 19-20%, the cycle searches for forced members 13-19%, strong branching 15-18%,
 augmenting paths 8-14%, at about four instructions a cycle.  How much of that work can go without changing a single
 search tree?

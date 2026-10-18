@@ -1,10 +1,10 @@
 # Proving an upper bound part of the way: searches under a floor (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Brian's: the search keeps its best promotion set (the incumbent) and prunes a node whose bound is no more
 than the incumbent's sum, so a search stopped partway leaves little behind on the upper side: the dual bound of a
-stopped search ([the ledger](the-ledger-bounds-from-both-sides-2026-10.md)) closed 23%, 61% and 29% of the root gap of
+stopped search ([the ledger](../the-ledger-bounds-from-both-sides-2026-10/README.md)) closed 23%, 61% and 29% of the root gap of
 996, 1020 and 1218 only 65%, 96% and 88% of the way through their trees.  The old Java solver went at the upper bound
 one value at a time ("no set reaches x", then x − 1, ...), which banks a proven bound at every step.  A search from a
 *floor* F above the optimum, an incumbent worth F with no set behind it, proves "no promotion set weighs more than F" for
@@ -15,7 +15,7 @@ does the log of the nodes grow about linearly with the distance proven down?
 virtual incumbent worth `floor` and no start (no greedy set, seed, dive or local search); nodes are pruned against it as
 against a set of that weight, and a set found heavier becomes the incumbent as usual.  `SearchResult::floor_held` says
 that it completed and found none.  With no floor the code path is the old one (the tripwires' node counts, the probe's
-trees and every other test are unchanged).  [Lemma F](../../../heuristics/THEORY.md#the-ledger-bounds-between-boards) in
+trees and every other test are unchanged).  [Lemma F](../../../docs/THEORY.md#the-ledger-bounds-between-boards) in
 THEORY.md: a completed search with a floor that found no set proves P\* ≤ F, by the argument of Lemma D (the search reads
 only the incumbent's value).  The tests (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400,
 a floor below the optimum finds it, a floor at it or above completes with nothing found, and a floor at the root's bound
@@ -29,9 +29,9 @@ sound search from the known optimum as its seed, as the finder hands it to the l
 nodes and CPU seconds of each.
 
 **What was run.**  On the laptop on 2026-10-18, the test-profile build of `wall` (opt-level 2), one process a game and
-four at once under `nice -n 10`, 25 minutes (the data, commands and tables are in [bench/target/](../../bench/target/README.md)).
+four at once under `nice -n 10`, 25 minutes (the data, commands and tables are in [solver/notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/](README.md)).
 14 games of 2265-3259 with the shares 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8 and 0.9 of the gap: the ten
-**main** games are those of [the landscape's](../../bench/landscape/README.md) standalone one-thread searches that
+**main** games are those of [the landscape's](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md) standalone one-thread searches that
 finished in 286 to 1,450 s (2265, 2299, 2423, 2485, 2528, 2555, 3156, 3204, 3221, 3259); four cheaper games (2416, 2560,
 2696, 3064) add points to the curve.  The root gaps are 627 to 1,113 (median 834); the full proofs took 28.6 to 1,050 CPU
 s and 0.22 to 5.1 million nodes (4,135 CPU s in all; all the runs 5,812 CPU s).  The cap was 1.3 times the game's
@@ -61,7 +61,7 @@ decades (a factor 1.2 to 1.8).  Its slope is a median 0.68 decades per 100 of ga
 per 147, or a factor of about 27 for each quarter of an average gap of 834.  Step by step the slope shows no trend with the
 share: a median 0.71 between 0.25 and 0.5, 0.63 between 0.5 and 0.75, 0.69 between 0.75 and 1.  The full proofs are on
 the chain's cost model (log10 of the nodes is 2.67 + G/247, [the gap past
-2175](the-gap-past-2175-2026-10.md)): a median residual of −0.01 decades; a floor at k of the gap costs 1.75, 1.19 and
+2175](../the-gap-past-2175-2026-10/README.md)): a median residual of −0.01 decades; a floor at k of the gap costs 1.75, 1.19 and
 0.55 decades less than the model gives a game whose gap were k · G (k = 0.25, 0.5, 0.75): within a game the cost falls
 faster with distance (a decade per 147) than across games (a decade per 247).
 
@@ -86,10 +86,34 @@ different slope but cannot show it.  One thread; the floors' runs on many thread
 search (which resumes, tested) are not measured.  The ledger does not use floors yet.
 
 **Commits.**  742e88a (`search_above`, Lemma F, `wall target` and their tests); this entry adds the data and the scripts in
-`bench/target/`.
+`solver/notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/`.
 
 ## Later (2026-10): the command removed from master
 
 The command `wall target` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
 9d9dae3:rust/examples/wall/finders.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
 `search_above` and its tests stay in the library.
+
+## Files
+
+The runs were made on the laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the
+test-profile build of `wall` (`cargo build --profile test --example wall` in `rust/`: opt-level 2, debug assertions on)
+of commit 742e88a (copied out of `target/` before the run, so that a rebuild could not change it), from `rust/`, against
+the committed chain (`results/strict.jsonl`, which gives each game its optimum).  The command `target` was removed from
+master on 2026-10-18; it builds at commit 9d9dae3 (`git checkout 9d9dae3` first), where it is defined in the module
+comment of `examples/wall/finders.rs`, which defines every field of a line.  Every time is the CPU seconds of the
+process (the laptop was shared with other work, so the wall time says little), and the searches are compared by their
+nodes as well.
+
+### Files and the commands that made them
+
+| file | command | what it is |
+|---|---|---|
+| `target.jsonl` | `./bench/target/run.py target.jsonl --wall PATH` | one line a game of the 14 in `run.py` (`wall target --known results/strict.jsonl --fractions 0.1,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.75,0.8,0.9 --cap CAP N`, the cap in CPU seconds 1.3 times the game's standalone search in `../landscape/sa/`): the gap, and for each share of it the floor search's completion, nodes and CPU seconds, and the full proof's |
+| `tables.py`, `tables.txt` | `./bench/target/tables.py > tables.txt` | the tables the entry quotes |
+
+
+`GAMES` of `run.py` is the 14 games: the ten **main** games are those of `../landscape/sa/` whose standalone one-thread
+search finished in 286 to 1,450 s there (2265, 2299, 2423, 2485, 2528, 2555, 3156, 3204, 3221, 3259: root gaps 628 to
+1,113), the four **extra** (2416, 2560, 2696, 3064) cost 28 to 160 s of full proof and add points to the curve.
+`run.py` runs the dearest first and skips the games the file has, so an interrupted run goes on where it was.

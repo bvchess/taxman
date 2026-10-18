@@ -1,16 +1,16 @@
 # The sweep: a local test (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Brian's plan of 2026-10-17 is as many proven games of 3441..8191 as one cheap machine gives, holes
 allowed: blocks of consecutive games, one thread each, a search of at most 180 s a game, a game that does not finish
 leaves its best game as a seed for the next, and passes over the merged file so that each game sees the game before it
-whichever block made it ([RUNBOOK section 13](../../tools/cloud/RUNBOOK.md#13-the-sweep);
+whichever block made it ([RUNBOOK section 13](../../docs/RUNBOOK.md#13-the-sweep);
 `taxman solve --keep-going`).  Does it do that on a range small enough for a laptop, and does a block's first game end
 as it would in one unbroken chain when the game before it is proven?
 
-**What was run.**  `rust/tools/cloud/sweep.sh` on the laptop (ten CPUs) with the binary of `cargo build --profile test`
-(opt-level 2, debug assertions on), the committed games to 1300 or to 1410 as `KNOWN`, and `tools/cloud/test/run.sh
+**What was run.**  `solver/tools/cloud/sweep.sh` on the laptop (ten CPUs) with the binary of `cargo build --profile test`
+(opt-level 2, debug assertions on), the committed games to 1300 or to 1410 as `KNOWN`, and `solver/tools/cloud/test/run.sh
 sweep`, which runs it against the stand-in for aws and the real `verify.sh` (both referees, and the agreement with
 the committed chain).
 
@@ -35,7 +35,7 @@ the committed chain).
   progress); the same command went on to the end and both referees accepted the file.  A second run of the command on
   a finished sweep left the merged file byte for byte as it was.
 
-**The sizes of the real run** (`tools/sweep_plan.py blocks 3441 8191 64 180`; computed, not run): 4,751 games in 64
+**The sizes of the real run** (`solver/tools/sweep_plan.py blocks 3441 8191 64 180`; computed, not run): 4,751 games in 64
 blocks, the first of 95 games (3441..3535) and the last of 50 (8142..8191), each of 4.83 to 4.97 core-hours of expected
 work.  The expected work of a game is its setup (5.1 s at 3441, 22.6 at 5000, 90.7 at 7000, 173.5 at 8191 by the power
 laws through the four measured points: 1 s at 2200, 3 at 3000, 9 at 4000, 48 at 6000) and the limit of its search: 76
@@ -59,4 +59,4 @@ core-hours of setup and at most 238 of search, 314 in all, 4.9 hours on 64 CPUs,
 four points); the passes at the scale of 64 blocks; anything on EC2.
 
 **Commits.**  The branch with `--keep-going`, `--retry`, `--retry-improved` and `--pass` in `taxman solve`, the referees'
-checks of unfinished lines, `sweep.sh` and `tools/sweep_plan.py`.
+checks of unfinished lines, `sweep.sh` and `solver/tools/sweep_plan.py`.

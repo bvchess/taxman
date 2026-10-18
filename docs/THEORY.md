@@ -1,6 +1,6 @@
 # The theory, with proofs
 
-This is the proof companion to [README.md](README.md): every theorem
+This is the proof companion to [README.md](../heuristics/README.md): every theorem
 the ledger there cites lives here in full.  The README states what is
 claimed and how well it is tested; this file is *why*.
 
@@ -18,7 +18,7 @@ Everything below supports three headline facts:
   proven and what remains.  A linear-algebra certificate, (♦),
   settles it game by game: every game to 100,000 is certified.
 * **Proven, but for one statement.**  The frame solver's answer
-  (`rust/`) is opt(n) exactly when *some optimal game plays every
+  (`solver/frame/`) is opt(n) exactly when *some optimal game plays every
   member of U\* with three or more prime factors*, on every board
   the solver supports (Lemma Ω, Theorems L, B and M; "The frame
   model: what is proven and what remains").  That statement, U, is
@@ -461,7 +461,7 @@ never rejected because of one.  Checking (♦) is greedy itself plus
 Gaussian elimination, a few seconds per game at n = 500,000, and it
 held in every game checked (Evidence, below).  The open problem
 becomes: **prove (♦)**.  The adversarial experiments of the prover
-(`rust/prover`, a branch and bound over sets of picks on the whole
+(`solver/noframe`, a branch and bound over sets of picks on the whole
 board) locate what it needs: it holds under every order of
 the real incidence structure that obeys the window law, even
 adversarially chosen ones, and under the window law reversed, but
@@ -586,7 +586,7 @@ positive weights allow only one (Theorem 8's layer-cake argument,
 for any matroid).  The certificate that settles the upper half has
 no analogue that is exact for the whole game.
 
-What is measured (`rust/prover`, "Is the optimal set unique?"):
+What is measured (`solver/noframe`, "Is the optimal set unique?"):
 the prover enumerates every optimal set in 954 of the games 2..989
 (the other 34, the most expensive, with the upper half fixed).
 The optimal set is unique in every game n ≤ 424; 30 games between 425
@@ -645,9 +645,9 @@ for five lighter ones:
     heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
 
 *Proof (computational, by the prover).*  opt(833) = 218,226, and the
-optimal set is unique, with 362 members (`rust/prover`, sections 3
+optimal set is unique, with 362 members (`solver/noframe`, sections 3
 and 5).  The longer set replays by the rules, and ν(833) = 363, so
-M(833) = 363.  The branch and bound of `rust/prover`, weighting the
+M(833) = 363.  The branch and bound of `solver/noframe`, weighting the
 pick of c by K + c with K above every sum, proves that no playable
 set of 363 members sums to more than 218,197.  ∎
 
@@ -664,12 +664,12 @@ against 1,167.
 The same exchange is a promotion set of the frame model: the optimal
 game promotes 48 numbers and the longer one 49, which is `max_total`,
 so the "theorem" of the Java's comment is false for the whole frame
-game of 833 (`rust/tests/soundness.rs`).  The Java's `reviseFreedoms`
+game of 833 (`solver/frame/tests/soundness.rs`).  The Java's `reviseFreedoms`
 applied it only to the two-frame game of frames 0 and 1, where it stayed
 unproven; the frame solver had it as the tactic `revise_freedoms`, measured
 that it no longer paid, and removed it.
 
-What is measured (`rust/prover`, "Does an optimal game play the
+What is measured (`solver/noframe`, "Does an optimal game play the
 most moves?"): to n = 1300 the recorded optimal game is a longest
 game in every game but 833, 834 and 835, where it is one move short.
 In 1,293 of the 1,299 games its moves meet ν(n), the certificate
@@ -790,7 +790,7 @@ rationals the unsigned vectors of a triangle of moves are independent.
 The same construction, frame by frame, bounds the frame model's
 promotions (Theorem 11, below), and the two agree at every root
 measured ([Matroid intersection
-bounds](../rust/docs/experiments/matroid-intersection-bounds-2026-10.md)).
+bounds](../solver/notebook/matroid-intersection-bounds-2026-10/README.md)).
 What the bound buys the prover's search is in the evidence table
 below.
 
@@ -800,7 +800,7 @@ Theorem 10's lemma, applied frame by frame, bounds the frame model's
 promotions in the same way: two matroids, one of the even frames and
 one of the odd frames, in both of which every promotable set is
 independent.  This is the solver's GF(2) bound (tactic `gf2`;
-rust/DESIGN.md, section 4, "The GF(2) bound").
+solver/docs/DESIGN.md, section 4, "The GF(2) bound").
 
 **Theorem 11 (the frame matroids).**  Give each frame h of a state
 the coordinates of its factors, each mover u paying in h (a move of
@@ -823,7 +823,7 @@ contractions.
 *Proof.*  Promoting Q succeeds exactly when every frame is winnable
 with all of Q applied at once, its moves plus Q's members promoted
 into it and its factors less Q's members promoted out of it
-(rust/DESIGN.md, section 4; `model::promote`).  A winnable frame
+(solver/docs/DESIGN.md, section 4; `model::promote`).  A winnable frame
 peels completely (`model::peel`): each move dropped has a live factor
 that no move still there has, so, as in the proof of Theorem 10's
 lemma (the peel's order read backwards is the play order there), the
@@ -838,7 +838,7 @@ is independent in their contractions by P (which P, independent, makes
 well defined).  ∎
 
 Three facts about it.  It is never above the matching bound of
-rust/DESIGN.md, by Theorem 10's minor argument frame by frame: an
+solver/docs/DESIGN.md, by Theorem 10's minor argument frame by frame: an
 assignment of the movers to distinct live factors in which each unit
 vector e_y takes y itself, so that no promoted number pays as a
 factor, is the matching bound's relaxation.  On movers with at most
@@ -850,8 +850,8 @@ of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And
 Theorem 10's bound equals in_the_bag plus Theorem 11's at every root
 of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
 bound's to 1300.  The measurements are in
-rust/docs/experiments/matroid-intersection-bounds-2026-10.md and
-rust/docs/experiments/the-gf2-bound-in-the-search-2026-10.md; the
+solver/notebook/matroid-intersection-bounds-2026-10/README.md and
+solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md; the
 search's forced members rest on weak duality for a weight split, as
 Theorem 10's certificate does (`gf2::meet`).
 
@@ -861,9 +861,9 @@ Exchanging two primes in every number is an automorphism of
 divisibility.  Where it maps the frame model's root onto itself, it
 maps promotion sets to promotion sets, and no optimal set is improved
 by it, which orders the two primes' shares in every optimal set at
-once.  This is the solver's tactic `symmetry` (rust/DESIGN.md,
+once.  This is the solver's tactic `symmetry` (solver/docs/DESIGN.md,
 section 4, "Prime exchanges";
-rust/docs/experiments/dominance-and-symmetry-2026-10.md found the
+solver/notebook/dominance-and-symmetry-2026-10/README.md found the
 exchanges and measured them).
 
 For primes p < q let π = π_{p,q} send p^a q^b m (m prime to pq) to
@@ -887,7 +887,7 @@ when π(y) = π(x)/π(r): π preserves the maximal-factor relation.
 Promoting S succeeds exactly when every member of S is a factor of its
 home frame h ≥ 1 and every frame is winnable with all of S applied at
 once, its moves plus S's members promoted into it and its factors less
-S's members promoted out of it (rust/src/model/promote.rs, from the
+S's members promoted out of it (solver/frame/src/model/promote.rs, from the
 peel); a promotion set also leaves no frame with negative freedoms and
 has at most max_total members.  π maps each frame's factors onto
 themselves, so π(x) has the home frame of x, and π maps frame h with S
@@ -940,7 +940,7 @@ can still promote), plus μ (c_q(P) − c_p(P)), bounds every such
 completion: a Lagrangian relaxation of the inequality (weak duality,
 as for Theorem 11's weight split).  The solver uses the first two;
 the third was measured and not kept
-(rust/docs/experiments/prime-exchanges-in-the-search-2026-10.md).
+(solver/notebook/prime-exchanges-in-the-search-2026-10/README.md).
 
 These hold for the search of the root's problem, whose subtrees all
 are; a search of one node's completions for their own best (as some
@@ -948,9 +948,9 @@ tests run) finds the best of those that keep the inequalities.
 
 ## The frame model: what is proven and what remains
 
-The frame solver (`rust/`) does not search the games of n.  It
+The frame solver (`solver/frame/`) does not search the games of n.  It
 searches the *promotion sets* of the frame model, and its answer is
-in_the_bag plus the heaviest of them (rust/README.md, section 1, and
+in_the_bag plus the heaviest of them (solver/frame/README.md, section 1, and
 its glossary define the words used here: sources, frames, `unzip`
 and its mandatory moves, impossible sources, freedoms, closed frames,
 the numbering, candidates, promotion sets, `max_total`).  The model
@@ -1082,7 +1082,7 @@ empty.  ∎
 
 The frames of layer 2 have freedoms on 80 boards, all at most 186,
 and are closed on every other board to 8191
-(`rust/bench/structure/`).  Theorem B settles the members of U\* that
+(`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`).  Theorem B settles the members of U\* that
 the barred parity bounds leave open in layers 1 and 2: the largest
 prime (open at 1000 and 1300) and the rest of those (with the prime,
 13 of the 17 open members at 600, 24 of 36 at 1000, 15 of 18 at 1300
@@ -1110,11 +1110,11 @@ number 0 for those with no frame with freedoms in front of them,
 h + 1 for those directly behind a frame numbered h and not yet
 numbered.  It is the numbering by layer when it is clean and its
 frames numbered 0 lie in one layer, and the census of every board to
-8191, the largest the solver supports (`rust/examples/structure.rs`;
-the data in `rust/bench/structure/`), found the two the same on every
+8191, the largest the solver supports (`solver/frame/examples/structure.rs`;
+the data in `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`), found the two the same on every
 one, with ℓ₀ = 3 on
 8,100 boards and ℓ₀ = 2 on the 80 where the frames of layer 2 have
-freedoms (the tests of `rust/src/frames/` compare the two numberings
+freedoms (the tests of `solver/frame/src/frames/` compare the two numberings
 on every board to 400 and a sample to 8191).  So on those boards the
 frames, the candidates and the searches are the same under either
 numbering, and so is every result.  The two can differ on boards with
@@ -1125,7 +1125,7 @@ number, and on 32 without 4 a layer between two with freedoms has none
 
 ### The frame model is exact, given its upper part
 
-What setup does, in the words of the code (`rust/src/frames/`):
+What setup does, in the words of the code (`solver/frame/src/frames/`):
 
 1. It forms the frames and runs `removeImpossible` on each: descending
    greedy over the frame's sources against its factors, peel deciding
@@ -1245,7 +1245,7 @@ factor in a frame of the root is a front move of I_h(L) after the
 claims, and its factor is not in L, for the reasons M5 gives for a
 front claim (a factor reduced away is in no frame of the root either).
 And reducing never changes whether a frame is winnable, before or
-after promotions (the reduction lemma, `rust/src/model/peel.rs`).
+after promotions (the reduction lemma, `solver/frame/src/model/peel.rs`).
 
 **Theorem M (exactness).**  Let Π_n be the frame solver's root problem
 (its frames, candidates and `max_total`).  For every
@@ -1260,7 +1260,7 @@ moves, and no member of L is claimed or reduced away: each keeps its
 home.  By Theorem 3 what is left, which is frame h of the search with
 L applied, is playable, that is, winnable.  So L can be promoted from
 the root, and |L| ≤ `max_total`, a count that winnability implies
-(`rust/src/model/frame.rs`).  (If.)  Let L be a promotion set.  In
+(`solver/frame/src/model/frame.rs`).  (If.)  Let L be a promotion set.  In
 each numbered frame, the claims, the reductions and then a peel of
 what is left with L applied pair every member of I_h(L); by M5 and M6
 that is a sequence of front and back moves, an acyclic scheme
@@ -1286,9 +1286,9 @@ factor 2, and the frame would stay winnable; but on the board 22 and
 listed twice, so U\* ∪ {22} is not playable.  22 is no candidate,
 because frame 0 cannot take 22 on: only the filter keeps it out.  The
 same happens on 27 boards to 2000, all in 98–120 and 182–186
-(`rust/tests/model_exact.rs`).
+(`solver/frame/tests/model_exact.rs`).
 
-*Boards with holes.*  The sacrifice study (`rust/src/sacrifice.rs`)
+*Boards with holes.*  The sacrifice study (`solver/frame/src/sacrifice.rs`)
 forms frames on a board B with *holes*, numbers taken off it, under
 the *maximal-factor rule*: a move needs one of its maximal factors in
 the pot, and a hole is never in it.  Theorem 1 holds for that game as
@@ -1340,7 +1340,7 @@ or by the prime formula rests on the game before it, not on the model.
   board, every n ≤ 2175: the recorded game plays U\* and is optimal.
   In its strong form, every optimal set contains U\*, it holds in
   every game whose optimal sets were enumerated (954 games of 2..989;
-  `rust/tests/bottom_layers.rs` checks Theorem B on all of them).
+  `solver/frame/tests/bottom_layers.rs` checks Theorem B on all of them).
   Past 2175 it is not yet certified: the committed games of 2176..3440
   that are proven by an exhausted search or a repeat (991 of the 1265)
   rest on it, and `taxman certify` will check it game by game.
@@ -1358,8 +1358,8 @@ or by the prime formula rests on the game before it, not on the model.
   and over the 635 of the EC2 chain's 2176..3314, 14.9% (15 to 317 a
   game, 54% to 98% certified), the open share growing with the root's
   gap by 2 to 3 points per 100.  The root's heaviest set plays all of
-  U\*_{≥3} in every one of these games.  (`rust/prover`, `bin/upper.rs`;
-  the data in `rust/prover/data/upper_*.jsonl` and the table in its
+  U\*_{≥3} in every one of these games.  (`solver/noframe`, `bin/upper.rs`;
+  the data in `solver/noframe/data/upper_*.jsonl` and the table in its
   README, section 3.)
 
 *Where a proof stops.*  Take an optimal S without U\*_{≥3}, and d the
@@ -1390,7 +1390,7 @@ U\*_2 among them); and R the sources that greedy rejected in the frames
 that hold a member of O.  "Frame" means here a frame as setup forms
 it, before any merge: a component of Lemma Ω, in one layer.
 
-*The problem Π⁺(O)* (`rust/src/frames/extended.rs`):
+*The problem Π⁺(O)* (`solver/frame/src/frames/extended.rs`):
 
 * a frame C has the *freedoms⁺* |factors(C)| − |F ∩ C|, never negative
   (F ∩ C ⊆ U\* ∩ C is playable); one with none is *inert*;
@@ -1484,7 +1484,7 @@ root, candidates), so the search, its bounds and its tactics apply to
 it unchanged: Theorems 11 and 13, the reduction lemma, the conflicts
 and the nogoods use nothing else.  The search takes the one-sided
 candidates too, each as a possible move of its frame
-(rust/DESIGN.md, "Extended mode"), and a reference predicate (plain
+(solver/docs/DESIGN.md, "Extended mode"), and a reference predicate (plain
 peels of the unreduced frames) decides the promotion sets of Π⁺(O)
 for the tests.
 
@@ -1565,7 +1565,7 @@ candidate lists it), Π⁺(∅) has Π_n's candidates, and each frame of
 Π⁺(∅), the union of its parts' sources and factors less the pairs, is
 the merged frame's remaining sources and factors.  The census of the
 frames checks that the two problems the search is given are equal on
-every board to 8191 (`rust/examples/structure.rs`, check H).
+every board to 8191 (`solver/frame/examples/structure.rs`, check H).
 
 *Theorem 11 for Π⁺.*  Give each one-sided candidate s, of frame h,
 the vector v_h(s) of its maximal factors among frame h's factors in
@@ -1618,7 +1618,7 @@ only one of them has is no longer part of it.
 
 The chain proves the game of n from the game of n − 1 (the ceiling,
 the prime formula) or by a search of its own.  The ledger
-(`rust/examples/ledger/`) keeps, for many boards at once, a lower bound
+(`solver/frame/examples/ledger/`) keeps, for many boards at once, a lower bound
 L(n), the score of a game it holds, and an upper bound U(n) ≥ opt(n),
 and passes bounds between boards by the lemmas below; a board is
 proven when the two meet.  Each lemma is an inequality between optima,
@@ -1682,7 +1682,7 @@ is + p − q, and the construction needs no optimal game, only a
 finished one.
 
 **Lemma L4 (repeats).**  If boards n and m pose the same search
-problem, Π_n = Π_m (rust/DESIGN.md, "Same search"), then every
+problem, Π_n = Π_m (solver/docs/DESIGN.md, "Same search"), then every
 promotion set S of it, played on the board of n
 (`solution_for_promotions`), is a legal game of n scoring
 in_the_bag(n) + ΣS; and, given U at n, opt(n) − in_the_bag(n) ≤
@@ -1710,7 +1710,7 @@ Then P\*(Π_n) ≤ max(I, max_u (ΣP_u + B_u)), where B_u is the heaviest
 common independent set over C_u of Theorem 11's matroids contracted by
 P_u, of at most `max_additional` members.
 
-*Proof.*  The search is exact (rust/DESIGN.md, section 4): each
+*Proof.*  The search is exact (solver/docs/DESIGN.md, section 4): each
 pruning drops only sets no heavier than the incumbent of its time
 (at most I), sets that cannot be promoted, and, with the tactic
 `symmetry`, sets that break an inequality every heaviest set keeps
@@ -1776,7 +1776,7 @@ every field.  Each such choice gives a matroid per frame in which
 every promotable set is independent, and the GF(2) bound and any
 number of them combine by Lagrangian multipliers into one bound
 (the fields study,
-rust/docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md,
+solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md,
 which measured it).
 
 Fix a state and a frame h of it, with factors F_h and moves M_h; its
@@ -1811,7 +1811,7 @@ candidate y of home h by the class of e_y.  Moreover:
 
 *Proof.*  Promoting Q succeeds exactly when every frame is winnable
 with all of Q applied at once: movers M_h plus Q's members of home
-h + 1, pool F_h less Q's members of home h (rust/src/model/promote.rs;
+h + 1, pool F_h less Q's members of home h (solver/frame/src/model/promote.rs;
 the proof of Theorem 11).  A winnable frame peels completely
 (`model::peel`): list the movers u₁, …, u_k in the order the peel
 drops them, u_i with a pool factor f_i that no mover still there
@@ -2135,7 +2135,7 @@ alternating cycles, both through 30, so never disjoint: three sets
 
 The bound is exact longer than the proof reaches.  It equals opt(n)
 for every n ≤ 77 and first exceeds it at 78, with 1,992 against 1,991
-(`rust/prover/data/exact_parity_2_1300.jsonl`).  So odd cores exist
+(`solver/noframe/data/exact_parity_2_1300.jsonl`).  So odd cores exist
 from 45 on, and none weighs in before 78.
 
 ### The hardness
@@ -2166,7 +2166,7 @@ number.  Three consequences:
   half (members above the factors they list) and the frames are
   instances of the two-rank problem that their Theorem 2 shows hard in
   general, and the gap left by Theorem 11 is the odd cores of frames
-  1–3 (rust/docs/experiments/the-anatomy-of-the-gap-2026-10.md).  So
+  1–3 (solver/notebook/the-anatomy-of-the-gap-2026-10/README.md).  So
   wherever (♦) or the parity bound is exact in Taxman, the exactness
   comes from the arithmetic, not the structure.  This matches what the
   adversarial experiments on (♦) found.
@@ -2226,7 +2226,7 @@ components verified or certified) had left five components undecided,
 n = 3103, 3872, 3936, 4000 and 9170; the rank bound settles all five,
 n=9170's (residual jam of 304 members, greedy's 37 exclusions, the
 matching-number bound proving only 19) in milliseconds.  Data, programs
-and the adversarial experiments: `rust/prover/README.md`.
+and the adversarial experiments: `solver/noframe/README.md`.
 
 | Claim | Evidence | Status |
 | --- | --- | --- |
@@ -2238,23 +2238,23 @@ and the adversarial experiments: `rust/prover/README.md`.
 | U\* is the unique heaviest playable upper set, every playable upper set termwise below it | follows from (★); brute force (`certify.py`) to 62 | proven given (★) (Thm 8), so certified per game to 100,000 |
 | Optimal sets of n from those of n−1 (at the ceiling: T ∪ {n}; prime: T − p + n, a bijection); every optimal set holds the largest prime and no other | derivation = direct enumeration on every game at its ceiling and every prime game to 700 | proven (Thm 9, lemma) |
 | The optimal set is unique | all optimal sets enumerated by the prover: every n ≤ 424; two at 425 | measured; false in general |
-| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`rust/prover`, section 5) | measured; open |
+| Every optimal game's upper part is U\*; a game's optimal sets have equal sizes and differ by equal-sum exchanges below n/2 | every completely enumerated game (`solver/noframe`, section 5) | measured; open |
 | M(n) ≤ ν(n); M(n−1) ≤ M(n) ≤ M(n−1) + 1, with equality on the left at a prime n | brute force to 22 | proven (Lemma, "Longest games") |
 | Playable sets, with each pick's own coordinate taken out, are GF(2)-independent; the parity matroids bound opt(n) | every playable set independent in both matroids on every board to 18 (enumerated); the bound at least opt(n), and the recorded game independent in both, at every n ≤ 1300; the certified intersection equal to enumeration on 3,000 random pairs of matroids | proven (Thm 10) |
 | Promotable sets of the frame model are independent in the even and the odd frames' GF(2) matroids, whose heaviest common independent set bounds the best promotion set, at every node in their contractions | every promotable set of every board with ≤ 22 candidates independent; the bound at least the best promotion set at every n ≤ 1300; never below the best completion at the 600 nodes of the solver's probe; the solver's chain 1..2175 with it reproduces every score to 1300 (optimal.json's, made without it) | proven (Thm 11) |
 | A prime exchange that maps the frame model's root onto itself maps promotion sets to promotion sets worth (q − p)(c_p − c_q) more, so every heaviest set keeps c_p ≤ c_q for every such pair at once | the images of the optimal set and of random maximal promotion sets promotable and worth the formula at every board with pairs to 400 and a sample to 1300, every optimum keeping every inequality; every promotion set of the boards with pairs and ≤ 22 candidates likewise, the best that keeps the inequalities the optimum; the solver with the rule finds the optimum of every board with pairs to 600 and its chains reproduce every score to 1300 and on 2126-2175 | proven (Thm 13) |
-| The frames are the components of the layers by Ω (Lemma Ω); playability splits by layer (Theorem L) | every frame of every board 2..8191 in one layer, the frames in front one layer down (the census, `rust/examples/structure.rs`, check A) | proven |
-| Every optimal set holds the largest prime alone in layer 1 and exactly U\*_2 among the sources of layer 2, and its numbers of layer 2 up to n/2 keep U\*_2 a forest (Theorem B) | every game of optimal.json (2..1300), `results/strict.jsonl` (2..3440) and the Graviton calibration's chain 2176..2276; every optimal set the prover enumerated (987 sets of 2..989, 57 of 798..1019 with the upper part fixed); every optimal set of 2..48 by exhaustive search; 0 exceptions; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 (`rust/tests/bottom_layers.rs`) | proven |
-| N: the numbering of the frames is clean; setup numbers them by layer, and the Java's breadth-first numbering is the same on every board the solver supports | N by construction (Lemma Ω); the two numberings equal on every board 2..8191 (the census, checks C and the numbering's fields: frame h is the frames with freedoms of layer 3 + h, 2 + h on 80 boards ≤ 186), and on every board to 400 and a sample to 8191 (the tests of `rust/src/frames/`); on boards with holes they differ (56 without 39; 32 without 4 has a number without frames) | proven (N); measured (the equality) |
-| U\* ∪ L is playable iff L is a promotion set of the frame solver's root problem, and weighs in_the_bag + ΣL (Theorem M) | every set of every board ≤ 100 both ways (11,635 sets; 101..120, 167,681, in an ignored test); random sets both ways on boards 60..1300 (and 2000..8191, ignored); no candidate lists a back claim's factor, none is in frame 0, every one has a home, U\* is an independent greedy's, on every board to 8191 (the census, checks D-G); the true near misses the candidate filter alone keeps out, 27 boards to 2000 (`rust/tests/model_exact.rs`) | proven |
-| With a set O of the sources of three or more prime factors left optional, a set S ⊇ U\* ∖ O is playable iff it is a promotion set (K, L) of the extended problem Π⁺(O), and weighs in_the_bag⁺ + ΣK + ΣL (Theorem M⁺); with O = ∅ its promotion sets are the frame model's | every set of every board ≤ 80 both ways for O = ∅ and three random O per board, ≤ 60 for O = U\*_{≥3} (6.4 million sets; 81..100 and 61..69, 24 million more, in ignored tests); random sets both ways for O of 20 random members, for O = U\*_{≥3} and for O = ∅ at 300..1300, at 741, 1100 and 1200 (where greedy rejects a source of layer 3) and, ignored, at 2000..4095; Π⁺(∅)'s frames, candidates, freedoms and promotion sets the frame model's on every board to 400 (to 100 for the sets); a chain 2..1300 searched on Π⁺(∅) gives every score of optimal.json (`rust/tests/model_extended.rs`, `rust/examples/extended.rs`) | proven |
-| The claims of `unzip` kept by a frame free of O ∪ R whose back claims pass the check are front and back moves of every instance, so Theorem M⁺ holds with them taken out, and Π⁺(O) has the same promotion sets with and without them (Lemma M5⁺ and its corollary); with O = ∅ every claim is kept and Π⁺(∅) is Π_n | Theorem M⁺ against the oracle with the claims kept, as without (every set both ways on every board ≤ 80, ≤ 60 with every source open, 5.9 million sets, and the ignored 81..100 and 61..69; random sets at 300..1300, 741, 1100, 1200 and, ignored, 2000..4095; the search's optimum on every board ≤ 80); a mutant that keeps the claims the check refuses is caught on every problem ≤ 80 where it refuses one (24..26); Π⁺(∅) with the claims poses Π_n's problem on every board 2..8191 (the census, check H) and searches the tripwires' trees node for node; all 377 certificates of 600..1300 certified in both formulations, the rule of the same problem settling 101 with the claims where 81 without, each as a search of it (`rust/tests/model_extended.rs`, `rust/tests/tripwires.rs`, `rust/tests/certify.rs`) | proven |
-| U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`rust/prover/data/upper_*.jsonl`) | open; holds to 2175 |
-| opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `rust/prover`, section 3): every n = 2..2175, the committed chain to there (its games 2176..3440 are not yet proven on the whole board) | verified (exact, on the whole board) to 2175 |
-| The ledger's relations between boards (monotone, the ceiling and the game below it, the prime formula both ways from any finished game, repeats) and the dual bound of a stopped search (Lemmas L1-L4, D) | from proven games every tenth board of 2..1300 the relations give every board both bounds, every one on its side of the optimum and every game they make legal, exact at the primes and repeats of the proven boards; so from loose bounds at 1001..1300; the dual bound of stopped one-thread searches of 996, 1020 and 1218 between the optimum and the root's bound and never rising as the node limit doubles, the root's bound at zero steps on 14 boards of 60..1300; the laptop's run of 1301..1500 with the truth hidden proves every board at the optimum (`rust/examples/ledger/`, `rust/src/search/dual.rs`) | proven |
-| A search started from a floor F (an incumbent worth F and no promotion set) that completes having found no set proves P\* ≤ F, and if it finds sets the last one is worth P\* (Lemma F) | on every game of the Java's that needs a search, to 400, with the default tactics: a floor below the optimum finds it, a floor at it or above completes with nothing found, a floor at the root's bound or above ends at its first check; the same on four threads and on the matching path and without the rule of symmetric pairs (every ninth game); the floor at the optimum has the node count of the search seeded with the optimum on games 300-1000; a floor at the ceiling ends the search before it starts; a stopped floor search resumes under its floor and is refused under another (`rust/src/search/tests.rs`); the 154 searches under floors between the root's bound and the optimum on 14 games of 2265-3259 all completed with nothing found, and the one at the optimum is the proof (`rust/bench/target/`) | proven |
+| The frames are the components of the layers by Ω (Lemma Ω); playability splits by layer (Theorem L) | every frame of every board 2..8191 in one layer, the frames in front one layer down (the census, `solver/frame/examples/structure.rs`, check A) | proven |
+| Every optimal set holds the largest prime alone in layer 1 and exactly U\*_2 among the sources of layer 2, and its numbers of layer 2 up to n/2 keep U\*_2 a forest (Theorem B) | every game of optimal.json (2..1300), `results/strict.jsonl` (2..3440) and the Graviton calibration's chain 2176..2276; every optimal set the prover enumerated (987 sets of 2..989, 57 of 798..1019 with the upper part fixed); every optimal set of 2..48 by exhaustive search; 0 exceptions; numbers of layer 2 up to n/2 only on 76 boards, all ≤ 186 (`solver/frame/tests/bottom_layers.rs`) | proven |
+| N: the numbering of the frames is clean; setup numbers them by layer, and the Java's breadth-first numbering is the same on every board the solver supports | N by construction (Lemma Ω); the two numberings equal on every board 2..8191 (the census, checks C and the numbering's fields: frame h is the frames with freedoms of layer 3 + h, 2 + h on 80 boards ≤ 186), and on every board to 400 and a sample to 8191 (the tests of `solver/frame/src/frames/`); on boards with holes they differ (56 without 39; 32 without 4 has a number without frames) | proven (N); measured (the equality) |
+| U\* ∪ L is playable iff L is a promotion set of the frame solver's root problem, and weighs in_the_bag + ΣL (Theorem M) | every set of every board ≤ 100 both ways (11,635 sets; 101..120, 167,681, in an ignored test); random sets both ways on boards 60..1300 (and 2000..8191, ignored); no candidate lists a back claim's factor, none is in frame 0, every one has a home, U\* is an independent greedy's, on every board to 8191 (the census, checks D-G); the true near misses the candidate filter alone keeps out, 27 boards to 2000 (`solver/frame/tests/model_exact.rs`) | proven |
+| With a set O of the sources of three or more prime factors left optional, a set S ⊇ U\* ∖ O is playable iff it is a promotion set (K, L) of the extended problem Π⁺(O), and weighs in_the_bag⁺ + ΣK + ΣL (Theorem M⁺); with O = ∅ its promotion sets are the frame model's | every set of every board ≤ 80 both ways for O = ∅ and three random O per board, ≤ 60 for O = U\*_{≥3} (6.4 million sets; 81..100 and 61..69, 24 million more, in ignored tests); random sets both ways for O of 20 random members, for O = U\*_{≥3} and for O = ∅ at 300..1300, at 741, 1100 and 1200 (where greedy rejects a source of layer 3) and, ignored, at 2000..4095; Π⁺(∅)'s frames, candidates, freedoms and promotion sets the frame model's on every board to 400 (to 100 for the sets); a chain 2..1300 searched on Π⁺(∅) gives every score of optimal.json (`solver/frame/tests/model_extended.rs`, `solver/frame/examples/extended.rs`) | proven |
+| The claims of `unzip` kept by a frame free of O ∪ R whose back claims pass the check are front and back moves of every instance, so Theorem M⁺ holds with them taken out, and Π⁺(O) has the same promotion sets with and without them (Lemma M5⁺ and its corollary); with O = ∅ every claim is kept and Π⁺(∅) is Π_n | Theorem M⁺ against the oracle with the claims kept, as without (every set both ways on every board ≤ 80, ≤ 60 with every source open, 5.9 million sets, and the ignored 81..100 and 61..69; random sets at 300..1300, 741, 1100, 1200 and, ignored, 2000..4095; the search's optimum on every board ≤ 80); a mutant that keeps the claims the check refuses is caught on every problem ≤ 80 where it refuses one (24..26); Π⁺(∅) with the claims poses Π_n's problem on every board 2..8191 (the census, check H) and searches the tripwires' trees node for node; all 377 certificates of 600..1300 certified in both formulations, the rule of the same problem settling 101 with the claims where 81 without, each as a search of it (`solver/frame/tests/model_extended.rs`, `solver/frame/tests/tripwires.rs`, `solver/frame/tests/certify.rs`) | proven |
+| U: some optimal set contains U\*_{≥3}; the frame solver's answer is opt(n) iff U holds at n (the corollary) | every n ≤ 2175 (the prover's proofs on the whole board); the strong form in every game enumerated; barred parity bounds certify 84-99.7% of U\*_{≥3} per game to 2175 and 54-98% on the EC2 chain's 2176..3314, and close no game alone (`solver/noframe/data/upper_*.jsonl`) | open; holds to 2175 |
+| opt(n) equals the recorded score: the frame model's answer is the true optimum | the prover's exact searches on the whole board (playability theorems, the Franklín–Moniot and parity bounds, the ceiling and the prime formula; `solver/noframe`, section 3): every n = 2..2175, the committed chain to there (its games 2176..3440 are not yet proven on the whole board) | verified (exact, on the whole board) to 2175 |
+| The ledger's relations between boards (monotone, the ceiling and the game below it, the prime formula both ways from any finished game, repeats) and the dual bound of a stopped search (Lemmas L1-L4, D) | from proven games every tenth board of 2..1300 the relations give every board both bounds, every one on its side of the optimum and every game they make legal, exact at the primes and repeats of the proven boards; so from loose bounds at 1001..1300; the dual bound of stopped one-thread searches of 996, 1020 and 1218 between the optimum and the root's bound and never rising as the node limit doubles, the root's bound at zero steps on 14 boards of 60..1300; the laptop's run of 1301..1500 with the truth hidden proves every board at the optimum (`solver/frame/examples/ledger/`, `solver/frame/src/search/dual.rs`) | proven |
+| A search started from a floor F (an incumbent worth F and no promotion set) that completes having found no set proves P\* ≤ F, and if it finds sets the last one is worth P\* (Lemma F) | on every game of the Java's that needs a search, to 400, with the default tactics: a floor below the optimum finds it, a floor at it or above completes with nothing found, a floor at the root's bound or above ends at its first check; the same on four threads and on the matching path and without the rule of symmetric pairs (every ninth game); the floor at the optimum has the node count of the search seeded with the optimum on games 300-1000; a floor at the ceiling ends the search before it starts; a stopped floor search resumes under its floor and is refused under another (`solver/frame/src/search/tests.rs`); the 154 searches under floors between the root's bound and the optimum on 14 games of 2265-3259 all completed with nothing found, and the one at the optimum is the proof (`solver/notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/`) | proven |
 | Promotable sets are independent in every signed frame matroid, over any field and any nonzero entries; with the GF(2) matroids they make a Lagrangian bound L(λ) valid for every λ | every promotable set of every board with ≤ 22 candidates, and the optimal and 100 random maximal promotion sets of every non-prime board of 137-400, independent for the plain and five random GF(3) signings of every frame (6.4 million pairs); 14,472 promotion sets at every 25th board of 400-2175 independent in 4,320 signed matroids, column-sum signings among them; L never below P* at 309 roots of 2-400 (6,180 random multipliers) and 72 of 400-2175 (1,440), and equal to the GF(2) bound at zero; every bound of the fields study at least P* (66 roots, 330 families) and at least the best completion at the probe's nodes where it is known | proven (Thms 14, 15) |
-| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`rust/prover`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
+| An optimal game has the most moves, M(n) | one move short at n = 833, 834 and 835, proven by the prover; a longest game for every other n ≤ 1300, 1,293 of them by the matching certificate (`solver/noframe`, section 6) | **false** (n = 833); the gap is at most one to 1300, open beyond |
 | (★) on rejection-bearing components | every threshold of every game n = 2..20,000 certified by bounds; the earlier 5 undecided settled | certified per game; open in general |
 | (♦) and (★) under orders obeying the window law, adversarial or random, or its reverse | 1,981 instances, n = 2000..20,000, 0 failures (uniformly random orders: 16–50% fail; window law for a random prime ranking: 26–57%) | measured |
 | n=2873 component: greedy's 6 exclusions minimal | 12.4M playability checks over the 70-member residual | verified |

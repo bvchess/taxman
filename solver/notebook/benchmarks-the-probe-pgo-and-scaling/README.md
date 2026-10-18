@@ -1,8 +1,8 @@
 # Benchmarks, the probe, PGO and scaling
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-What the measuring tools were first used to find ([DESIGN.md, "Performance"](../../DESIGN.md#10-performance) says how to
+What the measuring tools were first used to find ([DESIGN.md, "Performance"](../../docs/DESIGN.md#10-performance) says how to
 use them).
 
 * **The bench set.**  Until 2026-10 `taxman bench` ran n = 480–760 (W = 8 and 16, milliseconds per game), which no
@@ -23,7 +23,7 @@ use them).
   (1215 after 1.5M nodes) resumed on one thread for 50,000 steps, one period of forgetting nogoods.  Cycles and
   instructions retired of the process are what it reports, since other load on the machine barely moves them,
   unlike wall time (up to 3x).
-* **Profile-guided optimization** (`tools/pgo.sh`).  On the code before "Faster nodes, same trees" it took 12% off
+* **Profile-guided optimization** (`solver/tools/pgo.sh`).  On the code before "Faster nodes, same trees" it took 12% off
   the cycles of the proof of 1215 (151.1 → 132.5 G), 13% at 1184, 6% at 936 and 9–11% on games it was not trained on
   (880, 1050, 1100, 1170), mostly, it turned out, by inlining the Hungarian search's heap; with that inlined by
   hand it adds 0–2% (1215: 106.0 → 105.1–106.4 G, 1184: 3.16 → 3.10 G).  Profile the plain build: with PGO the
@@ -33,7 +33,7 @@ use them).
   2, 15.8 s on 4 and 12.9 s on 6, effective parallelism 99.9–100%, all workers busy within 3 ms; node counts vary
   by ±10% with the threads (what each thread's nogood table has learned).  Games that take minutes on one thread
   (1215, 1220, 1225 with `--seed-opt`: about 60, 150 and 200 s) suit a many-core machine; at 192 threads a game of a
-  minute is a third of a second, mostly ramp-up and tail.  [bench/curve/README.md](../../bench/curve/README.md) has
+  minute is a third of a second, mostly ramp-up and tail.  [solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](cost-curve.md) has
   the later measurement of the proof of 1225 on 1, 2, 4 and 8 threads and the cost curve beyond the frontier.
 * **The ladder before and after the conflicts round** (10 threads, standalone from the frame builder, seeded from
   n − 1): before, 992 and 1000 were open at 100 s (992's incumbent not even optimal), 960 took 37 s and 800 13 s,

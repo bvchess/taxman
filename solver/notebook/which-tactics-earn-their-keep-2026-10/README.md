@@ -1,6 +1,6 @@
 # Which tactics earn their keep (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The owner's: a tactic that is unproven and does not pay has no reason to stay.  Which tactics and
 alternatives give meaningful acceleration in the case that matters, long strict chains at the frontier (n of 1200 to
@@ -50,7 +50,7 @@ game at the ceiling) and `same_search` (the rest) now prove.
 ## `revise_freedoms`: the same trees
 
 Its premise is false for the whole frame game ([n =
-833](../../prover/README.md#6-does-an-optimal-game-play-the-most-moves), `tests/soundness.rs`), and the owner decided to
+833](../../noframe/README.md#6-does-an-optimal-game-play-the-most-moves), `tests/soundness.rs`), and the owner decided to
 remove it; measuring stopped there.  Measured before that: in every one of the 60 searched or repeated games of
 1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms, 1.2 s for the 60) and lowers frame 0's
 freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet seven frontier proofs have the same trees
@@ -108,7 +108,7 @@ its share of the tests (each variant of `tests/solver.rs`'s `every_tactic_gives_
 | `fix_forced` | the `forcing` flag: about five conditions in `searcher.rs` and `refine.rs` | 6 tripwire rows, variants and soundness configurations |
 | `nogoods` | none (the table is an `Option`) | 6 tripwire rows, variants and configurations |
 | `forget_nogoods` | none (the period is an `Option`) | configurations (never, every step, every third), a variant |
-| `prev_cap`, `seed_incumbent` | one filter each (`solver::search_game`); the ladder's `--no-cap` and `--no-seed` | a variant each; the standalone re-solves of `bench/curve/calib.jsonl` used both flags |
+| `prev_cap`, `seed_incumbent` | one filter each (`solver::search_game`); the ladder's `--no-cap` and `--no-seed` | a variant each; the standalone re-solves of `solver/notebook/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` used both flags |
 | `prime_shortcut` | one condition (`solver`) | `derivations_can_be_switched_off` |
 | `match_refine` (0 to 7) | the early return of a child's check at level 0 (three lines); `Refiner::top` takes any depth; `MAX_MATCH_REFINE` and 3 header bits | 6 tripwire rows (0 and 3), variants and configurations |
 
@@ -129,7 +129,7 @@ its share of the tests (each variant of `tests/solver.rs`'s `every_tactic_gives_
 With `reuse_prev`, `revise_freedoms` and `legacy_bound` gone no unproven tactic is left, so every run is strict and
 there is nothing doubtful to switch on: `--strict`, `tactics::UNPROVEN`, `Tactics::strict`, `Tactics::unproven_on`,
 the line's `unproven_tactics_on` and the rules of a game's own taint (`results::own_taint`, `own_taint` in
-`tools/check_results.py`) go, with their tests (`strict_turns_off_exactly_the_unproven_tactics`,
+`solver/tools/check_results.py`) go, with their tests (`strict_turns_off_exactly_the_unproven_tactics`,
 `a_game_made_with_unproven_tactics_on_but_not_used_is_clean`, the `--strict` cases of `tests/cli.rs`,
 `design_grades_the_unproven_tactics_as_the_code_lists_them`), and a taint can then only be inherited from
 `optimal.json` (whose games 1..1000 the Java made with those tactics on, so `--allow-tainted-prev` stays).  Of
@@ -138,7 +138,7 @@ the line's `unproven_tactics_on` and the rules of a game's own taint (`results::
 ## What each removal deletes
 
 * **`reuse_prev`.**  `accelerate::reuse_prev` (and the module comment's half on it); step 4 of `solver::solve_one`;
-  `Method::Reuse` and `Proof::ReusePrev` with their rules in `src/results.rs` and `tools/check_results.py`;
+  `Method::Reuse` and `Proof::ReusePrev` with their rules in `src/results.rs` and `solver/tools/check_results.py`;
   `FrameColumns::estimate_max_promotions` (its only user, with its check against the Java's `estimateMaxPromotions` in
   `tests/golden_hives.rs`) and the frames test `the_frames_candidates_are_the_plain_apiarys` (it guards the
   tactic's candidates); `examples/sacrifice.rs`'s `--select reuse` (the theorem of `src/sacrifice.rs` stays; its module
@@ -164,7 +164,7 @@ the line's `unproven_tactics_on` and the rules of a game's own taint (`results::
   of 480 to 936 were taken with it on and should not move, since it changed no tree measured here; if one does, it is
   re-baselined).  The test of n = 833 stays as a fact about the frame model.
 * **`legacy_bound`.**  `RunnerUp::Legacy` and `SearchTactics::rule`, the `legacy_bound` argument of `own_taint` and
-  its rule in `tools/check_results.py`, header bit 1, the legacy comparisons of `bounds.rs`'s `upper_bound_is_sound`
+  its rule in `solver/tools/check_results.py`, header bit 1, the legacy comparisons of `bounds.rs`'s `upper_bound_is_sound`
   and the `legacy_bound` cases of `search/tests.rs`; all of `RunnerUp` goes with `match_bound=off`.
 * **`preclusions`.**  `bounds::Preclusions` with `explore_preclusions` and `below`, the preclusion step of
   `Bounds::new_candidate_list_after`, the table's build in `prepare_state` and `PrepareTimings::preclusions`, the
@@ -197,7 +197,7 @@ Everything that exists only to read what older builds wrote, and what deleting i
   field, `reached_cap` and `in_the_bag` derived, no proof, taint or `prev` record), `taint_by_schema` (before schema
   3 a proof by the cap counted the game's own taint), the `FromCheckpoint` exception of schemas 1 and 2 in
   `contradiction`, the optional digest of lines before schema 4, and the module comment's account of them; the same in
-  `tools/check_results.py` (its `schema` branches, `legacy` `FromCheckpoint`, the schema-1 cap and `in_the_bag`).  In
+  `solver/tools/check_results.py` (its `schema` branches, `legacy` `FromCheckpoint`, the schema-1 cap and `in_the_bag`).  In
   the solver, the problems set up again stay (nothing rests on a digest alone), but the optional digest of
   `Earlier` and the schema-3 reason given for `SAME_SEARCH_WINDOW` go.  Tests:
   `a_chain_from_schema_3_lines_repeats_their_searches` with `testdata/strict_schema3_1_90.jsonl` (124 KB); the schema-2
@@ -208,10 +208,10 @@ Everything that exists only to read what older builds wrote, and what deleting i
   but for 1221..1224, are `strict.jsonl`'s): delete it (git keeps it).  Its readers: `tests/results.rs`'s pinned
   counts, `tests/golden_hives.rs` (the games behind `accel_java.txt`, which goes with `reuse_prev`), the default
   `--results` of `evidence/src/bin/exact.rs` and `moves.rs` (a fallback past `optimal.json`, which now reaches 1300;
-  point it at `strict.jsonl`), `COMMITTED_RESULTS` in `tools/cloud/env.sh` (used by `setup.sh` and `verify.sh`), and
-  the text of README.md, `results/README.md`, DESIGN.md and RUNBOOK.md.  `bench/curve/chain.jsonl` (the cost-curve
+  point it at `strict.jsonl`), `COMMITTED_RESULTS` in `solver/tools/cloud/env.sh` (used by `setup.sh` and `verify.sh`), and
+  the text of README.md, `results/README.md`, DESIGN.md and RUNBOOK.md.  `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (the cost-curve
   study's strict chain 1001..1231 of commit e710d16) is that study's raw data: `analysis.py` reads its seconds, and
-  `--known` (`Optimal::with_results`) and `tools/cloud/scaling.sh` only its scores and moves, which work with any
+  `--known` (`Optimal::with_results`) and `solver/tools/cloud/scaling.sh` only its scores and moves, which work with any
   schema.  Keep it as data, like `calib.jsonl`, and take it out of what the verifiers check (`tests/results.rs`,
   `COMMITTED_RESULTS`, the README's and `results/README.md`'s commands); or delete it with the study's scripts
   reading it from git.  The notebook's entries that cite these files stay as history.
@@ -255,7 +255,7 @@ Everything that exists only to read what older builds wrote, and what deleting i
   losing values are gone, with their tests, tripwire rows and fixtures (`testdata/accel_java.txt`).  The nine proven or
   sound tactics of the table stay as switches.
 * *No strict runs.*  With no unproven tactic left there is one kind of run: `--strict`, `UNPROVEN`, `Tactics::strict`,
-  `unproven_tactics_on` and the rules of a game's own taint are gone, and so are `STRICT_ARGS` in `tools/cloud`.
+  `unproven_tactics_on` and the rules of a game's own taint are gone, and so are `STRICT_ARGS` in `solver/tools/cloud`.
 * *Assumptions instead of taint.*  A range takes the game of n − 1 from the run or from the `--out` file and otherwise
   solves its first game standalone; `--use-prev` takes it from optimal.json.  A result whose proof rests on such a game
   records `"assumes": ["the game of 1300 in optimal.json is optimal"]` (say), carried down the chain as taint was, and
@@ -270,14 +270,14 @@ Everything that exists only to read what older builds wrote, and what deleting i
   `prev_source`, `setup.revise`, `seconds.revise` or `seconds.preclusions`, `unproven_tactics_on`, `optimal_file` or
   `allow_optimal_mismatch`), and both verifiers read schema 5 only; `results/default.jsonl` and
   `testdata/strict_schema3_1_90.jsonl` are deleted (`git show f72c332:rust/results/default.jsonl`), and
-  `bench/curve/chain.jsonl` stays as the cost-curve study's data, which no verifier reads.  The checkpoint header is
+  `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` stays as the cost-curve study's data, which no verifier reads.  The checkpoint header is
   version 4 (no frame 0, the tactics recorded plainly), every other version is refused with one message, and the
   widening to an older build's width is gone; `testdata/n1133_after_1000_nodes.ckpt` (now W = 20) and the probe's
   windows were made again, the probe's fingerprint now 7e8e724717d26545 (5b83bbebf0bb2899 with `lagrange=off`).
 * *Left for the owner.*  `results/strict.jsonl` is schema 4, so until it is made again by this build (the chain from
   n = 1, about 18 minutes on four threads) neither verifier reads it: `tests/results.rs`'s
-  `the_committed_results_pass_the_verifier` skips it, saying so, and `tools/cloud/verify.sh`, `setup.sh`'s verifier
-  smoke check, `tools/profile/profile.sh` and the README's commands that extend a copy of it wait for the rerun.
+  `the_committed_results_pass_the_verifier` skips it, saying so, and `solver/tools/cloud/verify.sh`, `setup.sh`'s verifier
+  smoke check, `solver/tools/profile/profile.sh` and the README's commands that extend a copy of it wait for the rerun.
 
 ## Later (2026-10): the program removed from master
 

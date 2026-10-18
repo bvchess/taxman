@@ -1,13 +1,13 @@
 # Root-fitted nogood multipliers at the nodes (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-**Question.**  [Nogoods from the finder's work](nogoods-from-the-finders-work-2026-10.md) found that a Lagrangian bound
+**Question.**  [Nogoods from the finder's work](../nogoods-from-the-finders-work-2026-10/README.md) found that a Lagrangian bound
 over the nogoods of a few seconds' search, with the GF(2) bound as its inner problem and multipliers fitted at the root,
 closes about 0.38 of the root's GF(2) gap at 3016-3396.  The multipliers cost seconds to fit, so a search could fit them
 once and use them unchanged at every node, at about the cost of a second GF(2) bound.  How much of the root's gain
 survives at the nodes of a proof: what share of the nodes that today's bound leaves open would the root's multipliers
-cut, and by how much do they lower the bound there?  [How far nogoods can go](how-far-can-nogoods-go-2026-10.md) found
+cut, and by how much do they lower the bound there?  [How far nogoods can go](../how-far-can-nogoods-go-2026-10/README.md) found
 the matching-based Lagrangian's root multipliers weak at the nodes ("fitted at the root, for the root"); this asks the
 same of the GF(2) form, at the end of the chain.
 
@@ -20,7 +20,7 @@ too: a nogood with a member gone from the candidates counts only its members sti
 root's either way, so along a path only the matroids change, as for the GF(2) bound itself.
 
 **What was run** (laptop, 2026-10-18, test-profile builds, at most four processes under `nice -n 10`, about 12 minutes
-of CPU in all; data, commands and tables in [bench/nogood_bound/](../../bench/nogood_bound/README.md)).  The command
+of CPU in all; data, commands and tables in [solver/notebook/root-fitted-nogood-multipliers-at-the-nodes-2026-10/](README.md)).  The command
 `wall relaxed` (`examples/wall/relaxed.rs`), for each game with a known optimum: the pool, the nogoods that the finder
 and the sound search learn from the standalone start in 10 CPU s each (as `wall nogoods` harvests them: 263-6,008
 distinct); the fit, 200 subgradient steps at the root towards the optimum plus one (`wall nogoods`'s fit, 0.03-0.66 s),
@@ -92,7 +92,7 @@ only roots, which need none of this.
 bound leaves open at 2700-3440 (7-10% at 936 and 1215), none of the suite's units at the end of the chain, and lower the
 bound at the nodes by a median 18 where 160 would be needed; the gain is at the shallow nodes and gone by depth 60, and
 it does not grow with the gap.  In the search that is about 6% fewer nodes at twice the cost a node.  A Lagrangian over
-nogoods would need multipliers fitted near each node, which [how far nogoods can go](how-far-can-nogoods-go-2026-10.md)
+nogoods would need multipliers fitted near each node, which [how far nogoods can go](../how-far-can-nogoods-go-2026-10/README.md)
 found too dear in every cheap form.
 
 **Commits.**  The command `wall relaxed` and its data are in the commit that has this entry (`wall nogoods`'s fit now
@@ -103,3 +103,30 @@ returns its multipliers, and its harvest, fit and pool union are shared with `re
 The command `wall relaxed` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
 9d9dae3:rust/examples/wall/relaxed.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
 The sampling of its nodes stays in `examples/wall/sample.rs`, which `wall choice-prepare` uses.
+
+## Files
+
+The runs were made on the
+laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the test-profile build of `wall` and
+`perf` (`cargo build --profile test --example wall --example perf` in `rust/`: opt-level 2, debug assertions on), copied
+out of `target/` before the runs, from `rust/`, against the committed chain (`results/strict.jsonl`, which gives each
+game its optimum).  The command `relaxed` was removed from master on 2026-10-18; it builds at commit 9d9dae3 (`git
+checkout 9d9dae3` first), where it is defined in the module comment of `examples/wall/relaxed.rs`, which defines every
+field of a line.  The times are CPU seconds of the process, which was shared with other work.
+
+### Files and the commands that made them
+
+| file | command | what it is |
+|---|---|---|
+| `nodes.jsonl` | `wall relaxed --cpu 10 --steps 200 --paths 50 --fixtures DIR --suite solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl --known results/strict.jsonl N`, one process a game, for N = 936, 1215, 2700, 2976, 3129, 3213, 3260, 3267, 3300, 3425 and 3440, the lines joined in order of N | a line a game: the pool of nogoods (the finder's and the sound search's, 10 CPU s each), the fit at the root, and every node measured: today's bound and the root-λ bound with both constants, and their times |
+| `tables.py`, `tables.txt` | `./bench/nogood_bound/tables.py > tables.txt` | the tables the entry quotes |
+
+`DIR` held the nodes fixtures: the probe's `testdata/perf/n0936.nodes` and `n1215.nodes`, and for 2700, 2976, 3129,
+3213, 3260 and 3267 fixtures made the same way and not kept (each about 240 kB; the command makes them again, the
+same, in a minute or two each): `perf make-nodes N --known results/strict.jsonl --every 2000 --keep 300 --fixtures
+DIR` (the proof of N seeded with the optimum, one thread, in runs of 2,000 steps each resuming the last one's
+checkpoint; 300 of the units it handed its searcher, evenly spaced).  The proofs took 109,331 (2700), 157,075 (2976),
+308,708 (3129), 439,812 (3213), 331,761 (3260) and 129,513 (3267) steps and handed 854 to 3,911 distinct units.  3300,
+3425 and 3440 have no fixture: their nodes are the tuning suite's units (10 a game, from checkpoints of searches at the
+end of the chain, each with the nodes of its subtree when the default solved it).  Every game has 50 nodes on the way to
+its optimum besides, which check the bound's validity.

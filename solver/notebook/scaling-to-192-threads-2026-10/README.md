@@ -1,25 +1,25 @@
 # Scaling to 192 threads (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The calibration measured one proof to 64 threads and the chain's games an hour on 64, before the inner
 loop's round, round A, the prime-exchange rule and round B's window.  After them: where does a thread's time go at 64
 and 192 threads (the units' starts, the lock, the ramp and the tail, the step itself), what does the window of games in
 flight do at those counts, and does a 192-vCPU `c8g.48xlarge` keep its threads busy enough that the next run at the end
 of the chain should use one instead of a 64-vCPU `c8g.16xlarge`?  Items 1, 3, 4, 7 and 8 of
-[bench/wall/README.md](../../bench/wall/README.md#for-a-cloud-machine), "For a cloud machine"; item 2 (hours of large
+[solver/notebook/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a cloud machine"; item 2 (hours of large
 trees) was not run.
 
 *What was run.*  One `c8g.48xlarge` on spot in us-east-1b on 2026-10-15: Graviton4 (Neoverse V2), 192 vCPUs on two
 sockets of 96, two NUMA nodes (CPUs 0-95 and 96-191), 371 GiB, Amazon Linux 2023, rustc 1.99.0, `-C target-cpu=native`;
-the code of 55287ff (the renames merged after it change no behaviour), built by `tools/cloud/setup.sh` with its smoke
+the code of 55287ff (the renames merged after it change no behaviour), built by `solver/tools/cloud/setup.sh` with its smoke
 checks and without the tests; an instance role and SSM as RUNBOOK 9.4 runs the prover.  One script ran the items in
 order, one process at a time, and two more ran after it (`measure.sh`, `extras.sh`, `extras2.sh` in
-[bench/cloud/c8g48/](../../bench/cloud/README.md#scaling-to-192-threads-c8g48), with the logs, the tables and `runs.py`,
+[solver/notebook/scaling-to-192-threads-2026-10/c8g48/](README.md#scaling-to-192-threads-c8g48), with the logs, the tables and `runs.py`,
 which turns the logs into `runs.jsonl` and `games.jsonl`).  The 64-thread runs of the window and of the next games were
 bound (`taskset`) to 64 CPUs of node 0, a stand-in for the one-node `c8g.16xlarge`; the ladder ran unbound, and once
 bound to node 0.  Item 1 (one thread) ran on CPU 191 beside the 64-thread runs.  Every game of the window's runs was
-checked: both referees (`tools/cloud/verify.sh`) accept the window-16 files at 64 and 192 threads, and in all 13 runs
+checked: both referees (`solver/tools/cloud/verify.sh`) accept the window-16 files at 64 and 192 threads, and in all 13 runs
 of 2226..2276 every score, proof and `same_search` is the c8g chain's (`c8g48/checks.txt`).
 
 *Where a thread's time goes* (item 7: `ladder --seed-opt`, the proofs of 2170 and 2172 summed, from one thread's 147 s
@@ -107,7 +107,7 @@ game before them is concluded) adds 30 to 55% nodes at 16 and 32: at 64 threads 
 slower than in order (68-75 s against 56.5); at 192 the spare threads absorb it (32-34 s at 1, 16 and 32 alike).  A
 window of 4 is the best measured at both counts in (b): 55.0 s at 64 threads with no more nodes, 29.6 s at 192 with 16
 to 19% more (one run each), and (a) points the same way (7.7 and 10.0 s against 11.0 and 16.1).  By the rule of
-bench/wall/README.md that makes `WINDOW` 4 the setting for the chain at 64 and at 192 threads, and `chain.sh`'s default
+solver/notebook/the-wall-regime-2026-10/README.md that makes `WINDOW` 4 the setting for the chain at 64 and at 192 threads, and `chain.sh`'s default
 of 16 costs a run at 64 threads a fifth of its games an hour past 2225; the default is not changed by this entry.  The
 trace at 192 threads with a window of 16 (`c8g48/window-trace.txt`): 555 grants, 152 reclaims, 36 suspensions, 75
 hints and 4 deferrals for the 51 games.
@@ -161,7 +161,7 @@ kept as a measurement (`c8g48/solve-4000.jsonl`), not a result.  Memory (maximum
 192; 4000 2.28 GB.
 
 *Item 1, the fixed costs on Graviton* (`wall setup` on one thread, every 25th board of 2200..4075, 652 s;
-[bench/wall/setup_c8g.jsonl](../../bench/wall/setup_c8g.jsonl)), seconds against round A's M1 Max figures in brackets:
+[solver/notebook/scaling-to-192-threads-2026-10/setup_c8g.jsonl](setup_c8g.jsonl)), seconds against round A's M1 Max figures in brackets:
 
 | n | local search | the search's setup | board | moves | prime path |
 |---|---|---|---|---|---|
@@ -178,3 +178,150 @@ price did not move), **$1.83**, with the 30 GB root volume and the S3 copies add
 interruption for want of capacity at 04:33:49, the two-minute notice, as the last run was ending (04:34:33, its
 outputs copied to S3); the terminate call came first, and nothing was lost.  Afterwards no instance, volume, spot
 request or security group of the run was left.
+
+## Files
+
+### Scaling to 192 threads (`c8g48/`)
+
+One `c8g.48xlarge` (192 vCPUs, two sockets, two NUMA nodes; `machines/c8g48.txt`) on 2026-10-15, the code of 55287ff
+built by `solver/tools/cloud/setup.sh`, the items of [solver/notebook/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a
+cloud machine", that the entry names.  The 64-thread runs of the window and of the next games are bound to 64 CPUs of
+node 0 (`taskset`); the one-thread `wall setup` (item 1) ran beside them on CPU 191, and its lines are
+[setup_c8g.jsonl](setup_c8g.jsonl).
+
+| file | content |
+|---|---|
+| `c8g48/measure.sh` | the run: items 7, 8 (a and b), 1, 3 and 4 in that order, one process at a time, every output under one directory copied to S3 after each item; then 2226..2276 again at windows 1 and 16, and at 32, on both thread counts |
+| `c8g48/extras.sh`, `c8g48/extras2.sh` | run after it: the first ladder again and a window of 4 (`extras.sh`); the games from 2277 on at 192 and at 64 threads, five minutes each (`extras2.sh`) |
+| `c8g48/runs.py runs DIR`, `runs.py games DIR` | `runs.jsonl` and `games.jsonl` from the directory the scripts wrote |
+| `c8g48/steps.log` | every run of the three scripts: its command, the time it started and ended, its exit status and wall seconds |
+| `c8g48/runs.jsonl` | one line per run (`runs.py runs`): threads, window, CPUs, status, wall, user and system seconds, maximum resident set size, context switches, page faults, and `regress`'s own seconds |
+| `c8g48/games.jsonl` | one line per game of each `solve` run (`runs.py games`): method, proof, score, nodes, threads, search and total seconds |
+| `c8g48/ladder.txt` | the five ladders (item 7): each line of a search and the scaling tables, under the command that made them |
+| `c8g48/progress.txt` | the progress lines of 2184 with a checkpoint every second and every 300 s (item 3), of 4000 standalone (item 4), and of the runs from 2277 on |
+| `c8g48/window-trace.txt` | the window's events (`TAXMAN_WINDOW_TRACE`) for 2226..2276 at 192 threads with a window of 16 |
+| `c8g48/checks.txt` | the scores, proofs and `same_search` of every window run's 2226..2276 against `c8g.chain-2176.jsonl`, the trace's counts, and both referees on the window-16 files at 64 and 192 threads |
+| `c8g48/solve-4000.jsonl` | the line of the standalone search of 4000 on 192 threads (exhausted in 43 s) |
+
+Like the calibration's files, these are measurements, not results: the games of the runs (2226..2276 again, 2184 again,
+2277..2336 and 4000 new) are in no results file.
+
+### The fixed costs on Graviton
+
+| file | command | what it is |
+|---|---|---|
+| `setup_c8g.jsonl` | `wall setup K $(seq 2200 25 4095)` on one thread of a `c8g.48xlarge` (Graviton4), the code of 55287ff: item 1 of the next section | the fixed costs of a game on Graviton, after round A ([solver/notebook/scaling-to-192-threads-2026-10/README.md](../scaling-to-192-threads-2026-10/README.md)) |
+
+### For a cloud machine
+
+Items 1, 3, 4, 7 and 8 ran on a `c8g.48xlarge` on 2026-10-15, at 64 and 192 threads on the one machine: what they
+showed is the entry [Scaling to 192 threads](../scaling-to-192-threads-2026-10/README.md), their data and
+scripts are in [c8g48/](README.md#scaling-to-192-threads-c8g48).  Items 2 and 6 have not run, and item 5
+only inside `solver/tools/cloud/verify.sh` (its times are in `../cloud/c8g48/checks.txt`).
+
+What could not be run lightly on the laptop, as commands for an instance set up by `solver/tools/cloud/setup.sh` (from
+`rust/`, `K` as above; `K2` = `--known KNOWN` with `KNOWN` the committed results followed by the c8g chain's lines,
+as for `gaps_c8g.jsonl`).  Each line is one process; the one-thread ones can run side by side, one a vCPU (the
+calibration found no contention among 64 copies).
+
+1. The fixed costs on Graviton, every 25 boards past 2175 (one thread, about 15 minutes):
+   `wall setup K $(seq 2200 25 4095) > setup_c8g.jsonl`.
+2. Large GF(2) trees past 2175 (sets of 36 words since round A), on one thread each, a time series of 10^7 nodes and
+   more: the dear games of the c8g chain,
+   `wall grow K2 --nodes 40000000 --progress 30 --ckpt-dir ck_N --every 60 N > grow_N.jsonl 2> grow_N.progress` for N =
+   2184 (25.6 million nodes on 64 threads), 2260, 2268, 2254 (hours each: about 0.5 ms a node).
+3. The pause of a checkpoint with 192 (or 64) threads near the wall, the real one rather than one worker's: on a copy of
+   the committed results cut after 2183 and extended with the c8g lines to 2183, `taxman solve 2184 --threads 192
+   --out COPY --checkpoint-dir DIR --checkpoint-interval 1 --progress 10 --time-limit 600`; the end of its progress
+   line gives `pauses N (x%) max Y park Z`.  Then the same at `--checkpoint-interval 300` (the chain's default since
+   round A).
+4. Memory, the queue and the checkpoint at 192 threads at 4000, standalone (no game of 3999): `/usr/bin/time -v
+   taxman solve 4000 --threads 192 --out scratch.jsonl --checkpoint-dir DIR --checkpoint-interval 300 --progress 10
+   --time-limit 600`, with `ls -l DIR` once a minute (maximum resident set size from `time`; the queue and the pauses
+   from the progress lines; `max_queue` and `checkpoints` from the incomplete results line).
+5. The results check: `time taxman verify-results results/strict.jsonl` on the instance, and on the instance's own
+   results file once the chain has gone past 2500 (the model in the entry says 104 s at 2500 and 10 minutes at 4095).
+6. What an S3 save costs: with `S3_DEST` set, `/usr/bin/time -v solver/tools/cloud/save.sh` three times while a chain
+   runs (user and system seconds per save; the entry estimates 1.5 s).
+7. The node rate a thread at 64 and 192 threads (the proof of 2172 scaled 58.5 times on 64 threads, with the node rate
+   a thread 93 to 94% of one thread's: this measures where that 6 or 7% of a step's time goes, and what it is at 192).
+   The ladder takes one known-games file, `KNOWN` of `K2`: `cat results/strict.jsonl
+   solver/frame/testdata/c8g.chain-2176.jsonl > known.jsonl` (for these two games `K` would do; `K2` serves later games too).
+   On a 64-vCPU c8g.16xlarge, one process at a time:
+
+   ```
+   cargo run --release --example ladder -- --threads 1,16,64 --seed-opt --known known.jsonl --seconds 3600 2170 2172
+   ```
+
+   and on a 192-vCPU c8g.48xlarge the same with `--threads 1,64,192`.  What to read, in each game's table and the
+   table summed over both: `µs/step` against the 1-thread row's.  Of the difference, `reb %` and `1st %` are the
+   units' starts (the rebuild of the searcher's state, and the first node's GF(2) bound solved from scratch), which
+   are part of `µs/step`; `lock %`, `ramp %` and `tail %` are time not stepping (the lock after a run, the idle time
+   before all workers first ran at once, and after the last moment one finished a unit while all were running); and
+   what is left in `µs/tree`, which is `µs/step` without the units' starts, is the step itself (caches, memory,
+   nogoods learned by fewer steps a thread).  If the units' starts are the loss, the design to try is a unit that
+   carries its node's heaviest common independent set and weight split, so that a rebuilt GF(2) level is checked
+   rather than solved (see [round B](../round-b-the-chain-on-many-threads-2026-10/README.md)).
+8. The window at 64 and 192 threads (`--window W`: W consecutive games in flight, sharing the threads).  On each
+   machine, one process at a time, with the thread count in the shell variable `T` (`T=64` on the c8g.16xlarge,
+   `T=192` on the c8g.48xlarge):
+   * (a) The short searches, the chain to 1300 with the window at 1, 4, 8, 16 and 32, twice each; the seconds of wall
+     time are in the line `solved 1..=1300 ... in X s`:
+
+     ```
+     for W in 1 4 8 16 32; do for run in 1 2; do
+         echo "W=$W run $run"; taxman regress --to 1300 --threads $T --window $W 2>/dev/null | grep '^solved'
+     done; done
+     ```
+
+   * (b) The chain past 2175.  A prefix of the committed results and the c8g chain's lines up to 2225 (each line
+     starts `{"schema":5,"n":2176,...`, so the first `"n":` of a line is the game's):
+
+     ```
+     head -n 2175 results/strict.jsonl > prefix.jsonl
+     awk -F'"n":' '{ if ($2 + 0 <= 2225) print }' solver/frame/testdata/c8g.chain-2176.jsonl >> prefix.jsonl
+     ```
+
+     Then 51 games, 2226..2276, with the window at 1 and at 16:
+
+     ```
+     for W in 1 16; do
+         cp prefix.jsonl w$W.jsonl
+         time taxman solve 2226-2276 --threads $T --window $W --out w$W.jsonl --progress 0
+     done
+     ```
+
+     Games an hour = 51 x 3600 over the `real` seconds of each.  Once more with the trace of the window's events, to
+     see how the threads moved (`workers n=N a->b`: the threads of the search of N changed from a to b; a search
+     that loses threads to an older one has b below a, and one suspended has b = 0), which searches were deferred
+     (`defer`), and which were given the game before's best so far (`hint`):
+
+     ```
+     cp prefix.jsonl w16t.jsonl
+     TAXMAN_WINDOW_TRACE=1 taxman solve 2226-2276 --threads $T --window 16 --out w16t.jsonl --progress 0 2> trace.err
+     awk '$3 == "workers" { split($5, w, "->")
+                            count[w[2] == 0 ? "suspensions" : w[2] < w[1] ? "reclaims" : "grants"]++ }
+          $3 == "defer" || $3 == "hint" { count[$3 "s"]++ }
+          END { for (kind in count) print kind, count[kind] }' trace.err
+     ```
+
+     The results with the window are to be the same as without it: both referees on the file, `solver/tools/cloud/verify.sh
+     w16.jsonl`, and the scores, proofs and `same_search` of its games against the c8g file's lines for the same games
+     (`w1.jsonl` too; it prints the games that differ, none expected):
+
+     ```
+     python3 -c '
+     import json, sys
+     load = lambda path: {r["n"]: r for r in map(json.loads, open(path))}
+     new, old = load(sys.argv[1]), load(sys.argv[2])
+     key = lambda r: (r["score"], r["proof"], r["same_search"])
+     games = [n for n in sorted(new) if n > 2225]
+     bad = [n for n in games if key(new[n]) != key(old[n])]
+     print(len(games), "games after 2225 in", sys.argv[1], "differ from", sys.argv[2], "at", bad)
+     ' w16.jsonl solver/frame/testdata/c8g.chain-2176.jsonl
+     ```
+
+   * What to set `WINDOW` to in `solver/tools/cloud/chain.sh` (default 4; it was 16 until 2026-10-17): the W with the most
+     games an hour in (b) at the thread count of the machine that will run the chain, if (a) points the same way; 1 if
+     no W beats 1 by more than the difference between the two runs of one W in (a); and if 16 is still gaining on 8,
+     try 32 in (b) first.

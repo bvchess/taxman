@@ -1,11 +1,11 @@
 # The A1 bound at the nodes of the node-choice measurement (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Does the multi-field (A1) bound, fitted fully at a node, cut the nodes that head big subtrees?  The
-[E3 pilot](the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md) measured A1 in a branch and bound (trees five
-times smaller at 23 times the cost of a node, a constant factor and no change of slope, and [U4](r3-and-the-slope-test-u4-of-a1-2026-10.md)
-found the factor falling with the gap); [the node-choice measurement](../../bench/node_choice/README.md) asks per
+[E3 pilot](../the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md) measured A1 in a branch and bound (trees five
+times smaller at 23 times the cost of a node, a constant factor and no change of slope, and [U4](../r3-and-the-slope-test-u4-of-a1-2026-10/README.md)
+found the factor falling with the gap); [the node-choice measurement](../the-node-choice-where-the-strong-bound-pays-2026-10/README.md) asks per
 node instead, for sampled nodes with known subtrees, what share a strong bound cuts by the node's gap and by the
 decade of its subtree, and from what forecast subtree up computing it pays.  It was built for the nogood bound; this
 puts A1 in it as two more strong bounds.  The run on EC2 is the lead's; this entry records the instrument and its
@@ -38,7 +38,7 @@ and `wall/case.rs` add the options `choice-prepare --fit-seconds S --fits DIR` (
 capped, the share of the node's excess closed, the dearest bound), and the policy table (cost: `build_s` and `s`).
 
 *Checks* (laptop, non-release, 4 threads at most; `cargo test --features studies --example wall` 44 pass in 29 s).  The
-port reproduces the study: `the_study_fits_give_their_bounds_again` evaluates the saved fits of `bench/fields/fits` at
+port reproduces the study: `the_study_fits_give_their_bounds_again` evaluates the saved fits of `solver/frame/testdata/fits` at
 the roots of 987, 1215, 2700 and 3300 (blocks of 1, 1, 2 and 3 words) and finds the bounds the study recorded (23562,
 35168, 163215, 251783); the intersection on this module's vectors equals the crate's bound on `Gf2Graph::reweighted` at
 random reweightings of 120, 936, 2700 and 3300; the study's tests of the simplex, the signed matroids, the cores and
@@ -50,7 +50,7 @@ node's best completion is the check at every run: at the six path nodes of the l
 equals it at four and full at five (at the others they are above, r2 out of its 20 pricings and full out of its 2 s).
 
 *First numbers* (the M1 Max, test profile, one thread; `choice-prepare --keep 30 --fit-seconds 60 --fits
-bench/fields/fits`, `choice --a1 --a1-seconds 10 --cap 60`; 936 and 1215, 30 open nodes each of the probe's fixtures; the
+solver/frame/testdata/fits`, `choice --a1 --a1-seconds 10 --cap 60`; 936 and 1215, 30 open nodes each of the probe's fixtures; the
 root fits close 0.64 (936, fitted in 5.5 s) and 0.45 (1215, the pilot's) of the root gap, the nogood fit 0.27 and 0.22).
 Share of the open nodes cut, by gap, and the median CPU seconds:
 
@@ -70,7 +70,7 @@ within seconds and neither of the two above 200 within 10 s.  A rerun of the 132
 down gave the same bound, cut, pricings and stop at 131, and at the other a `full` out of time at 653 pricings
 instead of 654.
 
-*The cloud run* (`A1=1 bench/node_choice/cloud.sh`; [the README](../../bench/node_choice/README.md#the-a1-bounds) has the
+*The cloud run* (`A1=1 solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/cloud.sh`; [the README](../the-node-choice-where-the-strong-bound-pays-2026-10/README.md#the-a1-bounds) has the
 stages): one `c8g.16xlarge` (64 workers), the 4 suite games (3441, 3440, 3300, 3425), the 6 games whose proofs make nodes
 and 936 and 1215, `KEEP` 100 (about 1,000 nodes), the root fits within 300 s (the fits on file for 1215, 2700 and 3300),
 the node's own master within 30 s.  Expected work: the nogood measurement's 6,000 CPU s scaled to the larger sample,
@@ -98,7 +98,7 @@ small subtrees that search in milliseconds, and at the nodes that head the big s
 nothing.  Computing it only where the forecast subtree is big does not pay either.  This closes the lead of a selective
 A1 in the search.
 
-*The run.*  `A1=1 KEEP=100 WORKERS=64 bench/node_choice/cloud.sh` at commit 260e74f (no solver change), on one spot
+*The run.*  `A1=1 KEEP=100 WORKERS=64 solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/cloud.sh` at commit 260e74f (no solver change), on one spot
 `c8g.16xlarge`, launched 19:46:25Z; the release suite passed there (752 tests, 306 s).  The fixtures began at 20:02:32Z,
 the measurement ran 20:10:02Z to 20:16:27Z and the machine ended at about 20:18Z: 32 minutes at $0.676 an hour, about
 **$0.36** (the estimate was $0.40).  840 open nodes were measured, all solved to the end, none capped: the suite's
@@ -133,13 +133,59 @@ every N.  Over the 840 nodes, where searching them all costs 4,460 CPU s, `full`
 more than it saves (cutting 686 nodes); `r2` costs 56 more than it saves.  By group, `full` loses 4,330 CPU s on the
 made nodes (cutting 500 of 600, whose searches cost 374 s in all), 233 s on the probes (cutting 186 of 200, searches
 0.9 s) and 1,200 s on the suite, where it cuts none of the 40 and is capped in all.  The nogood bound loses too (126
-CPU s over the 840), as it did in [the first run](the-node-choice-where-the-strong-bound-pays-2026-10.md).
+CPU s over the 840), as it did in [the first run](../the-node-choice-where-the-strong-bound-pays-2026-10/README.md).
 
 *Verdict.*  The A1 bound cuts the nodes that are cheap to search and none that are dear, so a selective A1 in the
 search has nothing to select.  Lead 1 is closed.  Lead 2,
-[A5](../AGENDA.md#a5-decompose-across-the-frames-andor-search), is next.  The data is in
-[bench/node_choice/cloud-20261018-a1/](../../bench/node_choice/cloud-20261018-a1/), with the
-[README's section](../../bench/node_choice/README.md#the-a1-cloud-run-2026-10-18); `analyze.py` on the gunzipped lines
+[A5](../../docs/AGENDA.md#a5-decompose-across-the-frames-andor-search), is next.  The data is in
+[cloud-20261018-a1/](cloud-20261018-a1/), with the
+[section on it](#the-a1-cloud-run-2026-10-18) below; `analyze.py` of [the node-choice entry](../the-node-choice-where-the-strong-bound-pays-2026-10/README.md) on the gunzipped lines
 gives its three analyses again, byte for byte.
 
 Commits: 260e74f (the code measured), d5b3415 (the data) and the commit of this section.
+
+## Files
+
+**The run** is the same script with `A1=1`, sized for one `c8g.16xlarge` (64 CPUs, `WORKERS` 64) and an hour at the
+most (user data as above with `shutdown -h +60` and `S3_DEST`, and `A1=1` in the environment of `cloud.sh`; `KEEP` 100,
+the root fits 300 s):
+
+1. the fixtures, as before (the six proofs in parallel; 2 to 4 minutes);
+2. the preparation, a process a game, the twelve at once (the pool 20 CPU s, the A1 root fit up to `FIT_SECONDS` 300 for
+   the nine games without a fit on file; about 6 minutes);
+3. the measurement on 64 workers, the heaviest node first: about 1,000 nodes, the suite's and the made and probe games'
+   (`KEEP` 100 of each source), their solves about 6,000 CPU s as before (the dearest node 314 s), the nogood fits about
+   1,400, and the A1 bounds: `r2` about 0.1 to 1 s a node, `full` up to 30 s a node, which the nodes of gap 300 and
+   more are expected to use (about 250 nodes), so some 10,000 CPU s; 8 to 12 minutes with the dearest node last;
+4. `analyze.py` three ways, as before.
+
+That is **about 30 to 40 minutes** of the machine with the build cache (10 minutes more with a build), **about 40 cents
+at spot** ($0.68 an hour for a `c8g.16xlarge`, [STATUS](../../docs/STATUS.md)), $1.50 on demand ($2.55 an hour, $0.0399 a vCPU-hour;
+[RUNBOOK section 9.2](../../docs/RUNBOOK.md#92-what-it-costs)); the timer of 60 minutes bounds it at **$0.68 at spot** ($2.55 on
+demand) plus the volume.  The figures are estimates: the A1 bounds' times at 3300 to 3441 are not known (a pricing is 1.2
+to 2.9 ms at 2200 to 3400, a node's master 100 to 1,000 of them), and a `full` that overruns its 30 s by a few seconds
+in the exact checks makes the run longer, not dearer.
+
+### The A1 cloud run (2026-10-18)
+
+What it found: [the entry's section](../the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md#later-2026-10-18-the-run-on-ec2).
+`A1=1 KEEP=100 WORKERS=64 solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/cloud.sh` at commit 260e74f (the other settings the script's: `NODE_STEPS`
+200, `SUB` 1, `LIMIT` 900, `FIT_SECONDS` 300, `A1_PRICINGS` 20, `A1_SECONDS` 30) on one spot `c8g.16xlarge`, launched at
+19:46:25Z; no build-cache entry, so the setup built the examples (5 minutes), built the tests and ran the release suite
+(752 tests, 306 s).  The fixtures began at 20:02:32Z, the preparation at 20:04:34Z, the measurement ran 20:10:02Z to
+20:16:27Z, and the machine ended at about 20:18Z: 32 minutes, about $0.36 at $0.676 an hour.  `faults` was empty.  Its
+output is in `cloud-20261018-a1/`, the files of `cloud-20261018/` made the same way:
+
+| file | what it is |
+|---|---|
+| `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyses (all the steps; the floor entry's slope; the first 50 steps), with the A1 tables |
+| `log` | the stages' times (UTC) and the commit |
+| `prepare.jsonl` | the line each `wall choice-prepare` printed (suite, made, probe games in the script's order), now with the A1 root fit: `a1_source` (`file` for 3300, 2700 and 1215, `fitted` for the other nine), `a1_fit_s`, `a1_bound`, `a1_share` of the gap it closes (0.33-0.34 for 3441, 3440 and 3425 fitted in 300 s, 0.40 for 3300, 0.45-0.64 for the others), `a1_stop` (`Converged` at 3213, 3129, 2976 and 936, `Seconds` at 3441, 3440, 3425, 3260 and 3267) and `a1_lb` |
+| `fixtures.txt` | the six proofs that made the fixtures: runs, nodes and distinct units (the numbers of `cloud-20261018/`, the proofs being the same) |
+| `workers.jsonl` | a line for each worker and game, from the workers' output: the nodes it measured, skipped or left to other workers, and its CPU seconds (10,606 in all: 133 to 385 a worker) |
+| `measure.jsonl.gz` | the 876 lines of `measure/worker-0.jsonl` to `worker-63.jsonl`, joined in the order of the workers and gzipped (1.3 MB): 840 open nodes (the 40 of the suite and 100 of each of the 8 other games, whose `source` is `fixture`) and the 36 path nodes.  `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the three analyses again, byte for byte (A1 needs no flag: `analyze.py` reads the `a1` of the lines) |
+
+Not kept, as before: `prep/` (25 MB), `fixtures/` and `logs/` (the workers' output repeats `measure.jsonl.gz`'s lines
+and `workers.jsonl`'s, which was checked line for line when the files were made).  The work was 10,606 CPU s, not the
+17,000 or so of the estimate above: the solves 4,463, the nogood fits 253 (the two of `SUB`), `r2` 55 and `full` 5,770
+(124 nodes ran out of their 30 s).

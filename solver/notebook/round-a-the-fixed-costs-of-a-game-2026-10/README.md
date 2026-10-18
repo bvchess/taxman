@@ -1,6 +1,6 @@
 # Round A: the fixed costs of a game (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Everything a game of the chain does besides its search runs on one thread while the others wait, and it
 grows with n: the wall regime's study (above) put it at 1.2 s a game at 2200 and 4.9 at 4000, and the results check at
@@ -47,7 +47,7 @@ the tripwires unchanged; `taxman regress --to 1000` (one thread) every score, 8.
 (scratch file) identical line for line (moves, promotions, nodes, proofs, setups) to the same chain by the build before
 this round (402,205 nodes; 40.8 s of wall time against 58.7), its scores, methods and proofs those of
 `results/strict.jsonl` (move lists the same but at 1215, another optimal set, as with the build before), and both
-referees (`tools/cloud/verify.sh`) accept it; the chain 2226..2249 below identical line for line before and after.
+referees (`solver/tools/cloud/verify.sh`) accept it; the chain 2226..2249 below identical line for line before and after.
 
 *The gain, one thread* (`wall setup`, seconds, before and after):
 
@@ -84,6 +84,6 @@ at 2225 games on one thread, a few on many), and the serial order of the games, 
 *To measure again on the cloud machine.*  The chain's games an hour on 64 threads past 2175 (the calibration's 473 an
 hour in game seconds and 43 s of start-up at 2125 games, before this round and the inner loop's); the start-up at 64
 threads; the local search's speedup at 64 and 192 threads (`improve_on`, against one thread, at 2200-4000); the fixed
-costs on Graviton (`wall setup`, bench/wall/README.md, "For a cloud machine", 1); the checkpoint's pause at the new
-300 s (item 3 there); an S3 save's CPU under `nice` (item 6); and a profile-guided build (`tools/pgo.sh` now trains a
+costs on Graviton (`wall setup`, solver/notebook/the-wall-regime-2026-10/README.md, "For a cloud machine", 1); the checkpoint's pause at the new
+300 s (item 3 there); an S3 save's CPU under `nice` (item 6); and a profile-guided build (`solver/tools/pgo.sh` now trains a
 game of every width).

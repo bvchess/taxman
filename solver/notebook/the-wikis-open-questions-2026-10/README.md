@@ -1,9 +1,9 @@
 # The wiki's open questions (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The wiki's [Questions](https://github.com/bvchess/taxman/wiki/Questions) page has two open questions
-besides the one about longest games ([prover 6](../../prover/README.md#6-does-an-optimal-game-play-the-most-moves)).
+besides the one about longest games ([prover 6](../../noframe/README.md#6-does-an-optimal-game-play-the-most-moves)).
 (1) No optimal game the owner had seen pays more than two numbers of tax for one move: is that always so, or an
 artifact of the n he looked at?  Read three ways: (a) does some optimal game of some n have a move that pays three or
 more; (b) is there an n every optimal game of which has one; (c) does every n have an optimal game in which every move
@@ -15,8 +15,8 @@ and says that this gives an optimal game in about 70% of 1..1000: is there a pat
 `adapt` read `optimal.json` and the committed chain and search small boards exhaustively with `certify.py`'s exact
 solver: about 7 and 10 seconds with the default `--exhaustive 40`; the figures to 56 and to 50 below are `tax
 --exhaustive 56` (5 minutes) and `adapt --exhaustive 50` (40 seconds).  No solver change.  The scores are proven on
-the whole board to 1300 ([the prover](../../prover/README.md); its proofs of 1301..2175 came after this was written, [the
-run](the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md)) and within the frame model above, so what
+the whole board to 1300 ([the prover](../../noframe/README.md); its proofs of 1301..2175 came after this was written, [the
+run](../the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)) and within the frame model above, so what
 was said of 1301..2175 then rested on the frame model.
 
 *Words.*  A move's *tax* is what the taxman takes for it, every divisor of the move still in the pot; the move *pays
@@ -100,7 +100,7 @@ half of n's committed game, accepted when the set is playable and scores opt(n))
 888 of 2..1300 and 1,456 of 2..2175 (67.0%), the primes included (the Java takes as they are the boards without
 promotion candidates, such as 8, 12 and 16, which the emulation does not); the Rust port of it (`reuse_prev`,
 removed) accepted 670 of the games of 2..1300 that are neither prime nor trivial ([tactics
-review](which-tactics-earn-their-keep-2026-10.md#reuse_prev-nothing-left-to-save)).
+review](../which-tactics-earn-their-keep-2026-10/README.md#reuse_prev-nothing-left-to-save)).
 
 **7. What is proven about the procedure.**
 
@@ -142,7 +142,7 @@ emulated in section 6, and δ(n) = 0.
 
 * *Even n.*  The procedure succeeds whenever n/2 is not a move of the game of n − 1 (section 7), and seldom when it is.
   Whether it is, is decided by the upper half of n − 1, which the descending greedy finds in polynomial time (U\*,
-  [prover 2](../../prover/README.md#2-conjecture--at-scale)).  By the cofactor c = n/p of n's largest prime factor p: n/2
+  [prover 2](../../noframe/README.md#2-conjecture--at-scale)).  By the cofactor c = n/p of n's largest prime factor p: n/2
   is never a move at c = 2, and the procedure succeeds at 98 of the 100 n with c = 4, 67 of 71 with c = 6 and 44 of 45
   with c = 10, but at 1 of 58 with c = 8 and 1 of 41 with c = 12 (where the Java's reuse takes none).
 * *Odd n.*  The procedure succeeds only where δ(n) = 0 (54 of the 762 odd composites, each of them).  At the odd
@@ -160,7 +160,7 @@ the repeats and trivial boards at it (493 and 8).  The page's procedure succeeds
 Java's reuse at the primes, all 914 repeats, 191 of the `cap` games, 8 trivial boards and 17 `exhausted` games.  So the
 70% are, nearly exactly, the games the solver settles without a search, and the games it has to exhaust are the 30%: a
 game whose search problem is that of n − 1 (804) always adapts the Java's way, and the page's way only at the ceiling.
-From [going higher](going-higher-and-coming-back-down-2026-10.md): δ(n) ≤ n/2 for even n is that entry's bound with
+From [going higher](../going-higher-and-coming-back-down-2026-10/README.md): δ(n) ≤ n/2 for even n is that entry's bound with
 K = 1, and at its even n with δ(n) = n/2 (8, 12, 16, 24, 32, 48, 64, 96, 256, 384, 512, 768, 1024, and now 2048)
 dropping n/2 and selecting n last is optimal; the page's procedure does that at the powers of two, not at 3·2^k.
 

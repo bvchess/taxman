@@ -1,13 +1,13 @@
 # The anatomy of the gap (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Where does the root's gap live (by frame, by kind of candidate), which rule of the game do the
 relaxations' heaviest sets break, which part grows with n, and which valid inequalities cut it?  Begun against the
-matching and Lagrangian bounds; when the GF(2) bound of the [matroid study](matroid-intersection-bounds-2026-10.md)
+matching and Lagrangian bounds; when the GF(2) bound of the [matroid study](../matroid-intersection-bounds-2026-10/README.md)
 arrived, re-aimed at the gap that remains above it.  Run in parallel with that study, on the same laptop.
 
-*What was kept.*  Nothing but this entry and the next ([the per-frame bound](the-per-frame-bound-2026-10.md)); the solver
+*What was kept.*  Nothing but this entry and the next ([the per-frame bound](../the-per-frame-bound-2026-10/README.md)); the solver
 is unchanged.  The code of both lived on a branch that was never pushed and has been deleted, as the project does with
 research branches once they are harvested.  It was one example program (the measurements, a small simplex solver of its
 own for the LPs, and the per-frame bound's module), a table script and the data, and the move of the matroid study's
@@ -15,8 +15,8 @@ frame matroids out of `examples/matroid.rs` into a file the two examples shared.
 be redone.  What the studies read is on master: the built-in optimal games, the probe's fixtures
 (`testdata/perf/n0936.nodes`, `n1215.nodes`), the matroid study's frame matroids and weighted intersection
 (`examples/matroid.rs`, `examples/common/meet.rs`) and its best completions at the fixtures' nodes
-(`bench/matroid/nodes_exact.jsonl`), and the slope study's root Lagrangian bounds and 19 margin-scan games
-(`bench/curve/slope_roots.jsonl`, `slope_proofs.jsonl`).
+(`solver/notebook/matroid-intersection-bounds-2026-10/nodes_exact.jsonl`), and the slope study's root Lagrangian bounds and 19 margin-scan games
+(`solver/notebook/what-drives-the-slope-2026-10/slope_roots.jsonl`, `slope_proofs.jsonl`).
 
 *Method.*  No solver code changed.  Games are set up as `taxman solve` sets them up (default tactics); `S*` is the known
 game's moves that are candidates and `P* = sum(S*)`, from the built-in optimal games.  One thread a process, at most two
@@ -109,7 +109,7 @@ average, growing 1.1 ± 0.1 per 100 in n, and its cores hold 20.6 of its promoti
 matching gap.**  The matching LP with separated cover cuts (24-66 of them, mean 41, tens of milliseconds) gives at every
 band what the slope study's root Lagrangian reached in up to 8,000 steps, within 27 of it (band means 114-472 against
 112-471; 1 to 27 above, once 2 below), as the exact separation of [How far can nogoods
-go](how-far-can-nogoods-go-2026-10.md) found too (its LP over every conflict is 0-12 below that Lagrangian): the root's
+go](../how-far-can-nogoods-go-2026-10/README.md) found too (its LP over every conflict is 0-12 below that Lagrangian): the root's
 conflicts are worth that much and no more.  Its solutions are half-integral over clusters of overlapping conflicts: at
 936, the pairwise conflicts {370, 410}, {410, 430} and {370, 430} each hold 1 with all three at ½, though at most one of
 the three can be promoted.  Rank cuts on the unions of tight cuts (`{370, 410, 430} ≤ 1`, and unions of 20-26 members
@@ -147,7 +147,7 @@ The last column's gap averages 47 and grows 13.9 ± 1.7 per 100 in n (the cover 
 rank cuts, 62, +13.2 ± 1.9), three times as fast as the GF(2) gap: the cuts remove most of the residual where the odd
 cores are small and less than half where they are large.  The cover cuts alone, separated here by rounding, close 38%
 of the GF(2) gap; separated exactly (every conflict), 46%, a share falling with n, with a residual growing 8.4 ± 2.0
-([How far can nogoods go](how-far-can-nogoods-go-2026-10.md)); with the rank cuts, 54%, and with the matching LP's cuts
+([How far can nogoods go](../how-far-can-nogoods-go-2026-10/README.md)); with the rank cuts, 54%, and with the matching LP's cuts
 too, 66%.  Unions of up to 48 members with 20,000 conflict computations a check move 1215 by 6 and 1300 not at all (the
 time limit then allows fewer rounds).  The cover cut of a 13-member conflict is weak (the LP can keep 12/13 of each
 member), the alternatives to one odd core are many other odd cores of nearly the same candidates, and the unions of two
@@ -167,7 +167,7 @@ what such counting families do on the sets separated.
 | 1215 | 14, 53.5 | 17, 31.6 | 22, 11.5 | 27, 7.3 |
 
 (The last column is cover and rank cuts; cover cuts alone: 26, 6.9 and 22, 16.0.)  In the plain branch and bound,
-against the GF(2) bound alone (nodes; the per-frame column is the [next entry](the-per-frame-bound-2026-10.md)'s):
+against the GF(2) bound alone (nodes; the per-frame column is the [next entry](../the-per-frame-bound-2026-10/README.md)'s):
 
 | n | GF(2) gap | with cuts | GF(2) | cuts, root's multipliers | cuts, node's multipliers | per-frame | s: GF(2) | per-frame |
 |---|---|---|---|---|---|---|---|---|
@@ -201,7 +201,7 @@ matroid study's rate) the root's 90 units on average predict ten times fewer nod
 the 2.4 measured: the root's cuts are about the root's cores, and deep nodes meet others.  The same holds for the cover
 LP over every conflict solved at every node (nogoods: 6.2 times fewer nodes over the 146 proofs, less as n grows, a
 quarter slower), and for the Lagrangian over nogoods beside the parity bound in the model-free proofs, whose multipliers
-are fitted at the root and which cut nothing at 990 ([parity](the-parity-bound-in-the-model-free-proofs-2026-10.md),
+are fitted at the root and which cut nothing at 990 ([parity](../the-parity-bound-in-the-model-free-proofs-2026-10/README.md),
 section 5).
 
 *Conclusion.*  Both relaxations get the number of promotions right and the choice wrong.  The matching bound's error
@@ -224,7 +224,7 @@ every node (1.26 with the root's), not a lower slope.
   GF(2), Lorea's matroid, cover cuts nor rank cuts of small unions do.  An exact per-frame bound (each frame's
   winnable sets' convex hull, the frames coupled through their shared candidates by a Lagrangian decomposition, with
   an exact search per frame as the pricing problem) is the next candidate: measured in
-  [the next entry](the-per-frame-bound-2026-10.md).
+  [the next entry](../the-per-frame-bound-2026-10/README.md).
 
 ## Later (2026-10): the program removed from master
 

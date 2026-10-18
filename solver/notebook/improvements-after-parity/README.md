@@ -1,6 +1,6 @@
 # Improvements after parity
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 * **Matching bound** (sound).  Relax winnability (peel) to plain
   matchability across the whole frame chain: maximize the promoted sum

@@ -1,9 +1,9 @@
 # The A1 bound in a branch and bound: the E3 pilot (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The pilot of experiment E3 of avenue A1 (the advisor's second consultation on A1, its sections S3-S5,
-after [E1](a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md) passed strongly): in the matroid study's plain
+after [E1](../a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) passed strongly): in the matroid study's plain
 branch and bound (the GF(2) bound and its conflict branching), with the A1 bound at the nodes the GF(2) bound leaves
 open and its multipliers carried from parent to child, how much smaller are the trees, at what cost a node, and how
 many pricings does a node need from its parent's state?  *Variants*: `v0` (the GF(2) bound alone); `v1` (*Tier 1*: one
@@ -28,10 +28,10 @@ matroids; its multipliers restricted likewise), root fits as files (E2's format 
 `g + β d_prev`, Camerini, Fratta and Maffioli, steps toward the target) and R2 (the master warm-started from the
 inherited columns and inequalities, Wentges-stabilized pricing from the inherited multipliers, cheap separation only).
 `fields bnb` (bc33638, 33fb719): the variants, refit policies (`all`, `excess:E`, `tier1:F`), the audit, per-node logs
-with subtree sizes, checkpoints that resume to the same tree, paired Knuth dives; `bench/fields/e3.py`, the tables.
+with subtree sizes, checkpoints that resume to the same tree, paired Knuth dives; `solver/notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/e3.py`, the tables.
 
 *Validity.*  Nothing new to prove: every evaluation of L is a bound at any multipliers and any signings
-([THEORY.md](../../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields), Theorems 14 and 15,
+([THEORY.md](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields), Theorems 14 and 15,
 at a node by Theorem 14 (2)), the bound is ⌊L⌋ evaluated in integers, and the master only proposes multipliers.  The
 tests (`cargo t --release --example fields`, 48 pass, one ignored and run once): a child's inherited columns common
 independent in its matroids and within `max_add`, and its inequalities, ranks taken again, holding for 20 random
@@ -122,7 +122,7 @@ missing: from the same inherited states the reference cuts 95-100% of the nodes 
 
 A larger budget hardly helps: R2 stops on its own (nothing prices out and no cheap inequality is violated) after about
 27 pricings whatever K, R1 creeps.  What the reference has and R2 lacks is the exact checks and the separation (R2c's
-local signings gain a quarter of the nodes at 1215).  [E2](a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md#e2-past-2175-2026-10) found the same at the roots: in
+local signings gain a quarter of the nodes at 1215).  [E2](../a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#e2-past-2175-2026-10) found the same at the roots: in
 search mode (R2's) the cheap inequalities describe a relaxation of the LP, and the fit stops above it (0.27 of the
 gap at E1's roots), where a certified fit of 60 s gets within 5% of it everywhere.  The policies save refits but lose
 more tree than time.
@@ -159,7 +159,7 @@ longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 21
    54 roots and did not keep it).  The root node's bound is Tier 1 at the fit (recomputed), not the fit file's.  The
    two fit files were written in this branch's first format, holding the final family's lowest L, and converted at
    the merge with E2 to `common/fit.rs`'s, every value kept (the 1215 runs come out the same from them:
-   [bench/fields](../../bench/fields/README.md#the-fits-fits)); a fit `bnb` computes now is E2's, the lowest L evaluated.
+   [solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md](../../frame/testdata/fits/README.md)); a fit `bnb` computes now is E2's, the lowest L evaluated.
 2. The audit samples by a hash of the node (every 25th at 1215, every 500th at 1472, not the design's every 25th at
    1472, whose references would have taken over a day); it runs in the host variant's tree from that tree's states.
 3. Only v0's and r2's trees were run at 1472; v1, r1 and r2c only as paired dives (above).  r2's run had a budget of
@@ -180,3 +180,14 @@ longest run, r2c at 1475), about $4-5; the 2170s (gap 767) and the games past 21
 The examples `fields` and `matroid`, with the files of `examples/common/` they included, were removed from master on
 2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
 `cargo build --release --example fields --example matroid` in `rust/`.
+
+## Files
+
+The data of the pilot, made with the commands and the build described in [the fields study's files](../a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#files-and-the-commands-that-made-them):
+
+| file | command | what it is |
+|---|---|---|
+| `bnb.jsonl`, `audit.jsonl`, `fits/`, `logs/` | 1215: `fields bnb K --variants v0,v1,r1,r2,r2c --refit 20 --policy all --fit solver/frame/testdata/fits --fit-seconds 300 --fit-mode certified --audit 25 --audit-out audit.jsonl --log logs --checkpoint DIR --out bnb.jsonl 1215`; 1472: the same with `--variants r2 --audit 500 --seconds 36000`, then `--variants v0` with no audit and no log; the paired dives `--variants r2,r2c,v1,r1 --knuth 2000 --seed 1 1472`; the exploration `--variants r1,r2 --refit 50` (100, 200) and `--variants r2 --policy excess:50` (`tier1:0.5`) at 1215; the code of 33fb719 (the root fits `fits/n1215.json` and `fits/n1472.json` made by bc33638's, from the same code but for the saturating sums, in that branch's first format and converted at the merge with E2: below), the logs gzipped afterwards | E3's pilot: a line per run (tree or dives), a line per audited node, the root fits, and per run the per-node log (and per dive run the dives) |
+| `e3_output.md` | `./e3.py > e3_output.md` | the pilot's tables |
+
+The root fits of 1215 and 1472 are in [`solver/frame/testdata/fits/`](../../frame/testdata/fits/README.md).

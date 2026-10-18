@@ -1,6 +1,6 @@
 # Dominance and symmetry (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The slope study found a proof's nodes to be about `a + c·G` decades for a root gap `G`, with `c` the
 same at every n, so a lower cost per unit of gap cuts the slope as a tighter bound does.  A search that must rule
@@ -28,7 +28,7 @@ the ones to try): an upper estimate of what any cover could prove; 1,024 samples
 nodes in a hundred.
 
 *Method.*  No solver code changed.  `examples/dominance.rs` (commits aa56590 to d2de73f, on the cleaned-up build)
-and `examples/common/symmetry.rs`; `bench/dominance/` holds the node samples, the outputs and `dominance.py`, which
+and `examples/common/symmetry.rs`; `solver/notebook/dominance-and-symmetry-2026-10/` holds the node samples, the outputs and `dominance.py`, which
 makes the tables below (`dominance_output.md`).  One thread, at most two processes, on the shared laptop.
 
 * *Nodes.*  The probe's fixtures (units of the proofs of 936 and 1215, mostly shallow: 13-16 promotions); nodes of
@@ -94,7 +94,7 @@ relaxed (solver pilot and `dominance nodes`); the *Lagrangian of the constraint*
 (a bound on the completions that keep the constraint for any `μ ≥ 0`; GF(2) pilot).  The two dearer tests run only
 for pairs whose constraint the bound's heaviest set breaks.
 
-*Checks* (`dominance symcheck --known results/strict.jsonl 2-1300`, `bench/dominance/symcheck.jsonl`): in all 1,170
+*Checks* (`dominance symcheck --known results/strict.jsonl 2-1300`, `solver/notebook/dominance-and-symmetry-2026-10/symcheck.jsonl`): in all 1,170
 games with pairs, the images of the optimal set and of 50 random maximal promotable sets are promotable and worth
 what the formula says; on the 22 boards with pairs and at most 22 candidates every promotable set (97,839 in all) is
 checked and the best that keeps the constraints is `P*`; the brute-force oracle scores the known optimum to n = 40.

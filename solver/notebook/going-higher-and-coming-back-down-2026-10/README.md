@@ -1,12 +1,12 @@
 # Going higher and coming back down (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The chain uses the game below: the ceiling opt(n) ≤ n + opt(n − 1) (the cap), the prime formula,
 `same_search` and the seed.  Can the games above n (their optima, optimal games, search problems and proofs) tighten
 n's upper bound, raise its incumbent or settle it, so that an expensive game is derived from a cheaper one above it?
-Since a proof's cost is set by the root's gap ([slope](what-drives-the-slope-2026-10.md); the GF(2) gap for a search
-built on the [GF(2) bound](matroid-intersection-bounds-2026-10.md)), a relation from above counts if it beats that gap
+Since a proof's cost is set by the root's gap ([slope](../what-drives-the-slope-2026-10/README.md); the GF(2) gap for a search
+built on the [GF(2) bound](../matroid-intersection-bounds-2026-10/README.md)), a relation from above counts if it beats that gap
 where the searches are dear.
 
 *What was kept.*  Nothing but this entry; the solver is unchanged.  The study's code lived on a branch that was never
@@ -16,7 +16,7 @@ optimal set is worth on the other board; one that tests search problems for equi
 they made, and one-line mentions of the programs in DESIGN.md and README.  The method is written out below to be
 redone, with the one result that lived only in the code, the sufficient condition for one problem to relax another,
 stated and proved.  What it read is on master: the chain (`results/strict.jsonl`), the GF(2) root gaps
-(`bench/matroid/roots.jsonl`) and the one-thread proofs (`bench/curve/slope_proofs.jsonl`).
+(`solver/notebook/matroid-intersection-bounds-2026-10/roots.jsonl`) and the one-thread proofs (`solver/notebook/what-drives-the-slope-2026-10/slope_proofs.jsonl`).
 
 *Method.*  No solver code changed; one search was run (section 7).  For each board n of 2..1297 (primes and trivial
 boards included) and each m = n + 1..n + 3, both boards were set up as `taxman solve` sets them up (default tactics:
@@ -24,7 +24,7 @@ the root's frames after reduction, the candidates with their home frames, `max_t
 games read from the chain (a game's P\* is its score less `in_the_bag`).  Recorded for each pair:
 
 * whether the two search problems are *equal* (the test of `same_search`, DESIGN.md
-  "[Same search](../../DESIGN.md#same-search)") and whether each *relaxes* the other (below);
+  "[Same search](../../docs/DESIGN.md#same-search)") and whether each *relaxes* the other (below);
 * how m's root differs from n's, frame by frame: the moves and factors m has and n has not and the other way, the
   change of the frame's freedoms, the candidates gained and lost, the change of `max_total`;
 * what each optimal promotion set is worth on the other board: the set's members that are candidates there, whether
@@ -153,10 +153,10 @@ after n and is often built on it (98 of the 416 exhausted games are followed by 
 n + 1, whose optimal set is n's plus n + 1), so this is n's optimum coming back.  An incumbent n may use, the
 look-ahead start of n + 1..n + 3 seeded from the game of n − 1, beats n's own start in 7 of the 110 (462, 736, 837,
 1020, 1107, 1110, 1290) and reaches P\* in 1 (1290, from 1292's and 1293's).  Starting at the optimum would save at most
-what a start below costs, 0.9-1.8 times the proof at 10-100 below ([slope](what-drives-the-slope-2026-10.md), section 4).
+what a start below costs, 0.9-1.8 times the proof at 10-100 below ([slope](../what-drives-the-slope-2026-10/README.md), section 4).
 
 **5. The gap is the same across a chain step.**  The 37 exhausted games of 880-1299 followed by a chain game (opt(n +
-1) = opt(n) + n + 1) have the same GF(2) root gap as that game ([matroid](matroid-intersection-bounds-2026-10.md), section
+1) = opt(n) + n + 1) have the same GF(2) root gap as that game ([matroid](../matroid-intersection-bounds-2026-10/README.md), section
 1): the edit adds the same to the bound and the optimum, so the hard part of the problem does not change, and solving n
 + 1 first would face n's gap.  More broadly, take the exhausted games of 880-1300 in order and cut the sequence where
 two consecutive ones are more than 6 apart or have different GF(2) gaps: 77 of the 143 games fall into 32 runs of two to
@@ -233,6 +233,6 @@ runs of nearby searched games that hold a fifth of the proof nodes of 880-1300.
   measuring only once the GF(2) bound is in the search, which will change the trees (it is the bound whose gap the
   runs share).  (Measured since, with the GF(2) bound in the search: the trees of consecutive games share 0.15% of
   their steps, and a run costs at least its dearest game, so perfect reuse saves 18-29% of the nodes at best: ["Carrying
-  a search's learning"](carrying-a-searchs-learning-to-the-next-game-2026-10.md).)
+  a search's learning"](../carrying-a-searchs-learning-to-the-next-game-2026-10/README.md).)
 * *The bound is the lever, not the neighbours*: since every exact relation above preserves the gap, the slope is set
   by the shared core's gap, and closing it (the GF(2) bound in the search) is what changes the cost of these games.

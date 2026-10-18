@@ -1,8 +1,8 @@
 # Split by the number of promotions: A3's test (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  [Agenda A3](../AGENDA.md#a3-split-by-the-number-of-promotions-a-sound-tightening-constant-factor-maybe-more):
+*Question.*  [Agenda A3](../../docs/AGENDA.md#a3-split-by-the-number-of-promotions-a-sound-tightening-constant-factor-maybe-more):
 every promotion set has one size, so a node can be closed if, for every total size `k` that can still beat the
 optimum's promotion sum `P*`, the node's promoted weight plus the heaviest common independent set of the node's two
 GF(2) frame matroids of size `k` less the promotions is at most `P*` (sound by partition, no conjecture).  The weights
@@ -18,7 +18,7 @@ through the heaviest set of each size up to the largest common independent set; 
 amount times `k`), checked against the enumeration of all common independent sets of the roots and of nodes on the
 boards of 20-60 (tests) and, at every fixture node, against the plain bound and its set's size.  The fixtures: the
 probe's 300 nodes each of 936 and 1215, and the 212 of 2112 (the units that its proof, one thread, handed the searcher,
-made with `perf make-nodes` into `bench/promotions/n2112.nodes`; 2170, the larger game proposed, takes 588 s on one
+made with `perf make-nodes` into `solver/notebook/split-by-the-number-of-promotions-a3s-test-2026-10/n2112.nodes`; 2170, the larger game proposed, takes 588 s on one
 thread, so 2112 was taken).  `P*` is
 `strict.jsonl`'s score less `in_the_bag`, equal to each fixture's incumbent.  A node is *open* when its plain bound
 (at most `max_add` candidates) exceeds `P*` less its promotions' sum.
@@ -59,3 +59,20 @@ a node that the plain bound leaves open, so the test checks that closing loses n
 
 The example `promotions`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
 builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example promotions` in `rust/`.
+
+## Files
+
+`promotions.jsonl` is the output of `examples/promotions.rs`, the diagnostic of [agenda A3](../../docs/AGENDA.md): for
+each game, the root's *window* of total sizes that can still beat the optimum's promotion sum, and, for every node of
+the game's fixture, whether the total size of its heaviest completion lies below, inside or above it (one `node` line
+a node, one `game` line a game).  The entry is [Split by the number of
+promotions](README.md).
+
+* 936 and 1215 read the probe's fixtures (`testdata/perf`): `promotions --known results/strict.jsonl 936 1215`.
+* 2112 reads `n2112.nodes` here, made by `perf make-nodes 2112 --known results/strict.jsonl --every 500 --keep 300
+  --fixtures solver/notebook/split-by-the-number-of-promotions-a3s-test-2026-10` (the proof's 15,288 nodes handed the searcher 212 distinct units; all are kept):
+  `promotions --known results/strict.jsonl --fixtures solver/notebook/split-by-the-number-of-promotions-a3s-test-2026-10 2112`.
+
+Both are deterministic and take seconds on one thread; the commands run from `rust/`.  The example `promotions` was
+removed from master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release
+--example promotions` in `rust/`).

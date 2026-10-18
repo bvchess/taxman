@@ -1,15 +1,15 @@
 # The GF(2) bound in the search (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  The [matroid study](matroid-intersection-bounds-2026-10.md) found a bound whose gap at the root is a tenth
+*Question.*  The [matroid study](../matroid-intersection-bounds-2026-10/README.md) found a bound whose gap at the root is a tenth
 of the matching bound's and grows a thirtieth as fast, and a plain branch and bound with it, computed from scratch at
 every node, that needs 12 to 613 times fewer nodes than the solver.  Can the search use it as its node bound at a cost
 per node that pays, what of the solver's machinery still earns its keep with it, is it sound, and what does it do to
 the cost of the chain and the reach of a large machine?
 
 *What was built* (commits 679635b to the entry; the design is DESIGN.md, section 4, "The GF(2) bound", the proof
-heuristics/THEORY.md, Theorem 11, and the algorithms the module comments of `src/gf2.rs` and `src/gf2/meet.rs`):
+docs/THEORY.md, Theorem 11, and the algorithms the module comments of `src/gf2.rs` and `src/gf2/meet.rs`):
 
 * `gf2::Gf2Graph`, the root's two matroids (the even and the odd frames' quotients by their moves, 1 to 3 words a
   block: the frames' ranks at 1215 are 33, 52, 34, 18, 7, 3, 1), and `gf2::Gf2Bound`, a level per node of the
@@ -41,7 +41,7 @@ heuristics/THEORY.md, Theorem 11, and the algorithms the module comments of `src
   allocation in the split (f1d09e7).
 * A greedy lower bound before each strong-branching solve (the level's heaviest set without the member, completed
   greedily): when it reaches the solve's stop, no solve; 10% less time at 1254 (9a99f34).
-* Profile-guided optimization (`tools/pgo.sh`, now trained on the GF(2) probe too): 1.5% fewer cycles on the
+* Profile-guided optimization (`solver/tools/pgo.sh`, now trained on the GF(2) probe too): 1.5% fewer cycles on the
   probe's GF(2) kernels and windows, 1.8% on the proof of 1287, the same fingerprint and tree.
 * Where the time goes now (a sampled proof of 1287, one thread): the shortest paths 57%, the level's own work (the
   solve's setup, history, the split) 22%, the pivots 8%, the peels 3%.  An augmentation takes 2.4-2.5 Bellman–Ford
@@ -117,7 +117,7 @@ cap); per game the default's nodes and G cycles, and each variant's nodes and cy
    threads, 429 times fewer nodes.  1201-1300: 35.3 s against 901.7 s (26 times).  The dearest game is 1287 at 4.9 s
    (strict: 1232 at 206.7 s; with GF(2) 3.4 s).  1-1000: 21.4 s against 53.4 s.
 2. *The 146 proofs of the slope study* (`slope prove`, one thread, two at a time; against
-   `bench/curve/slope_proofs.jsonl`, the matching path at its commit):
+   `solver/notebook/what-drives-the-slope-2026-10/slope_proofs.jsonl`, the matching path at its commit):
 
    | band | games | nodes, matching | nodes, GF(2) | ratio | s, matching | s, GF(2) | ratio | Gcycles, GF(2) |
    |---|---|---|---|---|---|---|---|---|
@@ -149,7 +149,7 @@ cap); per game the default's nodes and G cycles, and each variant's nodes and cy
    three invocations, the last stopped by its 29-minute cap during game 2176) reached 2175: 875 games, all
    completed (prime 115, cap 77, exhausted 314, same search 369), in 5,490 s of game time and 48.9 M nodes;
    `verify-results` accepts the file, and the ten games of 1302-1352 that the matching path had solved standalone
-   (`bench/curve/bands.jsonl`) have the same scores.  (The first invocation, 1301-1700, ran 47 minutes, beyond the
+   (`solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl`) have the same scores.  (The first invocation, 1301-1700, ran 47 minutes, beyond the
    study's half-hour limit for a run, because an interruption of this session left it running.)  Per band of 50 n:
 
    | band | game time s | dearest game s (n) | nodes | µs a node (thread time) | root GF(2) gap, searched games |
@@ -182,7 +182,7 @@ cap); per game the default's nodes and G cycles, and each variant's nodes and cy
    (candidates, frames and wider sets: 120-180 µs of thread time at 1300-1500, 320-390 at 2050-2175, past the start
    of W = 64 and of an eighth frame at 2048).  Together: ×10 per about 1,350 n.
 
-   *Projections* (made as `bench/curve/README.md` made them): a 192-core c9g.48xlarge counted as 192 × 0.8 M1 cores,
+   *Projections* (made as `solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md` made them): a 192-core c9g.48xlarge counted as 192 × 0.8 M1 cores,
    linearly or at half that, which is 86 or 43 times this machine's 2 threads (1.79 one-thread equivalents); $3.33/h
    spot, $8.35/h on-demand; a game at n costing the mean of 1301-2175 (6.27 s on 2 threads, at 1738) times
    10^(slope × (n − 1738)), summed from 2176:
@@ -213,7 +213,7 @@ cap); per game the default's nodes and G cycles, and each variant's nodes and cy
    that pivots follow, where `exact` solves each node's matroids warm-started from its parent's certificate.  In the
    chain the frame model also has the seed and the cap: 1232 in 3.4 s on 2 threads.
 
-*The data* are in `bench/gf2/`: `proofs.jsonl` (the 146 proofs, `slope prove` lines with the process's cycles and
+*The data* are in `solver/notebook/the-gf2-bound-in-the-search-2026-10/`: `proofs.jsonl` (the 146 proofs, `slope prove` lines with the process's cycles and
 instructions), `variants.jsonl` (the `matroid prove` lines of the table above, each with its variant), `chain.jsonl`
 (the chain 1301-2175 as `taxman solve --out` wrote it, moves included, and the unfinished line of 2176) and
 `roots.jsonl` (`matroid roots` of 1301-2175).  The chain 1-1300 and the scaling run are not kept: the first

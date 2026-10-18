@@ -1,6 +1,6 @@
 # Graviton calibration (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The cloud runs (the chain on a many-CPU machine, the prover over 1301..2175) were planned with the M1 Max's
 figures and an assumed Graviton core.  How fast is a Graviton core against an M1 Max performance core, for the solver
@@ -10,7 +10,7 @@ instance suits the prover's run and the solver's chain?  The first measurements 
 
 *What was run.*  Two one-time spot instances in us-east-1, launched, measured and terminated within an hour each
 (`rust/bench/cloud/`: `instance.sh` for the order, `calibrate.sh` for the phases, `parse.py` and `summary.py` for the
-tables; the data and the commands are described in its [README](../../bench/cloud/README.md)): **c7g.16xlarge**
+tables; the data and the commands are described in its [README](README.md)): **c7g.16xlarge**
 (Graviton3, Neoverse V1, 1 MiB of L2 a core, 32 MiB of L3) at $0.6218 an hour and **c8g.16xlarge** (Graviton4,
 Neoverse V2, 2 MiB of L2 a core, 36 MiB of L3) at $0.6794; each 64 vCPUs (a vCPU is a core: one thread a core, one
 socket, one NUMA node) and 128 GiB, Amazon Linux 2023, rustc 1.99.0, `-C target-cpu=native`, the code of 407645f
@@ -76,15 +76,15 @@ else running):
 | c8g, 64 threads, 2126..2175 again | 50 | 45.2 | 69.3 | 2599 | the file's |
 | c8g, 64 threads, 2176..2276 (15 minutes) | 101 | 712.3 | 769.2 | 473 | new |
 
-The 101 new games went through `tools/check_results.py` behind the committed file (all checks passed, the chain 1..2276;
-the file `bench/cloud/c8g.chain-2176.jsonl`); game 2277 was in its 78th second (7.75 M nodes) when the stop came and is
+The 101 new games went through `solver/tools/check_results.py` behind the committed file (all checks passed, the chain 1..2276;
+the file `solver/frame/testdata/c8g.chain-2176.jsonl`); game 2277 was in its 78th second (7.75 M nodes) when the stop came and is
 the file's last line, unfinished.  The run took 900 s of wall time, of which 43 s were the start-up (one thread checking
 the 2125 games of the copy; the same at 1, 8 and 64 threads) and 79 s the unfinished game: 404 games an hour in all, 429
 without the start-up.  Against the laptop on the games 2126..2175: 3.6 times as fast in the games' total seconds on c8g
 (5.0 in search seconds, against the 7.2 that 8 times the threads at 0.9 of the speed would give: short searches do
 not fill 64 threads) and 2.1 on c7g.  The gap between the instances is not the search: c7g's per-game fixed time (a
 game that repeats a search: frames 0.26 s, 1.49 s in all) is 2.4 times c8g's (frames 0.11 s, 0.62 s), and c8g's is the
-M1 Max's (0.11 s, 0.61 s), at 1, 8 or 64 threads alike (`bench/cloud/c8g.startup-and-fixed-cost.jsonl`); why Graviton3
+M1 Max's (0.11 s, 0.61 s), at 1, 8 or 64 threads alike (`solver/notebook/graviton-calibration-2026-10/c8g.startup-and-fixed-cost.jsonl`); why Graviton3
 is so slow there was not looked into.  The laptop's rate past 2175 was not measured; the ratio above puts it near 130
 games an hour.
 
@@ -107,3 +107,32 @@ difficulty, $0.0016 a game.  Beyond 64 threads nothing is measured, and the fixe
 searches will cost: the average game here is 7.6 s at 64 threads, so a c8g.48xlarge ($2.0 to $2.5 an hour) would have to
 make 3 to 3.7 times the games to pay.  Graviton5 would have to be 12% faster a core than Graviton4 to pay at the
 c9g.16xlarge's $0.76 to $0.79; it is the one thing a repeat of the calibration (about $0.5) should add.
+
+## Files
+
+The scripts that made the measurements and the data they produced.  The scaling to 192 threads on a `c8g.48xlarge` is [another entry](../scaling-to-192-threads-2026-10/README.md), with its files in `c8g48/` there.
+
+### Scripts
+
+| file | what it does |
+|---|---|
+| `calibrate.sh PHASE OUTDIR ...` | one phase of the calibration of a machine: `probe`, `ladder`, `prover`, `contention-solver`, `contention-prover`, `scaling`, `chain`; the header lists the phases and their arguments |
+| `instance.sh OUTDIR` | the phases of one cloud instance in the order they ran (the chain is run afterwards, by hand) |
+| `timed.sh`, `copies.sh` | one run under `/usr/bin/time` (GNU `-v` on Linux, BSD `-l` on macOS), and K copies of a run at once |
+| `parse.py MACHINE DIR` | the logs of a machine as one JSON line per run |
+| `summary.py LAPTOP.jsonl MACHINE.jsonl...` | the tables of the entry, from those lines |
+
+### Data
+
+| file | content |
+|---|---|
+| `laptop.jsonl`, `c7g.jsonl`, `c8g.jsonl` | one line per run (`parse.py`): label, kind, game, threads, wall, user and system seconds, maximum resident set size, and the program's own figures (search seconds and nodes of a proof, the prover's nodes and seconds, the probe's time and fingerprint with its kernels in ns an operation); then one line per game of each chain run |
+| `machines/` | what each machine is |
+| `c7g.resolve-2126-2175.jsonl`, `c8g.resolve-2126-2175.jsonl` | the results lines of games 2126..2175 solved again on 64 threads, on a copy of `results/strict.jsonl` cut after game 2125; the scores are the committed file's |
+| [`solver/frame/testdata/c8g.chain-2176.jsonl`](../../frame/testdata/c8g.chain-2176.jsonl) | (read by `tests/bottom_layers.rs`) the results lines of the games 2176..2277 that `taxman solve 2176-4095 --threads 64` solved in 15 minutes on a copy of `results/strict.jsonl` (checked with `solver/tools/check_results.py` beside it); the committed chain has these games with the same scores, proofs and moves |
+| `c8g.startup-and-fixed-cost.jsonl` | games 2126 and 2127 (repeats of 2125's search) solved at 1, 8 and 64 threads: the fixed cost of a game, and the start-up of a run |
+
+These are measurements, not results: nothing here replaces or extends `results/strict.jsonl`.  The runs used the
+binaries as built by `cargo build --release --bins --examples` and, in `solver/noframe/`, `cargo build --release`, with
+`RUSTFLAGS="-C target-cpu=native"` (what `tools/cloud/setup.sh` does), from `git archive` of the code of 407645f.  The
+cloud runs were made before the prover's directory was renamed; `calibrate.sh` has the new path.

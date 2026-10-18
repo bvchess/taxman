@@ -1,6 +1,6 @@
 # Single-member conflicts belong to the node (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 Many of the conflicts the search computes have one member (`--diag`'s minimal
 conflict sizes: the 25th percentile is 1 at 936, the 10th at 1184).  They

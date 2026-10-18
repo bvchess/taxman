@@ -1,6 +1,6 @@
 # Theorem B by default in the prover, and the hunt's probes (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The third consultation of 2026-10-15 (the theory track's program, part III, section 15) answered four
 questions on the entry "The upper part game by game": (c) should the prover run from Theorem B's roles from now on, (a)
@@ -41,7 +41,7 @@ that runs to its end finds every game above V without it, and it costs 2 to 7 se
 with the start, seeded or not, agrees with the hunt without on 298 pairs of the boards 30 to 150 (the start alone finds
 the best game on 292), and `cargo t --release --example hunt` has six tests of the order, the probes, the verdicts and
 the seeds.  Rebuilt on master (numbering by layer) and rerun on one laptop thread, 12 of the calibration pairs
-(`bench/hunt/recalibration.jsonl`): the same nodes at every pair that finished (301, 11, 4 at 1302; 9,634, 15,065,
+(`solver/notebook/theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10/recalibration.jsonl`): the same nodes at every pair that finished (301, 11, 4 at 1302; 9,634, 15,065,
 152,993, 351,905 and 1,146,404 at 3311 and 2346), `none` for every margin up to 899 in the first calibration's seconds
 (53 at 835, 121 and 185 at 896-899), `probed` for 959, 1126 and 1215 (181.8 to 186.9 s each, the start reaching 598 to
 854 below V), no counterexample.  The cost of the cloud run falls from about 400 vCPU-hours (every pair using its 10
@@ -51,5 +51,33 @@ deferred them to a later batch of AWS work.
 
 ## Later (2026-10): the program removed from master
 
-The example `hunt` and its script `tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
+The example `hunt` and its script `solver/tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
 8753189: `git checkout 8753189`, then `cargo build --release --example hunt` in `rust/`.
+
+## Files
+
+The probes of the hunt, from the data of [the upper part](../the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#files); the command, the build and the margins are described there.
+
+| file | command | what it is |
+|---|---|---|
+| `recalibration.jsonl` | `hunt --upper ../../prover/data/upper_1301_2175.jsonl --list 1302:682,1302:754,1302:715`, then `hunt --upper ../../prover/data/upper_2176_3314.jsonl --list 3311:1826,2346:1265,3311:1978,3311:1818,2346:1495,3311:1926,3311:1856,3311:1792,3311:2511`, both with `--threads 1` and the defaults of the policy (margin up to 900 to completion in 10 minutes, above it a probe of 3 minutes), `nice -n 10`, on the M1 Max, 2026-10-15, the code of the commit that added the probes (master with the numbering by layer) | 12 of the pairs above, no counterexample: the same nodes as `calibration.jsonl` at every pair that finished, `none` for every margin up to 899, `probed` for 959, 1126 and 1215 (they were `timeout`); a probe's `start_score` is the score the solver's start (greedy set, dive, local search) reached |
+
+With the policy (RUNBOOK 10.2: the pairs in decreasing margin, up to 900 to completion under 10 minutes, above it a probe
+of the solver's start and 3 minutes, recorded `probed`, never `none`), the same pairs rerun in `recalibration.jsonl`
+(one thread, the seconds of the pairs that finished the same as the first calibration within load noise, since only a
+probe makes the start):
+
+| margin | pairs | verdict | seconds (one thread) | nodes | V − the start's game |
+|---|---|---|---|---|---|
+| 10 to 582 | 5 | none | 0.01 to 2.7 | 1 to 9,634 | |
+| 734 | 1 | none | 5.6 | 15,065 | |
+| 835 | 1 | none | 52.8 | 152,993 | |
+| 896 to 899 | 2 | none | 120.9 to 184.9 | 351,905 to 1,146,404 | |
+| 959 to 1215 | 3 | probed | 181.8 to 186.9 (a 180 s search and a start of 2 to 7 s) | 551,015 to 1,015,324 | 598 to 854 |
+
+The start (greedy set, dive, local search) reaches within 0.02 to 0.05 per cent of the recorded score at these margins
+and is never above it.  Forced to run as probes at 1302 (`--probe-above 0 --probe-minutes 1`, the three pairs above, whose
+searches end in milliseconds, so the lines say `"finished":true` and `probed`), the start with the recorded game of
+1302 as its seed (`--results ../../results/strict.jsonl`) reached 44, 116 and 308 below the score, without the seed 66,
+138 and 173 below: the seed does not decide it.  Of 4,499 pairs, 3,533 have a margin up to 800, 388 between 800 and 900
+and 578 above 900.

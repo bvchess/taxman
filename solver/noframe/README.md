@@ -1,13 +1,13 @@
 # The prover: independent proofs and checks of the frame solver's results
 
-The prover is the second program of this repository.  The frame solver finds the optimal games (`rust/results`,
-`src/main/resources/optimal.json`) by searching promotions within the frame model, whose answer is the optimum exactly
+The prover is the second program of this repository.  The frame solver finds the optimal games (`results`,
+`results/optimal.json`) by searching promotions within the frame model, whose answer is the optimum exactly
 when one open statement holds: that some optimal game plays every source with three or more prime factors that the
 frame solver's setup keeps (U; [THEORY.md, "The frame model: what is proven and what
-remains"](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's former
-assumptions are proven; [DESIGN.md §2](../DESIGN.md#what-optimal-means)).  The sources it keeps are the heaviest
+remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's former
+assumptions are proven; [DESIGN.md §2](../docs/DESIGN.md#what-optimal-means)).  The sources it keeps are the heaviest
 playable set of them wherever the upper-half optimality conjecture, equivalently conjecture (★), holds
-([THEORY.md](../../heuristics/THEORY.md#the-open-problem)).  The prover is a branch and bound over sets of moves on
+([THEORY.md](../../docs/THEORY.md#the-open-problem)).  The prover is a branch and bound over sets of moves on
 the whole board.  It decides playability by peel (THEORY.md, Theorem 1), uses only proven bounds, takes the recorded
 score as its target and proves that no set of moves beats it, so that the frame model's answers are checked without
 assuming the frame model.  It also lists every optimal set of a game, finds the longest games, certifies conjecture (★)
@@ -73,12 +73,12 @@ What the evidence is, in one paragraph each:
   were never committed (only their numbers, in THEORY.md and the commit messages of e04f7c4, 20822ea and
   43936d3), so that evidence could not be reproduced; this crate's checks can.  (The uncertified 0.2% were
   exactly those five components.)
-* **The frame model** ([DESIGN.md §2](../DESIGN.md#what-optimal-means)): its assumptions (greedy removal of
+* **The frame model** ([DESIGN.md §2](../docs/DESIGN.md#what-optimal-means)): its assumptions (greedy removal of
   impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
   promotions one frame forward) were validated end to end: the solver reproduces the Java's optimal.json to
   1000 (made by the same model, so not independent), `src/brute.rs` matches it to 40 in its tests (52 once, by the
   example `sacrifice`, removed from master), and `heuristics/evaluation/certify.py`'s brute force over pot states
-  confirms it to n = 62.  Beyond 1000 (`rust/results`), nothing independent of the frame model.
+  confirms it to n = 62.  Beyond 1000 (`results`), nothing independent of the frame model.
 
 ## 2. Conjecture (★) at scale
 
@@ -165,7 +165,7 @@ opt(n) ≤ V(n) because an optimal set beating V(n) would obey them.  Its lines 
   which made the search 160 times faster than solving each node from scratch.
 * **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set
   is independent in two linear matroids over GF(2), split by the parity of Ω (THEORY.md, [the parity
-  matroids](../../heuristics/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game)), so at a node the heaviest set
+  matroids](../../docs/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game)), so at a node the heaviest set
   independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
   It is computed by shortest augmenting paths (a child starting from its parent's set and weight split) and reported
   only with a weight split that satisfies the local optimality conditions of both matroids, checked explicitly, so
@@ -268,7 +268,7 @@ nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–
 dominate), 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70 million
 nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
-The committed chain (`../results/strict.jsonl`) reached 2175 when the prover's run began, and the next subsection is
+The committed chain (`../../results/strict.jsonl`) reached 2175 when the prover's run began, and the next subsection is
 the run that proved it (the chain has since been extended, within the frame model; the prover has not proven the games
 past 2175).  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of
 thread time, the hardest proofs about 3 hours) was made before there was anything to measure it against, and it was
@@ -278,7 +278,7 @@ low: 1301–1999 took 164 hours, the hardest proof (1475) 4.9.
 
 `data/exact_parity_1301_2175.jsonl`: `exact` over the 875 games of 1301–2175, each proven from scratch with the parity
 bound, on one `c8g.4xlarge` (Graviton4, 16 vCPUs, one game a thread) on spot in us-east-1b, run by
-`../tools/cloud/prover.sh` ([RUNBOOK section 9](../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
+`../tools/cloud/prover.sh` ([RUNBOOK section 9](../docs/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
 from 2026-10-14 23:29 to 2026-10-15 15:22 UTC, the build of commit 4db7a14: 190 passes of 300 s, every one ending with
 status 0, no interruption; 15.9 hours of run, 16.0 instance-hours at $0.2402, **$3.84**.  The check
 (`../tools/cloud/prover.sh --verify 1301 2175`, on the instance and again at home on this file) prints `OK: opt(n) is
@@ -331,14 +331,14 @@ projection gave 1475, 1430, 1472 and 1521 1.7 to 2.5 million nodes and 1.5 hours
 and 0.89 million nodes, 4.9, 1.9, 3.0 and 0.6 hours; 1848–1851 took 5.33, 5.33, 4.51 and 4.50 million nodes, 3.0 to 3.6
 hours each, and 2060 and 2064 3.4 and 4.0 hours; 2160 and 1863, on the projection's list, took 0.2 and 0.6 hours.  The
 projection's order of the games put 12 of the 16 dearest among its first 16.
-[EXPERIMENTS.md](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md) has the
+[EXPERIMENTS.md](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) has the
 run's account and what it says about the projection's model.
 
 ### The upper part, game by game
 
 The frame solver's answer for a game that rests on its search is opt(n) exactly when U holds at n: some optimal set
 plays U\*_{≥3}, the members of U\* with three or more prime factors
-([THEORY.md](../../heuristics/THEORY.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity bound
+([THEORY.md](../../docs/THEORY.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity bound
 which of those members every set beating the recorded score V must play.  It fixes layers 1 and 2 as Theorem B says
 every optimal set has them (the largest prime and no other; U\*_2 among the sources of layer 2; where U\*_2 spans
 every prime up to n/2, which it decides for each board, no number of layer 2 up to n/2), bars one member u at a time,
@@ -357,10 +357,10 @@ rest on the frame model need it
 Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed chain's games 1301–2175 (875 games,
 490 of them needing it; 300 s), and `data/upper_2176_3314.jsonl`, the copy of the EC2 chain's results taken on
 2026-10-15 (games the committed chain now has) that
-[the gap past 2175](../docs/experiments/the-gap-past-2175-2026-10.md) measured (1,139 games, 635 needing it; 1,272 s,
+[the gap past 2175](../notebook/the-gap-past-2175-2026-10/README.md) measured (1,139 games, 635 needing it; 1,272 s,
 4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
 games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
-certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  A fourth,
+certify` (the frame solver's certificates of U, [DESIGN.md](../docs/DESIGN.md#certificates-of-u)).  A fourth,
 `data/upper_3315_3440.jsonl`, the rest of the committed chain as it stood then (126 games, 73 needing it, 3424, 3425
 and 3440 among them; 277 s, 4.3 s for the slowest game), is the input of the campaign of certificates on 2176-3440
 (`../bench/certify/`).  By band (the open members and the margins of each game; the share is of all members):
@@ -448,7 +448,7 @@ of n − 1 when solving n, to justify shortcuts, to break symmetry.
 
 ### What is proven
 
-THEORY.md, ["Uniqueness of the optimal set"](../../heuristics/THEORY.md#uniqueness-of-the-optimal-set):
+THEORY.md, ["Uniqueness of the optimal set"](../../docs/THEORY.md#uniqueness-of-the-optimal-set):
 
 * **Theorem 8: the heaviest playable upper set is unique wherever (★) holds**, so in every game n ≤ 100,000
   (section 2).  More precisely, every playable upper set S is dominated termwise by U\*: the i-th largest member
@@ -577,7 +577,7 @@ Java solver nor the frame solver does that (below), but the Java's `reviseFreedo
 
 ### What is proven
 
-THEORY.md, ["Longest games"](../../heuristics/THEORY.md#longest-games).  Let M(n) be the most moves of a game of n,
+THEORY.md, ["Longest games"](../../docs/THEORY.md#longest-games).  Let M(n) be the most moves of a game of n,
 the size of the largest playable set of picks.
 
 * **M(n) <= ν(n)**, the matching number of the board's maximal-factor graph (each number joined to its maximal
@@ -629,7 +629,7 @@ longest game (49):   the same with 250 252 294 400 out and 116 180 200 320 351 i
 ```
 
 Both replay by the rules (in `src/moves.rs`, the test `game_833_has_a_longer_game_than_its_optimal_one`), and the
-frame model plays both (`rust/tests/soundness.rs`).  The optimal games of 834 and 835 hold the same four numbers
+frame model plays both (`solver/frame/tests/soundness.rs`).  The optimal games of 834 and 835 hold the same four numbers
 below n/2, and the same exchange makes their heaviest longest games.
 
 What the data shows:
@@ -665,11 +665,11 @@ What the data shows:
   solves the two-frame game of frames 0 and 1 for its heaviest promotion set and lowers frame 0's freedoms to that
   set's size, which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the
   tactic `revise_freedoms`, measured it and removed it ([which tactics earn their
-  keep](../docs/experiments/which-tactics-earn-their-keep-2026-10.md)).  (`SearchManager.finalReport`, :185-188,
+  keep](../notebook/which-tactics-earn-their-keep-2026-10/README.md)).  (`SearchManager.finalReport`, :185-188,
   reports an optimum with fewer promotions than `maxTotalPromotions` as "max promotions was over-estimated".)
 * **833 refutes the comment's "theorem" for the whole frame game.**  The exchange above is a promotable set: the
   optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
-  (`rust/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`), so at 833 `max_total` was not
+  (`solver/frame/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`), so at 833 `max_total` was not
   an over-estimate.  It does not decide the two-frame form the tactic used: at 833 the tactic searched the two-frame
   game (`Searched { size: 21 }`) and left `max_total` at 49, and the scores of 833-835 are proven on the whole board.
 
@@ -684,7 +684,7 @@ in milliseconds.
 
 ## 7. Reproducing
 
-Rust (std only; `cargo` from this directory), Python 3 standard library for the tools.
+Rust (std only; `cargo` in `solver/noframe`, the commands below run there), Python 3 standard library for the tools.
 
 ```
 cargo test --release                       # brute-force checks of every bound and search (about a minute)
@@ -715,9 +715,9 @@ tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_par
                                     # every n in 2..2175 proven, scores recorded, and how many proofs rest on Theorem B
 ./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min)
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
-./target/release/upper --from 2176 --to 3314 --results ../results/strict.jsonl --results CHAIN.jsonl \
+./target/release/upper --from 2176 --to 3314 --results ../../results/strict.jsonl --results CHAIN.jsonl \
     --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
-./target/release/upper --from 3315 --to 3440 --results ../results/strict.jsonl \
+./target/release/upper --from 3315 --to 3440 --results ../../results/strict.jsonl \
     --out data/upper_3315_3440.jsonl          # the committed chain's games 3315 to 3440 (5 minutes)
 ./target/release/exact --list 1575,1584 --out B.jsonl                   # E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
@@ -747,14 +747,14 @@ gzipped where large (`gunzip -k` to resume into it).
 * The optimal sets of 990–1300 are not enumerated.  The enumeration mode works with the parity bound (tested
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * The frame model's individual assumptions are no longer open: they are theorems given a per-board fact that holds
-  on every board to 8191 ([THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
+  on every board to 8191 ([THEORY.md](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
   Theorems B and M), and what the model's answers rest on is one statement, U: some optimal game plays every source of
   three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175.  Beyond, the
   committed games past 2175 that rest on U (an exhausted search or a repeat) have it uncertified, and the
   barred parity bounds certify 85% of those sources per game to 3314 but close no game alone
   ([section 3](#the-upper-part-game-by-game)); the rest needs a search that leaves the open sources optional, whose
   cost against the search with them fixed is the measurement E6 (`exact` against `exact --fix-upper 1`,
-  prepared, [RUNBOOK section 10](../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
+  prepared, [RUNBOOK section 10](../docs/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
 * Whether every optimal game's upper part is U\*.  Theorem 8 settles the upper half alone; for the whole game, a
   frontier argument would start from an optimal S whose upper part S_U is not U\*: termwise domination puts the
   largest disagreement d in U\* ∖ S_U, and S + d is unplayable, so the question is whether some repair costs less

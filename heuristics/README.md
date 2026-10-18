@@ -15,9 +15,9 @@ Two primary approaches:
 2. **A self-fed continuation solver holds 99.97% of all optimal
    points**, starting from nothing at n=2, and extends to n = 1001..2000,
    provably within 0.35% of the Franklín–Moniot upper bound in
-   aggregate.  Ground truth now exists out there: the solver in `rust/`
+   aggregate.  Ground truth now exists out there: the solver in `solver/frame/`
    has proven games to n=3440 (within its frame model), and the prover
-   (`rust/prover`, a branch and bound over sets of moves on the whole
+   (`solver/noframe`, a branch and bound over sets of moves on the whole
    board) proves their scores optimal on the whole board to n=2175.
 
 This chart shows the player's share of the pot using different
@@ -47,7 +47,7 @@ one prime from c.
 > b whenever a's assigned factor divides b, or a divides b" is
 > acyclic.  Any topological order of the precedence is a legal game.
 
-Both directions are proven in [THEORY.md](THEORY.md) — the harder
+Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder
 one by the Franklín–Moniot lifting argument turned inward, whose
 payoff is that maximal factors are the only factor notion the whole
 project needs.
@@ -86,11 +86,11 @@ What is proven vs. trusted, precisely:
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
 | U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) (THEORY.md, "Uniqueness of the optimal set", Theorem 8), so certified for every n ≤ 100,000 |
-| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`rust/prover`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds for every n ≤ 1300 |
+| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds for every n ≤ 1300 |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
 | optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
-| an optimal game plays the most moves any game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes a local form) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than the optimum (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`rust/prover`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
-| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`rust/prover`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
+| an optimal game plays the most moves any game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes a local form) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than the optimum (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`solver/noframe`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
@@ -100,11 +100,11 @@ What is proven vs. trusted, precisely:
 | peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
 | peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`rust/prover`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10), the ceiling and the prime formula |
+| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10), the ceiling and the prime formula |
 
 ### The proofs
 
-The proof work lives in [THEORY.md](THEORY.md), the companion this
+The proof work lives in [THEORY.md](../docs/THEORY.md), the companion this
 ledger cites.  Its contents, in one breath: the **playability
 characterization** (lifting — maximal factors suffice); the
 **schedulability theorem** (peel's assignments can always be
@@ -252,7 +252,7 @@ bound's own looseness averages 0.29% — beating solvent in 894 games and
 tying the other 106.  Each of those 1000 games has a per-game certified
 gap (the distance to the bound, which the true optimum also lives
 inside).  The ground truth to compare them with now exists: the solver
-in `rust/` has proven games to n=3440 (`rust/results/strict.jsonl`,
+in `solver/frame/` has proven games to n=3440 (`results/strict.jsonl`,
 within the frame model) and the prover proves their scores optimal on
 the whole board to n=2175.
 
@@ -346,7 +346,7 @@ was produced by the same theory this project tests, so the audit uses
 none of it — exhaustive
 bitmask search (unique optimal upper sets confirmed through n=62;
 it enumerates the whole optimal pick sets too, which
-`rust/prover/tools/crosscheck_optsets.py` compares with the
+`solver/noframe/tools/crosscheck_optsets.py` compares with the
 prover's enumeration of every optimal set: they agree, one set
 each, for every n ≤ 57),
 the naive all-divisors matching bound, and opt(n) ≤ n + opt(n−1)
@@ -447,7 +447,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
 | `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
 | `evaluation/certify.py` | theory-free certification of optimal.json (uses `evaluation/bitpot.py` bitmask primitives) |
-| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in rust/docs/experiments/the-wikis-open-questions-2026-10.md) |
+| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in solver/notebook/the-wikis-open-questions-2026-10/README.md) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |

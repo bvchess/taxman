@@ -1,6 +1,6 @@
 # The upper part game by game, and two cloud runs prepared (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Steps 2B to 2D of the theory track's second consultation (2026-10-15).  Since the entry above, the
 prover's proofs reach 2175, so U holds there; every game past 2175 that rests on the frame model rests on U.  (E5)
@@ -10,7 +10,7 @@ free than with the whole upper part fixed to U\*: is the integrated search, whic
 worth building?  (E9(a)) Does the frame solver find a game above the recorded score on the board without an open
 source, at the games of largest gap past 2175?  E5 ran on the laptop; E6 and E9(a) are built, tested and calibrated on
 the laptop and wait for approval to run on EC2 ([RUNBOOK section
-10](../../tools/cloud/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
+10](../../docs/RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)).
 
 *E5* (commit abcfb18 and the data).  The prover's `upper` (`src/upper.rs`, `src/bin/upper.rs`): per game that rests on
 the model (neither at its ceiling nor given by the prime formula), the roles of Theorem B (the largest prime forced
@@ -23,7 +23,7 @@ alone; 1,403 checks), Theorem B's roles hold for every optimal set there and eve
 figures at 600 are the consultation's.  It reproduces the consultation's scratch figures where they overlap (600, 1000,
 1300, 2000).  The committed chain's 1301-2175 (490 games need it, 300 s) and the copy of the EC2 chain's results of
 2026-10-15, 2176-3314 (635, 1,272 s), one thread on the laptop; the table by band is in [the prover's
-README](../../prover/README.md#the-upper-part-game-by-game):
+README](../../noframe/README.md#the-upper-part-game-by-game):
 
 | | 1301-2175 | 2176-3314 |
 |---|---|---|
@@ -37,7 +37,7 @@ README](../../prover/README.md#the-upper-part-game-by-game):
 
 No game is certified whole, and the open share follows the root's gap, not n (it falls with the gap at 2600-2699).
 The root's gap with layers 1 and 2 fixed is the solver's GF(2) gap at the root on all 400 games past 2175 that
-[the gap past 2175](the-gap-past-2175-2026-10.md) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
+[the gap past 2175](../the-gap-past-2175-2026-10/README.md) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
 every one of the 1,125 games, so no game is flagged.  The fixed set of the integrated search (U\* less a game's open
 members) is in these files.  THEORY.md's "What is known of U" now cites them; its scratch figures and the sentence on
 searches closing U to 1500, which the prover's proofs to 2175 supersede, are gone.
@@ -75,9 +75,9 @@ pairs (every source of the boards 30, 37, ..., 149) the hunt finds a game at one
 optimum and nothing at it, the game replaying on the whole board; on every board to 30 and every hole it agrees with
 the brute force.  `examples/hunt.rs` takes the 20 games of largest gap that need a certificate and each one's open
 members (`--per-game`, `--list` to choose otherwise), runs `--jobs` pairs at once on `--threads` each with a time
-limit, appends a line per pair, resumes, summarizes, and exits 2 on a counterexample; `tools/cloud/hunt.sh` runs it
+limit, appends a line per pair, resumes, summarizes, and exits 2 on a counterexample; `solver/tools/cloud/hunt.sh` runs it
 under `run.sh`'s deadline, saves and power-off, and `spot-watch.sh` now stops it too.  Calibration, one laptop thread
-(`bench/hunt/`): at 1302 the three open members end in milliseconds (U is proven there); at 3311 (gap 1303) and 2346
+(`calibration.jsonl`): at 1302 the three open members end in milliseconds (U is proven there); at 3311 (gap 1303) and 2346
 (gap 1346) the cost of a pair follows its margin, not the gap: under 6 seconds to margin 781, 51 to 182 seconds at 835
 to 899, and every pair from 959 to 1215 out of its 3 to 5 minutes; no counterexample.  The 20 games (3300,
 3174-3176, 3104, 2346, 3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171; gaps 1257 to
@@ -96,5 +96,32 @@ prover's node at no cost to its proofs.
 
 ## Later (2026-10): the program removed from master
 
-The example `hunt` and its script `tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
+The example `hunt` and its script `solver/tools/cloud/hunt.sh` were removed from master on 2026-10-17.  They build at commit
 8753189: `git checkout 8753189`, then `cargo build --release --example hunt` in `rust/`.
+
+## Files
+
+What the hunt does and what each verdict is worth: the module comment of `examples/hunt.rs` and `sacrifice::hunt`
+(the board without one open source of U\*, searched by the frame solver from an incumbent worth the recorded score, so
+that it looks only for a better game).  Why: docs/THEORY.md, "The upper part" (U), and the entry
+["The upper part game by game"](README.md).
+The open sources and their margins come from the prover's `upper` (`../../prover/data/upper_*.jsonl`).  The example
+`hunt` and its script `solver/tools/cloud/hunt.sh` were removed from master (2026-10-17); they build and run at commit 8753189
+(`git checkout 8753189`, then `cargo build --release --example hunt` in `rust/`).
+
+| file | command | what it is |
+|---|---|---|
+| `calibration.jsonl` | `hunt --upper ../../prover/data/upper_1301_2175.jsonl --list 1302:682,1302:715,1302:754 --minutes 2`, then on `upper_2176_3314.jsonl` four pairs of 3311 (`--minutes 3`), five (`--minutes 6`), three of 3311 and three of 2346 (`--minutes 5`); one thread, one job, `nice -n 10`, on the M1 Max, the code of the commit that added the hunt (and one smoke pair, 1304:682) | 19 pairs, no counterexample: at 1302 (U proven there) `none` in milliseconds; at 3311 (gap 1303) and 2346 (gap 1346) `none` for every margin up to 899 (under 6 s to margin 781, 51 to 182 s at 835 to 899), `timeout` for every margin from 959 to 1215 |
+
+The cost of a pair follows its margin, the barred parity bound's excess over the recorded score, not its game's gap:
+
+| margin | pairs | verdict | seconds (one thread) | nodes |
+|---|---|---|---|---|
+| 10 to 582 | 7 | none | 0.01 to 2.7 | 1 to 9,634 |
+| 674 to 781 | 3 | none | 1.0 to 5.5 | 2,485 to 15,108 |
+| 835 to 899 | 3 | none | 51 to 182 | 152,993 to 1,146,404 |
+| 959 to 1215 | 6 | timeout | 180 to 300 (the limit) | 710,842 to 2,046,333 |
+
+
+`solver/docs/RUNBOOK.md`, section 10.2, turns this into the estimate of the cloud run (20 games, 4,499 pairs); its
+output is to go here as `hunt_2176_3314.jsonl` with its summary.

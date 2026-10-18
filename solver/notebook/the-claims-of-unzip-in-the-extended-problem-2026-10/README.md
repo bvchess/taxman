@@ -1,6 +1,6 @@
 # The claims of `unzip` in the extended problem (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  32.2 of the fifth consultation of the theory track (2026-10-16): Π⁺(O) claims nothing, which costs time
 (stage 1 measured +11% time on Π⁺(∅)) and keeps repeats apart (3427 has 3425's search problem but another Π⁺,
@@ -31,7 +31,7 @@ there.  Π⁺(∅) with the claims poses Π_n's problem (frames, candidates, roo
 to 300 in the unit tests and on every board 2..8191 in the census (check H, below), and its search reproduces every
 row of the tripwires' default table node for node, the matching rows too.
 
-*The census* (`examples/structure.rs`, one thread, 1,271 s summed; `bench/structure/`, replacing the earlier run, every
+*The census* (`examples/structure.rs`, one thread, 1,271 s summed; `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, replacing the earlier run, every
 field of which it reproduces).  Check H holds on every board 2..8191.  Where Π⁺(U\*_{≥3}) fits in nine frames (to
 4095) it records the back claims at risk (their factor fails the check against the candidates of Π⁺(U\*_{≥3}), the
 most any O has) and those refused for some O (exactly: for each frame holding one at risk, the largest O free of it,
@@ -46,12 +46,12 @@ promotion set of either): a line of the other formulation is passed over unless 
 claims do not change, are n's, and is otherwise set up again in its own formulation (it must reproduce its line) and
 then in the run's.  `verify-certificates` sets each line up in its own formulation and checks the rule in the
 formulation of the line that rests on the other.
-* *600..1300*, one thread, with the claims (`bench/certify/certificates_claims_600_1300.jsonl`): the 377 games
+* *600..1300*, one thread, with the claims (`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/certificates_claims_600_1300.jsonl`): the 377 games
   certified again, none otherwise; the rule settles 101 of them against 81 (the same 81 and 20 more, 611 on 609 to 1147
   on 1145), each as a direct search of the game in the same formulation does; the 276 searched take exactly the nodes
   they took without the claims (296,743) and 29.4 s against 30.5 s.  `verify-certificates` passes the file beside the
   one without the claims, and a file that mixes the two.
-* *Past 1300* (`bench/certify/problems_claims_600_3440.jsonl`, every certificate's Π⁺(O) set up with the claims, 78
+* *Past 1300* (`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/problems_claims_600_3440.jsonl`, every certificate's Π⁺(O) set up with the claims, 78
   s): the claims change the problem of 346 of the 1,575 games that need a certificate (231 of 377 in 600..1300, 43 of
   490 in 1301..2175, 72 of 708 in 2176..3440, none past 2688), and the rule finds 361 repeats against 340: one more
   past 1300 (1371).  None of the 115 deferred repeats is settled, 3427 neither: 3425 and 3427 keep their problems of
@@ -92,3 +92,48 @@ was measured on this code, then taken out:
 (`gf2=on`), the tripwires, `regress --to 1000 --threads 1` (9.2 s), the one-thread chain 1..1300 line for line equal,
 but for the times and the build, to the base commit's binary (ed09ac0; 290,503 nodes), both suites, clippy and fmt.
 The laptop ran one process at a time, on one thread, `nice`; nothing ran on AWS.
+
+## Files
+
+What the census checks and why: the module comment of `examples/structure.rs` (it defines every field of a line) and
+docs/THEORY.md, "The frame model: what is proven and what remains" (Lemma Ω, N and Theorem M, whose hypotheses
+it checks).  It ran on the M1 Max, `nice -n 10`, on the code of commit 631e027 (`cargo build --release --example
+structure`, from `rust/`; since the feature `studies` was added, `--features studies` too).
+
+| file | command | what it is |
+|---|---|---|
+| `structure_2_8191.jsonl.gz` | `structure 2 8191 --threads 4 --out structure_2_8191.jsonl`, then `gzip -9`; 156 s of wall time, 624 s summed over the boards (0.27 s at most, n = 8129) | one line per board 2..8191, every board the solver supports: the checks A, C, D, E, F and G (no violation on any board), the frames by layer, the layers of every number, the claims of `unzip`, the back claims whose factor has a composite among the factors, the reach of `Home::MergedAway` |
+| `summary.txt` | the summary the same run printed | `PASS`: every check holds on every board; frame 0 is layer 3 on 8,100 boards, layer 2 on 80 (all at most 186: exactly the boards where a frame of layer 2 has freedoms), and there is none on the 10 boards with no frame with freedoms; on every board the numbers follow the layers (frame h is the frames with freedoms of layer 3 + h, or 2 + h); `Home::MergedAway` is reached on one board (114), twice, and never counts |
+
+To resume or extend the run into the file, `gunzip -k structure_2_8191.jsonl.gz` first: `--out` appends to a file and
+skips the boards it already has.
+
+Setup has numbered the frames by layer since ([The frame model by layer, and the extended
+problem](../the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md)); the census run again on
+that code (one thread) reproduces every line of the file but for `secs`, and the summary but for the seconds, so the
+data stand for both numberings, which are the same on every board here.
+
+The census has since recorded, per board, the frames of the extended problem with every source of three or more prime
+factors open (`extended_frames`, the most any set of open sources gives; [One-sided candidates in
+the search](../one-sided-candidates-in-the-search-2026-10/README.md)), and the files here are its run on
+that code (`structure 2 8191 --threads 1`, 814 s summed over the boards): every line of the earlier file is in the new
+one, field for field but for `secs`, with `extended_frames` added, and the summary has two rows more.  The extended
+problem needs 9 frames on 2048..4095 and 10 on every board from 4096, which a frame set (9 at most) cannot hold:
+certificates past 4095 wait for a tenth frame.
+
+Since Lemma M5⁺ (docs/THEORY.md; solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md) the
+census also checks that the extended problem with nothing open and the claims of `unzip` is the frame model's problem
+(check H), and records per board the back claims at risk of the lemma's check and those that some set of open sources
+refuses (`m5_at_risk`, `m5_refused`, with their counts).  The files here are its run on the code of that change
+(`structure 2 8191 --threads 1`, 1,271 s summed over the boards): every field of every line of the earlier file is
+reproduced, but for `secs`, with the four fields added; check H holds on every board; the summary has a row for it and
+four more.
+
+### The certificates and the extended problems with the claims
+
+Made on the certificates' data (the work list of [the certify tools](../../tools/certify/README.md), `U` being its four `--upper` files, `solver/noframe/data/upper_*.jsonl`):
+
+| file | command | what it is |
+|---|---|---|
+| `certificates_claims_600_1300.jsonl` | `taxman certify 600-1300 --results results/strict.jsonl --upper solver/noframe/data/upper_2_1300.jsonl --out certificates_claims_600_1300.jsonl --threads 1 --progress 0` (code of commit cd959d1, the extended problem with the claims of `unzip` that Lemma M5⁺ keeps; 29 s of search) | the same 377 games, every one `certified` again, each line with `"claims": true`: 276 by a search (the very nodes of the searches above, 296,743) and 101 by the same problem, the 81 above and 20 more whose problems differ only by claims (611 on 609, ...); `verify-certificates` passes it beside the file above |
+| `problems_claims_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_claims_600_3440.jsonl` (code of commit cd959d1, with the claims; 78 s) | `problems_600_3440.jsonl` again in the formulation with the claims (each line with `"claims": true`): 361 games with a `same_as` against 340 (the 20 of 600..1300 and 1371); the claims change the problem of 346 of the 1,575 games (231 of the 377 of 600..1300, 43 of the 490 of 1301..2175, 72 of the 708 of 2176..3440, none past 2688): the frame of layer 3 that holds most sources holds open ones and keeps no claim, so none of the 115 repeats the rule could not settle (3427 among them) is settled (solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md) |

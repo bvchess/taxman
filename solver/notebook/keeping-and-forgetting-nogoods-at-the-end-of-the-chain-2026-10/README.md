@@ -1,18 +1,18 @@
 # Keeping and forgetting nogoods at the end of the chain (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Each searcher keeps its own table of nogoods, looks a node's conflict up by scanning it, and clears it after
-every 50,000 of its own steps ([forgetting](forgetting-nogoods-2026-10.md), measured at 1024-1225 on the matching path).
+every 50,000 of its own steps ([forgetting](../forgetting-nogoods-2026-10/README.md), measured at 1024-1225 on the matching path).
 Nogood work is under 1% of a node's time at the end of the chain (the profile in
-[bench/chain_end](../../bench/chain_end/README.md)), so the question is not what the table costs but whether keeping more,
+[solver/notebook/the-calibration-for-the-run-to-4000-2026-10/README.md](../the-calibration-for-the-run-to-4000-2026-10/README.md)), so the question is not what the table costs but whether keeping more,
 or keeping better, makes the trees smaller.  Every policy is sound (the table is a cache of nogoods that hold at every
 node), so a policy changes the trees and never the optimum.
 
 *Status.*  **Partial.**  The knobs and the counters are done and kept (defaults unchanged); the sweep below is six games
 under twenty policies and four more under eight, all on one thread.  The runs on games of 4-10 million nodes that the
 plan asked for if a policy gained 5% were stopped before one ended, because Brian moved the sweep to the cloud machine,
-where the tuning campaign (`bench/tuning/`) runs these policies on the suite of subtrees of the dearest games and six
+where the tuning campaign (its entry's folder) runs these policies on the suite of subtrees of the dearest games and six
 whole games.  That campaign is where the sweep continues.
 
 *What was built* (commit ea0eda6; DESIGN.md section 4, "Forgetting nogoods", and section 5).  Three tactics, set by
@@ -44,7 +44,7 @@ proves its optimum and the nodes are exact.  Six games of 2211-3260 whose record
 million nodes and are `exhausted` (a proof at the ceiling would be no search): 2211, 2250, 2862, 2910, 3050, 3260; one
 thread needs 0.4-0.8 million for them.  Four more, 2316, 2625, 3135, 3228 (1.3-3.1 million recorded, 1.0-2.0 million on one thread), for eight
 policies.  The
-data, the scripts and the tables are in [bench/nogoods](../../bench/nogoods/README.md).  CPU seconds are the process's,
+data, the scripts and the tables are in [solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10](README.md).  CPU seconds are the process's,
 on a laptop others shared (load 6 to 200), and the later runs went eight at a time (about 8% fewer instructions per CPU
 second), so nodes are the measure and the CPU figures are good to a few percent.
 
@@ -103,7 +103,7 @@ default):
 * **Nogoods of at most 4 members do not occur.**  `size2`, `size3` and `size4` give the default's trees to the node: at
   no forgetting did the table hold one.  The nogoods of this search are large: 5% of the table has at most 8 members
   (20 of 424) and 28% at most 16 (117 of 421), and keeping the short ones (+7%, +17%) makes the trees larger, as it
-  did on the matching path ([IDEAS 3](../IDEAS.md#3-nogoods-with-very-many-threads)).  (Means over the forgettings
+  did on the matching path ([IDEAS 3](../../docs/IDEAS.md#3-nogoods-with-very-many-threads)).  (Means over the forgettings
   of the six games; the table averages 424 nogoods.)
 * **The counters say why the table does not pay, and what it does not cost.**  With no forgetting 5,379 nogoods were
   learned on the six games against 34,463 at the default: each is learned 6.4 times over, which by the notebook's
@@ -120,18 +120,47 @@ default):
 
 *Which policies deserve a test at 64 threads.*  None of the keeping policies.  If the campaign tries one, it is a
 period near 20,000-40,000, for which the data show no loss and a gain too small for ten games to see (the idea of
-[IDEAS 3](../IDEAS.md#3-nogoods-with-very-many-threads) that a period of about 30,000 might suit 192 threads is not
+[IDEAS 3](../../docs/IDEAS.md#3-nogoods-with-very-many-threads) that a period of about 30,000 might suit 192 threads is not
 refuted); `nogood_period` is the only knob that has a chance, and at 64 threads each searcher's table is smaller than
 here, which can only shrink the differences between policies.
 
 *Commits.*  ea0eda6 (the knobs, the counters, the tests), the merges of master that followed, and the commit of this
-entry with `bench/nogoods/`.
+entry with `solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/`.
 
 ## Later (2026-10): the tuning campaign's runs
 
-The sweep went on in the [tuning campaign](the-tuning-campaign-at-the-end-of-the-chain-2026-10.md), on the suite of
+The sweep went on in the [tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md), on the suite of
 subtrees of 3300, 3425, 3440 and 3441 and six whole games, one thread each.  It agrees with this entry: against the
 default (9 problems, stage A) the periods 5,000, 10,000, 20,000, 30,000 and 200,000 took 0.998, 1.007, 0.970, 0.996 and
 1.036 of the CPU and 0.919, 0.959, 0.950, 0.984 and 1.055 of the nodes, `nogood_keep=top64` 1.131 and 1.168 and
 `nogood_limit=256` 1.096 and 1.098; and on top of `force_window=all` (16 problems) the periods 5,000, 10,000 and 20,000
 took 1.036, 1.044 and 1.018 of `all`'s CPU.  No policy was adopted.
+
+## Files
+
+The sweep of this entry:
+games of 2211-3260 proved on one thread by the ladder, seeded with their own optimum, under the default policy and the
+other policies of the tactics `nogood_period`, `forget_nogoods`, `nogood_keep` and `nogood_limit` (DESIGN.md, section
+5).  A search on one thread is deterministic, so node counts compare exactly, and they are the measure; CPU seconds and
+cycles are the process's over the search (`getrusage`, `proc_pid_rusage`) on a laptop that other jobs shared (load 6
+to 200), and the later runs went eight at a time, with about 8% fewer instructions per CPU-second than one at a time,
+so CPU figures compare only between runs made under the same load.
+
+| file | what it is |
+|---|---|
+| `run.sh` | the sweep: `nice -n 10 solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/run.sh OUT "GAME ..." SECONDS POLICY...` from the top of the repository; one line per run appended to OUT as it ends, runs already in OUT skipped, so an interrupted sweep resumes |
+| `parallel.sh` | `nice -n 10 solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/parallel.sh JOBS 8`: a file of `run.sh` arguments, one line a run, eight at a time |
+| `summarize.py` | `summarize.py RESULTS [--games=G,...] [--policies=P,...]`: nodes by game and policy, each policy against the default by game with the geometric mean and its standard error, the totals with the CPU time of a node, and the counters of the tables |
+| `sweep.txt` | 152 runs: six games (2211, 2910, 2250, 3050, 2862, 3260) under 20 policies, four more (2625, 3135, 3228, 2316) under 8; each line is `GAME<TAB>POLICY<TAB>the ladder's line` |
+| `sweep.md` | `summarize.py sweep.txt`, for the six games and for the ten games of the eight policies run on all of them |
+
+The ladder was `target/release/examples/ladder` of commit ea0eda6 (`--seed-opt --known results/strict.jsonl --threads
+1`); the policies are the `--tactic` specs of the first column of the tables (`forget_nogoods=off,nogood_limit=256` is
+two of them).  Every `default` run has the node count of the build before the knobs (506,416 at 2211, 415,764 at 2910,
+683,587 at 2250, 761,406 at 3050, 814,937 at 2862), and the merge with master's node-speed round (6460c86) changes none
+(2910 again: 415,764).  The summary's column of CPU microseconds a node weighs the games by their nodes, so it moves with
+which game a policy made large; compare a game with itself.
+
+The plan went on to three games whose recorded proofs took 4-10 million nodes (2260, 3243, 3340) under the default and
+four periods; the sweep moved to the cloud machine's tuning campaign (its entry's folder) before one of those runs ended,
+so there are none.

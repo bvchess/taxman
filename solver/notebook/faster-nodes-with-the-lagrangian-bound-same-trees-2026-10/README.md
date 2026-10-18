@@ -1,6 +1,6 @@
 # Faster nodes with the Lagrangian bound, same trees (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  With the Lagrangian bound ("A Lagrangian bound over the nogoods", above) proofs take about 3.3 times fewer
 cycles, but each step costs about half as much again (the probe's window of 1215: 24.6k cycles a step against 16.4k
@@ -14,7 +14,7 @@ cycles and instructions retired (the probe's own, the fastest of its repetitions
 interleaved; for whole searches `/usr/bin/time -l`).  The laptop was shared with a chain run and other agents (load
 2 to 30), so instructions separate signal from noise where cycles move by a percent or two.
 
-**The profile.**  `tools/profile/profile.sh N 60 2` (commit a2da702) on the hardest games of the strict chain as the
+**The profile.**  `solver/tools/profile/profile.sh N 60 2` (commit a2da702) on the hardest games of the strict chain as the
 chain runs them, two threads: 1254 (done in 25.3 s), 1272 (17.2 s), 1288 (34.1 s), 1290 and 1300 (stopped at 60 s).
 `attribute.py` now charges the Lagrangian levels' work to kinds of its own (commit dd4f89c).  Shares of busy
 samples:

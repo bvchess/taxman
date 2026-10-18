@@ -1,8 +1,8 @@
 # The per-frame bound (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  [The anatomy](the-anatomy-of-the-gap-2026-10.md) found that what the GF(2) bound misses is winnability in
+*Question.*  [The anatomy](../the-anatomy-of-the-gap-2026-10/README.md) found that what the GF(2) bound misses is winnability in
 odd cores of frames 1-3.  Does a bound exact frame by frame close a share of that residual that holds or grows with
 n, at the roots and at nodes; what does it cost; and what does it do in the plain branch and bound?  (Its code went with
 the previous entry's: see "What was kept" there.)
@@ -99,7 +99,7 @@ node; cuts of 30, and the mean of `max(0, bound − target)`:
 | 936 | 20, 25.7 | 25, 5.9 | 29, 0.8 | 0.10, 0.66 |
 | 1215 | 14, 53.5 | 23, 24.9 | 27, 5.9 | 0.46, 2.14 |
 
-The root's cuts of the anatomy at the node's multipliers cut 26 and 22 ([there](the-anatomy-of-the-gap-2026-10.md)); the
+The root's cuts of the anatomy at the node's multipliers cut 26 and 22 ([there](../the-anatomy-of-the-gap-2026-10/README.md)); the
 GF(2) bound costs 0.3-0.7 ms, so the two per-frame columns cost 300 to 3,000 times as much.
 
 **3. In the branch and bound it is a constant factor at many times the time.**  The anatomy's skeleton (the table in
@@ -119,5 +119,5 @@ falls at the frontier (15-39% at 1254-1300).  The residual's difficulty moves in
 going away.  In the branch and bound it is a constant factor at 28 times the time, behind the GF(2) bound with
 learned cuts.  Not recommended.  A frame-local relaxation that sees odd cores cheaply (a bound for one frame
 stronger than its GF(2) matroid and computable without search) would make it practical; none is known (Lorea's
-matroid ([matroid](matroid-intersection-bounds-2026-10.md), section 5), cover cuts and rank cuts of small unions do not
+matroid ([matroid](../matroid-intersection-bounds-2026-10/README.md), section 5), cover cuts and rank cuts of small unions do not
 see the cores).

@@ -1,14 +1,14 @@
 # The frontier chain to 3440 (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  The day on one `c8g.16xlarge` that [the gap past 2175](the-gap-past-2175-2026-10.md) projected (from the
+*Question.*  The day on one `c8g.16xlarge` that [the gap past 2175](../the-gap-past-2175-2026-10/README.md) projected (from the
 committed file's 2175 games, about 4,100, with 3,700 to 4,850 across its models) was run.  How far did it take the chain
 with every game proven within the frame model and nothing assumed; what did the dear games cost; do the independent
 chains that cover its games agree with them; and what did its operators find wrong in the procedure
-([RUNBOOK](../../tools/cloud/RUNBOOK.md))?
+([RUNBOOK](../../docs/RUNBOOK.md))?
 
-*What was run* (2026-10-15 04:05:42Z to 2026-10-16 04:05:42Z, commit 55287ff, a clean tree): `rust/tools/cloud/chain.sh
+*What was run* (2026-10-15 04:05:42Z to 2026-10-16 04:05:42Z, commit 55287ff, a clean tree): `solver/tools/cloud/chain.sh
 4095`, that is `taxman solve 1-4095 --window W --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 300
 --progress 60` on all 64 CPUs of one `c8g.16xlarge` (Graviton4, 124 GiB) on spot in us-east-1d at $0.6752 an hour, on
 a copy of the committed file's 2175 lines, with a deadline of 24 hours, `S3_DEST` a prefix (`chain-2176/`) of the
@@ -20,7 +20,7 @@ disk.
 
 * *Instance 1* (i-0c23a62e915eac46e): window 16, the default.  Games 2176..3310 in 23,025 s (6.4 hours), then stopped
   by a signal, with a final checkpoint, at 10:29:26Z; 6.80 instance-hours, $4.59.  A window of 16 had been measured
-  20-32% slower than 1 on the games past 2225 ([scaling to 192 threads](scaling-to-192-threads-2026-10.md)), hence the
+  20-32% slower than 1 on the games past 2225 ([scaling to 192 threads](../scaling-to-192-threads-2026-10/README.md)), hence the
   move.
 * *Instance 2* (i-0f588d4ad388bfd5c, launched 10:31:24Z): restored from the bucket, window 4, the solver from 10:40:41Z
   with 3310 games done.  Games 3311..3440 and part of 3441 in 62,701 s (17.4 hours), then stopped by the deadline (24
@@ -52,7 +52,7 @@ three of the four dearest games of the run, 3424 (1.30 G, 2.0 hours on 64 thread
 minutes.  A least-squares line through the log of the search seconds of the 448 gives a decade per about 1,040 in n
 (1,070 without 3440), 7 s at 2200 and 97 s at 3400 (93 without 3440), with a standard deviation of one decade around
 it, nearly all of it the patches, against a decade per about 1,050-1,250 in n that [the gap past
-2175](the-gap-past-2175-2026-10.md) projected from the gaps.  The long searches
+2175](../the-gap-past-2175-2026-10/README.md) projected from the gaps.  The long searches
 run at the engine's best: 3441 at 202 to 209 thousand nodes a second on 64 threads (3.2 thousand a thread), `eff`
 100%, `idle` and `lock` 0.0%, 71 pauses for checkpoints (0.0%, the longest 29.9 ms), 4,100 to 6,100 units queued in its
 last minutes, none spilled; its checkpoint is 5.5 MB.
@@ -65,25 +65,25 @@ percentile of five of the seven scenarios (all but the two that use the gap alon
 about where the model put it (6.1 hours), and the remaining 130 games took 17.4, the last forty holding three of the
 four dearest games of the run.  The projection's range for a single run's luck (−400 to +700 around 4,100) does not
 reach 3440; whether the patch at the end is luck or the trend is open, and what the gaps of 3315..3440 were is not
-measured (the committed games can be fed to `bench/wall/gap.py` and `examples/wall.rs nodes --nodes 1`: one thread, a
+measured (the committed games can be fed to `solver/notebook/the-gap-past-2175-2026-10/gap.py` and `examples/wall.rs nodes --nodes 1`: one thread, a
 few minutes).
 
-*Agreement.*  Both referees on the file (`rust/tools/cloud/verify.sh`: `taxman verify-results`, 10 s and 42 s of CPU on
-several threads, and `tools/check_results.py`, 3 s): every game replayed legally and finished, the chain bounds, the
+*Agreement.*  Both referees on the file (`solver/tools/cloud/verify.sh`: `taxman verify-results`, 10 s and 42 s of CPU on
+several threads, and `solver/tools/check_results.py`, 3 s): every game replayed legally and finished, the chain bounds, the
 Franklín–Moniot bound, the heuristic chain; proofs trivial 13, prime formula 481, cap 311, exhausted 1178, same search
 1457; nothing assumed; scores at a proven ceiling given the game before: n + score(n − 1) 1096, prime formula 480.  The
 file's first 2175 lines are the committed file's, byte for byte.  The Graviton calibration's chain
-(`bench/cloud/c8g.chain-2176.jsonl`: 101 games, 2176..2276) and a rehearsal of this run's own (125 games, 2176..2300; not
+(`solver/frame/testdata/c8g.chain-2176.jsonl`: 101 games, 2176..2276) and a rehearsal of this run's own (125 games, 2176..2300; not
 committed) have this file's scores, proofs, methods, promotions and moves in every game they share with it, move for
 move.  Past 2300 nothing else covers the games; the prover's proofs on the whole board stop at 2175.
 
 *What the file does and does not say.*  The 991 games of 2176..3440 proven by an exhausted search or a repeat rest on
 statement U (the frame solver's answer is opt(n) exactly when U holds at n), and the 274 proven at the ceiling or by the
 prime formula on the games before them.  U holds where the prover has proven the optimum (n ≤ 2175) and is not certified
-past it: the barred bounds of `prover/data/upper_2176_3314.jsonl` leave members open in every game, and `taxman
+past it: the barred bounds of `solver/noframe/data/upper_2176_3314.jsonl` leave members open in every game, and `taxman
 certify` (E8 stage 2) will close them game by game with the open ones optional.  `optimal.json` stays at 1300.
 
-*What the operators found* (each is now in the [RUNBOOK](../../tools/cloud/RUNBOOK.md)): the rehearsal's stops wait for a
+*What the operators found* (each is now in the [RUNBOOK](../../docs/RUNBOOK.md)): the rehearsal's stops wait for a
 checkpoint (4.5); `spot-watch.sh` logs only to its terminal, so it is run through `tee` into `logs/spot-watch.log`; the
 copy of `save.log` in S3 trails by one save; `save.sh --restore` brings back the results and the checkpoints but not
 the logs (copy them back first, or the next save overwrites the old instance's); the deadline file is not saved, so a

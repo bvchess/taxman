@@ -1,6 +1,6 @@
 # Forgetting nogoods (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 The measurements of carrying nogoods over pointed the other way: a search
 resumed with empty tables was faster than one that kept them.  So each

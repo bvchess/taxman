@@ -1,6 +1,6 @@
 # Prime exchanges in the search (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  "Dominance and symmetry" found that the frame model has symmetries, the exchanges of two primes that the
 frame builder treats alike, and piloted breaking them: in a plain GF(2) branch and bound a hopeless test took 0.948
@@ -10,7 +10,7 @@ pair, a tactic, on by default only if it pays in time on the real search.  And t
 pruning by all the inequalities at once sound when the classes interact (candidates divisible by primes of two
 classes), and is it sound with what the search learns (the matching pilot saw its trees grow, 1184 +27%)?
 
-*The theorem* (heuristics/THEORY.md, Theorem 13, "Prime exchanges").  An exchange π of `p < q` that maps the root's
+*The theorem* (docs/THEORY.md, Theorem 13, "Prime exchanges").  An exchange π of `p < q` that maps the root's
 frames (moves to moves, factors to factors) and candidates onto themselves maps promotion sets to promotion sets
 (π is multiplicative and sends primes to primes, so it keeps the maximal-factor relation, and a frame with a set
 applied is the same game as the frame with its image applied), and changes a sum by `Σ (π(x) − x)`, which is

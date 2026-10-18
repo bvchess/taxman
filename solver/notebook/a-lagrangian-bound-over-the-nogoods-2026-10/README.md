@@ -1,8 +1,8 @@
 # A Lagrangian bound over the nogoods (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-The question (docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](../IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2))
+The question (solver/docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](../../docs/IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2))
 folded the nogoods into the matching bound by Lagrangian multipliers fitted once at the root, and cut the nodes of
 proofs by 13 to 67%, but it solved the weighted matching from scratch, 7 times slower per node.  Can the bound be kept
 incrementally, cheaply enough to pay in cycles?  Yes, and with the forced members its potentials give it pays far more
@@ -96,7 +96,7 @@ tactic as committed, schedule of step 2):
 
 From 1184 to 1288 the ratio of cycles is 2.0 to 6.1, 3.3 as a geometric mean, and it does not grow with n: a least
 squares line through its logarithm falls by 12% per 100 in n, well inside the scatter from game to game (1220 2.3,
-1240 5.6).  At ×10 per 55-70 in n (bench/curve/README.md) a constant factor of 3.3 moves the cost curve down by
+1240 5.6).  At ×10 per 55-70 in n (solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) a constant factor of 3.3 moves the cost curve down by
 half a decade, about 30 to 35 in n, and leaves its slope as it was.  Each step costs about half as much again
 (the window of the probe, 50,000 steps resumed from the 1215 proof: 25.3k cycles a step against 16.9k), so the
 games where the search spends its time finding the optimum late, not proving it, lose.
@@ -129,7 +129,7 @@ change of slope; even on short searches, a loss where finding the optimum domina
   build), 1254 112.0 G (151.3), 1240 18.4 G (18.4), 1250 17.6 G (20.5): 0 to 26% fewer.  (Without refinement a child's
   check stops at the matching bound, the Lagrangian bound included, and its first step checks it fully.)  Refinement
   is 12-20% of the time; it needs its own measurement over the bench set and small games before its default moves.
-  (Measured in ["Faster nodes with the Lagrangian bound"](faster-nodes-with-the-lagrangian-bound-same-trees-2026-10.md):
+  (Measured in ["Faster nodes with the Lagrangian bound"](../faster-nodes-with-the-lagrangian-bound-same-trees-2026-10/README.md):
   a few percent on average, ±20% per game, even on the strict chain 1201-1231; the default stays 1.)
 * *Refits without solving afresh*: re-weighting the levels in place (weights that fall unmatch their candidates if
   promoted, as weights that rise do the rest) and warm-starting the fit, about 4% now.
@@ -159,4 +159,4 @@ threads, schema 3; `git show cd3d32f:rust/results/strict.jsonl`), which "the com
 committed run" in the entries above mean (the figures of the same-search round, which come from `repeats --known`, need
 that file: on the new one the repeats cost 0.0 s, since it did not search them).  Its scores are that file's, and its
 moves too but for 1221..1224, which have at least two optimal sets, and the two runs found different ones
-([results](../../results/README.md#strictjsonl)).
+([results](../../../results/README.md#strictjsonl)).

@@ -1,7 +1,7 @@
 # Results of the solver
 
 One JSON line per game, as `taxman solve --out` writes it (the fields are described in `src/results.rs` and in
-[../README.md](../README.md#a-results-line---out-schema-5)).  This page says what each file is, how it was made, and
+[solver/frame/README.md](../solver/frame/README.md#a-results-line---out-schema-5)).  This page says what each file is, how it was made, and
 what supports the scores in it.  The counts in it are pinned by `tests/results.rs`, so changing a file means updating
 both together.  The one file of another kind, `bounds.jsonl` (bounds on opt(n), a line each, for boards the chain has
 not proven), is described at the end.
@@ -17,14 +17,14 @@ the whole board, by the prover; its games 2176..3914 are proven within the frame
 U (below, "What supports the scores"), and U is not yet certified past 2175.  Three other files were checked with
 it and agree with it (see "What supports the scores"): `default.jsonl` (1001–1231, the first run past 1000, made with
 the unproven tactics `reuse_prev` and `revise_freedoms` on, schema 1), which is gone from the tree (`git show
-f72c332:rust/results/default.jsonl` has it); the cost-curve study's `bench/curve/chain.jsonl` (a chain 1001–1231 with
-those tactics off, schema 1, commit e710d16); and the GF(2) study's `bench/gf2/chain.jsonl` (a chain 1301–2175 from
+f72c332:rust/results/default.jsonl` has it); the cost-curve study's `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (a chain 1001–1231 with
+those tactics off, schema 1, commit e710d16); and the GF(2) study's `solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (a chain 1301–2175 from
 `optimal.json`'s game of 1300, schema 5, commit 716ebd9, 2 threads).  The two chains stay as their studies' data; the
 verifiers read the second beside `strict.jsonl`, and no longer read the first.
 
 **`explore.jsonl` is not a chain, and never goes into `strict.jsonl`.**  The file of a sweep
-([README, "Keeping going past limits, and the sweep"](../README.md#keeping-going-past-limits-and-the-sweep);
-`tools/cloud/sweep.sh`) merges the games of many blocks of consecutive board sizes, each given a limited search: it has
+([README, "Keeping going past limits, and the sweep"](../solver/frame/README.md#keeping-going-past-limits-and-the-sweep);
+`solver/tools/cloud/sweep.sh`) merges the games of many blocks of consecutive board sizes, each given a limited search: it has
 board sizes with only an unfinished search (a lower bound, no proof) and board sizes that no block reached, games built
 on the best game of an unfinished search (no ceiling, no prime formula), and the same game's several lines.  Each
 completed game in it is proven by its own proof, given what it assumes, in the frame model; it is evidence for those
@@ -67,17 +67,17 @@ How the first run, games 1–2175, was made:
 * The cost of the first 1300 games fell with the tactics that came after the earlier chains: the third took 1022.5 s of
   search and 332.0 M nodes (on 4 threads of a machine shared with four other jobs, which makes its times pessimistic),
   the second 1052 s and the first 3359 s.  `same_search` concludes 545 of them as repeats of an earlier game's search
-  ([EXPERIMENTS](../docs/experiments/same-search-2026-10.md)), the Lagrangian bound over the nogoods makes the searches
+  ([EXPERIMENTS](../solver/notebook/same-search-2026-10/README.md)), the Lagrangian bound over the nogoods makes the searches
   that remain shorter
-  ([EXPERIMENTS](../docs/experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md)), and the GF(2) bound, which this
+  ([EXPERIMENTS](../solver/notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)), and the GF(2) bound, which this
   is the first committed chain made with, makes them shorter again
-  ([EXPERIMENTS](../docs/experiments/the-gf2-bound-in-the-search-2026-10.md)).  What the run adds to those entries is in
-  [EXPERIMENTS](../docs/experiments/the-committed-chain-to-2175-2026-10.md).
+  ([EXPERIMENTS](../solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md)).  What the run adds to those entries is in
+  [EXPERIMENTS](../solver/notebook/the-committed-chain-to-2175-2026-10/README.md).
 
-How the second run, games 2176–3440, was made ([EXPERIMENTS](../docs/experiments/the-frontier-chain-to-3440-2026-10.md)
-has the run's story and cost; [the runbook](../tools/cloud/RUNBOOK.md) the procedure):
+How the second run, games 2176–3440, was made ([EXPERIMENTS](../solver/notebook/the-frontier-chain-to-3440-2026-10/README.md)
+has the run's story and cost; [the runbook](../solver/docs/RUNBOOK.md) the procedure):
 
-* The command was `rust/tools/cloud/chain.sh 4095`, which runs `taxman solve 1-4095 --window W --out strict.jsonl
+* The command was `solver/tools/cloud/chain.sh 4095`, which runs `taxman solve 1-4095 --window W --out strict.jsonl
   --checkpoint-dir ckpt --checkpoint-interval 300 --progress 60` on all the CPUs, on a copy of the first run's 2175
   lines, so that the first game it solved was 2176; it was stopped by its 24-hour deadline (status 124, a final
   checkpoint written), after game 3440.  Every line of 2176–3440 records the build of commit 55287ff (`dirty` false),
@@ -86,7 +86,7 @@ has the run's story and cost; [the runbook](../tools/cloud/RUNBOOK.md) the proce
   2026-10-15 04:05:42Z with a window of 16 games in flight (`W`) to game 3310, and was stopped on purpose; the second,
   restored from the saved state, ran with a window of 4 from 10:40:41Z to the deadline.  About $16.46 in all.
 * The window is not in the lines (a window changes neither a score nor a proof,
-  [README](../README.md#games-in-flight)), but `invocations` is: it is 1 in every line of 2176–3440 but 3311, 3312 and
+  [README](../solver/frame/README.md#games-in-flight)), but `invocations` is: it is 1 in every line of 2176–3440 but 3311, 3312 and
   3315, which were in flight when the first instance stopped and were taken up by the second from their checkpoints (2
   each).  The game of n − 1 came from the results file, not from the run, for the first game of each instance
   (`prev.source` is `results` for 2176 and 3311); the lines it read assume nothing, and so do these.
@@ -115,7 +115,7 @@ How the third run, games 3441–3914, was made:
   0.67 and 0.50 G); by time, after 3441, 3888 (5,271 s) and 3444 (4,687 s).  The queue of work units never held more
   than 5,815, and none spilled to disk.
 
-What the lines say, as `taxman verify-results` and `tools/check_results.py` report them:
+What the lines say, as `taxman verify-results` and `solver/tools/check_results.py` report them:
 
 | | 1–1300 | 1301–2175 | 2176–3440 | 3441–3914 | `strict.jsonl` |
 |---|---|---|---|---|---|
@@ -148,17 +148,17 @@ Several games have more than one optimal set of moves, and which one a run finds
 scores are reproducible, move lists need not be.  The sets of this file differ from the earlier files' in these games:
 
 * 539, 684–687 and 770–773, which the prover lists with two or three optimal sets each
-  ([the prover's README](../prover/README.md#5-is-the-optimal-set-unique) has the exchanges).  `optimal.json`'s games
+  ([the prover's README](../solver/noframe/README.md#5-is-the-optimal-set-unique) has the exchanges).  `optimal.json`'s games
   1–1000 are the Java's, and this file has the same set of moves in each of them but 539 and 770–773, where the chain
   found another optimal set.  The previous file (the chain of commit 271c817, and that of 243af9b) had the table's
   sets at 539 and 770–773 and another at 684–687, where this file has the table's.
 * 1215, where `optimal.json` and every earlier chain have {312, 450} and this file {342, 420}: an exchange of two
   numbers of the same sum (762).  The prover enumerates optimal sets only to n = 989.
-* 1221–1224, where the chain of commit bd9bb5d and `bench/curve/chain.jsonl` found {364, 456, 544} and this file,
+* 1221–1224, where the chain of commit bd9bb5d and `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` found {364, 456, 544} and this file,
   `default.jsonl` and the chains of 243af9b and 271c817 have {348, 408, 608}: an exchange of three numbers of the same
   sum (1364) that starts at 1221 and is carried by 1222, 1223 and 1224.  The prover describes exchanges like it,
   which first appear at game 425.
-* 1560–1563, where `bench/gf2/chain.jsonl` has {510, 594, 620, 624, 660} and this file {476, 528, 616, 644, 744}: an
+* 1560–1563, where `solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl` has {510, 594, 620, 624, 660} and this file {476, 528, 616, 644, 744}: an
   exchange of five numbers of the same sum (3008), found by the search of 1560 and carried by the three repeats after
   it.
 
@@ -189,16 +189,16 @@ the store's bound) inherits what it assumes, as for a game from `optimal.json`.
 ## What supports the scores
 
 "Optimal" here means optimal within the frame model, which is opt(n) wherever one open statement about the game,
-U, holds ([DESIGN.md](../DESIGN.md#what-optimal-means); it holds for every n ≤ 2175, where the prover proves the
+U, holds ([DESIGN.md](../solver/docs/DESIGN.md#what-optimal-means); it holds for every n ≤ 2175, where the prover proves the
 optimum on the whole board, and is not yet certified past it: `taxman certify` will check it game by game for 2176–3914;
 a game proven at its ceiling or by the prime formula does not need it), and given that the solver is right.  Two
 verifiers, about 10 s (42 s of CPU, on several threads) and 3 s on the laptop:
 
     taxman verify-results results/strict.jsonl
-    python3 tools/check_results.py results/strict.jsonl
+    python3 solver/tools/check_results.py results/strict.jsonl
 
 (from the `rust` directory; the proof kinds and the assumptions are defined in
-[DESIGN.md](../DESIGN.md#8-results-and-the-trust-model))
+[DESIGN.md](../solver/docs/DESIGN.md#8-results-and-the-trust-model))
 
 The first is the solver's own (also run on any results file `solve --out` opens, and by `tests/results.rs`).  The
 second is an independent referee in Python that shares no code with the solver; it also checks every score against the
@@ -218,14 +218,14 @@ What that evidence amounts to:
    tree, as the solver reports it.  The rest of the file is its 354 proofs at the ceiling, its 541 prime games, its 13
    trivial ones (no promotion candidate, so there is only one game) and its 1650 repeats, which take the promotions and
    the proof of an earlier game that posed the same search problem (both verifiers check it, `src/results.rs`).
-3. **Standalone re-solves.**  `bench/curve/calib.jsonl` holds 197 standalone searches, one for every non-prime n in
+3. **Standalone re-solves.**  `solver/notebook/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for every non-prime n in
    1001–1231, with no seed and no ceiling (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads, commit
-   e710d16; see `bench/curve/README.md`).  All of them finished, and each found the promotion sum of the score recorded
+   e710d16; see `solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`).  All of them finished, and each found the promotion sum of the score recorded
    here.  These proofs rest on no other game: every non-prime game in 1001–1231 is proven without the chain, and every
    prime one by the prime formula from a non-prime game so proven.  There is no such re-solve for 1232–1300: of those 69
    games, 24 are proven by an exhausted search of their own, and the 7 proofs at the ceiling, the 9 prime ones and the
    29 repeats rest on the game before them or on the game they repeat, so on the chain from n = 1 (see 5).  Past 1300,
-   `bench/curve/bands.jsonl` has ten games of 1302–1352 solved standalone (the matching path, 8 threads), each finishing
+   `solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` has ten games of 1302–1352 solved standalone (the matching path, 8 threads), each finishing
    with the promotion sum recorded here; the rest of 1301–3914 is the chain's (940 exhausted searches of their own, and
    239 proofs at the ceiling, 330 prime ones and 1105 repeats that rest on the games before them).
 4. **Agreement between builds and files.**
@@ -237,13 +237,13 @@ What that evidence amounts to:
      it).  The lines say `optimal_match` true here too: when the run was made the table held those games, so this is a
      second run reproducing the first's scores, not a comparison with another source.
    * n = 1301–2175: optimal.json has no game (the lines say `optimal_match` null), so the comparison is with another
-     run of the same search: `bench/gf2/chain.jsonl`, a chain from optimal.json's game of 1300 (`--use-prev`) made by
+     run of the same search: `solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl`, a chain from optimal.json's game of 1300 (`--use-prev`) made by
      the build of commit 716ebd9 on 2 threads in three invocations, which reached 2175 from 1301 in 92 minutes of game
      time.  Its 875 games have this file's scores, proofs and methods, in every game, and its moves in all but
      1560–1563 (above); only its game of 1301 assumes anything (that optimal.json's game of 1300 is optimal).
-     `taxman verify-results results/strict.jsonl bench/gf2/chain.jsonl` (93 s) and `tools/check_results.py` on both
+     `taxman verify-results results/strict.jsonl solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (93 s) and `solver/tools/check_results.py` on both
      accept them and find 875 board sizes in both files, with equal scores in all.
-   * n = 2176–3440: optimal.json has no game here either, and no other chain reaches far.  `bench/cloud/c8g.chain-2176.jsonl`,
+   * n = 2176–3440: optimal.json has no game here either, and no other chain reaches far.  `solver/frame/testdata/c8g.chain-2176.jsonl`,
      the Graviton calibration's chain (64 threads, one game after another, the build of commit 407645f, 15 minutes),
      has the games 2176–2276, 101 in all; and a rehearsal of the second run, made on the same machine type just before
      it started (the build of commit 55287ff, 64 threads, a window of 16, stopped and killed and resumed on purpose; not
@@ -253,7 +253,7 @@ What that evidence amounts to:
    * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
      before these games, with this file's scores in all of them (the lines it made of those games are not kept), and
      the referees pass the whole file.
-   * 1001–1231: the scores of `strict.jsonl`, `bench/curve/chain.jsonl` (commit e710d16, 8 threads, a chain with the
+   * 1001–1231: the scores of `strict.jsonl`, `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (commit e710d16, 8 threads, a chain with the
      unproven tactics off) and `default.jsonl` (the earlier solver, with unproven tactics on) are equal in all 231
      games.  `strict.jsonl`'s games are `default.jsonl`'s move for move but 1215, and `chain.jsonl`'s but 1215 and
      1221–1224 (other games, the same scores).
@@ -264,14 +264,14 @@ What that evidence amounts to:
    built from optimal.json (which is only compared with, up to 1300: a score that differs would be a hard error), and
    all 3914 games record that they assume nothing.
 6. **The prover's proofs.**  The prover proves every n up to 2175 optimal without the frame model (no frames or
-   promotions: [the prover's README](../prover/README.md); [THEORY.md](../../heuristics/THEORY.md),
+   promotions: [the prover's README](../solver/noframe/README.md); [THEORY.md](../docs/THEORY.md),
    Theorem 10), so `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are the optimum on
    the whole board (1301–2175 in the cloud run of 2026-10-14 and 15,
-   [EXPERIMENTS](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md)).  The 1739
+   [EXPERIMENTS](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 1739
    games of 2176–3914 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model: what is
-   proven and what remains"](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and U is
+   proven and what remains"](../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and U is
    not yet certified past 2175: `taxman certify` will check it game by game, with the prover's barred bounds
-   ([the prover's README](../prover/README.md#the-upper-part-game-by-game) has them to 3314).  Until then their
+   ([the prover's README](../solver/noframe/README.md#the-upper-part-game-by-game) has them to 3314).  Until then their
    scores are opt(n) wherever U holds at n, and a game of them proven at its ceiling or by the prime formula is opt(n)
    wherever the game before it is.
 
@@ -293,30 +293,30 @@ results/strict.jsonl` would add the 2614 games of 1301–3914.
 
 ## bounds.jsonl
 
-The bounds on opt(n) that [the ledger](../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md) finds, kept for
+The bounds on opt(n) that [the ledger](../solver/notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) finds, kept for
 good, for the boards the chain has not proven.  The first `ledger export` made it, from stage 1 of the ledger past 4400
 (2026-10-18), and each export since appends to it.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, a board that `strict.jsonl` has proven has no line in it,
 and it is not `explore.jsonl`'s kind of file either (that one is the sweep's games).  `taxman solve --use-prev` draws on
 it (a board it has proven is recorded with no search, and its other boards seed and end the searches, see
-[the README](../README.md#known-games)), and `taxman verify-results` and `tools/check_results.py` read it for the
+[the README](../solver/frame/README.md#known-games)), and `taxman verify-results` and `solver/tools/check_results.py` read it for the
 results lines that cite it (`known`, above): they look the cited lines up, and do not check it, which its own referees
 do.  Its lines are bounds that hold:
 a lower bound is the score of a finished game that the referee replays, an upper bound is the frame model's, carried
-between boards by the lemmas of [THEORY.md](../../heuristics/THEORY.md#the-ledger-bounds-between-boards).  A board is
+between boards by the lemmas of [THEORY.md](../docs/THEORY.md#the-ledger-bounds-between-boards).  A board is
 proven when its best lower bound equals its best upper bound, and the file is the record of those proofs.
 
 **Append-only.**  A line is never changed or removed.  A new line is added only when it improves the file's best bound
 of its board and side (a lower bound above every earlier lower bound of the board, an upper bound below every earlier
 one), so a second export of the same ledger appends nothing; both checkers refuse a line that improves nothing.
 
-**The commands** (from `rust/`; the program is the example `ledger`, built with `cargo build --profile test --example
-ledger` on the laptop; its module comment, `examples/ledger/main.rs`, has every flag):
+**The commands** (from the top of the repository; the program is the example `ledger`, built with `cargo build --profile test --example
+ledger` in `solver/frame` on the laptop; its module comment, `examples/ledger/main.rs`, has every flag):
 
     ledger export RUN_DIR --bounds results/bounds.jsonl --source NAME [--checkpoints S3_PREFIX]
     ledger run A-B --dir DIR --cpu-hours H ... --bounds results/bounds.jsonl
     ledger verify-bounds results/bounds.jsonl
     ledger games results/bounds.jsonl > games.jsonl
-    python3 -I tools/check_bounds.py results/bounds.jsonl --games games.jsonl
+    python3 -I solver/tools/check_bounds.py results/bounds.jsonl --games games.jsonl
 
 `export` appends the bounds of the run's `ledger.jsonl` that improve on the file's best, for the boards not already
 games of `results/strict.jsonl` (`--strict` names another file), creating the file if there is none, and prints what it
@@ -331,7 +331,7 @@ first: the run takes its upper bounds on its word.  So does `taxman solve --use-
 (replayed by the referee), with proof `known`, citing the two lines and assuming U at the boards the upper line rests
 on; a board with one bound or a gap seeds its search with the lower bound's game and stops it at the upper bound.  The
 referees of results files check that the cited lines exist and say what the results line says (rule, run, value); the
-bounds themselves are checked by `ledger verify-bounds` and `tools/check_bounds.py`, not again by them.
+bounds themselves are checked by `ledger verify-bounds` and `solver/tools/check_bounds.py`, not again by them.
 
 **The line.**  One JSON object, with the fields below and no others:
 
@@ -373,7 +373,7 @@ the chain is never cited: a run need not have the chain).  Any other game is its
 **What an upper bound rests on.**  Every upper bound is a bound of the frame model at some board (a root bound, a dual
 bound, a completed search, a given game), which is opt(n) where statement U holds at that board; the lemmas carry it
 between boards without more, except the upper half of Lemma L4, which rests on U at the board it is carried to
-([THEORY.md, "In the ledger"](../../heuristics/THEORY.md#the-ledger-bounds-between-boards)).  `rests_on` lists the
+([THEORY.md, "In the ledger"](../docs/THEORY.md#the-ledger-bounds-between-boards)).  `rests_on` lists the
 boards: a bound of the frame model has its own board alone, a relation has what the bound it comes from rests on (a
 board of the chain that it cites counts as resting on itself), and a repeat adds its own board.  U is certified for
 every n up to 2175 (DESIGN.md, "What optimal means"), so a bound whose list holds only boards up to 2175 rests on no open
@@ -388,9 +388,9 @@ are recomputed and equal to its source's; that every relation's arithmetic holds
 before it with a bound of that board at most `from_value`, or a game of the chain) and rests on what that line rests on;
 and that where the chain has a game of a board, the file's bounds enclose its score.  It reports the proven boards, and
 lists the bounds it takes on their record: the `exhausted`, `dual` and `floor` bounds of searches and the `nogoods`
-bounds, which no check short of the search (or the fit) recomputes, and the `given` games.  `tools/check_bounds.py` (Python, standard library only, run with `python3
+bounds, which no check short of the search (or the fit) recomputes, and the `given` games.  `solver/tools/check_bounds.py` (Python, standard library only, run with `python3
 -I`) is the second referee of the games and of the arithmetic: it shares no code with the Rust crate, loads the rules
-of the game from `tools/check_results.py`, and writes out the arithmetic of the lemmas and the constructions of the
+of the game from `solver/tools/check_results.py`, and writes out the arithmetic of the lemmas and the constructions of the
 cited games again.  It cannot rebuild a game from promotions, which needs the frame model, so `ledger games FILE` writes
 the moves of every promotion set (the game that `solution_for_promotions` makes of it) and the checker replays those by
 its own rules and checks that they contain the promotions and score the line's value: whatever the frame model did to
@@ -399,9 +399,13 @@ Rust program's.  What the Python referee takes on the line's record, because onl
 bounds, a repeat's bags and the identity of its two search problems, and the bounds of searches and of nogoods.  Both exit with status 1
 if any check fails and name the line (`line K (n=N)`).
 
-**Size**, from the laptop's dry run of 901..960 with the truth hidden ([bench/ledger/store/](../bench/ledger/store/)):
+**Size**, from the laptop's dry run of 901..960 with the truth hidden ([the ledger entry's `store/`](../solver/notebook/the-ledger-bounds-from-both-sides-2026-10/store/)):
 58 boards of the stretch not in the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a
 board, from lines of 330 bytes for a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155
 for an upper bound.  At the end of the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, a cited
 game and an upper bound about 150 and 220 bytes: of the order of 3 kilobytes a board in a first export (about 12
 megabytes for 3,800 boards), less than `strict.jsonl`'s 6 (22.7 megabytes for 3,914 games).
+
+## certificates
+
+`certificates/` holds the committed certificates of U that `taxman certify` made (what a certificate is and what it proves: [DESIGN.md, "Certificates of U"](../solver/docs/DESIGN.md#certificates-of-u)): `certificates_600_1300.jsonl`, a certificate for each of the 377 games of 600..1300 that need one, 296 certified by a search and 81 by the same problem as an earlier game.  `taxman verify-certificates` passes it (4.6 s).  It was made by `taxman certify 600-1300 --results results/strict.jsonl U --out results/certificates/certificates_600_1300.jsonl --threads 1 --progress 0` (39 s), on the code of commit 35c614b, with `U` the four `--upper` files, the prover's barred bounds for 2..1300, 1301..2175, 2176..3314 and 3315..3440 (`solver/noframe/data/upper_*.jsonl`).  It is in a directory of its own because `tests/results.rs` and `solver/tools/check_results.py` take every `results/*.jsonl` for a chain or the bounds store.  `tests/certify.rs` checks the work list's prediction against it: the games that need a certificate, their open and rejected sources, and the games the rule of the same problem settles ([the work list of 2176-3440](../solver/tools/certify/README.md)).

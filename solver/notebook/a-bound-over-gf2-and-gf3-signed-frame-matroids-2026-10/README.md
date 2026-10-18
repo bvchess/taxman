@@ -1,9 +1,9 @@
 # A bound over GF(2) and GF(3) signed frame matroids (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Avenue A1 of the
-[agenda](../AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds) and its conjecture
+[agenda](../../docs/AGENDA.md#a1-a-bound-over-several-fields-and-signings-a-change-of-slope-if-its-share-holds) and its conjecture
 C1: does the LP over the two GF(2) frame matroids and a family of GF(3) *signed* frame matroids (the plain signing,
 random signings, and signings built from the cores the LP's own columns run into) close a share of the root's GF(2) gap
 that holds with n?  This is the advisor's experiment E1 (with E0, its validation, E1-lite, a quick look, and E1n, the
@@ -18,8 +18,8 @@ strongly" at a mean share of 0.5 or more for n ≥ 1700 and a slope above −1 p
 matroids and their greedy), `common/cores.rs` (a frame's cores with a set applied, minimal cores, column-sum signings
 and their merging), `common/dw.rs` (the bound and its multipliers), `common/lp.rs` (the master's simplex), and
 `common/frames.rs` (the GF(2) frame matroids and the game setup, moved out of `examples/matroid.rs`, which prints the
-same lines as before); the data and the tables in [bench/fields](../../bench/fields/README.md).  Theorems 14 and 15 of
-[THEORY.md](../../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
+same lines as before); the data and the tables in [solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md](README.md).  Theorems 14 and 15 of
+[THEORY.md](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
 rests on.  No solver change.
 
 *The bound.*  A *signing* σ of frame h over a field gives each incidence (mover, maximal factor) a nonzero value, each
@@ -90,7 +90,7 @@ the optimal one a board) independent in 4,320 signed matroids (all frames, plain
 a board), 302,623 cores of 14,400 random unpromotable sets each making its set dependent, 1,440 random multiplier
 vectors never below P*.  Every run asserted that the bound is at least P* (330 extra-matroid runs at 66 roots and the 13
 of E1-lite), that the optimal promotions are independent in every final matroid, and at the probe's nodes that the bound
-is at least the best completion recorded in `bench/matroid/nodes_exact.jsonl`.
+is at least the best completion recorded in `solver/notebook/matroid-intersection-bounds-2026-10/nodes_exact.jsonl`.
 
 *E1-lite* (`lite.jsonl`, the code of b8d8256, 11 minutes): the main arm at every 100th game of 900-2100; 8 of 13
 converged (not 1400, 1500, 1700, 1800, 2000), the 3 converged with n ≥ 1500 at a mean share of 0.64: no early kill.  The
@@ -196,8 +196,7 @@ reaches E1's certified bound within 5% of the gap at 80% of E1's 54 converged ro
 E3 starts from.
 
 *Roots and data.*  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423 (not
-yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the README of
-bench/fields](../../bench/fields/README.md) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
+yet in `results/`: `--known` takes the snapshot after `results/strict.jsonl`, and [the files section below](#files) names it by its hash).  The roots: every 100th game of 2200-3400 (13) and the
 *dear* games, the searched games (proof `exhausted`) past 2175 with the largest root GF(2) gaps: 3300 (1443), 3333, 3335
 and 3336 (1427 each) and 3176 (1388): 17 distinct roots, 3300 being both.  3333, 3335 and 3336 are neighbours of one
 search with nearly one root, three roots of one family and not three independent ones.  Two games of proof `cap` have
@@ -216,7 +215,7 @@ the bound 254722) and in 17 of E1's 132 core-arm runs.  An arm `f1cores16` is th
 a frame.  `common/dw.rs` already dispatched the intersection to `Meet<3>` for blocks of 129 to 192 coordinates (it
 asserts at most 192; the largest frame matroid has rank 137 at 3423, 128 at 3200 and 132 at 3300); a test compares it
 with the reference at 3200, 3300 and 3400, and every run checks it every 50th pricing as before.  A test reads
-`bench/fields/fits` back and checks each file's bound at its root.
+`solver/frame/testdata/fits` back and checks each file's bound at its root.
 
 **The main arm certified, 600 s a root.**  Share of the GF(2) gap closed (`*`: not converged in 600 s, the share a lower
 bound on the LP's), seconds, and the share with a limit of 16 signings a frame where run:
@@ -283,7 +282,7 @@ that grows with the gap is the right shape.  The runs of the 54 roots with the n
 where both converged within 60 s (48 of 48 roots: bound, lowest L, lower bound, pricings, rounds, cores, columns and
 cuts all equal): the changes to `dw.rs` did not touch the fit.
 
-*Fits, signings and cost.*  The 17 fits are in `bench/fields/fits` (14 MB; the README there says what each holds).  The
+*Fits, signings and cost.*  The 17 fits are in `solver/frame/testdata/fits` (14 MB; the README there says what each holds).  The
 main arm took 81 minutes of one thread for the 17 roots (the design's 5 hours were for 600 s at every root), 27 to 600 s
 a root; the 12 roots of the limit of 16, 96 minutes.  A pricing (one intersection and the greedies) costs 1.2 ms at 2200
 and 2.9 ms at 3400 (0.15-0.96 ms at 900-2175), 640 to 2,660 of them a root; over the 17 roots the intersections are 1%
@@ -301,7 +300,7 @@ node 20 times as dear as GF(2)'s; 0.4 lies between.  The limit of 8 core-derived
 0.03-0.09 where it converges, nothing at the dear roots in 600 s), and the family stays fragmented: every root fills the
 limit on some frame, and 57% of the cores found go unplaced.  For E3 and E4 the root fit should be the certified arm
 with a budget that grows with the gap, not search mode (60 s costs under 0.05 of the gap below a gap of 800 and up to
-0.15 above it, and the 17 certified fits are in `bench/fields/fits`).
+0.15 above it, and the 17 certified fits are in `solver/frame/testdata/fits`).
 
 *Questions for the advisor and deviations from the design* (each resolved as stated, all sound):
 
@@ -330,3 +329,44 @@ with a budget that grows with the gap, not search mode (60 s costs under 0.05 of
 
 The example `fields`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
 builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example fields` in `rust/`.
+
+## Files
+
+The data and the tables of this entry, with E2 as its last section; for the bound in a branch and bound (E3's pilot) see
+[its entry](../the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), and for R3 and the slope test (U4)
+[theirs](../r3-and-the-slope-test-u4-of-a1-2026-10/README.md).
+This directory holds the data that `examples/fields.rs` wrote (its module comment and `common/dw.rs`'s define the
+bound and every field), `fields.py`, which makes the first entry's tables from them (`./fields.py >
+fields_output.md`; `./fields.py --roots lite.jsonl --lite` for the quick look), `e2.py` (E2's), `e3.py` (the
+pilot's) and `u4.py` (U4's, from `u4/`, in [its entry](../r3-and-the-slope-test-u4-of-a1-2026-10/README.md)).  Everything ran on the M1 Max, one process at a time under
+`nice -n 10` (two at a time for U4), one thread, with other jobs on the machine; times are wall seconds of one
+thread.
+
+### Files and the commands that made them
+
+`fields` is `target/release/examples/fields` (`nice -n 10 cargo build --release -j 4 --example fields`), run from
+`rust/`; `K` is `--known results/strict.jsonl`.  The example `fields` and the files of `examples/common/` it included
+(`dw`, `gf3`, `cores`, `lp`, `fit`, `bnb`, `frames`, `meet`; `fit.rs` specifies the format of `fits/`) were removed from
+master (2026-10-17); they build at commit 8753189 (`git checkout 8753189`, then the build command above), and `git
+show 8753189:rust/examples/common/fit.rs` shows the specification.
+
+| file | command | what it is |
+|---|---|---|
+| `lite.jsonl` | `fields roots K --arms f1cores --seconds 120 --out lite.jsonl 900-2100/100`, the code of b8d8256 | E1-lite: the main arm at 13 roots (before the master's stall restart and the exact checks' column limit) |
+| `roots.jsonl`, `census.jsonl` | `fields roots K --arms gf2,f1,f1r1,f1r3,cores,f1cores --seconds 120 --fixed-seconds 30 --out roots.jsonl --census census.jsonl 900-2175/25 936 992 1088 1184 1196 1215 1240 1254 1288 1430 1472 1521 2170 2172`, the code of 1051560 | E1: six arms at 66 roots (the design's 67 count 1475 twice), and every core the main arm found |
+| `nodes.jsonl` | `fields nodes K --modes root,node --seconds 10 --root-seconds 120 --exact solver/notebook/matroid-intersection-bounds-2026-10/nodes_exact.jsonl --out nodes.jsonl testdata/perf/n0936.nodes testdata/perf/n1215.nodes`, the code of 1e12c77 | E1n: the probe's 600 nodes, in modes `root` and `node` |
+| `check.jsonl` | `fields check K --samples 200 400-2175/25` | Theorems 14 and 15 and the column-sum signings at scale: per board, the promotion sets and signed matroids checked |
+| `fields_output.md`, `lite_output.md` | `./fields.py > fields_output.md`, `./fields.py --roots lite.jsonl --lite > lite_output.md` | the tables |
+| `roots_e2.jsonl`, `fits/` | `fields roots K S --arms gf2,f1cores --seconds 600 --save-fit solver/frame/testdata/fits --out roots_e2.jsonl 2200-3400/100 3333 3335 3336 3176`, then the same with `--arms f1cores16` at 2200-3200/200, 3300, 3333, 3335, 3336, 3176 and 3400, the code of 32cccb3 (run in pieces of a few roots, each resuming where the last ended) | E2: the main arm certified (600 s a root) at 17 roots past 2175, the limit of 16 core-derived signings a frame (`f1cores16`) at 12 of them, and the fit of each main-arm run (below) |
+| `search_e1roots.jsonl` | `fields roots K --arms f1cores --seconds 60 --fit-mode search --out search_e1roots.jsonl 900 925 936 ... 2175` (the 54 games of `roots.jsonl` whose `f1cores` line has `converged` true), the code of 32cccb3 | E2: search mode (no exact checks) against E1's certified bounds |
+| `budget60_e1roots.jsonl`, `budget60_e2roots.jsonl` | `fields roots K S --arms f1cores --seconds 60 --out budget60_e1roots.jsonl` at the same 54 roots, and `... budget60_e2roots.jsonl 2200-3400/100 3333 3335 3336 3176`, the code of 32cccb3 | E2: the main arm certified with a budget of 60 s (not run to convergence): the fit a search can afford, against E1's and the 600 s runs |
+| `e2_output.md` | `./e2.py > e2_output.md` | E2's tables |
+
+`S` is `--known` of a snapshot of the EC2 chain's results to board 3423 (`chain_snapshot2.jsonl`, 3,423 games, sha256
+`a24709934602002d79c9caf29f4b39e3c3aad17c9650115fcb8d4ccd18e008a9`; the chain's games past 2175 were not yet in
+`results/` then; they are now), after `K`; the optimum of each game used is `opt` of its line.  The dear roots are the searched games
+(`method` search, proof `exhausted`) past 2175 with the largest root GF(2) gaps in that snapshot: 3300 (1443), 3333,
+3335 and 3336 (1427 each; neighbours of one search, with the same root structure) and 3176 (1388, the longest search
+of the three games of that gap).  Games with a proof of `cap` (3303: 1443, 3339: 1427) were not searched.
+
+The root fits that these runs saved (`fits/`) are in [solver/frame/testdata/fits/](../../frame/testdata/fits/README.md), where the tests read them.

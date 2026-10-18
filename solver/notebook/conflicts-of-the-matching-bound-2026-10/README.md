@@ -1,6 +1,6 @@
 # Conflicts of the matching bound (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 Measured with `examples/ladder.rs` (see DESIGN.md, "Performance") on 1 thread for 760,
 880 and 936 and on 10 threads for 1000 and the hard games near it.  With the

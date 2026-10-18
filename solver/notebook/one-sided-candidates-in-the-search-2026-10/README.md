@@ -1,6 +1,6 @@
 # One-sided candidates in the search (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Stage 2 of E8 (the third consultation of 2026-10-15): can the frame solver search the extended problem
 Π⁺(O) with the open sources as one-sided candidates, so that `taxman certify` proves a recorded score on the whole
@@ -22,7 +22,7 @@ the state (and nothing promotable), the count never below a promotion set's size
 (narrowing, the count, `edits`, the freedoms, the nogood) were all caught.  `build_extended` refuses more frames than
 a frame set holds (9), naming the board and the layers, and the census of the frames records the worst case, every
 source of three or more prime factors open, on every board to 8191: 9 frames on 2048..4095 (layers 3 to 11) and 10 on
-every board from 4096 (`bench/structure/`, every earlier field unchanged).  No tree changed: the fingerprints
+every board from 4096 (`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, every earlier field unchanged).  No tree changed: the fingerprints
 7e8e724717d26545 and f3deaac0dbdc030a, the tripwires, `regress --to 1000 --threads 1` in 9.2 s, the chain 1..1300
 line for line (290,503 nodes).
 
@@ -69,7 +69,7 @@ something does (the set F ∪ K ∪ L ordered by the whole-board oracle's peel, 
 `playable`, finished with the largest legal moves left and refereed by `game::replay_finished`; written to
 `<out>.counterexample.jsonl`; status 2).  Resumable like `solve`; a problem whose GF(2) bound needs more block words
 than its set width's engines is searched at the widest width.  The barred bounds of the table's games 2..1300 were
-made for its tests (`prover/data/upper_2_1300.jsonl`, 65 s: 665 games need a certificate, 417 of them with nothing
+made for its tests (`solver/noframe/data/upper_2_1300.jsonl`, 65 s: 665 games need a certificate, 417 of them with nothing
 open, 1.0% of the members open).  Every game of 600..1300 that needs one is certified: 377 games, 382,887 nodes, 44.9 s
 on one thread (the dearest 1287, 17,744 nodes); a planted wrong score (1302, 1305 and 1309 each with its smallest move
 up to n/2 taken out of the game) is beaten by a game of exactly the chain's score, which the referee accepts; a search

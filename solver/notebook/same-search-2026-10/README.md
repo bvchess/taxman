@@ -1,13 +1,13 @@
 # Same search (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  Rank 1 of [IDEAS.md](../IDEAS.md#1-the-recommended-order): many games pose exactly the search problem of an
+*Question.*  Rank 1 of [IDEAS.md](../../docs/IDEAS.md#1-the-recommended-order): many games pose exactly the search problem of an
 earlier game of the chain (the same frames, candidates, `max_total` and factor graph; only the cap differs), so they
 have its best promotion sum, yet the solver proves it again.  How many, what does it cost, and does concluding them
-from the earlier game hold up?  The pilot ([IDEAS.md 4.1](../IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the
+from the earlier game hold up?  The pilot ([IDEAS.md 4.1](../../docs/IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the
 root frames, the candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits
-f5a2af3 and 1cc4067; DESIGN.md, ["Same search"](../../DESIGN.md#same-search), has the argument).
+f5a2af3 and 1cc4067; DESIGN.md, ["Same search"](../../docs/DESIGN.md#same-search), has the argument).
 
 *Method.*  The problem is written out canonically (`search::Problem`, which also records the model's factor lists and
 home frames for every number of the frames) and compared whole; the digest only finds candidates.  The repeats are
@@ -48,7 +48,7 @@ s for the game and 0.46 s for the whole process (opening and checking the 1301 l
 schema-3 games up again), score 531389 as committed, against 265 s of search in the committed run.  The same from the
 file cut after 1292: 1293 repeats 1292 (0.081 s, 526200; 207 s committed) and 1294 repeats 1293, itself a repeat
 (0.082 s); cut after 1270: 1271 repeats 1270 (0.064 s, 509880; 75 s committed).  Every file passes `taxman
-verify-results` and `tools/check_results.py`.
+verify-results` and `solver/tools/check_results.py`.
 
 *Chains with the tactic on and off.*  The strict chain 1..300 concludes 107 games as repeats with the tactic on
 (proofs: trivial 13, prime 62, cap 34, exhausted 84, same_search 107), against cap 101 and exhausted 124 with it off,

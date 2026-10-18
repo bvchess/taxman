@@ -1,8 +1,8 @@
 # R3 and the slope test: U4 of A1 (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  After the [E3 pilot](the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md), the advisor's fourth
+*Question.*  After the [E3 pilot](../the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), the advisor's fourth
 consultation on A1 read r2's factor of 5 as what a refit of R2's strength gives (a roughly fixed *amount* off each
 node's gap) and put the question that decides A1 in the search: can a refit of the reference's strength (the exact
 checks and the core separation), at the nodes high in the tree, take a fixed *share* off each node's gap, so that the
@@ -31,7 +31,7 @@ root's GF(2) gap, R2 at the others), R3's settings in the run's key, `--label`, 
 state of every K-th Tier-1-open node: its path, candidates, `need`, the state it inherited, and what the run's refit
 made of it), `--harvest FILE` (every distinct core the nodes' separation finds), `--max-depth` for dives; `fields
 replay` (refits and the reference run again on saved states); `fields fit` (a root's fit from a carried fit, pruned
-with `--prune K`, with offered cores).  `bench/fields/u4.py`, the tables.
+with `--prune K`, with offered cores).  `solver/notebook/r3-and-the-slope-test-u4-of-a1-2026-10/u4.py`, the tables.
 
 *Validity.*  Nothing new to prove: every bound is ⌊L⌋ at some multipliers and signings, valid by Theorems 14 and 15
 whatever the master proposes.  The tests (`cargo t --release --example fields`, 54 pass, one ignored): R3's traces and
@@ -83,7 +83,7 @@ design's order ran beside it as context).  The fixed master's breakdowns, which 
 1472, are now rare: 4 in the 9,290 replays, none ending a refit.
 
 *Phase 2: the slope test.*  Games, by the design's rule fixed before the runs: from the 146 games of
-`bench/matroid/bnb.jsonl`, those with a root GF(2) gap of at least 120, six spread evenly by gap in each band of
+`solver/notebook/matroid-intersection-bounds-2026-10/bnb.jsonl`, those with a root GF(2) gap of at least 120, six spread evenly by gap in each band of
 120-149, 150-199 and 200-249 (1215 left out of the third, being taken anyway), all five of 250-299 and the three of 300
 and above: 27 games of 987-1352, gaps 126-323, plain trees of 813 to 87,841 nodes.  1472 was not run: its r3 tree
 would take about 10 hours by the trees below (R3 about 0.55 s a refit at gaps near 300, its plain tree 39 times 1287's),
@@ -135,7 +135,7 @@ root-level gains still serve a root-level A1).
 *Not run.*  Phase 3 (patch mode with R3 on 1197-1212 and 1274-1284) and Phase 4 (R3's cost at 3300 and 3400 and the
 projection), as the owner asked once Phase 2's kill line fired.  Their instruments are built and tested (`fit --start
 --prune --offer`, `bnb --harvest`, `bnb --knuth --max-depth --save-states`, `replay`), and the own root fits of the
-patches' games are in `bench/fields/fits`.
+patches' games are in `solver/frame/testdata/fits`.
 
 *Cost.*  3.6 thread-hours of runs on the laptop, two processes at a time under `nice` (about 2.5 hours of wall
 time): Phase 1's hosts and replays 0.4, the 32 root fits 0.06, Phase 2's 79 trees 2.5, the design's order 0.6, the
@@ -151,7 +151,7 @@ three v0 trees 0.01; nothing on EC2.
    regression over the games of 2,000 nodes and more is given beside the criterion's.
 3. Phase 1 saved 929 states (the design expected 150-300 a game): r2's tree at 992 has 6,316 Tier-1-open nodes.  The
    states themselves (28 MB) are not kept: the hosts' trees are deterministic from their committed root fits (no refit
-   meets a time budget), so the commands of `bench/fields/README.md` make them again in about a minute.
+   meets a time budget), so the commands of `solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md` make them again in about a minute.
 4. The root's state keeps all of its fit's inequalities (the fit files hold no duals); only the refits' states are
    filtered, so the root's children rebuild from up to about 2,000 at 1472 once.
 5. R3 runs with a budget in seconds, so its trees depend a little on the machine's load (13.5% of R3's refits at
@@ -165,3 +165,22 @@ three v0 trees 0.01; nothing on EC2.
 The examples `fields` and `matroid`, with the files of `examples/common/` they included, were removed from master on
 2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
 `cargo build --release --example fields --example matroid` in `rust/`.
+
+## Files
+
+### U4 (`u4/`)
+
+U4, the advisor's fourth consultation on A1: R3 (a refit of the reference's strength) against the reference on saved
+node states (Phase 1) and the slope test (Phase 2); Phases 3 and 4 were not run (the slope test killed A1 in the
+search).  From `rust/`, `K` being `--known results/strict.jsonl`; the binaries were built at the commits named.
+
+| file | command | what it is |
+|---|---|---|
+| `u4/trees.jsonl` | Phase 1's hosts: `fields bnb K --variants r2 --fit solver/frame/testdata/fits --fit-seconds 60 --fit-mode certified --save-states STATES --every 10 992`, and `--fit solver/frame/testdata/fits/n1215.json --every 5 1215`, the code of 9f750a3 (they are Phase 2's r2 at those games); Phase 2: for each of 987, 988, 990, 992, 996, 999, 1000, 1024, 1035, 1044, 1105, 1112, 1184, 1188, 1192, 1197, 1215, 1221, 1235, 1250, 1254, 1274, 1281, 1287, 1290, 1350, 1352, `fields bnb K --fit solver/frame/testdata/fits --variants r2 N` and `fields bnb K --fit solver/frame/testdata/fits --variants r3 --policy r3-top:A --r3-order cores-first N` for A = 0.25 and 0.5, the code of 2537604; the design's order as context, `--variants r3 --policy r3-top:0.25` at 987, 988, 990, 992, 999, 1105, 1192, 1197, 1215, 1221, 1250, and v0 at 990, 1112, 1197, the code of 627def0 | a line per tree (run two at a time under `nice`; R3's budget in seconds makes its trees depend a little on the load) |
+| `u4/replay.jsonl` | `fields replay K --methods r2,r3:0.1,r3:0.3,r3:1,r3x:1,r3c:1,ref:10 STATES/n992-r2-all-k20.states.jsonl` and the same for `n1215-r2-all-k20`, the code of 9f750a3; then `--methods r3s:0.1,r3s:0.3,r3s:1` on both, the code of 2537604 | Phase 1: a line per saved state and method (9,290) |
+| `u4/fits.jsonl` and the root fits above | `fields fit K --seconds 60 --label own --save-fit solver/frame/testdata/fits 987 988 990 996 999 1000 1024 1035 1044 1105 1112 1184 1188 1192 1197 1221 1235 1250 1254 1274 1281 1287 1290 1350 1352 1200 1204 1208 1209 1212 1280 1284`, the code of 2537604 (992's fit was made by its Phase 1 host) | a line per root fit (their `carried_signings`, 3, is the plain signings' count: an own fit carries nothing) |
+| `u4/logs/` | the per-node logs (`--log`) of Phase 2's r3 trees with `r3-top:0.25`, gzipped | where R3 cuts in the trees, by GF(2) excess |
+| `u4_output.md` | `./u4.py > u4_output.md` | the tables |
+
+The saved states (`STATES`, 28 MB) are not kept: the hosts' trees are deterministic from their committed root fits
+(no refit of theirs meets a time budget), so the host commands make them again, in about 20 s (1215) and 50 s (992).

@@ -1,6 +1,6 @@
 # Carrying nogoods over (2026-10): measured, not kept
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 A nogood is a fact about the root of a game's frame model, and consecutive
 games have nearly the same model, so the nogoods a search ends with could

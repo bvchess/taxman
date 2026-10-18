@@ -1,8 +1,8 @@
 # The landscape past the chain: standalone bounds and searches (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-**Question.**  Brian's, with holes allowed in the chain ([the sweep](the-sweep-a-local-test-2026-10.md)): can each game's
+**Question.**  Brian's, with holes allowed in the chain ([the sweep](../the-sweep-a-local-test-2026-10/README.md)): can each game's
 standalone bounds, taken with no game of n − 1 (no seed, no ceiling, no prime formula), tell cheaply which games past
 3440 are easy, and can those be proven one by one?  The two ends are `upper`, `in_the_bag` plus the root's GF(2) bound,
 which the search computes at its first node, and `lower`, the game the search starts from (the better of the greedy set
@@ -22,9 +22,9 @@ $2), the code of commit 6f57399, in three stages one after the other on the 64 t
 3. **The map**, 62 minutes (65.1 core-hours): `wall landscape 3441-8191 --threads 64`, the bounds of all 4,751 games
    past the end of the chain, with no optimum to compare.
 
-The data, the commands and the scripts (`cal.py`, `map.py`) are in [bench/landscape/](../../bench/landscape/README.md);
+The data, the commands and the scripts (`cal.py`, `map.py`) are in [solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md](README.md);
 the numbers below are their output.  Beside them, on the laptop, a quick measurement of when a search finds its best
-game (`bench/landscape/ttb/`, last section).
+game (`solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/ttb/`, last section).
 
 **1. The calibration, 2176-3440.**  No game's bounds met: 0 of the 1,265 (the run took 0.95 core-hours, a median 2.08 s
 of CPU a game and 8.98 s at most).  The heuristic ends short of the optimum by a median 227, and by 0 in 161 of the
@@ -56,7 +56,7 @@ nodes the chain's search took against the gap, least squares):
 | the true root gap | 259 | 0.88 | 0.51 decades |
 | the standalone gap | 579 | 0.77 | 0.69 decades |
 
-The true root gap is the better predictor, as [the gap past 2175](the-gap-past-2175-2026-10.md) found (a decade per
+The true root gap is the better predictor, as [the gap past 2175](../the-gap-past-2175-2026-10/README.md) found (a decade per
 about 250), and the standalone gap carries the shortfall's scatter (r² 0.59 against 0.77).  Both are fits to the chain's
 searches, which had the seed and the ceiling, not to standalone searches; stage 2 tests those.
 
@@ -109,7 +109,7 @@ at 5.1 s at 3441, 22.6 at 5000, 90.7 at 7000 and 173.5 at 8191 by power laws thr
 core-hours for the 4,751 games); the medians here are 7.0 (3441-3940), 22.4 (4941-5440), 66.7 (6941-7440) and 103.2
 (7941-8191), 65.1 core-hours in all, so the extrapolation held to 5000 and ran high beyond 6000.
 
-**4. The time to the best game, on the laptop** (`bench/landscape/ttb/`).  Standalone one-thread searches of 60 games
+**4. The time to the best game, on the laptop** (`solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/ttb/`).  Standalone one-thread searches of 60 games
 of 1301-2175 with the non-release build of the ladder (`cargo build --profile test --example ladder`), no seed, no
 ceiling, 300 s at most; the ladder prints when the final game was found.  All 60 finished (the longest in 116 s,
 452 s in all) at the known optimum.  In 10 of them the heuristic's start was already the optimum.  In the other 50 the
@@ -134,7 +134,7 @@ searches still had a worse game than the chain's after 30 minutes).
   at 4441-4940, 3,200 at 4941-5440 and 4,600 to 8,300 beyond; none is under 1,000, where every sampled game finished in
   five minutes or less.  So with today's heuristic no game past 3440 is within a few minutes of one-thread search:
   games of standalone gap about 1,200 took 1.5 to 30 minutes on 2176-3440, the map has 77 games under 1,300 and none
-  under 1,196, and a node costs more past 3440 ([the wall regime](the-wall-regime-2026-10.md): +0.042 decades per
+  under 1,196, and a node costs more past 3440 ([the wall regime](../the-wall-regime-2026-10/README.md): +0.042 decades per
   100 n).
 * What would help is a better lower end, and it has a limit: the true root gap, which a perfect start incumbent would
   leave, is a median 1,177 over 3176-3440 and the search must still close it.
@@ -145,4 +145,52 @@ searches of more than 30 minutes or on more than one thread; a different start i
 second heuristic): the shortfall of 227 to 523 is the room it has.
 
 **Commits.**  6f57399, the run's build (the merge of `wall landscape`, 51da910); this entry adds the data and the
-scripts in `bench/landscape/`.
+scripts in this entry's folder.
+
+## Files
+
+This directory holds the data of that run (2026-10-17, one `c8g.16xlarge` at spot, 08:53 to 10:33 PDT, about $1.10, the
+code of commit 6f57399) and of the quick laptop measurement beside it (`ttb/`), and the scripts that make the entry's
+numbers.  `wall` is `target/release/examples/wall` (`cargo build --release --features studies --example wall`) and
+`taxman` `target/release/taxman`, run from `rust/`.  The module comment of `examples/wall.rs` ("landscape") defines
+every field of a `cal.jsonl` and `map.jsonl.gz` line.  The files
+were written on the instance, synced to the project's bucket (`landscape-20261017/out`) every five minutes and at the
+end, and copied from there; the run's stdout copies of the two landscape files (`cal.out` and `map.out`, byte for
+byte the `.jsonl` files) are not kept.
+
+### Files and the commands that made them
+
+| file | command | what it is |
+|---|---|---|
+| `userdata.sh` | the instance's user data, as it ran | installs the build (`solver/tools/cloud/setup.sh` at 6f57399), then runs the three stages below one after the other from a tmux session, syncs the output, and powers off; `shutdown -h +240` is its backstop |
+| `log` | | the times (UTC) at which each stage began and ended: the run began 15:59:00, the calibration ended 15:59:56, the standalone searches 16:30:05, the map 17:32:14 |
+| `cal.jsonl` | `wall landscape 2176-3440 --threads 64 --known results/strict.jsonl --out cal.jsonl` | the calibration, 56 s: one line for each of the 1,265 games of 2176-3440, standalone (no game of n − 1: no seed, no ceiling, no prime formula): the bounds `upper` and `lower`, their `gap`, whether they `meet`, the times, and, from the committed chain, the game's optimum `opt` and with it `root_gap` (`upper` less `opt`) and `shortfall` (`opt` less `lower`) |
+| `sample.txt` | | the 64 games of the standalone searches (2196 to 3440), followed by their count |
+| `sa/N.jsonl`, `sa/N.out` | for the 64 games of `sample.txt`, all at once: `taxman solve N --threads 1 --time-limit 1800 --progress 0 --out sa/N.jsonl > sa/N.out 2>&1` | the standalone search of game N, one thread, 1,800 s at most: the results file with the one line the search wrote (an unfinished search has `completed` false, `score` null and its best game's score in `best_so_far`) and what `solve` printed |
+| `map.jsonl.gz` | `wall landscape 3441-8191 --threads 64 --out map.jsonl`, then gzipped | the map, 62 minutes: the same lines for the 4,751 games of 3441-8191, with `opt`, `opt_proof`, `root_gap` and `shortfall` null |
+| `low.jsonl.gz` | `wall landscape 2-2175 --known results/strict.jsonl --out low.jsonl` on the laptop (2026-10-17, about two minutes, 497 CPU s), then gzipped; the command is that of `cal.jsonl` for the stretch below it (the run's own record was not kept) | the quick bounds of the 2,174 games of 2-2175 with their optima: the lines of `cal.jsonl` for the games before it |
+| `plot_gap.py`, `gap_landscape.svg` | `./plot_gap.py gap_landscape.svg` | the standalone gap (`upper` less `lower`) of every game 2-8191 from `low.jsonl.gz`, `cal.jsonl` and `map.jsonl.gz`, dots of one game each and rolling medians of 101 games, and the quick upper bound less the proven optimum to 3440: an SVG with a linear y axis (it was at the repository's root; the script reproduces it byte for byte) |
+| `land.py` | | what the scripts share: the paths, and loading a file of lines (gzipped or not) |
+| `cal.py` | `./cal.py` | the calibration's table from `cal.jsonl` and `../../results/strict.jsonl` (the committed chain): the shortfall, the root gap and the standalone gap, and the fits of the chain's nodes (log10) to the two gaps |
+| `map.py` | `./map.py` | the standalone searches against the chain's own search (`sa/`, `cal.jsonl`, `../../results/strict.jsonl`), and the map by bands of 500 games (`map.jsonl.gz`) |
+
+The entry quotes the output of `cal.py`, `map.py` and `ttb/ttb.py`.
+
+### The time to the best game (`ttb/`)
+
+On the laptop, while the instance ran, with the non-release build of the ladder (`cargo build --profile test --example
+ladder` in `rust/`: opt-level 2, debug assertions on, in `target/debug/examples/`): a standalone one-thread search of
+each of 60 games of 1301-2175 (`games.txt`), no seed and no ceiling, 300 s at most, a few at a time under `nice -n 10`
+(the driver that ran them is not kept).  Every search finished, the longest in 116 s; their sum is 452 s.
+
+| file | what it is |
+|---|---|
+| `one.sh` | `ttb/one.sh N` from `rust/`: the search of game N |
+| `N.txt` | its ladder line (`examples/ladder.rs`): the search's time and nodes, the game found against the known optimum, the start incumbent, and when the final game was found |
+| `games.txt` | the 60 games |
+| `ttb.py` | `./ttb.py`: the time at which the best game was found, as a share of the search's time, for each game and in all |
+
+### Seeding from a neighbour (`seeding/`)
+
+The start incumbents of 2176-3440 seeded from a neighbour's start incumbent (`wall chain`, since removed), against the
+standalone start and the start seeded from the proven game of n − 1: [seeding/README.md](../seeding-the-start-from-a-neighbours-heuristic-game-2026-10/README.md).

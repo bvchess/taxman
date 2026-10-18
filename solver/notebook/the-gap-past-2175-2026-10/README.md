@@ -1,8 +1,8 @@
 # The gap past 2175 (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  The [research agenda](../AGENDA.md#6-what-the-cloud-runs-should-measure) left one measurement to the chain
+*Question.*  The [research agenda](../../docs/AGENDA.md#6-what-the-cloud-runs-should-measure) left one measurement to the chain
 past 2175: the true root GF(2) gap of every searched game, against the chain's own optima.  It says which of two
 regimes of the gap's growth the wall follows (C5: +7 per 100 n, the committed games', or +57, the unseeded starts'
 upper bound to 4095, which would put the wall between 3000 and 4000), whether the cost model of 1301-2175 (`log10
@@ -13,7 +13,7 @@ past 2175 on a `c8g.16xlarge`: `taxman solve`, 64 threads, the code of 55287ff, 
 4 after it) had made 2176..3314 in 6.4 hours when a copy of its results file was taken (2026-10-15).
 
 *What was run*, on the laptop (one process at a time under `nice -n 10`, one thread, no solver change, nothing on AWS;
-the commands and the data are in [bench/wall/](../../bench/wall/README.md)):
+the commands and the data are in [solver/notebook/the-wall-regime-2026-10/README.md](../the-wall-regime-2026-10/README.md)):
 
 * `examples/wall.rs nodes --nodes 1` over the copy, for its 509 searched games past 2175 (400 `exhausted`, 109 `cap`:
   ended by the ceiling; a repeat poses its source's problem, and every source is among them): the root's GF(2) bound
@@ -24,7 +24,7 @@ the commands and the data are in [bench/wall/](../../bench/wall/README.md)):
 * `taxman solve 1301-2175 --threads 1` on the committed chain cut after game 1300: its 391 searched games as the
   EC2 chain's build solves them, in order (24 minutes); every score and proof kind is the committed chain's.
   Why this was needed is in 4.
-* `bench/wall/gap.py`: the tables ([gap_output.md](../../bench/wall/gap_output.md)); `gaps_chain.jsonl` is the per-game
+* `solver/notebook/the-gap-past-2175-2026-10/gap.py`: the tables ([gap_output.md](gap_output.md)); `gaps_chain.jsonl` is the per-game
   data (n, gap, nodes, seconds, proof, threads, the root's sizes), `anatomy_chain.jsonl` and `resolved_1301_2175.jsonl`
   the others.
 
@@ -82,7 +82,7 @@ are: the 90th percentile of the gap by 400 n is 514, 519, 1035, 868 and 1193 (13
 
 **3. The speculation and the threads in the chain's nodes.**  The chain's nodes come from 64 threads with a window of
 16 (4 after about 3310), whose speculation (younger searches run on a weaker incumbent until the game before them is
-concluded) added nodes in the [scaling run](scaling-to-192-threads-2026-10.md).  That run's per-game nodes at other
+concluded) added nodes in the [scaling run](../scaling-to-192-threads-2026-10/README.md).  That run's per-game nodes at other
 windows and thread counts, 2226..2276 and 2277..2336, against the chain's own for the same games (each game once, its
 mean over the runs of a window):
 
@@ -110,7 +110,7 @@ largely the build: the 39 searches of 2176-2276 that the Graviton calibration's 
 order) also made have 0.44 times its nodes (-0.355 decades, sd 0.15; -0.40 with the window's 0.04 taken off).  So the
 committed chain's 391 searched games were solved again by the EC2 chain's build (`taxman solve 1301-2175 --threads
 1`, in order; every score and proof kind is the committed chain's, and 2170 has the 440,988 nodes of the
-[prime-exchange entry](prime-exchanges-in-the-search-2026-10.md)):
+[prime-exchange entry](../prime-exchanges-in-the-search-2026-10/README.md)):
 
 | games | searches of 1000 nodes or more | mean log10 of the new nodes over the committed | sd | ratio of the sums | correlation with the gap |
 |---|---|---|---|---|---|
@@ -295,7 +295,7 @@ What it says, with its uncertainty stated:
   0.3; 3,720 to 3,860 for the gap alone and 4,270 to 4,850 for p = 0.5.  A single run's luck, the waves, moves it by
   about -400 to +700 (10th to 90th percentile).  So a day reaches about the end of the set widths, 4095, and no further;
   4000 takes 13 to 20 hours past 3313, 5000 takes 4 to 10 days (107 to 228 hours; 29 to 56 at p = 0.5) and 6000 a month
-  or more.  Boards past 4095 also need the widths and `MAX_FRAMES` that [the wall regime](the-wall-regime-2026-10.md)
+  or more.  Boards past 4095 also need the widths and `MAX_FRAMES` that [the wall regime](../the-wall-regime-2026-10/README.md)
   lists.
 * *The old regime* (+57 per 100 n, the `steep` rows) would have taken 38 hours to 4000 and a day would have reached
   3,830 to 3,890.
@@ -334,3 +334,14 @@ committed chain's games solved again.  Nothing was run on AWS.
 
 The example `matroid`, with the files of `examples/common/` it included, was removed from master on 2026-10-17.  It
 builds at commit 8753189: `git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`.
+
+## Files
+
+The files of this entry ran on master ee03872 with no change to the solver, in the same way as [the wall regime's](../the-wall-regime-2026-10/README.md#files-and-the-commands-that-made-them), with `K` and `wall` as there.  The example `matroid`, which made `anatomy_chain.jsonl`, was removed from master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release --example matroid` in `rust/`).
+
+| file | command | what it is |
+|---|---|---|
+| `gaps_chain.jsonl` | `wall nodes --known SNAPSHOT --nodes 1 $(./gap.py games SNAPSHOT) > RAW`, then `./gap.py join SNAPSHOT RAW > gaps_chain.jsonl`; `SNAPSHOT` is a copy of the EC2 chain's results file taken at game 3314 on 2026-10-15 (64 threads on a `c8g.16xlarge`, the code of 55287ff, a window of 16 to about game 3310 and 4 after it; 16.5 MB, not committed), `wall` built from master ee03872, one thread, 9 minutes in all | one line per searched game past 2175 of the snapshot (509 games, 2176..3312: 400 `exhausted`, 109 `cap`; a repeat has its source's gap, and every source is among them): the root's GF(2) bound, the optimum, the true root gap (the bound less the optimum) and the start incumbent, the chain's own nodes, seconds, proof and threads, and the root's sizes (candidates, `max_total`, the heaviest set's size, forced members, the frames' ranks, moves, factors and freedoms) |
+| `anatomy_chain.jsonl` | `matroid lagrange --known SNAPSHOT --limit 0 $(./gap.py games SNAPSHOT) > L`, `matroid cores $(./gap.py games SNAPSHOT) > C` (`cargo build --release -j 4 --example matroid`), then `./gap.py join-anatomy SNAPSHOT L C > anatomy_chain.jsonl`; 3 minutes | for the same games, the sizes of the successive conflicts of the root GF(2) bound's heaviest set (`matroid`'s research intersection, `common/meet.rs`, whose bound equals `wall`'s `root_bound` at all 509 games) and the cores that set runs into, frame by frame (movers, promoted, factors, movers with three or more live factors) |
+| `resolved_1301_2175.jsonl` | `head -n 1300 results/strict.jsonl > RESOLVE.jsonl`, `taxman solve 1301-2175 --threads 1 --out RESOLVE.jsonl --checkpoint-dir DIR --checkpoint-interval 300 --progress 600` (`nice -n 10`, `taxman` built from master ee03872), then `./gap.py join-resolved RESOLVE.jsonl > resolved_1301_2175.jsonl`; 24 minutes | the committed chain's searched games of 1301-2175 solved again by the EC2 chain's build, in order on one thread (every score and proof is the committed chain's): the game's root gap (`solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl`), its nodes, seconds, method and proof from this run beside the committed chain's nodes, so that the two chains' games are on one build |
+| `gap.py`, `gap_output.md` | `./gap.py > gap_output.md` (a table at a time: `./gap.py bands trend arithmetic window build cost runs anatomy projection`) | the tables of [the gap past 2175](../the-gap-past-2175-2026-10/README.md) from `gaps_chain.jsonl`, `anatomy_chain.jsonl`, `resolved_1301_2175.jsonl`, `results/strict.jsonl`, `solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl`, `solver/notebook/scaling-to-192-threads-2026-10/c8g48/games.jsonl`, `solver/frame/testdata/c8g.chain-2176.jsonl` and `setup_c8g.jsonl`; the module comment says what each table is |

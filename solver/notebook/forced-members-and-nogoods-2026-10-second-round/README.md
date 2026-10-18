@@ -1,6 +1,6 @@
 # Forced members and nogoods (2026-10, second round)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 Measured with the ladder on one thread (deterministic node counts) with the
 frontier's tactics (`revise_freedoms=off`), seeded from n−1 (from

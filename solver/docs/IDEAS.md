@@ -1,13 +1,13 @@
 # Ideas from other fields: a ranked proposal, with pilot measurements
 
 The solver already borrows from SAT solving (conflict analysis, nogoods, forgetting them) and from MIP (a
-relaxation bound, strong branching), and those borrowings paid a great deal ([EXPERIMENTS.md](EXPERIMENTS.md)).
+relaxation bound, strong branching), and those borrowings paid a great deal ([EXPERIMENTS.md](../notebook/README.md)).
 This page asks what else to borrow, and answers with measurements rather than opinions: every idea that looked
 promising got a cheap pilot (a counter, a fixture, a node-limited or proof-only run), and the ones that did not
 survive their pilot are recorded with the number that killed them.  The pilots' code was discarded after the study
 (section 6), so each pilot is described here well enough to be rebuilt: what it computed, on which games and with
 which settings, and the numbers that decided it.  The register of everything tried, in
-[EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried), has a row for each.
+[EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried), has a row for each.
 
 * [1. The recommended order](#1-the-recommended-order)
 * [2. Where the time goes in the hardest games](#2-where-the-time-goes-in-the-hardest-games)
@@ -23,7 +23,7 @@ something costs, and only as ratios within one run.  All searches use only prove
 tactic since removed) and, unless they say otherwise, *proof-only*: seeded with the game's own optimum
 (`ladder --seed-opt`), which makes the node count of a one-thread search exact and leaves the tree to the bound and the
 branching, the parts these ideas change.  "Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.
-What matters at the end of the chain is the slope of the cost curve ([bench/curve/README.md](../bench/curve/README.md):
+What matters at the end of the chain is the slope of the cost curve ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md):
 ×10 per 55-70 in n), so each result says whether its effect grows with n where that could be measured.
 
 ## 1. The recommended order
@@ -98,8 +98,8 @@ What follows for the ideas:
 
 A fourth game, 1295 (25 s), gives the same split to within two points (repairs 58.1%, peels 20.8%; strong branching
 29.0%, making children 25.5%, refinement 19.8%).  (This is the solver before the Lagrangian bound; with it, the
-profile of experiments/faster-nodes-with-the-lagrangian-bound-same-trees-2026-10.md has the Lagrangian levels at a
-quarter of the time and strong branching at 11-20%.)  `tools/profile/profile.sh N SECONDS THREADS OUTDIR` reproduces any
+profile of solver/notebook/faster-nodes-with-the-lagrangian-bound-same-trees-2026-10/README.md has the Lagrangian levels at a
+quarter of the time and strong branching at 11-20%.)  `solver/tools/profile/profile.sh N SECONDS THREADS OUTDIR` reproduces any
 of them; the probe (`examples/perf.rs`) agrees on the hot kernels (a strong-branching exclusion costs 9-12 k cycles,
 a step 16-17 k).
 
@@ -206,7 +206,7 @@ of 192 threads 0.5-5 M steps, which is the 1215 proof on 1-16 workers, where cle
 small adjustments are worth a test on the big machine, not more: a period of about 30,000 steps keeps the tables at the
 size they have at 4 workers (they learn ~1.7× faster at 128), and the time to full occupancy and the unit count should
 be watched, because what does grow with the number of workers is the tree, by 10-20% from 4-8 to 32-128 workers on 1225
-(9.3-10.1 M to 10.3-13.6 M nodes; the committed `bench/curve/scaling.jsonl` has 9.45 M at 4 and 9.30 M at 8), with ten
+(9.3-10.1 M to 10.3-13.6 M nodes; the committed `solver/notebook/benchmarks-the-probe-pgo-and-scaling/scaling.jsonl` has 9.45 M at 4 and 9.30 M at 8), with ten
 to twenty-five times as many unit starts (385 at 4 workers, 4,000-10,000 at 32-128), each a rebuild that forgets the
 conflicts known along its path.  That is idea 5.
 
@@ -235,20 +235,20 @@ it, replayed by the referee as always.  It needs a proof kind (a repeat of game 
 assumes), the digest in the result line or recomputed when the range starts, and the two verifiers.  The payoff is a
 constant fraction of the chain, at no risk, and it multiplies with everything else here.
 Implemented as the tactic and proof kind `same_search`
-([EXPERIMENTS, "Same search"](experiments/same-search-2026-10.md)).
+([EXPERIMENTS, "Same search"](../notebook/same-search-2026-10/README.md)).
 
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
 Done since: kept incrementally, and with the forced members its potentials give, it is the tactic `lagrange`, on by
 default, about 3 times fewer cycles on the proofs of 1184-1300
-([EXPERIMENTS.md](experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md)).
+([EXPERIMENTS.md](../notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).
 
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
 candidate's weight lowered by the multipliers of its nogoods, plus a constant.  A nogood with a member that has left
 the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the prover's
-second bound ([the prover's README](../prover/README.md), section 3: 3.3× fewer nodes at n = 793 in the
+second bound ([the prover's README](../noframe/README.md), section 3: 3.3× fewer nodes at n = 793 in the
 prover), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
 multipliers say how much each costs.
 
@@ -446,10 +446,10 @@ experiment.  "Pilot" refers to section 4.
   candidates with the same neighbourhoods) is rare, since a number's maximal factors determine it (up to those
   missing from the frame).  High cost, unknown payoff; not tried.  A first, cheap look would count pairs with
   nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and
-  symmetry"](experiments/dominance-and-symmetry-2026-10.md) (no twins, literal dominance at a few percent of the nodes).
+  symmetry"](../notebook/dominance-and-symmetry-2026-10/README.md) (no twins, literal dominance at a few percent of the nodes).
 * *Symmetry breaking*: none found here; there are symmetries after all, exchanges of primes that the frame builder
   treats alike, and breaking them is a constant factor ([the same
-  entry](experiments/dominance-and-symmetry-2026-10.md)).
+  entry](../notebook/dominance-and-symmetry-2026-10/README.md)).
 * *Nogood recording on restarts*: subsumed by the existing nogoods.
 
 **From #SAT and model counting**
@@ -470,7 +470,7 @@ of the numbers of children along the way, summed over the depths, is an unbiased
 few thousand walks give its order of magnitude.  Here a "child" is a node's surviving child (a node's loop is run to
 the end, its children checked and not explored), and steps rather than tree nodes are counted (each node adds its
 loop's steps).  Uses: the cost of a game before running it (the cloud budget is ×10 per 55-70 in n, with games of a
-band varying ×3-×18, bench/curve), and, inside a run, which units to split first.  Not a pruning, so nothing to prove.
+band varying ×3-×18; solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md), and, inside a run, which units to split first.  Not a pruning, so nothing to prove.
 Experiment: a probe searcher that expands a node fully and descends into one surviving child at random (units can
 be rebuilt from `(promoted, cands)`, as the engine does), run on the proofs of 1215, 1225 and 1250 whose sizes are
 known; report the median and spread of the estimate against the truth for 100, 1,000 and 10,000 walks.  The nogood
@@ -498,21 +498,21 @@ record of what it did.  Two pieces were useful on their own and are on `master`:
   `examples/common/counters.rs` (cycles and instructions of the process), which the probe used to hold and the
   pilots shared.
 
-`tools/profile/` (the profile of section 2) needs only the solver and is on `master` too.  Every other pilot is
+`solver/tools/profile/` (the profile of section 2) needs only the solver and is on `master` too.  Every other pilot is
 described where its result is: the nogood study and the cost of a table in section 3, memoizing repeated searches,
 reduced-cost fixing, components, disjoint conflicts and recency in section 4, with what each computed, on which
 games, with which settings, and the numbers that decided it.  The Lagrangian pilot (section 4.2) was taken over by
 the experiment that follows it up.
 
-The register in [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) has a row for each.  A pilot that
+The register in [EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried) has a row for each.  A pilot that
 graduates (rank 2 first, once its incremental matching pays) comes to `master` as a tactic, rewritten for it.
 
-To reproduce what is still reproducible (from `rust/`, after `cargo build --release --examples`;
+To reproduce what is still reproducible (from the top of the repository, after `cargo build --release --examples` in `solver/frame`;
 `K=results/strict.jsonl`):
 
 ```
-ladder --threads 16 --cores 4 --seed-opt --known $K 1215    # 16 workers on 4 CPUs
-tools/profile/profile.sh 1232 40 4 /tmp/prof    # the profile of section 2
+solver/frame/target/release/examples/ladder --threads 16 --cores 4 --seed-opt --known $K 1215    # 16 workers on 4 CPUs
+solver/tools/profile/profile.sh 1232 40 4 /tmp/prof    # the profile of section 2
 ```
 
-The profile (macOS only: `sample` and `atos -i`) is attributed by `tools/profile/attribute.py`, standard library only.
+The profile (macOS only: `sample` and `atos -i`) is attributed by `solver/tools/profile/attribute.py`, standard library only.

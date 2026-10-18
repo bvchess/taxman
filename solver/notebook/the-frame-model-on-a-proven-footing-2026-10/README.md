@@ -1,6 +1,6 @@
 # The frame model on a proven footing (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The frame model rested on five assumptions, validated and never proven: the greedy removal of impossible
 sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames taking no part, and a promoted number
@@ -11,7 +11,7 @@ by the number of prime factors), Theorem L (playability splits by layer), Theore
 largest prime and U\*_2) and Theorem M (given N, U\* ∪ L is playable iff L is a promotion set).  Its first steps,
 E1 to E4, are this entry: check the hypotheses on every board, test the theorems against the code and the data, and
 write them down.  The statements and proofs are now in [THEORY.md, "The frame model: what is proven and what
-remains"](../../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains); DESIGN.md (§2, "What optimal
+remains"](../../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains); DESIGN.md (§2, "What optimal
 means") and the README say what each proof kind rests on.
 
 *E1, the census* (commits 631e027, a122f43).  `unzip` records its pairs as *claims*, front (a source with one
@@ -23,7 +23,7 @@ suite).  `examples/structure.rs` checks, on each board: (A) every frame in one l
 frames in front one below; (C) N; (D) no candidate has the factor of a back claim among its maximal factors; (E) no
 candidate in frame 0; (F) every candidate's home at least 1; (G) the sources the game with no promotions plays are
 an independent descending greedy's.  Every board 2..8191, four threads, 156 s of wall time and 624 s of work (0.27 s
-at most, n = 8129); [bench/structure/](../../bench/structure/README.md):
+at most, n = 8129); [solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/](../the-claims-of-unzip-in-the-extended-problem-2026-10/README.md):
 
 | what | on the boards 2..8191 |
 |---|---|
@@ -64,7 +64,7 @@ unwinnable.)  The distinct near misses are (77, 11, 22), (77, 11, 33), (91, 13, 
 (the same as setup's on 500 boards to 8191) and checks the theorem's statements (the one prime is the largest; the
 sources of layer 2 are U\*_2; the numbers of layer 2 up to n/2 keep U\*_2 a forest; none where layer 2 is closed) on
 every game of optimal.json (1,299), `results/strict.jsonl` (2,174) and the chain 2176-2276 of
-`bench/cloud/c8g.chain-2176.jsonl` (101); on every optimal set the prover enumerated (987 sets of 2..989, 57 of
+`solver/frame/testdata/c8g.chain-2176.jsonl` (101); on every optimal set the prover enumerated (987 sets of 2..989, 57 of
 798..1019 with the upper part fixed), each rebuilt from its line, checked playable and worth the optimum; and on every
 optimal set of the boards 2..48 (and, ignored, 49..54) found again by a search with the oracle alone, whose counts are
 the prover's.  No exception.  The games play numbers of layer 2 up to n/2 on 76 boards, all at most 186 (9, 10, 14,

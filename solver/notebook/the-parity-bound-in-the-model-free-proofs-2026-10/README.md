@@ -1,17 +1,17 @@
 # The parity bound in the model-free proofs (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
-*Question.*  The model-free proofs of opt(n) ([prover 3](../../prover/README.md#3-the-proofs-of-optn))
+*Question.*  The model-free proofs of opt(n) ([prover 3](../../noframe/README.md#3-the-proofs-of-optn))
 stopped at 989 (and 999-1019): the matching bound overrates the optimum by about 1,170 at n = 1000, and games 990,
 992, 993, 995, 996, 1020 and 1023-1027 had spent millions to tens of millions of nodes each without finishing.  The
-[matroid study](matroid-intersection-bounds-2026-10.md) found a model-free bound with a tenth of that gap: every playable
+[matroid study](../matroid-intersection-bounds-2026-10/README.md) found a model-free bound with a tenth of that gap: every playable
 set is independent in two linear matroids over GF(2), split by the parity of Ω.  Reimplemented in the evidence crate
 from its mathematics (no code shared with the solver or the study) and proven there as a theorem, does it carry the
 model-free proofs to the end of the committed chain, 1300?  What does a proof cost, and how fast does that grow?
 
 *The theorem.*  THEORY.md, [the parity
-matroids](../../../heuristics/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game) (Theorem 10): a playable set's
+matroids](../../../docs/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game) (Theorem 10): a playable set's
 vectors of maximal factors, with the unit vectors of its own members up to n/2, are linearly independent (from a legal
 order and Theorem 1's lifting argument; for the upper half it is Theorem 7's lemma), and each vector lies in the
 coordinates of one parity of Ω, so every playable set is independent in both parity matroids; at a node of a search,
@@ -58,7 +58,7 @@ games against one below its optimum: every one finds a set worth exactly V(n), w
 n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 (R² 0.06 and 0.11, the gap's swings between
 bands dominating), about 1.6 ms a node.  The trees are the size of the study's frame-model branch and bound with the
 same bound (992: 66,892 nodes from scratch against its 77,567).  The band table and the extrapolation are in
-[prover 3](../../prover/README.md#3-the-proofs-of-optn): at that slope 1300–2000 would take about
+[prover 3](../../noframe/README.md#3-the-proofs-of-optn): at that slope 1300–2000 would take about
 57 thread-hours, the hardest single proofs about 3 hours; the recorded optima, not the search, stop the proofs at 1300.
 
 **4. Warm starts: kept, after one failed form.**  A child starts from its parent's certified set and split.  The split

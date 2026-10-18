@@ -1,16 +1,16 @@
 # Taxman: the frame solver in Rust
 
-`rust/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies): the *frame solver*, which
-finds optimal games of Taxman.  It reimplements the algorithm of the Java solver in the repository root
-(`src/main/java`) with a search built for speed and for many threads, and it has found optimal games for every n of the
-committed chain ([results/README.md](results/README.md) gives its range; the Java solver got to 1000).  A second
-program, the prover ([prover/](prover/README.md)), checks the frame solver's answers on the whole board, without the
+`solver/frame/` is a Cargo crate (a library and one binary, `taxman`; no third-party dependencies): the *frame solver*,
+which finds optimal games of Taxman.  It reimplements the algorithm of the Java solver (no longer in the tree: the git
+tag `java-final` is the last commit that has it) with a search built for speed and for many threads, and it has found
+optimal games for every n of the committed chain ([results/README.md](../../results/README.md) gives its range; the Java
+solver got to 1000).  A second program, the prover ([solver/noframe/](../noframe/README.md)), checks the frame solver's answers on the whole board, without the
 frame model, so far to 2175.  Below, "the solver" is the frame solver.
 
 This page is the user guide: what the frame solver computes and what "optimal" means here, how to build and run it, how
 to read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
-and where to start reading the code.  The design is in [DESIGN.md](DESIGN.md) and the measurements behind it in
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); this page links there instead of repeating them.
+and where to start reading the code.  The design is in [DESIGN.md](../docs/DESIGN.md) and the measurements behind it in
+[solver/notebook/README.md](../notebook/README.md); this page links there instead of repeating them.
 
 * [1. What it solves](#1-what-it-solves)
 * [2. Build, test, run](#2-build-test-run)
@@ -33,7 +33,7 @@ n = 4 the optimal game is 3, 4 (the taxman takes 1, then 2) and scores 7.
 
 Finding an optimal game is a search over an enormous tree.  The frame solver's results are the optimal games, as
 sequences of moves with their scores, for every n of the committed chain: `results/strict.jsonl` (its range is in
-[results/README.md](results/README.md)) is a chain from n = 1 (section 3), whose games 1 to 1000 reproduce the Java's
+[results/README.md](../../results/README.md)) is a chain from n = 1 (section 3), whose games 1 to 1000 reproduce the Java's
 table, whose games 1001 to 1300 go beyond it (the table `optimal.json` has them now too, see `extend-optimal` in
 section 3) and whose games from 1301 on are past the table.  Its games 2 to 2175 are also proven on the whole board,
 by the prover; its games from 2176 on are proven within the frame model, which is exact given statement U (below,
@@ -41,12 +41,12 @@ by the prover; its games from 2176 on are proven within the frame model, which i
 can attempt any larger n up to 8191, the largest board the set widths cover.  With the GF(2) bound (the default since
 2026-10), a chain from `optimal.json`'s game of 1300 reached 2175 in 92 minutes on two threads of a laptop, and the
 committed chain from n = 1 to 2175 in 27 minutes on eight
-([results/README.md](results/README.md)), the cost in waves with no growth a fit over those games resolves
-([docs/EXPERIMENTS.md](docs/experiments/the-gf2-bound-in-the-search-2026-10.md)); before it, the cost of a game grew by a
-factor of ten for every 55 to 70 in n past 1200 ([bench/curve/README.md](bench/curve/README.md)).  Past 2175 it grows:
+([results/README.md](../../results/README.md)), the cost in waves with no growth a fit over those games resolves
+([solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md](../notebook/the-gf2-bound-in-the-search-2026-10/README.md)); before it, the cost of a game grew by a
+factor of ten for every 55 to 70 in n past 1200 ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).  Past 2175 it grows:
 the search times of the games 2176 to 3440, which a day on one 64-thread cloud machine made for about $16, rise
 tenfold per about 1,040 in n, with about a decade of scatter
-([docs/EXPERIMENTS.md](docs/experiments/the-frontier-chain-to-3440-2026-10.md)).
+([the entry](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
 
 ### How the solver sees the game (the frame model)
 
@@ -58,7 +58,7 @@ tenfold per about 1,040 in n, with about a decade of scatter
    still in the pot, so is every f with d | f | m other than m itself (whatever had removed f would have removed d
    too), and one of those f is a maximal factor of m.  So m is playable exactly when one of its maximal factors is
    in the pot, and the model needs nothing else of divisibility (the *lifting* argument of
-   [src/numtheory.rs](src/numtheory.rs) and Theorem 1 of [../heuristics/THEORY.md](../heuristics/THEORY.md)).
+   [src/numtheory.rs](src/numtheory.rs) and Theorem 1 of [docs/THEORY.md](../../docs/THEORY.md)).
 3. Sources and the factors they compete for fall into independent groups, the *frames*: sources that share a factor are
    in one frame, with all the factors they can be paid with.  Frame X is *in front of* frame Y (and Y *behind* X) when
    a number of Y has a maximal factor in X, that is, when Y's numbers are multiples of X's; the frames in front are
@@ -111,8 +111,8 @@ promotion from that frame needs one frame to go to.
   the greedy removal of impossible sources inside frames, the mandatory moves of `unzip` (a source with only one
   usable factor must take it), freedoms = factors - sources, closed frames (those with no freedom) taking no part in
   the search, and a promoted number paying tax only from the frame one forward.  They are now theorems
-  ([heuristics/THEORY.md, "The frame model: what is proven and what
-  remains"](../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and what is left is one
+  ([docs/THEORY.md, "The frame model: what is proven and what
+  remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and what is left is one
   statement about the game:
 
   > **U**: some optimal game plays every source with three or more prime factors that setup keeps (U\*).
@@ -122,14 +122,14 @@ promotion from that frame needs one frame to go to.
   h - 1, as the numbering by layer is by construction); every
   optimal game plays the sources setup keeps with one or two prime factors (Theorem B); so the heaviest promotion set
   gives opt(n) exactly when U holds at n.  U is open in general.  It holds for every n <= 2175, where [the
-  prover](prover/README.md) proves the optimum on the whole board, without the frame model.  So a game proven above
+  prover](../noframe/README.md) proves the optimum on the whole board, without the frame model.  So a game proven above
   2175 by an exhausted search, a trivial board or a repeat assumes U at n: the committed games above 2175 proven that
-  way (the [results README](results/README.md) counts the proofs) do, and U is not yet certified for them (`taxman
+  way (the [results README](../../results/README.md) counts the proofs) do, and U is not yet certified for them (`taxman
   certify` checks it game by game, section 3).  A game proven at its ceiling or by the prime formula does not (section
   5).  The results lines do not record it.
-  [DESIGN.md](DESIGN.md#what-optimal-means) says what each proof kind needs of the model.
+  [DESIGN.md](../docs/DESIGN.md#what-optimal-means) says what each proof kind needs of the model.
 * **Given the pruning is exact.**  Every tactic is proven or sound: none prunes a promotion set that could win
-  ([DESIGN.md, Tactics](DESIGN.md#5-tactics) grades each).  So a result rests on nothing but U (where its proof uses
+  ([DESIGN.md, Tactics](../docs/DESIGN.md#5-tactics) grades each).  So a result rests on nothing but U (where its proof uses
   the frame model), the correctness of the code and, where its proof says so, the game it was built from.
 * **Given the previous game is optimal.**  A game of n is built from the game of n - 1: its search starts from the
   previous game's promotions and stops as soon as it reaches the proven ceiling `n + score(n-1)`.  So a chain of
@@ -140,10 +140,10 @@ promotion from that frame needs one frame to go to.
 
 Requirements: Linux or macOS (the engine uses POSIX signals and `flock`); a Rust toolchain of at least 1.89
 (`rust-version` in `Cargo.toml`; the engine uses `File::try_lock`); a C linker.  There are no crates to download.
-Python 3 (standard library only) for `tools/check_results.py`.
+Python 3 (standard library only) for `solver/tools/check_results.py`.
 
 ```
-cd rust
+cd solver/frame
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
 cargo build --release --examples   # also the ladder (scaling and progress harness), the probe and the ledger
 cargo build --release --examples --features studies   # and the study tools: the tuning benchmark, the census of
@@ -151,15 +151,17 @@ cargo build --release --examples --features studies   # and the study tools: the
 ./target/release/taxman help
 ```
 
+Cargo's commands run in `solver/frame`.  The commands of the other sections run from the top of the repository, where `results/` is, and `taxman` in them is `solver/frame/target/release/taxman`.
+
 The study tools (the examples `tune`, `extended`, `structure` and `wall`) are behind the feature `studies`, which is
 off by default, so that a build, `cargo test` and `cargo clippy --all-targets` do not compile them; a command that names
 one (`cargo build --release --example wall`) needs `--features studies` too.
 
 The build is long for a program of this size because the search is compiled once for every set width
-([DESIGN.md](DESIGN.md#3-architecture), "Width dispatch").
+([DESIGN.md](../docs/DESIGN.md#3-architecture), "Width dispatch").
 
 The binary carries `optimal.json` (the table of optimal games, n <= 1300: the Java's games to 1000, then those of the
-chain from n = 1) built in: `src/main/resources/optimal.json` as it was when the binary was compiled.  Every run
+chain from n = 1) built in: `results/optimal.json` as it was when the binary was compiled.  Every run
 confirms its scores against that table, wherever the binary runs, and no option names another; a changed table takes a
 rebuild, which cargo does by itself when the file has changed.  `taxman bench` finds its two files in the repository
 (below), above the working directory and, if they are not there, above the binary.
@@ -168,32 +170,32 @@ The release profile uses fat LTO and `panic = "abort"`; the `test` profile is op
 tests replay real games.  A build is generic for its target architecture, so a binary runs on any machine of that
 architecture; tuning for the build machine's CPU is opt-in, `RUSTFLAGS="-C target-cpu=native" cargo build --release`,
 for a machine that will run only that binary (the cloud scripts do this, see
-[tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md)).  It gains nothing on the Apple M1, where it was measured; it is
-unmeasured elsewhere (the generic x86-64 target has no hardware popcount, so measure there).  `tools/pgo.sh` makes a
+[solver/docs/RUNBOOK.md](../docs/RUNBOOK.md)).  It gains nothing on the Apple M1, where it was measured; it is
+unmeasured elsewhere (the generic x86-64 target has no hardware popcount, so measure there).  `solver/tools/pgo.sh` makes a
 profile-guided build in `target/pgo/release` (0-2% fewer cycles on the M1, the same answers and trees; its header says
 how, and DESIGN.md "Performance" what it gains); `examples/perf.rs` measures the hot paths.
 
 ```
-tools/quick_check.py               # the quick check: fmt, clippy and the tests, the long ones skipped, within time limits
+../tools/quick_check.py             # the quick check: fmt, clippy and the tests, the long ones skipped, within time limits
 cargo test                         # the same tests, a binary at a time
 cargo test --release               # the full suite
 ```
 
 The tests run as many threads as the machine has CPUs, and none of these builds the study tools (`--features studies`
-adds them and their tests).  What each takes, and when each is run, is in [DESIGN.md](DESIGN.md#9-testing).
+adds them and their tests).  What each takes, and when each is run, is in [DESIGN.md](../docs/DESIGN.md#9-testing).
 
 The ignored tests are for large machines and long runs: `cargo test --release --test engine -- --ignored
 many_threads` (64 and 192 worker threads), `TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored
 stress` (random engine configurations through resumes), `TXENGINE_CONSERVATION=500 cargo test --release --test
 robustness conservation`, and the benchmarks under `bench` in `src/` and `tests/engine.rs`.  What the suite checks is
-listed under "Testing" in [DESIGN.md](DESIGN.md#9-testing); `tests/tripwires.rs` asserts exact node counts, so a change
+listed under "Testing" in [DESIGN.md](../docs/DESIGN.md#9-testing); `tests/tripwires.rs` asserts exact node counts, so a change
 that alters the search tree on purpose fails it (DESIGN.md says how to update the counts).
 
 ## 3. Commands
 
 `taxman help` lists everything; this section shows each command with output from this build.  A tactic is one
 switchable piece of the algorithm; `--tactic NAME=VALUE` is repeatable, and the names, values and defaults are in
-`taxman help` and [DESIGN.md](DESIGN.md#5-tactics).  Every tactic is proven or sound and on by default
+`taxman help` and [DESIGN.md](../docs/DESIGN.md#5-tactics).  Every tactic is proven or sound and on by default
 (`match_refine` is 1), so switching one changes how fast an answer comes, never the answer.  The other flags of
 `solve` are in the table at the end of this section.
 
@@ -263,18 +265,18 @@ whose predecessor is in neither the run nor the results file, and not taken with
 solve 1400`, or `taxman solve 480` without the flag), runs *standalone*, with no seed and no ceiling; `solve` says so on
 stderr (`note: no previous game for n=...`) and the result line has `"prev": null`.  That is still correct, but costs
 about twice as much on the hard games, and many times more on games that a chain settles at once by reaching the
-ceiling ([bench/curve/README.md](bench/curve/README.md)).
+ceiling ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
 
 ### Known games
 
-`--use-prev` draws on three sources of games that the run has not made, all in the repository (`rust/results`, no
+`--use-prev` draws on three sources of games that the run has not made, all in the repository (`results`, no
 option names another):
 
 | source | holds | a game of it rests on |
 |---|---|---|
 | `optimal.json` (built in) | the table of optimal games, n <= 1300 | nothing but the table's word: the line records that it assumes the game optimal |
 | `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes (nothing) |
-| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](results/README.md#boundsjsonl)); a board whose best lower bound is its best upper bound is *proven* | statement U at the boards its upper bound rests on (`rests_on`), one assumption each |
+| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a board whose best lower bound is its best upper bound is *proven* | statement U at the boards its upper bound rests on (`rests_on`), one assumption each |
 
 Of a board that several hold, the committed chain's game is taken, then the store's, then the table's.  What it does:
 
@@ -304,7 +306,7 @@ $ taxman solve 1-2175 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-inte
 
 Starting at n = 1, no game is taken from `optimal.json` (it is only compared with, up to 1300, where it ends: a score
 that differs is a hard error), so no proof in the file assumes anything beyond the frame model.  The committed
-`results/strict.jsonl` is such a run, in parts ([results/README.md](results/README.md) has the details of them): its
+`results/strict.jsonl` is such a run, in parts ([results/README.md](../../results/README.md) has the details of them): its
 games 1 to 2175 were made by this command (up to the paths and the thread count), and a run of it reproduces their
 scores; its later games continue them (runs on a cloud machine, the first started from a copy of the 2175 lines).  A
 run that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof rests on it, that it
@@ -325,10 +327,10 @@ game after another gives it; the moves may be another optimal set, and the nodes
 window: games in flight" and "What a window changes in the results").  The default is 4, and with one thread the window
 is always 1 (one game after another).  On 4 threads of the laptop a window of 16 makes 1..1300 about 16% faster and
 the games past 2225, whose searches already keep 4 threads busy, no slower ([round
-B](docs/experiments/round-b-the-chain-on-many-threads-2026-10.md)); on 64 threads a window of 16 makes the games past
+B](../notebook/round-b-the-chain-on-many-threads-2026-10/README.md)); on 64 threads a window of 16 makes the games past
 2225 20 to 32% slower than one game after another, and 4 is the best measured, so it is the default, and what
-`tools/cloud/chain.sh` runs with ([scaling to 192
-threads](docs/experiments/scaling-to-192-threads-2026-10.md)).  With the
+`solver/tools/cloud/chain.sh` runs with ([scaling to 192
+threads](../notebook/scaling-to-192-threads-2026-10/README.md)).  With the
 environment variable `TAXMAN_WINDOW_TRACE` set, the run prints the window's events on stderr (games set up, searches
 started, threads moved, deferrals, hints, conclusions).
 
@@ -368,7 +370,7 @@ counts them.
   waits behind another).  Every search in flight stops with a final checkpoint, nothing is recorded for that game, not
   even an incomplete line, `solve` prints `wall at N after H hours` and exits with status 4; the game's clock is kept
   beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
-  ([DESIGN.md](DESIGN.md#the-window-games-in-flight)).
+  ([DESIGN.md](../docs/DESIGN.md#the-window-games-in-flight)).
 * **The result is recorded before the checkpoint is deleted**, so a crash never loses a finished game; at worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  Searcher state is bounded; the shared queue of work units spills to `DIR/spill` beyond `--mem-cap` units
@@ -395,7 +397,7 @@ increasing n, so that one it has just proven helps the next.  A signal still end
 game it stopped, so that a rerun resumes it.  `--pass N` records N in `options.pass` of every line the run writes, and
 changes nothing else.
 
-**The sweep** (`rust/tools/cloud/sweep.sh FIRST LAST`, [RUNBOOK section 13](tools/cloud/RUNBOOK.md#13-the-sweep))
+**The sweep** (`solver/tools/cloud/sweep.sh FIRST LAST`, [RUNBOOK section 13](../docs/RUNBOOK.md#13-the-sweep))
 goes over a long stretch of board sizes for as many proven games as the time allows, holes allowed: the stretch is
 split into blocks of consecutive games of about equal expected work, one `taxman solve --keep-going` on one thread
 for each, with a limit on each game's search (`GAME_SECONDS`, 180); then passes of `--retry-improved` on the merged
@@ -416,9 +418,9 @@ neighbourhood search, which is not sound: its games are lower bounds once the re
 proven when its bounds meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
 chain has proven is a fair test, which `report --known` checks.  What it finds is kept in the bounds store,
 `results/bounds.jsonl` (`ledger export`; `run --bounds` starts from it; two referees:
-[results/README](results/README.md#boundsjsonl)), which `taxman solve --use-prev` draws on too (below, "Known games").  Its files are its own, not results lines
-([DESIGN.md, "The ledger"](DESIGN.md#the-ledger); the experiment: [the
-ledger](docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md)).
+[results/README](../../results/README.md#boundsjsonl)), which `taxman solve --use-prev` draws on too (below, "Known games").  Its files are its own, not results lines
+([DESIGN.md, "The ledger"](../docs/DESIGN.md#the-ledger); the experiment: [the
+ledger](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)).
 
 ### All flags of `solve`
 
@@ -464,9 +466,9 @@ $ taxman tables 85 8 45                         # the maximal factors and compos
 $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184 (standalone, no derivation)
 ```
 
-`bench` appends one JSON line per run to its history file, `rust/bench/history.jsonl` of the repository unless
+`bench` appends one JSON line per run to its history file, `solver/frame/bench/history.jsonl` of the repository unless
 `--history FILE` names another (pass it to keep the checkout clean), and takes the games past `optimal.json`'s from
-`rust/results/strict.jsonl` unless `--known FILE` names another results file.  The ladder is the harness for
+`results/strict.jsonl` unless `--known FILE` names another results file.  The ladder is the harness for
 hard games and for scaling over thread counts: `cargo run --release --example ladder -- --scaling --seed-opt --known
 results/strict.jsonl --seconds 600 1215` (its flags are documented at the top of
 `examples/ladder.rs`).
@@ -493,13 +495,13 @@ added 2614 games (n = 1301..=3914); the table has 3914 games, n up to 3914; wrot
 stopped at n = 3915: the results end at n = 3914
 ```
 
-Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `src/main/resources/optimal.json`;
+Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `results/optimal.json`;
 the binaries built after that carry the new table.
 
 `certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE` proves, game by game, that the recorded
 scores of A..B (or of the boards of the list FILE, one board size a line, in that order) that rest on the frame model
 are the optima on the whole board (statement U at each n; section 1, "What optimal means"):
-for each game the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`) say needs it, a search of the
+for each game the prover's barred bounds (`--upper`, `solver/noframe/data/upper_*.jsonl`) say needs it, a search of the
 extended problem with the bounds' open members optional, started from the recorded game, ends `certified` (nothing
 beats it) or `beaten` (a game that does, written to `OUT.counterexample.jsonl` too; the run exits with status 2).  It
 takes `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it; the extended problem keeps the
@@ -508,7 +510,7 @@ a line records which.
 `verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]` checks the files it
 wrote without changing them, line by line, and says how far the proofs of the recorded scores reach (the prover's, the
 certificates' and the ceilings').
-[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) has what they check and what a line holds.
+[DESIGN.md, "Certificates of U"](../docs/DESIGN.md#certificates-of-u) has what they check and what a line holds.
 
 ## 4. Reading the output
 
@@ -617,7 +619,7 @@ Each completed game records how its optimality is established (`proof`):
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached `n + score(n-1)`, which no game of n can exceed (removing the move n from an optimal game of n leaves a game of n - 1) | yes |
 | `prime_formula` | a prime n plays the game of n - 1 with its first move replaced by n; optimal if the game of n - 1 is (proved in `src/accelerate.rs`, at `prime_shortcut`) | yes |
-| `same_search` | the game's search problem (frames, candidates, `max_total`, the factor graph among their numbers) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; the argument is in [DESIGN.md](DESIGN.md#same-search)) | no: on the game m it repeats |
+| `same_search` | the game's search problem (frames, candidates, `max_total`, the factor graph among their numbers) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; the argument is in [DESIGN.md](../docs/DESIGN.md#same-search)) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search: the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
 
 ### Citing a known source
@@ -634,10 +636,10 @@ A line of proof `known` has a `known` field that says which source it rests on:
 The score is optimal, wherever the cited bound holds: a finished game that scores what an upper bound of the board
 allows is the best (a lower bound is a game, and a game replayed by the referee is a lower bound).  The referees check
 that the game plays and scores the line's score, and that the cited lines are in the sources and are what the line
-says; they do not check the sources again (`ledger verify-bounds` and `tools/check_bounds.py` check the store, the
+says; they do not check the sources again (`ledger verify-bounds` and `solver/tools/check_bounds.py` check the store, the
 referees of results files the committed chain), and which game the line plays is not compared with the source's.  So
-a file with `known` lines is checked against the sources of the repository's `rust/results` (the defaults of `taxman
-verify-results`; `tools/check_results.py` takes `--committed FILE` and `--bounds FILE`), and one that cites a source
+a file with `known` lines is checked against the sources of the repository's `results` (the defaults of `taxman
+verify-results`; `solver/tools/check_results.py` takes `--committed FILE` and `--bounds FILE`), and one that cites a source
 that was not given is refused.  A known game that is wrong would be caught by the chain (a score outside
 `score(n - 1) <= score(n) <= n + score(n - 1)` is an error), by the table where it has the game, and by the next
 `ledger verify-bounds`; a search that finds a game above the store's bound stops the run, naming the board: the store is
@@ -691,7 +693,7 @@ a game and the one before it are both completed, the chain bounds hold between t
   agree, and a count of games by proof kind and by what they assume.  For a repeat it sets the search problems of both
   games up again and compares them.  For a `known` line it checks the citation against the sources ("Citing a known source"
   above): the table, the committed chain and the bounds store of the repository, which it reads as they are, since their
-  own referees check them (`ledger verify-bounds` and `tools/check_bounds.py` the store).  Opening a results file for
+  own referees check them (`ledger verify-bounds` and `solver/tools/check_bounds.py` the store).  Opening a results file for
   `--out` runs the same checks, with the sources `--use-prev` draws on.
 * **Both accept a file with holes** (a `--keep-going` run's, the sweep's `explore.jsonl`: board sizes with no line, or
   with only incomplete ones), and check each line against what it rests on in the same file: a ceiling (`setup.cap`)
@@ -702,7 +704,7 @@ a game and the one before it are both completed, the chain bounds hold between t
   is checked to be legal, to score the `best_so_far`, and to be no better than `optimal.json`'s score.  The report
   names the board sizes that only an unfinished search is recorded for.  A line whose game of n - 1 is not in the file
   at all is still refused, as it was (`tests/results.rs` shows each case with both referees).
-* `python3 tools/check_results.py [FILE...]` is an independent referee in Python (standard library only, no shared
+* `python3 solver/tools/check_results.py [FILE...]` is an independent referee in Python (standard library only, no shared
   code).  It re-derives every proof and assumption, and also checks each score against `optimal.json`, the
   Franklín-Moniot upper bound and the best-known heuristic chain in `heuristics/results`.  With no arguments it checks
   `results/*.jsonl` but the store `bounds.jsonl`, which is not a file of results.  It cannot rebuild the frame model: it
@@ -723,7 +725,7 @@ results/strict.jsonl: 3914 completed games, n = 1..=3914 (0 missing), 0 incomple
 
 What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal when the game
 of n - 1 is not optimal either; that is what the proof kinds and the assumptions track, and why a chain from n = 1
-matters.  [results/README.md](results/README.md) says what supports each committed score (re-solves from scratch, a
+matters.  [results/README.md](../../results/README.md) says what supports each committed score (re-solves from scratch, a
 second build's chain, what the games assume).
 
 ## 6. The pipeline
@@ -772,7 +774,7 @@ second build's chain, what the games assume).
                                      the game becomes the previous game of n+1
 ```
 
-The numbers are those of [DESIGN.md](DESIGN.md#7-per-game-pipeline-solver), which gives the Java class each step
+The numbers are those of [DESIGN.md](../docs/DESIGN.md#7-per-game-pipeline-solver), which gives the Java class each step
 replaces, and of the module comment of `src/solver.rs`, which gives the checks of each.
 
 ## 7. Glossary
@@ -781,9 +783,9 @@ Words that mean more than one thing in this code base are marked **(overloaded)*
 inside one part of the code are defined where they are used, not here: the setup's (`unzip`, mandatory moves, claimed
 factors) in the module comment of `src/frames/mod.rs`; the peel, `reduce` and the home frame in `src/model/`; the
 bounds' internals (potentials, weight splits, contraction, refinement, refits) in [DESIGN.md, section
-4](DESIGN.md#4-the-search); the engine's (units, splits, steals, spills, pauses) in [section
-6](DESIGN.md#6-engine) and the module comment of `src/engine.rs`; the fields of the progress line in section 4 above;
-the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#the-java-solver-and-the-frame-solver).
+4](../docs/DESIGN.md#4-the-search); the engine's (units, splits, steals, spills, pauses) in [section
+6](../docs/DESIGN.md#6-engine) and the module comment of `src/engine.rs`; the fields of the progress line in section 4 above;
+the Java's and the wiki's own words, mapped to these, in [DESIGN.md](../docs/DESIGN.md#the-java-solver-and-the-frame-solver).
 
 ### The game
 
@@ -816,7 +818,7 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **freedoms**: a frame's factors minus its moves: how many factors it can spare.  A promotion into or out of the frame
   uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **winnable**: some order takes every move of a frame.  A **peel** tests it ([DESIGN.md, section
-  2](DESIGN.md#2-the-game-and-the-frame-model)).
+  2](../docs/DESIGN.md#2-the-game-and-the-frame-model)).
 * **promotion, promote**: play a factor as a move: take it out of its frame's factors and make it a move of the frame
   in front of it.  Legal when both frames stay winnable.
 * **candidate** **(overloaded)**: (1) a number setup says could be promoted (`SearchFrames::candidates`,
@@ -840,14 +842,14 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 ### The search
 
 * **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven**: the grading in
-  [DESIGN.md](DESIGN.md#5-tactics); every tactic is one or the other.
+  [DESIGN.md](../docs/DESIGN.md#5-tactics); every tactic is one or the other.
 * **node, step**: a search node is a set of promotions made from the root plus the candidates left; the `nodes` that
   results and progress lines count are *steps*, one per candidate a node's loop tries.
 * **incumbent**: the best promotion set found so far, shared by all threads.  **greedy**: promote every candidate that
   can be, from the largest down; the search starts from the best of that, the previous game's promotions and a rounding
-  of the root's matching ([DESIGN.md, section 4](DESIGN.md#the-starting-incumbent-the-ceiling-and-the-seed)).
+  of the root's matching ([DESIGN.md, section 4](../docs/DESIGN.md#the-starting-incumbent-the-ceiling-and-the-seed)).
 * **GF(2) bound** (`gf2`, the default): what no completion of a node can exceed, from the heaviest set that is
-  independent in two matroids over GF(2), one for the even frames and one for the odd ones (heuristics/THEORY.md,
+  independent in two matroids over GF(2), one for the even frames and one for the odd ones (docs/THEORY.md,
   Theorem 11; DESIGN.md, section 4).  **matching bound** (`gf2=off`): winnability relaxed to matchability, the largest
   sum of promotions such that every move and every promoted number gets a distinct maximal factor in its frame, a
   maximum-weight bipartite matching kept along the search path (`matchbound`).
@@ -864,11 +866,11 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **prime exchange, symmetric pair**: exchanging two primes `p < q` in every number; a pair whose exchange maps the
   root's frames and candidates onto themselves is *symmetric*, and maps promotion sets to promotion sets worth
   `(q − p)(c_p − c_q)` more (`c_r` the sum of a set's cofactors `x / r`), so every heaviest set keeps `c_p ≤ c_q`
-  for every symmetric pair (heuristics/THEORY.md, Theorem 13).  The search cuts a node none of whose completions
+  for every symmetric pair (docs/THEORY.md, Theorem 13).  The search cuts a node none of whose completions
   can keep them, and drops the candidates none that does holds (tactic `symmetry`; DESIGN.md, section 4).
 * **dual bound**: what a search that a limit stopped proves from above: the largest of its incumbent and, over the
   open units of its final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
-  heuristics/THEORY.md, Lemma D).  Stopped before its first node, it is the root's bound.
+  docs/THEORY.md, Lemma D).  Stopped before its first node, it is the root's bound.
 
 ### Results and trust
 
@@ -896,11 +898,11 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 * **known game, known source**: a game that `--use-prev` takes from `optimal.json`, the committed chain
   (`results/strict.jsonl`) or a board the bounds store (`results/bounds.jsonl`) has proven, instead of searching for it
   (section 3, "Known games"; `src/known.rs`).  **bounds store**: the bounds on opt(n) that the ledger finds, a line
-  each, kept for good ([results/README.md](results/README.md#boundsjsonl); `src/store.rs`).
+  each, kept for good ([results/README.md](../../results/README.md#boundsjsonl); `src/store.rs`).
 * **optimal ok / optimal match**: the score equals `optimal.json`'s, the table built into the binary.  It is not a
   proof, and does not exist above the table's last game; a score that differs is a hard error.
 * **referee**: code that checks a game or a results file independently of the code that made it: `game::replay`,
-  `taxman verify-results`, `tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
+  `taxman verify-results`, `solver/tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
   written to `<results>.rejected.jsonl`.
 * **results line, schema 5**: the format of a line of `--out` (section 4); this build reads no other.  Two words
   survive only as field names there: `nodes` counts steps, and `prev.source` says where the game of n - 1 came from.
@@ -911,19 +913,19 @@ the Java's and the wiki's own words, mapped to these, in [DESIGN.md](DESIGN.md#t
 ### Other programs and bounds
 
 * **the frame solver** (this crate, the binary `taxman`; "the solver" for short): a branch and bound over promotions
-  within the frame model, which finds the games.  **the Java solver** (`src/main/java`): the original, whose algorithm
+  within the frame model, which finds the games.  **the Java solver** (not in the tree; the git tag `java-final` has it): the original, whose algorithm
   the frame solver reimplements.  **optimal.json**: the table of optimal games, n <= 1300 (the Java's games 1 to 1000,
   then those of the chain from n = 1, appended by `taxman extend-optimal`), built into the binary.
-* **the prover** ([prover/](prover/README.md)): a branch and bound over sets of moves on the whole board, which decides
+* **the prover** ([solver/noframe/](../noframe/README.md)): a branch and bound over sets of moves on the whole board, which decides
   playability by peel and uses only proven bounds; it proves that no set of moves beats a recorded score, with none of
   the frame solver's code.
   **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n);
-  `tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
-  over GF(2) split by the parity of Ω (heuristics/THEORY.md, Theorem 10).
+  `solver/tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
+  over GF(2) split by the parity of Ω (docs/THEORY.md, Theorem 10).
 * **brute force**: `src/brute.rs`, the exhaustive search that is the test oracle for small boards.  **U\***:
-  the sources that setup keeps, by descending greedy on each frame; heuristics/THEORY.md's name for the heaviest
+  the sources that setup keeps, by descending greedy on each frame; docs/THEORY.md's name for the heaviest
   playable set of sources, which they are wherever the upper-half conjecture holds, so on every board to 100,000
-  ([prover/README.md, section 2](prover/README.md#2-conjecture--at-scale)).  **U**: the statement that some optimal
+  ([solver/noframe/README.md, section 2](../noframe/README.md#2-conjecture--at-scale)).  **U**: the statement that some optimal
   game plays every member of U\* with three or more prime factors, on which the frame solver's answers rest (section
   1, "What optimal means").
 
@@ -950,7 +952,7 @@ comment that is worth reading first; section 6 above is the map of how the piece
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
 9. `src/gf2.rs`: the GF(2) bound, the default node bound: the module comment explains the two frame matroids, how
     a node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their
-    weighted intersection (the tableau, the augmenting paths, the weight split).  `heuristics/THEORY.md`, Theorem 11,
+    weighted intersection (the tableau, the augmenting paths, the weight split).  `docs/THEORY.md`, Theorem 11,
     is the proof.
 10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
     whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
@@ -974,14 +976,14 @@ comment that is worth reading first; section 6 above is the map of how the piece
 | document | what it holds |
 |---|---|
 | this page | the user guide |
-| [DESIGN.md](DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
-| [docs/STATUS.md](docs/STATUS.md) | the current state of the work: what is in flight, paused, decided, waiting on a decision (read it first) |
-| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements, one file an entry in [docs/experiments/](docs/experiments/) |
-| [docs/IDEAS.md](docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
-| [docs/AGENDA.md](docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
-| [results/README.md](results/README.md) | the committed results files and what supports their scores |
-| [bench/curve/README.md](bench/curve/README.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
-| [prover/README.md](prover/README.md) | the prover: independent proofs and checks of the frame solver's results on the whole board, and the conjecture checks |
-| [tools/cloud/RUNBOOK.md](tools/cloud/RUNBOOK.md) | running the solver, and the prover's proofs, on a many-core cloud machine |
-| [../heuristics/THEORY.md](../heuristics/THEORY.md) | the theory (maximal factors, playable sets) the model rests on |
+| [DESIGN.md](../docs/DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
+| [solver/docs/STATUS.md](../docs/STATUS.md) | the current state of the work: what is in flight, paused, decided, waiting on a decision (read it first) |
+| [solver/notebook/README.md](../notebook/README.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements, one folder an entry in [solver/notebook/](../notebook/) |
+| [solver/docs/IDEAS.md](../docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
+| [solver/docs/AGENDA.md](../docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
+| [results/README.md](../../results/README.md) | the committed results files and what supports their scores |
+| [solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
+| [solver/noframe/README.md](../noframe/README.md) | the prover: independent proofs and checks of the frame solver's results on the whole board, and the conjecture checks |
+| [solver/docs/RUNBOOK.md](../docs/RUNBOOK.md) | running the solver, and the prover's proofs, on a many-core cloud machine |
+| [docs/THEORY.md](../../docs/THEORY.md) | the theory (maximal factors, playable sets) the model rests on |
 | the [wiki](https://github.com/bvchess/taxman/wiki) | the Java solver's algorithm and definitions |

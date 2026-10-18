@@ -1,20 +1,20 @@
 # Nogoods from the finder's work (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Can a burst of the finder's work produce nogoods that lower a game's upper bound?  The finder (large
-neighbourhood search, [the finders entry](finders-for-good-games-that-are-not-sound-2026-10.md)) fixes part of an
+neighbourhood search, [the finders entry](../finders-for-good-games-that-are-not-sound-2026-10/README.md)) fixes part of an
 incumbent's promotions and runs the sound search on the rest as a unit, over and over; every one of those searches
 learns nogoods (sets of candidates that cannot all be promoted from the root, which hold everywhere in the search of
 the game).  Any nogoods with any non-negative multipliers give a valid upper bound by Lagrangian relaxation of "at most
 `|N| - 1` members of `N`".  Two earlier studies measured what such bounds can reach at n ≤ 1300: a Lagrangian over
 conflicts with the GF(2) intersection as the inner problem closed 7-36% of the root's GF(2) gap
-([matroid study](matroid-intersection-bounds-2026-10.md)), and the cover LP over all conflicts closed 46% on average
-over 880-1300, a share that fell 3.8 points per 100 in n ([how far nogoods can go](how-far-can-nogoods-go-2026-10.md)).
+([matroid study](../matroid-intersection-bounds-2026-10/README.md)), and the cover LP over all conflicts closed 46% on average
+over 880-1300, a share that fell 3.8 points per 100 in n ([how far nogoods can go](../how-far-can-nogoods-go-2026-10/README.md)).
 Here the nogoods come from searches, at n = 3000-4800, and are a few seconds' work.
 
 **What was run.**  On the laptop on 2026-10-18, with the test-profile build of `wall`, one process a game and four at
-once under `nice -n 10` (the data, commands and tables are in [bench/finders/nogoods/](../../bench/finders/nogoods/README.md);
+once under `nice -n 10` (the data, commands and tables are in [solver/notebook/nogoods-from-the-finders-work-2026-10/](README.md);
 the command `wall nogoods`, new in commit 05e3744 and changed by d47ea73, is defined in `examples/wall/nogoods.rs`).
 For each game: the standalone start incumbent; the finder for S CPU seconds, harvesting the nogood table of every
 unit's searcher; as the control, the sound search standalone from the same start for S CPU seconds, harvested the
@@ -27,7 +27,7 @@ without a lower bound, a direction with 0.9 of the last direction added) and the
 steps is the answer, and the same fit run on to L = 2,000 steps shows how far it goes.  Any multipliers make a bound,
 so nothing about the fit can make it wrong, only loose.  The tables never forget (the search's tables are not cleared
 every 50,000 steps, as a real search's are, so that every nogood it learned is in its pool).  Two small changes in
-`rust/src`, neither of which changes a search: `TaxSearcher::nogoods` (the table a searcher holds) and
+`solver/frame/src`, neither of which changes a search: `TaxSearcher::nogoods` (the table a searcher holds) and
 `Gf2Graph::reweighted`.
 
 * **Eight games with known optima**, 3016, 3156, 3216, 3276, 3311, 3336, 3381 and 3396: games of 3000-3440 that the
@@ -101,10 +101,10 @@ sound search's own nogoods from the same time do almost as well (0.32 against 0.
 120 s) with a tenth or less of the pool, so the finder is not the better source; the bound comes from nogoods, not from
 the finder's games.  (ii) What is left is far from a proof: 690 above the optimum at the known games and over 1,000
 above the lower bound at the open ones, where a proof needs the two to meet.  (iii) A root bound lowered by a third is
-the kind of result [A1](the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md) found not to change the trees (its
+the kind of result [A1](../the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md) found not to change the trees (its
 multi-field bound closed 0.4-0.6 of the gap at the roots, and the trees fell by a factor that fell as the gap grew), and
 the Lagrangian bound over the nogoods in the search (the matching as its inner problem) gained nothing in
-[the tuning campaign](the-tuning-campaign-at-the-end-of-the-chain-2026-10.md); nothing here measures trees.
+[the tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md); nothing here measures trees.
 
 As a result in the store the bound would need a checkable certificate (the nogoods, each checked by
 `promote_all_using`, and the multipliers: the bound is then one weighted GF(2) solve); the store takes none yet, so
@@ -115,7 +115,7 @@ as good as any pool.
 
 **Commits.**  05e3744 (the command and the two accessors), d47ea73 (the fit's momentum); the data are in the commit
 that has this entry.  The `lagrange` command of the removed `matroid` example (`git show
-8753189^:rust/examples/matroid.rs`) was the model, with the research intersection of `common/meet.rs` replaced by the
+8753189^:solver/frame/examples/matroid.rs`) was the model, with the research intersection of `common/meet.rs` replaced by the
 crate's own GF(2) bound.
 
 ## Later (2026-10): the command removed from master
@@ -124,3 +124,31 @@ The command `wall nogoods` was removed from the tree on 2026-10-18.  It builds a
 9d9dae3:rust/examples/wall/nogoods.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
 The harvest of nogoods and the fit of the multipliers stay in `examples/wall/nogoods.rs`, which `wall choice-prepare`
 and `wall choice` use.
+
+## Files
+
+The runs were made on the
+laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the test-profile build of `wall`
+(`cargo build --profile test --example wall` in `rust/`), from `rust/`, against the committed chain
+(`results/strict.jsonl`).  The command `nogoods` was removed from master on 2026-10-18; it builds at commit 9d9dae3
+(`git checkout 9d9dae3` first), where it is defined in the module comment of `examples/wall/nogoods.rs`, which defines
+every field of a line.  Every time is the CPU seconds of the process (or the wall seconds of a bound, which is one
+thread), and the budgets of the finder and of the control are CPU seconds, so the pools of two runs of one game differ a
+little (a budget cuts a search at a different step).
+
+`run.py` runs `wall nogoods` over a list of games, four processes at a time, and appends each game's line to the file
+as it ends (a run that is interrupted goes on where it was); it takes the helpers of `../run.py`.  `tables.py` makes
+the tables of the entry from the files and `../../../results/bounds.jsonl`; its output is `tables.txt`.
+
+### Files and the commands that made them
+
+The eight games with known optima are 3016, 3156, 3216, 3276, 3311, 3336, 3381 and 3396: games of 3000-3440 that
+the chain searched (not primes, not repeats, not stopped at the ceiling), picked from `../stage2.jsonl` for a spread
+of root gaps (766 to 1,427; `upper` less `opt`).  The open games are 4300, 4522, 4761 and 4788.
+
+| file | command | what it is |
+|---|---|---|
+| `known-10s.jsonl`, `known-120s.jsonl` | `./bench/finders/nogoods/run.py known-10s.jsonl --cpu 10 --shuffle 3016 3156 3216 3276 3311 3336 3381 3396`, and with `--cpu 120` | the eight games with known optima, the finder and the sound search 10 and 120 CPU s each |
+| `open-10s.jsonl`, `open-120s.jsonl` | `./bench/finders/nogoods/run.py open-10s.jsonl --cpu 10 4300 4522 4761 4788`, and with `--cpu 120` | the four open games |
+| `plain-known-10s.jsonl`, `plain-known-120s.jsonl`, `plain-open-10s.jsonl`, `plain-open-120s.jsonl` | the same four commands, made before the fit had momentum (commit 05e3744: plain subgradient steps) | the first pass, kept because it shows that the fit decides the answer for a large pool: with plain steps the finder's pool of 120 s, thirteen thousand nogoods, closed less of the gap than the pool of 10 s (the entry has the numbers) |
+| `tables.py`, `tables.txt` | `./bench/finders/nogoods/tables.py > tables.txt` | the tables the entry quotes |

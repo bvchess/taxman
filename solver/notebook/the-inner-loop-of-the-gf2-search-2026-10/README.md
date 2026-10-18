@@ -1,6 +1,6 @@
 # The inner loop of the GF(2) search (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The GF(2) bound cut the trees about 400-fold, but a node cost 9 to 13 times a node of the matching
 path: 340k cycles at the proof of 1287, of which the intersection's shortest paths took 57%, the levels' own work
@@ -16,7 +16,7 @@ of 12 proofs (936, 990, 992, 1024, 1100, 1184, 1215, 1232, 1254, 1287, 1300, 135
 the slope study and the dearest games past 1300 (1430, 1472, 1475, 1521, 2170, 2172) at the start and the end; the
 probe (`perf --tactic gf2=on`); sampled profiles by source line (Instruments' Time Profiler, `xctrace record
 --launch`, every sample's address symbolicated with its inlined frames by `atos -i`; the scripts were scratch and
-are not kept: `tools/profile/attribute.py` does the same from `sample` output, coarser).  The window's fingerprint
+are not kept: `solver/tools/profile/attribute.py` does the same from `sample` output, coarser).  The window's fingerprint
 used to fold in the GF(2) bound's counts of solves and augmentations, which a cheaper bound changes with the same
 tree: it now counts them as zero (30f600f; the matching path's fingerprint is unchanged, the GF(2) probe of feba6d0
 is 87991b2903990d65 so measured).
@@ -140,7 +140,7 @@ from 2201 to 665 nodes, 1000 from 5386 to 2657).  `taxman regress --to 1000` on 
 The chain 1..1300 on one thread (`taxman solve 1-1300 --threads 1`, to a scratch file): 63 s of wall time, 34.4 s of
 search and 402,205 nodes; every score, method and proof equal to `results/strict.jsonl`'s (trivial 13, prime 211,
 `cap` 115, exhausted 416, same search 545), the move lists of 1,291 of the 1,300 games identical (9 are other
-optimal sets), and `verify-results` and `tools/check_results.py` accept it.  Clippy and fmt clean.
+optimal sets), and `verify-results` and `solver/tools/check_results.py` accept it.  Clippy and fmt clean.
 
 *Tried and not kept.*
 

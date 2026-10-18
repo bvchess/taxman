@@ -1,6 +1,6 @@
 # The wall regime (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The committed chain reaches 2175 with costs that barely grow, and the set widths stop at n = 4095.  Near
 the wall trees will be large and n larger.  What grows with n, and with the size of a tree, apart from parallel scaling
@@ -8,7 +8,7 @@ the wall trees will be large and n larger.  What grows with n, and with the size
 and checkpoints, the chain's fixed costs per game, the set widths and what lies beyond 4095, the checkpoints and the S3
 saves of a cloud run?  And what should change first?  Measured on the M1 Max (one process at a time, `nice -n 10`, one
 thread unless said, other jobs running at load 4 to 5), with no change to the solver: `examples/wall.rs` (commits
-49c7917 and dddc5fd) measures, and [bench/wall/](../../bench/wall/README.md) has the data, the commands, `wall.py` with its
+49c7917 and dddc5fd) measures, and [solver/notebook/the-wall-regime-2026-10/README.md](README.md) has the data, the commands, `wall.py` with its
 tables (`wall_output.md`) and the commands for a cloud machine.
 
 *What was built.*  `examples/wall.rs`, five commands: `setup` (the fixed costs of a game piece by piece, the sizes, the
@@ -186,8 +186,8 @@ the longest pause 0.42 s with a park of 0.41 s: a step at 4000 can run 0.4 s (st
 0.7 ms at 1430 and 0.12 ms on the matching path.  A checkpoint of one thread at 4000 is 58 KB (63 to 71 units of 1
 KiB: the path); 64 workers at 2170 wrote 1.4 to 1.8 MB.  At 192 threads near 4000, then: about 13 MB a checkpoint, a
 pause costing every worker the slowest worker's step (up to 0.4 s) and its path's rebuilds (about 40 ms), so about
-0.7% of the machine at the chain's interval of 60 s and 0.15% at 300 s.  The real figure needs the machine (bench/wall,
-"For a cloud machine", 3).
+0.7% of the machine at the chain's interval of 60 s and 0.15% at 300 s.  The real figure needs the machine ([the scaling run's "For a cloud
+machine"](../scaling-to-192-threads-2026-10/README.md#for-a-cloud-machine), 3).
 
 *S3.*  One `aws s3 sync` (aws-cli 2.38) costs 0.38 s of CPU (0.30 user, 0.08 system, 88 MB) before its first request;
 `save.sh` makes three, and uploads the results file whole whenever it changed (7.7 MB now, about 27 MB at 4095: a
@@ -225,3 +225,45 @@ Build first: 1 to 4, one round with no tree changed anywhere (the one-thread nod
 must not move), measured by the chain's games an hour on the cloud machine; then 5 if 2048..3583 is where the chain is.
 Not recommended: 9.  Not in this study: the inner loop (the GF(2) intersection, 98% of a node) and parallel scaling
 (another study's), which the dear games past 2175 will need most.
+
+## Files
+
+This directory holds the data that `examples/wall.rs` wrote (its module comment defines every field) and `wall.py`,
+which makes the entry's tables from them (`./wall.py > wall_output.md`).  Everything ran on the M1 Max, one process
+at a time under `nice -n 10`, one thread unless a line says otherwise, with other jobs on the machine (load 4 to 5), on
+the code of this branch at the merge of master 5252d5d (9c99ca1).  Times are wall seconds of one thread; the cycles
+and instructions of the `nodes` lines are the process's, and those of the start mode include the search's own setup.
+
+### Files and the commands that made them
+
+`wall` is `target/release/examples/wall` (`nice -n 10 cargo build --release -j 4 --features studies --example wall`),
+run from `rust/`; `K` is `--known results/strict.jsonl`.  The example `matroid`, which made `anatomy_chain.jsonl`, was removed from
+master (2026-10-17); it builds at commit 8753189 (`git checkout 8753189`, then `cargo build --release --example
+matroid` in `rust/`).
+
+| file | command | what it is |
+|---|---|---|
+| `setup.jsonl` | `wall setup K 1000 1300 1600 1900 2100 2175 2200 2500 2800 3100 3400 3700 4000 4095` | the fixed costs of a game piece by piece, the sizes, the root's GF(2) bound and the gap |
+| `setup_widths.jsonl` | `wall setup K --repeat 2 --width W N` for N = 2170 (W = 36, 48, 64) and 3000 (48, 64) | the same at other set widths |
+| `start.jsonl` | `wall start K 1301 1306 ... 2171` (every fifth board) | the starting incumbent's local search: singles against pairs |
+| `nodes_start_low.jsonl`, `nodes_opt_low.jsonl` | `wall nodes K --no-seed --nodes 5000 1300 1600 1900 2170`, and with `--mode opt` | the cost of a node from the start incumbent and in the proof of the optimum |
+| `nodes_start_high.jsonl` | `wall nodes --no-seed --nodes 5000 2200 2500 2800 3100 3400 3700 4000 4095` | the cost of a node past 2175 |
+| `gaps.jsonl` | `wall nodes K --no-seed --nodes 1000 1402 1502 ... 2102` and `2252 2352 ... 4052` | root gaps over the unseeded start (and the optimum where known), and node costs, every 100 |
+| `gaps_c8g.jsonl` | `wall nodes --known KNOWN --nodes 1000 2184 2185 2190 2200 2220 2240 2250 2254 2256 2260 2268 2275`, `KNOWN` = `results/strict.jsonl` followed by `../cloud/c8g.chain-2176.jsonl` | the root gaps of the dear games past 2175, against their optima (seeded starts) |
+| `gaps_c8g_rest.jsonl` | the same with `--nodes 1` for the other 33 searched games of 2176..2276 (2176 2178 2180 2187 2192 2193 2196 2205 2208 2210 2211 2212 2214 2216 2223 2224 2225 2226 2232 2233 2235 2236 2241 2244 2247 2248 2255 2259 2261 2262 2264 2265 2272), a later build of `wall` (2026-10-14) | with `gaps_c8g.jsonl`, the root gap of every searched game of the c8g chain, for the fit of [solver/docs/AGENDA.md](../../docs/AGENDA.md#71-the-root-gaps-of-the-c8g-chain) |
+| `widths_1300.jsonl`, `widths_2170.jsonl` | `wall nodes K --mode opt --nodes 5000 --width W N`, each width twice | the same proof at several set widths |
+| `widths_3000.jsonl` | `wall nodes --no-seed --nodes 5000 --width W 3000`, W = 48, 56, 64, twice | the same, past 2175 |
+| `ckpt_4000.jsonl` | `wall nodes --no-seed --nodes 5000 --ckpt-dir DIR --every 0 4000`, then `--every 1` | what checkpoints cost a thread at 4000 |
+| `grow_1430.jsonl`, `.progress` | `wall grow K --delta 0 --nodes 1000000 --progress 2 --ckpt-dir DIR --every 10 1430` | a GF(2) proof of 706,620 nodes: monitor lines and summary (stdout), progress lines (stderr) |
+| `grow_1230_matching.jsonl`, `.progress` | `wall grow K --tactic gf2=off --tactic lagrange=on --nodes 15000000 --progress 2 --ckpt-dir DIR --every 10 1230` | a matching-path proof of 10.45 million nodes |
+| `grow_2170_t64c1.jsonl`, `.progress` | `wall grow K --threads 64 --cores 1 --seconds 90 --progress 10 --ckpt-dir DIR --every 10 2170` | 64 workers taking turns on one CPU: queue, checkpoint size, memory |
+| `frames.jsonl` | `wall frames 1024 2048 3000 4095 4096 4500 5000 5500 6000 6500 7000 7500 8000 8191` | the frames, sizes and ranks beyond the widest set |
+| `profile_4000_search.txt` (`.jsonl`) | macOS `sample` (1 ms) for 30 s of `wall nodes --no-seed --nodes 30000 4000`, attributed by `solver/tools/profile/attribute.py` | where a node's time goes at 4000 |
+| `profile_4000_setup.txt` | the same for 60 s of `wall setup --repeat 3 4000` | where the fixed costs go at 4000 |
+
+In the two profiles `attribute.py` could not symbolicate the inlined frames of this binary, so its kinds and purposes
+say `other`; the innermost functions are the useful part, as truncated symbols: `gf2::meet::Meet<3>::shortest_path`
+(`...Meet...13s`), `Meet<3>::add` (`...3ad`), `Gf2Bound<64>::evaluate` (`...8eva`), `Meet<3>::insert_both` (`...11i`),
+`Meet<3>::apply_path` (`...10a`), `model::peel::Scratch<64>::winnable` (`...peel...Scratch`),
+`BoardFrames<64>::count_freedoms` (`...6Apiary...14cou`: the build of the profiles called it `hives::Apiary`),
+`model::peel::reduce_from` (`...11reduce_from`).

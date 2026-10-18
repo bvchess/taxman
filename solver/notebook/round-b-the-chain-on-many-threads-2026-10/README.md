@@ -1,6 +1,6 @@
 # Round B: the chain on many threads (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  Round A made the serial part of a game small (a repeat 0.02 s, a searched game's setup 0.02 s plus its
 local search on all threads).  On a machine of 64 to 192 threads the chain must still keep its threads busy: game n + 1
@@ -48,14 +48,14 @@ jobs keeping the load at 3 to 6, so a few per cent of noise); the many-thread me
    which then settles it at once if the provisional game was final).
 5. *Tools* (13804bb, e4bfc4e): the ladder's scaling table has `µs/step` (busy time a step), `µs/tree` (the same without
    the units' starts), `reb %`, `1st %`, `ramp %` and `tail %`; `wall`'s lines have the new counters; `chain.sh` runs
-   with `WINDOW` (16 by default); `bench/wall/README.md`, "For a cloud machine", items 7 (where a step's time goes at 64
+   with `WINDOW` (16 by default); `solver/notebook/the-wall-regime-2026-10/README.md`, "For a cloud machine", items 7 (where a step's time goes at 64
    and 192 threads) and 8 (the window at 64 and 192 threads).
 
 *The same chains.*  With a window of 1, and with any window on one thread, the chain 1..1300 is line for line that of
 master (b24a38e, the build with the prime-exchange rule) in every field but the times and the build: window 1 and window
 8, 0 lines differ.  On 4 threads with a window of 8, every score, method, proof, ceiling, repeat (`same_search`),
 assumption and previous game (n, score, proof) of 1..1300 is `results/strict.jsonl`'s, and `taxman verify-results` and
-`tools/check_results.py` accept the file (the two steps of `tools/cloud/verify.sh`, run with 4 threads); no line's
+`solver/tools/check_results.py` accept the file (the two steps of `solver/tools/cloud/verify.sh`, run with 4 threads); no line's
 proof or repeat differs, as the argument of DESIGN.md says none can (a completed search's sum is its problem's best, and
 its proof is `cap` exactly when that best reaches the ceiling).  Move lists that differ (other optimal sets, as between
 thread counts): 1215 in one run and none in another of the final build; 539 and 1136 (with the repeats 1137-1139 that

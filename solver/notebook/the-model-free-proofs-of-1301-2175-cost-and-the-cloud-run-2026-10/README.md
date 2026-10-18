@@ -1,9 +1,9 @@
 # The model-free proofs of 1301-2175: cost and the cloud run (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover
-3](../../prover/README.md#3-the-proofs-of-optn) stopped at 1300 (the entry above, when this one began, said that the check
+3](../../noframe/README.md#3-the-proofs-of-optn) stopped at 1300 (the entry above, when this one began, said that the check
 of 1301..2175 was pending).
 What does it cost, can `exact` use the many cores of a cloud machine, and how should it be run?  Measured on the M1 Max
 (10 cores, other jobs running throughout), with `exact` as it is: no proving code was changed.
@@ -60,11 +60,11 @@ threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure a
 By list scheduling the wall time on 4, 8, 16, 32 and more threads is 36, 18, 11 and 11 hours at 2.5 ms a node; from 16
 threads up the dearest games (2170-2173, the model's 8 million nodes each) set it.  The range of the estimate is wider
 than the draws': the trend in n rests on 7 games above 1800 and a sample, not a random one, and the speed of a Graviton
-core is unmeasured.  The RUNBOOK ([section 9](../../tools/cloud/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
+core is unmeasured.  The RUNBOOK ([section 9](../../docs/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
 gives the wall time and the price by size (about $3 to $4 on spot for 16 vCPUs) and says that the calibration on
 Graviton3, 4 and 5 (`rust/bench/cloud/`) refines the per-core figures.
 
-*Tooling.*  `tools/cloud/evidence.sh A B` runs `exact` in passes of 300 s over the range, dearest first,
+*Tooling.*  `solver/tools/cloud/evidence.sh A B` runs `exact` in passes of 300 s over the range, dearest first,
 until every game has a line, then the check `summarize.py check A B` (every n in 2..B proven, every score the recorded
 one); `run.sh` holds what it shares with `chain.sh` (one run at a time, log, pid, deadline, S3 saves, clean stop,
 power-off), `setup.sh` builds and checks the evidence crate (`EVIDENCE_ONLY=1` skips the solver), `spot-watch.sh` stops
@@ -76,27 +76,27 @@ build (`--build-arg RUST_IMAGE=taxman-cloud`): the registry's metadata did not a
 *Not done, and why.*  No change to `exact` to use many cores on one game (its open units are independent subtrees, so a
 `--shard i/K` over a checkpoint's units would do it), nor to pause on a signal: at 16 vCPUs the campaign ends when the
 dearest game does, and a pass of 300 s bounds what a kill loses.  The run on EC2 and the check of 1301..2175 were the
-owner's, and are below; the results are in `prover/data/exact_parity_1301_2175.jsonl`.
+owner's, and are below; the results are in `solver/noframe/data/exact_parity_1301_2175.jsonl`.
 
 *The run (2026-10-14 and 15).*  The plan above ran, the check passed, and the cost came out higher than the projection's
 central figure, inside its ranges.
 
-*What ran.*  `rust/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../tools/cloud/RUNBOOK.md#94-run) describes, on one
+*What ran.*  `solver/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../docs/RUNBOOK.md#94-run) describes, on one
 `c8g.4xlarge` (Graviton4, 16 vCPUs, 31 GiB) on spot in us-east-1b at $0.2402 an hour, launched 2026-10-14 23:22:58 UTC
 (the run began at 23:28:46 and ended "complete" at 15:21:58 on the 15th: 15.9 hours), the build of commit 4db7a14 with
 `-C target-cpu=native`.  The instance shut itself down at the end (`POWEROFF=always`) and was terminated: 16.0
 instance-hours, **$3.84**.  190 passes of 300 s, every one ended with status 0: no spot interruption, no crash, no
-error.  The results, 875 lines of 152 KB, are `prover/data/exact_parity_1301_2175.jsonl`; the logs and the checkpoints
+error.  The results, 875 lines of 152 KB, are `solver/noframe/data/exact_parity_1301_2175.jsonl`; the logs and the checkpoints
 are not kept.
 
 *The check.*  `OK: opt(n) is proven equal to the recorded score for every n in 2..2175`, printed on the instance and
 again at home (`prover.sh --verify 1301 2175`, which is `summarize.py check`): every score of the committed chain is the
 optimum on the whole board, and no search found a set that beat one.  With the 1..1300 proofs of
-`prover/data/exact_parity_2_1300.jsonl`, `summarize.py exact` counts 2,174 games proven: 45 by the Franklín–Moniot bound
+`solver/noframe/data/exact_parity_2_1300.jsonl`, `summarize.py exact` counts 2,174 games proven: 45 by the Franklín–Moniot bound
 and 199 by the parity bound at the root, 1,047 by a search (557 and 490), 607 at their ceiling and 276 by the prime
 formula (337 and 270, 161 and 115).  Of the 875 games 490 needed a search, and all of them ran to the end.  They took
 309.2 million nodes and **226.0 thread-hours**, 2.63 ms a node; the 385 others took 83 seconds in all.
-[The prover's README](../../prover/README.md#to-2175-on-a-cloud-machine) has the table by band (`summarize.py cost --band
+[The prover's README](../../noframe/README.md#to-2175-on-a-cloud-machine) has the table by band (`summarize.py cost --band
 100`).
 
 *Against the projection above.*
@@ -129,7 +129,7 @@ nodes or more, 57 an hour or more, the ten dearest 24% of the thread-hours and t
   these 457 games 170 million nodes, and they took 287 million: by the geometric mean of the games 2.4 times as many at
   1301-1499, 1.7 at 1500-1799, as many at 1800-2169 (1.05 and 1.06) and 0.8 times at 2170-2175.  Carried to 3000, the
   old trend priced the prover's nodes at about 60 times the solver's ([agenda
-  2](../AGENDA.md#2-the-diagnosis-of-the-wall)), this one at about 15: an extrapolation of 800 in n.
+  2](../../docs/AGENDA.md#2-the-diagnosis-of-the-wall)), this one at about 15: an extrapolation of 800 in n.
 * **The model priced 33 games at zero, and `exact` took 22.1 million nodes and 13.9 thread-hours on them** (15 thousand
   to 4.2 million nodes each).  The solver's chain records no nodes for these: each is a repeat (`same_search`, through
   one to five other repeats) of a game whose search ended before its first node, at the ceiling (the proof `cap`).  The
@@ -151,5 +151,5 @@ games in flight times the passes' length come to 227 thread-hours).  Packing 226
 takes 14.1 hours, 1.8 fewer (about $0.42): the most that a better order could have saved.
 
 *Not measured.*  Where a proof's tree branches (members above n/2 against below, the premise of [agenda
-A2](../AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)): the lines
+A2](../../docs/AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)): the lines
 hold totals only.  Graviton5.  A spot interruption, which never came in 15.9 hours.

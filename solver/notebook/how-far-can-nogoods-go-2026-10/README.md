@@ -1,28 +1,28 @@
 # How far can nogoods go (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The Lagrangian bound over the nogoods (tactic `lagrange`) fits its multipliers at the root, to the
-nogoods each searcher has learned, and uses them at every node.  The [slope study](what-drives-the-slope-2026-10.md)'s
+nogoods each searcher has learned, and uses them at every node.  The [slope study](../what-drives-the-slope-2026-10/README.md)'s
 two pilots found that the root's best-fitted bound given to every searcher saved little, and that a refit from zero
 multipliers ends 50-540 above the best bound the same nogoods allow.  (1) What is the best bound the nogoods a
 searcher holds could give, at the root and at its nodes, and how far is the search's own bound from it?  (2) What does
 the bound become with more conflicts: every minimal conflict of a few members, every conflict of the node?  (3) Does
 the gap left by the best possible use of all conflicts still grow with n?  If it does, that bounds what this direction
 can do.  (4) Is something cheap worth most of it?  And once the
-[matroid study](matroid-intersection-bounds-2026-10.md) made the GF(2) bound the baseline: (5) what share of its
+[matroid study](../matroid-intersection-bounds-2026-10/README.md) made the GF(2) bound the baseline: (5) what share of its
 residual gap do conflicts close, at the root and at nodes, by n, and at what cost?
 
 *What was kept.*  Nothing but this entry; the solver is unchanged.  The study's code lived on a branch that was never
 pushed and has been deleted, as the project does with research branches once they are harvested (the pilots of
-[IDEAS.md](../IDEAS.md#6-the-tools-and-what-became-of-the-pilot-code) went the same way).  It was a library module that
+[IDEAS.md](../../docs/IDEAS.md#6-the-tools-and-what-became-of-the-pilot-code) went the same way).  It was a library module that
 solves the LP below (Dantzig-Wolfe column generation with a dense revised simplex, and exact separation of conflicts),
 an example program that ran the measurements, a patch that instrumented the search, and a script that made the tables
 from the data; the data went with it.  So the method is written out here to be redone: which LP, with which inner
 problems, how it is solved, what was measured where, on which games and fixtures, and how it was checked.  What it
-read is on master: the games' optima (`results/strict.jsonl`, `bench/curve/bands.jsonl`), the probe's fixtures
-(`testdata/perf/n0936.nodes`, `n1215.nodes`), and the slope and matroid studies' data (`bench/curve/slope_roots.jsonl`
-and `slope_proofs.jsonl`, `bench/matroid/roots.jsonl` and `bnb.jsonl`), against which its tables were made.
+read is on master: the games' optima (`results/strict.jsonl`, `solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl`), the probe's fixtures
+(`testdata/perf/n0936.nodes`, `n1215.nodes`), and the slope and matroid studies' data (`solver/notebook/what-drives-the-slope-2026-10/slope_roots.jsonl`
+and `slope_proofs.jsonl`, `solver/notebook/matroid-intersection-bounds-2026-10/roots.jsonl` and `bnb.jsonl`), against which its tables were made.
 
 *The tool: the cover LP.*  A conflict `K` of a node (a set of its candidates that cannot all be promoted) gives every
 completion `F` the *cover inequality* `|F ∩ K| ≤ |K| − 1`.  The cover LP of a family of conflicts is `max Σ x·y_x` over
@@ -82,7 +82,7 @@ optimum (which must find a set worth `P*`) finds it in all 709 non-prime games 3
 the 146 proofs of section 6 met no promotable set above `P*`.
 
 *Method.*  No solver code changed.  Games are set up with the default (strict) tactics, the optimum promotion sum `P*`
-read as the slope study reads it (from `results/strict.jsonl`, and `bench/curve/bands.jsonl` past 1300), and everything
+read as the slope study reads it (from `results/strict.jsonl`, and `solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` past 1300), and everything
 is one thread a process and at most two processes, on the laptop shared with four other agents: times are indicative.  A
 node's *excess* under a bound is the bound's integer part less `P* − sum(promoted)`, the most a completion can be worth
 without beating the incumbent; the node is cut when that is at most 0 (its `need` is `P* + 1 − sum(promoted)`).  The `±`
@@ -139,8 +139,8 @@ of a trend is the standard error of its least-squares slope.  The measurements:
   soundness check.
 
 **1. At the root, all conflicts are worth what the root's own conflicts are.**  The LP over every conflict of the
-root, over the matching (every LP exact; the GF(2) gap is the [matroid study's](matroid-intersection-bounds-2026-10.md),
-the Lagrangian gap the [slope study's](what-drives-the-slope-2026-10.md)):
+root, over the matching (every LP exact; the GF(2) gap is the [matroid study's](../matroid-intersection-bounds-2026-10/README.md),
+the Lagrangian gap the [slope study's](../what-drives-the-slope-2026-10/README.md)):
 
 | n | games | matching gap | Lagrangian gap (slope study) | all conflicts | GF(2) gap | ms |
 |---|---|---|---|---|---|---|

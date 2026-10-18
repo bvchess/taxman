@@ -1,6 +1,6 @@
 # Carrying a search's learning to the next game (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  In a bad patch of the chain, a run of games whose root gap is high (3388-3424 on the EC2 chain), is the
 solver doing 99% of the same search over and over, game after game?  The owner asked it, with a second question
@@ -31,7 +31,7 @@ solver; it is the way avenue A1's bound, once it is in the search (A1's E3), can
 
 *Method.*  The games are the chain's: the recorded games of `results/strict.jsonl` (to 2175) and, past it, the EC2
 chain's results of 2026-10-15 (2176-3423, 64 threads; that snapshot is not committed, but
-`bench/wall/gaps_chain.jsonl` holds its games to 3312 with their root gaps and nodes).  The instruments:
+`solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl` holds its games to 3312 with their root gaps and nodes).  The instruments:
 
 * `examples/diff.rs` (new, in the repository): `diff [--known FILE] A:B ...` sets up the boards A and B as the solver
   does and compares their search problems frame by frame (the moves and factors each has that the other lacks, the
@@ -86,7 +86,7 @@ them), from `diff`.
 | 3417→3420 | f = 1710 (frames 2→3) | relaxation | +1,409 | 206.6M |
 | 3420→3423 | frame 0 gains 2282, 3423 and 1141 | restriction | −336 | 118.7M |
 
-*Relaxation* is the shape of ["Going higher"](going-higher-and-coming-back-down-2026-10.md), section 2 (from an odd n to
+*Relaxation* is the shape of ["Going higher"](../going-higher-and-coming-back-down-2026-10/README.md), section 2 (from an odd n to
 n + 1 = 2f: f leaves the moves of frame h, becomes a candidate of home frame h + 1, and the new move 2f has f as a
 private factor).  In every such step the earlier game's optimal promotions are promotable on the later root and not the
 reverse, and the later optimum contains the new candidate.  *Restriction* is a new move, or two new moves over a new
@@ -149,7 +149,7 @@ shares 117 of 489,761 steps.  So the edit alone changes the tree from its first 
 the root's heaviest set, its conflict and its forced members), and so does the level alone.  The table also shows where
 a restriction step's cost is: nothing above the ceiling is proven in 9 thousand steps, nothing above the optimum 179
 below it in 490 thousand (53 times, the margin scans' 0.01 decades per unit of value, see ["What drives the
-slope"](what-drives-the-slope-2026-10.md)).
+slope"](../what-drives-the-slope-2026-10/README.md)).
 
 **3. Why the work does not repeat: the two proofs have disjoint obligations.**  For a search problem Π (a game's root:
 its frames, candidates and `max_total`) let Prom(Π) be its promotion sets and P\*(Π) the largest sum ΣT over
@@ -191,12 +191,12 @@ look at, in a tree of its own.
 
 **4. What does repeat: the hard core.**
 
-* *The gap.*  Over the 509 searched games of 2176-3312 (`bench/wall/gaps_chain.jsonl`) the root GF(2) gaps of
+* *The gap.*  Over the 509 searched games of 2176-3312 (`solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl`) the root GF(2) gaps of
   consecutive searched games have lag-1 autocorrelation 0.95; of consecutive searched games at most 6 apart, half
   (51%) have exactly the same gap and three quarters gaps within 50 (median change 0, mean 33, against an sd of 211).
   The edit moves the bound and the optimum together ("Going higher" section 5 saw it on 37 of 37 chain steps), so the
   odd cores of frames 1-3 that make the gap are the same game after game.  That is why the cost residuals run (lag-1
-  0.84, [the gap past 2175](the-gap-past-2175-2026-10.md)) and the bad patches come in runs: the same core priced again,
+  0.84, [the gap past 2175](../the-gap-past-2175-2026-10/README.md)) and the bad patches come in runs: the same core priced again,
   at 10^(G/250), game after game.
 * *The conflicts.*  19% to 73% of the nogoods the next game learns were learned by the previous one in the 11 pairs of
   one edit that move the optimum (median 46%; 9% across three edits, 100% for the near repeats; the last column of the
@@ -220,7 +220,7 @@ their multipliers, tens of seconds to fit at a root and valid on any problem.
 
 **5. The limit of any reuse of work.**  A search that proves a run of games together, or reuses every piece of work from
 game to game, still contains a proof of the run's dearest game: with perfect reuse a run costs its dearest member.  Over
-the EC2 chain's 400 exhausted searches of 2176-3312 (the nodes of `bench/wall/gaps_chain.jsonl`), runs cut where
+the EC2 chain's 400 exhausted searches of 2176-3312 (the nodes of `solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl`), runs cut where
 consecutive searched games are more than 6 apart or their gaps differ by more than a tolerance:
 
 | runs (gap tolerance) | total over the sum of the runs' dearest | saving if each run cost its dearest |
@@ -233,7 +233,7 @@ consecutive searched games are more than 6 apart or their gaps differ by more th
 
 On the patch 3396-3423 (10 exhausted searches, 2.05 billion nodes, the dearest 3400 with 0.52 billion) the ratio is 3.9
 times; 2.6 with 3424 at 1.3 billion nodes (a figure the snapshot lacks, which ends at 3423).  Over the committed chain's
-1301-2175, solved again by the current build on one thread (`bench/wall/resolved_1301_2175.jsonl`, 314 exhausted
+1301-2175, solved again by the current build on one thread (`solver/notebook/the-gap-past-2175-2026-10/resolved_1301_2175.jsonl`, 314 exhausted
 searches), it is 1.28 with equal gaps and 1.47 within 10.  So perfect reuse between games whose cores match would give
 1.2 to 1.4 times, and 10 times is out of reach of any reuse of work: it needs the dearest games themselves to get
 cheaper, which only a tighter bound gives.  And the measured reuse is far from perfect (section 2).
@@ -273,11 +273,11 @@ one thread:
 
 Mostly valid (every one across a restriction; across a relaxation 59% to 100%, the rest made promotable by the freedom
 frame h gains), re-checked in microseconds, answering most lookups, and worse on balance.  As on the matching path
-in ["Carrying nogoods over"](carrying-nogoods-over-2026-10-measured-not-kept.md) (1227, the best a carried table can be:
+in ["Carrying nogoods over"](../carrying-nogoods-over-2026-10-measured-not-kept/README.md) (1227, the best a carried table can be:
 −10% nodes, +3% time; the chain 1201-1231 617 s to 941 s), a carried table changes which conflict a node branches on
 (the smallest the table knows, rather than one computed from the frame where the heaviest set fails), so it changes the
 tree, and the change is noise around a loss.  A larger table also costs every node (["Forgetting
-nogoods"](forgetting-nogoods-2026-10.md)).
+nogoods"](../forgetting-nogoods-2026-10/README.md)).
 
 *The lemmas.*
 
@@ -323,10 +323,10 @@ on each incidence of a mover with a maximal factor in the frame), given by numbe
 an incidence of both and the default (1, or a hashed 1 or 2) elsewhere: a signing of Π_{n+1}'s frame h.  So every
 promotion set of Π_{n+1} is independent in its matroid (Theorem 14), and with any multipliers (n's, by candidate number,
 0 for a new candidate) L bounds every promotion set of Π_{n+1} (Theorem 15; [THEORY.md, signed frame
-matroids](../../../heuristics/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields)).  A core of n whose
+matroids](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields)).  A core of n whose
 movers, their incidences and its factors are unchanged in n + 1 has the same column sums, so the carried signing still
 makes it dependent.  Frame h is the same layer in both games (numbering by layer, ℓ₀ = 3 on every board past 186;
-[THEORY.md, numbering by layer](../../../heuristics/THEORY.md#numbering-by-layer)).  Nothing is re-checked: validity is
+[THEORY.md, numbering by layer](../../../docs/THEORY.md#numbering-by-layer)).  Nothing is re-checked: validity is
 unconditional, only the strength depends on the fit.
 
 *Ideas from other fields, and why they fit or not.*
@@ -425,7 +425,7 @@ refitted for a tenth of the budget, at 1.08.
   E2's `--save-fit` and `common/fit.rs` (which write and read a root's fit) and E3's `Warm` (which carries a fit from a
   node to its children) have landed, the command reads A's saved fit instead of fitting A again, and *refit* is E3's
   refit from it.  Over every searched game that follows one of E1's converged roots of 1700-2175 (E1's
-  `bench/fields/roots.jsonl`), plus 2170→2172 and two pairs of the 2340s from the EC2 snapshot if their roots converge
+  `solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/roots.jsonl`), plus 2170→2172 and two pairs of the 2340s from the EC2 snapshot if their roots converge
   in the budget: about 30 roots at 36-120 s, under an hour of one thread, S = 120 s and a tenth of it for the refit.
   Criterion, fixed: the family carries if on the median pair *carried* ≥ 0.7 × *own* and *refit with separation* ≥
   0.95 × *own*; then E3 starts each game from the previous searched game's family.  Otherwise E3 fits each game's root

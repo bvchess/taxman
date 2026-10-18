@@ -1,10 +1,10 @@
 # Seeding the start from a neighbour's heuristic game (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 **Question.**  Brian's: for games no chain has proven, how much better a lower bound do we get if each game's start
 incumbent is seeded from a neighbour's start incumbent (a heuristic game, never proven), the way a chain seeds from
-the proven game of n − 1?  [The landscape past the chain](the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10.md)
+the proven game of n − 1?  [The landscape past the chain](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)
 took every game standalone, with no seed: the heuristic fell short of the optimum by a median 227 on 2176-3440.
 Seeded from the proven game of n − 1 (`wall start --known`) the start is exact in 88% of games, with a mean shortfall of
 11: the floor for any seeding.  Where the two lie matters for the games past 3440, where no neighbour is proven.
@@ -28,7 +28,7 @@ at once under `nice -n 10` with the test-profile build, over the 1,265 games of 
 * **max(A,B)**: for each game the better of A's and B's, which costs two threads.
 
 The data, commands and the analysis script (`seeding.py`, whose output is `seeding.txt`) are in
-[bench/landscape/seeding/](../../bench/landscape/seeding/README.md); the numbers below are its output.
+[solver/notebook/seeding-the-start-from-a-neighbours-heuristic-game-2026-10/](README.md); the numbers below are its output.
 
 **1. The shortfall (the optimum less the start's score), 2176-3440.**
 
@@ -133,9 +133,28 @@ compare with, and whose shortfall stood at a median 523 on 3176-3440 and may ris
 search, for the neighbour's games; the proven game of n + 1 as a seed going down; the times on the cloud's CPUs.
 
 **Commits.**  a8ee892 (the subcommand `wall chain`, with its test, and `set_up` and `start_of` that `landscape` shares
-with it); this entry adds the data and the script in `bench/landscape/seeding/`.
+with it); this entry adds the data and the script in `solver/notebook/seeding-the-start-from-a-neighbours-heuristic-game-2026-10/`.
 
 ## Later (2026-10): the command removed from master
 
 The command `wall chain` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
 9d9dae3:rust/examples/wall.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
+
+## Files
+
+The
+runs were made on the laptop on 2026-10-17, one thread each, six at once under `nice -n 10`, with the test-profile
+build of `wall` (`cargo build --profile test --example wall` in `rust/`) at commit a8ee892, from `rust/`, over
+2176-3440 against the committed chain (`results/strict.jsonl`).  The command `chain` was removed from master on
+2026-10-18; it builds at commit 9d9dae3 (`git checkout 9d9dae3` first), where each `chain` line is defined in the module
+comment of `examples/wall.rs`; `shortfall` is the optimum less the start's score.  (`wall start`, the command of `c`,
+is still there: `cargo build --release --features studies --example wall`.)
+
+| file | command | what it is |
+|---|---|---|
+| `a.jsonl` | `wall chain --known results/strict.jsonl --out a.jsonl 2176-3440` | A: up, seeded from the game before, unbroken |
+| `a64.jsonl`, `a256.jsonl` | the same with `--restart 64`, `--restart 256` | A64 and A256: up, standalone at every 64th and 256th game |
+| `b.jsonl` | the same with `--down` | B: down from 3440, seeded from the game after, unbroken |
+| `r1.jsonl` | the same with `--restart 1` | the standalone start of every game, here on the laptop beside the others (equal, game for game, to `lower` in `../cal.jsonl`) |
+| `c.jsonl` | `wall start --known results/strict.jsonl 2176-3440 > c.jsonl` | C: the start seeded from the proven game of n − 1 (`pairs` is its promotion sum; the matching dive is not part of it) |
+| `seeding.py`, `seeding.txt` | `./seeding.py > seeding.txt` | the analysis (it reads `land.py` and `../cal.jsonl`) and its output, which the entry quotes |

@@ -1,10 +1,10 @@
 # Boards past 4095 (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The chain on the cloud machine reached 3314 overnight and would stop at 4095, the end of the set widths,
 for want of code.  What limits the boards to 4095, how far does one more width take them, and what does a board past
-4095 cost?  Item 8 of the [wall regime](the-wall-regime-2026-10.md)'s design, built in commit 4316168, with no change
+4095 cost?  Item 8 of the [wall regime](../the-wall-regime-2026-10/README.md)'s design, built in commit 4316168, with no change
 at all to the boards up to 4095.
 
 *The limits.*  Everything that held the solver at 4095, and what it is now:
@@ -32,7 +32,7 @@ frames and five block words hold every one, which a scan of every board shows.  
 from 1024, 8 from 2048, 9 from 4096) and six block words.
 
 *The scan* (`wall frames 2-8191` by the build before the change, in four processes of one thread, 124 s;
-[bench/wall/frames_all.jsonl](../../bench/wall/frames_all.jsonl)).  The frames: 8 on every board 2048..4095, 9 on every
+[solver/notebook/boards-past-4095-2026-10/frames_all.jsonl](frames_all.jsonl)).  The frames: 8 on every board 2048..4095, 9 on every
 board 4096..8191.  The largest frame rank, which is the GF(2) bound's block dimension, by bands of 512:
 
 | boards | largest rank (at n) | block words | most members | most candidates |
@@ -64,7 +64,7 @@ candidates, need 79 words at 8191.)
    symbols and no LTO has 127 to 129 symbols of `Levels<W, R>` for R ≤ 3 at every width and for R = 4 and 5 at 128,
    and one (its drop) for R = 4 and 5 at the others.  An engine of more words than the graph needs runs the same bound
    on vectors padded with zero words (`Gf2Bound::with_words`, `Gf2Graph::padded`), which the tests use.
-5. `examples/wall.rs` takes `--width 128`, and `frames` covers every board the solver does; `tools/pgo.sh` trains a game
+5. `examples/wall.rs` takes `--width 128`, and `frames` covers every board the solver does; `solver/tools/pgo.sh` trains a game
    of 128 words (4100).
 
 *Tests* (`cargo test --release`: 376 s with compiling, on two test threads):
@@ -88,11 +88,11 @@ one thread (a scratch file) identical line for line, apart from the times and th
 the build before (290,503 nodes; 26.2 s of search and 37 s of wall time against 26.3 and 38), its scores, methods and
 proofs those of `results/strict.jsonl` (the moves too but at one board, another optimal set, as before).  At 4000 (64
 words, one thread, 20,000 steps from the unseeded start, net of the setup;
-[bench/wall/past4095_nodes.jsonl](../../bench/wall/past4095_nodes.jsonl)): 4,245 thousand instructions a node before and
+[solver/notebook/boards-past-4095-2026-10/past4095_nodes.jsonl](past4095_nodes.jsonl)): 4,245 thousand instructions a node before and
 after, 963 and 954 thousand cycles before, 963 and 947 after; the fixed costs the same (the board 0.046 s, the local
 search 6.16 and 6.23 s).  The release build of the binary alone from nothing (four jobs, `nice`): 82 s before, 106 s after.
 
-*What a board past 4095 costs* (one thread; [bench/wall/past4095_setup.jsonl](../../bench/wall/past4095_setup.jsonl),
+*What a board past 4095 costs* (one thread; [solver/notebook/boards-past-4095-2026-10/past4095_setup.jsonl](past4095_setup.jsonl),
 `past4095_nodes.jsonl`).  The width, at 4100 (65 words needed):
 
 | words | thousand cycles a node (two runs) | thousand instructions a node | board | the moves | local search |
@@ -118,8 +118,19 @@ instance considered.
 games 4096..4110 ran standalone (`taxman solve N --threads 4 --time-limit 10`, one invocation each, into one file): no
 seed, no ceiling, so each search stopped at its limit with the best game it had found: 98,000 to 111,000 nodes, 213 to
 215 promotions, 5,280,922 at 4096 to 5,315,188 at 4110, 14 to 15 s a game with the setup
-([bench/wall/past4095_standalone.jsonl](../../bench/wall/past4095_standalone.jsonl); measurements, not results).  Both
-referees accept the file (`verify-results`, `tools/check_results.py`); an incomplete line has no proof to check, so
+([solver/notebook/boards-past-4095-2026-10/past4095_standalone.jsonl](past4095_standalone.jsonl); measurements, not results).  Both
+referees accept the file (`verify-results`, `solver/tools/check_results.py`); an incomplete line has no proof to check, so
 its moves were also replayed by the Python referee's rules: every game legal, finished, opening with the largest
 prime, and scoring its `best_so_far`, which is its `in_the_bag` plus its promotions' sum.  The chain behind a file
 that reaches 4095 is the cloud machine's to run: the RUNBOOK says how (section 5, "Past 4095").
+
+## Files
+
+From `wall` as in [the wall regime's files](../the-wall-regime-2026-10/README.md#files-and-the-commands-that-made-them):
+
+| file | command | what it is |
+|---|---|---|
+| `frames_all.jsonl` | `wall frames 2-8191` (the build of ee03872, in four processes), each line cut to `n`, `frames`, `max_freedoms`, `block_words`, `candidates`, `members` | every board to 8191: what bounds `MAX_FRAMES` (9) and the GF(2) bound's block words (5) ([solver/notebook/boards-past-4095-2026-10/README.md](../boards-past-4095-2026-10/README.md)) |
+| `past4095_setup.jsonl` | `wall setup 4000` by the builds before (`"build":"base"`, ee03872) and after (`"new"`) the boards past 4095, and `wall setup --width W 4100` for W = 72, 80, 96, 128 (a build whose `--width` list had 72, 80, 96 and 112 as well; add them to `at_width!` to run it again) | the fixed costs past 4095, by set width |
+| `past4095_standalone.jsonl` | `taxman solve N --threads 4 --time-limit 10 --out FILE` for N = 4096..4110, one invocation each (the build of 4316168, before its commit) | the first games past 4095, standalone (no seed, no ceiling) and stopped at the limit: incomplete lines, measurements and not results |
+| `past4095_nodes.jsonl` | `wall nodes --no-seed --nodes K 4000` (both builds) and `--width W 4100` (W = 72, 128; the same build), K = 1 and 20,000, twice (`rep`) | the cost of a node net of the setup (the difference of the two K), before and after, and by width |

@@ -1,23 +1,23 @@
 # What drives the slope (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 *Question.*  The cost of a game grows about ×10 per 55-70 in n near the frontier
-([bench/curve](../../bench/curve/README.md#results)), and every improvement so far (same search, the Lagrangian bound,
+([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../benchmarks-the-probe-pgo-and-scaling/cost-curve.md#results)), and every improvement so far (same search, the Lagrangian bound,
 faster nodes) moved the curve down without changing its slope.  What drives the slope: the room for doubt at the root
 (the gap between the root's upper bound and the optimum, which the tree must rule out), the size of the problem (n,
 candidates, `max_total`), or something else?  And so what would change it?
 
 *Method.*  No search code changed.  `examples/slope.rs` (commit db7faf1) measures the root of a game and runs proofs
 with the incumbent set by value, through the library's public interfaces (`Board`, `MatchBound`,
-`matchbound::lagrange`, `engine::run`); `bench/curve/slope.py` makes the tables below (and more) from its two data
-files, `bench/curve/slope_roots.jsonl` and `bench/curve/slope_proofs.jsonl`, and `results/strict.jsonl` as of 2487671
+`matchbound::lagrange`, `engine::run`); `solver/notebook/what-drives-the-slope-2026-10/slope.py` makes the tables below (and more) from its two data
+files, `solver/notebook/what-drives-the-slope-2026-10/slope_roots.jsonl` and `solver/notebook/what-drives-the-slope-2026-10/slope_proofs.jsonl`, and `results/strict.jsonl` as of 2487671
 (the 1..1300 chain of the older build, which the script reads from git).  The solver of 331eb09 with
 `--tactic revise_freedoms=off` (the strict tactics; the tactic has been removed since, and the commands below, which no
 longer pass it, run the same searches), one thread a process and at most two processes, on the laptop while another
 agent ran the test suite.  `P*` is a game's optimum promotion sum (its score minus `in_the_bag`).
 
-* *Roots* (`slope roots --known results/strict.jsonl --sums bench/curve/bands.jsonl 880-1300` and the games past 1300
+* *Roots* (`slope roots --known results/strict.jsonl --sums solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl 880-1300` and the games past 1300
   that `bands.jsonl` solved; about a second a game): the root's matching bound; the matching bound refined one to three
   levels deep (the search's refinement, computed to a value); and a Lagrangian bound over nogoods of the root, made
   without a search: the conflicts the refinement found, then up to 8,000 subgradient steps towards `P* + 1` (Polyak's
@@ -28,7 +28,7 @@ agent ran the test suite.  `P*` is a game's optimum promotion sum (its score min
 * *Proofs* (`slope prove --known results/strict.jsonl --deltas ... N`, with `--sums` as above past 1300): the search of
   the game on one thread, its incumbent a value `P* + δ` with no set behind it, no seed, no cap.  With δ = 0 it is the
   proof of the optimum (the `--seed-opt` ladder's node counts: 29,614 for 1100, 19,473,016 for 1290 and 28,024,916 for
-  1300, as in ["A Lagrangian bound over the nogoods"](a-lagrangian-bound-over-the-nogoods-2026-10.md)), for all 143 games
+  1300, as in ["A Lagrangian bound over the nogoods"](../a-lagrangian-bound-over-the-nogoods-2026-10/README.md)), for all 143 games
   of 880-1300 that `strict.jsonl` searched to exhaustion (the others are repeats, caps and primes) and for 1309, 1350
   and 1352.  With δ > 0 nothing beats the incumbent, and every cut is the cut the search would make with every bound it
   uses (matching, refined, Lagrangian, forced members) lowered by δ: a *margin scan* over δ = 25 to 800 measures how the

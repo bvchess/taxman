@@ -61,7 +61,7 @@ $ echo 1-1000 | ./playtaxman -h MaxTurn+ -s -p CSV > maxturn_plus.csv
 
 Run `./playtaxman -d -h NAME` for the author's description of each.
 Scores below were measured over n = 2..1000 against
-[`optimal.json`](../src/main/resources/optimal.json); "point share" is the
+[`optimal.json`](../results/optimal.json); "point share" is the
 strategy's total as a fraction of the optimal total, and "exact" counts
 games where it found an optimal score.
 

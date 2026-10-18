@@ -1,6 +1,6 @@
 # Faster nodes, same trees (2026-10)
 
-Part of the [lab notebook](../EXPERIMENTS.md).
+Part of the [lab notebook](../README.md).
 
 The inner loop, made faster without changing any answer or tree: every
 change keeps the node counts of every game and the fingerprints of the
