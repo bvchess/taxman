@@ -1906,6 +1906,23 @@ a proof, and its game is a lower bound once the referee has replayed it.  Its ev
 `seed_from`, `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line are what the
 run is for: what sets up a run past 3440 best.
 
+**Floor steps** (`FLOOR_STEP`, `FLOOR_SLACK`; [the entry's section on them](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-18-floor-guided-drilling)).
+An open board that is not climbed to is stepped down before its proof: a search under a floor `FLOOR_STEP` points
+(unset the program's 150; 0 turns the steps off and the order back to `level + gap / gap_unit`) below its upper
+bound, which if it completes having found nothing makes the floor the upper bound (rule `floor`), and whose cost
+grows about tenfold a step; a step's time limit is `FLOOR_SLACK` (unset 4) times its forecast, at least `BASE`, and
+doubles each time the limit stops it (the step is kept: its checkpoint is `ckpt/nN.floor.ckpt`, beside the board's
+`nN.ckpt`).  The boards go, after the climbs, by the forecast seconds of one thread of their proofs (the line of the
+board's own steps), cheapest first, so that a board forecast far beyond the rest waits until the cheaper work is
+done.  The status line says how many steps have ended (and how: lowered U, proved their board, found a set, stalled)
+and how many boards are forecast within an hour, a day, or longer; the events have each job's `forecast` (log10 of
+nodes) and `forecast_s`, and `bench/ledger/events.py` compares the forecasts with the proofs.  **A run that goes on
+from a ledger written before the steps** (the stage on `ledger-frontier-2/out/run`, written by afe4513) reads it as
+it is: the boards get their root bounds at the start (a fraction of a second a board, on the workers), they have no
+steps, and the checkpoints of their ordinary searches stay where they are and are resumed when the board comes to
+its proof (nothing is dropped); a board with a wide gap takes its steps first, so a board whose old search was far
+along is forecast at least twice what that search spent and waits behind cheaper boards, as `level` made it wait.
+
 **The bounds store.**  The bounds a run finds are kept in `results/bounds.jsonl` ([results/README, "bounds.jsonl"](../../results/README.md#boundsjsonl)).
 `BOUNDS=results/bounds.jsonl` (an option of `bench/ledger/cloud.sh`, with the file in the checkout the machine cloned)
 starts the run from the file's best bounds of its stretch, and a board with both needs no map (the maps of 3441..8191

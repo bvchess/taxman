@@ -84,6 +84,8 @@ def main(directory, chain=None):
                   f"the board: {len(errors)} boards, log10 error median {median(errors):+.2f}, "
                   f"median absolute error {median([abs(x) for x in errors]):.2f}")
     root = {e["n"]: e["after"][1] for e in maps}
+    # (A floor step that its limit stopped has no dual bound.)
+    stopped = [e for e in stopped if e["dual"] is not None]
     lowered = [e["before"][1] - e["after"][1] for e in stopped if e["after"][1] < e["before"][1]]
     print(f"stopped searches whose dual bound lowered U: {len(lowered)}, by {sum(lowered)} in all "
           f"(median {median(lowered)})")

@@ -303,7 +303,11 @@ game), `lns` (the finder's game), `given` (a proven game given to the run); and 
 n − 1 followed by n), `ceiling` (the game of n + 1 without the move n + 1, completed), `prime` (the game of the board
 next to a prime with its opening exchanged) and `repeat` (the promotions of the game of a board with the same search
 problem, played on this board).  The rules of an upper bound: `root` (the GF(2) bound of the root), `dual` (the dual
-bound of a search that a limit stopped), `exhausted` (a search that explored its whole tree), `given`, and the relations
+bound of a search that a limit stopped), `exhausted` (a search that explored its whole tree), `floor` (a search under
+a floor F, an incumbent worth F and no set, that completed having found nothing: no promotion set weighs more than F,
+THEORY.md Lemma F, so the bound is `in_the_bag` and F), `nogoods` (the Lagrangian bound over nogoods that were each
+checked to fail to promote, with the GF(2) bound as its inner problem, as `wall nogoods` makes it; the ledger's runs
+do not make it yet), `given`, and the relations
 `ceiling` (U(n) ≤ U(n − 1) + n), `monotone` (U(n − 1) ≤ U(n)), `prime` (U(p) = U(p − 1) + p − q, q the largest prime
 below p, both ways) and `repeat` (U(n) − bag(n) ≤ U(m) − bag(m)).  A line of 4501 might read:
 
@@ -333,8 +337,8 @@ from the one it cites; that every `root` bound is recomputed and equal; that eve
 are recomputed and equal to its source's; that every relation's arithmetic holds against the line it cites (a line
 before it with a bound of that board at most `from_value`, or a game of the chain) and rests on what that line rests on;
 and that where the chain has a game of a board, the file's bounds enclose its score.  It reports the proven boards, and
-lists the bounds it takes on their record: the `exhausted` and `dual` bounds of searches, which no check short of the
-search recomputes, and the `given` games.  `tools/check_bounds.py` (Python, standard library only, run with `python3
+lists the bounds it takes on their record: the `exhausted`, `dual` and `floor` bounds of searches and the `nogoods`
+bounds, which no check short of the search (or the fit) recomputes, and the `given` games.  `tools/check_bounds.py` (Python, standard library only, run with `python3
 -I`) is the second referee of the games and of the arithmetic: it shares no code with the Rust crate, loads the rules
 of the game from `tools/check_results.py`, and writes out the arithmetic of the lemmas and the constructions of the
 cited games again.  It cannot rebuild a game from promotions, which needs the frame model, so `ledger games FILE` writes
@@ -342,7 +346,7 @@ the moves of every promotion set (the game that `solution_for_promotions` makes 
 its own rules and checks that they contain the promotions and score the line's value: whatever the frame model did to
 make them, a game that is not a game of its value is refused, and the link between the promotions and the moves is the
 Rust program's.  What the Python referee takes on the line's record, because only the Rust one can compute it: root
-bounds, a repeat's bags and the identity of its two search problems, and the bounds of searches.  Both exit with status 1
+bounds, a repeat's bags and the identity of its two search problems, and the bounds of searches and of nogoods.  Both exit with status 1
 if any check fails and name the line (`line K (n=N)`).
 
 **Size**, from the laptop's dry run of 901..960 with the truth hidden ([bench/ledger/store/](../bench/ledger/store/)):
