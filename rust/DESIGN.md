@@ -955,11 +955,12 @@ referee, or not made), and an L above a U stops the run as an error.  The maps o
 workers, and the relations carry their bounds once, when the last is in; the main thread, which applies every result
 while the workers whose searches ended wait for it, does little for each.  The order of the searches is where a proof
 looks cheapest (least `level + gap / gap_unit`, which finds the boards proven with no help from below), with *climbs*
-ahead of it: a board whose board below is proven, however that was proven, is searched next for a limit of its own
-(`--climb-limit`), seeded with that game and capped by the ceiling it gives, and when a climb proves its board the one
-above is climbed to (a climb up); a board whose board above is proven is climbed to down, after those, seeded with that
-game but under the ledger's own, loose ceiling (`--climb` picks the ways); a climb that stops parks its board in the
-ordinary order, and a board next to one being climbed to waits for it.  The *finder*, large neighbourhood search
+ahead of it: a board whose board below its repeat class is proven, however that was proven, is searched next for a
+limit of its own (`--climb-limit`), seeded with that game and capped by the ceiling it gives, and when a climb proves
+its board, the board above its class is climbed to (a climb up); a board whose board above its repeat class is proven
+is climbed to down, after those, seeded with that game but under the ledger's own, loose ceiling (`--climb` picks the
+ways); a climb that stops parks its board in the ordinary order, and a board next to one being climbed to waits for
+it.  The *finder*, large neighbourhood search
 (`examples/common/lns.rs`, which `wall finders` measures), is not sound and proves nothing, but a lower bound needs only
 a legal game: for `--lns-seconds` seconds of a worker it runs after a board's map and before a search whose best seed
 has changed since it last ran on the board (a climb's always has), and its game, which the referee replays like every
