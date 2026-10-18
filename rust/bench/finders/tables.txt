@@ -1,0 +1,315 @@
+STAGE 1: 40 games with both searches; 0 with only one
+      n short |  (i) nodes   cpu s done | (ii) nodes   cpu s done |  nodes    cpu
+   2180   349 |    3144851   461.7    T |     193115    30.6    T |  0.061  0.066
+   2196     0 |      37638     4.9    T |      37638     5.1    T |  1.000  1.029
+   2200   348 |      42193     5.9    T |      14806     2.2    T |  0.351  0.370
+   2264   649 |    3046610   490.7    T |     567758    88.2    T |  0.186  0.180
+   2312   273 |    1477748   195.8    T |     942147   129.0    T |  0.638  0.659
+   2397   154 |     824416   125.6    T |     373077    58.8    T |  0.453  0.468
+   2416    93 |     562114    83.5    T |     383330    63.1    T |  0.682  0.755
+   2430   525 |    1887941   301.4    T |     464879    74.3    T |  0.246  0.247
+   2440   141 |      47059     9.4    T |      16190     3.7    T |  0.344  0.401
+   2451   410 |     372166    54.0    T |     124352    20.4    T |  0.334  0.378
+   2478    54 |    1967538   283.1    T |    1904192   267.9    T |  0.968  0.946
+   2556   367 |    1430753   196.2    T |     502005    77.8    T |  0.351  0.397
+   2560   525 |     789652   111.7    T |     425374    64.1    T |  0.539  0.574
+   2565   727 |     343674    49.2    T |      57109     9.5    T |  0.166  0.193
+   2592   485 |    2468342   370.1    T |     307131    49.4    T |  0.124  0.133
+   2601   143 |      79127    12.3    T |      39204     6.0    T |  0.495  0.490
+   2632   225 |     480405    71.2    T |     385527    57.5    T |  0.803  0.808
+   2640     0 |     235829    32.4    T |     235829    29.3    T |  1.000  0.904
+   2691   312 |     666372    81.2    T |     203097    26.1    T |  0.305  0.321
+   2696   312 |    1149159   138.2    T |     223481    28.3    T |  0.194  0.205
+   2700   195 |     555866    65.9    T |     112464    15.0    T |  0.202  0.228
+   2704   253 |     170761    22.0    T |     146054    19.1    T |  0.855  0.871
+   2712   253 |     206378    27.7    T |     166142    22.7    T |  0.805  0.822
+   2720   256 |     310715    43.3    T |     184979    25.9    T |  0.595  0.597
+   2799     0 |      77364    10.7    T |      77364    10.6    T |  1.000  0.989
+   2849    74 |     109361    16.1    T |      47817     6.0    T |  0.437  0.371
+   2891   421 |    1151337   162.7    T |     458862    65.3    T |  0.399  0.402
+   2925    60 |     253467    38.6    T |     235049    31.2    T |  0.927  0.809
+   2964   227 |     221455    30.5    T |      68135     9.2    T |  0.308  0.303
+   2976     0 |     143370    19.5    T |     143370    19.4    T |  1.000  0.997
+   3000   219 |     488617    73.4    T |     167554    25.6    T |  0.343  0.349
+   3003   290 |     388246    61.7    T |      29997     4.8    T |  0.077  0.079
+   3010   321 |    1302072   189.5    T |      53188     9.6    T |  0.041  0.051
+   3064   124 |    1357245   217.0    T |     983077   159.9    T |  0.724  0.737
+   3128   339 |     851088   417.1    T |     436384   237.3    T |  0.513  0.569
+   3129   193 |     449610    82.7    T |     304091    57.5    T |  0.676  0.695
+   3213   504 |    2277040   531.2    T |     450606   106.5    T |  0.198  0.201
+   3260   373 |     430056   105.5    T |     390058    96.0    T |  0.907  0.910
+   3267   782 |     193733    51.7    T |     150748    43.4    T |  0.778  0.840
+   3272   782 |     335517    87.8    T |     277366    78.0    T |  0.827  0.888
+
+  both searches finished: 40 of 40 games; (i) took 5333 CPU s, (ii) 2135
+  all (40 games):
+    nodes (ii)/(i): median 0.474, mean 0.521, p10 0.166, p90 1.000, range 0.041-1.000
+    CPU   (ii)/(i): median 0.479, mean 0.531, p10 0.180, p90 0.946, range 0.051-1.029
+    in total: nodes 0.380, CPU 0.400
+  start short of the optimum (36 games):
+    nodes (ii)/(i): median 0.418, mean 0.468, p10 0.124, p90 0.855, range 0.041-0.968
+    CPU   (ii)/(i): median 0.401, mean 0.481, p10 0.133, p90 0.871, range 0.051-0.946
+    in total: nodes 0.370, CPU 0.393
+  start is the optimum (4 games):
+    nodes (ii)/(i): median 1.000, mean 1.000, p10 1.000, p90 1.000, range 1.000-1.000
+    CPU   (ii)/(i): median 0.993, mean 0.980, p10 0.904, p90 1.029, range 0.904-1.029
+    in total: nodes 1.000, CPU 0.954
+  (i) took 300 CPU s or less (34 games):
+    nodes (ii)/(i): median 0.567, mean 0.574, p10 0.194, p90 1.000, range 0.041-1.000
+    CPU   (ii)/(i): median 0.586, mean 0.583, p10 0.205, p90 0.946, range 0.051-1.029
+    in total: nodes 0.529, CPU 0.561
+  (i) took more than 300 CPU s (6 games):
+    nodes (ii)/(i): median 0.192, mean 0.222, p10 0.061, p90 0.513, range 0.061-0.513
+    CPU   (ii)/(i): median 0.190, mean 0.233, p10 0.066, p90 0.569, range 0.066-0.569
+    in total: nodes 0.177, CPU 0.228
+  by the start's shortfall (nodes (ii)/(i), games that finished):
+    0-0        4 games: median 1.000, mean 1.000, range 1.000-1.000
+    1-150      7 games: median 0.682, mean 0.654, range 0.344-0.968
+    151-300     11 games: median 0.595, mean 0.523, range 0.077-0.855
+    301-500     11 games: median 0.334, mean 0.325, range 0.041-0.907
+    501-         7 games: median 0.246, mean 0.420, range 0.166-0.827
+
+STAGE 2 (stage2.jsonl): 253 games, 0 whose start meets the root bound (nothing to find), 253 searched
+
+  all searched games: 253 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           227   328.7    782  12.6%     0.0%    29.6%   3.01        0.00
+    lns               0    27.9     96  64.4%    77.9%     3.6%   5.00        0.00
+    restricted       76   189.7    629  33.2%    63.2%     6.3%   4.98        6.07
+    control         195   297.4    752  20.6%     0.0%     0.0%   4.94        0.00
+
+  games that need a search of their own (no primes or repeats): 94 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           234   331.9    847  14.9%     0.0%    29.8%   3.07        0.00
+    lns               0    20.7    112  69.1%    78.7%     2.1%   5.00        0.00
+    restricted       76   199.9    629  34.0%    66.0%     6.4%   4.98        6.15
+    control         210   311.3    826  20.2%     0.0%     0.0%   4.94        0.00
+
+  n 2176-2425: 50 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           424   560.0   1232   4.0%     0.0%    24.0%   1.71        0.00
+    lns               4    61.4    195  50.0%    94.0%     0.0%   5.00        0.00
+    restricted      268   359.1    916  22.0%    72.0%     0.0%   4.98        3.51
+    control         404   536.8   1232   6.0%     0.0%     0.0%   4.94        0.00
+
+  n 2426-2675: 50 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           154   223.0    530  14.0%     0.0%    42.0%   1.93        0.00
+    lns               0    24.7     84  58.0%    72.0%     8.0%   5.00        0.00
+    restricted       11   114.8    372  48.0%    60.0%    10.0%   4.92        3.93
+    control         101   172.0    490  24.0%     0.0%     0.0%   4.73        0.00
+
+  n 2676-2925: 50 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start            72   102.7    256  36.0%     0.0%    36.0%   2.27        0.00
+    lns               0     0.5      0  92.0%    44.0%     6.0%   5.00        0.00
+    restricted        0    26.8    151  72.0%    36.0%     4.0%   5.01        4.55
+    control           0    67.3    233  56.0%     0.0%     0.0%   5.01        0.00
+
+  n 2926-3175: 50 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           194   203.7    433  10.0%     0.0%    28.0%   3.10        0.00
+    lns               0     7.8     21  80.0%    78.0%     4.0%   5.00        0.00
+    restricted       72    95.2    231  26.0%    60.0%    12.0%   5.01        6.26
+    control         154   183.2    433  18.0%     0.0%     0.0%   5.01        0.00
+
+  n 3176-3440: 53 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           510   541.5    911   0.0%     0.0%    18.9%   5.85        0.00
+    lns               8    44.2    145  43.4%   100.0%     0.0%   5.00        0.00
+    restricted      255   343.4    736   0.0%    86.8%     5.7%   5.00       11.76
+    control         504   514.8    869   0.0%     0.0%     0.0%   5.01        0.00
+
+  the best of the four (ties count for each): start 32, lns 240, restricted 90, control 55
+  games both finders have exactly: 76; neither: 82
+  CPU of a game: start 3.01 s, neighbours' starts 6.07 s, each method 5.00 s; the run in all 1.69 core-hours
+  lns: 2562 units a game, 99.9% of them searched to the end, 5.4 improvements a game
+  restricted: 3.2 rounds a game, ended with 45.6% of the candidates; finished the whole search in 3 games, the control in 8
+
+STAGE 2 (stage2-20s.jsonl): 51 games, 0 whose start meets the root bound (nothing to find), 51 searched
+
+  all searched games: 51 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           220   347.5    905   9.8%     0.0%    49.0%   3.25        0.00
+    lns               0    20.8     60  64.7%    72.5%     5.9%  20.00        0.00
+    restricted        4   121.5    371  49.0%    66.7%     5.9%  19.70        6.53
+    control         142   287.1    678  25.5%     0.0%     0.0%  18.41        0.00
+
+  games that need a search of their own (no primes or repeats): 19 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           158   277.4    905  21.1%     0.0%    63.2%   3.10        0.00
+    lns               0    22.6    135  63.2%    52.6%    10.5%  20.00        0.00
+    restricted        0   120.5    546  63.2%    42.1%    10.5%  20.00        6.03
+    control           9   180.7    605  47.4%     0.0%     0.0%  18.13        0.00
+
+  n 2176-2425: 10 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           626   674.2   1366   0.0%     0.0%    80.0%   1.80        0.00
+    lns               0    36.5    247  60.0%    80.0%     0.0%  20.00        0.00
+    restricted      143   201.8    546  40.0%    70.0%    10.0%  18.73        3.71
+    control         400   530.5   1339  20.0%     0.0%     0.0%  18.63        0.00
+
+  n 2426-2675: 10 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           142   242.4    678   0.0%     0.0%    60.0%   1.90        0.00
+    lns               6    25.1    143  50.0%    70.0%    20.0%  20.00        0.00
+    restricted        6    84.2    503  50.0%    70.0%    10.0%  20.01        3.93
+    control          55   186.4    678  20.0%     0.0%     0.0%  18.15        0.00
+
+  n 2676-2925: 10 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start            70    83.2    256  40.0%     0.0%    40.0%   2.34        0.00
+    lns               0     1.1      8  80.0%    40.0%    10.0%  20.00        0.00
+    restricted        0     0.0      0 100.0%    40.0%     0.0%  19.85        4.71
+    control           0    37.9    124  60.0%     0.0%     0.0%  15.10        0.00
+
+  n 2926-3175: 10 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           208   236.2    766  10.0%     0.0%    40.0%   3.26        0.00
+    lns               0     9.3     72  80.0%    70.0%     0.0%  20.00        0.00
+    restricted        0    64.2    258  60.0%    60.0%     0.0%  19.86        6.70
+    control         162   207.6    766  30.0%     0.0%     0.0%  20.01        0.00
+
+  n 3176-3440: 11 games; the shortfall (the optimum less the game's score)
+                 median    mean    p90  exact <control >control  cpu s +neighbours
+    start           430   487.4    667   0.0%     0.0%    27.3%   6.63        0.00
+    lns               0    30.8     67  54.5%   100.0%     0.0%  20.00        0.00
+    restricted      249   244.9    366   0.0%    90.9%     9.1%  20.01       12.98
+    control         430   456.3    654   0.0%     0.0%     0.0%  20.01        0.00
+
+  the best of the four (ties count for each): start 5, lns 44, restricted 28, control 14
+  games both finders have exactly: 20; neither: 13
+  CPU of a game: start 3.25 s, neighbours' starts 6.53 s, each method 20.00 s; the run in all 0.96 core-hours
+  lns: 6834 units a game, 100.0% of them searched to the end, 6.0 improvements a game
+  restricted: 4.0 rounds a game, ended with 59.5% of the candidates; finished the whole search in 3 games, the control in 8
+
+STAGE 3, seeded with lns (stage3-lns-1s.jsonl): 40 games
+      n short  seed |     nodes       (i)      (ii) | cpu in all     (i)    (ii)
+   2180   349   148 |    759702   3144851    193115 |      115.9   463.4    30.6
+   2196     0     0 |     37638     37638     37638 |        7.3     6.2     5.1
+   2200   348     0 |     14806     42193     14806 |        4.9     7.6     2.2
+   2264   649    41 |    796233   3046610    567758 |      125.6   492.5    88.2
+   2312   273     0 |    942147   1477748    942147 |      136.8   198.3   129.0
+   2397   154     0 |    373077    824416    373077 |       63.9   127.3    58.8
+   2416    93    37 |    387416    562114    383330 |       63.4    86.5    63.1
+   2430   525    11 |    482697   1887941    464879 |       79.9   302.8    74.3
+   2440   141     0 |     16190     47059     16190 |        6.4    11.0     3.7
+   2451   410     0 |    124352    372166    124352 |       23.0    55.6    20.4
+   2478    54    13 |   1918501   1967538   1904192 |      277.1   284.5   267.9
+   2556   367    20 |    631568   1430753    502005 |       99.2   198.2    77.8
+   2560   525     0 |    425374    789652    425374 |       68.1   113.7    64.1
+   2565   727   268 |    255605    343674     57109 |       41.9    51.2     9.5
+   2592   485     0 |    307131   2468342    307131 |       52.5   372.8    49.4
+   2601   143   143 |     79127     79127     39204 |       15.0    15.5     6.0
+   2632   225     5 |    442948    480405    385527 |       68.7    72.8    57.5
+   2640     0     0 |    235829    235829    235829 |       32.7    34.2    29.3
+   2691   312     0 |    203097    666372    203097 |       29.2    83.1    26.1
+   2696   312     0 |    223481   1149159    223481 |       31.5   140.1    28.3
+   2700   195     0 |    112464    555866    112464 |       17.2    67.6    15.0
+   2704   253     0 |    146054    170761    146054 |       21.9    23.5    19.1
+   2712   253     0 |    166142    206378    166142 |       25.3    29.4    22.7
+   2720   256     0 |    184979    310715    184979 |       28.7    45.0    25.9
+   2799     0     0 |     77364     77364     77364 |       13.4    12.3    10.6
+   2849    74     0 |     47817    109361     47817 |        9.0    18.4     6.0
+   2891   421     0 |    458862   1151337    458862 |       69.5   167.4    65.3
+   2925    60     0 |    235049    253467    235049 |       33.6    39.9    31.2
+   2964   227     0 |     68135    221455     68135 |       12.3    32.4     9.2
+   2976     0     0 |    143370    143370    143370 |       22.1    20.9    19.4
+   3000   219     0 |    167554    488617    167554 |       29.7    76.4    25.6
+   3003   290     0 |     29997    388246     29997 |        9.1    64.9     4.8
+   3010   321     0 |     53188   1302072     53188 |       13.5   192.7     9.6
+   3064   124    72 |   1043196   1357245    983077 |      174.3   219.6   159.9
+   3128   339    55 |    621164    851088    436384 |      325.1   421.8   237.3
+   3129   193    81 |    476427    449610    304091 |       91.4    86.6    57.5
+   3213   504   115 |    627891   2277040    450606 |      154.2   537.9   106.5
+   3260   373     0 |    390058    430056    390058 |      101.7   109.8    96.0
+   3267   782     0 |    150748    193733    150748 |       48.7    57.0    43.4
+   3272   782     0 |    277366    335517    277366 |       84.5    93.1    78.0
+  against (i), 40 games that finished: nodes median 0.567, mean 0.579, p10 0.202, p90 1.000, range 0.041-1.060
+    CPU in all, finder and start counted: median 0.643, mean 0.628, p10 0.250, p90 1.056, range 0.070-1.164
+    the seed's shortfall 25 on the mean (the start's 294)
+    in total: nodes 0.437 of (i)'s and 1.151 of (ii)'s; CPU in all 2628 s against (i)'s 5434 s and (ii)'s search alone 2135 s (the finder 40 s of it); 36 of 40 games cost less in all
+
+STAGE 3, seeded with lns (stage3-lns-5s.jsonl): 40 games
+      n short  seed |     nodes       (i)      (ii) | cpu in all     (i)    (ii)
+   2180   349   148 |    759702   3144851    193115 |      119.8   463.4    30.6
+   2196     0     0 |     37638     37638     37638 |       11.2     6.2     5.1
+   2200   348     0 |     14806     42193     14806 |        8.9     7.6     2.2
+   2264   649     0 |    567758   3046610    567758 |       94.7   492.5    88.2
+   2312   273     0 |    942147   1477748    942147 |      136.7   198.3   129.0
+   2397   154     0 |    373077    824416    373077 |       65.5   127.3    58.8
+   2416    93    37 |    387416    562114    383330 |       67.3    86.5    63.1
+   2430   525     0 |    464879   1887941    464879 |       80.9   302.8    74.3
+   2440   141     0 |     16190     47059     16190 |       10.3    11.0     3.7
+   2451   410     0 |    124352    372166    124352 |       27.0    55.6    20.4
+   2478    54    13 |   1918501   1967538   1904192 |      275.3   284.5   267.9
+   2556   367    20 |    631568   1430753    502005 |      102.8   198.2    77.8
+   2560   525     0 |    425374    789652    425374 |       71.2   113.7    64.1
+   2565   727     0 |     57109    343674     57109 |       16.4    51.2     9.5
+   2592   485     0 |    307131   2468342    307131 |       56.6   372.8    49.4
+   2601   143   143 |     79127     79127     39204 |       19.0    15.5     6.0
+   2632   225     0 |    385527    480405    385527 |       64.5    72.8    57.5
+   2640     0     0 |    235829    235829    235829 |       36.3    34.2    29.3
+   2691   312     0 |    203097    666372    203097 |       33.2    83.1    26.1
+   2696   312     0 |    223481   1149159    223481 |       35.4   140.1    28.3
+   2700   195     0 |    112464    555866    112464 |       21.2    67.6    15.0
+   2704   253     0 |    146054    170761    146054 |       25.7    23.5    19.1
+   2712   253     0 |    166142    206378    166142 |       29.4    29.4    22.7
+   2720   256     0 |    184979    310715    184979 |       32.6    45.0    25.9
+   2799     0     0 |     77364     77364     77364 |       17.4    12.3    10.6
+   2849    74     0 |     47817    109361     47817 |       13.0    18.4     6.0
+   2891   421     0 |    458862   1151337    458862 |       73.5   167.4    65.3
+   2925    60     0 |    235049    253467    235049 |       37.6    39.9    31.2
+   2964   227     0 |     68135    221455     68135 |       16.3    32.4     9.2
+   2976     0     0 |    143370    143370    143370 |       26.0    20.9    19.4
+   3000   219     0 |    167554    488617    167554 |       33.6    76.4    25.6
+   3003   290     0 |     29997    388246     29997 |       13.1    64.9     4.8
+   3010   321     0 |     53188   1302072     53188 |       17.5   192.7     9.6
+   3064   124    72 |   1043196   1357245    983077 |      177.5   219.6   159.9
+   3128   339    55 |    621164    851088    436384 |      324.0   421.8   237.3
+   3129   193    26 |    425455    449610    304091 |       87.3    86.6    57.5
+   3213   504    53 |    505074   2277040    450606 |      129.6   537.9   106.5
+   3260   373     0 |    390058    430056    390058 |      105.7   109.8    96.0
+   3267   782     0 |    150748    193733    150748 |       52.8    57.0    43.4
+   3272   782     0 |    277366    335517    277366 |       88.7    93.1    78.0
+  against (i), 40 games that finished: nodes median 0.496, mean 0.555, p10 0.186, p90 1.000, range 0.041-1.000
+    CPU in all, finder and start counted: median 0.717, mean 0.707, p10 0.241, p90 1.223, range 0.091-1.805
+    the seed's shortfall 14 on the mean (the start's 294)
+    in total: nodes 0.416 of (i)'s and 1.096 of (ii)'s; CPU in all 2656 s against (i)'s 5434 s and (ii)'s search alone 2135 s (the finder 200 s of it); 32 of 40 games cost less in all
+
+BUDGETS: the 51 games both runs have; the shortfall, mean (exact)
+  lns         5 s   29.0 (56.9%), 20 s   20.8 (64.7%)
+  restricted  5 s  170.8 (29.4%), 20 s  121.5 (49.0%)
+  control     5 s  325.7 (15.7%), 20 s  287.1 (25.5%)
+
+LNS: CPU seconds of its last improvement, 40 games of stage3-lns-1s.jsonl: median 0.32, p90 0.77, largest 0.98; 40 within 1 s, 40 within 2.5 s
+
+LNS: CPU seconds of its last improvement, 40 games of stage3-lns-5s.jsonl: median 0.32, p90 1.15, largest 4.73; 35 within 1 s, 39 within 2.5 s
+
+CPU SPENT (core-hours, from the CPU fields of the lines)
+  stage1.jsonl                        2.13
+  stage2-20s.jsonl                    0.96
+  stage2.jsonl                        1.69
+  stage3-lns-1s.jsonl                 0.73
+  stage3-lns-5s.jsonl                 0.74
+  tuning/lns-fix50-80-nodes1024.jsonl  0.06
+  tuning/lns-fix60-95-nodes1024.jsonl  0.06
+  tuning/lns-fix70-90-nodes1024.jsonl  0.06
+  tuning/lns-fix70-90-nodes4096.jsonl  0.06
+  tuning/lns-fix80-95-nodes1024.jsonl  0.06
+  tuning/restricted-extra128-value.jsonl  0.06
+  tuning/restricted-extra32-chosen.jsonl  0.06
+  tuning/restricted-extra32-value.jsonl  0.06
+  tuning/restricted-extra8-value.jsonl  0.06
+  in all                              6.77
+
+TUNING: 26 games n = 2178 + 50k, 5 CPU s each; the shortfall of the finder's game (the optimum less its score)
+  lns-fix50-80-nodes1024          26 games: mean   18.3, median    0, exact 61.5%
+  lns-fix60-95-nodes1024          26 games: mean   17.2, median    0, exact 61.5%
+  lns-fix70-90-nodes1024          26 games: mean   15.5, median    0, exact 61.5%
+  lns-fix70-90-nodes4096          26 games: mean   15.5, median    0, exact 61.5%
+  lns-fix80-95-nodes1024          26 games: mean   28.4, median    0, exact 53.8%
+  restricted-extra128-value       26 games: mean  258.4, median  137, exact 30.8%
+  restricted-extra32-chosen       26 games: mean  163.5, median   67, exact 30.8%
+  restricted-extra32-value        26 games: mean  254.9, median  137, exact 30.8%
+  restricted-extra8-value         26 games: mean  254.9, median  137, exact 30.8%
