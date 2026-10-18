@@ -128,10 +128,14 @@ What it found: [the entry](../../docs/experiments/the-node-choice-where-the-stro
 |---|---|
 | `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyses (all the steps; the floor entry's slope; the first 50 steps) |
 | `log` | the stages' times (UTC) and the commit |
+| `prepare.jsonl` | the line each `wall choice-prepare` printed (suite, made, probe games in the script's order): the nogood pools (`finder_pool`, `search_pool`, `pool`), the root's gap, the 200-step root fit (`relaxed_root`, `share` of the gap it closes, `fit_cpu_s`) and the nodes kept |
+| `fixtures.txt` | the six proofs that made the fixtures (`perf make-nodes`): runs, nodes and distinct units |
+| `workers.jsonl` | a line for each worker and game, from the workers' output: the nodes it measured, skipped (done already) or left to other workers, and its CPU seconds (4,636 in all) |
 | `measure.jsonl.gz` | the 553 lines of `measure/worker-0.jsonl` to `worker-15.jsonl`, joined in the order of the workers and gzipped.  `analyze.py` reads plain files: `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I bench/node_choice/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the analyses again, byte for byte |
 
 Not kept: `prep/` (the files of `wall choice-prepare`, up to 2 MB a game) and `fixtures/` (the nodes of the six proofs,
-70-250 KB a game), which the commands above make again, and `logs/` (each worker's output, which repeats its lines).
+70-250 KB a game), which the commands above make again, and `logs/` (each worker's output, which repeats its
+lines, and the outputs of the fixtures and the preparations, which `fixtures.txt` and `prepare.jsonl` hold).
 
 ## What it does not measure
 

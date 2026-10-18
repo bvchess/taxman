@@ -23,7 +23,10 @@ fresh tables, stopped at 900 CPU s: none was), and the refit at the node (up to 
 multipliers, stopping at the first that cuts; `sub` the same with the nogoods of the node's own solve too).  520 are
 open nodes with a completed solve; the other 33 lines are nodes on the way to the optimum, which only check that no fit
 goes below their best completion (none did: the faults file was never written).  The machine was launched at 17:48:31Z
-and powered itself off at the end, a few cents; the data is `bench/node_choice/cloud-20261018/`.
+and powered itself off at the end, a few cents; the data is `bench/node_choice/cloud-20261018/`.  The pools of the
+twelve games held 263 to 5,825 nogoods (about 3,300 at the end of the chain) and the root fits closed 0.23 to 0.52 of
+the root gap (`prepare.jsonl`); the 553 nodes took 4,636 CPU s, 4,141 of them the suite's forty (`workers.jsonl`; the
+README had estimated about 6,000).
 
 *Results* (`analysis.txt`; the refit with all steps, the share of the open nodes it cuts):
 
