@@ -1,0 +1,24 @@
+# started on Fri Oct 16 16:48:32 2026
+
+
+ Performance counter stats for '/usr/bin/time -v -o /home/ec2-user/calib/t32/time.txt /home/ec2-user/taxman/rust/target/release/taxman solve 3441 --threads 32 --out /home/ec2-user/calib/t32/out.jsonl --checkpoint-dir /home/ec2-user/calib/t32/ckpt --checkpoint-interval 300 --progress 10 --time-limit 180':
+
+        5825533.66 msec task-clock:u                     #   28.624 CPUs utilized          
+                 0      context-switches:u               #    0.000 /sec                   
+                 0      cpu-migrations:u                 #    0.000 /sec                   
+            122361      page-faults:u                    #   21.004 /sec                   
+    16156056928798      cycles:u                         #    2.773 GHz                      (50.01%)
+    61451261966522      instructions:u                   #    3.80  insn per cycle           (50.00%)
+    10943551470328      branches:u                       #    1.879 G/sec                    (50.01%)
+      270472106626      branch-misses:u                  #    2.47% of all branches          (33.35%)
+    25328774009871      L1-dcache-loads:u                #    4.348 G/sec                    (33.36%)
+      259382404049      L1-dcache-load-misses:u          #    1.02% of all L1-dcache accesses  (33.34%)
+   <not supported>      LLC-loads:u                                                 
+   <not supported>      LLC-load-misses:u                                           
+
+     203.517814940 seconds time elapsed
+
+    5824.953479000 seconds user
+       0.500027000 seconds sys
+
+

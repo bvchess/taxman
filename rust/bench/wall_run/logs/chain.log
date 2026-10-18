@@ -1,0 +1,25 @@
+2026-10-17T07:20:48Z the run's ledger is new: the run starts now
+2026-10-17T07:20:48Z the run began 2026-10-17T07:20:47Z; instance-hours so far: 0.0944
+2026-10-17T07:20:48Z saving to s3://taxman-013764204840-us-east-1/wall-to-the-wall every 600s
+2026-10-17T07:20:48Z counting the hours in s3://taxman-013764204840-us-east-1/wall-to-the-wall/run/ledger every 60s
+2026-10-17T07:20:48Z chain 1-8191; threads: all available; window 4; wall: 24 hours; results /home/ec2-user/taxman-work/results/strict.jsonl; checkpoints /home/ec2-user/taxman-work/ckpt
+date:       2026-10-17T07:20:48Z
+host:       ip-172-31-5-148.ec2.internal Linux 6.18.54-121.166.amzn2023.aarch64 aarch64
+cpus:       64
+            Architecture:                            aarch64
+            CPU(s):                                  64
+            Thread(s) per core:                      1
+            Core(s) per socket:                      64
+            Socket(s):                               1
+            NUMA node(s):                            1
+memory:     124 GiB
+rustc:      rustc 1.99.1 (58cf8f9c3 2026-10-13)
+native cpu: native          - Select the CPU of the current host (currently neoverse-v2).
+RUSTFLAGS:  -C target-cpu=native
+commit:     eb84a6fd201e568312b3e6a097db36049d910f2c
+work dir:   /home/ec2-user/taxman-work (37G free on /dev/nvme0n1p1)
+2026-10-17T07:20:48Z starting the solver (games done so far: 0)
+2026-10-18T18:58:04Z signal received: asking the command to stop
+2026-10-18T18:58:04Z the solver exited with status 143 after 128236s
+2026-10-18T18:58:04Z the solver was stopped by a signal (a final checkpoint was written)
+2026-10-18T18:58:04Z ended: stopped

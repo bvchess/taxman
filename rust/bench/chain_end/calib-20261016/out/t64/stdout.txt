@@ -1,0 +1,2 @@
+n=3441  score=3729369   search  nodes=665052705     180.341 s  incomplete
+stopped: the search for n=3441 hit a limit before it finished; run the same command to resume it

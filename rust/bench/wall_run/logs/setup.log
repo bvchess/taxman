@@ -1,0 +1,60 @@
+2026-10-17T07:15:49Z building (RUSTFLAGS='-C target-cpu=native'): the solver and the examples (ladder, sacrifice, hunt)
+   Compiling taxman v0.1.0 (/home/ec2-user/taxman/rust)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4m 19s
+2026-10-17T07:20:08Z building the prover (its own workspace): exact, the other tools and their examples
+   Compiling taxman-prover v0.1.0 (/home/ec2-user/taxman/rust/prover)
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.11s
+2026-10-17T07:20:19Z smoke: replay optimal.json
+verified 1300 games (n up to 1300, 367449 moves)
+load+parse 13.7 ms, replay 582.2 ms
+2026-10-17T07:20:19Z smoke: the committed results files, with the solver's verifier and the independent Python one
+/home/ec2-user/taxman/rust/results/strict.jsonl: 3440 completed games, n = 1..=3440 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 481, cap 311, exhausted 1178, same_search 1457
+  assumptions: none in 3440 of 3440 games
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1096, prime formula 480
+0 board sizes are in more than one file, with equal scores in all
+checked in 22408.2 ms
+/home/ec2-user/taxman/rust/results/strict.jsonl:
+  3440 completed games, n = 1..3440 (0 missing)
+  proof: cap 311, exhausted 1178, prime_formula 481, same_search 1457, trivial 13
+  assumed: (nothing) 3440
+  arithmetic certificates: n + score(n-1) 1096, prime formula 480
+0 board sizes are in more than one file
+all checks passed
+2026-10-17T07:20:45Z smoke: games 1..400 against optimal.json
+  through n=100 after 0.0 s
+  through n=200 after 0.1 s
+  through n=300 after 0.2 s
+  through n=400 after 0.3 s
+solved 1..=400 (8 threads, tactics default) in 0.3 s
+by method: trivial 13, prime 78, repeat 151, search 158
+400 games match optimal.json, 0 are not in it
+2026-10-17T07:20:46Z smoke: the prover on games 2..400, and the check of its proofs
+exact: 399 to do (0 already in /home/ec2-user/taxman-work/smoke-exact/exact.jsonl)
+exact: 399 written in 0s
+games 2..400: 399 of 399 have a line; searches: {'skipped': 324, 'proven': 75}; proven by {'Franklín–Moniot bound': 45, 'parity bound': 193, 'search': 75, 'prime': 29, 'chain': 57}
+without a line: none; score not the recorded optimum: none; not proven in 2..400: none
+searches that proved: 75, of them 75 from the roles of Theorem B (fix_low)
+OK: opt(n) is proven equal to the recorded score for every n in 2..400
+2026-10-17T07:20:47Z ready
+date:       2026-10-17T07:20:47Z
+host:       ip-172-31-5-148.ec2.internal Linux 6.18.54-121.166.amzn2023.aarch64 aarch64
+cpus:       64
+            Architecture:                            aarch64
+            CPU(s):                                  64
+            Thread(s) per core:                      1
+            Core(s) per socket:                      64
+            Socket(s):                               1
+            NUMA node(s):                            1
+memory:     124 GiB
+rustc:      rustc 1.99.1 (58cf8f9c3 2026-10-13)
+native cpu: native          - Select the CPU of the current host (currently neoverse-v2).
+RUSTFLAGS:  -C target-cpu=native
+commit:     eb84a6fd201e568312b3e6a097db36049d910f2c
+work dir:   /home/ec2-user/taxman-work (37G free on /dev/nvme0n1p1)
+
+work directory: /home/ec2-user/taxman-work (results, ckpt, logs)
+solver:         /home/ec2-user/taxman/rust/target/release/taxman
+note: /home/ec2-user/taxman/rust/tools/pgo.sh exists in this checkout; read its header for an optional profile-guided build
+prover:         /home/ec2-user/taxman/rust/prover/target/release/exact
+next:           /home/ec2-user/taxman/rust/tools/cloud/scaling.sh (the solver) or /home/ec2-user/taxman/rust/tools/cloud/prover.sh A B (the prover's proofs); see RUNBOOK.md

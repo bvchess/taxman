@@ -1,0 +1,23 @@
+	Command being timed: "/home/ec2-user/taxman/rust/target/release/examples/ladder --threads 32 --seed-opt --known /home/ec2-user/taxman/rust/results/strict.jsonl 3232 3360 3388 3179"
+	User time (seconds): 7677.47
+	System time (seconds): 0.77
+	Percent of CPU this job got: 3189%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:00.69
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 456276
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 139868
+	Voluntary context switches: 1377
+	Involuntary context switches: 6040
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 32
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
