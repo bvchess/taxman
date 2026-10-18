@@ -17,6 +17,8 @@
 //!     [--seed S] [--fix LO-HI] [--unit-nodes K] [--extra K] [--pool value|chosen] N|A-B...
 //! cargo run --release --example wall -- finders [--cpu S] [--known FILE] [--seed S] [--fix LO-HI] [--unit-nodes K]
 //!     [--extra K] [--pool value|chosen] N|A-B...
+//! cargo run --release --example wall -- nogoods [--cpu S] [--steps K] [--long K] [--known FILE] [--seed S]
+//!     [--fix LO-HI] [--unit-nodes K] N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -117,6 +119,9 @@
 //!   against the sound search for the same CPU time.  `sound` runs the sound search of each game from the start
 //!   incumbent, from the known optimum or from a finder's game; `finders` runs the finders and the control on each
 //!   game.  Both are defined in `wall/finders.rs`, whose module comment has the options and the lines.
+//! * **nogoods**: whether the nogoods the finder's unit searches learn lower a game's upper bound (a Lagrangian bound
+//!   over them, the root's GF(2) bound as its inner problem), beside the nogoods of the sound search for the same CPU
+//!   time.  Defined in `wall/nogoods.rs`, whose module comment has the options and the lines.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -148,6 +153,9 @@ mod finders;
 mod known;
 #[path = "common/lns.rs"]
 mod lns;
+/// `nogoods`: the Lagrangian bounds over the nogoods that the finder and the sound search learn.
+#[path = "wall/nogoods.rs"]
+mod nogoods;
 #[path = "common/rng.rs"]
 mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
@@ -184,17 +192,20 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 9] = ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders"];
+const COMMANDS: [&str; 10] =
+    ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders", "nogoods"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 26] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders"]),
+const OPTIONS: [(&str, &[&str]); 28] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods"]),
     ("--from", &["sound"]),
     ("--cap", &["sound"]),
-    ("--cpu", &["sound", "finders"]),
-    ("--seed", &["sound", "finders"]),
-    ("--fix", &["sound", "finders"]),
-    ("--unit-nodes", &["sound", "finders"]),
+    ("--cpu", &["sound", "finders", "nogoods"]),
+    ("--steps", &["nogoods"]),
+    ("--long", &["nogoods"]),
+    ("--seed", &["sound", "finders", "nogoods"]),
+    ("--fix", &["sound", "finders", "nogoods"]),
+    ("--unit-nodes", &["sound", "finders", "nogoods"]),
     ("--extra", &["sound", "finders"]),
     ("--pool", &["sound", "finders"]),
     ("--repeat", &["setup"]),
@@ -309,7 +320,8 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 
 /// The board sizes of the arguments: numbers, and for `setup`, `start` and `frames` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
-    let ranges = matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders");
+    let ranges =
+        matches!(command, "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods");
     let mut games = Vec::new();
     for text in texts {
         let number = |part: &str| part.parse::<u32>().map_err(|e| format!("{text}: {e}"));
@@ -389,6 +401,8 @@ fn parse() -> Result<Options, String> {
             "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
             "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
+            "--steps" => o.finders.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
+            "--long" => o.finders.long = number("--long", value("--long")?)?,
             "--seed" => o.finders.lns.seed = number("--seed", value("--seed")?)?,
             "--fix" => o.finders.lns.fix = finders::fix_range(&value("--fix")?)?,
             "--unit-nodes" => o.finders.lns.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,

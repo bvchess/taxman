@@ -35,10 +35,14 @@
 //!   limit), `lns_improved` and `lns_found_ms` (the CPU milliseconds at which the last of them was found); `restricted_candidates` (the last set's size) and `restricted_rounds`.
 //!
 //! `--seed` seeds the random choices (mixed with the board size).
+//!
+//! The command `nogoods` (`nogoods.rs`) is played the same way, on the same [`Case`]; it takes the budgets, the start
+//! and the referee from here.
 
 use super::{beyond, chained_of, counters, root_bound, set_up, Line, Options};
 use crate::known::known_incumbent;
 use crate::lns::{self, run_unit, Lns};
+use crate::nogoods;
 use std::cmp::Reverse;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -117,7 +121,7 @@ impl FromStr for PoolScore {
     }
 }
 
-/// The options of `sound` and `finders`, with their defaults.
+/// The options of `sound`, `finders` and `nogoods`, with their defaults.
 #[derive(Clone, Copy)]
 pub struct Params {
     pub from: Source,
@@ -130,6 +134,10 @@ pub struct Params {
     /// How many candidates beyond the starts' [`Case::restricted`] begins with, and in which order it takes them.
     pub extra: usize,
     pub pool: PoolScore,
+    /// The subgradient steps of each bound of `nogoods`, and the steps of the longer fit that shows how far the
+    /// bound goes (at least `steps`).
+    pub steps: usize,
+    pub long: usize,
 }
 
 impl Default for Params {
@@ -141,6 +149,8 @@ impl Default for Params {
             lns: lns::Options::default(),
             extra: 32,
             pool: PoolScore::Chosen,
+            steps: 200,
+            long: 2000,
         }
     }
 }
@@ -161,17 +171,17 @@ pub fn fix_range(text: &str) -> Result<(f64, f64), String> {
 // Budgets and runs
 
 /// Elapsed CPU seconds of this process (wall seconds where the system does not say).
-struct Clock {
+pub struct Clock {
     cpu: Option<f64>,
     wall: Instant,
 }
 
 impl Clock {
-    fn start() -> Clock {
+    pub fn start() -> Clock {
         Clock { cpu: counters::cpu_seconds(), wall: Instant::now() }
     }
 
-    fn elapsed(&self) -> f64 {
+    pub fn elapsed(&self) -> f64 {
         match (self.cpu, counters::cpu_seconds()) {
             (Some(before), Some(after)) => after - before,
             _ => self.wall.elapsed().as_secs_f64(),
@@ -181,14 +191,14 @@ impl Clock {
 
 /// What a method works under: the control that stops its searches when the CPU budget is up, whether it is, and the
 /// CPU clock of the budget.
-struct Budget {
-    control: Arc<Control>,
+pub struct Budget {
+    pub control: Arc<Control>,
     expired: AtomicBool,
-    clock: Clock,
+    pub clock: Clock,
 }
 
 impl Budget {
-    fn expired(&self) -> bool {
+    pub fn expired(&self) -> bool {
         self.expired.load(Ordering::Acquire)
     }
 }
@@ -196,7 +206,7 @@ impl Budget {
 /// `work` under a budget of `cap` CPU seconds (none: no limit), and the CPU seconds it took.  A watchdog thread stops
 /// the budget's control once the budget is spent, which ends the search in progress; it sleeps in between, so it costs
 /// nothing.
-fn budgeted<T>(cap: Option<f64>, work: impl FnOnce(&Budget) -> T) -> (T, f64) {
+pub fn budgeted<T>(cap: Option<f64>, work: impl FnOnce(&Budget) -> T) -> (T, f64) {
     let budget = Budget { control: Control::new(), expired: AtomicBool::new(false), clock: Clock::start() };
     let done = AtomicBool::new(false);
     let (budget, done) = (&budget, &done);
@@ -235,25 +245,25 @@ struct Found<const W: usize> {
 }
 
 /// A game, set up, with what the methods use.
-struct Case<'a, const W: usize> {
-    board: &'a Board<W>,
-    p: &'a Prepared<W>,
-    space: &'a SearchSpace<'a, W>,
-    params: &'a Params,
-    optimal: &'a Optimal,
+pub struct Case<'a, const W: usize> {
+    pub board: &'a Board<W>,
+    pub p: &'a Prepared<W>,
+    pub space: &'a SearchSpace<'a, W>,
+    pub params: &'a Params,
+    pub optimal: &'a Optimal,
 }
 
 impl<const W: usize> Case<'_, W> {
-    fn n(&self) -> u32 {
+    pub fn n(&self) -> u32 {
         self.board.n()
     }
 
-    fn score(&self, set: &Bits<W>) -> u64 {
+    pub fn score(&self, set: &Bits<W>) -> u64 {
         self.board.in_the_bag + set.sum()
     }
 
     /// The game a standalone `solve` starts from, and the CPU seconds it took.
-    fn start(&self) -> (Bits<W>, f64) {
+    pub fn start(&self) -> (Bits<W>, f64) {
         let clock = Clock::start();
         let graph = self.space.match_graph;
         (start_incumbent(self.p, graph, &Control::new(), 1, None), clock.elapsed())
@@ -261,7 +271,7 @@ impl<const W: usize> Case<'_, W> {
 
     /// The beginning of the game's line: the board, the root bound (`upper`, as a score), the known optimum and the
     /// start; and whether the start already reaches the root bound (`meets`), when nothing is left to find.
-    fn line(&self, start: &Bits<W>, start_cpu_s: f64) -> (Line, bool) {
+    pub fn line(&self, start: &Bits<W>, start_cpu_s: f64) -> (Line, bool) {
         let bound = self.space.gf2.as_ref().map(|graph| root_bound(self.p, graph).0.value);
         let meets = bound.is_some_and(|bound| bound <= start.sum());
         let mut line = Line::of(self.n());
@@ -351,7 +361,7 @@ impl<const W: usize> Case<'_, W> {
     }
 
     /// Whether `set` plays as a legal finished game at the score it claims, by the referee.
-    fn referee(&self, set: &Bits<W>) -> Result<(), String> {
+    pub fn referee(&self, set: &Bits<W>) -> Result<(), String> {
         let moves = solution_for_promotions::<W>(&self.board.tables, *set);
         let score = replay_finished(self.n(), &moves)?;
         if score == self.score(set) {
@@ -388,6 +398,8 @@ impl<const W: usize> Case<'_, W> {
 pub enum Command {
     Sound,
     Finders,
+    /// `wall nogoods` (`nogoods.rs`): the nogoods the finder and the search learn, as bounds.
+    Nogoods,
 }
 
 impl Command {
@@ -396,15 +408,16 @@ impl Command {
         match name {
             "sound" => Some(Command::Sound),
             "finders" => Some(Command::Finders),
+            "nogoods" => Some(Command::Nogoods),
             _ => None,
         }
     }
 }
 
 /// What a command made of a game: its line, and the faults found in the games its methods returned.
-struct Played {
-    line: Line,
-    faults: Vec<String>,
+pub struct Played {
+    pub line: Line,
+    pub faults: Vec<String>,
 }
 
 /// `finders` on a game: the three methods from the same start.
@@ -460,11 +473,17 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
         return Ok(Played { line, faults: Vec::new() });
     };
     let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, &graph);
+    let mut space = SearchSpace::new(&p, &graph);
+    if command == Command::Nogoods {
+        // Every nogood a searcher learns is wanted, so none is forgotten (the unit searches of the finder are shorter
+        // than the period anyway; the control's table would be cleared every NOGOOD_PERIOD steps).
+        space.forgetting.period = None;
+    }
     let case = Case { board: &board, p: &p, space: &space, params: &o.finders, optimal };
     match command {
         Command::Sound => sound_of(&case),
         Command::Finders => Ok(finders_of(&case)),
+        Command::Nogoods => Ok(nogoods::of(&case)),
     }
 }
 
@@ -550,6 +569,28 @@ mod tests {
                     assert_eq!(number(&line, "search_from"), opt, "n={n}: {line}");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn the_nogoods_the_searches_learn_fail_to_promote_and_every_bound_over_them_is_at_least_the_optimum() {
+        let mut o = options("nogoods", 0.2);
+        o.finders.steps = 40;
+        o.finders.long = 120;
+        for n in [480, 747, 936] {
+            let line = line_of(Command::Nogoods, n, &o);
+            let (opt, upper) = (number(&line, "opt"), number(&line, "upper"));
+            assert_eq!(number(&line, "promotable"), 0, "n={n}: {line}");
+            assert!(number(&line, "finder_pool") > 0 && number(&line, "search_pool") > 0, "n={n}: {line}");
+            for pool in ["finder", "search", "both"] {
+                let (bound, long) = (number(&line, &format!("{pool}_bound")), number(&line, &format!("{pool}_long")));
+                assert!(
+                    opt <= long && long <= bound && bound <= upper,
+                    "n={n}: {pool}: {opt} <= {long} <= {bound} <= {upper}"
+                );
+            }
+            // The pools of the two methods together bound at least as well as either alone, up to the fit.
+            assert!(number(&line, "both_pool") >= number(&line, "finder_pool").max(number(&line, "search_pool")));
         }
     }
 
