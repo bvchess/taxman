@@ -503,12 +503,16 @@ fn check_the_committed_results_to(last: u32) {
         .collect();
     paths.sort();
     let names: Vec<_> = paths.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
-    assert_eq!(names, ["strict.jsonl"], "a new results file needs its counts here and in the README");
-    let whole = fs::read_to_string(&paths[0]).unwrap();
+    // bounds.jsonl is not a results file (its lines are bounds, not games): the ledger's own tests check it, in
+    // examples/ledger/store_tests.rs.
+    assert_eq!(names, ["bounds.jsonl", "strict.jsonl"], "a new results file needs its counts here and in the README");
+    let strict = paths.into_iter().find(|path| path.ends_with("strict.jsonl")).unwrap();
+    let whole = fs::read_to_string(&strict).unwrap();
     let text: String = whole.split_inclusive('\n').take(last as usize).collect();
 
     // The verifier reads a file, so a prefix is written to one.
     let dir = TempDir::new("committed-prefix");
+    paths = vec![strict];
     if last < LAST {
         let prefix = dir.join("strict.jsonl");
         fs::write(&prefix, &text).unwrap();
