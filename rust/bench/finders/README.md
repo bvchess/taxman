@@ -4,7 +4,8 @@ What was measured and what it showed:
 [docs/EXPERIMENTS.md](../../docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md).  The runs were
 made on the laptop on 2026-10-17, one process a game and four at once under `nice -n 10`, with the test-profile build
 of `wall` (`cargo build --profile test --example wall` in `rust/`), from `rust/`, against the committed chain
-(`results/strict.jsonl`).  The commands `sound` and `finders` are defined in the module comment of
+(`results/strict.jsonl`).  The commands `sound` and `finders` were removed from master on 2026-10-18; they build at
+commit 9d9dae3 (`git checkout 9d9dae3` first), where they are defined in the module comment of
 `examples/wall/finders.rs`, which defines every field of a line.  Every time is the CPU seconds of the process (the
 laptop was shared with other work, so the wall time says little), and the searches are compared by their nodes as well.
 

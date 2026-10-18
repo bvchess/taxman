@@ -3,7 +3,8 @@
 once under `nice -n 10`, one process a game, each line appended to the stage's file as its game finishes.  A run that
 is interrupted goes on where it was: the (game, search) pairs the file has are skipped.
 
-usage (from rust/, after `cargo build --profile test --example wall`):
+usage (from rust/, after `cargo build --profile test --example wall` at commit 9d9dae3: the commands were removed from
+master on 2026-10-18):
   ./bench/finders/run.py sound FILE --from start|opt|lns|restricted [--cap S] [--cpu S] [--jobs 4] GAME...
   ./bench/finders/run.py finders FILE [--cpu S] [--jobs 4] [--shuffle] GAME...
 where a GAME is N, or A-B, or A-B/STEP (every STEP-th game of A..B), and the options not named here (`--fix`,

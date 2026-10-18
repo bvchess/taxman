@@ -18,7 +18,7 @@
 //! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound; `floor`, Lemma F, a
 //! search under a floor that completed having found nothing: U is the floor), the finder's games (`lns`: L only),
 //! proven games given (`given`), boards with nothing to promote (`trivial`), and the Lagrangian bound over checked
-//! nogoods (`nogoods`: U only, which `wall nogoods` makes and the ledger's runs do not yet).  Every bound only
+//! nogoods (`nogoods`: U only, which nothing makes now: the removed `wall nogoods` did).  Every bound only
 //! improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
 //! [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on statement U, a
 //! counterexample to it.

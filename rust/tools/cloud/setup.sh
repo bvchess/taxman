@@ -25,6 +25,9 @@
 #                   unless BUILD_PROVER asks for it; the checks of a part that is not built are left out.
 #   BUILD_PROVER    the same for rust/prover/ (default "--bins --examples" when BUILD is not set, none when it is; the
 #                   word `none` for none)
+#   STUDIES=1       also build the study tools of rust/ (tune, extended, structure, wall: cargo's feature `studies`) and
+#                   test them; the default build, with the ladder, the probe and the ledger, skips them.  A build with
+#                   the studies is another entry of the cache than one without (and serves a request without them).
 #   BUILD_CACHE     where the cache is: s3://taxman-013764204840-us-east-1/builds (default), file:///DIR (for tests) or
 #                   off.  build_cache.py has the key and the layout.  A dirty checkout, no commit, RUSTFLAGS other than
 #                   a single -C target-cpu, or a cache out of reach (no aws, no credentials) is a miss: the build
@@ -173,6 +176,14 @@ if [ "${PROVER_ONLY:-0}" = 1 ]; then
 fi
 [ "$prover_args" != none ] || prover_args=""
 
+# STUDIES=1 adds cargo's feature `studies` to the solver's build, and to its tests (run_tests.py and cargo test take the
+# same option): the cache then holds the build apart from one without.
+studies=""
+if [ "${STUDIES:-0}" = 1 ] && [ -n "$solver_args" ]; then
+    studies="--features studies"
+    solver_args="$solver_args $studies"
+fi
+
 # Whether the cargo arguments $1 build the binary or example (the word $2) named $3.
 selects() {
     case " $1 " in
@@ -313,6 +324,8 @@ elif [ "${RELEASE_TESTS:-0}" = 1 ]; then
     release_crates=()
     [ -z "$solver_args" ] || release_crates+=("solver=$CRATE")
     [ -z "$prover_args" ] || release_crates+=("prover=$PROVER")
+    release_features=()
+    [ -z "$studies" ] || release_features=(--features solver=studies)
     [ "$cache_usable" = 1 ] || say "release suite: the build cache is not used here (see above): nothing will be stored"
     release_summary="$cache_tmp/release-summary.json"
     release_times="$cache_tmp/test-times.json"
@@ -322,7 +335,7 @@ elif [ "${RELEASE_TESTS:-0}" = 1 ]; then
     release_status=0
     python3 -I "$here/run_tests.py" --release --jobs "${TEST_JOBS:-$(ncpu)}" --timeout "${TEST_TIMEOUT:-3600}" \
         --times "$release_times" --report "$LOGS/release-tests.txt" --summary "$release_summary" \
-        "${release_crates[@]}" || release_status=$?
+        ${release_features[@]+"${release_features[@]}"} "${release_crates[@]}" || release_status=$?
     [ "$cache_usable" != 1 ] || [ ! -s "$release_times" ] || cache times-put --file "$release_times" ||
         say "could not store the test times"
     [ "$release_status" = 0 ] || release_failed "status $release_status"
@@ -337,8 +350,9 @@ elif [ "${SKIP_TESTS:-0}" != 1 ]; then
     # and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored large-machine tests
     # are run by hand (RUNBOOK.md).
     if [ -n "$solver_args" ]; then
-        say "cargo test -- --test-threads=4"
-        (cd "$CRATE" && cargo test -- --test-threads=4)
+        say "cargo test${studies:+ $studies} -- --test-threads=4"
+        # shellcheck disable=SC2086 # an option, or nothing
+        (cd "$CRATE" && cargo test $studies -- --test-threads=4)
     fi
     if [ -n "$prover_args" ]; then
         say "cargo test --release -- --test-threads=4, in the prover (about a minute)"

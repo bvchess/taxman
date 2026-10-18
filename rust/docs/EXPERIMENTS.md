@@ -33,7 +33,10 @@ README](../README.md#7-glossary) and in DESIGN.md; the measurements were made wi
   `repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) were removed from master on 2026-10-17, with the files of
   `examples/common/` that only they used and `tools/cloud/hunt.sh`.  An entry that used one ends with a section
   `## Later (2026-10)` naming the commit where it builds (8753189); the register, the index and the entries keep the
-  paths and commands of their time.
+  paths and commands of their time.  The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the
+  example `wall` were removed on 2026-10-18, with the code only they used (`choice-prepare` and `choice` stay); their
+  entries end the same way, and name the commit 9d9dae3.  The study tools that stay (`tune`, `extended`, `structure`
+  and `wall`) are built with `--features studies`, not by default.
 * **The register and the index point to every entry.**  An entry adds its rows to the
   [register](#register-of-everything-tried) (what was tried, the link, kept or not, the finding in a sentence or two)
   and a row to the [index](#index-of-rounds).  The docs test refuses an entry that neither links to.

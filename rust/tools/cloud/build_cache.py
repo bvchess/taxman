@@ -15,7 +15,8 @@ Common options (setup.sh passes them):
   --root DIR      the checkout (the directory with rust/ in it)
   --cache URL     where the cache is: s3://bucket/prefix, file:///directory (a stand-in for tests), or off.  Default
                   $BUILD_CACHE, else s3://taxman-013764204840-us-east-1/builds
-  --solver ARGS   what was (or is to be) built in rust/:        cargo arguments, "--bins --examples" or "--bin taxman"
+  --solver ARGS   what was (or is to be) built in rust/:        cargo arguments, "--bins --examples" or "--bin taxman";
+                  `--features studies` builds the study examples too, and is a part of the set (see below)
   --prover ARGS   what was built in rust/prover/ (default none): the same
   --tmp DIR       where files are staged and downloaded (default: the system's temporary directory)
 
@@ -32,7 +33,10 @@ binary for the CPU that built it.  Under it, one directory a set of binaries:
 
 An entry is never changed by a later run except by a release run of the same set, which replaces it.  A request is
 covered by an entry that holds each of its parts: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or
-`--examples`.  The entry of a larger set serves a smaller request; there is no half-built entry to complete.
+`--examples`, `--features F` by `--features F`.  The entry of a larger set serves a smaller request; there is no
+half-built entry to complete.  A feature is a part like the others: the entry of `--bins --examples --features studies`
+(which holds the study examples that `--examples` alone does not build) serves a request for `--bins --examples`, and
+an entry without the feature never serves a request with it, so a default build is not taken for one with the studies.
 
 Exit status: 0 done; 1 a miss, or a transfer that failed; 2 a wrong request; 3 the cache is not used (the reason is
 printed): a dirty checkout, no commit, other RUSTFLAGS, the cache off or out of reach.
@@ -83,7 +87,9 @@ def say(message: str) -> None:
 
 # --- what is asked for ----------------------------------------------------------------------------------------------
 def parse_selectors(crate: str, text: str) -> FrozenSet[Selector]:
-    """The parts of a cargo build that `text` (`--bins --examples`, `--bin taxman --example ledger`) asks for."""
+    """The parts of a cargo build that `text` (`--bins --examples`, `--bin taxman --example ledger`) asks for.  A
+    feature (`--features studies`) is a part of its own: it makes the build another one, whose entry serves a request
+    that does not name the feature but not the other way round."""
     found = set()
     words = text.split()
     i = 0
@@ -93,17 +99,17 @@ def parse_selectors(crate: str, text: str) -> FrozenSet[Selector]:
             found.add((crate, word[2:], ""))
             i += 1
             continue
-        if word in ("--bin", "--example") and i + 1 < len(words):
+        if word in ("--bin", "--example", "--features") and i + 1 < len(words):
             kind, name = word[2:], words[i + 1]
             i += 2
-        elif word.startswith(("--bin=", "--example=")):
+        elif word.startswith(("--bin=", "--example=", "--features=")):
             kind, name = word[2:].split("=", 1)
             i += 1
         else:
-            raise Usage(f"unsupported build argument {word!r} for the {crate}: --bins, --examples, --bin NAME and "
-                             "--example NAME are what BUILD and BUILD_PROVER take")
+            raise Usage(f"unsupported build argument {word!r} for the {crate}: --bins, --examples, --bin NAME, "
+                        "--example NAME and --features NAME are what BUILD and BUILD_PROVER take")
         if not NAME.fullmatch(name):
-            raise Usage(f"{name!r} is not a name of a binary or an example")
+            raise Usage(f"{name!r} is not a name of a binary, an example or a feature")
         found.add((crate, kind, name))
     return frozenset(found)
 
@@ -136,6 +142,8 @@ def artifact_paths(root: Path, selectors: FrozenSet[Selector]) -> List[str]:
     objects)."""
     paths = set()
     for crate, kind, name in sorted(selectors):
+        if kind == "features":
+            continue  # an option of the build, not a file
         directory = Path(CRATES[crate]) / "target" / "release"
         if kind.startswith("example"):
             directory = directory / "examples"

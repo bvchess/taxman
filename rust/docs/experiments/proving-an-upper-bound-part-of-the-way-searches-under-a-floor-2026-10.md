@@ -87,3 +87,9 @@ search (which resumes, tested) are not measured.  The ledger does not use floors
 
 **Commits.**  742e88a (`search_above`, Lemma F, `wall target` and their tests); this entry adds the data and the scripts in
 `bench/target/`.
+
+## Later (2026-10): the command removed from master
+
+The command `wall target` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
+9d9dae3:rust/examples/wall/finders.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
+`search_above` and its tests stay in the library.

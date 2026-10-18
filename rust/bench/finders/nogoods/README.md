@@ -4,10 +4,11 @@ What was measured and what it showed:
 [docs/EXPERIMENTS.md](../../../docs/experiments/nogoods-from-the-finders-work-2026-10.md).  The runs were made on the
 laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the test-profile build of `wall`
 (`cargo build --profile test --example wall` in `rust/`), from `rust/`, against the committed chain
-(`results/strict.jsonl`).  The command `nogoods` is defined in the module comment of `examples/wall/nogoods.rs`, which
-defines every field of a line.  Every time is the CPU seconds of the process (or the wall seconds of a bound, which is
-one thread), and the budgets of the finder and of the control are CPU seconds, so the pools of two runs of one game
-differ a little (a budget cuts a search at a different step).
+(`results/strict.jsonl`).  The command `nogoods` was removed from master on 2026-10-18; it builds at commit 9d9dae3
+(`git checkout 9d9dae3` first), where it is defined in the module comment of `examples/wall/nogoods.rs`, which defines
+every field of a line.  Every time is the CPU seconds of the process (or the wall seconds of a bound, which is one
+thread), and the budgets of the finder and of the control are CPU seconds, so the pools of two runs of one game differ a
+little (a budget cuts a search at a different step).
 
 `run.py` runs `wall nogoods` over a list of games, four processes at a time, and appends each game's line to the file
 as it ends (a run that is interrupted goes on where it was); it takes the helpers of `../run.py`.  `tables.py` makes

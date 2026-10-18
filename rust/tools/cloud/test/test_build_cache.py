@@ -192,6 +192,28 @@ class Cache(unittest.TestCase):
         done = self.fetch("--bin taxman --example ladder", "--bin exact", root=self.fresh_checkout())
         self.assertEqual(done.returncode, 0, done.stderr)
 
+    def test_a_build_with_the_studies_is_an_entry_of_its_own_that_serves_a_build_without_them(self):
+        studies = "--bins --examples --features studies"
+        key = self.cache / f"{self.commit}-{self._arch()}-cortex-a76"
+        self.assertEqual(self.store(solver="--bins --examples", prover="").returncode, 0)
+        machine = self.fresh_checkout()
+        for request in (studies, "--example wall --features studies"):  # the default build holds no study example
+            self.assertEqual(self.fetch(request, root=machine).returncode, 1, request)
+        self.assertFalse((machine / "rust/target/release/examples/wall").exists())
+
+        make_binary(self.root / "rust/target/release/examples/wall", "wall")  # what the feature adds to the build
+        self.assertEqual(self.store(solver=studies, prover="").returncode, 0)
+        self.assertEqual(sorted(p.name for p in key.iterdir()),
+                         ["solver-bins+solver-examples", "solver-bins+solver-examples+solver-features-studies"])
+        self.assertIn("set=solver features studies\n", (key / "solver-bins+solver-examples+solver-features-studies"
+                                                        / "manifest").read_text())
+        machine = self.fresh_checkout()
+        self.assertEqual(self.fetch("--example wall --features studies", root=machine).returncode, 0)
+        self.assertTrue(os.access(machine / "rust/target/release/examples/wall", os.X_OK))
+        machine = self.fresh_checkout()  # a request without the studies takes the smaller entry, the default build
+        self.assertEqual(self.fetch("--bins --examples", root=machine).returncode, 0)
+        self.assertFalse((machine / "rust/target/release/examples/wall").exists())
+
     def test_nothing_is_fetched_for_another_cpu_or_commit(self):
         self.store()
         machine = self.fresh_checkout()
@@ -305,9 +327,20 @@ class Selectors(unittest.TestCase):
         self.assertFalse(module.covers(parse("solver", "--bin taxman"), parse("solver", "--bins")))
         self.assertTrue(module.covers(frozenset(), frozenset()))
 
-    def test_only_binaries_and_examples_are_understood(self):
+    def test_a_feature_is_a_part_and_a_build_with_one_serves_a_request_without(self):
         module = load()
-        for text in ("--lib", "--all-targets", "--features x", "--bin", "--bin ../x", "-p taxman"):
+        parse = module.parse_selectors
+        default, studies = parse("solver", "--bins --examples"), parse("solver", "--bins --examples --features studies")
+        self.assertTrue(module.covers(studies, default))
+        self.assertFalse(module.covers(default, studies))
+        self.assertFalse(module.covers(default, parse("solver", "--example wall --features studies")))
+        self.assertTrue(module.covers(studies, parse("solver", "--example wall --features=studies")))
+        self.assertFalse(module.covers(studies, parse("solver", "--features other")))
+        self.assertNotEqual(module.slug(default), module.slug(studies))
+
+    def test_only_binaries_examples_and_features_are_understood(self):
+        module = load()
+        for text in ("--lib", "--all-targets", "--features", "--features a,b", "--bin", "--bin ../x", "-p taxman"):
             with self.assertRaises(module.Usage, msg=text):
                 module.parse_selectors("solver", text)
 

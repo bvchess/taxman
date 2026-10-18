@@ -1,9 +1,9 @@
 //! Large neighbourhood search (LNS) for a good game: keep a random share of the incumbent's promotions fixed, search
 //! the rest exactly as a unit of the engine, take any better game, and repeat (`#[path = "common/lns.rs"] mod lns;`
-//! beside `rng`; `wall finders` measures it and the ledger uses it, so that they share one copy).  It is not sound: it
-//! may miss the optimum, and nothing it finds proves anything.  A lower bound needs only a legal game, so a caller may
-//! offer what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed it at its score.  The
-//! measurements are in docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md.
+//! beside `rng`; `wall choice-prepare` harvests nogoods with it and the ledger uses it, so that they share one copy).
+//! It is not sound: it may miss the optimum, and nothing it finds proves anything.  A lower bound needs only a legal
+//! game, so a caller may offer what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed
+//! it at its score.  The measurements are in docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md.
 
 use crate::rng::Rng;
 use std::sync::Arc;
@@ -32,7 +32,8 @@ pub fn run_unit<const W: usize>(
     run_unit_with(control, unit, start, node_limit, |_| TaxSearcher::new(space))
 }
 
-/// [`run_unit`] with the searcher `make` makes (for a caller that wants what the searcher learned: `wall nogoods`).
+/// [`run_unit`] with the searcher `make` makes (for a caller that wants what the searcher learned, as `wall
+/// choice-prepare` does).
 pub fn run_unit_with<const W: usize, S: Searcher<TaxUnit<W>>>(
     control: &Arc<Control>,
     unit: TaxUnit<W>,

@@ -13,7 +13,8 @@ grows about tenfold per 147 points of gap, which is what makes the gap a forecas
 
 Defined in [`examples/wall/choice.rs`](../../examples/wall/choice.rs), whose module comment defines every field of
 every line: two commands of the `wall` example, `choice-prepare` (a game's file: the nogood pool harvested at the root
-as `wall nogoods` does, the multipliers fitted there, and the nodes) and `choice` (every node of such files).  For each
+as [the nogoods entry](../../docs/experiments/nogoods-from-the-finders-work-2026-10.md) did, the multipliers fitted
+there, and the nodes) and `choice` (every node of such files).  For each
 node it records:
 
 1. **the gap**: today's bound (`NodeBound`, the GF(2) bound of a unit) less what the node needs to beat the game's
@@ -52,8 +53,8 @@ About 520 nodes, and the path nodes.  A node today's bound cuts has no subtree t
 
 ## Commands
 
-On a laptop, a handful of nodes (from `rust/`, with `cargo build --profile test --example wall --example perf`, the
-non-release build; `P` a scratch directory):
+On a laptop, a handful of nodes (from `rust/`, with `cargo build --profile test --features studies --example wall
+--example perf`, the non-release build; `P` a scratch directory):
 
 ```text
 target/debug/examples/wall choice-prepare --known results/strict.jsonl --fixtures testdata/perf --prep P/prep \
@@ -63,13 +64,15 @@ python3 -I bench/node_choice/analyze.py P/out
 ```
 
 A suite game is prepared with `--suite bench/tuning/suite.jsonl`; `choice` skips the nodes `P/out` already has, and
-`--claims DIR` makes a node taken by whichever worker makes its file in `DIR` first.  Tests: `cargo test --example wall
--- choice` (a game below 1000: no step of a fit goes below the best completion that an exhaustive search of the node
-finds, a cut agrees with the solve from three incumbents, and a run again goes on where it was).
+`--claims DIR` makes a node taken by whichever worker makes its file in `DIR` first.  Tests: `cargo test --features
+studies --example wall -- choice` (a game below 1000: no step of a fit goes below the best completion that an
+exhaustive search of the node finds, a cut agrees with the solve from three incumbents, and a run again goes on where it was).
 
-In the cloud, on one `c8g.4xlarge` (16 CPUs), once `tools/cloud/setup.sh` has built the release examples:
+In the cloud, on one `c8g.4xlarge` (16 CPUs), once `STUDIES=1 tools/cloud/setup.sh` has the release examples, built or
+taken from the build cache (`STUDIES=1` for the study tools, `wall` among them, which a default build skips):
 [`cloud.sh`](cloud.sh), whose comment has the environment (`WORKERS`, `GAMES_SUITE`, `GAMES_MADE`, `GAMES_PROBE`,
-`KEEP`, `PATHS`, `CPU`, `ROOT_STEPS`, `NODE_STEPS`, `LIMIT`, `SUB`, `OUT`, `S3_DEST`, `POWEROFF`).  Its stages, from `rust/`:
+`KEEP`, `PATHS`, `CPU`, `ROOT_STEPS`, `NODE_STEPS`, `LIMIT`, `SUB`, `OUT`, `S3_DEST`, `POWEROFF`).  Its stages, from
+`rust/`:
 
 1. the six proofs that make the fixtures, one process each (`perf make-nodes`, a few minutes);
 2. `wall choice-prepare` for the twelve games, one process each (the finder and the sound search 10 CPU s each for the
@@ -94,12 +97,13 @@ sudo -u ec2-user bash -lc 'cd ~ && git clone -q https://github.com/bvchess/taxma
     git checkout -q COMMIT'
 sudo -u ec2-user tmux new-session -d -s choice -c /home/ec2-user/taxman/rust \
     'export S3_DEST=s3://taxman-013764204840-us-east-1/node-choice-DATE
-     BUILD="--bin taxman --example wall --example perf" REQUIRE_CACHED=1 SKIP_TESTS=1 tools/cloud/setup.sh \
-         > ~/setup.log 2>&1 && POWEROFF=1 bench/node_choice/cloud.sh;
+     STUDIES=1 BUILD="--bin taxman --example wall --example perf" REQUIRE_CACHED=1 SKIP_TESTS=1 \
+         tools/cloud/setup.sh > ~/setup.log 2>&1 && POWEROFF=1 bench/node_choice/cloud.sh;
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
-The binaries come from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, [RUNBOOK section
+The binaries come from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, and with `STUDIES=1`,
+because `wall` is a study tool that a default build does not hold; [RUNBOOK section
 15](../../tools/cloud/RUNBOOK.md#15-the-build-cache-and-the-release-suite)); a setup that fails ends the machine and the
 measurement does not start.
 

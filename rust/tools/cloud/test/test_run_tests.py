@@ -22,6 +22,9 @@ name = "toy"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+extra = []
+
 [dependencies]
 """
 
@@ -56,6 +59,10 @@ mod tests {
     fn fails_only_when_told() {
         assert!(std::env::var("TOY_FAIL").is_err(), "told to fail");
     }
+
+    #[cfg(feature = "extra")]
+    #[test]
+    fn only_with_the_feature() {}
 }
 """
 
@@ -120,6 +127,14 @@ class Toy(unittest.TestCase):
         # lib: doubles, slow, fails_only_when_told; bin: 1; it.rs: 2; the doc test: 1 (7).  One ignored.
         self.assertEqual(summary["crates"], {"solver": {"passed": 7, "failed": 0, "ignored": 1}}, done.stderr)
         self.assertIn("solver: 7 passed, 0 failed, 1 ignored", report)
+
+    def test_a_feature_is_given_to_the_crate_it_names_and_to_no_other(self):
+        done, summary, _ = self.run_suite("--features", "solver=extra")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(summary["crates"]["solver"]["passed"], 8)  # the test that only the feature builds is one more
+        done, summary, _ = self.run_suite("--features", "prover=extra")
+        self.assertEqual(done.returncode, 2, done.stderr)  # there is no such crate in this run
+        self.assertIsNone(summary)
 
     def test_a_failing_test_is_collected_and_does_not_stop_the_others(self):
         done, summary, report = self.run_suite(env={**os.environ, "TOY_FAIL": "1"})

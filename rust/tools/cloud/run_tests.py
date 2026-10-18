@@ -11,6 +11,8 @@ together.  A failing test is collected, not a reason to stop (like `--no-fail-fa
 usage: run_tests.py [options] LABEL=DIR [LABEL=DIR ...]      (DIR holds a Cargo.toml; the tests are named LABEL/...)
 
   --release        test the release profile (`cargo test --release`), as the cache's binaries are built
+  --features L=F   test crate L with cargo's feature F (`cargo test --features F`), as the build being tested has it;
+                   repeat for more
   --jobs N         tests at once (default: the CPUs this process may use)
   --times FILE     how long each test took in earlier runs (JSON; read if it exists, rewritten after the run): the
                    tests with no entry go first, then the longest.  Without it every test is unknown and they run in
@@ -123,9 +125,14 @@ def run(command: List[str], cwd: Path, timeout: Optional[float]) -> Tuple[str, s
 
 
 # --- building and listing -------------------------------------------------------------------------------------------
-def build(label: str, directory: Path, release: bool) -> List[Binary]:
+def cargo_options(release: bool, features: str) -> List[str]:
+    """The options that make `cargo test` test the build that is being tested: the release profile, the features."""
+    return [*(["--release"] if release else []), *(["--features", features] if features else [])]
+
+
+def build(label: str, directory: Path, options: List[str]) -> List[Binary]:
     """The test executables of a crate: `cargo test --no-run` builds them all and names them."""
-    command = ["cargo", "test", *(["--release"] if release else []), "--no-run", "--message-format=json"]
+    command = ["cargo", "test", *options, "--no-run", "--message-format=json"]
     say(f"building the tests of {label}: {' '.join(command)}")
     process = subprocess.Popen(command, cwd=directory, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                errors="replace")
@@ -181,9 +188,8 @@ def run_test(test: Test, timeout: float) -> Outcome:
                    f"[{status}]\n{output}", 0, 1)
 
 
-def run_doc_tests(label: str, directory: Path, release: bool, jobs: int) -> Outcome:
-    command = ["cargo", "test", *(["--release"] if release else []), "--doc", "--no-fail-fast", "--",
-               f"--test-threads={jobs}"]
+def run_doc_tests(label: str, directory: Path, options: List[str], jobs: int) -> Outcome:
+    command = ["cargo", "test", *options, "--doc", "--no-fail-fast", "--", f"--test-threads={jobs}"]
     status, output, seconds = run(command, directory, None)
     passed = failed = 0
     for line in output.splitlines():
@@ -201,14 +207,15 @@ def schedule(tests: List[Test], times: Dict[str, float]) -> List[Test]:
     return sorted(tests, key=lambda t: (0, 0.0) if t.id not in times else (1, -times[t.id]))
 
 
-def run_all(tests: List[Test], docs: List[Tuple[str, Path]], args: argparse.Namespace, times: Dict[str, float]):
+def run_all(tests: List[Test], docs: List[Tuple[str, Path]], options: Dict[str, List[str]], args: argparse.Namespace,
+            times: Dict[str, float]):
     """Runs the tests, `args.jobs` at a time; returns the outcomes."""
     total = len(tests) + len(docs)
     outcomes: List[Outcome] = []
     started = time.monotonic()
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     try:
-        pending = {pool.submit(run_doc_tests, label, directory, args.release, args.jobs) for label, directory in docs}
+        pending = {pool.submit(run_doc_tests, label, directory, options[label], args.jobs) for label, directory in docs}
         pending |= {pool.submit(run_test, test, args.timeout) for test in schedule(tests, times)}
         last_progress = time.monotonic()
         while pending:
@@ -241,6 +248,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("crates", nargs="+", metavar="LABEL=DIR")
     parser.add_argument("--release", action="store_true")
+    parser.add_argument("--features", action="append", default=[], metavar="LABEL=NAME")
     parser.add_argument("--jobs", type=int, default=cpus())
     parser.add_argument("--times")
     parser.add_argument("--report")
@@ -261,11 +269,18 @@ def main() -> int:
         if not label or not (Path(directory) / "Cargo.toml").is_file():
             parser.error(f"{spec!r}: expected LABEL=DIR with a Cargo.toml in DIR")
         crates.append((label, Path(directory).resolve()))
+    features: Dict[str, str] = {}
+    for spec in args.features:
+        label, _, name = spec.partition("=")
+        if label not in {c[0] for c in crates} or not name:
+            parser.error(f"--features {spec!r}: expected LABEL=NAME, the LABEL of one of the crates")
+        features[label] = ",".join(filter(None, [features.get(label), name]))
+    options = {label: cargo_options(args.release, features.get(label, "")) for label, _ in crates}
 
     started = time.monotonic()
     try:
         with ThreadPoolExecutor(max_workers=len(crates)) as pool:
-            binaries = [b for found in pool.map(lambda c: build(c[0], c[1], args.release), crates) for b in found]
+            binaries = [b for found in pool.map(lambda c: build(c[0], c[1], options[c[0]]), crates) for b in found]
         say(f"built {len(binaries)} test executables in {time.monotonic() - started:.0f} s; listing their tests")
         with ThreadPoolExecutor(max_workers=min(16, args.jobs)) as pool:
             listings = list(pool.map(list_tests, binaries))
@@ -292,7 +307,7 @@ def main() -> int:
 
     cpu_before = resource.getrusage(resource.RUSAGE_CHILDREN)
     pass_started = time.monotonic()
-    outcomes = run_all(tests, docs, args, times)
+    outcomes = run_all(tests, docs, options, args, times)
     seconds = time.monotonic() - pass_started
     cpu_after = resource.getrusage(resource.RUSAGE_CHILDREN)
     cpu = (cpu_after.ru_utime + cpu_after.ru_stime) - (cpu_before.ru_utime + cpu_before.ru_stime)

@@ -7,7 +7,8 @@
 # `perf make-nodes`.
 #
 #   bench/node_choice/cloud.sh          from rust/, once tools/cloud/setup.sh has the release `wall` and `perf` examples
-#                                       (built there, or taken from the build cache: RUNBOOK section 15; set
+#                                       (built there, or taken from the build cache: RUNBOOK section 15; `wall` is a
+#                                       study tool, which a default build skips: set STUDIES=1 and
 #                                       BUILD="--bin taxman --example wall --example perf" for setup.sh: the solver
 #                                       is there for its smoke checks)
 #
@@ -28,7 +29,7 @@
 #   KNOWN        the results file that gives the games' optima (default results/strict.jsonl)
 #   SUITE        the tuning suite (default bench/tuning/suite.jsonl)
 #   BIN          the directory of the examples (default target/release/examples; a laptop's test is target/debug/examples,
-#                built by `cargo build --profile test --example wall --example perf`)
+#                built by `cargo build --profile test --features studies --example wall --example perf`)
 #   OUT          where everything goes (default ~/node_choice): fixtures/, prep/ (a file a game), measure/ (a file of
 #                lines a worker), claims/, logs/, faults (what went wrong, if anything), log (the times of the stages)
 #                and analysis*.txt
@@ -54,7 +55,7 @@ sub_flag=""
 if [ "${SUB:-1}" = 1 ]; then sub_flag="--sub-nogoods"; fi
 
 if [ ! -x "$bin/wall" ] || [ ! -x "$bin/perf" ]; then
-    echo "no $bin/wall or $bin/perf: run tools/cloud/setup.sh first" >&2
+    echo "no $bin/wall or $bin/perf: run STUDIES=1 tools/cloud/setup.sh first (wall needs --features studies)" >&2
     exit 2
 fi
 mkdir -p "$out/fixtures" "$out/prep" "$out/measure" "$out/logs"

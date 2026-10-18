@@ -322,11 +322,12 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
    tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and
    run `setup.sh` from inside it: it then works on that tree and does not pull (results record no commit, then).
    `setup.sh` installs packages, installs Rust with rustup if there is none (stable, at least 1.89), builds with
-   `RUSTFLAGS="-C target-cpu=native"`, replays `optimal.json`, runs both result verifiers on the committed files, runs
-   `taxman regress --to 400`, and runs `cargo test -- --test-threads=4`.  Its output is also in
-   `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick up new commits.  In a clean checkout at a
-   commit it first looks for that commit's tested binaries in the build cache and, finding them, builds nothing
-   (section 15); `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` is how they get there.
+   `RUSTFLAGS="-C target-cpu=native"` (the solver and the examples `ledger`, `perf` and `ladder`; `STUDIES=1` adds the
+   study tools `tune`, `extended`, `structure` and `wall`, which a default build skips), replays `optimal.json`, runs
+   both result verifiers on the committed files, runs `taxman regress --to 400`, and runs `cargo test --
+   --test-threads=4`.  Its output is also in `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick
+   up new commits.  In a clean checkout at a commit it first looks for that commit's tested binaries in the build cache
+   and, finding them, builds nothing (section 15); `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` is how they get there.
 3. In `tmux new -s tx` (detach with Ctrl-b d, return with `tmux attach -t tx`), run the sweep:
 
    ```
@@ -2036,7 +2037,11 @@ s3://taxman-013764204840-us-east-1/builds/test-times.json
   `prover-bins+prover-examples+solver-bins+solver-examples` (everything: the default of `setup.sh`).  An entry serves a
   request it covers: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or `--examples`.  So the entry
   of the release, which is everything, serves any `BUILD`; an entry of a few binaries serves only those.  An entry is
-  never completed: a request that no entry covers builds what it needs, and nothing is stored.
+  never completed: a request that no entry covers builds what it needs, and nothing is stored.  The study tools (cargo's
+  feature `studies`: `tune`, `extended`, `structure` and `wall`, which `--examples` alone does not build) are a part of
+  the set when `STUDIES=1` asks for them: `solver-bins+solver-examples+solver-features-studies`, covered only by an
+  entry that has the part.  So a default build never claims to hold `wall`, and an entry with the studies serves a
+  request without them (the smaller entry first, when both exist).
 * **binaries.tar.gz** holds the executables only (paths relative to the checkout: `rust/target/release/taxman`,
   `.../examples/ledger`, `rust/prover/target/release/exact`), not the objects, libraries or cargo's hash-named copies.
   **manifest** (`key=value` lines, uploaded last: an entry without one does not exist) has the commit, architecture, CPU,
@@ -2059,13 +2064,14 @@ machine at once and costs minutes, not a run of untested binaries.
 **Build only what a run needs**, with `BUILD`, cargo's arguments for `rust/` (`--bins`, `--examples`, `--bin NAME`,
 `--example NAME`; default `--bins --examples`, as before).  A `BUILD` leaves the prover out, unless `BUILD_PROVER` asks for
 it (the same for `rust/prover/`; `none` for none; `PROVER_ONLY=1` is the prover alone, as before); the smoke checks of a
-part that is not built are left out.  What the jobs need:
+part that is not built are left out.  `STUDIES=1` adds `--features studies` to the solver's build (and to its tests: the
+release suite, `cargo test`), for the study tools, which a build without it skips.  What the jobs need:
 
 | job | `BUILD` |
 |---|---|
 | the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
 | the ledger (14) | `--bin taxman --example ledger` |
-| the node-choice measurement | `--bin taxman --example wall --example perf` |
+| the node-choice measurement | `STUDIES=1`, `--bin taxman --example wall --example perf` |
 | the scaling sweep (`scaling.sh`) | `--bin taxman --example ladder` |
 | the prover's proofs (9) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
@@ -2078,7 +2084,9 @@ in turn.  Nothing passes `-j` to cargo, so every build and every test build uses
 The release is `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` on **one machine, once for each commit and CPU**, with the
 default `BUILD` (everything, so that every smaller request hits it).  It is a launch under the rules at the top: a
 `c8g.16xlarge` on spot for about 10 to 20 minutes, **about $0.15 to $0.25**, Brian's yes first.  Any size serves (the key
-is the CPU, which every `c8g` shares); the suite gains nothing past about 64 vCPUs.
+is the CPU, which every `c8g` shares); the suite gains nothing past about 64 vCPUs.  The study tools are the one thing
+that "everything" leaves out: `STUDIES=1` makes a release that also serves the node-choice measurement (its entry holds
+`wall`, and the suite runs the study tools' tests too; it serves every smaller request as well).
 
 ```
 export S3_DEST=s3://taxman-013764204840-us-east-1/release-COMMIT       # where a failure is reported
@@ -2118,10 +2126,11 @@ times.
 
 On the laptop (macOS, bash 3.2 and 5): `python3 -I test/test_build_cache.py` (the key, the dirty and the commit-less
 refusals, other `RUSTFLAGS`, which entry serves which request, a corrupted tarball, an entry without its manifest or its
-passed suite, a build that lacks a file, a stranger in the tarball, the same through the stand-in for aws),
-`python3 -I test/test_run_tests.py` (a toy crate: a failure, an ignored test, a doc test, a timeout, the order, a build
-that fails), `python3 -I test/test_setup.py` (`setup.sh` with a stand-in for cargo: what `BUILD` builds, a hit and a miss,
-the release suite on a pass and on a failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once), and
+passed suite, a build that lacks a file, a stranger in the tarball, a build with the studies as an entry of its own, the
+same through the stand-in for aws), `python3 -I test/test_run_tests.py` (a toy crate: a failure, an ignored test, a doc
+test, a timeout, the order, a feature, a build that fails), `python3 -I test/test_setup.py` (`setup.sh` with a stand-in
+for cargo: what `BUILD` and `STUDIES` build, a hit and a miss, the release suite on a pass and on a failure, the dirty
+checkout, `REQUIRE_CACHED`, the two builds at once), and
 `test/run.sh node launch` (the settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both
 crates in the test profile; no release build was made on the laptop.  **Not run on EC2**: the S3 commands against S3
 (the listing's format, credentials from the instance profile, the transfer times), the release profile's build of the

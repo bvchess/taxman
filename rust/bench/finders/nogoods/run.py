@@ -3,7 +3,8 @@
 game, each line appended to the file as its game finishes.  A run that is interrupted goes on where it was: the games
 the file has are skipped.
 
-usage (from rust/, after `cargo build --profile test --example wall`):
+usage (from rust/, after `cargo build --profile test --example wall` at commit 9d9dae3: the command was removed from
+master on 2026-10-18):
   ./bench/finders/nogoods/run.py FILE --cpu S [--jobs 4] [--shuffle] GAME... [-- WALL OPTIONS]
 where a GAME is N, or A-B, or A-B/STEP (every STEP-th game of A..B); the options after `--` (`--steps`, `--long`,
 `--seed`, `--fix`, `--unit-nodes`) go to `wall nogoods` as they are.

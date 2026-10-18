@@ -5,8 +5,9 @@ What was measured and what it showed:
 The runs were made on the laptop on 2026-10-18, one process a game and four at once under `nice -n 10`, with the
 test-profile build of `wall` (`cargo build --profile test --example wall` in `rust/`: opt-level 2, debug assertions on)
 of commit 742e88a (copied out of `target/` before the run, so that a rebuild could not change it), from `rust/`, against
-the committed chain (`results/strict.jsonl`, which gives each game its optimum).  The command `target` is defined in the
-module comment of `examples/wall/finders.rs`, which defines every field of a line.  Every time is the CPU seconds of the
+the committed chain (`results/strict.jsonl`, which gives each game its optimum).  The command `target` was removed from
+master on 2026-10-18; it builds at commit 9d9dae3 (`git checkout 9d9dae3` first), where it is defined in the module
+comment of `examples/wall/finders.rs`, which defines every field of a line.  Every time is the CPU seconds of the
 process (the laptop was shared with other work, so the wall time says little), and the searches are compared by their
 nodes as well.
 

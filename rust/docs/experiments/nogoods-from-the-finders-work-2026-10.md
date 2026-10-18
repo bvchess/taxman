@@ -117,3 +117,10 @@ as good as any pool.
 that has this entry.  The `lagrange` command of the removed `matroid` example (`git show
 8753189^:rust/examples/matroid.rs`) was the model, with the research intersection of `common/meet.rs` replaced by the
 crate's own GF(2) bound.
+
+## Later (2026-10): the command removed from master
+
+The command `wall nogoods` was removed from the tree on 2026-10-18.  It builds at commit 9d9dae3 (`git show
+9d9dae3:rust/examples/wall/nogoods.rs`): `git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`.
+The harvest of nogoods and the fit of the multipliers stay in `examples/wall/nogoods.rs`, which `wall choice-prepare`
+and `wall choice` use.
