@@ -189,6 +189,30 @@ demand) plus the volume.  The figures are estimates: the A1 bounds' times at 330
 to 2.9 ms at 2200 to 3400, a node's master 100 to 1,000 of them), and a `full` that overruns its 30 s by a few seconds
 in the exact checks makes the run longer, not dearer.
 
+## The A1 cloud run (2026-10-18)
+
+What it found: [the entry's section](../../docs/experiments/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10.md#later-2026-10-18-the-run-on-ec2).
+`A1=1 KEEP=100 WORKERS=64 bench/node_choice/cloud.sh` at commit 260e74f (the other settings the script's: `NODE_STEPS`
+200, `SUB` 1, `LIMIT` 900, `FIT_SECONDS` 300, `A1_PRICINGS` 20, `A1_SECONDS` 30) on one spot `c8g.16xlarge`, launched at
+19:46:25Z; no build-cache entry, so the setup built the examples (5 minutes), built the tests and ran the release suite
+(752 tests, 306 s).  The fixtures began at 20:02:32Z, the preparation at 20:04:34Z, the measurement ran 20:10:02Z to
+20:16:27Z, and the machine ended at about 20:18Z: 32 minutes, about $0.36 at $0.676 an hour.  `faults` was empty.  Its
+output is in `cloud-20261018-a1/`, the files of `cloud-20261018/` made the same way:
+
+| file | what it is |
+|---|---|
+| `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyses (all the steps; the floor entry's slope; the first 50 steps), with the A1 tables |
+| `log` | the stages' times (UTC) and the commit |
+| `prepare.jsonl` | the line each `wall choice-prepare` printed (suite, made, probe games in the script's order), now with the A1 root fit: `a1_source` (`file` for 3300, 2700 and 1215, `fitted` for the other nine), `a1_fit_s`, `a1_bound`, `a1_share` of the gap it closes (0.33-0.34 for 3441, 3440 and 3425 fitted in 300 s, 0.40 for 3300, 0.45-0.64 for the others), `a1_stop` (`Converged` at 3213, 3129, 2976 and 936, `Seconds` at 3441, 3440, 3425, 3260 and 3267) and `a1_lb` |
+| `fixtures.txt` | the six proofs that made the fixtures: runs, nodes and distinct units (the numbers of `cloud-20261018/`, the proofs being the same) |
+| `workers.jsonl` | a line for each worker and game, from the workers' output: the nodes it measured, skipped or left to other workers, and its CPU seconds (10,606 in all: 133 to 385 a worker) |
+| `measure.jsonl.gz` | the 876 lines of `measure/worker-0.jsonl` to `worker-63.jsonl`, joined in the order of the workers and gzipped (1.3 MB): 840 open nodes (the 40 of the suite and 100 of each of the 8 other games, whose `source` is `fixture`) and the 36 path nodes.  `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I bench/node_choice/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the three analyses again, byte for byte (A1 needs no flag: `analyze.py` reads the `a1` of the lines) |
+
+Not kept, as before: `prep/` (25 MB), `fixtures/` and `logs/` (the workers' output repeats `measure.jsonl.gz`'s lines
+and `workers.jsonl`'s, which was checked line for line when the files were made).  The work was 10,606 CPU s, not the
+17,000 or so of the estimate above: the solves 4,463, the nogood fits 253 (the two of `SUB`), `r2` 55 and `full` 5,770
+(124 nodes ran out of their 30 s).
+
 ## What it does not measure
 
 * **The A1 bounds start from the root's fit.**  There is no parent to hand a node its state, so `r2` has the root's
