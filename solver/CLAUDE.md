@@ -12,6 +12,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
   record each when it ends, failures included, as the notebook's front page says (one folder an entry in
   solver/notebook/, its README.md the entry, with its rows in the register and the index).
 
+* **Writing.**  Docs follow docs/WRITING.md.
 * **Keep the quick check quick.**  Every change passes `solver/tools/quick_check.py`, which fails on a slow test or a
   slow suite; how to keep a test inside its limits is in solver/docs/DESIGN.md, section 9.
 

@@ -18,6 +18,7 @@ in the docs listed at the end.
 * **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
   moniot/Makefile, not edited.
 * **Branch.**  Work on master; commit and push there.
+* **Writing.**  Docs follow docs/WRITING.md.
 
 ## Where things are
 

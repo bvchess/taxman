@@ -1,18 +1,22 @@
 # Design: the frame solver for optimal Taxman
 
-This is the design of the frame solver as it is now ("the solver" below), written to be read from top to bottom: the
-goals, the game and the model of it that the solver searches, the architecture, the search and its tactics, the engine
-that runs it on many threads, the per-game pipeline, how results are recorded and trusted, how it is tested, and how
-performance is measured.  Each term is defined where it first matters.
+The frame solver ("the solver" below) finds optimal games of Taxman: for each n, a game on the numbers 1 to n that
+scores as much as any game can.  With each game it records how the game's optimality is proven; section 2 says what
+"optimal" means here.
 
-* The [README](../frame/README.md) is the user guide (how to build, run and read the output) and has the glossary.
-* [solver/docs/STATUS.md](STATUS.md) is the current state of the work: what is in flight, paused, decided and waiting.
-  Read it first.
-* [solver/notebook/README.md](../notebook/README.md) is the lab notebook and the register of everything tried, kept or not:
-  every round of improvements with its measurements, one folder an entry in [solver/notebook/](../notebook/), and
-  the ideas that were measured and not kept.  This page states what the solver does and why; the notebook says what it
-  was worth and what was tried instead.
-* Each module starts with a comment that says what it is for; [`src/lib.rs`](../frame/src/lib.rs) has the module map.
+This page explains what the solver does, and why.  It reads from top to bottom, in the order of the contents below, and
+defines each term where it first matters.
+
+The other documents:
+
+* [STATUS.md](STATUS.md) is the current state of the work: what is in flight, paused, decided and waiting.  Read it
+  first.
+* The [README](../frame/README.md) is the user guide: how to build, run and read the output.  It has the
+  [glossary](../frame/README.md#7-glossary).
+* The [lab notebook](../notebook/README.md) says what each part was worth and what was tried instead.  Its front page is
+  the register of everything tried, kept or not; each entry is a folder in [solver/notebook/](../notebook/).
+* In the code, each module starts with a comment that says what it is for, and [`src/lib.rs`](../frame/src/lib.rs) has
+  the module map.
 
 * [1. Goals and constraints](#1-goals-and-constraints)
 * [2. The game and the frame model](#2-the-game-and-the-frame-model)
@@ -28,166 +32,224 @@ performance is measured.  Each term is defined where it first matters.
 
 ## 1. Goals and constraints
 
-* Find optimal games beyond n = 1000, where the Java solver's table of optimal games stopped, as far as the machines
-  at hand reach: today every n to 2175 on one laptop (Apple M1 Max, 10 CPUs, 32 GB RAM, fast SSD), and to 3440 with
-  the same chain on a many-core cloud machine in a day (`solver/docs/RUNBOOK.md`).
-* Be right before being fast.  Every game is replayed by an independent referee before it counts, every result
-  records how its optimality is established and what that proof takes as given, every tactic is proven or sound, and
-  every tactic can be switched off so that its effect on speed can be measured.
-* Search an enormous tree efficiently: fast per node on a single thread, and scaling cleanly to the CPUs available
-  (up to a 192-CPU machine) without depending on many of them.
-* Never rely on everything fitting in RAM.  Memory use is bounded by configuration, independent of tree size; work
-  that does not fit goes to disk.
-* Every long run checkpoints frequently and resumes after a restart, losing at most one checkpoint interval; stopped
-  by SIGINT or SIGTERM, it loses nothing.  (A machine can restart without warning, and a job that wrote its output
-  only when it finished then loses all of its progress.)
-* Fast iteration: correctness and performance are worked out on small and medium games that finish in seconds
-  (the tests, the benchmark set, the probe).  Big runs come last.
-* Standard library only, no third-party crates; Linux and macOS.
+* **Go past n = 1000**, where the Java solver's table of optimal games stopped, as far as the machines at hand reach: a
+  laptop (an Apple M1 Max: 10 CPUs, 32 GB of RAM, a fast SSD) and a cloud machine of many CPUs ([RUNBOOK](RUNBOOK.md)).
+  [results/README.md](../../results/README.md#strictjsonl) says how far the committed chain of games reaches, and which
+  machine made each part of it.
+* **Be right before being fast.**  A game counts only once an independent referee has replayed it.  Every result records
+  how its optimality is proven and what that proof takes as given.  Every tactic, a switchable piece of the search, is
+  proven or sound (section 5), and can be switched off to measure its effect on speed.
+* **Search an enormous tree efficiently.**  Each node is fast on a single thread.  The search scales cleanly to the CPUs
+  available, up to a 192-CPU machine, without depending on many of them.
+* **Never rely on everything fitting in RAM.**  The configuration bounds memory use, whatever the size of the tree.
+  Work that does not fit goes to disk.
+* **Lose little to a restart.**  A machine can restart without warning, and a job that writes its output only at the end
+  then loses all of its progress.  So every long run checkpoints often and resumes after a restart, losing at most one
+  checkpoint interval.  Stopped by SIGINT or SIGTERM, it loses nothing.
+* **Iterate fast.**  Correctness and performance are worked out on small and medium games that finish in seconds: the
+  tests, the benchmark set and the probe (section 10).  Big runs come last.
+* **Standard library only**: no third-party crates.  The solver runs on Linux and macOS.
 
 ## 2. The game and the frame model
 
+The solver does not search the game move by move.  It splits the numbers into independent groups, the *frames*, settles
+what it can at setup, and then searches only over which spare numbers to *promote*: to play as moves instead of leaving
+them as tax.
+
 ### The game
 
-The pot holds the numbers 1 to n.  A move takes a number that still has a proper divisor in the pot; the player
-scores it, and the taxman takes it and every divisor of it still in the pot.  The game is over when no number in the
-pot has a divisor left in it.  An *optimal game* scores the most.  `game::replay` is this rule in code, and
-`game::replay_finished` also requires the game to be over and to open with the largest prime, as every optimal game
-does; together they are the referee that does not share code with the solver.
+The pot starts with the numbers 1 to n, the *board*.  A move takes a number that still has a proper divisor in the pot.
+The player scores that number, and the taxman takes every divisor of it still in the pot.  The game is over when no
+number in the pot has a proper divisor left in it.  An *optimal game* scores the most; its score is opt(n).  For
+example, on the board 1 to 6 the player can take 5 (the taxman takes 1), then 4 (the taxman takes 2), then 6 (the taxman
+takes 3), and scores 15, which is opt(6).
+
+In the code, `game::replay` applies these rules to a list of moves.  Its companion `game::replay_finished` also requires
+the game to be over and to open with the largest prime, as every optimal game does.  Together they are the *referee* of
+a game, and they share no code with the solver.
 
 ### Sources, factors, frames
 
-Every number above n/2 divides nothing else on the board, so it can only be a move, never tax: it is a *source*.
-Every other number is a *factor*: tax for a larger number, and sometimes a move itself.  A move m is paid for by one
-of its *maximal factors* m/p (p a prime dividing m); and a factor can pay for one move.
+Every number above n/2 divides nothing else on the board, so it can only be a move, never tax: it is a *source*.  Every
+other number is a *factor*: tax for a larger number, and sometimes a move itself.  On the board 1 to 21, the sources are
+11 to 21.
 
-Why maximal factors are enough, although a move takes every divisor of it: the lifting argument of `numtheory` and
-[THEORY.md](../../docs/THEORY.md) (Theorem 1), summarised in the
-[README](../frame/README.md#how-the-solver-sees-the-game-the-frame-model).
+A move m is *paid for* by one of its *maximal factors* m/p, for a prime p that divides m: 12 has the maximal factors 6
+and 4.  A factor can pay for one move.  Although a move takes every divisor of it, maximal factors are enough: see the
+lifting argument of `numtheory` and [THEORY.md](../../docs/THEORY.md) (Theorem 1), which the
+[README](../frame/README.md#how-the-solver-sees-the-game-the-frame-model) summarises.
 
 Sources and the factors they compete for fall into independent groups, the *frames*: sources that share a factor are in
-one frame (`frames::BoardFrames` forms them).  Frame X is *in front of* frame Y (and Y *behind* X) when a number of Y
-has a maximal factor in X, that is, Y's numbers are multiples of X's; the frames in front are played first.  Simplifying
-a frame finds its mandatory moves (`unzip`: a source with one usable factor must take it), the sources that cannot be
-played together with the larger ones (`removeImpossible`), and its *freedoms*, factors minus sources: how many factors
-it can spare; a frame with none is *closed*.  The frames with freedoms are numbered from 0 at the front, by *layer*
-(`frames::build_frames`): the layer of a frame is the number of prime factors of its sources, frames in front of it lie
-one layer lower, and a frame with freedoms gets its layer less the lowest layer of a frame with freedoms.  (The Java
-numbered them breadth first: number 0 every one that has no other in front of it, number k + 1 every one directly
-behind number k.  The two are the same on every board the solver supports.)  Frames with the same number are merged into one, so that a promotion always has one frame to go to (the
-README's example shows where that happens).  A frame is a game of *Taxman Mini*: a set of moves and a set of factors, in
-which every move must still have one of its maximal factors in the frame when it is taken, and taking it removes all of
-its factors still in the frame (not only the one that pays for it).  A frame is *winnable* when some order takes every
-move; a frame is winnable exactly when repeatedly dropping a move that has a factor no other move has (a *peel*) drops
-them all, and `model` tests that with counters instead of searching orders.
+one frame (`frames::BoardFrames` forms them).  Frame X is *in front of* frame Y, and Y is *behind* X, when a number of Y
+has a maximal factor in X: Y's numbers are multiples of X's.  The frames in front are played first.
+
+Setup simplifies each frame in three ways.  It finds the frame's *mandatory moves* (`unzip`): a source with one usable
+factor must take it.  It drops the sources that cannot be played together with the larger ones (`removeImpossible`).
+And it counts the frame's *freedoms*, factors minus sources: how many factors the frame can spare.  A frame with no
+freedoms is *closed*.
+
+The frames with freedoms are numbered from 0 at the front, by *layer* (`frames::build_frames`).  A number's layer is how
+many prime factors it has, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A frame's layer is its sources'
+layer, and the frames in front of a frame lie one layer lower.  A frame with freedoms gets its layer less the lowest
+layer of a frame with freedoms.  Frames with the same number are merged into one, so that a promotion always has one
+frame to go to; the README's example shows where that happens.  The Java numbered the frames breadth first instead: 0
+for every frame with no other in front of it, k + 1 for every frame directly behind frame k.  The two numberings are the
+same on every board the solver supports.
+
+Each frame is a small game of its own, *Taxman Mini*: a set of moves and a set of factors.  Every move must still have
+one of its maximal factors in the frame when it is taken.  Taking it removes all of its factors still in the frame, not
+only the one that pays for it.  A frame is *winnable* when some order takes every move.  The module `model` tests that
+with counters instead of searching orders.  A *peel* drops a move that has a factor no other move has, and a frame is
+winnable exactly when repeated peels drop every move.
 
 ### Promotions and the score
 
-What a game can still choose is which of the spare factors to *promote*: to play it as a move instead of leaving it
-as tax.  Promoting a factor of frame h makes it a move of frame h − 1, one frame forward (a promoted number pays tax
-only from the frame directly in front of its own), and is legal when both frames stay winnable.  The numbers that
-could be promoted are the *candidates*; a *promotion set* is a set of candidates that is *promotable*: all of it can
-be promoted from the root.  Afterwards the frames are *reduced*: a move left with one live factor must be paid by it,
-so the pair is dropped, repeatedly.  A frame's *freedoms* (factors minus moves) drop by one for each promotion into or
-out of it, and no frame may go below zero.
+Once setup has settled the frames, what a game can still choose is which spare factors to promote.  The score of a game
+of the model is `in_the_bag`, what the game with no promotions scores, plus the sum of its promotions.  So the solver
+looks for the set of promotions with the largest sum.  The moves of the game follow from the promotions
+(`frames::BoardFrames`, with the promotions treated as sources).  The
+[README](../frame/README.md#how-the-solver-sees-the-game-the-frame-model) works an example, the board 1..=21.
 
-The score of a game of the model is `in_the_bag` plus the sum of its promotions, where `in_the_bag` is what the game
-with no promotions scores (the Java's `inTheBag`).  So the solver looks for the promotion set with the largest sum; the
-moves of the game follow from the promotions (`frames::BoardFrames` with the promotions treated as sources).  A worked
-example, the board 1..=21, is in the [README](../frame/README.md#how-the-solver-sees-the-game-the-frame-model).
+The rules of promotion:
+
+* Promoting a factor of frame h makes it a move of frame h − 1, one frame forward: a promoted number pays tax only from
+  the frame directly in front of its own.  It is legal when both frames stay winnable.
+* A frame's freedoms (factors minus moves) drop by one for each promotion into or out of it, and no frame may go below
+  zero.
+* After promotions the frames are *reduced*: a move left with one live factor must be paid by it, so the pair is
+  dropped, repeatedly.
+
+The numbers that could be promoted are the *candidates*.  A *promotion set* is a set of candidates that is *promotable*:
+all of it can be promoted together from the *root*, the frames as setup leaves them.
 
 ### What "optimal" means
 
-* **Within the frame model.**  The search finds P\*(Π_n), the heaviest promotion set of the root problem Π_n (the
-  frames, the candidates, `max_total`; section 8, "Same search"), and the answer is in_the_bag + P\*(Π_n).  What that
-  is, is proven in [THEORY.md, "The frame model: what is proven and what
-  remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains):
-  * the sources that setup keeps are U\*, descending greedy on each frame, and in_the_bag = ΣU\* (Theorem M, M1);
-  * **completeness and soundness** (Theorem M): a set U\* ∪ L with L up to n/2 is playable exactly when L is a
-    promotion set of Π_n, and then it scores in_the_bag + ΣL.  So `unzip`'s mandatory moves, freedoms = factors −
-    sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the candidate filter
-    and the root's reduction lose no game that plays U\* and admit none that is not a game.  What the proof needs of
-    the numbering is that it is *clean* (N: every frame with freedoms directly in front of frame h is frame h − 1),
-    which the numbering by layer is by construction;
-  * every optimal game plays the members of U\* with one or two prime factors (Theorem B);
-  * so in_the_bag + P\*(Π_n) = opt(n) exactly when **U** holds at n: some optimal game plays the members of U\* with
-    three or more prime factors.  U is open in general; it holds for every n ≤ 2175, where the prover (a branch and
-    bound over sets of moves on the whole board, from the playability theorems, the Franklín–Moniot bound, the parity
-    bound of THEORY.md's Theorem 10, the ceiling and the prime formula, and nothing of frames) proves the optimum of
-    every game of the committed chain.  The committed games of 2176-3440 are proven within the frame model alone: each
-    is opt(n) wherever U holds at n, and U is not yet certified for them (`taxman certify` will check it game by game,
-    "Certificates of U" below).  Game by game, the prover's barred parity bounds certify 93% of those members
-    over 1301-2175 and 85% over the committed chain's 2176-3314, but close no game alone ([its
-    README](../noframe/README.md#the-upper-part-game-by-game)); what is left needs a search that leaves the open ones
-    optional (a hunt for a counterexample on the boards without each of them, the example `hunt`, was prepared and never
-    run, and is removed from master; [RUNBOOK](RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a)
-    says where it builds).  That search is the search of the *extended problem* Π⁺(O) (THEORY.md, Theorem M⁺;
-    `frames::build_extended`, research code): the frame model with the set O of open members optional, exact like
-    Π_n, so that a search of it that finds nothing better, the other members certified, proves opt(n) on the whole
-    board.  The search takes it with the open members as one-sided candidates (section 4, "Extended mode";
-    `Board::prepare_extended_with`).  It keeps the claims of `unzip` that Lemma M5⁺ allows (THEORY.md), which with
-    nothing open are all of them, so that Π⁺(∅) is Π_n itself; without the claims, Π⁺(∅) is the frame model with them
-    put back (`examples/extended.rs --no-claims`).
+The solver's answer for n rests on up to three premises: the frame model is exact at n, the search's pruning is exact,
+and the game of n − 1 is optimal.
 
-  What each proof kind needs of this, beyond the code's correctness and the games before it:
+**Within the frame model.**  The search finds P\*(Π_n), the largest sum of a promotion set of the *root problem* Π_n:
+the frames, the candidates and `max_total`, the most promotions the frames' freedoms allow.  (Section 8, "Same search",
+defines Π exactly.)  The answer is in_the_bag + P\*(Π_n).  [THEORY.md, "The frame model: what is proven and what
+remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains) proves what that is:
 
-  | proof | needs |
-  |---|---|
-  | `prime_formula` | nothing of the model (proved at `accelerate::prime_shortcut`) |
-  | `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
-  | `exhausted`, `trivial` | completeness at n, so U at n |
-  | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
-  | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
+* The sources that setup keeps are U\*, chosen greedily from the largest on each frame, and in_the_bag = ΣU\* (Theorem
+  M, M1).
+* **Completeness and soundness** (Theorem M): a set U\* ∪ L, with L a set of numbers up to n/2, is playable exactly when
+  L is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So no step of setup loses a game that plays U\*, and
+  none admits a set that is not a game.  The steps are `unzip`'s mandatory moves, freedoms = factors − sources, closed
+  frames taking no part, a promotion paying one frame forward, the numbering, the candidate filter and the root's
+  reduction.  What the proof needs of the numbering is that it is *clean*: every frame with freedoms directly in front
+  of frame h is frame h − 1 (statement N in THEORY.md).  The numbering by layer is clean by construction.
+* Every optimal game plays the members of U\* with one or two prime factors (Theorem B).
+* So in_the_bag + P\*(Π_n) = opt(n) exactly when the statement **U** holds at n: some optimal game plays the members of
+  U\* with three or more prime factors.
 
-  The tests tie the theorems to the code: `tests/model_exact.rs` checks Theorem M both ways, on every set of every
-  board to 100 and on random sets to 8191, against a playability oracle that shares no code with `frames` or
-  `model`; `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open; `tests/bottom_layers.rs`
-  checks Theorem B on every recorded and enumerated optimal set; and two exhaustive
-  searches agree with the frame model's games on small boards: `brute`, the solver's own (to 40 in the test suite, and
-  to 52 once by the example `sacrifice`, removed from master; [the
-  entry](../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md) has the run), and
-  `heuristics/evaluation/certify.py` (to 62).  The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a
-  different route (games on punctured boards, where Theorem M holds too, but U and Theorem B are statements about the
-  board 1..n, so the bound rests on the upper part of each punctured board); it proves game 1133 and disagrees with
-  nothing.  [The prover's README](../noframe/README.md) has the details of the prover.
-* **Given the pruning is exact.**  Every tactic is proven or sound (section 5 grades each).  The Java used two
-  shortcuts that rest on conjectures (`reuse_prev` and `revise_freedoms`); the frame solver had them as tactics for a
-  while, measured that they no longer paid, and removed them (EXPERIMENTS, "Which tactics earn their keep").
-* **Given the previous game is optimal.**  The game of n is built from the game of n − 1: opt(n) ≤ n + opt(n − 1)
-  (deleting the move n from an optimal game leaves a game of n − 1), and a prime n plays the game of n − 1 with
-  its first move replaced by n.  A chain of games from n = 1 is therefore proven game by game (section 8).
-  Optimal games need not be unique, though, which matters to any step that reuses the game of n − 1: from
-  n = 425 some games have two or three optimal sets (all with upper part U\*, differing below n/2), and the
-  recorded game of 685 plus 686 is unplayable although opt(686) = 686 + opt(685), through another optimal set of
-  685.  A chain step is decided by the complete list of n − 1's optimal sets, not by one of them
-  ([the prover's README, section 5](../noframe/README.md#5-is-the-optimal-set-unique)).
+The statement U is open in general.  It holds for every n ≤ 2175, where the prover proves the optimum of every game of
+the committed chain.  The prover ([its README](../noframe/README.md)) is a separate program: a branch and bound over
+sets of moves on the whole board that uses nothing of frames, only the playability theorems, the Franklín–Moniot bound,
+the parity bound of THEORY.md's Theorem 10, the ceiling and the prime formula.
+
+Past 2175, the committed games are proven within the frame model, so each is opt(n) wherever U holds at n.  Proving U at
+such an n takes two steps, which the command `taxman certify` combines game by game ("Certificates of U", section 8);
+[results/README.md](../../results/README.md#certificates) says which games have certificates.
+
+First, the prover's parity bound settles most members of U\*.  Barring one member u at a time, it *certifies* u when the
+bound is then at most the recorded score: every set of moves that beats that score, and obeys Theorem B, plays u.  The
+members it does not certify are *open*.  It certifies most members in each game, below 2175 and past it, but closes no
+game alone ([the prover's README](../noframe/README.md#the-upper-part-game-by-game) has the method, and [the
+entry](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the shares).
+
+Second, a search settles the open members.  It is the search of the *extended problem* Π⁺(O): the frame model with the
+set O of open members made optional (THEORY.md, Theorem M⁺; `frames::build_extended`, research code).  The extended
+problem is exact like Π_n, so a search of it that finds nothing better, with the other members certified, proves opt(n)
+on the whole board.  The search takes the open members as one-sided candidates (section 4, "Extended mode";
+`Board::prepare_extended_with`).
+
+Details of the extended problem: it keeps the claims of `unzip` that Lemma M5⁺ (THEORY.md) allows.  With nothing open
+that is all of them, so Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back
+(`examples/extended.rs --no-claims`).  A hunt for a counterexample on the boards without each open member, the example
+`hunt`, was prepared and never run.  It is removed from master; the
+[RUNBOOK](RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a) says where it builds.
+
+What each kind of proof needs of the frame model, beyond the code's correctness and the games before it:
+
+| proof | needs |
+|---|---|
+| `prime_formula` | nothing of the model (proved at `accelerate::prime_shortcut`) |
+| `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
+| `exhausted`, `trivial` | completeness at n, so U at n |
+| `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
+| `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
+
+The tests tie the theorems to the code:
+
+* `tests/model_exact.rs` checks Theorem M both ways, on every set of every board to 100 and on random sets to 8191,
+  against a playability oracle that shares no code with `frames` or `model`.
+* `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open.
+* `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set.
+* Two exhaustive searches agree with the frame model's games on small boards: `brute`, the solver's own, to 40 in the
+  test suite, and `heuristics/evaluation/certify.py`, to 62.  The example `sacrifice`, removed from master, once ran
+  `brute` to 52 ([the entry](../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md) has the
+  run).
+
+The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route: games on punctured boards, boards
+with holes, where Theorem M holds too.  But U and Theorem B are statements about the board 1..n, so the bound rests on
+the upper part of each punctured board.  It proves game 1133 and disagrees with nothing.
+
+**Given the pruning is exact.**  Every tactic is proven or sound; section 5 grades each.  The Java used two shortcuts
+that rest on conjectures, `reuse_prev` and `revise_freedoms`.  The frame solver had them as tactics for a while,
+measured that they no longer paid, and removed them ([which tactics earn their
+keep](../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+
+**Given the previous game is optimal.**  The game of n is built from the game of n − 1, using two facts.  First, opt(n)
+≤ n + opt(n − 1): deleting the move n from an optimal game of n leaves a game of n − 1.  Second, a prime n plays the
+game of n − 1 with its first move replaced by n.  So a chain of games from n = 1 is proven game by game (section 8).
+
+Optimal games need not be unique, though, and that matters to any step that reuses the game of n − 1.  From n = 425 on,
+some games have two or three *optimal sets*, the sets of moves of their optimal games.  In all of them the members above
+n/2 are U\*; they differ below n/2.  For example, the recorded game of 685 plus the move 686 is unplayable, although
+opt(686) = 686 + opt(685): the equality holds through another optimal set of 685.  So a chain step is decided by the
+complete list of the optimal sets of n − 1, not by one of them ([the prover's README, section
+5](../noframe/README.md#5-is-the-optimal-set-unique)).
 
 ### The Java solver and the frame solver
 
-The optimization strategy is the Java solver's (and the [wiki's](https://github.com/bvchess/taxman/wiki)): decompose the
-game into frames of Taxman Mini and search for the optimal promotion set.  The Java is research code, three generations
-of the same frame idea layered on each other, so the frame solver is a reimplementation of the *algorithm*, designed for
-clarity and speed, not a translation of the classes.  What must match the Java is *results*: the setup (frames,
-candidates, the greedy incumbent) defines the search space, and reproduces the Java's values exactly (its golden data in
-`testdata/golden/` is the check); every final score equals optimal.json.  The search itself is new.  It started as the
-Java's loop (its `blameGame` bound, its depth-2 preclusion table and the promotability checks of its candidate lists,
-branching on the largest candidate), and each of those was replaced by something measured to be faster, then removed
-(the notebook has the rounds, and [which tactics earn their
-keep](../notebook/which-tactics-earn-their-keep-2026-10/README.md) the last measurements of what was removed).  Not
+The frame solver uses the Java solver's strategy, which the [wiki](https://github.com/bvchess/taxman/wiki) describes:
+split the game into frames of Taxman Mini, and search for the best promotion set.  The Java is research code, three
+generations of the same frame idea layered on each other.  So the frame solver reimplements the *algorithm*, designed
+for clarity and speed, instead of translating the classes.
+
+What must match the Java is the *results*.  The setup (frames, candidates, the greedy incumbent) defines the search
+space, and it reproduces the Java's values exactly; the Java's golden data in `testdata/golden/` is the check.  Every
+final score equals optimal.json's.
+
+The search is the frame solver's own.  It started as the Java's loop: its `blameGame` bound, its depth-2 preclusion
+table, the promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was
+replaced by something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
+keep](../notebook/which-tactics-earn-their-keep-2026-10/README.md) has the last measurements of what was removed.  Not
 ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`, `WorkingFrame.fancyFit/fits`, the
-picklers and compressor.
+picklers and the compressor.
 
-The Java's and the wiki's words map onto this document's.  The Java's `Hive` is a frame during setup (before or after
-frames of one number are merged: `frames::Frame`) and `Apiary` all the frames of a board in playing order
-(`frames::BoardFrames`); `FrameBuilder`'s levels are the frame numbers; `WorkingFrame` and `search.Frame` are a frame
-(as the search takes it, `model::Frame`); `freeFactorCount` is the freedoms; `downstream` and `upstream` are in front
-of and behind; `fits` is promotable; `getMaxPromotionSum` is the ceiling as a promotion sum.
-`isWinnable`, `inTheBag`, `maxTotalPromotions`, `promotionCandidates` and `mandatoryMoves` are used as they are.  The
-wiki's *selection* is a move, its *front* and *back* are the same, and its upper bound N + opt(N − 1) is the ceiling.
+The Java's and the wiki's words map onto this document's:
 
-One defect of the Java's bound was found in the port: `UpperBoundEstimator.getRunnerUp` replaces the failing number
-with the next candidate below the smallest bid member, and a skipped candidate from the failing number's frame can be
-larger, so the Java bound can be too low (at the root of n = 114: 358 against the best completion's 360; [the
+| the Java or the wiki | here |
+|---|---|
+| `Hive` | a frame during setup, before or after the frames of one number are merged (`frames::Frame`) |
+| `Apiary` | all the frames of a board in playing order (`frames::BoardFrames`) |
+| `FrameBuilder`'s levels | the frame numbers |
+| `WorkingFrame`, `search.Frame` | a frame as the search takes it (`model::Frame`) |
+| `freeFactorCount` | the freedoms |
+| `downstream`, `upstream` | in front of, behind |
+| `fits` | promotable |
+| `getMaxPromotionSum` | the ceiling as a promotion sum |
+| `isWinnable`, `inTheBag`, `maxTotalPromotions`, `promotionCandidates`, `mandatoryMoves` | used as they are |
+| the wiki's *selection* | a move |
+| the wiki's *front* and *back* | the same |
+| the wiki's upper bound N + opt(N − 1) | the ceiling |
+
+The port found one defect in the Java's bound: it can be too low.  Its `UpperBoundEstimator.getRunnerUp` replaces the
+failing number with the next candidate below the smallest bid member, but a skipped candidate from the failing number's
+frame can be larger.  At the root of n = 114, the Java's bound is 358 against the best completion's 360 ([the
 story](../notebook/the-port-and-its-first-improvements/README.md)).
 
 ## 3. Architecture
@@ -1060,74 +1122,101 @@ replayed them.
 
 ### Same search
 
-Consecutive boards often pose exactly the same search problem with another ceiling: of the 2946 games of the committed
-chain 1..3440 that need a search, 1457 pose the problem of the game before them (or the one before that, past a prime).
-The chain of commit bd9bb5d, which searched the 545 of them in 1..1300, spent 953 of its 3359 s on those, 851 s of them
-in 1232–1300 (EXPERIMENTS, "Same search").  The tactic `same_search` (proven, on by default) concludes such a game from
-the earlier one with no search; the committed `results/strict.jsonl` was made with it.
+Moving from one board to the next often leaves the search untouched.  The new number lands in the part of the game that
+setup settles.  The frames that the search sees, and their candidates, stay as they were.  The game then poses exactly
+the same search problem as an earlier one, so it has the same best promotions.  The tactic `same_search` (proven, on by
+default) recognizes this and reuses the earlier game's promotions instead of searching again.  About half of the
+committed chain's games that need a search are such repeats ([results/README.md](../../results/README.md#strictjsonl)
+has the counts).  Skipping their searches saves a large share of a chain's search time; [the
+entry](../notebook/same-search-2026-10/README.md) has the measurements.
 
-*The problem.*  After setup (`search::prepare`) the searcher is given the model (the factor graph among the frames'
-numbers and each number's home frame), the root frame set (every frame's moves, factors and freedoms), the candidates
-and `max_total`, besides the tactics, the ceiling and the seed; the greedy set and the matching graph are functions of
-those.  Call Π = (model, root, candidates, `max_total`) the game's *search problem*, and P\*(Π) the largest sum of a
-*promotable* set of Π: a set of candidates that can be promoted from the root, keeping every frame winnable and its
-freedoms at least 0, with at most `max_total` members.  Which sets are promotable depends on the frames and on the
-graph's edges among their numbers, and on nothing else: promotion and reduction see only the numbers in the frames, and
-an edge is the maximal-factor relation (y = x/p, p prime), a property of the two numbers that does not depend on n.
-`search::Problem` writes Π out canonically, as numbers (so independently of the set width): the frames front first, each
-its freedoms, moves and factors; the candidates; `max_total`; and for every number of the frames its home frame and the
-lists of maximal factors and maximal composites the model's graph keeps for it, which name some numbers that reduction
-removed and the search never sees, erring on the side of telling problems apart.  Equal forms are equal problems, with
-the same promotable sets and the same P\*.  The tactics, the ceiling and the seed are not in it: they change how the
-search runs, not what it finds (section 4).  A results line records the form's 64-bit digest (`setup.digest`); nothing
-rests on the digest alone (below).
+*The search problem.*  A game's *search problem* Π is what setup gives the search, less what only changes how the search
+runs.  It has four parts:
 
-*Which proofs settle P\*.*  A game m whose proof is
-* `exhausted`: the search explored the whole tree of Π_m, so the sum of its promotions is P\*(Π_m), given that the
-  pruning is exact, which every exhausted proof rests on;
-* `cap`: its promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), so P\*(Π_m) ≥
-  ceiling(m).  And every promotable set T of Π_m is a legal game of m scoring in_the_bag(m) + sum(T): this is the
-  soundness of the frame model (THEORY.md, Theorem M), the
-  direction every search relies on each time it offers an incumbent, and the referee replays every game built from
-  one (none has ever failed).  So in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m
-  − 1), given that the game of m − 1 is optimal (which the proof by the ceiling rests on, and m's assumptions record),
-  and P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever tactics shaped the search;
-* `same_search`: by induction, m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
+* the model: the factor graph among the frames' numbers, and each number's home frame;
+* the root: every frame's moves, factors and freedoms;
+* the candidates;
+* `max_total`, the most promotions the frames' freedoms allow.
+
+The searcher also gets the tactics, the ceiling and the seed (`search::prepare`).  They change how the search runs, not
+what it finds (section 4).  The greedy set and the matching graph are functions of Π.  The best promotion sum P\*(Π) is
+the largest sum of a *promotable* set of Π: a set of at most `max_total` candidates that can be promoted from the root,
+keeping every frame winnable and its freedoms at least 0.
+
+Which sets are promotable depends only on the frames and on the graph's edges among their numbers.  Promotion and
+reduction see only the numbers in the frames.  An edge is the maximal-factor relation (y = x/p, p prime), a property of
+the two numbers that does not depend on n.
+
+The type `search::Problem` writes Π out canonically, as numbers, so that the form does not depend on the set width.  It
+lists the frames front first, each with its freedoms, moves and factors; then the candidates and `max_total`; then, for
+every number of the frames, its home frame and the lists of maximal factors and maximal composites that the model's
+graph keeps for it.  Those lists name some numbers that reduction removed and the search never sees, which errs on the
+side of telling problems apart.  Equal forms are equal problems, with the same promotable sets and the same P\*.  A
+results line records the form's 64-bit digest (`setup.digest`), but nothing rests on the digest alone ("Finding m",
+below).
+
+*Which proofs settle P\*.*  A repeat is only as good as the earlier game's proof.  Three kinds of proof of a game m
+establish P\*(Π_m):
+
+* `exhausted`: the search explored the whole tree of Π_m.  So the sum of m's promotions is P\*(Π_m), given that the
+  pruning is exact, which every exhausted proof rests on.
+* `cap`: m's promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), the ceiling as a
+  promotion sum.  So P\*(Π_m) ≥ ceiling(m).  Conversely, every promotable set T of Π_m is a legal game of m scoring
+  in_the_bag(m) + sum(T).  This is the soundness of the frame model (THEORY.md, Theorem M).  Every search relies on it
+  each time it offers an incumbent, and the referee replays every game built from one; none has ever failed.  So
+  in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be
+  optimal: the proof by the ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of
+  m's promotions, whatever tactics shaped the search.
+* `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
   k's.
 
-A trivial game has no candidates and sets no search up, and a prime one is the prime formula's and sets none up
-either: neither is ever repeated, and the verifiers refuse a repeat that names one.  An unfinished search settles
-nothing.
+No other proof settles P\*.  A trivial game has no candidates and sets no search up.  A prime game is the prime
+formula's and sets none up either.  Neither is ever repeated, and the verifiers refuse a repeat that names one.  An
+unfinished search settles nothing.
 
-*The repeat.*  If game n poses Π_n = Π_m and m's proof settles it, then P\*(Π_n) = P\*(Π_m) = P, the sum of m's
-promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`), and
-it goes through `conclude` like any game: it must replay legally, be over and open with the largest prime, score
-in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where that has n.
-It is optimal on the premise of an exhausted proof of n (the best game of n scores in_the_bag(n) + P\*(Π_n), which is
-U at n, section 2), with P\*(Π_n) established by m's proof instead of a search.  Its proof `same_search` rests on m, not on
-the game of n − 1, and it assumes what m assumes.
+*The repeat.*  Suppose game n poses Π_n = Π_m, and m's proof settles it.  Then P\*(Π_n) = P\*(Π_m) = P, the sum of m's
+promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`).  It
+goes through `conclude` like any game.  It must replay legally, be over, and open with the largest prime.  It must score
+in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where the table has
+n.
 
-*Finding m.*  Before n's search (and only for a search that is not resumed from a checkpoint, and without
-`force_search`), the solver looks at the completed games of the results file and of the run among the
-`SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first, for one that set a search up and whose proof settles it.
-A game whose recorded digest differs is passed over; for one whose digest agrees, its problem is set up again from
-its board size (milliseconds; `board::search_problem`), or, when the run set that board up itself, taken from memory
-(the problem its setup posed, which is the same problem), and compared with n's whole.  The first equal one is m.
-Setting m up again with this build stands for the problem m's own build searched, which the digest recorded by that
-build ties to it (a problem with the recorded digest is that problem, but for a 64-bit collision), and the problem
-set up again must also have the size its line records (frames, candidates, `max_total`).  Every repeat of 1..3440
-repeats the last game before it that set a search up (n − 1, or n − 2 past a prime), so the window loses nothing
-there, keeps the setups a range starts with to eight, and makes m a function of the window's games.
+The game is optimal on the premise of an exhausted proof of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),
+which is U at n (section 2).  Only P\*(Π_n) is established differently, by m's proof instead of a search.  So the proof
+`same_search` rests on m, not on the game of n − 1, and it assumes what m assumes.
 
-*The verifiers.*  `taxman verify-results` checks a repeat's line against m's: m is a completed game of the same file on
-an earlier line, its proof settles its search, the line's record of m (proof, assumptions, digest) is m's, the
-promotions are m's and sum to the recorded promotion sum; then it sets both problems up again from the two board sizes,
-checks that each is as large as its line records, that their digest is the recorded one and that they are equal, and
-that both games score their board's in_the_bag plus that sum; and it derives the proof and the assumptions (m's) as for
-any line.  `solver/tools/check_results.py` shares no code with the solver and cannot build the model: it checks the same
-structure from the lines (m earlier, completed, settling its search; the recorded digests and sizes equal; the
-promotions equal; score − in_the_bag equal; the assumptions inherited), and says that it takes the problems' equality,
-like an exhausted search, on trust.
+*Finding m.*  Before it searches game n, the solver looks for an earlier game whose problem is Π_n.  It looks among the
+completed games of the results file and of the run, in the `SAME_SEARCH_WINDOW` = 8 board sizes before n, latest first,
+for one that set a search up and whose proof settles it.  It does not look when the search resumes from a checkpoint, or
+with `force_search`.
+
+The digest finds candidates; the whole problem decides.  A game whose recorded digest differs is passed over.  For one
+whose digest agrees, the solver sets its problem up again from its board size, which takes milliseconds
+(`board::search_problem`), and compares it with Π_n whole.  When the run set that board up itself, the solver takes the
+problem from memory instead: the problem its setup posed, which is the same problem.  The first equal one is m.
+
+Setting m up again with this build stands for the problem that m's own build searched.  The digest that m's build
+recorded ties the two: a problem with the recorded digest is that problem, barring a 64-bit collision.  The problem set
+up again must also have the sizes that m's line records: frames, candidates and `max_total`.
+
+In the committed chain, every repeat is of the last game before it that set a search up: n − 1, or n − 2 past a prime.
+So the window loses nothing there.  It also keeps to eight the setups that a range starts with, and it makes m a
+function of the window's games.
+
+*The verifiers.*  The first, `taxman verify-results`, checks a repeat's line against m's:
+
+* m is a completed game on an earlier line of the same file, and its proof settles its search;
+* the line's record of m (proof, assumptions, digest) is m's;
+* the promotions are m's and sum to the recorded promotion sum;
+* both problems, set up again from the two board sizes, are as large as their lines record, have the recorded digest,
+  and are equal;
+* both games score their board's in_the_bag plus that sum.
+
+It then derives the proof and the assumptions (m's) as for any line.
+
+The second, `solver/tools/check_results.py`, shares no code with the solver and cannot build the model.  It checks the
+same structure from the lines alone: m is earlier, completed and settles its search; the recorded digests and sizes are
+equal; the promotions are equal; score − in_the_bag is equal; the assumptions are inherited.  It says that it takes the
+problems' equality on trust, as it takes an exhausted search.
 
 ### Certificates of U
 
