@@ -104,7 +104,8 @@ game past 3440 is within a few minutes of one-thread search
 * Nothing for the run itself: Brian approved it (2026-10-16); periodic updates need his AWS session (12 hours each).
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
-* The ledger's experiment on 2176..3440 (an hour of a `c8g.16xlarge`, about $0.9 at spot; "In flight").
+* The ledger's experiment with the climbs on 2176..3440 (about an hour of a `c8g.16xlarge`, about $0.9 at spot;
+  "In flight").
 
 ## In flight
 
@@ -131,11 +132,17 @@ game past 3440 is within a few minutes of one-thread search
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
   cheapest; `examples/ledger/`).  The laptop's dry run of 1301..1500 with the truth hidden proves all 200 boards at
   the optimum, 0 violations, for 1.28 times the one-thread chain's CPU (573 s) in 30% of its wall time on six workers
-  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  The experiment of the design, 2176..3440
-  for an hour of a `c8g.16xlarge` (about $0.9 at spot), was launched once (2026-10-17) and stopped after 9 minutes
-  ($0.18): the machine was 95% idle, the ledger's main thread replaying a game at every step of each map's cascade.
-  Fixed the same day (the maps first, a game made only if it can beat the board's, a faster referee): on the laptop,
-  2176..3440 keeps the workers at 96% of their CPU with the main thread busy 6 s of 329
+  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  The experiment of the design, 2176..3440,
+  was launched twice (2026-10-17).  The first was stopped after 9 minutes ($0.18): the machine was 95% idle, the main
+  thread replaying a game at every step of each map's cascade; fixed the same day
   ([the fix](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)).
-  The experiment is ready again, not re-run, and needs Brian's approval
+  The second (48 core-hours on 64 workers) proved 916 of 1,265 boards, every one at the optimum, but paid about 2.2
+  times the chain's cost on the same games, because most searches began before the board below was proven.  **Wedge
+  and climb**, built the same day: the board above a proven board, and then the board below it, is searched ahead of
+  every other job, seeded with its game, for 60 s (`--climb up|down|both|off`, `--climb-limit`; both by default, so
+  that the next cloud run says what each way costs and proves); a climb that stops parks the board in the ordinary
+  queue; a board next to a climb waits.  On the laptop 1301..1500 takes 547 to 576 CPU s against 598 without the
+  climbs, all proven at the optimum, 0 violations; 2576..2700 shows no difference beyond the noise
+  ([the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-wedge-and-climb)).  A cloud
+  run with the climbs is ready, not run, and needs Brian's approval
   ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
