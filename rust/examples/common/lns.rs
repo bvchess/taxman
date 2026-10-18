@@ -8,7 +8,7 @@
 use crate::rng::Rng;
 use std::sync::Arc;
 use taxman::bits::Bits;
-use taxman::engine::{self, Control, EngineConfig, Start};
+use taxman::engine::{self, Control, EngineConfig, Searcher, Start};
 use taxman::search::{payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 
 /// What a search of one unit came to.
@@ -29,9 +29,20 @@ pub fn run_unit<const W: usize>(
     start: &Bits<W>,
     node_limit: Option<u64>,
 ) -> Ran<W> {
+    run_unit_with(control, unit, start, node_limit, |_| TaxSearcher::new(space))
+}
+
+/// [`run_unit`] with the searcher `make` makes (for a caller that wants what the searcher learned: `wall nogoods`).
+pub fn run_unit_with<const W: usize, S: Searcher<TaxUnit<W>>>(
+    control: &Arc<Control>,
+    unit: TaxUnit<W>,
+    start: &Bits<W>,
+    node_limit: Option<u64>,
+    make: impl Fn(usize) -> S + Sync,
+) -> Ran<W> {
     let cfg = EngineConfig { threads: 1, node_limit, control: Some(Arc::clone(control)), ..EngineConfig::default() };
     let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: payload_of(start) };
-    let out = engine::run(&cfg, begin, b"finders", |_| TaxSearcher::new(space)).expect("the engine");
+    let out = engine::run(&cfg, begin, b"finders", make).expect("the engine");
     Ran { set: set_of_payload(&out.payload), nodes: out.stats.nodes, completed: out.completed }
 }
 
@@ -94,7 +105,22 @@ impl<const W: usize> Lns<'_, W> {
         clock: &dyn Fn() -> f64,
         over: &dyn Fn() -> bool,
     ) -> Outcome<W> {
-        let Options { fix, unit_nodes, .. } = self.options;
+        let unit_nodes = self.options.unit_nodes;
+        let run = |unit, best: &Bits<W>| run_unit(self.space, control, unit, best, Some(unit_nodes));
+        self.search_with(start, rng, clock, over, run)
+    }
+
+    /// [`search`](Self::search) with `run` searching each unit from the incumbent it is given (as [`run_unit`] does
+    /// within the step limit, `options.unit_nodes`), for a caller that wants what the searchers learned.
+    pub fn search_with(
+        &self,
+        start: &Bits<W>,
+        rng: &mut Rng,
+        clock: &dyn Fn() -> f64,
+        over: &dyn Fn() -> bool,
+        mut run: impl FnMut(TaxUnit<W>, &Bits<W>) -> Ran<W>,
+    ) -> Outcome<W> {
+        let Options { fix, .. } = self.options;
         let (mut best, mut nodes) = (*start, 0);
         let (mut units, mut finished, mut improved, mut found) = (0, 0, 0, 0.0);
         while !over() {
@@ -103,7 +129,7 @@ impl<const W: usize> Lns<'_, W> {
             let share = fix.0 + rng.unit() * (fix.1 - fix.0);
             let fixed: Bits<W> = members[..(members.len() as f64 * share).round() as usize].iter().copied().collect();
             let unit = TaxUnit { promoted: fixed, cands: self.p.candidates.difference(&fixed) };
-            let ran = run_unit(self.space, control, unit, &best, Some(unit_nodes));
+            let ran = run(unit, &best);
             (units, nodes, finished) = (units + 1, nodes + ran.nodes, finished + u64::from(ran.completed));
             if ran.set.sum() > best.sum() {
                 (best, improved, found) = (ran.set, improved + 1, clock());

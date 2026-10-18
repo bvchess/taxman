@@ -114,6 +114,78 @@ fn bound_and_independence_on_small_boards() {
     assert!(enumerated > 80, "{enumerated} boards enumerated");
 }
 
+/// The weight of the heaviest set of at most `cap` of the elements of `graph` that is independent in both matroids,
+/// by enumerating every subset of them (at most 16 elements).
+fn heaviest_independent<const W: usize>(graph: &Gf2Graph, weight: impl Fn(u32) -> i64, cap: usize) -> i64 {
+    let elems: Vec<u32> = graph.elems.clone();
+    assert!(elems.len() <= 16);
+    let mut best = 0;
+    for mask in 0u32..1 << elems.len() {
+        if mask.count_ones() as usize > cap {
+            continue;
+        }
+        let set: Bits<W> = (0..elems.len()).filter(|&i| mask >> i & 1 == 1).map(|i| elems[i]).collect();
+        let total: i64 = set.iter().map(&weight).sum();
+        if total > best && independent(graph, &set) {
+            best = total;
+        }
+    }
+    best
+}
+
+/// The bound of `graph` for the candidates `cands`, at most `cap` promotions, and the set it chooses.
+fn root_value<const W: usize>(graph: &Gf2Graph, cands: &Bits<W>, cap: u32) -> (u64, Bits<W>) {
+    let mut bound = Gf2Bound::<W>::new(graph);
+    bound.reset(&Bits::EMPTY, cands);
+    let eval = bound.evaluate(cap, None);
+    (eval.value, eval.chosen)
+}
+
+/// [`Gf2Graph::reweighted`]: with the numbers as weights it is the same bound; with any weights (some not positive,
+/// none in the order of the numbers) and any limit on the size, the bound is the weight of the heaviest common
+/// independent set, found by enumerating them, and the set it chooses is one, with that weight, in the labels of the
+/// graph and in the numbers they stand for.
+#[test]
+fn a_reweighted_graph_bounds_by_its_weights() {
+    const W: usize = 8;
+    let mut rng = Rng(0x3C6E_F372_FE94_F82B);
+    let (mut checked, mut largest) = (0, 0);
+    for n in 2..=200 {
+        let board = Board::<W>::for_n(n);
+        if board.is_trivial() {
+            continue;
+        }
+        let p = board.prepare(SearchTactics::default()).unwrap();
+        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+        let (plain, _) = root_value(&graph, &p.candidates, p.max_total);
+        let (same, labels) = graph.reweighted(i64::from);
+        let all: Bits<W> = (1..=labels.len() as u32).collect();
+        assert_eq!(root_value(&same, &all, p.max_total).0, plain, "n={n}: the numbers as weights");
+        if graph.len() > 16 {
+            continue;
+        }
+        (checked, largest) = (checked + 1, largest.max(graph.len()));
+        for cap in [p.max_total as usize, 1 + rng.below(4) as usize] {
+            // Weights from -30 to 90: a third of them not positive.
+            let weights: Vec<i64> = (0..=n).map(|_| rng.below(121) as i64 - 30).collect();
+            let weight = |x: u32| weights[x as usize];
+            let (re, labels) = graph.reweighted(weight);
+            let positive = graph.elems.iter().filter(|&&x| weight(x) > 0).count();
+            assert_eq!(re.len(), positive, "n={n}: the elements that weigh something");
+            let by_weight: Vec<i64> = labels.iter().map(|&x| weight(x)).collect();
+            assert!(by_weight.windows(2).all(|w| w[0] <= w[1]), "n={n}: the labels are in order of weight");
+            let all: Bits<W> = (1..=labels.len() as u32).collect();
+            let (value, chosen) = root_value(&re, &all, cap as u32);
+            let expected = heaviest_independent::<W>(&graph, weight, cap);
+            assert_eq!(value as i64, expected, "n={n}, cap {cap}: the weights {weights:?}");
+            let numbers: Bits<W> = chosen.iter().map(|k| labels[k as usize - 1]).collect();
+            assert!(independent(&graph, &numbers) && numbers.len() as usize <= cap, "n={n}: the chosen set");
+            assert_eq!(numbers.iter().map(weight).sum::<i64>(), expected, "n={n}: the chosen set's weight");
+        }
+    }
+    assert!(checked > 40 && largest >= 12, "{checked} boards checked, the largest of {largest} elements");
+}
+
 /// The extended problem Π⁺(`open`) of `board` as the search is given it, built by hand since its setup comes in a later
 /// step: the frames with the one-sided candidates, the model and root they make, the candidates (two-sided and
 /// one-sided) and the most promotions a promotion set can have.  The extended frames come with it, for their

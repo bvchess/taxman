@@ -306,6 +306,42 @@ impl Gf2Graph {
         Gf2Graph { vecs, words, ..self.clone() }
     }
 
+    /// The same matroids with each element `x` weighing `weight(x)` instead of its number, for bounds that are not the
+    /// search's (a Lagrangian bound, whose multipliers lower the weights of the members of nogoods); with the labels,
+    /// because the solver wants its elements by increasing weight and the numbers it is asked about to be those
+    /// elements.  An element whose weight is not positive is left out (a heaviest common independent set never needs
+    /// one), and the others are relabelled `1, 2, …` by increasing weight (ties by number): the graph is of those
+    /// labels, and `labels[k - 1]` is the number of label `k`.  Run [`Gf2Bound`] on it with the candidates
+    /// `1..=labels.len()`, and map the sets it chooses back through `labels`.
+    pub fn reweighted(&self, weight: impl Fn(u32) -> i64) -> (Gf2Graph, Vec<u32>) {
+        let mut kept: Vec<(i64, u32, usize)> = (0..self.elems.len())
+            .filter_map(|e| Some((weight(self.elems[e]), self.elems[e], e)).filter(|&(w, _, _)| w > 0))
+            .collect();
+        kept.sort_unstable();
+        let count = kept.len() as u32;
+        let mut g = Gf2Graph {
+            elems: (1..=count).collect(),
+            index: vec![NONE; count as usize + 1],
+            words: self.words,
+            blocks: self.blocks,
+            block: [Vec::new(), Vec::new()],
+            vecs: [Vec::new(), Vec::new()],
+            block_elems: self.block_elems.each_ref().map(|blocks| vec![Vec::new(); blocks.len()]),
+            weight: kept.iter().map(|&(w, _, _)| w).collect(),
+            ranks: self.ranks.clone(),
+        };
+        for (k, &(_, _, e)) in kept.iter().enumerate() {
+            for m in 0..2 {
+                let block = self.block[m][e];
+                g.block[m].push(block);
+                g.vecs[m].extend_from_slice(&self.vecs[m][e * self.words..(e + 1) * self.words]);
+                g.block_elems[m][usize::from(block)].push(k as u32);
+            }
+            g.index[k + 1] = k as u32;
+        }
+        (g, kept.iter().map(|&(_, x, _)| x).collect())
+    }
+
     /// The element of the number `x`, if it is one.
     #[inline]
     fn element(&self, x: u32) -> Option<u32> {

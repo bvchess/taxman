@@ -375,6 +375,13 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
     }
 
+    /// The nogoods the searcher holds now (tactic `nogoods`; none without it), in the order it learned them, for a
+    /// caller that wants what a search learned (the table is a cache: a searcher forgets as the space's
+    /// [`Forgetting`] says, and a new searcher starts with none).
+    pub fn nogoods(&self) -> &[Bits<W>] {
+        self.stepper.nogoods.as_ref().map_or(&[], Nogoods::sets)
+    }
+
     /// Rebuilds the unit's node in slot 0.
     fn start(&mut self, unit: &TaxUnit<W>) {
         let space = self.stepper.space;
