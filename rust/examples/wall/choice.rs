@@ -92,10 +92,10 @@ const CHECKED: usize = 100;
 // The incumbent and the prepared file
 
 /// The game a node must beat: the known optimum, or for a game with none the suite's checkpoint incumbent.
-pub(super) struct Incumbent<const W: usize> {
-    pub(super) set: Bits<W>,
-    pub(super) sum: u64,
-    pub(super) known: bool,
+struct Incumbent<const W: usize> {
+    set: Bits<W>,
+    sum: u64,
+    known: bool,
 }
 
 /// The incumbent of the game of `case`: the known optimum's promotions, else the incumbent of its units in the suite.
@@ -137,29 +137,29 @@ fn need_of<const W: usize>(incumbent: u64, promoted: &Bits<W>) -> u64 {
 }
 
 /// A unit of a prepared file.
-pub(super) struct PrepUnit<const W: usize> {
-    pub(super) id: String,
-    pub(super) source: String,
+struct PrepUnit<const W: usize> {
+    id: String,
+    source: String,
     /// The seconds to measure it, forecast, to order the units (the heaviest first).
-    pub(super) weight: f64,
-    pub(super) unit: TaxUnit<W>,
+    weight: f64,
+    unit: TaxUnit<W>,
     /// The nodes of the suite's solve, if it has the unit.
-    pub(super) hint: Option<u64>,
+    hint: Option<u64>,
     /// For a node on the way to the optimum, what its best completion reaches.
-    pub(super) lower: Option<u64>,
+    lower: Option<u64>,
     /// The gap when it was prepared.
-    pub(super) gap: i64,
+    gap: i64,
 }
 
 /// A game's prepared file: what is measured about every node of it alike, and the nodes.
-pub(super) struct Prep<const W: usize> {
-    pub(super) n: u32,
-    pub(super) incumbent: Incumbent<W>,
-    pub(super) root: u64,
+struct Prep<const W: usize> {
+    n: u32,
+    incumbent: Incumbent<W>,
+    root: u64,
     /// The nogood pool and the multipliers fitted for it at the root.
-    pub(super) pool: Vec<Bits<W>>,
-    pub(super) lambda: Vec<i64>,
-    pub(super) units: Vec<PrepUnit<W>>,
+    pool: Vec<Bits<W>>,
+    lambda: Vec<i64>,
+    units: Vec<PrepUnit<W>>,
 }
 
 /// The name of the file of game `n` in a prepared directory.
@@ -392,15 +392,15 @@ pub fn prepare<const W: usize>(case: &Case<'_, W>) -> Result<Played, String> {
 // choice
 
 /// The nogood pool of a game and the multipliers fitted for it at the root.
-pub(super) struct Pool<'a, const W: usize> {
-    pub(super) sets: &'a [Bits<W>],
-    pub(super) lambda: &'a [i64],
+struct Pool<'a, const W: usize> {
+    sets: &'a [Bits<W>],
+    lambda: &'a [i64],
 }
 
 /// What a worker keeps from node to node.
-pub(super) struct Tools<'a, const W: usize> {
-    pub(super) bound: NodeBound<'a, W>,
-    pub(super) scratch: Scratch<W>,
+struct Tools<'a, const W: usize> {
+    bound: NodeBound<'a, W>,
+    scratch: Scratch<W>,
 }
 
 /// A fit at a node: the nogoods live there, the fit, and the CPU seconds it took.
@@ -486,7 +486,7 @@ fn sample<T: Copy>(items: &[T], count: usize) -> Vec<T> {
 }
 
 /// The measurement of one unit against `incumbent`: its line, and the faults found.
-pub(super) fn measure_unit<const W: usize>(
+fn measure_unit<const W: usize>(
     case: &Case<'_, W>,
     pool: &Pool<'_, W>,
     incumbent: &Incumbent<W>,
