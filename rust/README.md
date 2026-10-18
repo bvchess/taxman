@@ -370,7 +370,9 @@ its upper bound read from the checkpoint: the *dual bound*) and by the relations
 prime formula, repeats, monotonicity, both ways), where a proof looks cheapest, with a finder of good games (large
 neighbourhood search, which is not sound: its games are lower bounds once the referee has replayed them); a board is
 proven when its bounds meet.  It never reads the known optima unless it is given proven games (`--proven FILE`), so a run on a stretch the
-chain has proven is a fair test, which `report --known` checks.  Its files are its own, not results lines
+chain has proven is a fair test, which `report --known` checks.  What it finds is kept in the bounds store,
+`results/bounds.jsonl` (`ledger export`; `run --bounds` starts from it; two referees:
+[results/README](results/README.md#boundsjsonl)).  Its files are its own, not results lines
 ([DESIGN.md, "The ledger"](DESIGN.md#the-ledger); the experiment: [the
 ledger](docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md)).
 
