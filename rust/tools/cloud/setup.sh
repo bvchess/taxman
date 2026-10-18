@@ -9,6 +9,10 @@
 #   rust/tools/cloud/setup.sh           from inside a checkout
 #   ./setup.sh                          a copy of this script alone: it clones REPO_URL to $TAXMAN_DIR first
 #
+# The release binaries come from the build cache when it has them (RUNBOOK.md, section 15): a clean checkout at a commit
+# looks for that commit's binaries, built for this architecture and CPU, in S3 and downloads them instead of building.
+# Everything in the cache has passed the release suite.  Only RELEASE_TESTS=1, on one machine, puts binaries there.
+#
 # Environment (all optional):
 #   REPO_URL        https://github.com/bvchess/taxman.git
 #   BRANCH          master
@@ -16,6 +20,23 @@
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
 #   PROVER_ONLY=1 build and check only the prover (what prover.sh runs), not the solver: a few minutes less
+#   BUILD           what to build in rust/, as cargo arguments: --bins, --examples, --bin NAME and --example NAME, e.g.
+#                   BUILD="--bin taxman --example ledger".  Default "--bins --examples".  A BUILD leaves the prover out
+#                   unless BUILD_PROVER asks for it; the checks of a part that is not built are left out.
+#   BUILD_PROVER    the same for rust/prover/ (default "--bins --examples" when BUILD is not set, none when it is; the
+#                   word `none` for none)
+#   BUILD_CACHE     where the cache is: s3://taxman-013764204840-us-east-1/builds (default), file:///DIR (for tests) or
+#                   off.  build_cache.py has the key and the layout.  A dirty checkout, no commit, RUSTFLAGS other than
+#                   a single -C target-cpu, or a cache out of reach (no aws, no credentials) is a miss: the build
+#                   goes on.
+#   REQUIRE_CACHED=1  a miss is an error: do not build (a launch that must start at once and run only tested binaries)
+#   RELEASE_TESTS=1   on a miss, once built (and the smoke checks passed): run the whole release suite of every crate
+#                   built, on every CPU (run_tests.py: all the tests of all the test binaries at once, the longest
+#                   first), and only if it passes put the binaries in the cache, with the result beside them.  If it
+#                   fails nothing is put there: the failing tests go to $LOGS/release-tests.txt and, when S3_DEST is
+#                   set, to $S3_DEST/RELEASE_TESTS_FAILED, and the script exits with status 1 (so does the job
+#                   that was to start).  Replaces the tests SKIP_TESTS governs; a hit has nothing to run.
+#   TEST_JOBS       tests at once in the release suite (default: every CPU); TEST_TIMEOUT a test's seconds (3600)
 #   TAXMAN_WORK     where results, checkpoints and logs live (see env.sh)
 #   RUSTFLAGS       default "-C target-cpu=native" (see env.sh)
 
@@ -135,20 +156,119 @@ export TAXMAN_ROOT="$root"
 mkdir -p "$TAXMAN_WORK/results" "$CKPT" "$LOGS"
 exec > >(tee -a "$LOGS/setup.log") 2>&1
 
-# --- the build ---------------------------------------------------------------------------------------------------
-if [ "${PROVER_ONLY:-0}" != 1 ]; then
-    say "building (RUSTFLAGS='${RUSTFLAGS:-}'): the solver and the examples (the ladder among them)"
-    (cd "$CRATE" && cargo build --release --bins --examples)
-    [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
-    [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
+# --- what to build -----------------------------------------------------------------------------------------------
+# cargo's arguments for rust/ (solver_args) and for rust/prover/ (prover_args); an empty one builds nothing there.
+solver_args="--bins --examples"
+[ -z "${BUILD+set}" ] || solver_args="$BUILD"
+if [ -n "${BUILD_PROVER+set}" ]; then
+    prover_args="$BUILD_PROVER"
+elif [ -n "${BUILD+set}" ]; then
+    prover_args=""
+else
+    prover_args="--bins --examples"
 fi
-say "building the prover (its own workspace): exact, the other tools and their examples"
-(cd "$PROVER" && cargo build --release --bins --examples)
-[ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
+if [ "${PROVER_ONLY:-0}" = 1 ]; then
+    solver_args=""
+    [ -n "${BUILD_PROVER+set}" ] || prover_args="--bins --examples"
+fi
+[ "$prover_args" != none ] || prover_args=""
+
+# Whether the cargo arguments $1 build the binary or example (the word $2) named $3.
+selects() {
+    case " $1 " in
+        *" --${2}s "* | *" --$2 $3 "* | *" --$2=$3 "*) return 0 ;;
+    esac
+    return 1
+}
+
+# --- the build cache ---------------------------------------------------------------------------------------------
+cache_tmp="$TAXMAN_WORK/build-cache"
+mkdir -p "$cache_tmp"
+cache() { python3 -I "$here/build_cache.py" "$1" --root "$root" "--solver=$solver_args" "--prover=$prover_args" \
+    --tmp "$cache_tmp" "${@:2}"; }
+
+# The key says whether the cache can be used at all (a dirty checkout, no commit, other RUSTFLAGS cannot), and checks
+# BUILD and BUILD_PROVER.
+cache_usable=0
+if [ -z "$solver_args$prover_args" ]; then
+    [ "${RELEASE_TESTS:-0}" != 1 ] || fail "RELEASE_TESTS=1 with nothing to build (BUILD and BUILD_PROVER are empty)"
+    say "nothing to build (BUILD and BUILD_PROVER are empty)"
+else
+    cache_status=0
+    cache_key="$(cache key)" || cache_status=$?
+    [ "$cache_status" != 2 ] || fail "BUILD or BUILD_PROVER is not understood"
+    if [ "$cache_status" = 0 ]; then
+        cache_usable=1
+        say "build cache key: $cache_key"
+    fi
+fi
+
+built_from_cache=0
+if [ "$cache_usable" = 1 ]; then
+    if cache fetch; then
+        built_from_cache=1
+    elif [ "${REQUIRE_CACHED:-0}" = 1 ]; then
+        fail "REQUIRE_CACHED=1 and the cache has no tested build of $cache_key for this set: run RELEASE_TESTS=1" \
+            "setup.sh on a machine of this type first (RUNBOOK.md, section 15)"
+    fi
+elif [ "${REQUIRE_CACHED:-0}" = 1 ]; then
+    fail "REQUIRE_CACHED=1 and the build cache cannot be used here (see above)"
+fi
+
+# --- the build ---------------------------------------------------------------------------------------------------
+# Builds a crate: cargo's own default is every CPU for its crates and binaries (a `-j` here would only limit it).
+build_crate() {
+    local label="$1" directory="$2" arguments="$3"
+    say "building the $label (RUSTFLAGS='${RUSTFLAGS:-}'): cargo build --release $arguments"
+    # shellcheck disable=SC2086 # the arguments are words
+    (cd "$directory" && cargo build --release $arguments) 2>&1 | while IFS= read -r line; do
+        printf '[%s] %s\n' "$label" "$line"
+    done
+}
+
+if [ "$built_from_cache" = 1 ]; then
+    say "the binaries come from the build cache: no build"
+else
+    if [ -n "$solver_args" ] && [ -n "$prover_args" ] && [ "$(ncpu)" -ge 32 ]; then
+        # Each build has fewer binaries to link than this machine has CPUs, each link a single thread (fat LTO, one
+        # codegen unit): the two builds at once keep the CPUs busy where one after the other leaves most idle.  A
+        # smaller machine is filled by one build, and two at once would only need more memory.
+        build_crate solver "$CRATE" "$solver_args" &
+        solver_build=$!
+        build_crate prover "$PROVER" "$prover_args" &
+        prover_build=$!
+        build_status=0
+        wait "$solver_build" || build_status=1
+        wait "$prover_build" || build_status=1
+        [ "$build_status" = 0 ] || fail "a build failed (see above)"
+    else
+        [ -z "$solver_args" ] || build_crate solver "$CRATE" "$solver_args"
+        [ -z "$prover_args" ] || build_crate prover "$PROVER" "$prover_args"
+    fi
+fi
+if [ -n "$solver_args" ]; then
+    # A named binary or example must be there; "--bins" and "--examples" are held to the ones the scripts use.
+    ! selects "$solver_args" bin taxman || [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
+    ! selects "$solver_args" example ladder || [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
+fi
+if [ -n "$prover_args" ]; then
+    ! selects "$prover_args" bin exact || [ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
+fi
+
+# What the cache is given if the release suite passes, packed now, before the tests run (and so before anything they
+# build can change a file).
+release_stage="$cache_tmp/stage"
+release_packed=0
+if [ "${RELEASE_TESTS:-0}" = 1 ] && [ "$built_from_cache" != 1 ] && [ "$cache_usable" = 1 ]; then
+    cache pack --stage "$release_stage" || fail "could not pack the binaries for the cache"
+    release_packed=1
+fi
 
 # --- checks ------------------------------------------------------------------------------------------------------
+# The smoke checks run on the binaries of the cache too: they show that this machine runs them.  A part that is not
+# built has no check.
 if [ "${SKIP_SMOKE:-0}" != 1 ]; then
-    if [ "${PROVER_ONLY:-0}" != 1 ]; then
+    if [ -n "$solver_args" ] && [ -x "$TAXMAN_BIN" ]; then
         say "smoke: replay optimal.json"
         "$TAXMAN_BIN" verify-optimal
         say "smoke: the committed results files, with the solver's verifier and the independent Python one"
@@ -156,24 +276,74 @@ if [ "${SKIP_SMOKE:-0}" != 1 ]; then
         python3 "$CRATE/tools/check_results.py" "${COMMITTED_RESULTS[@]}"
         say "smoke: games 1..400 against optimal.json"
         "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
+    else
+        say "smoke: none for the solver (not in this build)"
     fi
-    say "smoke: the prover on games 2..400, and the check of its proofs"
-    smoke="$TAXMAN_WORK/smoke-exact"
-    rm -rf "$smoke"
-    "$EXACT_BIN" --from 2 --to 400 --threads "$(ncpu)" --checkpoints "$smoke/ckpt" --out "$smoke/exact.jsonl"
-    python3 "$PROVER/tools/summarize.py" check 2 400 "$smoke/exact.jsonl"
-    rm -rf "$smoke"
+    if [ -n "$prover_args" ] && [ -x "$EXACT_BIN" ]; then
+        say "smoke: the prover on games 2..400, and the check of its proofs"
+        smoke="$TAXMAN_WORK/smoke-exact"
+        rm -rf "$smoke"
+        "$EXACT_BIN" --from 2 --to 400 --threads "$(ncpu)" --checkpoints "$smoke/ckpt" --out "$smoke/exact.jsonl"
+        python3 "$PROVER/tools/summarize.py" check 2 400 "$smoke/exact.jsonl"
+        rm -rf "$smoke"
+    else
+        say "smoke: none for the prover (not in this build)"
+    fi
 fi
-if [ "${SKIP_TESTS:-0}" != 1 ]; then
+
+# --- the release suite -------------------------------------------------------------------------------------------
+# The whole suite of every crate that was built, as run_tests.py runs it, on every CPU.  If it passes, the binaries
+# packed above go to the cache with its result; if not, the failing tests are written where the job's output is, and
+# the setup fails, so that the job that comes after it does not start on a broken build.
+release_failed() {
+    local report="$LOGS/release-tests.txt"
+    [ -s "$report" ] || printf 'the release suite did not finish: see %s/setup.log\n' "$LOGS" >"$report"
+    say "RELEASE_TESTS FAILED ($1): the report is $report"
+    if [ -n "${S3_DEST:-}" ]; then
+        "${AWS_CLI:-aws}" s3 cp "$report" "${S3_DEST%/}/RELEASE_TESTS_FAILED" --only-show-errors &&
+            say "the report is in ${S3_DEST%/}/RELEASE_TESTS_FAILED" ||
+            say "could not write ${S3_DEST%/}/RELEASE_TESTS_FAILED"
+    fi
+    exit 1
+}
+
+if [ "${RELEASE_TESTS:-0}" = 1 ] && [ "$built_from_cache" = 1 ]; then
+    say "release suite: not run, the binaries come from the cache, where only tested ones are"
+elif [ "${RELEASE_TESTS:-0}" = 1 ]; then
+    release_crates=()
+    [ -z "$solver_args" ] || release_crates+=("solver=$CRATE")
+    [ -z "$prover_args" ] || release_crates+=("prover=$PROVER")
+    [ "$cache_usable" = 1 ] || say "release suite: the build cache is not used here (see above): nothing will be stored"
+    release_summary="$cache_tmp/release-summary.json"
+    release_times="$cache_tmp/test-times.json"
+    rm -f "$release_summary" "$LOGS/release-tests.txt"
+    [ "$cache_usable" != 1 ] || cache times-get --file "$release_times" || say "no test times in the cache yet"
+    say "release suite: $(ncpu) CPUs, ${release_crates[*]}"
+    release_status=0
+    python3 -I "$here/run_tests.py" --release --jobs "${TEST_JOBS:-$(ncpu)}" --timeout "${TEST_TIMEOUT:-3600}" \
+        --times "$release_times" --report "$LOGS/release-tests.txt" --summary "$release_summary" \
+        "${release_crates[@]}" || release_status=$?
+    [ "$cache_usable" != 1 ] || [ ! -s "$release_times" ] || cache times-put --file "$release_times" ||
+        say "could not store the test times"
+    [ "$release_status" = 0 ] || release_failed "status $release_status"
+    say "release suite: passed"
+    if [ "$release_packed" = 1 ]; then
+        cache put --stage "$release_stage" --summary "$release_summary" ||
+            fail "the suite passed but the cache did not take the binaries"
+        rm -rf "$release_stage"
+    fi
+elif [ "${SKIP_TESTS:-0}" != 1 ]; then
     # A handful of test threads (DESIGN.md times the suite with two): many tests start a thread per CPU themselves,
     # and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored large-machine tests
     # are run by hand (RUNBOOK.md).
-    if [ "${PROVER_ONLY:-0}" != 1 ]; then
+    if [ -n "$solver_args" ]; then
         say "cargo test -- --test-threads=4"
         (cd "$CRATE" && cargo test -- --test-threads=4)
     fi
-    say "cargo test --release -- --test-threads=4, in the prover (about a minute)"
-    (cd "$PROVER" && cargo test --release -- --test-threads=4)
+    if [ -n "$prover_args" ]; then
+        say "cargo test --release -- --test-threads=4, in the prover (about a minute)"
+        (cd "$PROVER" && cargo test --release -- --test-threads=4)
+    fi
 fi
 
 # --- report ------------------------------------------------------------------------------------------------------

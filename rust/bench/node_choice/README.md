@@ -91,11 +91,17 @@ shutdown -h +90
 export AWS_DEFAULT_REGION=us-east-1
 dnf install -y -q git tmux
 sudo -u ec2-user bash -lc 'cd ~ && git clone -q https://github.com/bvchess/taxman.git && cd taxman &&
-    git checkout -q COMMIT && SKIP_TESTS=1 rust/tools/cloud/setup.sh > ~/setup.log 2>&1'
+    git checkout -q COMMIT'
 sudo -u ec2-user tmux new-session -d -s choice -c /home/ec2-user/taxman/rust \
-    'S3_DEST=s3://taxman-013764204840-us-east-1/node-choice-DATE POWEROFF=1 bench/node_choice/cloud.sh;
-     sudo shutdown -h now'
+    'export S3_DEST=s3://taxman-013764204840-us-east-1/node-choice-DATE
+     BUILD="--bin taxman --example wall --example perf" REQUIRE_CACHED=1 SKIP_TESTS=1 tools/cloud/setup.sh \
+         > ~/setup.log 2>&1 && POWEROFF=1 bench/node_choice/cloud.sh;
+     sudo shutdown -h now'                          # also if the setup failed
 ```
+
+The binaries come from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, [RUNBOOK section
+15](../../tools/cloud/RUNBOOK.md#15-the-build-cache-and-the-release-suite)); a setup that fails ends the machine and the
+measurement does not start.
 
 ## Cost and time
 
@@ -103,7 +109,7 @@ The work is about 6,000 CPU s, an estimate: the suite's subtrees 3,650 CPU s (th
 Max at about the speed of a `c8g` thread), the made units' subtrees about 1,500, and the fits (`NODE_STEPS` 200, about
 2 ms a step at the end of the chain, twice with `SUB`, stopping at a cut) about 800.  Packed on 16 CPUs that is 6 to 12
 minutes (the dearest node is 314 s), after the fixtures (the proof of 3213, 440,000 steps, sets the pace: 2 to 4
-minutes) and the pool (about a minute).  With the build of `setup.sh` (about 10 minutes) the machine is up for **about
+minutes) and the pool (about a minute).  With the build of `setup.sh` (about 10 minutes; none from the build cache) the machine is up for **about
 40 minutes**, and the run costs **about 30 cents at spot** ($0.17 an hour for a `c8g.4xlarge`, a quarter of the
 `c8g.16xlarge`'s $0.68, and the volume and the timer's slack; $0.64 an hour on demand).  The timer of 90 minutes
 bounds it at about $0.26 at spot for the machine.

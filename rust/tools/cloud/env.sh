@@ -15,7 +15,8 @@
 #   EXACT_BIN     the prover's `exact`            (default rust/prover/target/release/exact; prover.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
-#                 to the empty string to build generic code.
+#                 to the empty string to build generic code.  The build cache (setup.sh, build_cache.py) keys its
+#                 binaries by the CPU this names, and does not take any other flags.
 
 _cloud_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAXMAN_ROOT="${TAXMAN_ROOT:-$(cd "$_cloud_dir/../../.." && pwd)}"

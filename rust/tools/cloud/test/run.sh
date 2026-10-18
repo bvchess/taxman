@@ -35,8 +35,10 @@ printf '#!/usr/bin/env bash\necho "verify.sh (a stand-in): $*"\n' >"$cloud/verif
 cp "$cloud/verify.sh" "$tmp/verify.sh.stub"
 # ... and setup.sh, which installs and builds: the stand-in records how it was called and may sleep a while.
 printf '%s\n' '#!/usr/bin/env bash' \
-    'echo "setup.sh: NO_PULL=${NO_PULL:-} SKIP_TESTS=${SKIP_TESTS:-}" >>"$TAXMAN_WORK/setup-stub.log"' \
-    '[ -z "${STUB_SETUP_SLEEP:-}" ] || sleep "$STUB_SETUP_SLEEP"' >"$cloud/setup.sh"
+    'echo "setup.sh: NO_PULL=${NO_PULL:-} SKIP_TESTS=${SKIP_TESTS:-} BUILD=${BUILD-unset}" \
+        "RELEASE_TESTS=${RELEASE_TESTS:-}" >>"$TAXMAN_WORK/setup-stub.log"' \
+    '[ -z "${STUB_SETUP_SLEEP:-}" ] || sleep "$STUB_SETUP_SLEEP"' \
+    '[ -z "${STUB_SETUP_FAIL:-}" ] || exit 1' >"$cloud/setup.sh"
 chmod +x "$cloud"/*.sh
 export TAXMAN_ROOT="$(cd "$crate/.." && pwd)"
 export PATH="$here/bin:$PATH"
@@ -291,6 +293,17 @@ scenario_node() {
     node $name SKIP_SETUP=
     check "setup.sh is called with NO_PULL and SKIP_TESTS" matches "$tmp/n-$name/setup-stub.log" \
         'setup.sh: NO_PULL=1 SKIP_TESTS=1'
+    check "and builds the solver alone" matches "$tmp/n-$name/setup-stub.log" 'BUILD=--bin taxman RELEASE_TESTS=$'
+
+    # What the environment says about the build goes on to setup.sh; a setup that fails ends the run with the error.
+    name=setupenv
+    node_config $name "CHAIN_TO=20" "RELEASE_TESTS=1"
+    echo 1 >"$FAKE_STATE/desired"
+    node $name SKIP_SETUP= BUILD="--bin taxman --example ledger" STUB_SETUP_FAIL=1
+    check "BUILD, and RELEASE_TESTS from the config, reach setup.sh" matches "$tmp/n-$name/setup-stub.log" \
+        'BUILD=--bin taxman --example ledger RELEASE_TESTS=1$'
+    check "a setup that fails ends the run" matches "$(obj $name/run/ended)" '^reason=setup.sh failed'
+    check "and the chain does not start" absent "$tmp/n-$name/results/strict.jsonl"
 
     # A signal in the setup (the shutdown of a spot interruption sends SIGTERM to every process) is not the run's end:
     # no end is recorded, the group is left alone, and the machine does not power itself off.
@@ -389,6 +402,11 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
     check "it checks out the commit" matches "$tmp/user-data.sh" "git -C /home/ec2-user/taxman checkout $commit"
     check "it starts wall-node.sh in tmux" matches "$tmp/user-data.sh" 'tmux new-session -d -s tx .*wall-node.sh'
     check "it sets the timer from the budget" matches "$tmp/user-data.sh" '^shutdown -h +4560$'
+    check "the config has no build cache setting by default" lacks "$tmp/dry.out" '^RELEASE_TESTS='
+    RELEASE_TESTS=1 REQUIRE_CACHED=1 DRY_RUN=1 "$wall" launch --commit "$commit" --until 2099-01-01 \
+        >"$tmp/dry-cache.out" 2>&1
+    check "RELEASE_TESTS and REQUIRE_CACHED go into the config" matches "$tmp/dry-cache.out" '^RELEASE_TESTS=1$'
+    check "both" matches "$tmp/dry-cache.out" '^REQUIRE_CACHED=1$'
 
     "$wall" launch --commit "$commit" --until 2099-01-01 --zones "us-east-1b us-east-1a" >"$tmp/launch.out" 2>&1
     check "a launch succeeds" equals $? 0

@@ -10,9 +10,14 @@
 #
 # 1. A run that has ended ($S3_DEST/run/ended exists) only sets the group's desired capacity to 0 again and powers off.
 #    So does a run whose machines have been MAX_INSTANCES (default 20) already: a boot loop is a bug, not a run.
-# 2. On a fresh machine (no results file), the logs come back from S3 first, then setup.sh builds (no tests; the smoke
-#    checks run), then `save.sh --restore` brings the results and the checkpoints: the logs first, so that the first
-#    save does not replace the old machine's logs with this one's, which share their names (RUNBOOK.md, section 5).
+# 2. On a fresh machine (no results file), the logs come back from S3 first, then setup.sh gets the solver (BUILD
+#    defaults to `--bin taxman`, all the chain needs: from the build cache if it has this commit, tested, otherwise
+#    built; no tests of its own, the smoke checks run), then `save.sh --restore` brings the results and the
+#    checkpoints: the logs first, so that the first save does not replace the old machine's logs with this one's, which
+#    share their names (RUNBOOK.md, section 5).  RELEASE_TESTS=1 and REQUIRE_CACHED=1 in the config go on to setup.sh
+#    (RUNBOOK.md, section 15): the first runs the release suite before the chain starts if the cache has no tested
+#    build, and a failed suite ends the run with RELEASE_TESTS_FAILED beside the run's results; the second ends the
+#    run if the cache has none.
 # 3. spot-watch.sh watches for an interruption notice, a loop watches for $S3_DEST/run/stop (wall.sh stop), and
 #    chain.sh runs the chain with the settings of the config, GAME_HOURS (the wall), BUDGET_HOURS and RUN_UNTIL (the
 #    ledger in S3, run.sh) and POWEROFF=never: this script decides what the end means.
@@ -31,7 +36,7 @@
 #    is not an ending: it leaves the run as it is.
 #
 # Environment: S3_DEST, ASG (the group's name) and AWS_DEFAULT_REGION come from the user data.  SKIP_SETUP=1 leaves out
-# setup.sh (a machine that has been set up).  RETRY_SLEEP (default 10 s) is the wait between tries to set the capacity,
+# setup.sh (a machine that has been set up).  BUILD (what setup.sh builds: default `--bin taxman`).  RETRY_SLEEP (default 10 s) is the wait between tries to set the capacity,
 # STOP_POLL (30 s) the wait between looks for the stop object, INTERRUPTION_WAIT (300 s) as above.
 
 set -u
@@ -67,7 +72,8 @@ config_load() {
     while IFS='=' read -r key value; do
         case "$key" in
             COMMIT | INSTANCE_TYPE | CHAIN_TO | WINDOW | GAME_HOURS | BUDGET_HOURS | RUN_UNTIL | THREADS | \
-                EXTRA_ARGS | CHECKPOINT_INTERVAL | SAVE_EVERY | LEDGER_MARGIN | LEDGER_EVERY | MAX_INSTANCES)
+                EXTRA_ARGS | CHECKPOINT_INTERVAL | SAVE_EVERY | LEDGER_MARGIN | LEDGER_EVERY | MAX_INSTANCES | \
+                RELEASE_TESTS | REQUIRE_CACHED)
                 export "$key=$value"
                 ;;
         esac
@@ -156,7 +162,9 @@ printf '%s %s\n' "$(date +%s)" "$(hostname)" |
 
 if [ "${SKIP_SETUP:-0}" != 1 ]; then
     log "setup.sh"
-    NO_PULL=1 SKIP_TESTS=1 "$here/setup.sh" || fail_run "setup.sh failed (see setup.log)"
+    # The chain runs the solver and nothing else; `verify.sh` at its end is the solver's verifier and a Python script.
+    [ -n "${BUILD+set}" ] || export BUILD="--bin taxman"
+    NO_PULL=1 SKIP_TESTS=1 "$here/setup.sh" || fail_run "setup.sh failed (see setup.log and RELEASE_TESTS_FAILED)"
 fi
 if [ ! -e "$RESULTS" ]; then
     "$here/save.sh" --restore || fail_run "cannot restore the state from $S3_DEST"

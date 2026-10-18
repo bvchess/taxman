@@ -2,7 +2,10 @@
 # The ledger's experiment on one machine: `ledger run` over a stretch of boards for a CPU budget, with the truth hidden
 # from it (no --proven), then `ledger report` against the committed chain, which checks every bound.
 #
-#   bench/ledger/cloud.sh FIRST-LAST          from rust/, once tools/cloud/setup.sh has built the release examples
+#   bench/ledger/cloud.sh FIRST-LAST          from rust/, once tools/cloud/setup.sh has the release `ledger` example
+#                                             (built there, or taken from the build cache: RUNBOOK section 15; set
+#                                             BUILD="--bin taxman --example ledger" for setup.sh: the solver is there
+#                                             for its smoke checks)
 #
 # Environment (all optional):
 #   WORKERS     searches at once, one thread each (default: every CPU)

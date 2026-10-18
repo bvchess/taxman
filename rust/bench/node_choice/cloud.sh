@@ -6,7 +6,10 @@
 # fields; the nodes come from the tuning suite's units, the probe's fixtures and the proofs of a few games made with
 # `perf make-nodes`.
 #
-#   bench/node_choice/cloud.sh          from rust/, once tools/cloud/setup.sh has built the release examples
+#   bench/node_choice/cloud.sh          from rust/, once tools/cloud/setup.sh has the release `wall` and `perf` examples
+#                                       (built there, or taken from the build cache: RUNBOOK section 15; set
+#                                       BUILD="--bin taxman --example wall --example perf" for setup.sh: the solver
+#                                       is there for its smoke checks)
 #
 # Environment (all optional):
 #   WORKERS      processes at once, one thread each (default: every CPU)
