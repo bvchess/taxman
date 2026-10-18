@@ -89,10 +89,10 @@ fn harvesting<'a, 's, const W: usize>(space: &'a SearchSpace<'a, W>, sink: &'s S
 }
 
 /// What a method found and learned.
-struct Learned<const W: usize> {
+pub(super) struct Learned<const W: usize> {
     /// Its best game.
     best: Bits<W>,
-    cpu_s: f64,
+    pub(super) cpu_s: f64,
     /// The engine's steps.
     nodes: u64,
     /// The units searched (the finder's), and whether the search ran to its end (the control's).
@@ -100,7 +100,7 @@ struct Learned<const W: usize> {
     completed: bool,
     /// The nogoods its tables learned, a repeat counted again (the space's counter), and the distinct ones.
     learned: u64,
-    nogoods: Vec<Bits<W>>,
+    pub(super) nogoods: Vec<Bits<W>>,
 }
 
 /// The nogoods of a sink, in a fixed order.
@@ -110,13 +110,21 @@ fn sorted<const W: usize>(sink: Sink<W>) -> Vec<Bits<W>> {
     nogoods
 }
 
+/// The nogoods of two pools together, each once, in a fixed order.
+pub(super) fn union<const W: usize>(a: &[Bits<W>], b: &[Bits<W>]) -> Vec<Bits<W>> {
+    let all: HashSet<Bits<W>> = a.iter().chain(b).copied().collect();
+    let mut both: Vec<Bits<W>> = all.into_iter().collect();
+    both.sort_by_cached_key(Bits::to_vec);
+    both
+}
+
 /// The nogoods the tables of the space's searchers have learned so far.
 fn learned_so_far<const W: usize>(space: &SearchSpace<'_, W>) -> u64 {
     space.nogood_totals.lock().unwrap_or_else(PoisonError::into_inner).learned
 }
 
 /// The finder from `start` for `--cpu` CPU seconds.
-fn finder<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Learned<W> {
+pub(super) fn finder<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Learned<W> {
     let (sink, before) = (Sink::default(), learned_so_far(case.space));
     let search = Lns { p: case.p, space: case.space, options: case.params.lns };
     let mut rng = search.options.rng(case.n());
@@ -139,7 +147,7 @@ fn finder<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Learned<W> {
 }
 
 /// The sound search from `start`, standalone, for `--cpu` CPU seconds.
-fn control<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Learned<W> {
+pub(super) fn control<const W: usize>(case: &Case<'_, W>, start: &Bits<W>) -> Learned<W> {
     let (sink, before) = (Sink::default(), learned_so_far(case.space));
     let unit = TaxUnit { promoted: Bits::EMPTY, cands: case.p.candidates };
     let (ran, cpu_s) = budgeted(Some(case.params.cpu), |budget| {
@@ -167,10 +175,10 @@ fn promotable<const W: usize>(case: &Case<'_, W>, nogoods: &[Bits<W>]) -> usize 
 
 /// What a fit had found after a number of steps (a mark).
 #[derive(Clone, Copy)]
-struct Mark {
+pub(super) struct Mark {
     /// The lowest bound so far, scaled by `SCALE`, and the nogoods with a positive multiplier in its multipliers.
-    scaled: i64,
-    active: usize,
+    pub(super) scaled: i64,
+    pub(super) active: usize,
     /// The step the lowest bound came at.
     best_step: usize,
     /// The seconds the steps took.
@@ -178,16 +186,46 @@ struct Mark {
 }
 
 /// What a fit found.
-struct Fit {
+pub(super) struct Fit {
     /// The bound of the first step, with no multipliers (the root's GF(2) bound, scaled).
     first: i64,
     /// The steps taken (the fit ends early when the bound proves the incumbent optimal, when the chosen set breaks no
     /// nogood, or when the damping is spent), and the step at which the bound fell below what proves the incumbent
     /// optimal, if it did.
-    steps: usize,
+    pub(super) steps: usize,
     closed_at: Option<usize>,
     /// What it had found at each mark it was asked for (the final state for a mark it did not reach).
-    marks: Vec<Mark>,
+    pub(super) marks: Vec<Mark>,
+    /// The multipliers of the lowest bound, one for each nogood.
+    pub(super) lambda: Vec<i64>,
+}
+
+/// The weight each multiplier of `lambda` takes off the members of its nogood of `nogoods`, by number, in `shift`
+/// (cleared first; as long as the largest number of the nogoods plus one), and the nogoods' constant at the root,
+/// `Σ λ (|N| - 1)`.
+pub(super) fn shifts<const W: usize>(nogoods: &[Bits<W>], lambda: &[i64], shift: &mut [i64]) -> i64 {
+    shift.fill(0);
+    let mut constant = 0;
+    for (set, &l) in nogoods.iter().zip(lambda).filter(|&(_, &l)| l > 0) {
+        set.iter().for_each(|x| shift[x as usize] += l);
+        constant += l * (i64::from(set.len()) - 1);
+    }
+    constant
+}
+
+/// The heaviest common independent set of the matroids `graph` (of at most `cap` members) with each element `x`
+/// weighing `SCALE · x - shift[x]` (`shift` by number, 0 past its end; elements of no positive weight left out): its
+/// weight (scaled) and the set, as numbers.
+pub(super) fn reweighted_bound<const W: usize>(graph: &Gf2Graph, cap: u32, shift: &[i64]) -> (i64, Bits<W>) {
+    let (reweighted, labels) = graph.reweighted(|x| SCALE * i64::from(x) - shift.get(x as usize).copied().unwrap_or(0));
+    if labels.is_empty() {
+        return (0, Bits::EMPTY);
+    }
+    let all: Bits<W> = (1..=labels.len() as u32).collect();
+    let mut bound = Gf2Bound::<W>::new(&reweighted);
+    bound.reset(&Bits::EMPTY, &all);
+    let eval = bound.evaluate(cap, None);
+    (eval.value as i64, eval.chosen.iter().map(|k| labels[k as usize - 1]).collect())
 }
 
 /// The heaviest common independent set of the root's matroids (of at most `cap` members) with the weights the
@@ -201,21 +239,9 @@ fn dual<const W: usize>(
     lambda: &[i64],
     shift: &mut [i64],
 ) -> (i64, Bits<W>) {
-    shift.fill(0);
-    let mut constant = 0;
-    for (set, &l) in nogoods.iter().zip(lambda).filter(|&(_, &l)| l > 0) {
-        set.iter().for_each(|x| shift[x as usize] += l);
-        constant += l * (i64::from(set.len()) - 1);
-    }
-    let (reweighted, labels) = graph.reweighted(|x| SCALE * i64::from(x) - shift.get(x as usize).copied().unwrap_or(0));
-    if labels.is_empty() {
-        return (constant, Bits::EMPTY);
-    }
-    let all: Bits<W> = (1..=labels.len() as u32).collect();
-    let mut bound = Gf2Bound::<W>::new(&reweighted);
-    bound.reset(&Bits::EMPTY, &all);
-    let eval = bound.evaluate(cap, None);
-    (eval.value as i64 + constant, eval.chosen.iter().map(|k| labels[k as usize - 1]).collect())
+    let constant = shifts(nogoods, lambda, shift);
+    let (value, chosen) = reweighted_bound(graph, cap, shift);
+    (value + constant, chosen)
 }
 
 /// Fits multipliers for `nogoods` (sets that cannot be promoted from the root) by at most `steps` steps of the
@@ -225,7 +251,7 @@ fn dual<const W: usize>(
 /// goes in the direction of the subgradient plus [`MOMENTUM`] of the last direction (none after a return to the best
 /// multipliers).  What it has found after each number of steps in `marks` is in the result (the steps do not depend
 /// on the marks).
-fn fit<const W: usize>(
+pub(super) fn fit<const W: usize>(
     graph: &Gf2Graph,
     cap: u32,
     nogoods: &[Bits<W>],
@@ -239,7 +265,7 @@ fn fit<const W: usize>(
     let mut shift = vec![0i64; top + 1];
     let mut lambda = vec![0i64; nogoods.len()];
     let mut direction = vec![0.0f64; nogoods.len()];
-    let mut out = Fit { first: 0, steps: 0, closed_at: None, marks: Vec::new() };
+    let mut out = Fit { first: 0, steps: 0, closed_at: None, marks: Vec::new(), lambda: Vec::new() };
     let (mut best, mut best_chosen) = (lambda.clone(), Bits::<W>::EMPTY);
     let (mut lowest, mut best_step) = (i64::MAX, 0);
     let (mut damping, mut stalled) = (1.0f64, 0);
@@ -295,6 +321,7 @@ fn fit<const W: usize>(
     // A mark the fit did not reach has the state it ended in.
     let ended = mark(&best, lowest, best_step);
     out.marks.resize(marks.len(), ended);
+    out.lambda = best;
     out
 }
 
@@ -317,12 +344,7 @@ pub fn of<const W: usize>(case: &Case<'_, W>) -> Played {
     let incumbent = [start, found.best, searched.best].into_iter().max_by_key(Bits::sum).expect("three games");
     faults.extend(case.referee(&incumbent).err().map(|e| format!("n={n}: the best game: {e}")));
     let opt = case.optimal.score(n).map(|score| score - case.board.in_the_bag);
-    let both: Vec<Bits<W>> = {
-        let all: HashSet<Bits<W>> = found.nogoods.iter().chain(&searched.nogoods).copied().collect();
-        let mut both: Vec<Bits<W>> = all.into_iter().collect();
-        both.sort_by_cached_key(Bits::to_vec);
-        both
-    };
+    let both = union(&found.nogoods, &searched.nogoods);
     let wrong = promotable(case, &both);
     if wrong > 0 {
         faults.push(format!("n={n}: {wrong} harvested nogoods can be promoted from the root"));
