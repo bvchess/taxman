@@ -5,8 +5,8 @@
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
-//!     [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--bounds FILE]
-//!     [--save-every S]
+//!     [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--floor-step P] [--floor-slack X] [--gap-unit G]
+//!     [--proven FILE] [--bounds FILE] [--save-every S]
 //! cargo run --release --example ledger -- report DIR [--known FILE]...
 //! cargo run --release --example ledger -- export DIR --bounds FILE --source NAME [--checkpoints PREFIX]
 //!     [--strict FILE] [--date YYYY-MM-DD]
@@ -24,7 +24,10 @@
 //!   matching dive, improved by the local search) and U the dual bound of that search, the root's GF(2) bound, as
 //!   `wall landscape` has them.  *Searches* (`search`, `dual`, `exhausted`): L is a search's best game; U is the dual
 //!   bound of a search a limit stopped (`taxman::search::dual_bound`: the largest of its incumbent and the bounds of
-//!   its open units), or the game of a search that completed.  *Relations* (`monotone`, `ceiling`, `prime`,
+//!   its open units), or the game of a search that completed.  *Floor steps* (`floor`): U is the floor of a search under
+//!   that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over checked
+//!   nogoods that `wall nogoods` makes; the store accepts it, and nothing in the ledger produces it yet.
+//!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
 //!   the boards with the same search problem, applied to a fixpoint after every change (heuristics/THEORY.md, "The
 //!   ledger: bounds between boards").  *Given* games (`given`): the completed games of `--proven FILE` (a results
@@ -32,20 +35,40 @@
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
 //!   searched, and no prime whose board before it the ledger has (the prime formula gives its bounds both ways).  A
 //!   search is `taxman::search::search` on one thread, as `taxman solve` searches: seeded with the best of the games
-//!   the ledger holds for n − 1, n and n + 1 (the one whose candidates keep the largest sum), with the ceiling U(n),
-//!   so that a game that reaches U proves itself, and limited in time: `--base` seconds (default 2) the first time,
-//!   twice as long each time after, at most `--max-limit` (default 3600) and at most the budget left over the workers.
-//!   Each search goes on from the checkpoint of the last (DIR/ckpt/nN.ckpt), so its work adds up.
+//!   the ledger holds for n − 1, n and n + 1 and, for the board of a repeat class, for the boards just outside the class
+//!   (the one whose candidates keep the largest sum), with the ceiling U(n), so that a game that reaches U proves
+//!   itself, and limited in time: `--base` seconds (default 2) the first time, twice as long each time after, at most
+//!   `--max-limit` (default 3600) and at most the budget left over the workers.  Each search goes on from the
+//!   checkpoint of the last (DIR/ckpt/nN.ckpt), so its work adds up.  This is the board's *proof*, the search of
+//!   its climbs, and, when `--floor-step` is 0, of every ordinary job.
+//! * **Floor steps** (`cost.rs`; `--floor-step P`, default 150, 0: none).  A search under a floor F
+//!   (`taxman::search::search_above`: an incumbent worth F and no set) that completes having found nothing proves that
+//!   no promotion set weighs more than F (heuristics/THEORY.md, Lemma F), at a cost that grows about tenfold for every
+//!   147 points the floor is below the root's bound, a line of `log10(nodes)` against the distance for each board.  So
+//!   an open board, unless it is climbed to, is stepped down before its proof: a step is a search under the floor `P`
+//!   points below the board's upper bound (fewer points on a steeper line: the same factor of cost), without seed or
+//!   finder, limited to `--floor-slack` (default 4) times its forecast time (at least `--base`).  If it completes
+//!   having found nothing the floor is U (rule `floor`) and the step is a point of the board's line (its steps of 100
+//!   nodes or more; fewer than two points keep the median slope, none the median line).  If it finds a set above the
+//!   floor the set is a game like any other, offered as L after the referee has replayed it, and if the search
+//!   completes the set is the optimum (the board is proven); if the limit stops it with a set, the floor is below L and
+//!   the step is dropped with its checkpoint.  A step that its limit stops with nothing is *stalled*: kept with its
+//!   checkpoint (DIR/ckpt/nN.floor.ckpt, apart from the ordinary searches'), tried again under the same floor with the
+//!   limit doubled, and dropped if the bounds move to it.  A board whose gap is within two steps goes to its proof.
 //! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
 //!   bounds kept as they come, and when the last is in the relations carry them to the other boards in one go
 //!   (`settle`: a map's cascade through the boards, one map at a time, would make every board many times over);
 //!   then the climbs (below); then the boards whose bounds a proven neighbour has changed since their last search (the
 //!   ceiling and the prime formula of a board next to a proven one are exact: such a board is often proven by a search
-//!   at its ceiling in a few steps), smallest gap first; then the board of least `level + gap / gap_unit`, where
-//!   `level` counts its searches (each doubles the limit) and `--gap-unit` (default 175) is the gap worth one doubling
-//!   of the cost (the chain's steps rise a decade with about 580 of the standalone gap, `bench/landscape/`).
+//!   at its ceiling in a few steps), smallest gap first; then the board whose proof is forecast to cost the least: its
+//!   line at the distance from the root's bound down to its lower bound, in seconds of one thread (its own rate, else
+//!   the run's), and at least twice the steps its ordinary searches have spent (the cost `level` charged); a board
+//!   whose forecast is far beyond the rest waits until the cheaper work runs out.  With `--floor-step 0` the order is
+//!   that of least `level + gap / gap_unit`, where `level` counts the board's searches (each doubles the limit) and
+//!   `--gap-unit` (default 175) is the gap worth one doubling of the cost (the chain's steps rise a decade with about
+//!   580 of the standalone gap, `bench/landscape/`).
 //!   `--workers` searches at once (default all CPUs).  When a board is proven, its search is stopped if one is going,
-//!   and its checkpoint deleted; a search whose U falls is given the lower ceiling.
+//!   and its checkpoints deleted; a search whose U falls is given the lower ceiling.
 //! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
 //!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
 //!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A
@@ -59,8 +82,9 @@
 //!   (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.  `--climb` picks the ways (`up`, `down`,
 //!   `both`, the default, or `off`).  If a climb stops at its limit the board is *parked* (`parked` in the ledger): it
 //!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
-//!   run side by side.  A board next to one that is being climbed to waits (no ordinary search of it starts), as the
-//!   climb may prove that board within its limit.
+//!   run side by side.  A board just outside the repeat class of one that is being climbed to waits (no ordinary job of
+//!   it starts), as the climb may prove that board within its limit; the climb into a class is seeded with the games of
+//!   the boards just outside it, the proven one it goes from included.
 //! * **The finder** (`common/lns.rs`, which `wall finders` measures; `--lns-seconds` seconds of one thread, default
 //!   1; 0: none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the
 //!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:
@@ -81,26 +105,36 @@
 //! 30) and at the end: `n`, `in_the_bag`, `prime`, `class` (the smallest board of its repeat class, or null), `lower`
 //! (`value`, `rule`, `from`: the board a relation took it from, `moves`, `promotions`: those of a game made from
 //! promotions, else null), `upper` (`value`, `rule`, `from`), `gap`, `proven`, `proven_cpu_s` (the run's CPU seconds
-//! when it was proven), `attempts`, `level`, `search_s` and `nodes` (its searches, climbs among them: their number,
-//! the number of the ordinary ones, their seconds, the finder's included, and their steps over all runs), `lns_score`
-//! (see the finder), `mapped` (its own map is made), `boosted` (a proven neighbour changed its bounds since its last
-//! search) and `parked` (a climb to it ended unproven).  `events.jsonl`, one line an event, appended: each has `t`
-//! (seconds since the run began) and `cpu` (the CPU seconds of all runs); a
-//! run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`, `seconds`, `nodes` of this search,
-//! `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual bound, null if it completed), the
-//! bounds `before` and `after`, each [L, U]; `lns_s` (the finder's seconds, 0 if it did not run), `lns_from` and
-//! `lns_found` (the scores of the game it began from and of its game, null if it did not run), `seed_from` (which game
-//! seeded the search: `n-1`, `n`, `n+1` or `lns`, null for none) and `below_proven` and `above_proven` (whether the
-//! boards n − 1 and n + 1 were proven when the job started); a search also has its `job`, `ordinary` or `climb`, and a
-//! climb its `way` (`up` or `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved`
-//! (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
-//! went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
+//! when it was proven), `attempts`, `level`, `search_s` and `nodes` (its searches, floor steps and climbs among them:
+//! their number, the number of the ordinary ones, their seconds, the finder's included, and the steps of its ordinary
+//! searches and climbs over all runs), `root` (the root's GF(2) bound, as a score; a ledger from before the floor steps
+//! has none until a run reads it), `steps` (the floor steps that completed having found nothing, each its `floor`, a
+//! score, `nodes` and `seconds`) and `stalled` (the step its limit stopped: `floor`, `nodes`, `seconds` and `tries`;
+//! null if none; a ledger from before the floor steps has neither field), `lns_score` (see the finder), `mapped` (its
+//! own map is made), `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to it
+//! ended unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu`
+//! (the CPU seconds of all runs); a run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`,
+//! `seconds`, `nodes` of this search, `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual
+//! bound, null if it completed or was a floor step), the bounds `before` and `after`, each [L, U]; `lns_s` (the
+//! finder's seconds, 0 if it did not run), `lns_from` and `lns_found` (the scores of the game it began from and of its
+//! game, null if it did not run), `seed_from` (which game seeded the search: `n-1`, `n`, `n+1` or `lns`, null for none;
+//! the boards just outside the class of the board count as `n-1` and `n+1`), `below_proven` and `above_proven` (whether
+//! the boards n − 1 and n + 1 were proven when the job started), and `forecast` and `forecast_s` (log10 of the nodes
+//! and the seconds of one thread that the rest of the board's proof is forecast to cost after the job; null for a board
+//! proven); a search also has its `job`, `ordinary` (the proof), `climb` or `floor`, and a climb its `way` (`up` or
+//! `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved` (its search proved the
+//! board), `parked`, or `moot` (a relation had proven the board while it went on); a floor step has its `floor`,
+//! `distance` (points below the root's bound), `held` (it completed having found nothing) and `outcome`: `held` (the
+//! floor is U), `proved` (it found the optimum and completed), `found` (it stopped with a set, so the floor is below L:
+//! dropped), `stalled` (the limit stopped it: kept), or `moot` (a relation proved the board, or lowered U to the floor,
+//! while it went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
 //! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
 //! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
 //! the rules and sources of its two bounds), and the run's `end` (`reason`, `proven`, `games`, and the main thread's
 //! `main_s` busy, `main_longest_s` for the longest piece, and `waited_s`: the seconds that results waited in all).
-//! The events are written out after each result.  `ckpt/`: the checkpoints of the searches that have not finished.
-//! One run at a time uses DIR (`taxman.lock`).
+//! The events are written out after each result.  `ckpt/`: the checkpoints of the searches that have not finished,
+//! `nN.ckpt` of a board's ordinary searches and climbs and `nN.floor.ckpt` of its stalled floor step.  One run at a
+//! time uses DIR (`taxman.lock`).
 //!
 //! A bound that the relations make is checked as it is made: a game must pass the referee (`replay_finished`), and
 //! L > U anywhere ends the run with an error (a bug, or a counterexample to statement U, on which every U of the frame
@@ -143,6 +177,7 @@ mod rng;
 mod support;
 
 mod book;
+mod cost;
 mod export;
 mod pool;
 mod report;
@@ -159,8 +194,8 @@ const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/strict.jsonl"
 fn usage() -> ! {
     eprintln!(
         "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] \
-         [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] \
-         [--bounds FILE] [--save-every S]\n       ledger report DIR [--known FILE]...\n       \
+         [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--floor-step P] [--floor-slack X] \
+         [--gap-unit G] [--proven FILE] [--bounds FILE] [--save-every S]\n       ledger report DIR [--known FILE]...\n       \
          ledger export DIR --bounds FILE --source NAME [--checkpoints PREFIX] [--strict FILE] [--date YYYY-MM-DD]\n       \
          ledger verify-bounds FILE [--strict FILE] [--workers P]\n       ledger games FILE [--workers P]"
     );
@@ -204,6 +239,8 @@ fn main() {
             "--max-limit" => settings.max_limit = number(&arg, args.next()),
             "--climb-limit" => settings.climb_limit = number(&arg, args.next()),
             "--lns-seconds" => settings.lns_seconds = number(&arg, args.next()),
+            "--floor-step" => settings.floor_step = number(&arg, args.next()),
+            "--floor-slack" => settings.floor_slack = number(&arg, args.next()),
             "--climb" => {
                 (settings.climb_up, settings.climb_down) = match args.next().as_deref() {
                     Some("up") => (true, false),
@@ -232,6 +269,7 @@ fn main() {
                 || settings.base <= 0.0
                 || settings.climb_limit < 0.0
                 || settings.lns_seconds < 0.0
+                || settings.floor_slack <= 0.0
                 || settings.gap_unit <= 0.0
             {
                 usage();
@@ -286,6 +324,8 @@ fn main() {
     }
 }
 
+#[cfg(test)]
+mod floor_tests;
 #[cfg(test)]
 mod store_tests;
 #[cfg(test)]

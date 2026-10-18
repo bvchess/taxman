@@ -20,8 +20,18 @@ pub const SCHEMA: u64 = 1;
 /// The rules a lower bound can have, and an upper bound.
 const LOWER_RULES: [Rule; 8] =
     [Rule::Start, Rule::Search, Rule::Lns, Rule::Given, Rule::Monotone, Rule::Ceiling, Rule::Prime, Rule::Repeat];
-const UPPER_RULES: [Rule; 8] =
-    [Rule::Root, Rule::Dual, Rule::Exhausted, Rule::Given, Rule::Monotone, Rule::Ceiling, Rule::Prime, Rule::Repeat];
+const UPPER_RULES: [Rule; 10] = [
+    Rule::Root,
+    Rule::Dual,
+    Rule::Exhausted,
+    Rule::Floor,
+    Rule::Nogoods,
+    Rule::Given,
+    Rule::Monotone,
+    Rule::Ceiling,
+    Rule::Prime,
+    Rule::Repeat,
+];
 
 /// The names of a line's fields, in the order it writes them.
 const KEYS: [&str; 15] = [
@@ -152,7 +162,7 @@ impl Line {
     /// What a line of this side and rule has and has not.
     fn check_shape(&self) -> Result<(), String> {
         let relation = self.rule.is_relation();
-        let allowed = match self.side {
+        let allowed: &[Rule] = match self.side {
             Side::Lower => &LOWER_RULES,
             Side::Upper => &UPPER_RULES,
         };

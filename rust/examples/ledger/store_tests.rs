@@ -54,6 +54,11 @@ fn partial_book(ns: &[u32], given: &[u32], found: &[u32]) -> Book {
         } else if n == 975 {
             // So loose that the bound of 976, which the run found, is the better (monotone: nothing is below 975).
             Upper { value: opt(n) + 5000, rule: Rule::Dual, from: None }
+        } else if n % 11 == 3 {
+            // A search under a floor that completed having found nothing: the floor is the bound.
+            Upper { value: opt(n) + 4 + u64::from(n % 5), rule: Rule::Floor, from: None }
+        } else if n % 13 == 2 {
+            Upper { value: opt(n) + 6 + u64::from(n % 3), rule: Rule::Nogoods, from: None }
         } else {
             Upper { value: opt(n) + 5 + u64::from(n % 7), rule: Rule::Dual, from: None }
         };
@@ -280,12 +285,25 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     for rule in [Rule::Start, Rule::Search, Rule::Monotone, Rule::Ceiling, Rule::Prime, Rule::Repeat] {
         assert!(lines.iter().any(|l| l.side == Side::Lower && l.rule == rule), "no lower bound by {rule:?}");
     }
-    for rule in [Rule::Root, Rule::Dual, Rule::Exhausted, Rule::Ceiling, Rule::Monotone, Rule::Prime, Rule::Repeat] {
+    for rule in [
+        Rule::Root,
+        Rule::Dual,
+        Rule::Exhausted,
+        Rule::Floor,
+        Rule::Nogoods,
+        Rule::Ceiling,
+        Rule::Monotone,
+        Rule::Prime,
+        Rule::Repeat,
+    ] {
         assert!(lines.iter().any(|l| l.side == Side::Upper && l.rule == rule), "no upper bound by {rule:?}");
     }
     for line in lines.iter().filter(|l| l.side == Side::Upper) {
         match line.rule {
-            Rule::Root | Rule::Dual | Rule::Exhausted => assert_eq!(line.rests_on, [line.n]),
+            Rule::Root | Rule::Dual | Rule::Exhausted | Rule::Floor | Rule::Nogoods => {
+                assert_eq!(line.rests_on, [line.n]);
+                assert_eq!(line.from, None);
+            }
             Rule::Repeat => assert!(line.rests_on.contains(&line.n) && line.rests_on.len() >= 2, "{line:?}"),
             _ => assert!(!line.rests_on.is_empty()),
         }
@@ -478,6 +496,12 @@ fn both_referees_refuse_a_tampered_file_and_name_the_line() {
     assert!(ok.1, "{}", ok.0);
     let (status, report) = python(&f.bounds, Some(&f.games), &f.strict);
     assert_eq!(status, Some(0), "{report}");
+    // The bounds of floors and nogoods are taken on record, and both referees list them with the others.
+    for rule in ["exhausted", "dual", "floor", "nogoods"] {
+        let lines = f.lines.iter().filter(|l| l.side == Side::Upper && l.rule.name() == rule).count();
+        let listed = format!("on record, not recomputed: {lines} {rule} lines; best upper bound of ");
+        assert!(lines > 0 && ok.0.contains(&listed) && report.contains(&listed), "{rule}: {}\n{report}", ok.0);
+    }
 
     // Each case edits the lines and says which line (by index) the referees must name, whether the Python one finds it too
     // (it replays games and checks arithmetic; it cannot recompute a root bound or a repeat's problem), and a part of the

@@ -15,10 +15,13 @@
 //!   ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
 //!
 //! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map, as `wall
-//! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound), the finder's games
-//! (`lns`: L only), proven games given (`given`) and boards with nothing to promote (`trivial`).  Every bound only improves: L only rises and U only
-//! falls, and a board is proven when they meet.  L > U anywhere is a violation, which [`Book::propagate`] reports as an
-//! error: a bug, or, since the U of the frame model rests on statement U, a counterexample to it.
+//! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound; `floor`, Lemma F, a
+//! search under a floor that completed having found nothing: U is the floor), the finder's games (`lns`: L only),
+//! proven games given (`given`), boards with nothing to promote (`trivial`), and the Lagrangian bound over checked
+//! nogoods (`nogoods`: U only, which `wall nogoods` makes and the ledger's runs do not yet).  Every bound only improves:
+//! L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
+//! [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on statement U, a
+//! counterexample to it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use taxman::accelerate::solution_for_promotions;
@@ -42,6 +45,11 @@ pub enum Rule {
     Search,
     Dual,
     Exhausted,
+    /// A search under a floor F that completed having found no set (U): P* <= F (Lemma F), so U is in_the_bag + F.
+    Floor,
+    /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
+    /// (U): `wall nogoods` makes it; the store takes it on record.
+    Nogoods,
     /// The game the finder found (L): large neighbourhood search, which is not sound and proves nothing; its game is a
     /// lower bound because the referee replays it.
     Lns,
@@ -55,13 +63,15 @@ pub enum Rule {
 }
 
 impl Rule {
-    pub const ALL: [Rule; 12] = [
+    pub const ALL: [Rule; 14] = [
         Rule::Trivial,
         Rule::Start,
         Rule::Root,
         Rule::Search,
         Rule::Dual,
         Rule::Exhausted,
+        Rule::Floor,
+        Rule::Nogoods,
         Rule::Lns,
         Rule::Given,
         Rule::Monotone,
@@ -78,6 +88,8 @@ impl Rule {
             Rule::Search => "search",
             Rule::Dual => "dual",
             Rule::Exhausted => "exhausted",
+            Rule::Floor => "floor",
+            Rule::Nogoods => "nogoods",
             Rule::Lns => "lns",
             Rule::Given => "given",
             Rule::Monotone => "monotone",
@@ -116,6 +128,62 @@ pub struct Upper {
     pub from: Option<u32>,
 }
 
+/// A floor step that completed having found no set: the search under the floor `floor` (a score) explored its whole
+/// tree, which took `nodes` steps and `seconds` (over all its tries).  Its cost, against how far below the root's
+/// bound the floor is, is a point of the board's line (`cost.rs`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Step {
+    pub floor: u64,
+    pub nodes: u64,
+    pub seconds: f64,
+}
+
+/// A floor step that its limit stopped with nothing found: its checkpoint is kept, good only under the floor `floor`
+/// (a score), and the step is tried again under it with the limit doubled, `tries` times so far.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Stalled {
+    pub floor: u64,
+    pub nodes: u64,
+    pub seconds: f64,
+    pub tries: u32,
+}
+
+impl Step {
+    fn to_json(self) -> Json {
+        Json::object([
+            ("floor", Json::from(self.floor)),
+            ("nodes", Json::from(self.nodes)),
+            ("seconds", Json::from(self.seconds)),
+        ])
+    }
+
+    fn from_json(json: &Json) -> Result<Step, String> {
+        let get = |name: &str| json.get(name).ok_or_else(|| format!("a step with no \"{name}\""));
+        Ok(Step {
+            floor: get("floor")?.as_u64().ok_or("bad step \"floor\"")?,
+            nodes: get("nodes")?.as_u64().ok_or("bad step \"nodes\"")?,
+            seconds: get("seconds")?.as_f64().ok_or("bad step \"seconds\"")?,
+        })
+    }
+}
+
+impl Stalled {
+    fn to_json(self) -> Json {
+        Json::object([
+            ("floor", Json::from(self.floor)),
+            ("nodes", Json::from(self.nodes)),
+            ("seconds", Json::from(self.seconds)),
+            ("tries", Json::from(self.tries)),
+        ])
+    }
+
+    fn from_json(json: &Json) -> Result<Stalled, String> {
+        let step = Step::from_json(json)?;
+        let tries = json.get("tries").and_then(Json::as_u32).ok_or("a stalled step with no \"tries\"")?;
+        Ok(Stalled { floor: step.floor, nodes: step.nodes, seconds: step.seconds, tries })
+    }
+}
+
 /// What the ledger keeps of a board size.
 #[derive(Clone, Debug, Default)]
 pub struct Entry {
@@ -124,12 +192,19 @@ pub struct Entry {
     pub prime: bool,
     pub lower: Option<Lower>,
     pub upper: Option<Upper>,
-    /// The searches made of this board, the level of the next one (its limit doubles with each), and their seconds
-    /// (the finder's included) and steps in all.
+    /// The searches made of this board (ordinary ones, climbs and floor steps), the level of the next ordinary one
+    /// (its limit doubles with each), and their seconds (the finder's included) in all.
     pub attempts: u32,
     pub level: u32,
     pub search_s: f64,
+    /// The steps of the board's ordinary searches and climbs over all runs; the floor steps' are in `steps` and `stalled`.
     pub nodes: u64,
+    /// The root's GF(2) bound, as a score: how far below it a floor is measures the cost of the step (`cost.rs`).
+    /// Known once the board is mapped; a ledger written before the floor steps has none until a run reads it.
+    pub root: Option<u64>,
+    /// The floor steps that completed, in order, and the one the limit stopped, if any.
+    pub steps: Vec<Step>,
+    pub stalled: Option<Stalled>,
     /// The score of the best seed the board had when the finder last ran on it, its own game included (none: it has
     /// not run): the finder runs again before a search only if the best seed is another score.
     pub lns_score: Option<u64>,
@@ -183,6 +258,9 @@ impl Entry {
             ("level", Json::from(self.level)),
             ("search_s", Json::from(self.search_s)),
             ("nodes", Json::from(self.nodes)),
+            ("root", self.root.map_or(Json::Null, Json::from)),
+            ("steps", Json::array(self.steps.iter().copied().map(Step::to_json))),
+            ("stalled", self.stalled.map_or(Json::Null, |s| s.to_json())),
             ("lns_score", self.lns_score.map_or(Json::Null, Json::from)),
             ("mapped", Json::from(self.mapped)),
             ("boosted", Json::from(self.boosted)),
@@ -227,6 +305,18 @@ impl Entry {
             level: number("level")? as u32,
             search_s: field("search_s")?.as_f64().ok_or("bad \"search_s\"")?,
             nodes: number("nodes")?,
+            // Ledgers written before the floor steps have none of the next three.
+            root: line.get("root").and_then(Json::as_u64),
+            steps: match line.get("steps") {
+                None | Some(Json::Null) => Vec::new(),
+                Some(steps) => {
+                    steps.as_arr().ok_or("bad \"steps\"")?.iter().map(Step::from_json).collect::<Result<_, _>>()?
+                }
+            },
+            stalled: match line.get("stalled") {
+                None | Some(Json::Null) => None,
+                Some(stalled) => Some(Stalled::from_json(stalled)?),
+            },
             // Ledgers written before the finder have no such field.
             lns_score: line.get("lns_score").and_then(Json::as_u64),
             mapped: field("mapped")?.as_bool().ok_or("bad \"mapped\"")?,

@@ -92,25 +92,41 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let search_s: f64 = entries.iter().map(|e| e.search_s).sum();
     let _ =
         writeln!(w, "CPU {cpu:.0} s ({:.2} core-hours); {searches} searches, {search_s:.0} s of them", cpu / 3600.0);
-    // The climbs of each way (a run before the ways had only the climbs up, and no `way`).
+    // The climbs of each way (a run before the ways had only the climbs up, and no `way`), and the floor steps, each
+    // counted by how it ended.
+    let text = |e: &Json, field: &str| e.get(field).and_then(Json::as_str).map(str::to_owned);
+    let outcomes =
+        |jobs: &[&Json], name: &str| jobs.iter().filter(|e| text(e, "outcome").as_deref() == Some(name)).count();
+    let seconds = |jobs: &[&Json]| jobs.iter().filter_map(|e| e.get("seconds")?.as_f64()).sum::<f64>().round() as u64;
     for way in ["up", "down"] {
-        let text = |e: &Json, field: &str| e.get(field).and_then(Json::as_str).map(str::to_owned);
         let climbs: Vec<&Json> = events
             .iter()
             .filter(|e| text(e, "job").as_deref() == Some("climb") && text(e, "way").as_deref().unwrap_or("up") == way)
             .collect();
-        let by_outcome = |name: &str| climbs.iter().filter(|e| text(e, "outcome").as_deref() == Some(name)).count();
-        let climb_s = climbs.iter().filter_map(|e| e.get("seconds")?.as_f64()).sum::<f64>().round() as u64;
         let _ = writeln!(
             w,
-            "climbs {way}: {} among the searches, {climb_s} s of them: {} proved their board, {} parked, {} moot (the \
-             board was proven meanwhile)",
+            "climbs {way}: {} among the searches, {} s of them: {} proved their board, {} parked, {} moot (the board \
+             was proven meanwhile)",
             climbs.len(),
-            by_outcome("proved"),
-            by_outcome("parked"),
-            by_outcome("moot"),
+            seconds(&climbs),
+            outcomes(&climbs, "proved"),
+            outcomes(&climbs, "parked"),
+            outcomes(&climbs, "moot"),
         );
     }
+    let steps: Vec<&Json> = events.iter().filter(|e| text(e, "job").as_deref() == Some("floor")).collect();
+    let _ = writeln!(
+        w,
+        "floor steps: {} among the searches, {} s of them: {} lowered U, {} proved their board, {} found a set and \
+         stopped, {} stalled, {} moot",
+        steps.len(),
+        seconds(&steps),
+        outcomes(&steps, "held"),
+        outcomes(&steps, "proved"),
+        outcomes(&steps, "found"),
+        outcomes(&steps, "stalled"),
+        outcomes(&steps, "moot"),
+    );
 
     // The finder: its runs (a map or a search with an `lns_found`), those that found a better game than they began
     // from, and the boards whose lower bound at the end is its game.
@@ -147,17 +163,18 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let by_relations = proven.iter().filter(|e| e.upper.expect("proven").rule.is_relation()).count();
     let _ = writeln!(
         w,
-        "by the upper bound: search {} (exhausted {}, dual {}), relations {} (ceiling {}, prime {}, repeat {}, \
-         monotone {}), other {}",
-        by_upper(&[Rule::Exhausted, Rule::Dual]),
+        "by the upper bound: search {} (exhausted {}, dual {}, floor {}), relations {} (ceiling {}, prime {}, repeat \
+         {}, monotone {}), other {}",
+        by_upper(&[Rule::Exhausted, Rule::Dual, Rule::Floor]),
         by_upper(&[Rule::Exhausted]),
         by_upper(&[Rule::Dual]),
+        by_upper(&[Rule::Floor]),
         by_relations,
         by_upper(&[Rule::Ceiling]),
         by_upper(&[Rule::Prime]),
         by_upper(&[Rule::Repeat]),
         by_upper(&[Rule::Monotone]),
-        by_upper(&[Rule::Trivial, Rule::Given, Rule::Root]),
+        by_upper(&[Rule::Trivial, Rule::Given, Rule::Root, Rule::Nogoods]),
     );
 
     // The curve: boards proven against CPU.
