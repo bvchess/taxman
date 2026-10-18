@@ -18,7 +18,19 @@
 #   GAMES_MADE   the games whose proofs make nodes (default "3213 3260 3129 2976 3267 2700"), each a proof of 110,000
 #                to 440,000 steps on one thread
 #   GAMES_PROBE  the probe's fixtures in testdata/perf (default "936 1215")
-#   KEEP         nodes kept of each source of a game, spread over the gaps of those the bound leaves open (default 60)
+#   A1           1 to measure the A1 bounds (wall/fields.rs) besides the nogood bound: the root fit of each game in the
+#                preparation (the fit of FITS where it has one, else FIT_SECONDS of the study's main arm), and at every
+#                node the warm refit (A1_PRICINGS evaluations at most) and the node's own master with the exact checks
+#                and the separation (A1_SECONDS at most, then the node is counted as capped).  The run is sized for one
+#                c8g.16xlarge (64 CPUs, WORKERS 64) and an hour at the most: README.md, "The A1 bounds".  Default 0
+#   FITS         the directory of root fits, `nN.json`, that A1 takes before fitting (default bench/fields/fits: 936's
+#                is not there, 1215's, 2700's and 3300's are; the others are fitted)
+#   FIT_SECONDS  the seconds of a root fit that A1 makes (default 300, the E3 pilot's; the 60 s of E2 lose under 0.05 of
+#                the gap below a gap of 800 and up to 0.15 above)
+#   A1_PRICINGS  the most evaluations of the warm refit (default 20, the E3 pilot's)
+#   A1_SECONDS   the seconds a node's own master has (default 30)
+#   KEEP         nodes kept of each source of a game, spread over the gaps of those the bound leaves open (default 60,
+#                100 with A1=1: the nodes of the made and probe games number about 130 to 250 each)
 #   PATHS        nodes a game on the way to its optimum, for the bound's validity (default 3)
 #   CPU          CPU seconds the finder and the sound search each get for a game's pool of nogoods (default 10)
 #   ROOT_STEPS   subgradient steps of the fit at the root (default 200)
@@ -53,6 +65,17 @@ games_made="${GAMES_MADE-3213 3260 3129 2976 3267 2700}"
 games_probe="${GAMES_PROBE-936 1215}"
 sub_flag=""
 if [ "${SUB:-1}" = 1 ]; then sub_flag="--sub-nogoods"; fi
+# The A1 bounds: the flags of the preparation and of the measurement (strings, since the functions below run in
+# `bash -c` and an array does not cross).
+a1="${A1:-0}"
+keep="${KEEP:-60}"
+a1_prepare_flags=""
+a1_measure_flags=""
+if [ "$a1" = 1 ]; then
+    keep="${KEEP:-100}"
+    a1_prepare_flags="--fit-seconds ${FIT_SECONDS:-300} --fits ${FITS:-bench/fields/fits}"
+    a1_measure_flags="--a1 --a1-pricings ${A1_PRICINGS:-20} --a1-seconds ${A1_SECONDS:-30}"
+fi
 
 if [ ! -x "$bin/wall" ] || [ ! -x "$bin/perf" ]; then
     echo "no $bin/wall or $bin/perf: run STUDIES=1 tools/cloud/setup.sh first (wall needs --features studies)" >&2
@@ -76,15 +99,17 @@ fixture() {
         > "$out/logs/fixture-$game.out" 2>&1 || fault "fixture $game: status $?"
 }
 prepare() {
-    local game="$1" file
+    local game="$1" file fit
     file="$out/prep/n$(printf %04d "$game").choice"
-    [ -s "$file" ] && return 0
+    fit="$out/prep/n$(printf %04d "$game").fit.json"
+    [ -s "$file" ] && { [ "$a1" != 1 ] || [ -s "$fit" ]; } && return 0
+    # shellcheck disable=SC2086 # the A1 flags are words
     "$bin/wall" choice-prepare --known "$known" --suite "$suite" --fixtures "$out/fixtures" --prep "$out/prep" \
-        --cpu "${CPU:-10}" --steps "${ROOT_STEPS:-200}" --keep "${KEEP:-60}" --paths "${PATHS:-3}" "$game" \
+        --cpu "${CPU:-10}" --steps "${ROOT_STEPS:-200}" --keep "$keep" --paths "${PATHS:-3}" $a1_prepare_flags "$game" \
         > "$out/logs/prepare-$game.out" 2> "$out/logs/prepare-$game.err" || fault "prepare $game: status $?"
 }
 export -f fixture prepare fault
-export out bin known suite
+export out bin known suite a1 keep a1_prepare_flags
 
 stamp "fixtures"
 # shellcheck disable=SC2086 # lists of games
@@ -103,9 +128,9 @@ worker() {
     # shellcheck disable=SC2086
     for game in $games_suite $games_made $games_probe; do
         [ -s "$out/prep/n$(printf %04d "$game").choice" ] || { fault "measure $game: no prepared file"; continue; }
-        # shellcheck disable=SC2086 # an option, or nothing
+        # shellcheck disable=SC2086 # options, or nothing
         "$bin/wall" choice --prep "$out/prep" --results "$out/measure" --worker "$i" --claims "$out/claims" \
-            --node-steps "${NODE_STEPS:-200}" --cap "${LIMIT:-900}" $sub_flag "$game" \
+            --node-steps "${NODE_STEPS:-200}" --cap "${LIMIT:-900}" $sub_flag $a1_measure_flags "$game" \
             >> "$out/logs/measure-$i.out" 2>> "$out/logs/measure-$i.err" || fault "choice $game worker $i: status $?"
     done
 }

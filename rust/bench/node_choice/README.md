@@ -30,13 +30,15 @@ node it records:
    searcher held at its end besides the pool's (`sub`: hindsight, an upper limit on what the searcher's own table
    could give at the node);
 4. **the times** of today's bound at the node (`today_s`, from the root's matroids as a search starts a unit),
-   and of the matroids built afresh (`graph_s`) and the GF(2) bound solved on them (`plain_s`), the base of the ratio.
+   and of the matroids built afresh (`graph_s`) and the GF(2) bound solved on them (`plain_s`), the base of the ratio;
+5. **the A1 bounds**, with `--a1` ([below](#the-a1-bounds)): two more strong bounds, each with its value, whether it
+   cuts and its CPU seconds (`a1`).
 
 `analyze.py` reads the lines and prints the tables the entry will quote: the sample; the share of the open nodes each
-bound cuts by gap and by the decade of the subtree; and for a range of N, the policy "compute the strong bound where
-the forecast subtree exceeds N": the nodes it is computed at, the nodes it cuts, and the net saving, the CPU seconds of
-the subtrees it cuts less the CPU seconds of the bounds computed, as a share of what searching every sampled node
-costs, with the best N.  The forecast is a fit of log10(subtree) to the gap on the completed solves (`--model fit`) or
+bound cuts by gap and by the decade of the subtree; how the A1 bounds ended; and for a range of N, the policy "compute
+the strong bound where the forecast subtree exceeds N" (a table for the nogood bounds and one for the A1 bounds): the
+nodes it is computed at, the nodes it cuts, and the net saving, the CPU seconds of the subtrees it cuts less the CPU
+seconds of the bounds computed, as a share of what searching every sampled node costs, with the best N.  The forecast is a fit of log10(subtree) to the gap on the completed solves (`--model fit`) or
 the floor entry's decade per 147 points with the intercept fitted (`--model floor`); `--steps K` reads only the first K
 steps of every fit.  `test_analyze.py` checks the arithmetic on made-up lines (`python3 -I bench/node_choice/test_analyze.py`).
 
@@ -63,16 +65,20 @@ target/debug/examples/wall choice --prep P/prep --results P/out --node-steps 50 
 python3 -I bench/node_choice/analyze.py P/out
 ```
 
-A suite game is prepared with `--suite bench/tuning/suite.jsonl`; `choice` skips the nodes `P/out` already has, and
+With the A1 bounds, add `--fit-seconds 60 --fits bench/fields/fits` to the preparation and `--a1 --a1-seconds 10` to the
+measurement.  A suite game is prepared with `--suite bench/tuning/suite.jsonl`; `choice` skips the nodes `P/out` already has, and
 `--claims DIR` makes a node taken by whichever worker makes its file in `DIR` first.  Tests: `cargo test --features
-studies --example wall -- choice` (a game below 1000: no step of a fit goes below the best completion that an
-exhaustive search of the node finds, a cut agrees with the solve from three incumbents, and a run again goes on where it was).
+studies --example wall -- choice` (a game below 1000: no step of a fit, and neither A1 bound, goes below the best
+completion that an exhaustive search of the node finds, a cut agrees with the solve from three incumbents, and a run
+again goes on where it was); `-- fields` tests the A1 code (the study's: the simplex, the signed matroids, the cores; its
+intersection against the crate's bound at 120, 936, 2700 and 3300; its root fits of `bench/fields/fits` at 987, 1215, 2700
+and 3300 giving their recorded bounds again).
 
 In the cloud, on one `c8g.4xlarge` (16 CPUs), once `STUDIES=1 tools/cloud/setup.sh` has the release examples, built or
 taken from the build cache (`STUDIES=1` for the study tools, `wall` among them, which a default build skips):
 [`cloud.sh`](cloud.sh), whose comment has the environment (`WORKERS`, `GAMES_SUITE`, `GAMES_MADE`, `GAMES_PROBE`,
-`KEEP`, `PATHS`, `CPU`, `ROOT_STEPS`, `NODE_STEPS`, `LIMIT`, `SUB`, `OUT`, `S3_DEST`, `POWEROFF`).  Its stages, from
-`rust/`:
+`KEEP`, `PATHS`, `CPU`, `ROOT_STEPS`, `NODE_STEPS`, `LIMIT`, `SUB`, `A1`, `FITS`, `FIT_SECONDS`, `A1_PRICINGS`,
+`A1_SECONDS`, `OUT`, `S3_DEST`, `POWEROFF`).  Its stages, from `rust/`:
 
 1. the six proofs that make the fixtures, one process each (`perf make-nodes`, a few minutes);
 2. `wall choice-prepare` for the twelve games, one process each (the finder and the sound search 10 CPU s each for the
@@ -118,8 +124,57 @@ minutes) and the pool (about a minute).  With the build of `setup.sh` (about 10 
 `c8g.16xlarge`'s $0.68, and the volume and the timer's slack; $0.64 an hour on demand).  The timer of 90 minutes
 bounds it at about $0.26 at spot for the machine.
 
+## The A1 bounds
+
+The question: does [the A1 bound](../../docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md)
+(the GF(2) frame matroids and signed GF(3) ones, coupled by multipliers fitted by column generation), fitted fully at a
+node, cut the nodes that head big subtrees?  Its [E3 pilot](../../docs/experiments/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md)
+cut trees fivefold in a branch and bound; this asks it at the nodes that matter, as the nogood bound was asked.  The
+code is [`examples/wall/fields.rs`](../../examples/wall/fields.rs) (the study's, from commit 8753189, adapted), and at
+each node `choice --a1` measures two bounds beside the nogood bound:
+
+* **r2**, the study's warm refit: the multipliers of the game's root fit (one evaluation of the bound), then at most
+  `--a1-pricings` (20) more evaluations of a column generation started from the root's master columns and rank
+  inequalities that still hold at the node, with no exact check and no separation;
+* **full**, the node's own master: from the root fit's multipliers and signings, the column generation with the exact
+  checks and the separation of the node's own cores, stopping at the first bound that cuts, within `--a1-seconds`
+  (30); a node it did not cut within that is *capped*.
+
+Each is the lowest value of the bound it evaluated (valid at any multipliers and signings: Theorems 14 and 15 of
+heuristics/THEORY.md), so a bound that ran out of time is a bound, not a failure.  `choice-prepare --fit-seconds S`
+makes each game's root fit once (`nNNNN.fit.json` in the prepared directory; `--fits DIR` takes a game's fit from
+`DIR/nN.json` first, `bench/fields/fits` having 1215's, 2700's and 3300's), the main arm of the study, certified, within S
+seconds; every worker reads it back, checking that it gives its bound again.  A node's line has `a1`: `build_s` and
+for each of `r2` and `full` `bound`, `cut`, `stop`, `capped`, `pricings`, `s` (`choice.rs` defines them).  A bound
+below a path node's best completion, or a cut of a node whose subtree holds a better set, is a fault, as for the nogood
+bound.  `analyze.py` adds the A1 bounds to its tables of the cut share by gap and by subtree decade, a table of how
+they ended, and the policy table, the cost of an A1 bound being `build_s` and its `s`.
+
+**The run** is the same script with `A1=1`, sized for one `c8g.16xlarge` (64 CPUs, `WORKERS` 64) and an hour at the
+most (user data as above with `shutdown -h +60` and `S3_DEST`, and `A1=1` in the environment of `cloud.sh`; `KEEP` 100,
+the root fits 300 s):
+
+1. the fixtures, as before (the six proofs in parallel; 2 to 4 minutes);
+2. the preparation, a process a game, the twelve at once (the pool 20 CPU s, the A1 root fit up to `FIT_SECONDS` 300 for
+   the nine games without a fit on file; about 6 minutes);
+3. the measurement on 64 workers, the heaviest node first: about 1,000 nodes, the suite's and the made and probe games'
+   (`KEEP` 100 of each source), their solves about 6,000 CPU s as before (the dearest node 314 s), the nogood fits about
+   1,400, and the A1 bounds: `r2` about 0.1 to 1 s a node, `full` up to 30 s a node, which the nodes of gap 300 and
+   more are expected to use (about 250 nodes), so some 10,000 CPU s; 8 to 12 minutes with the dearest node last;
+4. `analyze.py` three ways, as before.
+
+That is **about 30 to 40 minutes** of the machine with the build cache (10 minutes more with a build), **about 40 cents
+at spot** ($0.68 an hour for a `c8g.16xlarge`, [STATUS](../../docs/STATUS.md)), $1.50 on demand ($2.55 an hour, $0.0399 a vCPU-hour;
+[RUNBOOK section 9.2](../../tools/cloud/RUNBOOK.md#92-what-it-costs)); the timer of 60 minutes bounds it at **$0.68 at spot** ($2.55 on
+demand) plus the volume.  The figures are estimates: the A1 bounds' times at 3300 to 3441 are not known (a pricing is 1.2
+to 2.9 ms at 2200 to 3400, a node's master 100 to 1,000 of them), and a `full` that overruns its 30 s by a few seconds
+in the exact checks makes the run longer, not dearer.
+
 ## What it does not measure
 
+* **The A1 bounds start from the root's fit.**  There is no parent to hand a node its state, so `r2` has the root's
+  columns that hold the node's promotions (few at depth) and all its inequalities, where the pilot's `r2` had its
+  parent's: its cut share here is a lower bound on what a tree would get, and `full` does not use the state at all.
 * **The sample is not a search's population.**  Nodes are spread over gaps (the made and probe sources) or picked for
   size (the suite), so the shares of the total are the sample's; the cut share by gap, and the break-even forecast,
   are what carries over.
