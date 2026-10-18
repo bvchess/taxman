@@ -1,0 +1,221 @@
+876 lines, 840 open nodes with a solve, 0 capped
+forecast (floor): log10(subtree) = 0.12 + 0.00680 gap, a decade per 147 points, r2 0.855, over the 840 completed solves
+
+The sample: open nodes by game and source (strong/today: median of the fit's seconds over today's)
+
+   n   source  nodes  capped  gap min  gap max  subtree med  subtree max  us/step  today ms  strong/today
+ 936  fixture    100       0        0      131            2          101      284      0.11            11
+1215  fixture    100       0        1      212           10         2997       65      0.21            35
+2700  fixture    100       0        0      730           22       112464      137      0.74           173
+2976  fixture    100       0        0      775           12       143370      146      0.92           171
+3129  fixture    100       0        0      923           24       304091      197      1.23           190
+3213  fixture    100       0        0      933           18       450606      250      1.58           179
+3260  fixture    100       0        0      942           16       390058      256      1.62           167
+3267  fixture    100       0        0      794           18       150748      289      1.71           171
+3300    suite     10       0      753      998       326441      1248609      249      2.18           228
+3425    suite     10       0      793      970       338325       721555      297      2.56           203
+3440    suite     10       0      746     1001       159786       870739      336      2.69           233
+3441    suite     10       0      776      971       174258      1099410      300      2.27           200
+
+Share of the open nodes each strong bound cuts, by gap
+
+    gap  nodes  root  strong  sub  a1r2  a1full  subtree med  strong s med  a1r2 s med  a1full s med
+   0-49    199   53%     91%  93%   90%    100%            2       0.00198      0.0114        0.0117
+  50-99    156   25%     71%  71%   61%     99%            5       0.00701      0.0234          0.13
+100-199    208   10%     22%  20%   24%     90%           20         0.124      0.0494          1.18
+200-299    124    0%      3%   4%    3%     77%           70         0.248      0.0783          6.35
+300-399     69    0%      0%   1%    1%     65%          175         0.308      0.0902          16.3
+400-499     31    0%      0%   0%    0%     16%          706         0.333       0.103            30
+500-599      6    0%      0%   0%    0%      0%         1167         0.378      0.0994            30
+600-699      1    0%      0%   0%    0%      0%         9046         0.406       0.135            30
+700-799      9    0%      0%   0%    0%      0%        82172         0.509       0.186            30
+800-899     16    0%      0%   0%    0%      0%       160644         0.493        0.15            30
+900-999     20    0%      0%   0%    0%      0%       473054         0.515       0.163            30
+  1000+      1    0%      0%   0%    0%      0%       676043         0.538       0.175            30
+
+Share of the open nodes each strong bound cuts, by the decade of their subtree
+
+subtree  nodes  root  strong  sub  a1r2  a1full  gap med
+    1e0    368   42%     78%  79%   76%    100%       48
+    1e1    262    4%     21%  20%   18%     96%      155
+    1e2    144    0%      0%   0%    0%     46%      289
+    1e3     20    0%      0%   0%    0%      0%      432
+    1e4     12    0%      0%   0%    0%      0%      801
+    1e5     31    0%      0%   0%    0%      0%      901
+    1e6      3    0%      0%   0%    0%      0%      971
+
+The A1 bounds: share of the open nodes cut, capped without a cut, the median share of the excess closed, the dearest bound's CPU s, by gap
+
+    gap  nodes  r2 cut  r2 capped  r2 closed  r2 max s  full cut  full capped  full closed  full max s
+   0-49    199     90%         9%       100%     0.135      100%           0%         100%       0.538
+  50-99    156     61%        38%       100%     0.142       99%           0%         100%        7.51
+100-199    208     24%        76%        67%     0.141       90%           3%         100%          30
+200-299    124      3%        96%        55%     0.149       77%          15%         100%        30.1
+300-399     69      1%        99%        53%     0.149       65%          29%         100%        30.2
+400-499     31      0%       100%        52%     0.145       16%          84%          89%        30.1
+500-699      7      0%       100%        48%     0.223        0%         100%          79%          30
+   700+     46      0%       100%        29%      2.95        0%         100%          42%        30.1
+
+Policies: the strong bound where the forecast subtree exceeds N (all: 840 nodes, searching them all costs 4.46e+03 CPU s; applied: the nodes root is computed at)
+
+    N  gap above  applied  root cut  root net s  root share  strong cut  strong net s  strong share  sub cut  sub net s  sub share
+    0          -      840       165       -1.75         -0%         342          -126           -3%      343       -128        -3%
+1e+01        129      418        10       -1.13         -0%          30          -112           -3%       28       -113        -3%
+3e+01        202      269         0      -0.817         -0%           4         -87.2           -2%        6      -88.1        -2%
+1e+02        276      181         0      -0.585         -0%           2         -65.6           -1%        3      -66.5        -1%
+3e+02        349      111         0      -0.385         -0%           0         -45.3           -1%        0        -46        -1%
+1e+03        423       78         0      -0.288         -0%           0         -34.7           -1%        0      -35.3        -1%
+3e+03        496       53         0      -0.212         -0%           0         -26.4           -1%        0      -26.9        -1%
+1e+04        570       47         0      -0.193         -0%           0         -24.3           -1%        0      -24.7        -1%
+3e+04        643       46         0       -0.19         -0%           0         -23.9           -1%        0      -24.3        -1%
+1e+05        717       46         0       -0.19         -0%           0         -23.9           -1%        0      -24.3        -1%
+3e+05        790       39         0      -0.163         -0%           0         -20.5           -0%        0      -20.9        -0%
+1e+06        864       26         0      -0.109         -0%           0         -13.7           -0%        0      -13.9        -0%
+3e+06        937       13         0     -0.0555         -0%           0         -7.05           -0%        0      -7.15        -0%
+1e+07       1011        0         0           0          0%           0             0            0%        0          0         0%
+best for root: none (every policy loses)
+best for strong: none (every policy loses)
+best for sub: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (made (2700-3267): 600 nodes, searching them all costs 374 CPU s; applied: the nodes root is computed at)
+
+    N  gap above  applied  root cut  root net s  root share  strong cut  strong net s  strong share  sub cut  sub net s  sub share
+    0          -      600       126       -1.51         -0%         208          -103          -27%      208       -104       -28%
+1e+01        129      347        10      -0.943         -0%          30         -89.3          -24%       28      -90.4       -24%
+3e+01        202      226         0      -0.649         -0%           4           -66          -18%        6      -66.5       -18%
+1e+02        276      141         0      -0.418         -0%           2         -44.6          -12%        3        -45       -12%
+3e+02        349       71         0      -0.218         -0%           0         -24.3           -6%        0      -24.6        -7%
+1e+03        423       38         0      -0.121         -0%           0         -13.7           -4%        0      -13.9        -4%
+3e+03        496       13         0     -0.0456         -0%           0         -5.39           -1%        0      -5.45        -1%
+1e+04        570        7         0     -0.0263         -0%           0         -3.25           -1%        0      -3.26        -1%
+3e+04        643        6         0     -0.0229         -0%           0         -2.84           -1%        0      -2.86        -1%
+1e+05        717        6         0     -0.0229         -0%           0         -2.84           -1%        0      -2.86        -1%
+3e+05        790        4         0     -0.0173         -0%           0          -2.2           -1%        0      -2.21        -1%
+1e+06        864        3         0     -0.0127         -0%           0         -1.59           -0%        0       -1.6        -0%
+3e+06        937        1         0    -0.00446         -0%           0        -0.572           -0%        0     -0.576        -0%
+1e+07       1011        0         0           0          0%           0             0            0%        0          0         0%
+best for root: none (every policy loses)
+best for strong: none (every policy loses)
+best for sub: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (probe (936, 1215): 200 nodes, searching them all costs 0.893 CPU s; applied: the nodes root is computed at)
+
+    N  gap above  applied  root cut  root net s  root share  strong cut  strong net s  strong share  sub cut  sub net s  sub share
+    0          -      200        39     -0.0794         -9%         134          -2.4         -269%      135      -2.42      -271%
+1e+01        129       31         0     -0.0168         -2%           0         -1.33         -149%        0      -1.34      -150%
+3e+01        202        3         0    -0.00168         -0%           0        -0.144          -16%        0     -0.146       -16%
+1e+02        276        0         0           0          0%           0             0            0%        0          0         0%
+3e+02        349        0         0           0          0%           0             0            0%        0          0         0%
+1e+03        423        0         0           0          0%           0             0            0%        0          0         0%
+3e+03        496        0         0           0          0%           0             0            0%        0          0         0%
+1e+04        570        0         0           0          0%           0             0            0%        0          0         0%
+3e+04        643        0         0           0          0%           0             0            0%        0          0         0%
+1e+05        717        0         0           0          0%           0             0            0%        0          0         0%
+3e+05        790        0         0           0          0%           0             0            0%        0          0         0%
+1e+06        864        0         0           0          0%           0             0            0%        0          0         0%
+3e+06        937        0         0           0          0%           0             0            0%        0          0         0%
+1e+07       1011        0         0           0          0%           0             0            0%        0          0         0%
+best for root: none (every policy loses)
+best for strong: none (every policy loses)
+best for sub: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (suite (3300-3441): 40 nodes, searching them all costs 4.09e+03 CPU s; applied: the nodes root is computed at)
+
+    N  gap above  applied  root cut  root net s  root share  strong cut  strong net s  strong share  sub cut  sub net s  sub share
+    0          -       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+1e+01        129       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+3e+01        202       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+1e+02        276       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+3e+02        349       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+1e+03        423       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+3e+03        496       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+1e+04        570       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+3e+04        643       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+1e+05        717       40         0      -0.167         -0%           0           -21           -1%        0      -21.4        -1%
+3e+05        790       35         0      -0.146         -0%           0         -18.3           -0%        0      -18.7        -0%
+1e+06        864       23         0     -0.0963         -0%           0         -12.1           -0%        0      -12.3        -0%
+3e+06        937       12         0     -0.0511         -0%           0         -6.48           -0%        0      -6.57        -0%
+1e+07       1011        0         0           0          0%           0             0            0%        0          0         0%
+best for root: none (every policy loses)
+best for strong: none (every policy loses)
+best for sub: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (all: 840 nodes, searching them all costs 4.46e+03 CPU s; applied: the nodes a1r2 is computed at)
+
+    N  gap above  applied  a1r2 cut  a1r2 net s  a1r2 share  a1full cut  a1full net s  a1full share
+    0          -      840       329       -55.6         -1%         686     -5.77e+03         -129%
+1e+01        129      418        35       -44.1         -1%         266     -5.64e+03         -126%
+3e+01        202      269         5       -35.7         -1%         138     -4.89e+03         -110%
+1e+02        276      181         2       -28.9         -1%          75     -3.92e+03          -88%
+3e+02        349      111         0       -22.8         -1%          23     -2.98e+03          -67%
+1e+03        423       78         0       -19.6         -0%           4      -2.3e+03          -52%
+3e+03        496       53         0       -17.1         -0%           0     -1.59e+03          -36%
+1e+04        570       47         0       -16.4         -0%           0     -1.41e+03          -32%
+3e+04        643       46         0       -16.2         -0%           0     -1.38e+03          -31%
+1e+05        717       46         0       -16.2         -0%           0     -1.38e+03          -31%
+3e+05        790       39         0       -14.5         -0%           0     -1.17e+03          -26%
+1e+06        864       26         0         -10         -0%           0          -780          -17%
+3e+06        937       13         0       -4.88         -0%           0          -390           -9%
+1e+07       1011        0         0           0          0%           0             0            0%
+best for a1r2: none (every policy loses)
+best for a1full: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (made (2700-3267): 600 nodes, searching them all costs 374 CPU s; applied: the nodes a1r2 is computed at)
+
+    N  gap above  applied  a1r2 cut  a1r2 net s  a1r2 share  a1full cut  a1full net s  a1full share
+    0          -      600       189       -47.6        -13%         500     -4.33e+03        -1157%
+1e+01        129      347        35       -37.4        -10%         248     -4.22e+03        -1128%
+3e+01        202      226         5       -29.4         -8%         138     -3.65e+03         -975%
+1e+02        276      141         2       -22.7         -6%          75     -2.72e+03         -726%
+3e+02        349       71         0       -16.6         -4%          23     -1.78e+03         -475%
+1e+03        423       38         0       -13.4         -4%           4      -1.1e+03         -293%
+3e+03        496       13         0       -10.9         -3%           0          -390         -104%
+1e+04        570        7         0       -10.2         -3%           0          -210          -56%
+3e+04        643        6         0         -10         -3%           0          -180          -48%
+1e+05        717        6         0         -10         -3%           0          -180          -48%
+3e+05        790        4         0       -9.09         -2%           0          -120          -32%
+1e+06        864        3         0        -6.5         -2%           0           -90          -24%
+3e+06        937        1         0       -2.95         -1%           0           -30           -8%
+1e+07       1011        0         0           0          0%           0             0            0%
+best for a1r2: none (every policy loses)
+best for a1full: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (probe (936, 1215): 200 nodes, searching them all costs 0.893 CPU s; applied: the nodes a1r2 is computed at)
+
+    N  gap above  applied  a1r2 cut  a1r2 net s  a1r2 share  a1full cut  a1full net s  a1full share
+    0          -      200       140       -1.77       -198%         186          -233       -26051%
+1e+01        129       31         0      -0.554        -62%          18          -213       -23806%
+3e+01        202        3         0      -0.105        -12%           0         -38.6        -4322%
+1e+02        276        0         0           0          0%           0             0            0%
+3e+02        349        0         0           0          0%           0             0            0%
+1e+03        423        0         0           0          0%           0             0            0%
+3e+03        496        0         0           0          0%           0             0            0%
+1e+04        570        0         0           0          0%           0             0            0%
+3e+04        643        0         0           0          0%           0             0            0%
+1e+05        717        0         0           0          0%           0             0            0%
+3e+05        790        0         0           0          0%           0             0            0%
+1e+06        864        0         0           0          0%           0             0            0%
+3e+06        937        0         0           0          0%           0             0            0%
+1e+07       1011        0         0           0          0%           0             0            0%
+best for a1r2: none (every policy loses)
+best for a1full: none (every policy loses)
+
+Policies: the strong bound where the forecast subtree exceeds N (suite (3300-3441): 40 nodes, searching them all costs 4.09e+03 CPU s; applied: the nodes a1r2 is computed at)
+
+    N  gap above  applied  a1r2 cut  a1r2 net s  a1r2 share  a1full cut  a1full net s  a1full share
+    0          -       40         0       -6.18         -0%           0      -1.2e+03          -29%
+1e+01        129       40         0       -6.18         -0%           0      -1.2e+03          -29%
+3e+01        202       40         0       -6.18         -0%           0      -1.2e+03          -29%
+1e+02        276       40         0       -6.18         -0%           0      -1.2e+03          -29%
+3e+02        349       40         0       -6.18         -0%           0      -1.2e+03          -29%
+1e+03        423       40         0       -6.18         -0%           0      -1.2e+03          -29%
+3e+03        496       40         0       -6.18         -0%           0      -1.2e+03          -29%
+1e+04        570       40         0       -6.18         -0%           0      -1.2e+03          -29%
+3e+04        643       40         0       -6.18         -0%           0      -1.2e+03          -29%
+1e+05        717       40         0       -6.18         -0%           0      -1.2e+03          -29%
+3e+05        790       35         0       -5.39         -0%           0     -1.05e+03          -26%
+1e+06        864       23         0       -3.55         -0%           0          -690          -17%
+3e+06        937       12         0       -1.94         -0%           0          -360           -9%
+1e+07       1011        0         0           0          0%           0             0            0%
+best for a1r2: none (every policy loses)
+best for a1full: none (every policy loses)

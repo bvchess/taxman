@@ -90,3 +90,56 @@ the exact check or the separation in progress.  (5) A path node's `full` gets 2 
 validity is checked.
 
 Commits: e8af0ea (the code), 296f650 (`analyze.py`, `cloud.sh`, the README) and the commit of this entry.
+
+## Later (2026-10-18): the run on EC2
+
+*Answer.*  No.  The full A1 bound is far stronger than the nogood bound at moderate gaps, but the nodes it cuts head
+small subtrees that search in milliseconds, and at the nodes that head the big subtrees (gap 500 and up) it cuts
+nothing.  Computing it only where the forecast subtree is big does not pay either.  This closes the lead of a selective
+A1 in the search.
+
+*The run.*  `A1=1 KEEP=100 WORKERS=64 bench/node_choice/cloud.sh` at commit 260e74f (no solver change), on one spot
+`c8g.16xlarge`, launched 19:46:25Z; the release suite passed there (752 tests, 306 s).  The fixtures began at 20:02:32Z,
+the measurement ran 20:10:02Z to 20:16:27Z and the machine ended at about 20:18Z: 32 minutes at $0.676 an hour, about
+**$0.36** (the estimate was $0.40).  840 open nodes were measured, all solved to the end, none capped: the suite's
+3300, 3425, 3440 and 3441 (10 each, gaps 746-1001, subtrees of 33,000 to 1.25 million steps), the made games 2700-3267
+and the probes 936 and 1215 (100 each, gaps 0-942), and 36 path nodes (none had a bound below its best completion; no
+faults).  The workers used 10,606 CPU s: the solves 4,463, `full` 5,770, the nogood fits 253, `r2` 55.  The A1 root
+fits close 0.33-0.34 of the gap at 3441, 3440 and 3425 (300 s each), 0.40 at 3300 (on file) and 0.45-0.64 at the
+others.
+
+Share of the open nodes cut, by gap (the nogood bound is the entry's "strong", 200 steps; `r2` the warm refit from the
+root; `full` the node's own master within 30 s):
+
+| gap | nodes | strong | A1 r2 | A1 full | median subtree |
+|---|---|---|---|---|---|
+| 0-49 | 199 | 91% | 90% | 100% | 2 |
+| 50-99 | 156 | 71% | 61% | 99% | 5 |
+| 100-199 | 208 | 22% | 24% | 90% | 20 |
+| 200-299 | 124 | 3% | 3% | 77% | 70 |
+| 300-399 | 69 | 0% | 1% | 65% | 175 |
+| 400-499 | 31 | 0% | 0% | 16% | 706 |
+| 500+ | 53 | 0% | 0% | 0% | 1,167 to 676,043 |
+
+By the decade of the subtree, `full` cuts 100% of the 368 nodes at 1e0 steps, 96% of the 262 at 1e1, 46% of the 144 at
+1e2, and none of the 66 at 1e3 and above (the nogood bound: 78%, 21%, 0%, 0%).  At gap 700 and up (46 nodes) `full` is
+capped at 30 s in every node and closes a median 42% of the excess (`r2`: 29%); at 400-499 it is capped in 84% and
+closes 89%.  The bound is right to the end of its tether and the tether is the cost: a node's `full` takes a median
+1.2 s at gap 100-199, 6 s at 200-299 and 16 s at 300-399, against 0.1 to 0.3 s for the nogood fit.
+
+*The policy* (compute the bound only where the forecast subtree exceeds N) loses for both A1 forms, in all four groups
+(all, made, probe, suite) and in all three analyses (all the steps, the floor entry's slope, the first 50 steps), at
+every N.  Over the 840 nodes, where searching them all costs 4,460 CPU s, `full` computed everywhere costs 5,770 CPU s
+more than it saves (cutting 686 nodes); `r2` costs 56 more than it saves.  By group, `full` loses 4,330 CPU s on the
+made nodes (cutting 500 of 600, whose searches cost 374 s in all), 233 s on the probes (cutting 186 of 200, searches
+0.9 s) and 1,200 s on the suite, where it cuts none of the 40 and is capped in all.  The nogood bound loses too (126
+CPU s over the 840), as it did in [the first run](the-node-choice-where-the-strong-bound-pays-2026-10.md).
+
+*Verdict.*  The A1 bound cuts the nodes that are cheap to search and none that are dear, so a selective A1 in the
+search has nothing to select.  Lead 1 is closed.  Lead 2,
+[A5](../AGENDA.md#a5-decompose-across-the-frames-andor-search), is next.  The data is in
+[bench/node_choice/cloud-20261018-a1/](../../bench/node_choice/cloud-20261018-a1/), with the
+[README's section](../../bench/node_choice/README.md#the-a1-cloud-run-2026-10-18); `analyze.py` on the gunzipped lines
+gives its three analyses again, byte for byte.
+
+Commits: 260e74f (the code measured), d5b3415 (the data) and the commit of this section.

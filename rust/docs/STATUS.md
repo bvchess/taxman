@@ -5,8 +5,7 @@ Updated 2026-10-18.
 What is in flight, what is paused, what is decided and what waits on a decision, as of the date above.  This page is
 the only place for the current state: it is rewritten, not appended to, whenever work lands or a decision is made
 (with the date), and it stays under 150 lines.  History goes to an entry of the [lab notebook](EXPERIMENTS.md); the
-results and how they are proven are in the [README](../README.md); the research avenues are in the
-[agenda](AGENDA.md).
+results and how they are proven are in the [README](../README.md); the research avenues are in the [agenda](AGENDA.md).
 
 ## The results
 
@@ -40,16 +39,17 @@ chain's launch is [RUNBOOK section 5](../tools/cloud/RUNBOOK.md#5-the-production
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
 more than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game
 has been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint,
-or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5
-thousand nodes a second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller
-trees.
+or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5 thousand nodes a
+second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller trees.
 
 What has been tried for the bound, and where it stands:
 
 * **A1, the multi-field bound in the search: closed.**  At the roots it closes 0.4-0.6 of the gap; in a branch and
   bound its trees are smaller by a factor that falls as the gap grows
   ([E3 pilot](experiments/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md),
-  [R3 and the slope test](experiments/r3-and-the-slope-test-u4-of-a1-2026-10.md)).
+  [R3 and the slope test](experiments/r3-and-the-slope-test-u4-of-a1-2026-10.md)); at 840 sampled nodes (2026-10-18)
+  its full bound cuts none from a gap of 500, where the cost is, and every policy of computing it loses
+  ([the entry](experiments/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10.md)).
 * **Carrying a search's work to the next game: closed.**  The trees of neighbours share 0.15% of their steps
   ([carrying](experiments/carrying-a-searchs-learning-to-the-next-game-2026-10.md)).
 * **A3, splitting by the number of promotions: closed.**  At 936, 1215 and 2112 every node's heaviest completion
@@ -58,7 +58,7 @@ What has been tried for the bound, and where it stands:
 * **The strong bound at the nodes: closed** (2026-10-18).  Refitted at a node it cuts 92% of the open nodes with a gap
   under 50, 19% at 100-199 and none from 300, where the cost is, and costs 164-234 GF(2) bounds: every policy of
   computing it loses ([the entry](experiments/the-node-choice-where-the-strong-bound-pays-2026-10.md)).
-* **A5, decomposing across the frames: not tried** (agenda A5; high risk).
+* **A5, decomposing across the frames: next** (agenda A5; high risk), the lead after the two bounds at the nodes.
 
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
 ([bench/landscape/](../bench/landscape/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
