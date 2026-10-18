@@ -12,9 +12,9 @@
 //!
 //! It finds optimal games.  Every number above `n/2` is never tax and is played (unless it turns out to be
 //! impossible), so a game is chosen by which of the other numbers to *promote* to a move as well.  The *frame
-//! model* (a restatement of the algorithm of the Java solver in `src/main/java`) splits the board into independent
-//! *frames*, each a group of sources with the factors they compete for, numbers the ones that have freedoms from
-//! the front (0 is played first) and merges those with the same number, and turns an optimal game into the
+//! model* (a restatement of the algorithm of the Java solver, at the git tag `java-final`) splits the board into
+//! independent *frames*, each a group of sources with the factors they compete for, numbers the ones that have freedoms
+//! from the front (0 is played first) and merges those with the same number, and turns an optimal game into the
 //! promotion set with the largest sum that keeps every frame winnable.  A branch-and-bound over
 //! promotion sets, bounded by the heaviest set independent in two GF(2) matroids of the frames (or by a matching
 //! relaxation) and run on many threads, finds that set; a game of `n` is
