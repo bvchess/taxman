@@ -3,7 +3,8 @@
 //! beside `rng`; `wall choice-prepare` harvests nogoods with it and the ledger uses it, so that they share one copy).
 //! It is not sound: it may miss the optimum, and nothing it finds proves anything.  A lower bound needs only a legal
 //! game, so a caller may offer what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed
-//! it at its score.  The measurements are in docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md.
+//! it at its score.  The measurements are in
+//! solver/notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md.
 
 use crate::rng::Rng;
 use std::sync::Arc;

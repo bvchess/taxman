@@ -3,7 +3,7 @@
 against the full proof, at each share of the gap, and whether the log of its nodes is linear in the distance proven
 down from the root's bound.
 
-usage (from rust/): ./bench/target/tables.py [FILE] > bench/target/tables.txt
+usage: tables.py [FILE] > tables.txt     (FILE is target.jsonl beside it by default)
 """
 import json
 import math
@@ -23,7 +23,7 @@ STEPS = (1e3, 1e4, 1e5, 1e6)
 # searches of two nodes), and the fits leave them out.
 FLAT = 100
 # The chain's cost model, log10(nodes) = A + G / B for a game of root gap G
-# (docs/experiments/the-gap-past-2175-2026-10.md).
+# (solver/notebook/the-gap-past-2175-2026-10/README.md).
 MODEL_A, MODEL_B = 2.67, 247
 
 

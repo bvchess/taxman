@@ -6,8 +6,8 @@
 //! also lists every optimal set, finds the longest games, certifies conjecture (★) at scale and searches for
 //! adversarial instances.
 //!
-//! This crate shares no code with the solver (`../src`) or with the Python heuristics; it rests only on the
-//! theorems of `heuristics/THEORY.md` (playability = peel succeeds = no self-covering subset; residual
+//! This crate shares no code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only on the
+//! theorems of `docs/THEORY.md` (playability = peel succeeds = no self-covering subset; residual
 //! confinement; the parity matroids; and the bottom layers of every optimal set, Theorem B, which the proofs of `exact`
 //! start from by default) and on elementary bounds.  The report is `README.md` next to this file.
 //!

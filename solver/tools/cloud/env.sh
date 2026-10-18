@@ -10,9 +10,9 @@
 #   RESULTS       the production results file     (default $TAXMAN_WORK/results/strict.jsonl)
 #   CKPT          the checkpoint directory        (default $TAXMAN_WORK/ckpt)
 #   LOGS          the log directory               (default $TAXMAN_WORK/logs)
-#   TAXMAN_BIN    the solver binary               (default rust/target/release/taxman)
-#   LADDER_BIN    the ladder example binary       (default rust/target/release/examples/ladder)
-#   EXACT_BIN     the prover's `exact`            (default rust/prover/target/release/exact; prover.sh)
+#   TAXMAN_BIN    the solver binary               (default solver/frame/target/release/taxman)
+#   LADDER_BIN    the ladder example binary       (default solver/frame/target/release/examples/ladder)
+#   EXACT_BIN     the prover's `exact`            (default solver/noframe/target/release/exact; prover.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
 #                 to the empty string to build generic code.  The build cache (setup.sh, build_cache.py) keys its
@@ -20,19 +20,20 @@
 
 _cloud_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAXMAN_ROOT="${TAXMAN_ROOT:-$(cd "$_cloud_dir/../../.." && pwd)}"
-CRATE="$TAXMAN_ROOT/rust"
+CRATE="$TAXMAN_ROOT/solver/frame"
+TOOLS="$TAXMAN_ROOT/solver/tools"
 TAXMAN_WORK="${TAXMAN_WORK:-$HOME/taxman-work}"
 RESULTS="${RESULTS:-$TAXMAN_WORK/results/strict.jsonl}"
 CKPT="${CKPT:-$TAXMAN_WORK/ckpt}"
 LOGS="${LOGS:-$TAXMAN_WORK/logs}"
 TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
 LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
-PROVER="$CRATE/prover"
+PROVER="$TAXMAN_ROOT/solver/noframe"
 EXACT_BIN="${EXACT_BIN:-$PROVER/target/release/exact}"
 CLOUD_DIR="$_cloud_dir"
 
 # The results file committed with the code, which a production run must agree with where they overlap.
-COMMITTED_RESULTS=("$CRATE/results/strict.jsonl")
+COMMITTED_RESULTS=("$TAXMAN_ROOT/results/strict.jsonl")
 
 : "${RUSTFLAGS=-C target-cpu=native}"
 export RUSTFLAGS
@@ -89,7 +90,7 @@ env_report() {
     echo "RUSTFLAGS:  ${RUSTFLAGS:-}"
     if command -v git >/dev/null 2>&1 && git -C "$TAXMAN_ROOT" rev-parse HEAD >/dev/null 2>&1; then
         local dirty=""
-        [ -n "$(git -C "$TAXMAN_ROOT" status --porcelain -- rust/src rust/Cargo.toml rust/Cargo.lock rust/build.rs 2>/dev/null)" ] &&
+        [ -n "$(git -C "$TAXMAN_ROOT" status --porcelain -- solver/frame/src solver/frame/Cargo.toml solver/frame/Cargo.lock solver/frame/build.rs 2>/dev/null)" ] &&
             dirty=" (sources modified)"
         echo "commit:     $(git -C "$TAXMAN_ROOT" rev-parse HEAD)$dirty"
     else

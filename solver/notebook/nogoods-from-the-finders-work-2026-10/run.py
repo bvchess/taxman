@@ -17,14 +17,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
-from run import KNOWN, RUST, WALL, done_keys, games  # noqa: E402  (the helpers of the finders' runner)
+sys.path.insert(0, str(HERE.parent / "finders-for-good-games-that-are-not-sound-2026-10"))
+from run import CRATE, KNOWN, WALL, done_keys, games  # noqa: E402  (the helpers of the finders' runner)
 
 
 def nogoods(args):
     """`wall nogoods ARGS` under `nice -n 10`: its output lines.  A fault (a nogood that promotes, a bound below the
     known optimum) exits the whole run with what the process printed: it is a bug to report."""
-    done = subprocess.run(["nice", "-n", "10", str(WALL), "nogoods", *map(str, args)], cwd=RUST,
+    done = subprocess.run(["nice", "-n", "10", str(WALL), "nogoods", *map(str, args)], cwd=CRATE,
                           capture_output=True, text=True)
     if done.returncode != 0:
         sys.exit(f"wall nogoods {' '.join(map(str, args))}: exit {done.returncode}\n{done.stdout}{done.stderr}")

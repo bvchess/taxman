@@ -48,7 +48,7 @@ fn failed(message: String) -> CliError {
     CliError::Failed(message)
 }
 
-/// The known sources of the repository (the committed chain and the bounds store in `rust/results`) with `optimal` as
+/// The known sources of the repository (the committed chain and the bounds store in `results`) with `optimal` as
 /// the table, for checking results that cite them; the table alone if there is no repository.
 fn known_in_repository(optimal: &Optimal) -> Result<Known<'_>, CliError> {
     let sources = KnownSources::in_repository().unwrap_or_default();
@@ -339,7 +339,7 @@ pub fn certify(args: &[String]) -> CliResult {
 /// against the recorded games, the barred bounds and Π⁺(O) set up again, and the games that rest on one another; the
 /// first that fails ends the command with status 1.  Then it says how far the proofs of the recorded scores reach:
 /// every game to some board is proven by the prover (`--exact`, default every `exact_*.jsonl` of the repository's
-/// `rust/prover/data`), by a certificate that passed, or by a ceiling above a proven game.  K threads set Π⁺(O) up
+/// `solver/noframe/data`), by a certificate that passed, or by a ceiling above a proven game.  K threads set Π⁺(O) up
 /// again for the lines (default: all CPUs), as `verify-results` does for the repeats.
 pub fn verify_certificates(args: &[String]) -> CliResult {
     let usage = |why: &str| {
@@ -568,7 +568,7 @@ pub fn verify_optimal(args: &[String]) -> CliResult {
 /// scores against the built-in `optimal.json`.  The check sets up the search problems of the repeats on K threads,
 /// as many as `solve` takes by default (the CPUs) unless `--threads` says.  A line that cites a known source (proof
 /// `known`) is checked against it: the table, the committed chain and the bounds store of the repository's
-/// `rust/results` (as `solve --use-prev` draws on them).
+/// `results` (as `solve --use-prev` draws on them).
 pub fn verify_results(args: &[String]) -> CliResult {
     let args = Args::parse(args, &["--threads"], &[])?;
     if args.positional().is_empty() {

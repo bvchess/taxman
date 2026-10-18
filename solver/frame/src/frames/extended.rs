@@ -3,7 +3,7 @@
 //! The frame solver searches Π_n: the frames with freedoms, their sources fixed to U\* (the sources setup keeps), the
 //! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and keeps
 //! only the pairs of `unzip` that Lemma M5⁺ shows are still moves of every instance (below), or none.  It is research
-//! code, for certifying that a game's optimum plays U\*_{≥3} (heuristics/THEORY.md, "The extended problem"; `taxman
+//! code, for certifying that a game's optimum plays U\*_{≥3} (docs/THEORY.md, "The extended problem"; `taxman
 //! certify`, [`crate::certify`]); the solver does not use it.  The search takes it with its one-sided candidates
 //! ([`Board::prepare_extended_with`](crate::board::Board::prepare_extended_with); the model's "One-sided candidates",
 //! [`crate::model`]), and the reference predicate [`ExtendedFrames::promotable`] decides its promotion sets for the
@@ -12,7 +12,7 @@
 //! # The problem
 //!
 //! A *component* is a frame as [`BoardFrames::new`] forms it, before any merge; it lies in one layer ([`layer_of`],
-//! heuristics/THEORY.md, Lemma Ω).  U\* is the sources of the components, U\*_{≥3} those of the components of layer 3
+//! docs/THEORY.md, Lemma Ω).  U\* is the sources of the components, U\*_{≥3} those of the components of layer 3
 //! or more.  Given O ⊆ U\*_{≥3}:
 //!
 //! * the *fixed* sources are F = U\* ∖ O, and R, the *rejected* sources, are those greedy rejected
@@ -48,7 +48,7 @@
 //! that holds a member of O ∪ R keeps none, nor does one whose back claim fails the check (its claims are recorded as
 //! [`ExtendedFrames::refused`]).  The candidates do not change, as they are decided on the components with nothing
 //! claimed, and no claimed factor is one (a back claim's by the check, a front claim's because its source has nothing
-//! else left).  heuristics/THEORY.md, Lemma M5⁺: the claims kept are front and back moves of every instance of Π⁺(O),
+//! else left).  docs/THEORY.md, Lemma M5⁺: the claims kept are front and back moves of every instance of Π⁺(O),
 //! so Theorem M⁺ holds with them taken out, and with O = ∅ every claim is kept and Π⁺(∅) is Π_n
 //! (`examples/structure.rs` checks the problems equal on every board).  Without the check a back claim could hide a
 //! use of f by a promoted number, as at n = 98 in Π_n (THEORY.md, "Why the candidate filter matters"): a component of
@@ -93,7 +93,7 @@ pub struct ExtendedFrames<const W: usize> {
     pub refused: Vec<Claim>,
 }
 
-/// The check of Lemma M5⁺ on a factor claimed by a back claim (heuristics/THEORY.md): the factor is not a two-sided
+/// The check of Lemma M5⁺ on a factor claimed by a back claim (docs/THEORY.md): the factor is not a two-sided
 /// candidate, and no two-sided candidate has it among its maximal factors.  The one place it is written, which
 /// [`build_extended`] applies and the census of the frames (`examples/structure.rs`) counts.
 #[derive(Clone, Debug)]

@@ -58,7 +58,7 @@
 //!
 //! After the frames are formed, [`BoardFrames::new`] simplifies each one until nothing changes (`finish_setup`).
 //! Three things are decided frame by frame.  All three were assumptions of the frame model, validated but not proven;
-//! they are theorems: heuristics/THEORY.md, "The frame model: what is proven and what remains" (Theorem M and its
+//! they are theorems: docs/THEORY.md, "The frame model: what is proven and what remains" (Theorem M and its
 //! lemmas M1 to M6, which follow this code step by step), summed up in DESIGN.md §2, "What optimal means".  What remains is a statement about the game, not about this code:
 //! that some optimal game plays every source with three or more prime factors that setup keeps.
 //!
@@ -97,19 +97,20 @@
 //! The frames are numbered by *layer*.  The layer of a frame is the number of prime factors, counted with
 //! multiplicity, of its sources (`layer_of`): every source of a frame has the same count, every factor one fewer, and
 //! every frame in front of it (one holding a maximal factor of one of its numbers, `BoardFrames::frames_in_front`)
-//! lies one layer lower (heuristics/THEORY.md, Lemma Ω; `build_frames` asserts it in debug builds).  With `ℓ₀` the
+//! lies one layer lower (docs/THEORY.md, Lemma Ω; `build_frames` asserts it in debug builds).  With `ℓ₀` the
 //! lowest layer of a frame with freedoms, a frame with freedoms of layer `ℓ` gets the number `ℓ − ℓ₀`; a closed frame
 //! gets none.  Among the frames with one number, the order is that of their smallest source.
 //!
 //! So the numbering is *clean* by construction: every frame with freedoms directly in front of a frame numbered `k`
 //! is numbered `k − 1`, and frames with one number are never neighbours.  A promoted number, paid for by one of its
 //! maximal factors, finds them one layer lower, in the frame numbered one lower or in closed frames, which is what the
-//! frame model's exactness needs (heuristics/THEORY.md, Theorem M, lemma M3).  The Java numbered the frames breadth
+//! frame model's exactness needs (docs/THEORY.md, Theorem M, lemma M3).  The Java numbered the frames breadth
 //! first from the front instead (number 0 to every frame with freedoms with no frame with freedoms directly in front
 //! of it, `k + 1` to every one directly behind a frame numbered `k` and not yet numbered); on every board up to 8191,
 //! the largest the solver supports, the two numberings are the same (the census `examples/structure.rs`,
-//! `bench/structure/`, and this module's tests), so the frames, candidates and searches are those of the Java's
-//! numbering.  [`numbering`] exposes the numbers of the board's frames, for the census of the structure of the frames.
+//! `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, and this module's tests), so the frames,
+//! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
+//! for the census of the structure of the frames.
 //!
 //! A layer between `ℓ₀` and the highest layer with freedoms that has no frame with freedoms leaves its number without
 //! frames: the search then has an *empty* frame there (no moves, no factors, no freedoms), through which nothing is
@@ -355,7 +356,7 @@ struct Numbers {
     layers: Vec<u32>,
 }
 
-/// The layer of a frame (heuristics/THEORY.md, Lemma Ω): Ω of its sources, the number of their prime factors counted
+/// The layer of a frame (docs/THEORY.md, Lemma Ω): Ω of its sources, the number of their prime factors counted
 /// with multiplicity.  The frame's sources and impossible sources all have the same Ω, so this is Ω of the smallest of
 /// them.  A frame that has neither (only a punctured board has one: a factor whose maximal composites are all holes)
 /// is a single factor, one layer above that factor's.
@@ -399,7 +400,7 @@ fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Numbers {
     Numbers { groups, number, layers }
 }
 
-/// Where the frames of the board do not lie in layers (heuristics/THEORY.md, Lemma Ω), given the `layers` of the
+/// Where the frames of the board do not lie in layers (docs/THEORY.md, Lemma Ω), given the `layers` of the
 /// frames ([`layer_of`]): a message naming the board, the first frame that fails and what fails, or `None`.  In a
 /// frame of layer `k`, every source and impossible source has Ω equal to `k`, every factor has Ω equal to `k − 1`, and
 /// every frame in front of it ([`BoardFrames::frames_in_front`]) is of layer `k − 1`.
@@ -469,7 +470,7 @@ fn breadth_first_numbers<const W: usize>(
     (number, in_front)
 }
 
-/// Where a numbering is not clean (heuristics/THEORY.md, N): the first frame `y`, by position, that is numbered `h`
+/// Where a numbering is not clean (docs/THEORY.md, N): the first frame `y`, by position, that is numbered `h`
 /// and has a frame with freedoms `x` directly in front of it not numbered `h − 1`, as `(y, Some(x))`, or that has
 /// freedoms and no number, as `(y, None)`; `None` when the numbering is clean.  `number` is the number of each frame
 /// and `in_front` the frames in front of each frame with freedoms (`None` for a closed frame), as
@@ -679,7 +680,7 @@ mod tests {
         }
     }
 
-    /// The frames lie in layers (heuristics/THEORY.md, Lemma Ω) on every board to 400 and on every board of up to 60
+    /// The frames lie in layers (docs/THEORY.md, Lemma Ω) on every board to 400 and on every board of up to 60
     /// numbers with one number taken off it, and on all of them the numbering by layer is clean.
     #[test]
     fn lemma_omega_holds_on_every_board() {

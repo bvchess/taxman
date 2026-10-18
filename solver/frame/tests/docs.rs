@@ -1,10 +1,11 @@
 //! Documentation that states what the code can check:
 //!
 //! * DESIGN.md's table of tactics lists the tactics of `taxman::tactics::Tactics`, in order, with their defaults;
-//! * every relative link and `#anchor` of the markdown files under `rust/` and of the repository's README resolves;
-//! * the lab notebook keeps its register and index on one page, `docs/EXPERIMENTS.md`, and its entries in
-//!   `docs/experiments/`: every entry opens with its title and a link back, and the register or the index links to
-//!   it; `docs/STATUS.md` is short and dated;
+//! * every relative link and `#anchor` of the repository's markdown files (the README, `docs/`, `results/`, `solver/`
+//!   with the lab notebook, and the READMEs of `heuristics/` and `moniot/`) resolves;
+//! * the lab notebook keeps its register and index on one page, `solver/notebook/README.md`, and its entries in the
+//!   folders beside it, one README.md each: every entry opens with its title and a link back, and the register or the
+//!   index links to it; `solver/docs/STATUS.md` is short and dated;
 //! * README's table of the fields of a result line has the keys the code writes, and its example line shows them;
 //! * README's reading order is the module map of `src/lib.rs`, and `rust-version` is what the docs and the cloud
 //!   setup say;
@@ -21,9 +22,25 @@ use taxman::known::KnownSources;
 use taxman::solver::{solve_game, SolveOptions};
 use taxman::tactics::Tactics;
 
-/// The crate's directory (`rust/`).
+/// The crate's directory (`solver/frame/`).
 fn crate_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+/// The repository's root, two directories above the crate (with no `..` in it, so that paths below it can be shown
+/// relative to it).
+fn repo_dir() -> PathBuf {
+    crate_dir().join("../..").canonicalize().expect("the repository above the crate")
+}
+
+/// The lab notebook's directory: its front page, `README.md`, and a folder for each entry.
+fn notebook_dir() -> PathBuf {
+    repo_dir().join("solver/notebook")
+}
+
+/// DESIGN.md, in the docs of the solver.
+fn design_md() -> PathBuf {
+    repo_dir().join("solver/docs/DESIGN.md")
 }
 
 fn read(path: impl AsRef<Path>) -> String {
@@ -50,7 +67,7 @@ struct Row {
 
 /// The rows of the table in DESIGN.md's section "5. Tactics".
 fn tactic_rows() -> Vec<Row> {
-    let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("DESIGN.md")).expect("DESIGN.md");
+    let text = read(design_md());
     let section = text.split("\n## 5. Tactics").nth(1).expect("the section 5. Tactics");
     let section = section.split("\n## ").next().expect("the section's end");
     section
@@ -85,7 +102,8 @@ fn design_gives_the_defaults_of_the_code() {
 // ---------------------------------------------------------------------------------------------------------
 // Links
 
-/// The markdown files of the crate (not its build directory), and the repository's README.
+/// The markdown files of the repository's docs: the README, `docs/`, `results/` and `solver/` (not the build
+/// directories), and the READMEs of `heuristics/` and `moniot/`.
 fn markdown_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
@@ -101,9 +119,12 @@ fn markdown_files() -> Vec<PathBuf> {
             }
         }
     }
-    let mut found = Vec::new();
-    walk(&crate_dir(), &mut found);
-    found.push(crate_dir().join("../README.md"));
+    let root = repo_dir();
+    let mut found = vec![root.join("README.md")];
+    for dir in ["docs", "results", "solver"] {
+        walk(&root.join(dir), &mut found);
+    }
+    found.extend(["heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
     found
 }
 
@@ -177,9 +198,9 @@ fn link_targets(line: &str) -> Vec<&str> {
 #[test]
 fn every_relative_link_and_anchor_in_the_markdown_files_resolves() {
     // The links reach across the whole repository, so they can only be checked in a full checkout; the Linux dry-run
-    // image (tools/cloud/Dockerfile) copies just the crate and the data it needs.
-    if !crate_dir().join("../README.md").exists() {
-        eprintln!("links not checked: this is not a full checkout of the repository (no ../README.md)");
+    // image (solver/tools/cloud/Dockerfile) copies just the solver's directory and the data it needs.
+    if !repo_dir().join("README.md").exists() {
+        eprintln!("links not checked: this is not a full checkout of the repository (no README.md at its top)");
         return;
     }
     let mut anchors_of: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
@@ -195,7 +216,7 @@ fn every_relative_link_and_anchor_in_the_markdown_files_resolves() {
                 checked += 1;
                 let (path, fragment) = target.split_once('#').unwrap_or((target, ""));
                 let linked = if path.is_empty() { file.clone() } else { file.parent().unwrap().join(path) };
-                let at = format!("{}:{}: ({target})", file.strip_prefix(crate_dir()).unwrap_or(&file).display(), i + 1);
+                let at = format!("{}:{}: ({target})", file.strip_prefix(repo_dir()).unwrap_or(&file).display(), i + 1);
                 if !linked.exists() {
                     broken.push(format!("{at}: there is no {}", linked.display()));
                 } else if !fragment.is_empty() && linked.extension().is_some_and(|ext| ext == "md") {
@@ -226,26 +247,39 @@ fn anchors_follow_githubs_rules() {
 // The lab notebook and the status page
 
 /// The second line of every entry of the lab notebook, after a blank one.
-const BACK_LINK: &str = "Part of the [lab notebook](../EXPERIMENTS.md).";
+const BACK_LINK: &str = "Part of the [lab notebook](../README.md).";
 
 /// The sections of the notebook's front page: the introduction's, and no entry.
 const FRONT_SECTIONS: [&str; 4] =
     ["How this notebook is kept", "Terms changed (2026-10)", "Register of everything tried", "Index of rounds"];
 
-/// The files of `docs/experiments/` (the notebook's entries), by name.
+/// The README.md of every entry of the lab notebook, which is the folder `solver/notebook/NAME/` beside the front page;
+/// sorted by name.
 fn entry_files() -> Vec<PathBuf> {
-    let dir = crate_dir().join("docs/experiments");
-    let mut files: Vec<PathBuf> =
-        std::fs::read_dir(&dir).expect("docs/experiments/").map(|e| e.unwrap().path()).collect();
-    files.retain(|path| !path.file_name().unwrap().to_string_lossy().starts_with('.'));
-    files.sort();
-    files
+    let dir = notebook_dir();
+    let mut folders: Vec<PathBuf> =
+        std::fs::read_dir(&dir).expect("solver/notebook/").map(|e| e.unwrap().path()).collect();
+    folders.retain(|path| path.is_dir() && !path.file_name().unwrap().to_string_lossy().starts_with('.'));
+    folders.sort();
+    folders
+        .into_iter()
+        .map(|folder| {
+            let readme = folder.join("README.md");
+            assert!(readme.is_file(), "{} has no README.md: an entry is a folder with one", folder.display());
+            readme
+        })
+        .collect()
+}
+
+/// The name of the entry whose README.md is `file`: its folder's.
+fn entry_name(file: &Path) -> String {
+    file.parent().and_then(Path::file_name).expect("an entry's folder").to_string_lossy().into_owned()
 }
 
 #[test]
 fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
-    // What the register and the index link to: `experiments/NAME.md`, with or without an anchor.
-    let front = read(crate_dir().join("docs/EXPERIMENTS.md"));
+    // What the register and the index link to: `NAME/README.md`, with or without an anchor.
+    let front = read(notebook_dir().join("README.md"));
     let mut listed = BTreeSet::new();
     for heading in ["## Register of everything tried", "## Index of rounds"] {
         for line in without_code(section(&front, heading)) {
@@ -258,12 +292,12 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
     assert!(files.len() > 40, "the check found only {} entries: has the layout changed?", files.len());
     let mut problems = Vec::new();
     for file in files {
-        let name = file.file_name().unwrap().to_string_lossy().into_owned();
+        let name = entry_name(&file);
         let text = read(&file);
         let top: Vec<&str> = text.lines().take(3).collect();
         match top.first() {
             Some(title) if title.starts_with("# ") => {
-                let named = format!("{}.md", anchors(title).into_iter().next().unwrap_or_default());
+                let named = anchors(title).into_iter().next().unwrap_or_default();
                 if named != name {
                     problems.push(format!("{name}: named for its title's anchor, it would be {named}"));
                 }
@@ -273,25 +307,26 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
         if top.get(1) != Some(&"") || top.get(2) != Some(&BACK_LINK) {
             problems.push(format!("{name}: the third line is not {BACK_LINK:?}, after a blank line"));
         }
-        if !listed.contains(&format!("experiments/{name}")) {
-            problems.push(format!("{name}: neither the register nor the index of docs/EXPERIMENTS.md links to it"));
+        if !listed.contains(&format!("{name}/README.md")) {
+            problems
+                .push(format!("{name}: neither the register nor the index of solver/notebook/README.md links to it"));
         }
     }
     assert!(
         problems.is_empty(),
-        "entries of docs/experiments/ that break the notebook's rules:\n{}",
+        "entries of solver/notebook/ that break the notebook's rules:\n{}",
         problems.join("\n")
     );
 }
 
 #[test]
 fn the_front_page_of_the_notebook_has_no_entries() {
-    let front = read(crate_dir().join("docs/EXPERIMENTS.md"));
+    let front = read(notebook_dir().join("README.md"));
     let sections: Vec<String> =
         without_code(&front).into_iter().filter_map(|line| line.strip_prefix("## ").map(str::to_owned)).collect();
     assert_eq!(
         sections, FRONT_SECTIONS,
-        "docs/EXPERIMENTS.md keeps the register and the index; an entry is a file in docs/experiments/"
+        "solver/notebook/README.md keeps the register and the index; an entry is a folder of solver/notebook/"
     );
 }
 
@@ -310,12 +345,15 @@ fn is_update_line(line: &str) -> bool {
 
 #[test]
 fn status_is_short_and_dated() {
-    let status = read(crate_dir().join("docs/STATUS.md"));
+    let status = read(repo_dir().join("solver/docs/STATUS.md"));
     let lines = status.lines().count();
-    assert!(lines <= 150, "docs/STATUS.md has {lines} lines; it stays at 150 or fewer (rewrite it, do not append)");
+    assert!(
+        lines <= 150,
+        "solver/docs/STATUS.md has {lines} lines; it stays at 150 or fewer (rewrite it, do not append)"
+    );
     assert!(
         status.lines().take(5).any(is_update_line),
-        "docs/STATUS.md says `Updated YYYY-MM-DD.` among its first lines"
+        "solver/docs/STATUS.md says `Updated YYYY-MM-DD.` among its first lines"
     );
     assert!(
         is_update_line("Updated 2026-10-16.")
@@ -432,7 +470,7 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
     let cargo = read(crate_dir().join("Cargo.toml"));
     let version = cargo.lines().find_map(|l| l.strip_prefix("rust-version = ")).expect("rust-version in Cargo.toml");
     let version = version.trim_matches('"');
-    let setup = read(crate_dir().join("tools/cloud/setup.sh"));
+    let setup = read(repo_dir().join("solver/tools/cloud/setup.sh"));
     let min_rust = setup.lines().find_map(|l| l.strip_prefix("MIN_RUST=")).expect("MIN_RUST in setup.sh");
     assert_eq!(min_rust.split('#').next().unwrap().trim().trim_matches('"'), version, "setup.sh and Cargo.toml");
     let readme = read(crate_dir().join("README.md"));
@@ -454,10 +492,12 @@ fn prose_files() -> Vec<PathBuf> {
             }
         }
     }
-    let mut files: Vec<PathBuf> = ["README.md", "DESIGN.md", "docs/EXPERIMENTS.md", "docs/STATUS.md"]
-        .iter()
-        .map(|name| crate_dir().join(name))
-        .collect();
+    let mut files: Vec<PathBuf> = vec![
+        crate_dir().join("README.md"),
+        design_md(),
+        notebook_dir().join("README.md"),
+        repo_dir().join("solver/docs/STATUS.md"),
+    ];
     files.extend(entry_files());
     rust_files(&crate_dir().join("src"), &mut files);
     files
@@ -506,7 +546,7 @@ const RETIRED_EVERYWHERE: &[Retired] = &[
     retired("prime relation", "the prime formula"),
 ];
 
-/// Retired in the guides and comments of the solver (the crate in `rust/`, but for the prover), which use the wiki's
+/// Retired in the guides and comments of the solver (`solver/` but for the prover), which use the wiki's
 /// words.  The heuristics and the prover keep some of these for their own meanings (THEORY's frontier argument).
 const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("upstream", "behind"),
@@ -541,8 +581,8 @@ const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sourc
 
 /// Paths and names that must not appear at all, not even in code: they were renamed.
 const RETIRED_NAMES: &[Retired] = &[
-    retired("rust/evidence", "rust/prover"),
-    retired("../evidence", "../prover"),
+    retired("rust/evidence", "solver/noframe"),
+    retired("../evidence", "../noframe"),
     retired("evidence.sh", "prover.sh"),
     retired("evidence_only", "PROVER_ONLY"),
     retired("taxman_evidence", "taxman_prover"),
@@ -568,9 +608,15 @@ const STAYS: &[&str] = &[
     "cap reached",
 ];
 
-/// The files the check skips: this one, which lists the words, and the entries of the lab notebook, which are history
-/// and keep the words of their time.
-const SKIPPED: &[&str] = &["tests/docs.rs", "docs/experiments/"];
+/// The file the check skips, by its path from the repository: this one, which lists the words.
+const SKIPPED: &str = "solver/frame/tests/docs.rs";
+
+/// Whether the file at `shown` (a path from the repository) is an entry of the lab notebook, `solver/notebook/NAME/
+/// README.md`: the entries are history and keep the words of their time, so the check skips them.
+fn is_entry(shown: &str) -> bool {
+    let parts: Vec<&str> = shown.split('/').collect();
+    matches!(parts.as_slice(), ["solver", "notebook", _, "README.md"])
+}
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
 fn without_link_targets(line: &str) -> String {
@@ -585,10 +631,10 @@ fn without_link_targets(line: &str) -> String {
     out
 }
 
-/// Whether the guide or code at `shown` (a path in the crate) names the numbers of the board by their part in the frame
-/// model.
+/// Whether the guide or code at `shown` (a path from the repository) names the numbers of the board by their part in
+/// the frame model.
 fn names_numbers_by_frame(shown: &str) -> bool {
-    shown.starts_with("src/") || shown == "README.md" || shown == "DESIGN.md"
+    shown.starts_with("solver/frame/src/") || shown == "solver/frame/README.md" || shown == "solver/docs/DESIGN.md"
 }
 
 /// Whether `word` occurs in `line` (lower case) as a whole word that is not quoted (`"forced moves" in its docs`).
@@ -618,10 +664,10 @@ fn retired_in(lines: &[String], lists: &[&[Retired]]) -> Vec<(usize, &'static st
     found
 }
 
-/// The front page, EXPERIMENTS.md, describes the present: all of it, but for the note that maps the old words, which
-/// keeps them, and the titles of the entries in the first column of the index, which keep the words of their time.
-/// Those are blanked or cut, so that line numbers stay.  The entries themselves (`docs/experiments/`) are history and
-/// are skipped (see `SKIPPED`).
+/// The front page of the lab notebook, `solver/notebook/README.md`, describes the present: all of it, but for the note
+/// that maps the old words, which keeps them, and the titles of the entries in the first column of the index, which
+/// keep the words of their time.  Those are blanked or cut, so that line numbers stay.  The entries themselves
+/// (`solver/notebook/NAME/README.md`) are history and are skipped (see `is_entry`).
 fn experiments_now(text: &str) -> String {
     let (before, after) = text.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
     let (note, register) = after.split_once("\n## Register of everything tried").expect("the register");
@@ -657,9 +703,21 @@ fn prose_lines(path: &Path, text: &str) -> Vec<String> {
     without_code(&comments.join("\n"))
 }
 
-/// The files to check, with whether they are the prover's or the repository's (where the solver's extra words don't
-/// apply).
-fn vocabulary_files() -> Vec<(PathBuf, bool)> {
+/// `path` as shown in a message and compared with the names above: relative to the repository, with `/`.
+fn from_repo(path: &Path) -> String {
+    path.strip_prefix(repo_dir()).unwrap_or(path).to_string_lossy().replace('\\', "/")
+}
+
+/// Whether the file at `shown` is one where the solver's extra retired words do not apply: the prover's, and the
+/// repository's own (the README, `docs/`, `heuristics/`, `moniot/`).  The solver's are `solver/` but for the prover,
+/// and the README of `results/`.
+fn keeps_own_words(shown: &str) -> bool {
+    shown.starts_with("solver/noframe/") || !(shown.starts_with("solver/") || shown.starts_with("results/"))
+}
+
+/// The files to check: the solver's directory and `results/` (which a Linux dry run has), and, in a full checkout, the
+/// repository's README and `docs/`, and the READMEs of `heuristics/` and `moniot/`.
+fn vocabulary_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
         paths.sort();
@@ -676,16 +734,15 @@ fn vocabulary_files() -> Vec<(PathBuf, bool)> {
             }
         }
     }
+    let root = repo_dir();
     let mut found = Vec::new();
-    walk(&crate_dir(), &mut found);
-    let outside = crate_dir().join("..");
-    if outside.join("README.md").exists() {
-        found.push(outside.join("README.md"));
-        found.extend(["README.md", "THEORY.md"].iter().map(|name| outside.join("heuristics").join(name)));
+    walk(&root.join("solver"), &mut found);
+    walk(&root.join("results"), &mut found);
+    if root.join("README.md").exists() {
+        walk(&root.join("docs"), &mut found);
+        found.extend(["README.md", "heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
     }
-    let shown = |path: &Path| path.strip_prefix(crate_dir()).unwrap_or(path).to_string_lossy().replace('\\', "/");
-    let checked = found.into_iter().filter(|path| !SKIPPED.iter().any(|skip| shown(path).starts_with(skip)));
-    checked.map(|path| (path.clone(), shown(&path).starts_with("prover/") || shown(&path).starts_with(".."))).collect()
+    found.into_iter().filter(|path| from_repo(path) != SKIPPED && !is_entry(&from_repo(path))).collect()
 }
 
 #[test]
@@ -693,14 +750,14 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
     let mut found = Vec::new();
     let files = vocabulary_files();
     assert!(files.len() > 40, "the check found only {} files: has the layout changed?", files.len());
-    for (path, own_words) in files {
-        let shown = path.strip_prefix(crate_dir()).unwrap_or(&path).display().to_string();
+    for path in files {
+        let shown = from_repo(&path);
         let mut text = read(&path);
-        if path.file_name().is_some_and(|name| name == "EXPERIMENTS.md") {
+        if shown == "solver/notebook/README.md" {
             text = experiments_now(&text);
         }
         let mut lists: Vec<&[Retired]> = vec![RETIRED_EVERYWHERE];
-        if !own_words {
+        if !keeps_own_words(&shown) {
             lists.push(RETIRED_IN_THE_SOLVER);
         }
         if names_numbers_by_frame(&shown) {
@@ -719,7 +776,7 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
     }
     assert!(
         found.is_empty(),
-        "words and names the project has retired (rust/docs/EXPERIMENTS.md, \"Terms changed\"):\n{}",
+        "words and names the project has retired (solver/notebook/README.md, \"Terms changed\"):\n{}",
         found.join("\n")
     );
 }
@@ -736,22 +793,22 @@ fn the_vocabulary_check_finds_what_it_should() {
     assert_eq!(without_link_targets("[a](b.md#c) and [d](e)"), "[a] and [d]");
 }
 
-/// The value of the constant `name` at the top of `tools/quick_check.py`.
+/// The value of the constant `name` at the top of `solver/tools/quick_check.py`.
 fn quick_check_limit(name: &str) -> f64 {
-    let script = read(crate_dir().join("tools/quick_check.py"));
+    let script = read(repo_dir().join("solver/tools/quick_check.py"));
     let line = script.lines().find_map(|line| line.strip_prefix(&format!("{name} = "))).expect("a constant");
     line.split_whitespace().next().and_then(|value| value.parse().ok()).expect("a number")
 }
 
-/// The quick check (`tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits as the script has
-/// them, so that the number in the one is the number in the other.
+/// The quick check (`solver/tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits as the script
+/// has them, so that the number in the one is the number in the other.
 #[test]
 fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
-    let tests = crate_dir().join("tools/test_quick_check.py");
+    let tests = repo_dir().join("solver/tools/test_quick_check.py");
     let run = std::process::Command::new("python3").arg("-I").arg(tests).output().expect("python3 runs the tests");
     assert!(run.status.success(), "{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
 
-    let design = read(crate_dir().join("DESIGN.md")).replace('\n', " ");
+    let design = read(design_md()).replace('\n', " ");
     let (target, limit, cpu) =
         (quick_check_limit("TOTAL_TARGET"), quick_check_limit("TOTAL_LIMIT"), quick_check_limit("TEST_LIMIT"));
     for stated in [format!("more than {limit} s (the target is {target} s;"), format!("more than {cpu} s of CPU")] {

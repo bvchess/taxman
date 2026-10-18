@@ -20,7 +20,7 @@
 //! relaxation) and run on many threads, finds that set; a game of `n` is
 //! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md`
 //! (in the crate's directory) is the user guide and has the glossary; `DESIGN.md` explains the design;
-//! `docs/EXPERIMENTS.md` is the lab notebook of how it got there.
+//! `solver/notebook/README.md` is the lab notebook of how it got there.
 //!
 //! # From a board size to a game
 //!

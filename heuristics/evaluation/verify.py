@@ -36,7 +36,7 @@ from typing import List, Sequence, Set
 
 from core import smallest_prime_factors, solve_upper_half
 
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "src/main/resources/optimal.json"
+DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "results/optimal.json"
 
 
 def replay(sequence: Sequence[int], pot: Set[int]) -> bool:

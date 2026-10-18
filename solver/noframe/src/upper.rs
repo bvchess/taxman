@@ -226,7 +226,7 @@ mod tests {
 
     /// The games of optimal.json: n -> (score, moves).
     fn optimal() -> BTreeMap<u64, (u64, Vec<u32>)> {
-        recorded_games(&[Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))])
+        recorded_games(&[Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"))])
     }
 
     /// The boards the enumerating tests cover.

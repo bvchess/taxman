@@ -220,9 +220,9 @@ def section_phase2(trees, plain, gap):
     games = sorted({r["n"] for r in runs if r["variant"] != "v0"})
     names = sorted({run_name(r) for r in runs if r["variant"] != "v0"})
     by = {(r["n"], run_name(r)): r for r in runs}
-    print("v0's trees are the matroid study's (`bench/matroid/bnb.jsonl`); the v0 reruns below check them.  *ratio*: "
-          "v0's nodes over the variant's; *f₃*: the share of the variant's nodes that got R3; *R3 ms*: its time a "
-          "refit; *time*: the run's over v0's.\n")
+    print("v0's trees are the matroid study's (`solver/notebook/matroid-intersection-bounds-2026-10/bnb.jsonl`); "
+          "the v0 reruns below check them.  *ratio*: v0's nodes over the variant's; *f₃*: the share of the "
+          "variant's nodes that got R3; *R3 ms*: its time a refit; *time*: the run's over v0's.\n")
     reruns = [r for r in runs if r["variant"] == "v0"]
     if reruns:
         rows = [[r["n"], num(r["nodes"]), num(plain[r["n"]]["nodes"]), "yes" if r["nodes"] == plain[r["n"]]["nodes"]
@@ -431,7 +431,7 @@ def section_phase4(replays, dives, phase2):
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--dir", type=Path, default=HERE / "u4")
-    p.add_argument("--matroid", type=Path, default=HERE.parent / "matroid")
+    p.add_argument("--matroid", type=Path, default=HERE.parent / "matroid-intersection-bounds-2026-10")
     a = p.parse_args()
     trees = load(a.dir / "trees.jsonl", tree_key) or []
     replays = load(a.dir / "replay.jsonl", replay_key) or []
@@ -439,7 +439,7 @@ def main():
     dives = load(a.dir / "dives.jsonl", tree_key) or []
     plain, gap = plain_trees(a.matroid)
     print("# U4: R3, the slope test, patch mode and the end of the chain\n")
-    print("Made by `bench/fields/u4.py` from `bench/fields/u4/` (see the README).\n")
+    print("Made by `u4.py` from `u4/`, both in the folder of this entry (see the README).\n")
     section_phase1(replays)
     phase2 = section_phase2(trees, plain, gap)
     section_phase2_logs(a.dir / "logs")

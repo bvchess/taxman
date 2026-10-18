@@ -1,8 +1,8 @@
 //! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from two linear
 //! matroids over GF(2) in which every promotable set is independent (tactic `gf2`).  It is never above the matching
-//! bound ([`crate::matchbound`]) and usually far below it; `heuristics/THEORY.md`, Theorem 11, has the proof, and
-//! `docs/experiments/matroid-intersection-bounds-2026-10.md` and
-//! `docs/experiments/the-gf2-bound-in-the-search-2026-10.md`, the measurements.
+//! bound ([`crate::matchbound`]) and usually far below it; `docs/THEORY.md`, Theorem 11, has the proof, and
+//! `solver/notebook/matroid-intersection-bounds-2026-10/README.md` and
+//! `solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md`, the measurements.
 //!
 //! # The matroids
 //!
@@ -25,7 +25,7 @@
 //! # One-sided candidates
 //!
 //! In the extended problem ([`crate::frames::build_extended`]) a one-sided candidate `s` of frame `j` is a mover of
-//! frame `j` and touches no other frame (heuristics/THEORY.md, Theorem 11 for the extended problem).  So its element
+//! frame `j` and touches no other frame (docs/THEORY.md, Theorem 11 for the extended problem).  So its element
 //! has the vector of its maximal factors in the matroid of frame `j`, and in the other matroid it is a *coloop*: it
 //! constrains nothing there.  The coloops of a matroid are put in *free blocks* after its frames' blocks, each element
 //! its own unit vector, at most `64·words` of them a block, so that a game with hundreds of one-sided candidates needs
@@ -358,8 +358,9 @@ impl Gf2Graph {
 /// of the members it leaves free cost more than they save while the trees are small: over the quick set of one-thread
 /// proofs (936-1350) a window of 25 costs 20.6 G cycles, 40 18.2, 60 17.3, 80 16.9, 120 17.6, no window 18.0 (without
 /// the search 26.4; nodes 217,374 then 132,049, 108,856, 96,283, 89,751, 86,481, 85,349).  At the end of the chain
-/// the trees are dear enough that every search pays (docs/experiments/the-tuning-campaign-at-the-end-of-the-chain-
-/// 2026-10.md).  A checkpoint's header of version 5 implies this window.
+/// the trees are dear enough that every search pays
+/// (solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md).  A checkpoint's header of
+/// version 5 implies this window.
 pub const LEGACY_FORCE_WINDOW: u32 = 80;
 
 /// Which members of the heaviest set that the weight split leaves free [`Gf2Bound::evaluate`] searches for being

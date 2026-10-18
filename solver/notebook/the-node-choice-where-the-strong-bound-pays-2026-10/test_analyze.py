@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests of analyze.py on lines made up to have known answers.
 
-Run from rust/: `python3 -I bench/node_choice/test_analyze.py`.
+Run it as `python3 -I test_analyze.py`.
 """
 
 import json

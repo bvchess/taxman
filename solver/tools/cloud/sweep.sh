@@ -3,10 +3,10 @@
 # money.  Not a chain: the games are made in blocks of consecutive board sizes, each block on one thread, and each game
 # gets a limited search.
 #
-#   rust/tools/cloud/sweep.sh FIRST LAST
+#   solver/tools/cloud/sweep.sh FIRST LAST
 #
 # Pass 1.  FIRST..LAST is split into BLOCKS blocks of consecutive games (default one a CPU), sized so that each block's
-# expected work is about equal (tools/sweep_plan.py: a game costs its setup, which grows steeply with n, and at most the
+# expected work is about equal (solver/tools/sweep_plan.py: a game costs its setup, which grows steeply with n, and at most the
 # limit of its search).  Each block is one process on one thread,
 #
 #   taxman solve A-B --threads 1 --time-limit $GAME_SECONDS --keep-going --pass 1 --out $BLOCK_DIR/block-NNN.jsonl
@@ -23,7 +23,7 @@
 # searches and whose game before it, as the merged file holds it, has more to give than it had when the game was last
 # tried: it is proven (which gives the ceiling and perhaps the prime formula or a repeat), or it has a better best game
 # than the seed was, or the game had none.  A pass runs one process a block that has such a game, each on one thread,
-# from an excerpt of the merged file (tools/sweep_plan.py), and goes through the block in increasing n, so that a game
+# from an excerpt of the merged file (solver/tools/sweep_plan.py), and goes through the block in increasing n, so that a game
 # it has just proven helps the next (`taxman solve --keep-going --retry-improved`).  Passes repeat until one changes
 # nothing (the games are then as an unbroken chain would have left them, whatever it could prove) or MAX_PASSES.
 #
@@ -54,7 +54,7 @@
 # Environment (all optional):
 #   BLOCKS         blocks, one thread each, default every CPU
 #   GAME_SECONDS   the limit of one game's search, default 180
-#   KNOWN          the results file the first block chains from, default the committed rust/results/strict.jsonl
+#   KNOWN          the results file the first block chains from, default the committed results/strict.jsonl
 #   RESULTS        the merged file, default $TAXMAN_WORK/results/explore.jsonl; the block files are in
 #                  RESULTS-minus-.jsonl-blocks/ beside it, which save.sh copies with it
 #   MAX_PASSES     the most passes after the first in one run, default 20
@@ -86,7 +86,7 @@ esac
 [ -n "$first" ] && [ -n "$last" ] || die "usage: sweep.sh FIRST LAST"
 [ "$first" -ge 1 ] && [ "$first" -le "$last" ] && [ "$last" -le 8191 ] || die "FIRST..LAST must be within 1..8191"
 [ -x "$TAXMAN_BIN" ] || die "$TAXMAN_BIN is missing: run setup.sh"
-command -v python3 >/dev/null 2>&1 || die "python3 is needed (tools/sweep_plan.py)"
+command -v python3 >/dev/null 2>&1 || die "python3 is needed (solver/tools/sweep_plan.py)"
 
 BLOCKS="${BLOCKS:-$(ncpu)}"
 GAME_SECONDS="${GAME_SECONDS:-180}"
@@ -107,7 +107,7 @@ esac
 BLOCK_DIR="$(dirname "$RESULTS")/$(basename "$RESULTS" .jsonl)-blocks"
 PASS_DIR="$TAXMAN_WORK/sweep-pass"
 PLAN="$BLOCK_DIR/plan"
-PLAN_TOOL="$CRATE/tools/sweep_plan.py"
+PLAN_TOOL="$TOOLS/sweep_plan.py"
 [ -r "$PLAN_TOOL" ] || die "$PLAN_TOOL is missing"
 
 run_begin sweep "$(dirname "$RESULTS")" "$BLOCK_DIR"

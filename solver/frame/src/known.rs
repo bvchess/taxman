@@ -19,10 +19,10 @@
 //! follows from the source; the referees check the citation against the same sources ([`Known::check_cite`]).
 //!
 //! The sources are read as they are given: the committed chain and the store are checked by their own referees
-//! (`taxman verify-results`, `tools/check_results.py`; `ledger verify-bounds`, `tools/check_bounds.py`), not again
-//! here.  What the solver does check of a game it takes is what it checks of every game: the referee's replay (legal,
-//! over, opening with the largest prime) at the score the source gives, and the chain bounds against the game before
-//! it.
+//! (`taxman verify-results`, `solver/tools/check_results.py`; `ledger verify-bounds`, `solver/tools/check_bounds.py`),
+//! not again here.  What the solver does check of a game it takes is what it checks of every game: the referee's replay
+//! (legal, over, opening with the largest prime) at the score the source gives, and the chain bounds against the game
+//! before it.
 
 use crate::game::Optimal;
 use crate::json::Json;
@@ -198,7 +198,7 @@ pub struct KnownSources {
 
 impl KnownSources {
     /// What `solve --use-prev` draws on: every game of the table, the committed chain and the store in the repository's
-    /// `rust/results`, for the board sizes of the range as well as the game before it.  The files that are not there
+    /// `results`, for the board sizes of the range as well as the game before it.  The files that are not there
     /// are left out.
     ///
     /// # Errors

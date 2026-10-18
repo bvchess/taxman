@@ -3,7 +3,7 @@
 # minute to its end.  The user data of the launch template starts it, as ec2-user in a tmux session `tx`, in a checkout
 # of the pinned commit; it is not run by hand (`tmux attach -t tx` shows it).
 #
-#   S3_DEST=s3://bucket/prefix ASG=taxman-wall rust/tools/cloud/wall-node.sh
+#   S3_DEST=s3://bucket/prefix ASG=taxman-wall solver/tools/cloud/wall-node.sh
 #
 # Everything the run needs besides those two names is the config object $S3_DEST/run/config, which wall.sh launch wrote
 # (the pinned commit, the budget, the date, the wall, the window, ...).  In order:

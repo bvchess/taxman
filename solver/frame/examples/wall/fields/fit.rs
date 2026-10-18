@@ -1,6 +1,6 @@
 //! A root fit on disk: what `dw::bound` found at a game's root, as one JSON object, for later experiments to start
 //! from (`wall/fields.rs`: `choice-prepare` writes `nNNNN.fit.json` beside a game's prepared file, and reads the fits of
-//! `bench/fields/fits` (`fits/n{N}.json`) when it is given them).
+//! `testdata/fits` (`fits/n{N}.json`) when it is given them).
 //!
 //! ```text
 //! n, opt, gf2          the game, its optimum promotion sum P*, the GF(2) bound at its root

@@ -62,7 +62,7 @@ try:
 except ImportError:
     nx = None
 
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "src/main/resources/optimal.json"
+DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "results/optimal.json"
 
 
 def fm_bound(n: int, spf: Optional[Sequence[int]] = None) -> int:

@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The fields study's tables: rust/docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md.
+"""The fields study's tables: solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md.
 
 The data files are the output of `examples/fields.rs`: roots.jsonl (`fields roots`, a line per root and arm),
 nodes.jsonl (`fields nodes`) and census.jsonl (`fields roots --census`), next to this script unless an option says
@@ -36,7 +36,7 @@ LITE_FROM, LITE_KILL = 1500, 0.15  # the E1-lite criterion: early kill below the
 K3_FIXTURE, K3_KILL = 1215, 0.5  # K3: node mode at this fixture must cut at least this fraction of the open nodes
 CAP = 8  # core signings per frame at most (`--per-frame` of examples/fields.rs)
 
-# Figures recorded in rust/docs/experiments/, by fixture n: the cuts of the probe's 300 nodes by the GF(2) bound alone
+# Figures recorded in solver/notebook/, by fixture n: the cuts of the probe's 300 nodes by the GF(2) bound alone
 # ("Matroid intersection bounds (2026-10)", nodes table) and by the LP over all conflicts ("How far can nogoods go
 # (2026-10)", the probe's nodes), and the range of the cuts of the per-frame bound at every 10th node, 30 a fixture
 # ("The per-frame bound (2026-10)": the root's multipliers to 20 steps of the node's own).
@@ -435,7 +435,7 @@ def section_nodes(nodes, path):
         rows = max((rs for (m, _), rs in rows_of.items() if m == n), key=len, default=None)
         return "-" if not rows else of(sum(1 for r in rows if not gf2_open(r)), len(rows))
 
-    print("The recorded figures (rust/docs/experiments/): GF(2) alone, \"Matroid intersection bounds (2026-10)\"; "
+    print("The recorded figures (solver/notebook/): GF(2) alone, \"Matroid intersection bounds (2026-10)\"; "
           "the LP over all conflicts, \"How far can nogoods go (2026-10)\"; the per-frame bound at every 10th node "
           "(the root's multipliers to 20 steps of the node's own), \"The per-frame bound (2026-10)\".  "
           "Here: cuts of the nodes in the data.\n")

@@ -46,7 +46,7 @@
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not the
 //! optimum: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree below
-//! the root can hold a heavier completion that breaks one (heuristics/THEORY.md, "Pruning with the inequalities").
+//! the root can hold a heavier completion that breaks one (docs/THEORY.md, "Pruning with the inequalities").
 //! With the optimum as the incumbent nothing beats it whatever the settings, so a different `best` there is a bug.
 
 #[allow(dead_code)] // this reads and writes hex sets only; the probe reads the nodes fixtures too

@@ -194,8 +194,8 @@ fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget, mut limit) = (1usize, f64::INFINITY, u64::MAX, 0);
     let (mut derive, mut searched_only, mut segments, mut upper) = (true, false, false, String::from("all"));
-    let mut optimal = root.join("../../src/main/resources/optimal.json");
-    let mut results = root.join("../results/strict.jsonl");
+    let mut optimal = root.join("../../results/optimal.json");
+    let mut results = root.join("../../results/strict.jsonl");
     let mut out = PathBuf::new();
     for (flag, value) in flags {
         match flag.as_str() {

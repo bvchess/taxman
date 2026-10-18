@@ -220,7 +220,7 @@ def take_option(args: list, flag: str, default):
 
 def main() -> None:
     args = sys.argv[1:]
-    strict_path = Path(take_option(args, "-r", HERE / "../../results/strict.jsonl"))
+    strict_path = Path(take_option(args, "-r", HERE / "../../../results/strict.jsonl"))
     last = int(take_option(args, "-e", CHAIN_END))
     machines = {Path(p).stem: load(p) for p in args}
     per_core(machines)

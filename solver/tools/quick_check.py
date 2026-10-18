@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""The quick check of the Rust crate: the check that every change passes before it is merged (DESIGN.md, section 9).
-Standard library only.
+"""The quick check of the frame solver's crate: the check that every change passes before it is merged (DESIGN.md,
+section 9). Standard library only.
 
-usage: tools/quick_check.py          (from anywhere; it works in rust/ and runs at a low priority)
+usage: solver/tools/quick_check.py   (from anywhere; it works in solver/frame and runs at a low priority)
 
 It runs `cargo fmt --check`, `cargo clippy --all-targets` and the tests of a non-release build, with
-tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy), and exits with status 1 if
+solver/tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy), and exits with status 1 if
 
   * a check fails or a test fails, or
   * the tests take more than TOTAL_LIMIT seconds (their time, not the build's), or
@@ -29,13 +29,14 @@ TEST_LIMIT = 2.0  # seconds of CPU one test may use in a non-release run
 # Tests at once: a half as many again as there are CPUs, since a few tests wait (for a sync, a timer) with a CPU idle.
 JOBS = (os.cpu_count() or 1) * 3 // 2
 
-CRATE = Path(__file__).resolve().parent.parent
-RUN_TESTS = CRATE / "tools" / "cloud" / "run_tests.py"
+TOOLS = Path(__file__).resolve().parent
+CRATE = TOOLS.parent / "frame"  # the frame solver's crate: where the checks run
+RUN_TESTS = TOOLS / "cloud" / "run_tests.py"
 TIMES = CRATE / "target" / "quick-check-times.json"  # how long the tests took last time: the longest start first
 REPORT = CRATE / "target" / "quick-check-report.txt"
 SUMMARY = CRATE / "target" / "quick-check-summary.json"
 
-POINTER = "A test that takes more than about a second is long: see rust/DESIGN.md, section 9, 'Testing'."
+POINTER = "A test that takes more than about a second is long: see solver/docs/DESIGN.md, section 9, 'Testing'."
 
 
 def problems(summary: dict) -> List[str]:
@@ -82,7 +83,7 @@ def main() -> int:
         for message in over:
             print(f"  {message}", file=sys.stderr)
         if over:
-            print(f"  {POINTER}\n  The limits are in rust/tools/quick_check.py; raising one needs Brian's approval.",
+            print(f"  {POINTER}\n  The limits are in solver/tools/quick_check.py; raising one needs Brian's approval.",
                   file=sys.stderr)
         return 1
     seconds = json.loads(SUMMARY.read_text())["seconds"]

@@ -57,7 +57,7 @@ pub enum CliError {
 }
 
 /// The exit status of a `solve` that a game passing the wall (`--game-hours`) ended: a status of its own, so that a
-/// script (`rust/tools/cloud/chain.sh`) tells it from an error (1, 2), a signal (130, 143) and the deadline of its
+/// script (`solver/tools/cloud/chain.sh`) tells it from an error (1, 2), a signal (130, 143) and the deadline of its
 /// own (124).
 pub const WALL_STATUS: u8 = 4;
 

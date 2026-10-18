@@ -1,6 +1,6 @@
 //! The nogoods that a burst of the finder's work and of the sound search learn, and the Lagrangian bound over them
 //! that `choice-prepare` and `choice` fit.  The study of the bound at the root, its data and its conclusion are in
-//! docs/experiments/nogoods-from-the-finders-work-2026-10.md.
+//! solver/notebook/nogoods-from-the-finders-work-2026-10/README.md.
 //!
 //! A *nogood* is a set of candidates that cannot all be promoted from the root ([`taxman::model::Nogoods`]); it holds
 //! everywhere in the search of its game.  So every completion `F` of the root has `|F ∩ N| ≤ |N| - 1` for each nogood

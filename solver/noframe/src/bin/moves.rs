@@ -46,8 +46,8 @@ fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut budget, mut heaviest, mut seconds) = (u64::MAX, true, f64::INFINITY);
-    let mut optimal = root.join("../../src/main/resources/optimal.json");
-    let mut results = root.join("../results/strict.jsonl");
+    let mut optimal = root.join("../../results/optimal.json");
+    let mut results = root.join("../../results/strict.jsonl");
     let mut out = PathBuf::new();
     for (flag, value) in flags {
         match flag.as_str() {

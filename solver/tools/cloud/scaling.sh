@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The scaling sweep: how the proof of a hard game speeds up with the number of threads, on this machine.
 #
-#   rust/tools/cloud/scaling.sh               the sweep (the ladder, --scaling: 1, 2, 4, ... up to all CPUs)
-#   rust/tools/cloud/scaling.sh --engine      also the engine's own benchmark (overhead per node, no work per node)
-#   rust/tools/cloud/scaling.sh --pauses      also one real game with a checkpoint every 0.5 s (cost of a pause)
-#   rust/tools/cloud/scaling.sh --quick       one small game only (seconds: a check that everything runs)
+#   solver/tools/cloud/scaling.sh               the sweep (the ladder, --scaling: 1, 2, 4, ... up to all CPUs)
+#   solver/tools/cloud/scaling.sh --engine      also the engine's own benchmark (overhead per node, no work per node)
+#   solver/tools/cloud/scaling.sh --pauses      also one real game with a checkpoint every 0.5 s (cost of a pause)
+#   solver/tools/cloud/scaling.sh --quick       one small game only (seconds: a check that everything runs)
 #
 # Everything is logged to $LOGS/scaling-<time>.txt with a description of the machine at the top.  RUNBOOK.md,
 # "Reading the sweep", says how to read the tables.  Run it on an idle machine.
@@ -13,7 +13,7 @@
 #   GAMES          games to sweep, default "1215 1225" (proofs that take about 1 and 2.5 minutes on one M1 CPU)
 #   THREADS        a comma list such as 1,8,64,192, default: 1, 2, 4, ... and the number of CPUs
 #   SECONDS_LIMIT  per game and thread count, default 1800; a search that hits it is marked with * in the tables
-#   KNOWN          the results file the ladder takes games from, default rust/results/strict.jsonl
+#   KNOWN          the results file the ladder takes games from, default results/strict.jsonl
 #   ENGINE_THREADS, ENGINE_ITEMS, ENGINE_DEPTH   the engine benchmark's sizes (see tests/engine.rs)
 #   PAUSE_GAME     the game of --pauses, default 1230; PAUSE_THREADS its threads, default all CPUs
 
@@ -37,13 +37,13 @@ for arg in "$@"; do
     esac
 done
 
-[ -x "$LADDER_BIN" ] || die "$LADDER_BIN is missing: run setup.sh (or: cd rust && cargo build --release --examples)"
+[ -x "$LADDER_BIN" ] || die "$LADDER_BIN is missing: run setup.sh (or: cd solver/frame && cargo build --release --examples)"
 [ -x "$TAXMAN_BIN" ] || die "$TAXMAN_BIN is missing: run setup.sh"
 
 GAMES="${GAMES:-1215 1225}"
 [ "$quick" = 1 ] && GAMES="${GAMES_QUICK:-1184}"
 SECONDS_LIMIT="${SECONDS_LIMIT:-1800}"
-KNOWN="${KNOWN:-$CRATE/results/strict.jsonl}"
+KNOWN="${KNOWN:-$TAXMAN_ROOT/results/strict.jsonl}"
 [ -r "$KNOWN" ] || die "$KNOWN is not readable"
 
 mkdir -p "$LOGS"

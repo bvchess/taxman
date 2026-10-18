@@ -56,7 +56,7 @@ def main():
     with opener(args.optsets_file, "rt") as f:
         rows = {r["n"]: r for r in map(json.loads, f) if r["n"] <= args.max}
     checkable = [n for n in sorted(rows) if rows[n]["ended"] == "complete" and rows[n]["sets"] <= MAX_SETS]
-    optimal = {g["n"]: g["moves"] for g in json.loads((ROOT / "src/main/resources/optimal.json").read_text())}
+    optimal = {g["n"]: g["moves"] for g in json.loads((ROOT / "results/optimal.json").read_text())}
     divs = divisor_lists(max(checkable, default=1))
     sys.setrecursionlimit(100_000)
 

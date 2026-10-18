@@ -24,7 +24,7 @@ CARGO = r"""#!/usr/bin/env bash
 # a stand-in for cargo: the commands setup.sh and run_tests.py give it
 echo "cargo $(basename "$PWD") $*" >>"$STUB_LOG"
 [ "$(basename "$PWD")" != "${STUB_FAIL_IN:-}" ] || exit 1
-case "$(basename "$PWD")" in prover) crate=prover ;; *) crate=solver ;; esac
+case "$(basename "$PWD")" in noframe) crate=prover ;; *) crate=solver ;; esac
 tool() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\nexit 0\n' >"$1"; chmod +x "$1"; }
 release=target/release
 case "$1" in
@@ -104,19 +104,19 @@ class Setup(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.base = Path(self.tmp.name)
         self.source = self.base / "source"
-        cloud = self.source / "rust" / "tools" / "cloud"
+        cloud = self.source / "solver" / "tools" / "cloud"
         cloud.mkdir(parents=True)
         for name in ("setup.sh", "env.sh", "build_cache.py", "run_tests.py"):
             shutil.copy(CLOUD / name, cloud / name)
-        (self.source / "rust" / "Cargo.toml").write_text("[package]\n")
-        (self.source / "rust" / "prover").mkdir()
-        (self.source / "rust" / "prover" / "Cargo.toml").write_text("[package]\n")
-        (self.source / "src" / "main" / "resources").mkdir(parents=True)
-        (self.source / "src" / "main" / "resources" / "optimal.json").write_text("{}\n")
-        (self.source / "rust" / "results").mkdir()
-        (self.source / "rust" / "results" / "strict.jsonl").write_text("")
-        executable(self.source / "rust" / "tools" / "check_results.py", "")
-        executable(self.source / "rust" / "prover" / "tools" / "summarize.py", "")
+        (self.source / "solver" / "frame").mkdir()
+        (self.source / "solver" / "frame" / "Cargo.toml").write_text("[package]\n")
+        (self.source / "solver" / "noframe").mkdir()
+        (self.source / "solver" / "noframe" / "Cargo.toml").write_text("[package]\n")
+        (self.source / "results").mkdir()
+        (self.source / "results" / "optimal.json").write_text("{}\n")
+        (self.source / "results" / "strict.jsonl").write_text("")
+        executable(self.source / "solver" / "tools" / "check_results.py", "")
+        executable(self.source / "solver" / "noframe" / "tools" / "summarize.py", "")
         (self.source / ".gitignore").write_text("target\n")
         subprocess.run(["git", "init", "-q", str(self.source)], check=True)
         git(self.source, "add", ".")
@@ -141,7 +141,7 @@ class Setup(unittest.TestCase):
         clone.parent.mkdir()
         subprocess.run(["git", "clone", "-q", str(self.source), str(clone)], check=True)
         if dirty:
-            (clone / "rust" / "stray.rs").write_text("not committed\n")
+            (clone / "solver" / "frame" / "stray.rs").write_text("not committed\n")
         return clone
 
     def setup(self, machine: Path, **variables):
@@ -158,7 +158,7 @@ class Setup(unittest.TestCase):
                      "FAIL_TEST"):
             environment.pop(name, None)
         environment.update({name: str(value) for name, value in variables.items()})
-        done = subprocess.run([BASH, str(machine / "rust" / "tools" / "cloud" / "setup.sh")], capture_output=True,
+        done = subprocess.run([BASH, str(machine / "solver" / "tools" / "cloud" / "setup.sh")], capture_output=True,
                               text=True, env=environment)
         logged = done.stdout + done.stderr
         return done.returncode, logged, work
@@ -176,41 +176,41 @@ class Setup(unittest.TestCase):
         machine = self.machine()
         status, logged, _ = self.setup(machine)
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bins --examples",
-                                              "cargo prover build --release --bins --examples"])
-        self.assertTrue((machine / "rust/target/release/examples/ladder").exists())
-        self.assertTrue((machine / "rust/prover/target/release/exact").exists())
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples",
+                                              "cargo noframe build --release --bins --examples"])
+        self.assertTrue((machine / "solver/frame/target/release/examples/ladder").exists())
+        self.assertTrue((machine / "solver/noframe/target/release/exact").exists())
         self.assertEqual(self.entries(), [], "an untested build never goes to the cache")
 
     def test_build_names_what_is_built_and_leaves_the_prover_out(self):
         machine = self.machine()
         status, logged, _ = self.setup(machine, BUILD="--bin taxman --example ledger", SKIP_SMOKE="")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bin taxman --example ledger"])
-        self.assertTrue((machine / "rust/target/release/examples/ledger").exists())
-        self.assertFalse((machine / "rust/target/release/examples/ladder").exists())
-        self.assertFalse((machine / "rust/prover/target").exists())
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman --example ledger"])
+        self.assertTrue((machine / "solver/frame/target/release/examples/ledger").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/ladder").exists())
+        self.assertFalse((machine / "solver/noframe/target").exists())
         self.assertIn("smoke: replay optimal.json", logged)  # the solver has its checks, the prover none
         self.assertIn("smoke: none for the prover", logged)
 
     def test_build_prover_asks_for_the_prover_and_none_leaves_it_out(self):
         status, logged, _ = self.setup(self.machine(), BUILD="--bin taxman", BUILD_PROVER="--bin exact")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bin taxman",
-                                              "cargo prover build --release --bin exact"])
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman",
+                                              "cargo noframe build --release --bin exact"])
         status, logged, _ = self.setup(self.machine(), BUILD_PROVER="none")
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bins --examples"])
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples"])
 
     def test_a_large_machine_builds_both_crates_at_once_and_a_failure_in_either_stops_the_setup(self):
         executable(self.bin / "nproc", "#!/bin/sh\necho 64\n")
         status, logged, _ = self.setup(self.machine())
         self.assertEqual(status, 0, logged)
-        self.assertEqual(sorted(self.cargo_calls()), ["cargo prover build --release --bins --examples",
-                                                      "cargo rust build --release --bins --examples"])
+        self.assertEqual(sorted(self.cargo_calls()), ["cargo frame build --release --bins --examples",
+                                                      "cargo noframe build --release --bins --examples"])
         self.assertIn("[solver] ", logged)  # each build's lines say whose they are
         self.assertIn("building the prover", logged)
         self.cargo_calls()
-        for crate in ("prover", "rust"):
+        for crate in ("noframe", "frame"):
             status, logged, _ = self.setup(self.machine(), STUB_FAIL_IN=crate)
             self.assertEqual(status, 1, logged)
             self.assertIn("a build failed", logged)
@@ -219,7 +219,7 @@ class Setup(unittest.TestCase):
         machine = self.machine()
         status, logged, _ = self.setup(machine, PROVER_ONLY="1", SKIP_SMOKE="")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo prover build --release --bins --examples"])
+        self.assertEqual(self.cargo_calls(), ["cargo noframe build --release --bins --examples"])
         self.assertIn("smoke: none for the solver", logged)
 
     def test_a_build_that_is_not_understood_stops_the_setup(self):
@@ -232,26 +232,26 @@ class Setup(unittest.TestCase):
     def test_the_old_tests_run_for_the_parts_that_are_built(self):
         status, logged, _ = self.setup(self.machine(), BUILD="--bin taxman", SKIP_TESTS="0")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bin taxman",
-                                              "cargo rust test -- --test-threads=4"])
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman",
+                                              "cargo frame test -- --test-threads=4"])
 
     def test_studies_adds_the_feature_to_the_solvers_build_and_tests_and_to_nothing_else(self):
         machine = self.machine()
         status, logged, _ = self.setup(machine, STUDIES="1", BUILD_PROVER="none", SKIP_TESTS="0")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo rust build --release --bins --examples --features studies",
-                                              "cargo rust test --features studies -- --test-threads=4"])
-        self.assertTrue((machine / "rust/target/release/examples/wall").exists())
+        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples --features studies",
+                                              "cargo frame test --features studies -- --test-threads=4"])
+        self.assertTrue((machine / "solver/frame/target/release/examples/wall").exists())
         status, logged, _ = self.setup(self.machine(), STUDIES="1", BUILD="--bin taxman --example wall")
         self.assertEqual(status, 0, logged)
         self.assertEqual(self.cargo_calls(),
-                         ["cargo rust build --release --bin taxman --example wall --features studies"])
+                         ["cargo frame build --release --bin taxman --example wall --features studies"])
         status, logged, _ = self.setup(self.machine(), STUDIES="1", PROVER_ONLY="1")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo prover build --release --bins --examples"])
+        self.assertEqual(self.cargo_calls(), ["cargo noframe build --release --bins --examples"])
         plain = self.machine()
         self.assertEqual(self.setup(plain)[0], 0)
-        self.assertFalse((plain / "rust/target/release/examples/wall").exists())
+        self.assertFalse((plain / "solver/frame/target/release/examples/wall").exists())
 
     # --- the release suite and the cache ---
     def test_a_release_run_tests_stores_and_a_second_machine_takes_it(self):
@@ -259,9 +259,9 @@ class Setup(unittest.TestCase):
         status, logged, work = self.setup(first, RELEASE_TESTS="1")
         self.assertEqual(status, 0, logged)
         calls = self.cargo_calls()
-        self.assertIn("cargo rust build --release --bins --examples", calls)
-        self.assertIn("cargo rust test --release --no-run --message-format=json", calls)
-        self.assertIn("cargo prover test --release --no-run --message-format=json", calls)
+        self.assertIn("cargo frame build --release --bins --examples", calls)
+        self.assertIn("cargo frame test --release --no-run --message-format=json", calls)
+        self.assertIn("cargo noframe test --release --no-run --message-format=json", calls)
         self.assertIn("release suite: passed", logged)
         self.assertEqual(self.entries(), ["prover-bins+prover-examples+solver-bins+solver-examples"])
         (manifest,) = self.cache.glob("*/*/manifest")
@@ -276,7 +276,7 @@ class Setup(unittest.TestCase):
         self.assertEqual(self.cargo_calls(), [], "a hit builds nothing and runs no suite")
         self.assertIn("the binaries come from the build cache", logged)
         self.assertIn("release suite: not run", logged)
-        self.assertTrue(os.access(second / "rust/target/release/taxman", os.X_OK))
+        self.assertTrue(os.access(second / "solver/frame/target/release/taxman", os.X_OK))
         self.assertIn("smoke: replay optimal.json", logged)  # the smoke checks still show that the machine runs them
 
     def test_a_build_with_the_studies_is_cached_apart_from_one_without(self):
@@ -293,18 +293,18 @@ class Setup(unittest.TestCase):
         status, logged, _ = self.setup(self.machine(), RELEASE_TESTS="1", STUDIES="1")
         self.assertEqual(status, 0, logged)
         calls = self.cargo_calls()
-        self.assertIn("cargo rust build --release --bins --examples --features studies", calls)
-        self.assertIn("cargo rust test --release --features studies --no-run --message-format=json", calls)
-        self.assertIn("cargo prover test --release --no-run --message-format=json", calls)  # the prover has none
+        self.assertIn("cargo frame build --release --bins --examples --features studies", calls)
+        self.assertIn("cargo frame test --release --features studies --no-run --message-format=json", calls)
+        self.assertIn("cargo noframe test --release --no-run --message-format=json", calls)  # the prover has none
         self.assertEqual(self.entries(), [default_entry, studies_entry])
 
         with_wall = self.machine()
         status, logged, _ = self.setup(with_wall, REQUIRE_CACHED="1", STUDIES="1", BUILD="--example wall")
         self.assertEqual(status, 0, logged)
-        self.assertTrue(os.access(with_wall / "rust/target/release/examples/wall", os.X_OK))
+        self.assertTrue(os.access(with_wall / "solver/frame/target/release/examples/wall", os.X_OK))
         without = self.machine()  # a request without the studies takes the entry without them
         self.assertEqual(self.setup(without, REQUIRE_CACHED="1")[0], 0)
-        self.assertFalse((without / "rust/target/release/examples/wall").exists())
+        self.assertFalse((without / "solver/frame/target/release/examples/wall").exists())
         self.assertEqual(self.cargo_calls(), [])
 
     def test_a_failing_suite_stores_nothing_and_says_which_test_failed(self):
@@ -332,7 +332,7 @@ class Setup(unittest.TestCase):
         self.cargo_calls()
         status, logged, _ = self.setup(self.machine(dirty=True))
         self.assertEqual(status, 0, logged)
-        self.assertIn("cargo rust build --release --bins --examples", self.cargo_calls())
+        self.assertIn("cargo frame build --release --bins --examples", self.cargo_calls())
 
     def test_require_cached_does_not_build_on_a_miss(self):
         status, logged, _ = self.setup(self.machine(), REQUIRE_CACHED="1")
@@ -355,7 +355,7 @@ class Setup(unittest.TestCase):
         self.cargo_calls()
         status, logged, _ = self.setup(self.machine(), RUSTFLAGS="-C target-cpu=neoverse-v2")
         self.assertEqual(status, 0, logged)
-        self.assertIn("cargo rust build --release --bins --examples", self.cargo_calls())
+        self.assertIn("cargo frame build --release --bins --examples", self.cargo_calls())
 
     def test_the_cache_off_builds_and_runs_the_suite_without_storing(self):
         status, logged, _ = self.setup(self.machine(), RELEASE_TESTS="1", BUILD_CACHE="off")

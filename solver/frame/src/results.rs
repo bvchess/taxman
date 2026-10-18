@@ -103,8 +103,8 @@
 //! done (so a crash loses at most the line being written); and a game that failed a check after it was found is
 //! written to [`rejected_path`] instead, with the reason.  [`verify_files`] runs the same checks on files without
 //! changing them, and that the files agree on the games they share (`taxman verify-results`).  The Python referee
-//! `tools/check_results.py` derives the same proofs and assumptions from the same rules with no code in common, so a
-//! mistake in either shows as a disagreement.
+//! `solver/tools/check_results.py` derives the same proofs and assumptions from the same rules with no code in common,
+//! so a mistake in either shows as a disagreement.
 //!
 //! # Extending the table of optimal games
 //!
@@ -643,7 +643,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
 }
 
 /// A completed game of the committed chain, or of any results file, as `taxman solve --use-prev` takes it ([`Known`]):
-/// read, not checked again (`taxman verify-results` and `tools/check_results.py` check the file).
+/// read, not checked again (`taxman verify-results` and `solver/tools/check_results.py` check the file).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommittedGame {
     pub score: u64,
@@ -1641,7 +1641,7 @@ mod tests {
     #[test]
     fn the_digest_is_fnv1a_of_the_moves_in_decimal() {
         assert_eq!(moves_digest(&[]), "cbf29ce484222325");
-        // As computed by tools/check_results.py, which shares no code with this.
+        // As computed by solver/tools/check_results.py, which shares no code with this.
         assert_eq!(moves_digest(&[5, 4, 6]), "c27bf6b65c1b8616");
         assert_eq!(moves_digest(&[79]), "07f20f07b4b4be5d");
     }
@@ -1922,7 +1922,7 @@ mod tests {
     /// The first `count` lines of the committed chain, which include hundreds of repeats (107 in the first 300), whose
     /// checks set search problems up.
     fn committed_lines(count: usize) -> Vec<Json> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("results/strict.jsonl");
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/strict.jsonl");
         let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         text.lines().take(count).map(|line| Json::parse(line).unwrap()).collect()
     }

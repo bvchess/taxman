@@ -57,10 +57,10 @@ m's.  The digests a line records are hashes of the problems, which only the solv
 that they agree and that the two games are consistent with sharing one problem, and `taxman verify-results` sets
 both problems up again and compares them.
 
-Proof kinds (rust/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.  The
-assumptions of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or by
-the prime formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1 taken
-from optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats
+Proof kinds (solver/frame/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.
+The assumptions of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or
+by the prime formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1
+taken from optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats
 assumes; a known proof assumes what its source's game does; other proofs assume nothing.  A line of another schema
 than this referee reads is a problem.
 
@@ -68,7 +68,7 @@ The report counts games by proof kind and by assumption, and the arithmetic cert
 n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
 
 usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--bounds PATH]
-Without FILEs it checks rust/results/*.jsonl but the bounds store, which is not a file of results.  The exit status is 1
+Without FILEs it checks results/*.jsonl but the bounds store, which is not a file of results.  The exit status is 1
 if any check fails.
 """
 import argparse
@@ -79,10 +79,10 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-RESULTS = REPO / "rust" / "results"
+RESULTS = REPO / "results"
 COMMITTED = RESULTS / "strict.jsonl"  # the committed chain, a source of known games
 BOUNDS = RESULTS / "bounds.jsonl"  # the bounds store, the other (it is not a results file)
-OPTIMAL = REPO / "src" / "main" / "resources" / "optimal.json"
+OPTIMAL = RESULTS / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The tuning driver: runs (configuration, problem) jobs of the tuning suite and ranks the configurations.
 
-Standard library only; run it as `python3 -I bench/tuning/tune.py` from rust/ (README.md has the commands).
+Standard library only; run it as `python3 -I tune.py` (README.md has the commands).
 
 A configuration is a name and a list of `NAME=VALUE` tactic settings (what `taxman solve --tactic` takes; the
 configurations file is a JSON object of them, and `default`, no settings, is always there).  A problem is a line of the
@@ -34,7 +34,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CRATE = HERE.parents[1]
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+CRATE = REPO / "solver" / "frame"
 DEFAULT = "default"
 PROBLEM_KINDS = ("unit", "whole")
 
@@ -294,7 +295,7 @@ def parse(argv=None):
     p.add_argument("--configs", help="JSON object of configurations: name -> list of NAME=VALUE (default: none)")
     p.add_argument("--results", default="results.jsonl", help="the results file, appended to (default results.jsonl)")
     p.add_argument("--suite", default=HERE / "suite.jsonl", type=Path, help="the suite (default: suite.jsonl here)")
-    p.add_argument("--known", default=CRATE / "results" / "strict.jsonl", type=Path, help="the known games")
+    p.add_argument("--known", default=REPO / "results" / "strict.jsonl", type=Path, help="the known games")
     p.add_argument("--bin", default=CRATE / "target" / "release" / "examples" / "tune", type=Path,
                    help="the tune example (cargo build --release --features studies --example tune)")
     p.add_argument("--workers", type=int, default=os.cpu_count() or 1, help="jobs at once, one thread each")

@@ -1414,9 +1414,8 @@ mod tests {
     /// Every 7th game to 420.
     #[test]
     fn the_search_finds_the_optimum_just_above_the_target() {
-        let text =
-            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"))
-                .expect("optimal.json");
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"))
+            .expect("optimal.json");
         let scores: Vec<(usize, u64)> = text
             .lines()
             .filter(|l| l.contains("\"n\""))
@@ -1652,7 +1651,7 @@ mod tests {
     /// (optimal.json's values; the optimal set is unique in all of them but 2..260 still exercises both rules).
     #[test]
     fn derived_optimal_sets_are_the_enumerated_ones() {
-        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"));
+        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
         let known = crate::jsonl::recorded_games(&[path]);
         let spf = smallest_prime_factors(300);
         let all = |n: u64| -> Vec<Vec<u32>> {
@@ -1693,7 +1692,7 @@ mod tests {
     /// {110, 132, 168} exchanged for {98, 150, 162}), with the same upper part.
     #[test]
     fn game_425_has_two_optimal_sets() {
-        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../src/main/resources/optimal.json"));
+        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
         let known = crate::jsonl::recorded_games(&[path]);
         let spf = smallest_prime_factors(500);
         let sets = |n: u64| {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The tables of a sweep of nogood policies, from the lines run.sh kept.
 
-usage: summarize.py RESULTS [--games=G,G,...] [--policies=P,P,...]     (from rust/bench/nogoods; markdown on stdout)
+usage: summarize.py RESULTS [--games=G,G,...] [--policies=P,P,...]     (markdown on stdout)
 
 RESULTS has one line per run, `GAME<TAB>POLICY<TAB>the ladder's line`.  The policies are in the order of their first
 appearance, or as --policies lists them (and the games as --games does); `default` is the one the others are compared

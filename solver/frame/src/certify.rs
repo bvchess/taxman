@@ -1,9 +1,9 @@
 //! Certificates of U: a recorded score proven optimal on the whole board, game by game, by a search of the extended
-//! problem (`taxman certify`; heuristics/THEORY.md, "The extended problem", Theorem M⁺ and its corollary).
+//! problem (`taxman certify`; docs/THEORY.md, "The extended problem", Theorem M⁺ and its corollary).
 //!
 //! A game of `n` whose proof uses the frame model (an exhausted search, a trivial board, a repeat) is optimal on the
 //! whole board if some optimal game plays every source of three or more prime factors that setup keeps, U\*_{≥3}
-//! (the statement U).  The prover's barred parity bounds (`rust/prover/src/bin/upper.rs`, one line per game) settle
+//! (the statement U).  The prover's barred parity bounds (`solver/noframe/src/bin/upper.rs`, one line per game) settle
 //! most of U\*_{≥3} against the game's score V: a member is *certified* when no set that respects Theorem B and leaves
 //! it out weighs more than V; the others are *open*, O.  The *extended problem* Π⁺(O)
 //! ([`build_extended`](crate::frames::build_extended)) keeps the certified ones fixed and leaves the open ones
@@ -28,7 +28,7 @@
 //! to keep (`claims`, the default), and without any, as every certificate made before that lemma was.  A run searches
 //! in one of them (`taxman certify --no-claims` in the second), and a certificate's line records which
 //! ([`Certificate::claims`]; a line with no such field is read as without).  The two have the same promotion sets and
-//! so the same heaviest promotion set (heuristics/THEORY.md, the corollary of Lemma M5⁺), so a certificate made in one
+//! so the same heaviest promotion set (docs/THEORY.md, the corollary of Lemma M5⁺), so a certificate made in one
 //! bounds the heaviest promotion set of the problem in the other.
 //!
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often

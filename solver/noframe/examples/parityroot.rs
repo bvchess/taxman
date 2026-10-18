@@ -1,5 +1,5 @@
 //! The parity bound at the root of each game (`parityroot A B [STEP]`): the heaviest common independent set of the
-//! two parity matroids, against the recorded optimum (optimal.json, then `../results/strict.jsonl`), with the
+//! two parity matroids, against the recorded optimum (optimal.json, then `../../results/strict.jsonl`), with the
 //! Franklín–Moniot bound beside it, its cost, and checks: the bound is at least the optimum and the recorded game's
 //! moves are independent in both matroids (the bound with every recorded move forced is still at least the optimum).
 
@@ -14,8 +14,7 @@ fn main() {
     let args: Vec<u32> = std::env::args().skip(1).map(|a| a.parse().unwrap()).collect();
     let (from, to, step) = (args[0], args[1], args.get(2).copied().unwrap_or(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let known =
-        recorded_games(&[&root.join("../../src/main/resources/optimal.json"), &root.join("../results/strict.jsonl")]);
+    let known = recorded_games(&[&root.join("../../results/optimal.json"), &root.join("../../results/strict.jsonl")]);
     let spf = smallest_prime_factors(to as usize);
     for n in (from..=to).step_by(step as usize) {
         let Some((score, moves)) = known.get(&u64::from(n)) else { continue };

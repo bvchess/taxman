@@ -45,7 +45,8 @@ pub fn testdata(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata").join(path)
 }
 
-/// The Java's golden data for game `n`: `testdata/golden/n<NNNN>.json` (made by `tools/golden/export.sh`).
+/// The Java's golden data for game `n`: `testdata/golden/n<NNNN>.json` (made by `tools/golden/export.sh` at the git tag
+/// `java-final`).
 pub fn golden(n: u32) -> Json {
     Json::from_file(testdata(&format!("golden/n{n:04}.json"))).unwrap_or_else(|e| panic!("n={n}: {e}"))
 }
@@ -73,7 +74,7 @@ pub fn golden_files(dir: &str) -> Vec<(u32, Json)> {
 
 /// A committed results file under `results/`.
 pub fn results_path(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("results").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results").join(name)
 }
 
 /// One game of a results file: its score and moves.
@@ -509,7 +510,7 @@ impl<const W: usize> Game<W> {
     /// Until it has found a completion that keeps them the search has no sum to prune by, and where none does it
     /// would take the whole tree, so it also cuts a node where no completion can, by the inequality itself: a pair
     /// `(p, q)` has `c_p(P ∪ F) ≥ c_p(P)` and `c_q(P ∪ F) ≤ c_q(P) + c_q(C)` for every `F` among the candidates `C`
-    /// that are left, with `P` the node's promotions (`promoted` and the completion so far; `heuristics/THEORY.md`,
+    /// that are left, with `P` the node's promotions (`promoted` and the completion so far; `docs/THEORY.md`,
     /// "Pruning with the inequalities"), so `c_p(P) > c_q(P) + c_q(C)` leaves no `F` that keeps `c_p ≤ c_q`.  That is
     /// the cofactor arithmetic alone, not the search's rule ([`Symmetries::hopeless`]).
     pub fn exhaustive_keeping(

@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))
+LANDSCAPE = HERE.parent / "the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10"
+sys.path.insert(0, str(LANDSCAPE))
 from land import by_n, quantile  # noqa: E402
 
 GAMES = range(2176, 3441)
@@ -45,7 +46,7 @@ def bands(games):
 
 
 runs = {name: by_n(HERE / file) for name, file in RUNS.items() if (HERE / file).exists()}
-cal = by_n(HERE.parent / "cal.jsonl")
+cal = by_n(LANDSCAPE / "cal.jsonl")
 short = {name: {n: d["shortfall"] for n, d in run.items()} for name, run in runs.items()}
 start_s = {name: {n: d["start_s"] for n, d in run.items()} for name, run in runs.items()}
 total_s = {name: {n: d["setup_s"] + d["start_s"] for n, d in run.items()} for name, run in runs.items()}

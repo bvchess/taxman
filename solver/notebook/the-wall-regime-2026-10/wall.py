@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The wall regime's tables: docs/experiments/the-wall-regime-2026-10.md.
+"""The wall regime's tables: solver/notebook/the-wall-regime-2026-10/README.md.
 
 What a game of the chain costs is its search, which grows with the size of the tree, plus everything around the search,
 which grows with the board size n alone.  `examples/wall.rs` measures the two apart; its output is in this directory
@@ -49,9 +49,9 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-CHAIN = RUST / "results" / "strict.jsonl"
-C8G_CHAIN = RUST / "bench" / "cloud" / "c8g.chain-2176.jsonl"
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+CHAIN = REPO / "results" / "strict.jsonl"
+C8G_CHAIN = REPO / "solver" / "frame" / "testdata" / "c8g.chain-2176.jsonl"
 CHAIN_END = 2175  # the last game of the committed chain that the tables use (wall_output.md: the chain ended here)
 
 PHASE_BAND = 250  # games to a band in the tables of the committed chain

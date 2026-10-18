@@ -3,8 +3,9 @@
 
 RUN_DIR holds a ledger run's events.jsonl and ledger.jsonl (or their gzipped copies).  The truth is the committed chain
 (results/strict.jsonl), the chain's cost per game is the run to the wall's search time (the current build on the same
-machine type: bench/wall_run/reproof.jsonl.gz), and the quick bounds of every game are the landscape's
-(bench/landscape/cal.jsonl)."""
+machine type: solver/notebook/the-run-to-the-wall-2026-10/reproof.jsonl.gz), and the quick bounds of every game
+are the landscape's (solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/
+cal.jsonl)."""
 import gzip
 import html
 import json
@@ -12,8 +13,9 @@ import math
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]  # rust/
-WALL_RUN = REPO / "bench/wall_run/reproof.jsonl.gz"
+NOTEBOOK = Path(__file__).resolve().parents[2]
+REPO = NOTEBOOK.parents[1]  # the repository
+WALL_RUN = NOTEBOOK / "the-run-to-the-wall-2026-10/reproof.jsonl.gz"
 CHAIN_CORE_HOURS = 280.0  # the run to the wall's 2176..3440: about 4.4 hours of 64 threads
 
 run_dir, out_path = sys.argv[1], sys.argv[2]
@@ -35,7 +37,8 @@ first, last = start["first"], start["last"]
 ns = list(range(first, last + 1))
 truth = {d["n"]: d for d in jsonl(f"{REPO}/results/strict.jsonl") if first <= d["n"] <= last}
 wall = {d["n"]: d for d in jsonl(WALL_RUN) if first <= d["n"] <= last}
-quick = {d["n"]: d for d in jsonl(f"{REPO}/bench/landscape/cal.jsonl") if first <= d["n"] <= last}
+LANDSCAPE = NOTEBOOK / "the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10"
+quick = {d["n"]: d for d in jsonl(LANDSCAPE / "cal.jsonl") if first <= d["n"] <= last}
 
 # What proved each game: the rule of the upper bound that met the lower one.
 METHODS = [("search", "its own search"), ("repeat", "the same search as another game"),

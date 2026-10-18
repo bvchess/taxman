@@ -49,9 +49,10 @@ class Cache(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         base = Path(self.tmp.name)
         self.root = base / "checkout"
-        (self.root / "rust" / "prover").mkdir(parents=True)
+        (self.root / "solver" / "frame").mkdir(parents=True)
+        (self.root / "solver" / "noframe").mkdir()
         (self.root / ".gitignore").write_text("target\n")
-        (self.root / "rust" / "Cargo.toml").write_text("[package]\n")
+        (self.root / "solver" / "frame" / "Cargo.toml").write_text("[package]\n")
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         git(self.root, "add", ".")
         git(self.root, "commit", "-q", "-m", "one")
@@ -65,15 +66,15 @@ class Cache(unittest.TestCase):
 
     def build(self, root: Path) -> None:
         """What `cargo build --release --bins --examples` leaves in the two crates, and its by-products."""
-        release = root / "rust" / "target" / "release"
+        release = root / "solver" / "frame" / "target" / "release"
         make_binary(release / "taxman", "taxman")
         make_binary(release / "examples" / "ladder", "ladder")
         make_binary(release / "examples" / "ledger", "ledger")
         make_binary(release / "examples" / "ledger-0123456789abcdef", "ledger copy")
         (release / "examples" / "ledger.d").write_text("deps\n")
         (release / "libtaxman.rlib").write_text("library\n")
-        make_binary(root / "rust" / "prover" / "target" / "release" / "exact", "exact")
-        make_binary(root / "rust" / "prover" / "target" / "release" / "examples" / "inspect", "inspect")
+        make_binary(root / "solver" / "noframe" / "target" / "release" / "exact", "exact")
+        make_binary(root / "solver" / "noframe" / "target" / "release" / "examples" / "inspect", "inspect")
 
     def cli(self, command: str, *arguments: str, env=None, root=None):
         where = ["--root", str(root or self.root)]
@@ -120,7 +121,8 @@ class Cache(unittest.TestCase):
     def test_a_dirty_checkout_has_no_key_and_neither_reads_nor_writes(self):
         self.assertEqual(self.store().returncode, 0)
         self.assertEqual(self.cli("key").returncode, 0)  # the build outputs are ignored files: clean
-        for dirt in ("rust/Cargo.toml", "rust/new.rs"):  # a change to a tracked file, a file git does not know
+        # a change to a tracked file, a file git does not know
+        for dirt in ("solver/frame/Cargo.toml", "solver/frame/new.rs"):
             (self.root / dirt).write_text("changed\n")
             self.assertEqual(self.cli("key").returncode, 3, dirt)
             self.assertEqual(self.fetch("--bins").returncode, 3, dirt)
@@ -134,7 +136,7 @@ class Cache(unittest.TestCase):
 
     def test_no_commit_and_no_repository_have_no_key(self):
         bare = Path(self.tmp.name) / "plain"
-        (bare / "rust").mkdir(parents=True)
+        (bare / "solver" / "frame").mkdir(parents=True)
         done = self.cli("key", root=bare)
         self.assertEqual(done.returncode, 3)
         self.assertIn("git", done.stderr)
@@ -153,15 +155,15 @@ class Cache(unittest.TestCase):
         machine = self.fresh_checkout()
         done = self.fetch("--bins --examples", "--bins --examples", root=machine)
         self.assertEqual(done.returncode, 0, done.stderr)
-        for relative in ("rust/target/release/taxman", "rust/target/release/examples/ledger",
-                         "rust/prover/target/release/exact", "rust/prover/target/release/examples/inspect"):
+        for relative in ("solver/frame/target/release/taxman", "solver/frame/target/release/examples/ledger",
+                         "solver/noframe/target/release/exact", "solver/noframe/target/release/examples/inspect"):
             path = machine / relative
             self.assertTrue(os.access(path, os.X_OK), relative)
             self.assertEqual(subprocess.run([str(path)], capture_output=True, text=True).stdout.strip(), path.name)
         # not what cargo keeps for itself:
-        self.assertFalse((machine / "rust/target/release/libtaxman.rlib").exists())
-        self.assertFalse((machine / "rust/target/release/examples/ledger-0123456789abcdef").exists())
-        self.assertFalse((machine / "rust/target/release/examples/ledger.d").exists())
+        self.assertFalse((machine / "solver/frame/target/release/libtaxman.rlib").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/ledger-0123456789abcdef").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/ledger.d").exists())
 
     def test_the_entry_says_what_it_holds_and_that_the_suite_passed(self):
         self.store()
@@ -184,7 +186,7 @@ class Cache(unittest.TestCase):
         self.assertEqual(self.fetch("--example ladder", root=machine).returncode, 1)  # not in it
         self.assertEqual(self.fetch("--bins", root=machine).returncode, 1)  # all of them is more than one
         self.assertEqual(self.fetch("--bin taxman", prover="--bin exact", root=machine).returncode, 1)  # no prover
-        self.assertFalse((machine / "rust/target/release/examples/ladder").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/ladder").exists())
         self.assertEqual(self.fetch("--bin taxman=oops").returncode, 2)
 
     def test_a_plural_entry_serves_a_named_request(self):
@@ -199,9 +201,10 @@ class Cache(unittest.TestCase):
         machine = self.fresh_checkout()
         for request in (studies, "--example wall --features studies"):  # the default build holds no study example
             self.assertEqual(self.fetch(request, root=machine).returncode, 1, request)
-        self.assertFalse((machine / "rust/target/release/examples/wall").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/wall").exists())
 
-        make_binary(self.root / "rust/target/release/examples/wall", "wall")  # what the feature adds to the build
+        # what the feature adds to the build
+        make_binary(self.root / "solver/frame/target/release/examples/wall", "wall")
         self.assertEqual(self.store(solver=studies, prover="").returncode, 0)
         self.assertEqual(sorted(p.name for p in key.iterdir()),
                          ["solver-bins+solver-examples", "solver-bins+solver-examples+solver-features-studies"])
@@ -209,17 +212,17 @@ class Cache(unittest.TestCase):
                                                         / "manifest").read_text())
         machine = self.fresh_checkout()
         self.assertEqual(self.fetch("--example wall --features studies", root=machine).returncode, 0)
-        self.assertTrue(os.access(machine / "rust/target/release/examples/wall", os.X_OK))
+        self.assertTrue(os.access(machine / "solver/frame/target/release/examples/wall", os.X_OK))
         machine = self.fresh_checkout()  # a request without the studies takes the smaller entry, the default build
         self.assertEqual(self.fetch("--bins --examples", root=machine).returncode, 0)
-        self.assertFalse((machine / "rust/target/release/examples/wall").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/wall").exists())
 
     def test_nothing_is_fetched_for_another_cpu_or_commit(self):
         self.store()
         machine = self.fresh_checkout()
         other_cpu = dict(self.env, RUSTFLAGS="-C target-cpu=neoverse-v2")
         self.assertEqual(self.fetch("--bins", root=machine, env=other_cpu).returncode, 1)
-        (machine / "rust" / "more.rs").write_text("a change\n")
+        (machine / "solver" / "frame" / "more.rs").write_text("a change\n")
         git(machine, "add", ".")
         git(machine, "commit", "-q", "-m", "two")
         self.assertEqual(self.fetch("--bins", root=machine).returncode, 1)
@@ -234,7 +237,7 @@ class Cache(unittest.TestCase):
         done = self.fetch("--bins --examples", "--bins --examples", root=machine)
         self.assertEqual(done.returncode, 1)
         self.assertIn("checksum", done.stderr)
-        self.assertFalse((machine / "rust" / "target").exists())
+        self.assertFalse((machine / "solver" / "frame" / "target").exists())
 
     def test_an_entry_without_its_manifest_or_without_a_passed_suite_does_not_exist(self):
         self.store()
@@ -271,7 +274,7 @@ class Cache(unittest.TestCase):
         self.assertEqual(self.store(prover="", summary=solver_only).returncode, 0)  # the solver's suite is enough
 
     def test_a_pack_of_a_build_that_lacks_a_file_fails(self):
-        (self.root / "rust" / "target" / "release" / "taxman").unlink()
+        (self.root / "solver" / "frame" / "target" / "release" / "taxman").unlink()
         done = self.cli("pack", "--stage", str(Path(self.tmp.name) / "stage"), "--solver=--bin taxman")
         self.assertEqual(done.returncode, 1)
         self.assertIn("did not produce", done.stderr)
@@ -280,7 +283,7 @@ class Cache(unittest.TestCase):
         # The stage was packed from a clean checkout; the tests ran after that and may have written files in it.
         stage = Path(self.tmp.name) / "stage"
         self.assertEqual(self.cli("pack", "--stage", str(stage), "--solver=--bins").returncode, 0)
-        (self.root / "rust" / "left-by-a-test.txt").write_text("x\n")
+        (self.root / "solver" / "frame" / "left-by-a-test.txt").write_text("x\n")
         summary = Path(self.tmp.name) / "summary.json"
         summary.write_text(json.dumps(PASSED))
         done = self.cli("put", "--stage", str(stage), "--summary", str(summary), "--solver=--bins")
@@ -306,7 +309,7 @@ class Cache(unittest.TestCase):
         machine = self.fresh_checkout()
         done = self.fetch("--bin taxman --example ledger", "--bin exact", root=machine)
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertTrue(os.access(machine / "rust/target/release/taxman", os.X_OK))
+        self.assertTrue(os.access(machine / "solver/frame/target/release/taxman", os.X_OK))
         stored = Path(fake["FAKE_S3"]) / "bucket" / "builds" / f"{self.commit}-{self._arch()}-cortex-a76"
         self.assertTrue(stored.is_dir())
 

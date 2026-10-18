@@ -1,6 +1,6 @@
 //! Whether a set of numbers of a whole board can all be played, decided with nothing from the frame solver.
 //!
-//! The decision is the peel of heuristics/THEORY.md (Theorems 1 to 3): a set is playable, that is, some order of it is
+//! The decision is the peel of docs/THEORY.md (Theorems 1 to 3): a set is playable, that is, some order of it is
 //! a legal game on the board `1..=n`, exactly when the peel pairs every member with a maximal factor of its own,
 //! whatever the order of the peel's moves.  The code uses only the tables of maximal factors and composites of
 //! [`crate::numtheory::Tables`], which are foundation code, and `std`: it shares nothing with `frames` or `model`.  So

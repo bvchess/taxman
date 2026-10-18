@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""What drives the slope of the cost curve: the tables of docs/experiments/what-drives-the-slope-2026-10.md.
+"""What drives the slope of the cost curve: the tables of solver/notebook/what-drives-the-slope-2026-10/README.md.
 
 Reads the recorded chain (nodes on 4 threads, proofs), slope_roots.jsonl (`slope roots`: the root of every non-prime
 game 880-1300 and of the games past 1300 that bands.jsonl solved) and slope_proofs.jsonl (`slope prove`: one-thread
@@ -21,8 +21,8 @@ from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-STRICT_FILE = "results/strict.jsonl"
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+STRICT_FILE = "rust/results/strict.jsonl"  # where the file was at STRICT_COMMIT, before the layout of solver/
 # The chain whose node counts the section quotes; the file was replaced by the GF(2) build's chain at 0133afe/0b5a136.
 STRICT_COMMIT = "2487671c38c051958fee9b8e2f0e0edd07715878"
 
@@ -40,7 +40,7 @@ def recorded_chain(path):
     if path:
         return load(path)
     try:
-        shown = subprocess.run(["git", "show", f"{STRICT_COMMIT}:./{STRICT_FILE}"], cwd=RUST, check=True,
+        shown = subprocess.run(["git", "show", f"{STRICT_COMMIT}:{STRICT_FILE}"], cwd=REPO, check=True,
                                capture_output=True, text=True)
     except (OSError, subprocess.CalledProcessError) as error:
         detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else error
@@ -118,7 +118,7 @@ def gaps(r):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description="The tables of docs/experiments/what-drives-the-slope-2026-10.md.")
+    parser = argparse.ArgumentParser(description="The tables of the entry in README.md.")
     parser.add_argument("--strict", type=Path,
                         help=f"the recorded chain (default: {STRICT_FILE} as of {STRICT_COMMIT[:7]}, from git)")
     strict = {r["n"]: r for r in recorded_chain(parser.parse_args(argv).strict)}

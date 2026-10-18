@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""Unit tests of certify_pilot.py: on synthetic certificate lines, on real ones (bench/certify/
+"""Unit tests of certify_pilot.py: on synthetic certificate lines, on real ones (solver/tools/certify/
 certificates_sample_1301_2175.jsonl, made by `taxman certify` on the laptop) and on the committed plan and pilot list.
 
 usage: python3 -I test_certify_pilot.py      (or python3 -I -m unittest test_certify_pilot, from this directory)
@@ -19,12 +19,12 @@ sys.path.insert(0, str(HERE))  # python -I puts neither the script's directory n
 import certify_campaign  # noqa: E402
 import certify_pilot  # noqa: E402
 
-CRATE = HERE.parent
-PLAN_JSONL = CRATE / "bench/certify/plan.jsonl"
-PLAN_MD = CRATE / "bench/certify/plan.md"
-PROBLEMS = CRATE / "bench/certify/problems_600_3440.jsonl"
-PILOT_LIST = CRATE / "bench/certify/lists/stage4/pilot7.txt"
-SAMPLE = CRATE / "bench/certify/certificates_sample_1301_2175.jsonl"
+CERTIFY = HERE / "certify"
+PLAN_JSONL = CERTIFY / "plan.jsonl"
+PLAN_MD = CERTIFY / "plan.md"
+PROBLEMS = CERTIFY / "problems_600_3440.jsonl"
+PILOT_LIST = CERTIFY / "lists/stage4/pilot7.txt"
+SAMPLE = CERTIFY / "certificates_sample_1301_2175.jsonl"
 
 C = 100.0  # microseconds a node, in the synthetic plans
 NODES = 1_000_000  # the chain's nodes of a synthetic game: N c is 100 thread-seconds

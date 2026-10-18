@@ -1,5 +1,6 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""Unit tests of certify_campaign.py, on synthetic work lists, and its lists as committed (bench/certify/lists/stage4).
+"""Unit tests of certify_campaign.py, on synthetic work lists, and its lists as committed
+(solver/tools/certify/lists/stage4).
 
 usage: python3 -I test_certify_campaign.py      (or python3 -I -m unittest test_certify_campaign, from this directory)
 """
@@ -16,9 +17,9 @@ sys.path.insert(0, str(HERE))  # python -I puts neither the script's directory n
 
 import certify_campaign  # noqa: E402
 
-CRATE = HERE.parent
-PLAN = CRATE / "bench/certify/plan.jsonl"
-STAGE4 = CRATE / "bench/certify/lists/stage4"
+CERTIFY = HERE / "certify"
+PLAN = CERTIFY / "plan.jsonl"
+STAGE4 = CERTIFY / "lists/stage4"
 PILOT = certify_campaign.PILOT_HEADS
 NAMES = ["dear_rest", "deferred", "pilot7", "rest_1", "rest_2", "rest_3", "rest_4"]
 

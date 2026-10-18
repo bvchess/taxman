@@ -51,13 +51,13 @@ pub struct SearchTactics {
     pub lagrange: bool,
     /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest common independent set of the two GF(2)
     /// frame matroids, kept along the searcher's path by contraction), branch on the conflicts of its heaviest set,
-    /// and (with `fix_forced`) force the members without which it would cut (proven: heuristics/THEORY.md, Theorem
+    /// and (with `fix_forced`) force the members without which it would cut (proven: docs/THEORY.md, Theorem
     /// 11, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
     /// bound; the Lagrangian bound over nogoods still applies after it.
     pub gf2: bool,
     /// Cut a node none of whose completions keeps the inequality of every symmetric pair of the root, and drop from a
     /// node's candidates those that no such completion holds ([`crate::search::symmetry`]; proven:
-    /// heuristics/THEORY.md, Theorem 13 and "Pruning with the inequalities": every heaviest promotion set keeps the
+    /// docs/THEORY.md, Theorem 13 and "Pruning with the inequalities": every heaviest promotion set keeps the
     /// inequalities, so a search for one needs only the completions that do).  It acts with either node bound.  The
     /// rule is a function of the node's promotions and candidates alone, so the tree depends on nothing but the node.
     pub symmetry: bool,

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Get the results (and the checkpoints) off the machine, or back onto a fresh one.
 #
-#   S3_DEST=s3://bucket/prefix rust/tools/cloud/save.sh             copy up: results, logs, checkpoints
-#   S3_DEST=s3://bucket/prefix rust/tools/cloud/save.sh --restore   copy down, onto a machine that has none of them
-#   rust/tools/cloud/save.sh                                        with no S3_DEST: says how to pull from your laptop
+#   S3_DEST=s3://bucket/prefix solver/tools/cloud/save.sh             copy up: results, logs, checkpoints
+#   S3_DEST=s3://bucket/prefix solver/tools/cloud/save.sh --restore   copy down, onto a machine that has none of them
+#   solver/tools/cloud/save.sh                                        with no S3_DEST: says how to pull from your laptop
 #
 # Needs the AWS CLI (preinstalled on Amazon Linux; on Ubuntu see https://aws.amazon.com/cli/) and an instance role or
 # credentials that may list, read and write that prefix.  chain.sh runs this every SAVE_EVERY seconds when S3_DEST is

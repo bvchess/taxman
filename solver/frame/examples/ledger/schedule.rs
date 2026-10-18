@@ -40,7 +40,7 @@ pub struct Settings {
     /// The time limit of a climb, in seconds: the search of a board next to a proven one, which that game seeds (0: no
     /// climbs).  60 s: on the cloud run's boards a climb of 60 s on each would have cost 142 core-seconds a proof, and
     /// the proofs a longer limit adds cost 310 (60 to 90 s), 420 (to 120 s), 870 (to 180 s) against the 1,500 to 2,600 of
-    /// the run's late ones (bench/ledger/climb_limit.txt).
+    /// the run's late ones (solver/notebook/the-ledger-bounds-from-both-sides-2026-10/climb_limit.txt).
     pub climb_limit: f64,
     /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
     pub climb_up: bool,
@@ -48,8 +48,9 @@ pub struct Settings {
     /// The seconds of one thread that the finder (large neighbourhood search, `common/lns.rs`) is given after a
     /// board's map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game
     /// is offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders'
-    /// measurements (docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md) it has most of its gain in
-    /// the first second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder included.
+    /// measurements (solver/notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md) it has most of its
+    /// gain in the first second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder
+    /// included.
     pub lns_seconds: f64,
     /// The points a floor step goes down below the board's upper bound, at the median slope of the cost of a search
     /// under a floor (a tenfold in cost; a steeper board's line takes fewer points).  A board whose gap is more than

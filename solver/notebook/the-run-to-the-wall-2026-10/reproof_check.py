@@ -21,7 +21,7 @@ def search_seconds(game):
 
 with gzip.open(HERE / "reproof.jsonl.gz", "rt") as f:
     run = {game["n"]: game for game in map(json.loads, f)}
-with open(HERE / "../../results/strict.jsonl") as f:
+with open(HERE / "../../../results/strict.jsonl") as f:
     committed = {game["n"]: game for game in map(json.loads, f)}
 # the run's own lines of 3441..3914 are the committed file's
 run.update({n: game for n, game in committed.items() if n > 3440})

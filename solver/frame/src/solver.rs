@@ -157,7 +157,7 @@ pub struct SolveOptions {
     /// (`window` is 1): a game that goes on from a game still in flight could not tell whether it was proven.
     pub keep_going: bool,
     /// A number recorded in `options.pass` of every line this run writes (`--pass N`): which pass over the games made
-    /// it, when a script (`rust/tools/cloud/sweep.sh`) goes over them more than once.  It changes nothing else.
+    /// it, when a script (`solver/tools/cloud/sweep.sh`) goes over them more than once.  It changes nothing else.
     pub pass: Option<u32>,
     /// With [`keep_going`](Self::keep_going), search again the games the results file holds only unfinished lines of
     /// (`--retry`; each resumes from its checkpoint if it has one), instead of passing over them.  A pass with a longer
@@ -166,7 +166,7 @@ pub struct SolveOptions {
     /// With [`keep_going`](Self::keep_going), search again only the unfinished games whose game of `n − 1` now has more
     /// to give than it had when the game was last tried (`--retry-improved`): it is proven and the line's was not, or
     /// it has a better best game than the line's seed, or the line had no game of `n − 1`.  The others are passed over.
-    /// One pass of a script (`rust/tools/cloud/sweep.sh`) that goes over blocks of games made apart, so that every
+    /// One pass of a script (`solver/tools/cloud/sweep.sh`) that goes over blocks of games made apart, so that every
     /// game sees the one before it whichever block made it.
     pub retry_improved: bool,
     /// The games of a range in flight at once (`--window`, at least 1, 4 by default: the best measured at 64 threads,
@@ -1393,8 +1393,9 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
 /// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1650
 /// games of the committed chain 1..3914 whose problem an earlier game posed repeats the last board size before it that
-/// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (docs/experiments/same-search-2026-10.md).  The window
-/// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
+/// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/same-search-2026-10/README.md).  The
+/// window keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games
+/// alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 
 /// An earlier completed game, as much of it as a repeat of its search needs.
@@ -1603,8 +1604,9 @@ fn previous_game(
 }
 
 /// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the
-/// seed and the ceiling that the game of `n − 1` gives, so it costs more (`bench/curve/README.md` measures how
-/// much).  `in_table`: whether `optimal.json` has the game of `n − 1` (which `--use-prev` would take).
+/// seed and the ceiling that the game of `n − 1` gives, so it costs more
+/// (`solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md` measures how much).  `in_table`: whether
+/// `optimal.json` has the game of `n − 1` (which `--use-prev` would take).
 fn note_standalone(n: u32, in_table: bool) {
     let before = n - 1;
     let how = if in_table {

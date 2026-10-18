@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""The gap past 2175: docs/experiments/the-gap-past-2175-2026-10.md.
+"""The gap past 2175: solver/notebook/the-gap-past-2175-2026-10/README.md.
 
 The root GF(2) gap of a game (the root's bound less the chain's optimum) against the size of the tree that the
 EC2 chain made of it.  Inputs (this directory unless a path says otherwise):
@@ -40,15 +40,15 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-STRICT = RUST / "results" / "strict.jsonl"
-ROOTS = RUST / "bench" / "gf2" / "roots.jsonl"
-SCALING = RUST / "bench" / "cloud" / "c8g48" / "games.jsonl"
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+STRICT = REPO / "results" / "strict.jsonl"
+ROOTS = HERE.parent / "the-gf2-bound-in-the-search-2026-10" / "roots.jsonl"
+SCALING = HERE.parent / "scaling-to-192-threads-2026-10" / "c8g48" / "games.jsonl"
 SETUP = HERE / "setup_c8g.jsonl"
 DATA = HERE / "gaps_chain.jsonl"
 ANATOMY = HERE / "anatomy_chain.jsonl"
 RESOLVED = HERE / "resolved_1301_2175.jsonl"
-CALIBRATION = RUST / "bench" / "cloud" / "c8g.chain-2176.jsonl"
+CALIBRATION = REPO / "solver" / "frame" / "testdata" / "c8g.chain-2176.jsonl"
 
 CHAIN_END = 2175  # the last game of the committed chain that the tables use (strict.jsonl runs on past it)
 FIRST = CHAIN_END + 1  # the first game past it, where the EC2 chain's games begin

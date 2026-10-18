@@ -19,9 +19,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-WALL = RUST / "target" / "debug" / "examples" / "wall"
-KNOWN = RUST / "results" / "strict.jsonl"
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+CRATE = REPO / "solver" / "frame"
+WALL = CRATE / "target" / "debug" / "examples" / "wall"
+KNOWN = REPO / "results" / "strict.jsonl"
 
 # game: seconds of its standalone search in ../landscape/sa/.  The first ten are the main games (300 to 1800 s there,
 # 286 for 3259); the four after them are cheap extras for the shape of the curve.
@@ -58,7 +59,7 @@ def main():
         cap = round(GAMES[n] * 1.3)
         command = ["nice", "-n", "10", str(args.wall), "target", "--known", str(KNOWN), "--fractions", args.fractions,
                    "--cap", str(cap), str(n)]
-        done = subprocess.run(command, cwd=RUST, capture_output=True, text=True)
+        done = subprocess.run(command, cwd=CRATE, capture_output=True, text=True)
         if done.returncode != 0:
             sys.exit(f"{' '.join(command)}: exit {done.returncode}\n{done.stdout}{done.stderr}")
         with args.file.open("a") as out:  # one line a game, appended whole

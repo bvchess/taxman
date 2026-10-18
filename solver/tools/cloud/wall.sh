@@ -4,10 +4,10 @@
 # comes, or something fails.  This is the script for your machine; the instance's side is wall-node.sh (RUNBOOK.md,
 # section 12).
 #
-#   rust/tools/cloud/wall.sh launch --commit SHA --until DATE [options]   create everything and start the run
-#   rust/tools/cloud/wall.sh status                                        where the run is, from S3 and the group
-#   rust/tools/cloud/wall.sh stop [--now]                                  end the run (cleanly, or at once)
-#   rust/tools/cloud/wall.sh cleanup [--force]                             delete what launch made; check what is left
+#   solver/tools/cloud/wall.sh launch --commit SHA --until DATE [options]   create everything and start the run
+#   solver/tools/cloud/wall.sh status                                        where the run is, from S3 and the group
+#   solver/tools/cloud/wall.sh stop [--now]                                  end the run (cleanly, or at once)
+#   solver/tools/cloud/wall.sh cleanup [--force]                             delete what launch made; check what is left
 #
 # Every aws command is printed, as `+ aws ...`, before it runs (reads and changes alike); DRY_RUN=1 runs the reads and
 # prints, without running, the commands that create, change or delete something.  `launch` does, in this order:
@@ -195,7 +195,7 @@ write_user_data() {
     local file="$1" timer_minutes="$2" commit="$3"
     {
         printf '#!/bin/bash\n'
-        printf '# The user data of the launch template %s (rust/tools/cloud/wall.sh).\n' "$NAME"
+        printf '# The user data of the launch template %s (solver/tools/cloud/wall.sh).\n' "$NAME"
         printf 'export AWS_DEFAULT_REGION=%s S3_DEST=%s ASG=%s\n' "$AWS_DEFAULT_REGION" "$S3_DEST" "$NAME"
         printf '# The timer: no machine lives longer than the whole budget and two hours, whatever the scripts do.\n'
         printf 'shutdown -h +%s\n' "$timer_minutes"
@@ -218,7 +218,7 @@ write_user_data() {
         printf '    fail "git checkout %s"\n' "$commit"
         printf 'sudo -u ec2-user -i env AWS_DEFAULT_REGION=%s S3_DEST=%s ASG=%s \\\n' "$AWS_DEFAULT_REGION" "$S3_DEST" \
             "$NAME"
-        printf '    tmux new-session -d -s tx -c /home/ec2-user/taxman rust/tools/cloud/wall-node.sh ||\n'
+        printf '    tmux new-session -d -s tx -c /home/ec2-user/taxman solver/tools/cloud/wall-node.sh ||\n'
         printf '    fail "tmux"\n'
     } >"$file"
 }

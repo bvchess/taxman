@@ -1,6 +1,6 @@
 //! Theorem M, the frame model's exactness, against the code.
 //!
-//! The theorem (heuristics/THEORY.md, "Theorem M"):
+//! The theorem (docs/THEORY.md, "Theorem M"):
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`), and
 //! > Π_n the root problem the search is given (`Board::prepare`: the model, the root frame set, the candidates and

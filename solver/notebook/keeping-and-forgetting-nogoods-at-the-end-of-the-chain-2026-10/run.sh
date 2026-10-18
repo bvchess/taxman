@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # The sweep of the nogood policies: each game proved by the ladder on one thread, seeded with its own optimum, under
-# each policy.  From rust/ (the release build of the ladder, `cargo build --release --example ladder`, must be there):
+# each policy.  From the top of the repository (the release build of the ladder, `cargo build --release --example
+# ladder` in solver/frame, must be there):
 #
-#   nice -n 10 bench/nogoods/run.sh OUT "GAME GAME ..." SECONDS POLICY...
+#   nice -n 10 solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/run.sh OUT "GAME GAME ..." SECONDS POLICY...
 #
 # A POLICY is `default`, or the `--tactic` specs of the run joined by commas (`nogood_keep=top64`, or
 # `forget_nogoods=off,nogood_cap=256`).  One line per run is appended to OUT as `GAME<TAB>POLICY<TAB>the ladder's
@@ -15,7 +16,7 @@ out=${1:?usage: run.sh OUT "GAME GAME ..." SECONDS POLICY...}
 games=${2:?}
 seconds=${3:?}
 shift 3
-ladder=${LADDER:-target/release/examples/ladder}
+ladder=${LADDER:-solver/frame/target/release/examples/ladder}
 known=${KNOWN:-results/strict.jsonl}
 
 for game in $games; do

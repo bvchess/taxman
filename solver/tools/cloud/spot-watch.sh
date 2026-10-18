@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # On an EC2 Spot interruption notice (two minutes of warning), stop the run cleanly and save.
 #
-#   rust/tools/cloud/spot-watch.sh   run it next to chain.sh, prover.sh or certify.sh, in a second tmux window
+#   solver/tools/cloud/spot-watch.sh   run it next to chain.sh, prover.sh or certify.sh, in a second tmux window
 #
 # It polls the instance metadata service (IMDSv2) every 5 seconds.  When the notice appears it sends SIGTERM to the
 # chain.sh, prover.sh or certify.sh whose pid is in $TAXMAN_WORK/chain.pid, prover.pid or certify_PHASE.pid (the

@@ -4,11 +4,11 @@
 # steers the optimized build: the same answers and trees, and 0-2% fewer cycles than the plain release build on
 # the searches at the end of the chain since the hot loop is inlined by hand (12% before; DESIGN.md, "Performance").
 #
-#   tools/pgo.sh [--no-train]
+#   solver/tools/pgo.sh [--no-train]
 #
-# Builds target/pgo/release/taxman and its examples (perf, ladder); target/release stays the plain build, which
+# Builds solver/frame/target/pgo/release/taxman and its examples (perf, ladder); target/release stays the plain build, which
 # is the one to profile (with PGO the search is inlined into a few functions and a sampler sees little).
-# --no-train reuses the profile of the last run (target/pgo/merged.profdata).  Takes a few minutes.
+# --no-train reuses the profile of the last run (solver/frame/target/pgo/merged.profdata).  Takes a few minutes.
 #
 # The training workload: the perf probe's fixtures (936 and 1215, every hot kernel and a search window, on the
 # matching path and with the GF(2) bound), and a short search on one thread of a game of every set width the
@@ -22,7 +22,7 @@
 # targets generic armv8-a by default, unlike macOS (apple-m1, where target-cpu gains nothing), so build for the
 # machine with extra flags, for instance
 #
-#   RUSTFLAGS="-C target-cpu=native" tools/pgo.sh
+#   RUSTFLAGS="-C target-cpu=native" solver/tools/pgo.sh
 #
 # (Graviton4 is a Neoverse V2; check /proc/cpuinfo.)  The probe measures cycles only on macOS; on Linux run it
 # under `perf stat` to compare builds.
@@ -33,11 +33,12 @@ TRAIN=1
 if [ "${1:-}" = "--no-train" ]; then
     TRAIN=0
 elif [ $# -gt 0 ]; then
-    echo "usage: tools/pgo.sh [--no-train]" >&2
+    echo "usage: solver/tools/pgo.sh [--no-train]" >&2
     exit 2
 fi
 
-CRATE="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." >/dev/null 2>&1 && pwd )"
+CRATE="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../frame" >/dev/null 2>&1 && pwd )"  # the frame solver's crate
+REPO="$( cd "$CRATE/../.." >/dev/null 2>&1 && pwd )"
 OUT="$CRATE/target/pgo"
 EXTRA="${RUSTFLAGS:-}"  # kept, and added to the profile flags
 TARGETS=(--bin taxman --example perf --example ladder)
@@ -73,7 +74,7 @@ if [ "$TRAIN" = 1 ]; then
     "$BIN/examples/perf" --reps 1 --tactic gf2=on
     # A game of every width, from W = 8 to W = 128; those at the end of the chain searched longer.
     for game in 480:2 700:2 936:4 1184:8 1300:8 1600:3 1900:3 2200:2 2400:2 2900:2 3300:2 3700:2 4100:2; do
-        "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$CRATE/results/strict.jsonl" \
+        "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$REPO/results/strict.jsonl" \
             "${game%:*}" | cut -c1-100
     done
     "$PROFDATA" merge -o "$OUT/merged.profdata" "$OUT/raw"

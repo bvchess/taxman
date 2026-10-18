@@ -1,6 +1,6 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """The tables of E2, the multi-field bound at the roots past 2175:
-rust/docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md, section "E2".
+solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md, section "E2".
 
 Reads, next to this script unless an option says otherwise: roots.jsonl (E1: arm f1cores at 66 roots of 900-2175),
 roots_e2.jsonl (E2: arms gf2, f1cores and f1cores16 certified at the roots past 2175), search_e1roots.jsonl (search

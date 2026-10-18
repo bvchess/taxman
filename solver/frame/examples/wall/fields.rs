@@ -1,8 +1,8 @@
 //! The A1 bound at a search node: the GF(2) frame matroids and a family of GF(3) signed frame matroids, coupled by
 //! Lagrangian multipliers that a column generation fits, for the node-choice measurement (`choice.rs`).  The bound,
-//! its proof (Theorems 14 and 15 of heuristics/THEORY.md) and the study that measured it at the roots and in a branch
-//! and bound are in docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md and
-//! docs/experiments/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10.md; its code is that study's, from
+//! its proof (Theorems 14 and 15 of docs/THEORY.md) and the study that measured it at the roots and in a branch
+//! and bound are in solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md and
+//! solver/notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md; its code is that study's, from
 //! commit 8753189 (`dw` the bound and its fit, `gf3` the signed matroids, `cores` the signings the fit derives from the
 //! cores of its columns, `lp` the master's simplex, `frames` the GF(2) matroids as vectors, `fit` a root fit as a
 //! file), adapted to today's library and cut to what a node needs.
@@ -12,7 +12,7 @@
 //! * [`fit_root`]: the *root fit* of a game, the main arm of the study (the plain signing of frames 1 to 3 and the
 //!   signings derived from the cores the master's columns run into, certified: the exact checks and the separation),
 //!   within a budget in seconds.  It is the one fit a game has, `choice-prepare` writes it beside the game's prepared
-//!   file (`nNNNN.fit.json`, [`SavedFit`]'s format, which `bench/fields/fits` has for the games the study fitted) and
+//!   file (`nNNNN.fit.json`, [`SavedFit`]'s format, which `testdata/fits` has for the games the study fitted) and
 //!   `choice` reads it back ([`Root`]).
 //! * [`Node::warm_refit`], the study's *R2* at a node: the root fit's multipliers (Tier 1: one evaluation of `L`), then
 //!   a column generation of at most `pricings` evaluations from the root's master columns and rank inequalities that

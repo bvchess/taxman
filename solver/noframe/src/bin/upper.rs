@@ -38,7 +38,7 @@ fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds) = (1usize, f64::INFINITY);
-    let mut optimal = root.join("../../src/main/resources/optimal.json");
+    let mut optimal = root.join("../../results/optimal.json");
     let mut results: Vec<PathBuf> = Vec::new();
     let mut out = PathBuf::new();
     for (flag, value) in flags {
@@ -53,7 +53,7 @@ fn main() {
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
     if results.is_empty() {
-        results.push(root.join("../results/strict.jsonl"));
+        results.push(root.join("../../results/strict.jsonl"));
     }
     let files: Vec<&Path> = std::iter::once(optimal.as_path()).chain(results.iter().map(PathBuf::as_path)).collect();
     let known = recorded_games(&files);

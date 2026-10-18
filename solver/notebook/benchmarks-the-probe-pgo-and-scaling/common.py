@@ -8,9 +8,9 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-TAXMAN = RUST / "target/release/taxman"
-LADDER = RUST / "target/release/examples/ladder"
+CRATE = HERE.parents[1] / "frame"  # the frame solver's crate (this folder is solver/notebook/<entry>)
+TAXMAN = CRATE / "target/release/taxman"
+LADDER = CRATE / "target/release/examples/ladder"
 
 # The study was made with `--tactic reuse_prev=off --tactic revise_freedoms=off` (no unproven tactic), for `solve`,
 # and `--tactic revise_freedoms=off` for the ladder; both tactics are gone, and the defaults are that search now.

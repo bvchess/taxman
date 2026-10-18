@@ -60,8 +60,8 @@ commands:
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: optimal.json's, the committed chain's
-                               (rust/results/strict.jsonl) and the proven boards of the bounds store
-                               (rust/results/bounds.jsonl).  A board a source has proven is recorded without a
+                               (results/strict.jsonl) and the proven boards of the bounds store
+                               (results/bounds.jsonl).  A board a source has proven is recorded without a
                                search (proof known), citing the source and what it assumes (optimal.json's games
                                are assumed optimal; the store's, wherever statement U holds at the boards its
                                bound rests on); the game of A-1 from them, if --out FILE lacks it, gives the
@@ -74,8 +74,8 @@ commands:
   bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
                           with the previous game from optimal.json or past it from the results file --known
-                          (default rust/results/strict.jsonl), and no derivation; appends the run to
-                          --history (default rust/bench/history.jsonl; both in the repository)
+                          (default results/strict.jsonl), and no derivation; appends the run to
+                          --history (default solver/frame/bench/history.jsonl; both in the repository)
   verify-optimal [FILE]   replay every game of the built-in optimal.json (or of the table FILE) and check its
                           recorded score
   verify-results [--threads K] FILE...
@@ -83,7 +83,7 @@ commands:
                           against optimal.json, the chain from n-1, each line's proof and provenance, and that the
                           files agree; counts games by proof and by what they assume.  K threads set up the
                           searches of the repeats (default: all CPUs).  A line that cites a known source is checked
-                          against optimal.json, the committed chain and the bounds store of rust/results
+                          against optimal.json, the committed chain and the bounds store of results
   extend-optimal RESULTS --out FILE [--table FILE]
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
                           results file RESULTS appended: from the board size after the table's last, each game that
@@ -110,7 +110,7 @@ commands:
                           the first line to fail ends it with status 1 (that a search explored its whole tree is
                           taken on trust).  Then says how far the proofs of the recorded scores reach: every
                           game to some board is proven by the prover (--exact, default every exact_*.jsonl of
-                          rust/prover/data), by a certificate, or by a ceiling above a proven game.  K threads
+                          solver/noframe/data), by a certificate, or by a ceiling above a proven game.  K threads
                           set the problems up (default: all CPUs)
   tables N K...           print the maximal factors and composites of each K on the board 1..=N
   help                    show this message

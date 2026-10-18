@@ -4,7 +4,7 @@
 //! it has not explored: the engine's deque and the units its workers held, which its final checkpoint holds, exactly
 //! what a resume needs ([`crate::engine`], "Checkpoint").  The search is exact (DESIGN.md, section 4: every pruning
 //! drops only sets no heavier than the incumbent of its time, sets that cannot be promoted, or, with the tactic
-//! `symmetry`, sets that break an inequality every heaviest set keeps, heuristics/THEORY.md, Theorem 13), so every
+//! `symmetry`, sets that break an inequality every heaviest set keeps, docs/THEORY.md, Theorem 13), so every
 //! promotable set that a resume would have to find, one heavier than the incumbent (keeping the inequalities, under
 //! `symmetry`), is a completion of an open unit's node: its promotions, plus some of its candidates.  So the best
 //! promotion sum of the game is at most the larger of the incumbent and, over the open units, the node's promotion sum

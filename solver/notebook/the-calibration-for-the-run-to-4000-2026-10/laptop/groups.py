@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Where the search workers' time goes, from a macOS `sample` profile of `taxman solve` (run.sh with a profile).
 
-usage: groups.py BINARY sample.txt [--top K] [--json]     (from rust/bench/chain_end)
+usage: groups.py BINARY sample.txt [--top K] [--json]
 
 Only the engine worker threads (`engine-N`) are counted: the main thread and the game's setup thread wait or set the
 game up.  Every frame's return address is symbolicated with its inlined frames (`atos -i`, as tools/profile/attribute.py
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 # The profile tool's parser and symbolicator (tools/profile/attribute.py), one source for both.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "profile"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools" / "profile"))
 import attribute  # noqa: E402
 
 WORKER = re.compile(r"engine-\d+")

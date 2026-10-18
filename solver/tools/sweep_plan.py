@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Planning for rust/tools/cloud/sweep.sh, which solves a stretch of board sizes in blocks of consecutive games, each
+"""Planning for solver/tools/cloud/sweep.sh, which solves a stretch of board sizes in blocks of consecutive games, each
 block on one thread, and then goes over the games again so that each sees the game before it whichever block made it.
 Standard library only; it shares no code with the Rust crate.
 
@@ -32,7 +32,7 @@ import math
 import os
 import sys
 
-# Seconds of setup of one game on one thread, measured on a Graviton4 core (rust/tools/cloud/RUNBOOK.md, section 5).
+# Seconds of setup of one game on one thread, measured on a Graviton4 core (solver/docs/RUNBOOK.md, section 5).
 SETUP_SECONDS = [(2200, 1.0), (3000, 3.0), (4000, 9.0), (6000, 48.0)]
 SAME_SEARCH_WINDOW = 8  # solver::SAME_SEARCH_WINDOW: how far back a game looks for a search to repeat
 

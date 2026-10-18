@@ -6,7 +6,7 @@
 //!
 //! * the vocabulary of a bound: [`Rule`], how it was derived, and [`Side`];
 //! * the relations between boards, with the arithmetic of the upper bounds ([`upper_by`]) and the games that carry a
-//!   lower bound across ([`carry_game`]), which heuristics/THEORY.md, "The ledger: bounds between boards", proves;
+//!   lower bound across ([`carry_game`]), which docs/THEORY.md, "The ledger: bounds between boards", proves;
 //! * the line ([`Line`], [`Game`]) and the file ([`Store`], [`Best`]);
 //! * a lower bound's game as the referee has it ([`play`], [`expand`], [`carried`]).
 //!
@@ -138,7 +138,7 @@ impl Side {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The relations between boards (heuristics/THEORY.md, "The ledger: bounds between boards")
+// The relations between boards (docs/THEORY.md, "The ledger: bounds between boards")
 
 /// Lemma L1: the game of `n` (composite) that the finished game `moves` of n − 1 gives: the same moves, then n if it is
 /// still legal.  (n is the only move that can be left: the legal moves that `complete` adds are n, or none.)
@@ -213,7 +213,7 @@ pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
 /// boards next to each other, `Ceiling` (the target is the board after the source: opt(n) <= opt(n − 1) + n),
 /// `Monotone` (the board before: opt(n − 1) <= opt(n)) and `Prime` (either way, across a prime p, q the largest prime
 /// below it: opt(p) = opt(p − 1) + p − q); and for boards with the same search problem, `Repeat`, with their bags
-/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (heuristics/THEORY.md, "The
+/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (docs/THEORY.md, "The
 /// ledger: bounds between boards"); the book and the store's checkers use this one copy of the arithmetic.
 ///
 /// # Errors

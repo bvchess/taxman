@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The certificates campaign of stage 4: `taxman certify` over the list files of rust/bench/certify/lists/stage4, one
+# The certificates campaign of stage 4: `taxman certify` over the list files of solver/tools/certify/lists/stage4, one
 # list or several at once, resumable, with logging.
 #
-#   rust/tools/cloud/certify.sh LIST[:THREADS]...
+#   solver/tools/cloud/certify.sh LIST[:THREADS]...
 #
 # LIST is a name (pilot7, dear_rest, rest_1 to rest_4, deferred: the file $LISTS/NAME.txt) or the path of a list file
 # (one board size a line, as `taxman certify --list` reads it; the files of stage4 hold only games that need a
@@ -44,9 +44,9 @@
 #
 # Environment (all optional):
 #   THREADS              threads to share among the lists without :THREADS, default every CPU
-#   LISTS                where the lists are, default rust/bench/certify/lists/stage4
-#   CERT_RESULTS         the recorded games, default rust/results/strict.jsonl
-#   CERT_UPPER           the prover's barred bounds, a list of files, default every rust/prover/data/upper_*.jsonl
+#   LISTS                where the lists are, default solver/tools/certify/lists/stage4
+#   CERT_RESULTS         the recorded games, default results/strict.jsonl
+#   CERT_UPPER           the prover's barred bounds, a list of files, default every solver/noframe/data/upper_*.jsonl
 #   OUT_DIR              the output files, default $TAXMAN_WORK/results (the directory that save.sh copies)
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #   STATUS_EVERY         seconds between status lines in certify_PHASE.log, default 600
@@ -63,8 +63,8 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=run.sh
 . "$here/run.sh"
 
-LISTS="${LISTS:-$CRATE/bench/certify/lists/stage4}"
-CERT_RESULTS="${CERT_RESULTS:-$CRATE/results/strict.jsonl}"
+LISTS="${LISTS:-$TOOLS/certify/lists/stage4}"
+CERT_RESULTS="${CERT_RESULTS:-$TAXMAN_ROOT/results/strict.jsonl}"
 OUT_DIR="${OUT_DIR:-$TAXMAN_WORK/results}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"

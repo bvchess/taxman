@@ -6,7 +6,7 @@
 # Written for Amazon Linux 2023 (dnf) and Ubuntu 22.04/24.04 (apt), on arm64 and x86_64.  Other Linux with git, a C
 # compiler and curl works with SKIP_PACKAGES=1.
 #
-#   rust/tools/cloud/setup.sh           from inside a checkout
+#   solver/tools/cloud/setup.sh         from inside a checkout
 #   ./setup.sh                          a copy of this script alone: it clones REPO_URL to $TAXMAN_DIR first
 #
 # The release binaries come from the build cache when it has them (RUNBOOK.md, section 15): a clean checkout at a commit
@@ -20,12 +20,12 @@
 #   NO_PULL=1       leave the checkout as it is (otherwise: git pull --ff-only, if it is clean and on a branch)
 #   SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1
 #   PROVER_ONLY=1 build and check only the prover (what prover.sh runs), not the solver: a few minutes less
-#   BUILD           what to build in rust/, as cargo arguments: --bins, --examples, --bin NAME and --example NAME, e.g.
+#   BUILD           what to build in solver/frame/, as cargo arguments: --bins, --examples, --bin NAME and --example NAME, e.g.
 #                   BUILD="--bin taxman --example ledger".  Default "--bins --examples".  A BUILD leaves the prover out
 #                   unless BUILD_PROVER asks for it; the checks of a part that is not built are left out.
-#   BUILD_PROVER    the same for rust/prover/ (default "--bins --examples" when BUILD is not set, none when it is; the
+#   BUILD_PROVER    the same for solver/noframe/ (default "--bins --examples" when BUILD is not set, none when it is; the
 #                   word `none` for none)
-#   STUDIES=1       also build the study tools of rust/ (tune, extended, structure, wall: cargo's feature `studies`) and
+#   STUDIES=1       also build the study tools of solver/frame/ (tune, extended, structure, wall: cargo's feature `studies`) and
 #                   test them; the default build, with the ladder, the probe and the ledger, skips them.  A build with
 #                   the studies is another entry of the cache than one without (and serves a request without them).
 #   BUILD_CACHE     where the cache is: s3://taxman-013764204840-us-east-1/builds (default), file:///DIR (for tests) or
@@ -55,7 +55,7 @@ say() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 fail() { say "error: $*"; exit 1; }
 
 # --- where the checkout is ---------------------------------------------------------------------------------------
-if [ -f "$here/../../Cargo.toml" ] && [ -f "$here/../../../src/main/resources/optimal.json" ]; then
+if [ -f "$here/../../frame/Cargo.toml" ] && [ -f "$here/../../../results/optimal.json" ]; then
     root="$(cd "$here/../../.." && pwd)"
 else
     root="${TAXMAN_DIR:-$HOME/taxman}"
@@ -135,7 +135,7 @@ fi
 say "rustc $rust_version"
 
 # --- the checkout ------------------------------------------------------------------------------------------------
-if [ ! -f "$root/rust/Cargo.toml" ]; then
+if [ ! -f "$root/solver/frame/Cargo.toml" ]; then
     [ -e "$root" ] && fail "$root exists but is not a Taxman checkout"
     say "cloning $REPO_URL ($BRANCH) to $root"
     git clone --branch "$BRANCH" "$REPO_URL" "$root"
@@ -154,13 +154,13 @@ fi
 
 export TAXMAN_ROOT="$root"
 # shellcheck source=env.sh
-. "$root/rust/tools/cloud/env.sh"
+. "$root/solver/tools/cloud/env.sh"
 
 mkdir -p "$TAXMAN_WORK/results" "$CKPT" "$LOGS"
 exec > >(tee -a "$LOGS/setup.log") 2>&1
 
 # --- what to build -----------------------------------------------------------------------------------------------
-# cargo's arguments for rust/ (solver_args) and for rust/prover/ (prover_args); an empty one builds nothing there.
+# cargo's arguments for solver/frame/ (solver_args) and for solver/noframe/ (prover_args); an empty one builds nothing there.
 solver_args="--bins --examples"
 [ -z "${BUILD+set}" ] || solver_args="$BUILD"
 if [ -n "${BUILD_PROVER+set}" ]; then
@@ -284,7 +284,7 @@ if [ "${SKIP_SMOKE:-0}" != 1 ]; then
         "$TAXMAN_BIN" verify-optimal
         say "smoke: the committed results files, with the solver's verifier and the independent Python one"
         "$TAXMAN_BIN" verify-results "${COMMITTED_RESULTS[@]}"
-        python3 "$CRATE/tools/check_results.py" "${COMMITTED_RESULTS[@]}"
+        python3 "$TOOLS/check_results.py" "${COMMITTED_RESULTS[@]}"
         say "smoke: games 1..400 against optimal.json"
         "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
     else
@@ -366,8 +366,8 @@ env_report
 echo
 echo "work directory: $TAXMAN_WORK (results, ckpt, logs)"
 echo "solver:         $TAXMAN_BIN"
-if [ -x "$CRATE/tools/pgo.sh" ]; then
-    echo "note: $CRATE/tools/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
+if [ -x "$TOOLS/pgo.sh" ]; then
+    echo "note: $TOOLS/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
 fi
 echo "prover:         $EXACT_BIN"
 echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/prover.sh A B (the prover's proofs);" \

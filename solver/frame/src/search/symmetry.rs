@@ -31,7 +31,7 @@
 //! # The rule
 //!
 //! A heaviest promotion set `S` has `c_p(S) ≤ c_q(S)` for every symmetric pair `(p, q)`: otherwise `π(S)` can be
-//! promoted too and is heavier (`heuristics/THEORY.md`, Theorem 13, "Prime exchanges").  So a search for a heaviest
+//! promoted too and is heavier (`docs/THEORY.md`, Theorem 13, "Prime exchanges").  So a search for a heaviest
 //! set may look only at the sets that *keep* every pair's constraint ([`Symmetries::keeps`]), and cut a node when no
 //! completion of it can: [`Symmetries::hopeless`] tests that, and [`Symmetries::exclude`] also takes out of the
 //! node's candidates those that no such completion holds.  Both are arithmetic on the cofactor sums of the

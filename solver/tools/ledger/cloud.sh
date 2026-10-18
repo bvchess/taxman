@@ -2,7 +2,8 @@
 # The ledger's experiment on one machine: `ledger run` over a stretch of boards for a CPU budget, with the truth hidden
 # from it (no --proven), then `ledger report` against the committed chain, which checks every bound.
 #
-#   bench/ledger/cloud.sh FIRST-LAST          from rust/, once tools/cloud/setup.sh has the release `ledger` example
+#   solver/tools/ledger/cloud.sh FIRST-LAST   from the top of the repository, once solver/tools/cloud/setup.sh has the
+#                                             release `ledger` example
 #                                             (built there, or taken from the build cache: RUNBOOK section 15; set
 #                                             BUILD="--bin taxman --example ledger" for setup.sh: the solver is there
 #                                             for its smoke checks)
@@ -23,8 +24,9 @@
 #   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
 #               ledger is exported to it afterwards with `ledger export` (RUNBOOK section 14)
 #   KNOWN       the results file the report checks against (default results/strict.jsonl)
-#   LEDGER_BIN  the program (default target/release/examples/ledger; a laptop's test is target/debug/examples/ledger,
-#               built by `cargo build --profile test --example ledger`)
+#   LEDGER_BIN  the program (default solver/frame/target/release/examples/ledger; a laptop's test is
+#               solver/frame/target/debug/examples/ledger, built by `cargo build --profile test --example ledger`
+#               in solver/frame)
 #   OUT         where everything goes (default ~/ledger): run/ (the ledger, its events and checkpoints), run.out and
 #               run.err (what the run printed), report.txt, log (the times of the stages)
 #   S3_DEST     if set, OUT is synced to S3_DEST/out every five minutes and at the end
@@ -35,19 +37,19 @@
 # replay, which is a bug to report.
 
 set -u
-cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit 1
-range="${1:?usage: bench/ledger/cloud.sh FIRST-LAST}"
+cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || exit 1
+range="${1:?usage: solver/tools/ledger/cloud.sh FIRST-LAST}"
 workers="${WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 cpu_hours="${CPU_HOURS:-$workers}"
 out="${OUT:-$HOME/ledger}"
 known="${KNOWN:-results/strict.jsonl}"
-ledger="${LEDGER_BIN:-target/release/examples/ledger}"
+ledger="${LEDGER_BIN:-solver/frame/target/release/examples/ledger}"
 mkdir -p "$out"
 
 stamp() { echo "$1 $(date -u +%FT%TZ)" >> "$out/log"; }
 sync_out() { if [ -n "${S3_DEST:-}" ]; then aws s3 sync --quiet "$out" "$S3_DEST/out"; fi; }
 
-[ -x "$ledger" ] || { echo "no $ledger: run tools/cloud/setup.sh first" >&2; exit 2; }
+[ -x "$ledger" ] || { echo "no $ledger: run solver/tools/cloud/setup.sh first" >&2; exit 2; }
 ( while sleep 300; do sync_out; done ) &
 syncer=$!
 

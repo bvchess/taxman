@@ -1,6 +1,6 @@
 //! A chain of games searched on the extended problem Π⁺(∅): the frame model with or without `unzip`'s claims
 //! ([`taxman::frames::build_extended`], [`Board::prepare_extended`]).  Research code for the extended problem
-//! (heuristics/THEORY.md, "The extended problem"); the solver does not use it.  By Theorems M and M⁺ the promotion sets
+//! (docs/THEORY.md, "The extended problem"); the solver does not use it.  By Theorems M and M⁺ the promotion sets
 //! of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as `optimal.json` and
 //! `results/strict.jsonl` do.  With the claims Lemma M5⁺ keeps, the default, Π⁺(∅) is the frame model's problem itself,
 //! so `--compare` shows the same trees (a ratio of 1).  With `--no-claims`, the formulation of the first certificates
@@ -45,11 +45,12 @@
 //! largest, and the smallest, ratios), and the benchmark games (README.md, DESIGN.md) that were in range.  Exit status:
 //! 0 if every game passed, 1 if one failed, 2 for a usage error.
 //!
-//! **`words`**: for each game of `FROM..=TO` that the prover's barred bounds (`--upper`, `prover/data/upper_*.jsonl`)
-//! say needs a certificate, how many block words the GF(2) bound of Π⁺(O), O its open members, needs at its root
-//! (`Board::extended_words`): an open source adds one to its frame's rank, so `taxman certify` searches a game whose
-//! words exceed the engines of its set width (three up to 64 words, rank 192) at the widest width (128 words, five
-//! engine words, rank 320), and cannot search one that needs more (`certify::certificate_width`).  One line a game (n,
+//! **`words`**: for each game of `FROM..=TO` that the prover's barred bounds (`--upper`,
+//! `solver/noframe/data/upper_*.jsonl`) say needs a certificate, how many block words the GF(2) bound of Π⁺(O), O its
+//! open members, needs at its root (`Board::extended_words`): an open source adds one to its frame's rank, so `taxman
+//! certify` searches a game whose words exceed the engines of its set width (three up to 64 words, rank 192) at the
+//! widest width (128 words, five engine words, rank 320), and cannot search one that needs more
+//! (`certify::certificate_width`).  One line a game (n,
 //! |O|, the words, the width `taxman certify` would use or `none`), then the games by words and the widths needed.
 //!
 //! **`problems`**: for each game of `FROM..=TO` that the barred bounds (`--upper`) say needs a certificate, one after

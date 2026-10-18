@@ -19,9 +19,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-RUST = HERE.parents[1]
-WALL = RUST / "target" / "debug" / "examples" / "wall"
-KNOWN = RUST / "results" / "strict.jsonl"
+REPO = HERE.parents[2]  # the repository: this folder is solver/notebook/<entry>
+CRATE = REPO / "solver" / "frame"
+WALL = CRATE / "target" / "debug" / "examples" / "wall"
+KNOWN = REPO / "results" / "strict.jsonl"
 
 
 def games(texts):
@@ -43,7 +44,7 @@ def done_keys(path, key):
 
 def wall(args):
     """`wall ARGS` under `nice -n 10`: its output lines."""
-    done = subprocess.run(["nice", "-n", "10", str(WALL), *map(str, args)], cwd=RUST, capture_output=True, text=True)
+    done = subprocess.run(["nice", "-n", "10", str(WALL), *map(str, args)], cwd=CRATE, capture_output=True, text=True)
     if done.returncode != 0:
         sys.exit(f"wall {' '.join(map(str, args))}: exit {done.returncode}\n{done.stdout}{done.stderr}")
     return done.stdout.splitlines()

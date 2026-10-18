@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""At which nodes is the strong bound worth computing?  The tables of bench/node_choice/README.md, from the lines of
-`wall choice` (examples/wall/choice.rs defines every field):
+"""At which nodes is the strong bound worth computing?  The tables of
+solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md, from the lines of `wall choice`
+(examples/wall/choice.rs defines every field):
 
-    python3 -I bench/node_choice/analyze.py DIR-OR-FILE... [--model fit|floor] [--steps K]
+    python3 -I analyze.py DIR-OR-FILE... [--model fit|floor] [--steps K]
 
 A line is a node that today's bound leaves open (`gap` >= 0), with the subtree today's search makes of it (`subtree`,
 the engine's steps) and the strong bound refitted at it: the Lagrangian bound over nogoods, `--node-steps` subgradient

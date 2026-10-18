@@ -4,7 +4,8 @@
 The optimum is not known here, so the zero line is the best game the ledger holds (the optimum, for a proven game).
 Up: how far the upper bound is above it, at the start (gray, the root's GF(2) bound) and now (blue, open games only).
 Down: how far the start game (the standalone start incumbent) was below it.  The quick bounds are the landscape's map
-(bench/landscape/map.jsonl.gz), the same the ledger's maps compute."""
+(solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/map.jsonl.gz), the same the
+ledger's maps compute."""
 import gzip
 import html
 import json
@@ -12,7 +13,8 @@ import statistics as st
 import sys
 from pathlib import Path
 
-MAP = Path(__file__).resolve().parents[2] / "landscape/map.jsonl.gz"  # rust/bench/landscape/
+LANDSCAPE = "the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10"
+MAP = Path(__file__).resolve().parents[2] / LANDSCAPE / "map.jsonl.gz"
 ledger_path, out_path = sys.argv[1], sys.argv[2]
 
 quick = {}

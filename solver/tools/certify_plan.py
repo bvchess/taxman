@@ -8,7 +8,7 @@ prover's barred bounds (`upper_*.jsonl`) say which games need one.  A campaign o
 This script makes the campaign's work list and the cost estimate that the owner approves, from the data files alone.
 
 Inputs, all JSON lines (the flags that take several files read them in order):
-  --results   the chain's results files (rust/results/strict.jsonl format).  Completed lines only; a later line for a
+  --results   the chain's results files (results/strict.jsonl format).  Completed lines only; a later line for a
               board replaces an earlier one.  Fields used: n, score, proof (exhausted, cap, same_search, prime_formula,
               trivial), nodes, threads, seconds.search, and same_search.n (the game whose search a repeat repeats).
   --upper     the prover's barred bounds.  Fields: n, score, relation (prime; chain, which is a score at its ceiling
@@ -19,7 +19,8 @@ Inputs, all JSON lines (the flags that take several files read them in order):
               open (|O|, a count), rejected (|R|), frames, two_sided, one_sided, in_the_bag, worth, words, width,
               digest, same_as (a board m in n-8..n-1 whose extended problem equals n's, or null).  Without it the
               shares are unknown and |R| is null.
-  --gaps      (optional) rust/bench/wall/gaps_chain.jsonl lines: n and gap, the root gap of the game's search problem.
+  --gaps      (optional) lines of solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root gap
+              of the game's search problem.
 
 The cost of a plain search.  The chain ran several searches at once (a window), so a game's recorded seconds.search is
 the time it shared the machine, not what it cost.  The cost is taken from nodes instead.  Each --era A-B:HOURS says that
@@ -91,7 +92,8 @@ DEAREST_SHOWN = 20  # games in the report's table of the dearest
 BAND = 100  # boards in a band of the report's table
 PART_END = 3314  # the first part of the table ends here, the second starts after it
 SPOTLIGHT = (3424, 3425, 3440)  # boards the report names
-# The cost model of the research agenda (rust/docs/AGENDA.md, section 2): log10 nodes = a + b G / n^p, plus the window.
+# The cost model of the research agenda (solver/docs/AGENDA.md, section 2): log10 nodes = a + b G / n^p, plus the
+# window.
 GAP_INTERCEPT, GAP_SLOPE, GAP_POWER, WINDOW_DECADES = 2.30, 0.0479, 0.3, 0.06
 PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search"}
 RELATIONS = {"prime": "prime", "chain": "ceiling", "none": "none"}  # upper's word -> the plan's

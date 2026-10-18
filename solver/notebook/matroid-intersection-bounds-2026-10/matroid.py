@@ -1,5 +1,5 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""Matroid intersection bounds: the tables of docs/experiments/matroid-intersection-bounds-2026-10.md.
+"""Matroid intersection bounds: the tables of solver/notebook/matroid-intersection-bounds-2026-10/README.md.
 
 The data files here are the output of `examples/matroid.rs` (the commands are in that entry); this script joins
 them with the slope study's ../curve/slope_roots.jsonl (the matching and Lagrangian bounds of every root) and
@@ -15,7 +15,7 @@ import statistics as st
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CURVE = HERE.parent / "curve"
+CURVE = HERE.parent / "what-drives-the-slope-2026-10"
 BANDS = [(851, 900), (901, 950), (951, 1000), (1001, 1050), (1051, 1100), (1101, 1150), (1151, 1200), (1201, 1250),
          (1251, 1300), (1301, 1310), (1350, 1352)]
 

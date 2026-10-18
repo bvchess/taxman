@@ -1,7 +1,7 @@
-# Used by `docker build -f rust/tools/cloud/Dockerfile .` (BuildKit reads <Dockerfile name>.dockerignore beside the
+# Used by `docker build -f solver/tools/cloud/Dockerfile .` (BuildKit reads <Dockerfile name>.dockerignore beside the
 # Dockerfile).  Send only what the image copies; the rules after the first one re-include what is needed.
 *
-!rust
-!src/main/resources/optimal.json
+!solver
+!results
 !heuristics/results
 **/target

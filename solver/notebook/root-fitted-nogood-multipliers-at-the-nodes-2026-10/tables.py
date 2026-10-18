@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The tables of docs/experiments/root-fitted-nogood-multipliers-at-the-nodes-2026-10.md from the lines of `wall relaxed`
-(the files given, default `nodes.jsonl` here).
+"""The tables of solver/notebook/root-fitted-nogood-multipliers-at-the-nodes-2026-10/README.md from the lines of `wall
+relaxed` (the files given, default `nodes.jsonl` here).
 
 A node is *open* when today's bound reaches its need (`today >= need`: today's search would not cut it); the root-λ bound
 *cuts* it when it is below the need.  The drop is today's bound less the root-λ bound, at the open nodes.  The path

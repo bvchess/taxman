@@ -38,13 +38,14 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
     Json::Obj(fields)
 }
 
-/// The Python referee `tools/check_results.py` on the files `paths`.  Their lines cite no known source, so it is given
-/// none (a path that is not there): by default it reads the committed chain and the bounds store, 0.4 s each time.
+/// The Python referee `solver/tools/check_results.py` on the files `paths`.  Their lines cite no known source, so it is
+/// given none (a path that is not there): by default it reads the committed chain and the bounds store, 0.4 s each
+/// time.
 fn python_referee(paths: &[PathBuf]) -> std::process::Output {
     let none = "/nonexistent/none.jsonl";
     let mut command = Command::new("python3");
-    command.arg("-I").arg(crate_path("tools/check_results.py")).args(["--committed", none, "--bounds", none]);
-    command.args(paths).output().expect("python3 runs tools/check_results.py")
+    command.arg("-I").arg(crate_path("../tools/check_results.py")).args(["--committed", none, "--bounds", none]);
+    command.args(paths).output().expect("python3 runs solver/tools/check_results.py")
 }
 
 /// A change to a line: the field at a path (as [`with`] takes it) and its new value.
@@ -57,8 +58,8 @@ enum Verdict<'a> {
     Refused { line: usize, n: u32, expected: &'a str },
 }
 
-/// Runs both verifiers, `verify_files` (on each file alone) and the Python referee `tools/check_results.py` (on all
-/// of them at once), on files made of the lines of each case, and checks that each gives its verdict.
+/// Runs both verifiers, `verify_files` (on each file alone) and the Python referee `solver/tools/check_results.py` (on
+/// all of them at once), on files made of the lines of each case, and checks that each gives its verdict.
 fn verifiers_agree(dir: &TempDir, cases: &[(Vec<Json>, Verdict)]) {
     let optimal = Optimal::built_in();
     let mut paths = Vec::new();
@@ -504,7 +505,7 @@ const QUICK_LAST: u32 = 400;
 /// of the chain (a file of its first `last` lines is a chain from n = 1 itself); the counts that `results/README.md`
 /// quotes, and the last scores, are checked where the games reach them.
 fn check_the_committed_results_to(last: u32) {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(crate_path("results"))
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(crate_path("../../results"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
@@ -567,7 +568,7 @@ fn check_the_committed_results_to(last: u32) {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
     // And its sets of moves are the table's but at six games, 539, 770 to 773 and 1215, where the chain found another
-    // of the several optimal sets (prover/README.md, "Is the optimal set unique?" lists the exchanges of the
+    // of the several optimal sets (solver/noframe/README.md, "Is the optimal set unique?" lists the exchanges of the
     // first five; it enumerates the sets only to 989).  The previous chain differed from the table at 684 to 687
     // instead.
     let sorted = |moves: &[u32]| {

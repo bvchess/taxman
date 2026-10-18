@@ -33,7 +33,7 @@ def main():
     opener = gzip.open if args.span_file.endswith(".gz") else open
     with opener(args.span_file, "rt") as f:
         rows = {r["n"]: r for r in map(json.loads, f) if r["n"] <= args.max}
-    optimal = {g["n"]: g for g in json.loads((ROOT / "src/main/resources/optimal.json").read_text())}
+    optimal = {g["n"]: g for g in json.loads((ROOT / "results/optimal.json").read_text())}
     spf = smallest_prime_factors(args.max)
     checked = with_optimal = 0
     for n in sorted(rows):

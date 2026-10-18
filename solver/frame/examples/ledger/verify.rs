@@ -1,5 +1,5 @@
 //! `ledger verify-bounds`, the Rust referee of a bounds store, and `ledger games`, the moves of its promotion sets for
-//! the Python referee (tools/check_bounds.py).
+//! the Python referee (solver/tools/check_bounds.py).
 
 use crate::book::{facts, Rule, Side};
 use crate::export::ranges;
@@ -196,7 +196,7 @@ pub fn verify(path: &Path, strict: &Path, workers: usize) -> Result<(String, boo
 
 /// Writes to `out` a line `{"n", "value", "moves"}` for every lower bound of the store at `path` that is a promotion
 /// set: the game that `solution_for_promotions` makes of it, replayed by the referee first.  The Python referee
-/// (tools/check_bounds.py) reads them, as it cannot rebuild a game from promotions.  Returns how many.
+/// (solver/tools/check_bounds.py) reads them, as it cannot rebuild a game from promotions.  Returns how many.
 pub fn games(path: &Path, out: &mut impl std::io::Write, workers: usize) -> Result<usize, String> {
     let store = Store::read(path)?;
     let promoted: Vec<&Line> = store.lines.iter().filter(|l| matches!(l.game, Some(Game::Promotions(_)))).collect();

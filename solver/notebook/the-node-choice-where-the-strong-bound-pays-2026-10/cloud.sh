@@ -6,25 +6,25 @@
 # fields; the nodes come from the tuning suite's units, the probe's fixtures and the proofs of a few games made with
 # `perf make-nodes`.
 #
-#   bench/node_choice/cloud.sh          from rust/, once tools/cloud/setup.sh has the release `wall` and `perf` examples
-#                                       (built there, or taken from the build cache: RUNBOOK section 15; `wall` is a
-#                                       study tool, which a default build skips: set STUDIES=1 and
-#                                       BUILD="--bin taxman --example wall --example perf" for setup.sh: the solver
-#                                       is there for its smoke checks)
+#   solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/cloud.sh
+#       from the top of the repository, once solver/tools/cloud/setup.sh has the release `wall` and `perf` examples
+#       (built there, or taken from the build cache: RUNBOOK section 15; `wall` is a study tool, which a default
+#       build skips: set STUDIES=1 and BUILD="--bin taxman --example wall --example perf" for setup.sh: the solver
+#       is there for its smoke checks)
 #
 # Environment (all optional):
 #   WORKERS      processes at once, one thread each (default: every CPU)
 #   GAMES_SUITE  the tuning suite's games (default "3441 3440 3300 3425": the end of the chain)
 #   GAMES_MADE   the games whose proofs make nodes (default "3213 3260 3129 2976 3267 2700"), each a proof of 110,000
 #                to 440,000 steps on one thread
-#   GAMES_PROBE  the probe's fixtures in testdata/perf (default "936 1215")
+#   GAMES_PROBE  the probe's fixtures in solver/frame/testdata/perf (default "936 1215")
 #   A1           1 to measure the A1 bounds (wall/fields.rs) besides the nogood bound: the root fit of each game in the
 #                preparation (the fit of FITS where it has one, else FIT_SECONDS of the study's main arm), and at every
 #                node the warm refit (A1_PRICINGS evaluations at most) and the node's own master with the exact checks
 #                and the separation (A1_SECONDS at most, then the node is counted as capped).  The run is sized for one
 #                c8g.16xlarge (64 CPUs, WORKERS 64) and an hour at the most: README.md, "The A1 bounds".  Default 0
-#   FITS         the directory of root fits, `nN.json`, that A1 takes before fitting (default bench/fields/fits: 936's
-#                is not there, 1215's, 2700's and 3300's are; the others are fitted)
+#   FITS         the directory of root fits, `nN.json`, that A1 takes before fitting (default
+#                solver/frame/testdata/fits: 936's is not there, 1215's, 2700's and 3300's are; the others are fitted)
 #   FIT_SECONDS  the seconds of a root fit that A1 makes (default 300, the E3 pilot's; the 60 s of E2 lose under 0.05 of
 #                the gap below a gap of 800 and up to 0.15 above)
 #   A1_PRICINGS  the most evaluations of the warm refit (default 20, the E3 pilot's)
@@ -39,9 +39,10 @@
 #   SUB          1 (the default) to repeat each fit with the nogoods of the node's own solve too, 0 not to
 #   EVERY        the steps of a run of `perf make-nodes` (default 2000, as the entry that made fixtures used)
 #   KNOWN        the results file that gives the games' optima (default results/strict.jsonl)
-#   SUITE        the tuning suite (default bench/tuning/suite.jsonl)
-#   BIN          the directory of the examples (default target/release/examples; a laptop's test is target/debug/examples,
-#                built by `cargo build --profile test --features studies --example wall --example perf`)
+#   SUITE        the tuning suite (default the campaign's, solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl)
+#   BIN          the directory of the examples (default solver/frame/target/release/examples; a laptop's test is
+#                solver/frame/target/debug/examples, built in solver/frame by `cargo build --profile test --features
+#                studies --example wall --example perf`)
 #   OUT          where everything goes (default ~/node_choice): fixtures/, prep/ (a file a game), measure/ (a file of
 #                lines a worker), claims/, logs/, faults (what went wrong, if anything), log (the times of the stages)
 #                and analysis*.txt
@@ -54,12 +55,13 @@
 # harvested nogood that can be promoted, which is a bug to report; the lines it comes with are in logs/.
 
 set -u
-cd "$(dirname "${BASH_SOURCE[0]}")/../.." || exit 1
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$here/../../.." || exit 1
 workers="${WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 out="${OUT:-$HOME/node_choice}"
-bin="${BIN:-target/release/examples}"
+bin="${BIN:-solver/frame/target/release/examples}"
 known="${KNOWN:-results/strict.jsonl}"
-suite="${SUITE:-bench/tuning/suite.jsonl}"
+suite="${SUITE:-solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl}"
 games_suite="${GAMES_SUITE-3441 3440 3300 3425}"
 games_made="${GAMES_MADE-3213 3260 3129 2976 3267 2700}"
 games_probe="${GAMES_PROBE-936 1215}"
@@ -73,12 +75,12 @@ a1_prepare_flags=""
 a1_measure_flags=""
 if [ "$a1" = 1 ]; then
     keep="${KEEP:-100}"
-    a1_prepare_flags="--fit-seconds ${FIT_SECONDS:-300} --fits ${FITS:-bench/fields/fits}"
+    a1_prepare_flags="--fit-seconds ${FIT_SECONDS:-300} --fits ${FITS:-solver/frame/testdata/fits}"
     a1_measure_flags="--a1 --a1-pricings ${A1_PRICINGS:-20} --a1-seconds ${A1_SECONDS:-30}"
 fi
 
 if [ ! -x "$bin/wall" ] || [ ! -x "$bin/perf" ]; then
-    echo "no $bin/wall or $bin/perf: run STUDIES=1 tools/cloud/setup.sh first (wall needs --features studies)" >&2
+    echo "no $bin/wall or $bin/perf: run STUDIES=1 solver/tools/cloud/setup.sh first (wall needs --features studies)" >&2
     exit 2
 fi
 mkdir -p "$out/fixtures" "$out/prep" "$out/measure" "$out/logs"
@@ -90,7 +92,7 @@ syncer=$!
 
 # The probe's fixtures are kept in the repository; the others are made from the proofs, a game a process.
 stamp "start workers=$workers commit=$(git rev-parse HEAD 2> /dev/null || echo unknown) suite=[$games_suite] made=[$games_made] probe=[$games_probe]"
-cp -n testdata/perf/n0936.nodes testdata/perf/n1215.nodes "$out/fixtures/"
+cp -n solver/frame/testdata/perf/n0936.nodes solver/frame/testdata/perf/n1215.nodes "$out/fixtures/"
 fixture() {
     local game="$1" file
     file="$out/fixtures/n$(printf %04d "$game").nodes"
@@ -142,9 +144,9 @@ done
 wait "${pids[@]}"
 stamp "measure done"
 
-python3 -I bench/node_choice/analyze.py "$out/measure" > "$out/analysis.txt" 2>&1
-python3 -I bench/node_choice/analyze.py "$out/measure" --model floor > "$out/analysis-floor.txt" 2>&1
-python3 -I bench/node_choice/analyze.py "$out/measure" --steps 50 > "$out/analysis-steps50.txt" 2>&1
+python3 -I "$here/analyze.py" "$out/measure" > "$out/analysis.txt" 2>&1
+python3 -I "$here/analyze.py" "$out/measure" --model floor > "$out/analysis-floor.txt" 2>&1
+python3 -I "$here/analyze.py" "$out/measure" --steps 50 > "$out/analysis-steps50.txt" 2>&1
 stamp "analysis done"
 
 kill "$syncer" 2> /dev/null

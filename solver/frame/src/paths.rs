@@ -2,15 +2,15 @@
 //!
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
-//! executable, that holds the table of optimal games, `src/main/resources/optimal.json`.  (The solver itself needs no
+//! executable, that holds the table of optimal games, `results/optimal.json`.  (The solver itself needs no
 //! file: the table is built into the binary, [`crate::game::Optimal::built_in`].)  The defaults are relative to that
 //! directory:
 //!
 //! | file | default | flag |
 //! |---|---|---|
-//! | the benchmark history (`taxman bench`) | `rust/bench/history.jsonl` | `--history FILE` |
-//! | the results `taxman bench` takes games past `optimal.json` from | `rust/results/strict.jsonl` | `--known FILE` |
-//! | the prover's proofs (`verify-certificates`) | `rust/prover/data/exact_*.jsonl` | `--exact FILE...` |
+//! | the benchmark history (`taxman bench`) | `solver/frame/bench/history.jsonl` | `--history FILE` |
+//! | the results `taxman bench` takes games past `optimal.json` from | `results/strict.jsonl` | `--known FILE` |
+//! | the prover's proofs (`verify-certificates`) | `solver/noframe/data/exact_*.jsonl` | `--exact FILE...` |
 //!
 //! A flag wins over the repository.  When the repository cannot be found the error says where it looked and what to
 //! give instead.
@@ -19,19 +19,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The table of optimal games, relative to the repository; its presence is what makes a directory the repository.
-pub const OPTIMAL_JSON_IN_REPOSITORY: &str = "src/main/resources/optimal.json";
+pub const OPTIMAL_JSON_IN_REPOSITORY: &str = "results/optimal.json";
 
 /// The benchmark history, relative to the repository.
-pub const BENCH_HISTORY_IN_REPOSITORY: &str = "rust/bench/history.jsonl";
+pub const BENCH_HISTORY_IN_REPOSITORY: &str = "solver/frame/bench/history.jsonl";
 
 /// The committed results of the chain from n = 1, relative to the repository.
-pub const STRICT_RESULTS_IN_REPOSITORY: &str = "rust/results/strict.jsonl";
+pub const STRICT_RESULTS_IN_REPOSITORY: &str = "results/strict.jsonl";
 
 /// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.
-pub const BOUNDS_STORE_IN_REPOSITORY: &str = "rust/results/bounds.jsonl";
+pub const BOUNDS_STORE_IN_REPOSITORY: &str = "results/bounds.jsonl";
 
 /// The prover's data (the barred bounds, the proofs of the scores), relative to the repository.
-pub const PROVER_DATA_IN_REPOSITORY: &str = "rust/prover/data";
+pub const PROVER_DATA_IN_REPOSITORY: &str = "solver/noframe/data";
 
 /// The nearest directory at or above one of `starts`, tried in order, that contains `marker`.
 fn find_above(starts: &[PathBuf], marker: &str) -> Option<PathBuf> {
@@ -46,7 +46,7 @@ fn starting_points() -> Vec<PathBuf> {
     starts
 }
 
-/// The repository checkout (the directory with `src/main/resources/optimal.json` in it) that the working directory
+/// The repository checkout (the directory with `results/optimal.json` in it) that the working directory
 /// or the executable is in.
 ///
 /// # Errors
@@ -106,9 +106,9 @@ mod tests {
     #[test]
     fn the_repository_is_the_nearest_directory_above_with_the_table() {
         let dir = TempDir::new("paths");
-        let inner = dir.join("repo/rust/target/release");
+        let inner = dir.join("repo/solver/frame/target/release");
         fs::create_dir_all(&inner).unwrap();
-        fs::create_dir_all(dir.join("repo/src/main/resources")).unwrap();
+        fs::create_dir_all(dir.join("repo/results")).unwrap();
         fs::write(dir.join("repo").join(OPTIMAL_JSON_IN_REPOSITORY), "[]").unwrap();
         fs::create_dir_all(dir.join("elsewhere")).unwrap();
         let elsewhere = dir.join("elsewhere");

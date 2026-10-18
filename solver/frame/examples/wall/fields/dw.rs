@@ -1,7 +1,7 @@
 //! The A1 bound and its multipliers: one GF(2) matroid intersection plus a greedy per signed GF(3) frame matroid,
 //! coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of the fields study
-//! (docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md) as it stood at commit 8753189, with
-//! the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer checked against a
+//! (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at commit 8753189,
+//! with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer checked against a
 //! reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
 //! # The bound
 //!
@@ -32,7 +32,7 @@
 //! `z(S) ≤ r_k(S)` (Edmonds' description of a matroid's polytope) rather than by columns of independent sets linked
 //! element by element: that master (link rows `Σ_j α_j [x ∈ Q_j] − Σ_i β_{k,i} [x ∈ I_{k,i}] ≤ ε`, the design's) was
 //! built and measured first, and its simplex spent nearly all its pivots in steps of the size of the perturbation
-//! (docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md).  A rank inequality's dual
+//! (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md).  A rank inequality's dual
 //! `μ_{k,S} ≥ 0` gives `λ_{k,x} = Σ_{S ∋ x} μ_{k,S}`, and then `G_k(λ_k) ≤ Σ_S μ_{k,S} r_k(S)`, so the master's dual is
 //! a Lagrangian bound's, and at the LP's optimal duals they coincide.  A pricing at multipliers `λ` is one evaluation
 //! of `L(λ)`, a valid bound, and its intersection's set is a column.  The inequalities are found from the master's
@@ -1901,12 +1901,12 @@ mod tests {
         eprintln!("the intersection checked at block vectors of {words:?} words");
     }
 
-    /// The fits of `bench/fields/fits` give their bounds again at the roots they were fitted at: the study's own
+    /// The fits of `testdata/fits` give their bounds again at the roots they were fitted at: the study's own
     /// numbers (E1, E2, the pilot), computed by its code with the intersection checked against a reference.  Among
     /// them 2700 and 3300, with frame matroids of more than 64 and more than 128 coordinates.
     #[test]
     fn the_study_fits_give_their_bounds_again() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("bench/fields/fits");
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/fits");
         for n in [987, 1215, 2700, 3300] {
             let saved = SavedFit::load(&dir.join(format!("n{n}.json"))).expect("a fit");
             taxman::with_width!(n, W => {

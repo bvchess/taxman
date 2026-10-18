@@ -5,7 +5,7 @@
 # 10, and keeps what the solver printed.  With PROFILE_SECONDS the run is sampled by macOS `sample` (every millisecond)
 # from 25 s into the search instead of being timed with /usr/bin/time -l.
 #
-#   TAXMAN_BENCH_SRC=DIR TAXMAN_BENCH_OUT=DIR bench/chain_end/run.sh THREADS SECONDS TAG [PROFILE_SECONDS]
+#   TAXMAN_BENCH_SRC=DIR TAXMAN_BENCH_OUT=DIR solver/notebook/the-calibration-for-the-run-to-4000-2026-10/laptop/run.sh THREADS SECONDS TAG [PROFILE_SECONDS]
 #
 # SECONDS 0 stops after the first batch of nodes (--node-limit 1): the setup alone, whose cycles and CPU time the
 # timed runs' are measured net of.  The search's clock starts when the workers do, after the setup (about 40 s on
@@ -15,14 +15,14 @@
 # modified.  Writes TAXMAN_BENCH_OUT/TAG/: ckpt/ and out.jsonl (the copies the run uses), progress.txt (the solver's
 # stderr), stdout.txt, time.txt (/usr/bin/time -l) or sample.txt, and the machine's load before and after.
 # Before the run it waits, a minute at a time, for the one-minute load average to fall under MAX_LOAD (default 6).
-# From rust/, after cargo build --release.
+# After cargo build --release in solver/frame.
 set -euo pipefail
 if [ $# -lt 3 ] || [ $# -gt 4 ]; then
     echo "usage: $0 THREADS SECONDS TAG [PROFILE_SECONDS]" >&2
     exit 2
 fi
 THREADS=$1; SECS=$2; TAG=$3; PROFILE=${4:-0}
-CRATE=$(cd "$(dirname "$0")/../.." && pwd)
+CRATE=$(cd "$(dirname "$0")/../../../frame" && pwd)
 BIN=$CRATE/target/release/taxman
 SRC=${TAXMAN_BENCH_SRC:?set TAXMAN_BENCH_SRC}
 DIR=${TAXMAN_BENCH_OUT:?set TAXMAN_BENCH_OUT}/$TAG

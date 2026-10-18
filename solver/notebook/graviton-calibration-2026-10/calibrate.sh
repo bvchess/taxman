@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # The calibration runs of one machine: calibrate.sh PHASE OUTDIR [ARGUMENT...]
 #
-# It runs from a checkout whose solver (rust/) and prover (rust/prover/) are built in release mode, on Linux or
+# It runs from a checkout whose solver (solver/frame/) and prover (solver/noframe/) are built in release mode, on Linux or
 # macOS, and writes the logs of every run to OUTDIR (timed.sh); parse.py turns a directory of them into one table.
-# The phases are the measurements of rust/docs/experiments/graviton-calibration-2026-10.md:
+# The phases are the measurements of solver/notebook/graviton-calibration-2026-10/README.md:
 #
 #   probe                    the solver's probe (examples/perf.rs), default and GF(2), three times each
 #   ladder [N...]            one-thread proof-only runs (ladder --seed-opt), default 1215 1232 1287 2170 2172
-#   prover [N...]            one-thread runs of the prover (rust/prover, exact), default 1300 990
+#   prover [N...]            one-thread runs of the prover (solver/noframe, exact), default 1300 990
 #   contention-solver K...   K copies at once of the proof of $CONTENTION_GAME (default 1326), for each K given
 #   contention-prover K...   K copies at once of the prover on $CONTENTION_PROVER_GAME (default 990), for each K given
 #   scaling T... [-- N]      the proof-only run of game N (default 2172) at each thread count T
@@ -21,12 +21,12 @@
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(cd "$here/../../.." && pwd)}"
-CRATE="$ROOT/rust"
+CRATE="$ROOT/solver/frame"
 PERF="$CRATE/target/release/examples/perf"
 LADDER="$CRATE/target/release/examples/ladder"
 TAXMAN="$CRATE/target/release/taxman"
-PROVER="$CRATE/prover/target/release/exact"
-KNOWN="$CRATE/results/strict.jsonl"
+PROVER="$ROOT/solver/noframe/target/release/exact"
+KNOWN="$ROOT/results/strict.jsonl"
 CONTENTION_GAME="${CONTENTION_GAME:-1326}"
 CONTENTION_PROVER_GAME="${CONTENTION_PROVER_GAME:-990}"
 

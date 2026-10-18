@@ -12,20 +12,21 @@ that has built and tested them puts them here.  Nothing is stored that has not p
                            them only where the key exists: they look at no checkout)
 
 Common options (setup.sh passes them):
-  --root DIR      the checkout (the directory with rust/ in it)
+  --root DIR      the checkout (the directory with solver/ in it)
   --cache URL     where the cache is: s3://bucket/prefix, file:///directory (a stand-in for tests), or off.  Default
                   $BUILD_CACHE, else s3://taxman-013764204840-us-east-1/builds
-  --solver ARGS   what was (or is to be) built in rust/:        cargo arguments, "--bins --examples" or "--bin taxman";
+  --solver ARGS   what was (or is to be) built in solver/frame/: cargo arguments, "--bins --examples" or
+                  "--bin taxman";
                   `--features studies` builds the study examples too, and is a part of the set (see below)
-  --prover ARGS   what was built in rust/prover/ (default none): the same
+  --prover ARGS   what was built in solver/noframe/ (default none): the same
   --tmp DIR       where files are staged and downloaded (default: the system's temporary directory)
 
 The key is COMMIT-ARCH-CPU: the checkout must be clean and at a commit, and RUSTFLAGS must be empty or a single
 `-C target-cpu=...` (`native` is resolved to the CPU name the compiler reports), because `target-cpu=native` makes a
 binary for the CPU that built it.  Under it, one directory a set of binaries:
 
-  builds/KEY/SET/binaries.tar.gz   the files, paths relative to the checkout (rust/target/release/..., and for the
-                                   prover rust/prover/target/release/...); every executable of a plural selector
+  builds/KEY/SET/binaries.tar.gz   the files, paths relative to the checkout (solver/frame/target/release/..., and for
+                                   the prover solver/noframe/target/release/...); every executable of a plural selector
   builds/KEY/SET/manifest          key=value lines: the commit, architecture, CPU, RUSTFLAGS, rustc, the host, the time,
                                    the sha256 of the tarball, `set=` lines (what the tarball holds) and the result of
                                    the release suite.  Sent last: an entry without one does not exist.
@@ -58,7 +59,7 @@ from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
 DEFAULT_CACHE = "s3://taxman-013764204840-us-east-1/builds"
-CRATES = {"solver": "rust", "prover": "rust/prover"}  # the crates, relative to the checkout
+CRATES = {"solver": "solver/frame", "prover": "solver/noframe"}  # the crates, relative to the checkout
 TARBALL = "binaries.tar.gz"
 MANIFEST = "manifest"
 TIMES = "test-times.json"

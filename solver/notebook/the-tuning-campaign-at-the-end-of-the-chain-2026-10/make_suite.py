@@ -295,7 +295,7 @@ def parse(argv=None):
     probe.add_argument("--workers", type=int, default=2)
     probe.add_argument("--nice", type=int, default=0)
     probe.add_argument("--bin", default=tune.CRATE / "target" / "release" / "examples" / "tune", type=Path)
-    probe.add_argument("--known", default=tune.CRATE / "results" / "strict.jsonl", type=Path)
+    probe.add_argument("--known", default=tune.REPO / "results" / "strict.jsonl", type=Path)
     assemble = sub.choices["assemble"]
     assemble.add_argument("--out", required=True)
     assemble.add_argument("--count", type=int, default=40, help="units to keep (default 40)")
@@ -311,7 +311,7 @@ def parse(argv=None):
                          help="accept other nodes than the suite's (the default's trees changed on purpose), if the "
                               "best sums are the suite's, and record them")
     cand = sub.add_parser("candidates")
-    cand.add_argument("--strict", default=tune.CRATE / "results" / "strict.jsonl", type=Path)
+    cand.add_argument("--strict", default=tune.REPO / "results" / "strict.jsonl", type=Path)
     cand.add_argument("--lo", type=int, default=300_000, help="fewest nodes in the chain (default 300,000)")
     cand.add_argument("--count", type=int, default=14, help="games to list (default 14)")
     return p.parse_args(argv)

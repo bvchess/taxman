@@ -1,7 +1,8 @@
 //! The wall regime: how the solver's costs grow with the board size `n` and with the size of a search tree.  What a
 //! game of the chain costs is its search, which grows with the tree, plus everything around the search, which grows
 //! with `n` alone (the tables, the frames, the model, the GF(2) matroids of the root, the replays); the commands
-//! measure the two apart.  The study, its data and its conclusions are in docs/experiments/the-wall-regime-2026-10.md.
+//! measure the two apart.  The study, its data and its conclusions are in
+//! solver/notebook/the-wall-regime-2026-10/README.md.
 //!
 //! ```text
 //! cargo run --release --example wall -- setup [--known FILE] [--repeat R] [--width W] N|A-B...
@@ -107,10 +108,11 @@
 //!   `choice-prepare` makes a game's file (its nogood pool, its root multipliers, its A1 root fit, its sampled nodes)
 //!   and `choice` measures each node of the file: its gap, the strong bounds and whether they cut, the subtree today's
 //!   search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the options and the
-//!   lines; `bench/node_choice/` runs them in the cloud and reads the lines.
+//!   lines; `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in the cloud and reads the
+//! lines.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
-//! from master (docs/EXPERIMENTS.md, "How this notebook is kept", says where they build).
+//! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -1463,7 +1465,7 @@ mod tests {
     fn the_output_file_is_appended_to_and_a_rerun_skips_what_it_has() {
         let dir = support::TempDir::new("wall-landscape");
         let out = dir.join("landscape.jsonl");
-        let known = Path::new(env!("CARGO_MANIFEST_DIR")).join("results/strict.jsonl");
+        let known = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/strict.jsonl");
         let optimal = Optimal::built_in().with_results_files(std::slice::from_ref(&known)).expect("the chain");
         let mut o = Options::new("landscape".to_owned());
         (o.out, o.known, o.threads) = (Some(out.clone()), Some(known), 3);

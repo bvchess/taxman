@@ -6,9 +6,9 @@
 //! a measured negative result, and because the tests use it as an independent check.
 //!
 //! * *The question.*  The tactic `reuse_prev` (since removed,
-//!   docs/experiments/which-tactics-earn-their-keep-2026-10.md) accepted a derived game unproven.  Could an upper bound
-//!   on `opt(n)` computed from games of `n − 1` prove those games optimal, or settle other games faster than searching
-//!   them?
+//!   solver/notebook/which-tactics-earn-their-keep-2026-10/README.md) accepted a derived game unproven.  Could an upper
+//! bound   on `opt(n)` computed from games of `n − 1` prove those games optimal, or settle other games faster than
+//! searching   them?
 //! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
 //!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
 //!   costs about as much as solving the game: it is no replacement for the tactic, and putting it into the
@@ -78,7 +78,7 @@
 //!   `n`'s turn (indeed with every divisor of `n` in the pot then taken off the board), but which those are is
 //!   not known in advance, and `opt_M` only grows as holes are filled, hence the maximum over single holes.
 //!   With the rules' `opt(B_f)` in place of `opt_M(B_f)` the theorem still holds but is weaker.
-//! * It is an upper bound only.  In the terms of Theorem 1 of `heuristics/THEORY.md` (a set of moves is
+//! * It is an upper bound only.  In the terms of Theorem 1 of `docs/THEORY.md` (a set of moves is
 //!   playable iff each can be paid a distinct maximal factor outside the set, with an acyclic precedence "`a`
 //!   before `b` when `a`'s payment or `a` divides `b`"), `n + opt_M(B_f)` is the best set containing `n` with `n`
 //!   paying `f`, except that the precedence edges at `n` are dropped: `n` before every multiple of `f`, and after
@@ -109,7 +109,7 @@
 //! impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
 //! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and so does their proof: the frames are numbered
 //! by layer, so the frame model is exact on a board with holes as on `[n]`, given the sources setup keeps
-//! (heuristics/THEORY.md, Theorem M and "Boards with holes": the heaviest promotion set gives the best game, under the
+//! (docs/THEORY.md, Theorem M and "Boards with holes": the heaviest promotion set gives the best game, under the
 //! maximal-factor rule, among those that play every source setup keeps on the punctured board).  What a bound computed
 //! this way rests on is therefore the upper part of each punctured board: that some best game of `B_f` plays every
 //! source setup keeps there.  That is open, as U is on `[n]` (where Theorem B settles the sources of one and two prime

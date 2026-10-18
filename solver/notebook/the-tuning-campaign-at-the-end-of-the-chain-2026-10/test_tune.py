@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests of the tuning driver (tune.py), with a fake `tune` program in place of the Rust example.
 
-Run from rust/: `python3 -I bench/tuning/test_tune.py`.
+Run it as `python3 -I test_tune.py`.
 """
 
 import contextlib

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STRICT = HERE / "../../results/strict.jsonl"
+STRICT = HERE / "../../../results/strict.jsonl"
 OUT = sys.argv[1]
 
 

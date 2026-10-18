@@ -41,9 +41,9 @@ pub const fn words_for(n: u32) -> usize {
 /// Widths of 8 and 16 words, then steps of 4 words from 20 to 32 (boards 1024 to 2047, where the games the
 /// solver works on today are), 36, 40, 48 and 56 (boards 2048 to 3583, where the chain goes next), 64 to board 4095,
 /// and 128 beyond, to board 8191 (no width between 64 and 128: past 4095 the width costs a node about 1% and the
-/// board layer little, docs/experiments/boards-past-4095-2026-10.md).  The arms of [`with_words!`](crate::with_words)
-/// repeat these numbers, because a macro arm needs literals; the test `the_width_dispatch_follows_the_widths` fails
-/// if they drift apart.
+/// board layer little, solver/notebook/boards-past-4095-2026-10/README.md).  The arms of
+/// [`with_words!`](crate::with_words) repeat these numbers, because a macro arm needs literals; the test
+/// `the_width_dispatch_follows_the_widths` fails if they drift apart.
 pub const WIDTHS: [usize; 12] = [8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 128];
 
 /// The narrowest of [`WIDTHS`] with at least `words` words, if any.

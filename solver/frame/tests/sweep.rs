@@ -1,7 +1,8 @@
-//! The sweep's tools (`rust/tools/cloud/sweep.sh`, run by `tools/cloud/test/run.sh sweep` against a stand-in for aws).
-//! The planner that sizes the blocks and cuts the excerpts of the passes (`tools/sweep_plan.py`, standard library only)
-//! has tests of its own, and the excerpt it writes is what `taxman solve --keep-going --retry-improved` opens: the
-//! solver checks the file it opens, so the excerpt must hold whatever each of its lines rests on.
+//! The sweep's tools (`solver/tools/cloud/sweep.sh`, run by `solver/tools/cloud/test/run.sh sweep` against a stand-in
+//! for aws). The planner that sizes the blocks and cuts the excerpts of the passes (`solver/tools/sweep_plan.py`,
+//! standard library only) has tests of its own, and the excerpt it writes is what `taxman solve --keep-going
+//! --retry-improved` opens: the solver checks the file it opens, so the excerpt must hold whatever each of its lines
+//! rests on.
 
 mod common;
 
@@ -12,7 +13,7 @@ use taxman::json::Json;
 use taxman::solver::{self, SolveOptions};
 
 fn tool(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tools").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools").join(name)
 }
 
 #[test]

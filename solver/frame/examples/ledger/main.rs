@@ -1,7 +1,7 @@
 //! The ledger: a lower bound L(n), the score of a game it holds, and an upper bound U(n) on opt(n) for every board
 //! size of a stretch at once, tightened from both sides by limited searches and by the relations between boards,
 //! with the effort spent where a proof looks cheapest.  A board is proven when L(n) = U(n).  The design and the
-//! experiment are in docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md.
+//! experiment are in solver/notebook/the-ledger-bounds-from-both-sides-2026-10/README.md.
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
@@ -29,7 +29,7 @@
 //!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
-//!   the boards with the same search problem, applied to a fixpoint after every change (heuristics/THEORY.md, "The
+//!   the boards with the same search problem, applied to a fixpoint after every change (docs/THEORY.md, "The
 //!   ledger: bounds between boards").  *Given* games (`given`): the completed games of `--proven FILE` (a results
 //!   file) in A − 1..B, each replayed, are fixed points.  `trivial`: a board with nothing to promote.
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
@@ -43,7 +43,7 @@
 //!   its climbs, and, when `--floor-step` is 0, of every ordinary job.
 //! * **Floor steps** (`cost.rs`; `--floor-step P`, default 150, 0: none).  A search under a floor F
 //!   (`taxman::search::search_above`: an incumbent worth F and no set) that completes having found nothing proves that
-//!   no promotion set weighs more than F (heuristics/THEORY.md, Lemma F), at a cost that grows about tenfold for every
+//!   no promotion set weighs more than F (docs/THEORY.md, Lemma F), at a cost that grows about tenfold for every
 //!   147 points the floor is below the root's bound, a line of `log10(nodes)` against the distance for each board.  So
 //!   an open board, unless it is climbed to, is stepped down before its proof: a step is a search under the floor `P`
 //!   points below the board's upper bound (fewer points on a steeper line: the same factor of cost), without seed or
@@ -67,9 +67,10 @@
 //!   whose forecast is far beyond the rest waits until the cheaper work runs out.  With `--floor-step 0` the order is
 //!   that of least `level + gap / gap_unit`, where `level` counts the board's searches (each doubles the limit) and
 //!   `--gap-unit` (default 175) is the gap worth one doubling of the cost (the chain's steps rise a decade with about
-//!   580 of the standalone gap, `bench/landscape/`).
-//!   `--workers` searches at once (default all CPUs).  When a board is proven, its search is stopped if one is going,
-//!   and its checkpoints deleted; a search whose U falls is given the lower ceiling.
+//!   580 of the standalone gap,
+//! `solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/`).   `--workers` searches at
+//! once (default all CPUs).  When a board is proven, its search is stopped if one is going,   and its checkpoints
+//! deleted; a search whose U falls is given the lower ceiling.
 //! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
 //!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
 //!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A
@@ -158,7 +159,7 @@
 //! `--checkpoints` the place (a prefix, with `nN.ckpt` under it) of the checkpoints of the searches that gave the dual
 //! bounds.  **run --bounds** starts a run from the file's best bounds of its stretch, each game replayed by the
 //! referee, and a board with both bounds there is not mapped.  **verify-bounds** is the Rust referee of the file (see
-//! `verify.rs`); **games** writes the moves of its promotion sets for the Python referee, tools/check_bounds.py.
+//! `verify.rs`); **games** writes the moves of its promotion sets for the Python referee, solver/tools/check_bounds.py.
 
 #[allow(dead_code, unused_imports)] // the ledger reads only the process's CPU time
 #[path = "../common/counters.rs"]
@@ -190,7 +191,7 @@ use schedule::Settings;
 use std::path::PathBuf;
 
 /// The committed chain, whose games the bounds store cites and leaves out.
-const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/strict.jsonl");
+const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/strict.jsonl");
 
 fn usage() -> ! {
     eprintln!(

@@ -5,7 +5,7 @@ edition = "2021"
 description = "Independent proofs and checks of the Taxman solver's results"
 publish = false
 
-# Its own workspace: this crate shares no code with the solver in ../ (independence is the point).
+# Its own workspace: this crate shares no code with the frame solver in ../frame (independence is the point).
 [workspace]
 
 [dependencies]

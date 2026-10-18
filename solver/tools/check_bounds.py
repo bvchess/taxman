@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Independent referee for the bounds store (rust/results/bounds.jsonl, one JSON line a bound; results/README.md,
+"""Independent referee for the bounds store (results/bounds.jsonl, one JSON line a bound; results/README.md,
 "bounds.jsonl", has the format).  Standard library only; it shares no code with the Rust crate.  The rules of the game
-and of a finished game are tools/check_results.py's (the referee of the results files), which this loads from beside
-itself; the bounds' arithmetic (Lemmas L1-L4 of heuristics/THEORY.md, "The ledger: bounds between boards") is written
+and of a finished game are solver/tools/check_results.py's (the referee of the results files), which this loads from
+beside itself; the bounds' arithmetic (Lemmas L1-L4 of docs/THEORY.md, "The ledger: bounds between boards") is written
 out again here, and so is the format.
 
 For every line:
@@ -19,7 +19,7 @@ For every line:
               to the game of the line before it that gives that board that value, and is replayed in turn
   relation    an upper bound by monotone, ceiling, prime or repeat is at least what the arithmetic of the lemma gives
               from the value of the bound it cites; the cited bound is a line before it (a bound of that board at most
-              that value) or a game of the chain (rust/results/strict.jsonl, whose score is exact); and it rests on
+              that value) or a game of the chain (results/strict.jsonl, whose score is exact); and it rests on
               every board that cited bound rests on (and, for a repeat, on its own board)
   given       a given upper bound has the given game as the lower bound, at its value
 and across the file: where the chain has a game of a board, the file's bounds of it enclose the chain's score.
@@ -42,10 +42,10 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-STRICT = REPO / "rust" / "results" / "strict.jsonl"
+STRICT = REPO / "results" / "strict.jsonl"
 
 SCHEMA = 1
-MAX_N = 8191  # the widest board of the solver (rust/src/solver.rs)
+MAX_N = 8191  # the widest board of the solver (solver/frame/src/solver.rs)
 KEYS = {
     "schema", "n", "side", "value", "rule", "from", "from_value", "bag", "from_bag", "rests_on", "checkpoint",
     "source", "date", "promotions", "moves",
@@ -57,8 +57,8 @@ DATE = re.compile(r"\d{4}-(\d{2})-(\d{2})")
 
 
 def referee_module():
-    """tools/check_results.py, the referee of the results files, loaded from beside this file (`python3 -I` does not
-    look there by itself)."""
+    """solver/tools/check_results.py, the referee of the results files, loaded from beside this file (`python3 -I` does
+    not look there by itself)."""
     path = Path(__file__).resolve().with_name("check_results.py")
     spec = importlib.util.spec_from_file_location("check_results", path)
     module = importlib.util.module_from_spec(spec)

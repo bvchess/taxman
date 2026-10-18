@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The production run: the chain of optimal games from n = 1 to N, resumable, with logging.
 #
-#   rust/tools/cloud/chain.sh N
+#   solver/tools/cloud/chain.sh N
 #
 # It runs
 #

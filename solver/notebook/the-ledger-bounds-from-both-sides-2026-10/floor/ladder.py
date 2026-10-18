@@ -1,7 +1,8 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """The ladder of floor steps (examples/ledger/cost.rs) laid on the 14 games measured under floors
-(bench/target/target.jsonl): what the steps and the proof cost together against the proof alone, and how well the line
-of the steps so far forecasts the proof.  Standard library only.
+(solver/notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/target.jsonl): what the steps and
+the proof cost together against the proof alone, and how well the line of the steps so far forecasts the proof.
+Standard library only.
 
 usage: ladder.py [STEP [PROOF_STEPS]]      STEP the points of a step at the median slope (default 150), PROOF_STEPS the
                                            steps the gap must exceed for another step to be taken (default 2)
@@ -50,7 +51,8 @@ def fit(points):
 def main():
     step_points = int(sys.argv[1]) if len(sys.argv) > 1 else 150
     proof_steps = float(sys.argv[2]) if len(sys.argv) > 2 else 2
-    path = Path(__file__).resolve().parents[2] / "target" / "target.jsonl"
+    floor = "proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10"  # the entry that made the file
+    path = Path(__file__).resolve().parents[2] / floor / "target.jsonl"
     games = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     rows = []
     for game in games:

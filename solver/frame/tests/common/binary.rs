@@ -1,5 +1,5 @@
-//! Running the `taxman` binary, or one of the Python tools of `tools/`, from an integration test, shared by the tests
-//! of the command line (`tests/cli.rs`) and of the commands that have a library function behind them
+//! Running the `taxman` binary, or one of the Python tools of `solver/tools/`, from an integration test, shared by the
+//! tests of the command line (`tests/cli.rs`) and of the commands that have a library function behind them
 //! (`tests/certify.rs`).
 
 use std::path::Path;

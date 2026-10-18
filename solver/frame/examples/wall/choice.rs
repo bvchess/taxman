@@ -1,6 +1,7 @@
 //! `wall choice-prepare` and `wall choice`: at which search nodes is a slow, strong bound worth computing instead of
-//! today's fast GF(2) bound alone?  The question and the data it asks for are in bench/node_choice/README.md; the
-//! analysis is `bench/node_choice/analyze.py`.
+//! today's fast GF(2) bound alone?  The question and the data it asks for are in
+//! solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md; the analysis is
+//! `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/analyze.py`.
 //!
 //! The *strong bound* of a node (promotions `P`, candidates `C`) is the Lagrangian bound over nogoods that
 //! [`nogoods`](super::nogoods) fits at the root, with the GF(2) bound as its inner problem, but with the multipliers
@@ -13,11 +14,11 @@
 //!
 //! Two more strong bounds can be measured at the same nodes, the *A1 bounds* ([`fields`](super::fields): GF(2) and
 //! signed GF(3) frame matroids coupled by multipliers that a column generation fits, with a certified bracket;
-//! docs/experiments/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10.md): **r2**, the study's warm refit (the
-//! multipliers of the game's root fit, then a column generation of at most `--a1-pricings` evaluations from the root's
-//! master columns and rank inequalities that still hold at the node, with no exact check), and **full**, the node's
-//! own master with the exact checks and the separation of the node's own cores, from the root fit's multipliers and
-//! signings, stopping at the first bound that cuts and within `--a1-seconds` (then *capped*).  Each is the lowest
+//! solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md): **r2**, the study's warm refit
+//! (the multipliers of the game's root fit, then a column generation of at most `--a1-pricings` evaluations from the
+//! root's master columns and rank inequalities that still hold at the node, with no exact check), and **full**, the
+//! node's own master with the exact checks and the separation of the node's own cores, from the root fit's multipliers
+//! and signings, stopping at the first bound that cuts and within `--a1-seconds` (then *capped*).  Each is the lowest
 //! `⌊L⌋` it evaluated, a bound on the node's completions at any multipliers and signings, and cuts the node when it
 //! is below `need`.
 //!

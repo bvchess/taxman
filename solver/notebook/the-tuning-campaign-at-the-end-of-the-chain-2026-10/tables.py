@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Recomputes the tables of the tuning campaign of 2026-10 from its data files (README.md says what they are).
 
-Standard library only; run it as `python3 -I bench/tuning/campaign-2026-10/tables.py` from rust/.  It prints what the
+Standard library only; run it as `python3 -I tables.py`.  It prints what the
 notebook entry quotes: stage A and stage B against the default (the geometric means of the CPU seconds and of the
 nodes over the problems both ran, as the driver's report has them), stage B against `force_window=all`, stage B by the
-source of the problems, and stage C per game.  The problems' sources are read from the suite (`../suite.jsonl`); the
+source of the problems, and stage C per game.  The problems' sources are read from the suite (`suite.jsonl`); the
 `default` of the data is the default of the build the campaign ran on, `force_window=80`.
 """
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
-SUITE = HERE.parent / "suite.jsonl"
+SUITE = HERE / "suite.jsonl"
 DEFAULT = "default"
 STAGE_C = ("default", "fw_all", "all_sl4", "all_sl4_mfo")
 STAGE_C_LINE = re.compile(

@@ -49,7 +49,7 @@
 //!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
 //!   [`lagrange`].
 //! * The rule of the tactic `symmetry` ([`symmetry`]): every heaviest promotion set keeps the inequality
-//!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (heuristics/THEORY.md, Theorem 13), so a node none of
+//!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (docs/THEORY.md, Theorem 13), so a node none of
 //!   whose completions keeps them all holds no heaviest set, and neither does a completion that holds a candidate
 //!   no such completion holds: the node is cut and the candidate dropped, whatever bound the search uses.  The
 //!   other prunings hold for the completions that keep the inequalities as for all (bounds above every completion,
@@ -118,7 +118,7 @@ use std::time::{Duration, Instant};
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
 /// tactic `nogood_period`).  Every interval from 10,000 to 100,000 steps was about as good on one thread (22–26% less
 /// time than never forgetting on hard games near n = 1200, games of fewer steps unchanged); see
-/// docs/experiments/forgetting-nogoods-2026-10.md.
+/// solver/notebook/forgetting-nogoods-2026-10/README.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// The outcome of [`search`].
@@ -130,7 +130,7 @@ pub struct SearchResult<const W: usize> {
     /// The search finished (or reached the ceiling); false when an engine limit or a stop stopped it.
     pub completed: bool,
     /// Under a floor ([`search_above`]): the search completed and found no set heavier than the floor, so no
-    /// promotion set is (heuristics/THEORY.md, Lemma F).  Then `sum` is the floor and `promotions` is empty.  Always
+    /// promotion set is (docs/THEORY.md, Lemma F).  Then `sum` is the floor and `promotions` is empty.  Always
     /// false when the search has no floor.
     pub floor_held: bool,
     /// The incumbent reached the ceiling (`cap`, or one the control was given), which proves it optimal.
@@ -194,7 +194,7 @@ pub fn search<const W: usize>(
 /// seed, dive or local search), and nodes are pruned against `floor` as against an incumbent of that worth.  A set
 /// heavier than the floor becomes the incumbent as usual, and is a real game (so a lower bound on the game's optimum).
 /// If the search completes and finds none, no promotion set is heavier than `floor`
-/// ([`SearchResult::floor_held`], heuristics/THEORY.md, Lemma F): an upper bound on the game's best promotion sum,
+/// ([`SearchResult::floor_held`], docs/THEORY.md, Lemma F): an upper bound on the game's best promotion sum,
 /// proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is the optimum.  `cap`
 /// and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same floor.
 ///

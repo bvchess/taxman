@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "landscape"))
+LANDSCAPE = HERE.parent / "the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10"
+sys.path.insert(0, str(LANDSCAPE))
 from land import by_n, lines, quantile  # noqa: E402
 
 METHODS = ("start", "lns", "restricted", "control")
@@ -75,7 +76,7 @@ def stage1():
 # Stage 2: the finders and the control, from the same start
 
 def stage2(name):
-    cal = by_n(HERE.parent / "landscape" / "cal.jsonl")
+    cal = by_n(LANDSCAPE / "cal.jsonl")
     rows = [d for d in lines(HERE / name) if not d.get("trivial")]
     searched = [d for d in rows if not d["meets"]]
     print(f"\nSTAGE 2 ({name}): {len(rows)} games, {len(rows) - len(searched)} whose start meets the root bound (nothing to find), "

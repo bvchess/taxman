@@ -11,7 +11,7 @@
 //! the incumbent promotes them.  (The live nogoods' inequalities hold for every completion of the node, with or
 //! without a given candidate, so the multipliers and the constant stay and the bound without the candidate is
 //! still a bound.)  With the tactic `fix_forced` they join the node's forced members, which its child promotes
-//! together; that is where most of the gain is (docs/experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md).
+//! together; that is where most of the gain is (solver/notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md).
 //!
 //! # The multipliers
 //!
@@ -44,7 +44,7 @@ impl Refits {
     /// The schedule of the tactic `lagrange`: after 2,000 steps, by when a searcher has learned a few dozen
     /// nogoods, then with every forgetting of its nogoods.  (On the proofs of 1215 and 1254, a first refit after
     /// 500 steps, refits every 10,000 steps, and 20 or 100 subgradient steps instead of [`FIT_STEPS`] each changed
-    /// the cycles by less than ±12%: docs/experiments/a-lagrangian-bound-over-the-nogoods-2026-10.md.)
+    /// the cycles by less than ±12%: solver/notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md.)
     pub const SEARCH: Refits = Refits { first: 2_000, every: NOGOOD_PERIOD };
 }
 

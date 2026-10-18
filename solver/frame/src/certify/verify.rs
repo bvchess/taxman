@@ -517,7 +517,7 @@ impl fmt::Display for Verified {
 // ---------------------------------------------------------------------------------------------------------
 // The proven chain
 
-/// A line of the prover's proofs of the scores (`prover/data/exact_*.jsonl`), as far as [`frontier`] reads it.
+/// A line of the prover's proofs of the scores (`solver/noframe/data/exact_*.jsonl`), as far as [`frontier`] reads it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExactLine {
     pub score: u64,
@@ -621,10 +621,10 @@ pub struct Frontier {
 /// A game `n` of `1..=` the largest board of the results is *proven* when it is the game 1, or the prover proved it (a
 /// line of `exact` for it whose `fm_bound` or `parity_bound` is its score, or whose search is `proven` (if it used the
 /// segment cuts, only when every smaller game is proven), or whose relation is `chain` or `prime` when the game before
-/// it is proven: `exact_proofs` of `prover/tools/summarize.py`), or it is certified, or its score reaches a proven
-/// ceiling ([`CeilingProof::of`]) given the game before it, which is proven.  The result is the largest `through`
-/// with every game to it proven, the first game after it that is not, and the games past that one that are proven
-/// anyway.
+/// it is proven: `exact_proofs` of `solver/noframe/tools/summarize.py`), or it is certified, or its score reaches a
+/// proven ceiling ([`CeilingProof::of`]) given the game before it, which is proven.  The result is the largest
+/// `through` with every game to it proven, the first game after it that is not, and the games past that one that are
+/// proven anyway.
 ///
 /// # Errors
 ///

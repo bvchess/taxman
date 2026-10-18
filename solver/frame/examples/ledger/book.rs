@@ -1,6 +1,6 @@
 //! The book of the ledger: for every board size n, a lower bound L(n), the score of a game it holds, and an upper
 //! bound U(n) on opt(n), each with its derivation (the rule and the board it came from), and the relations between
-//! board sizes, applied to a fixpoint.  The relations are proven in heuristics/THEORY.md, "The ledger: bounds between
+//! board sizes, applied to a fixpoint.  The relations are proven in docs/THEORY.md, "The ledger: bounds between
 //! boards"; each lemma there gives an L direction (a game of one board made from a game of another, which the
 //! referee replays here before it counts, and which is made and replayed only if it can beat the board's own) and a
 //! U direction (an inequality between the optima):

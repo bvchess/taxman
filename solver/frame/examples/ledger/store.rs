@@ -4,7 +4,7 @@
 //! described in results/README.md, "bounds.jsonl"; its one copy in code is the library's (`taxman::store`: the line,
 //! the file, the best bounds), which `taxman solve --use-prev` reads too.  What is here is what only the ledger does:
 //! the checks of a line against the lines before it (`Chain`), which `ledger export` makes before it appends,
-//! `ledger verify-bounds` makes of every line, and `tools/check_bounds.py` makes again independently.
+//! `ledger verify-bounds` makes of every line, and `solver/tools/check_bounds.py` makes again independently.
 
 use crate::book::{upper_by, Rule, Side};
 use std::collections::HashMap;

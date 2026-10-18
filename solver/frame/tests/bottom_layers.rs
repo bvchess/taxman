@@ -1,6 +1,6 @@
 //! Theorem B, the bottom layers of an optimal set, against every recorded and enumerated optimal set.
 //!
-//! The theorem (heuristics/THEORY.md, "Theorem B"):
+//! The theorem (docs/THEORY.md, "Theorem B"):
 //!
 //! > The *layer* of a number x is Ω(x), its number of prime factors counted with multiplicity.  Let q be the largest
 //! > prime ≤ n, and U\*_2 the numbers of layer 2 above n/2 that setup keeps (descending greedy; on layer 2 a set is
@@ -26,8 +26,8 @@
 //!   the committed chain has.  The frame solver's games play numbers of layer 2 up to n/2 only on small boards, where
 //!   the frames of layer 2 have freedoms.
 //! * [`theorem_b_holds_for_every_enumerated_optimal_set`]: the prover's lists of all the optimal sets of a board
-//!   (`prover/data/optsets_*.jsonl`): the other sets of a board as well as the recorded game.  Each set is checked to
-//!   be playable and worth the optimum before the theorem is asked of it.
+//!   (`solver/noframe/data/optsets_*.jsonl`): the other sets of a board as well as the recorded game.  Each set is
+//! checked to   be playable and worth the optimum before the theorem is asked of it.
 //! * [`theorem_b_holds_for_every_optimal_set_of_the_small_boards`]: on the small boards the optimal sets are found
 //!   again, by an exhaustive search over the playable sets that uses no model of the game, only the oracle and the
 //!   optimum of the table.  The brute force of the rules has the optimum itself on the boards it reaches, and the
@@ -307,7 +307,7 @@ fn layer_2_greedy_is_what_setup_keeps_on_every_25th_board() {
 // ---------------------------------------------------------------------------------------------------------
 // The recorded games
 
-/// A file under the crate's directory (`rust/`).
+/// A file under the crate's directory (`solver/frame/`).
 fn crate_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
@@ -360,7 +360,7 @@ fn theorem_b_holds_for_the_recorded_games(every: usize) {
     let table: Vec<(u32, Vec<u32>)> =
         Optimal::built_in().games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect();
     let chain = completed_games(&results_path("strict.jsonl"));
-    let ec2 = completed_games(&crate_path("bench/cloud/c8g.chain-2176.jsonl"));
+    let ec2 = completed_games(&crate_path("testdata/c8g.chain-2176.jsonl"));
     assert!(table.len() >= 1299, "the table has the games of 2 to 1300, not {}", table.len());
     assert!(chain.len() >= 3913, "the chain has the games of 2 to 3914, not {}", chain.len());
     assert!(ec2.len() >= 101, "the calibration's chain has the games of 2176 to 2276, not {}", ec2.len());
@@ -368,16 +368,16 @@ fn theorem_b_holds_for_the_recorded_games(every: usize) {
 
     let mut failures = check_games("optimal.json", &thin(table));
     failures.extend(check_games("results/strict.jsonl", &thin(chain)));
-    failures.extend(check_games("bench/cloud/c8g.chain-2176.jsonl", &thin(ec2)));
+    failures.extend(check_games("testdata/c8g.chain-2176.jsonl", &thin(ec2)));
     assert!(failures.is_empty(), "Theorem B fails on {} recorded games:\n{}", failures.len(), failures.join("\n"));
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // The enumerated optimal sets
 
-/// The lines of the file `prover/data/<name>`.
+/// The lines of the file `solver/noframe/data/<name>`.
 fn data_lines(name: &str) -> Vec<Json> {
-    let path = crate_path("prover/data").join(name);
+    let path = crate_path("../noframe/data").join(name);
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     text.lines().filter(|line| !line.trim().is_empty()).map(|line| Json::parse(line).expect("a line of JSON")).collect()
 }
@@ -408,9 +408,9 @@ fn sets_of_line(line: &Json, recorded: &[u32]) -> Result<Vec<Vec<u32>>, String> 
     Ok(sets)
 }
 
-/// Theorem B on every set of every line of `prover/data/<name>` that holds sets.  Each is checked to be what the line
-/// says (the sets are distinct, as many as the line counts, worth its score, playable, the recorded game among them
-/// where the line lists all the optimal sets), and then against the theorem.  Prints what it found and returns the
+/// Theorem B on every set of every line of `solver/noframe/data/<name>` that holds sets.  Each is checked to be what
+/// the line says (the sets are distinct, as many as the line counts, worth its score, playable, the recorded game among
+/// them where the line lists all the optimal sets), and then against the theorem.  Prints what it found and returns the
 /// failures.
 fn check_enumerated(name: &str) -> Vec<String> {
     let start = Instant::now();

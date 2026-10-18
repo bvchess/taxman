@@ -4,7 +4,7 @@
 //! first) to the back.  Each frame is a game of *Taxman Mini*: a set of *moves* and a set of *factors*.  A move
 //! must still have one of its maximal factors among the frame's factors when it is taken, and taking it removes
 //! all of its factors still there (its tax).  A frame is *winnable* when some order takes every move.
-//! (`rust/README.md` introduces the model with an example, and its glossary defines the words used here.)
+//! (`solver/frame/README.md` introduces the model with an example, and its glossary defines the words used here.)
 //!
 //! A game chooses which candidates to *promote*: promoting `n` takes it out of the factors of its *home frame*
 //! (the frame it is promoted from) `h ≥ 1` and makes it a move of frame `h − 1`, one frame forward, where it pays
@@ -28,7 +28,7 @@
 //!
 //! # One-sided candidates
 //!
-//! The extended problem Π⁺(O) ([`crate::frames::build_extended`], heuristics/THEORY.md, "The extended problem")
+//! The extended problem Π⁺(O) ([`crate::frames::build_extended`], docs/THEORY.md, "The extended problem")
 //! has, besides the candidates above (*two-sided*: out of one frame, into the one in front), *one-sided* candidates:
 //! sources that a game may play or leave out.  A one-sided candidate `s` has an *own* frame `j`
 //! ([`FrameGraph::own`]); promoting it adds `s` to the moves of frame `j` if that frame stays winnable, removes no

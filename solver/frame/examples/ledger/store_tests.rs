@@ -1,6 +1,7 @@
 //! The bounds store's tests: the format, the export of a ledger (by hand, with every rule, and of a run), the second
 //! export that appends nothing, a run that starts from the file, and the two referees (`ledger verify-bounds` and
-//! `tools/check_bounds.py`) on the file and on files with a game, a root bound, a relation or a citation tampered with.
+//! `solver/tools/check_bounds.py`) on the file and on files with a game, a root bound, a relation or a citation
+//! tampered with.
 
 use super::book::{upper_by, Book, Entry, Lower, Rule, Side, Upper};
 use super::export::{self, civil_date, Options};
@@ -85,15 +86,15 @@ fn write_lines(path: &Path, lines: &[Line]) {
     std::fs::write(path, lines.iter().map(|line| format!("{}\n", line.to_json())).collect::<String>()).unwrap();
 }
 
-/// What `tools/check_bounds.py` says of `file`: its exit status and what it printed.
+/// What `solver/tools/check_bounds.py` says of `file`: its exit status and what it printed.
 fn python(file: &Path, games: Option<&Path>, strict: &Path) -> (Option<i32>, String) {
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/check_bounds.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/check_bounds.py");
     let mut command = Command::new("python3");
     command.arg("-I").arg(script).arg(file).arg("--strict").arg(strict);
     if let Some(games) = games {
         command.arg("--games").arg(games);
     }
-    let run = command.output().expect("python3 runs tools/check_bounds.py");
+    let run = command.output().expect("python3 runs solver/tools/check_bounds.py");
     (run.status.code(), String::from_utf8_lossy(&run.stdout).into_owned())
 }
 
@@ -766,13 +767,13 @@ fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
 /// The Python referee needs only the standard library: it runs under `python3 -I` and prints a report.
 #[test]
 fn the_python_referee_prints_its_usage() {
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/check_bounds.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/check_bounds.py");
     let run = Command::new("python3").arg("-I").arg(script).arg("--help").output().expect("python3 runs the referee");
     assert!(run.status.success() && String::from_utf8_lossy(&run.stdout).contains("--games"));
 }
 
 /// The committed store, `results/bounds.jsonl`, checked against the chain `STRICT` (`results/strict.jsonl`).
-const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/bounds.jsonl");
+const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/bounds.jsonl");
 
 /// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these
 /// are games replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked

@@ -114,7 +114,7 @@ fn rust_verdict(file: &Path, sources: &KnownSources) -> Result<(), String> {
 
 /// The Python referee on `file`, given the sources: its exit status and report.
 fn python_verdict(file: &Path, sources: &KnownSources) -> (Option<i32>, String) {
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/check_results.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/check_results.py");
     // A source that is not given is a path that is not there.
     let none = Path::new("/nonexistent/none.jsonl");
     let committed = sources.committed.as_deref().unwrap_or(none);
@@ -549,16 +549,15 @@ fn a_store_game_that_does_not_play_or_contradicts_the_chain_stops_the_run_naming
     assert!(err.contains("n=910") && err.contains("less than the previous game"), "{err}");
 }
 
-/// The command line finds the sources in `rust/results` of the repository it runs in (a directory above the working
-/// directory with `src/main/resources/optimal.json`), and names no option for them: a repository made for the purpose,
+/// The command line finds the sources in `results` of the repository it runs in (a directory above the working
+/// directory with `results/optimal.json`), and names no option for them: a repository made for the purpose,
 /// with a store of two boards and no committed chain.
 #[test]
 fn solve_use_prev_and_verify_results_find_the_sources_in_the_repository() {
     let dir = TempDir::new("known-cli");
-    fs::create_dir_all(dir.join("src/main/resources")).unwrap();
-    fs::write(dir.join("src/main/resources/optimal.json"), "[]").unwrap();
-    fs::create_dir_all(dir.join("rust/results")).unwrap();
-    let store = dir.join("rust/results/bounds.jsonl");
+    fs::create_dir_all(dir.join("results")).unwrap();
+    fs::write(dir.join("results/optimal.json"), "[]").unwrap();
+    let store = dir.join("results/bounds.jsonl");
     write_lines(&store, &[proven_lines(905), proven_lines(906)].concat());
     let in_repo = |args: &[&str]| {
         let run =
@@ -589,7 +588,7 @@ fn solve_use_prev_and_verify_results_find_the_sources_in_the_repository() {
     let (code, stdout, stderr) = in_repo(&["verify-results", common::path(&out)]);
     assert_eq!(code, Some(0), "{stdout}{stderr}");
     assert!(stdout.contains("proof: known 6"), "{stdout}");
-    let moved = dir.join("rust/results/bounds.jsonl.moved");
+    let moved = dir.join("results/bounds.jsonl.moved");
     fs::rename(&store, &moved).unwrap();
     let (code, _, stderr) = in_repo(&["verify-results", common::path(&out)]);
     assert_eq!(code, Some(1));

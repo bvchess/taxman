@@ -152,8 +152,8 @@ fn main() {
     let (mut all, mut parity, mut segments, mut lagrangian) = (false, true, false, None);
     // The roles of Theorem B are the default; --fix-low 0 starts from the plain root.
     let (mut fix_low, mut fix_upper) = (true, false);
-    let mut optimal = root.join("../../src/main/resources/optimal.json");
-    let mut results = root.join("../results/strict.jsonl");
+    let mut optimal = root.join("../../results/optimal.json");
+    let mut results = root.join("../../results/strict.jsonl");
     let mut checkpoints = root.join("work/checkpoints");
     let mut out = PathBuf::new();
     for (flag, value) in flags {

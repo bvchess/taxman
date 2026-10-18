@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CHAIN = HERE.parents[1] / "results" / "strict.jsonl"
+CHAIN = HERE.parents[2] / "results" / "strict.jsonl"
 
 
 def lines(path):

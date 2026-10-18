@@ -17,7 +17,7 @@
 //! proper divisor `d` of a move `c` is still in the pot, so is every number `f` with `d | f | c`, `f ≠ c` (whatever
 //! removed `f` earlier, playing `f` or a multiple of it, would have removed its divisor `d` too), and one of those
 //! is a maximal factor of `c`.  So `c` can be played exactly when one of its maximal factors is in the pot, and
-//! the model treats each maximal factor as able to pay for one move.  (`heuristics/THEORY.md`, Theorem 1, has the
+//! the model treats each maximal factor as able to pay for one move.  (`docs/THEORY.md`, Theorem 1, has the
 //! full argument.  It needs every number between `d` and `c` to be on the board, so it fails on a board with
 //! holes: see [`Tables::punctured`].)
 

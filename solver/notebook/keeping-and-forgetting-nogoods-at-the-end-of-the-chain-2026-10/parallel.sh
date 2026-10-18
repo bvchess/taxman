@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Several runs of run.sh at once, one thread each: from rust/,
+# Several runs of run.sh at once, one thread each: from the top of the repository,
 #
-#   nice -n 10 bench/nogoods/parallel.sh JOBS [PROCESSES]
+#   nice -n 10 solver/notebook/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/parallel.sh JOBS [PROCESSES]
 #
 # JOBS is a file with a line for each run, the arguments of run.sh for one game and one policy (`OUT GAME SECONDS
 # POLICY`).  Node counts do not depend on how many runs go at once (a search on one thread is deterministic); CPU

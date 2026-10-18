@@ -3,10 +3,10 @@
 
 Standard library only; every path comes from the arguments or, by default, from the repository this file is in.
 
-The plan (bench/certify/plan.md, plan.jsonl) priced a certificate at twice the plain search of its problem, and a plain
-search by its nodes at the cost per node c of the stretch of the chain it came from.  The pilot (phase A of the
-campaign, bench/certify/lists/stage4/pilot7.txt) runs seven of the dearest games first, to see what the overhead is in
-the regime the money goes to.  For each game that `taxman certify` searched (a line with a verdict and no
+The plan (solver/tools/certify/plan.md, plan.jsonl) priced a certificate at twice the plain search of its problem, and a
+plain search by its nodes at the cost per node c of the stretch of the chain it came from.  The pilot (phase A of the
+campaign, solver/tools/certify/lists/stage4/pilot7.txt) runs seven of the dearest games first, to see what the overhead
+is in the regime the money goes to.  For each game that `taxman certify` searched (a line with a verdict and no
 `same_problem`), with N the nodes of its search in the chain (plan.jsonl `cost_nodes`: `chain_nodes` of an exhausted
 game, the source's nodes of a repeat) and c its stretch's cost per node (plan.md's table of eras):
 
@@ -23,8 +23,8 @@ answer is UNFINISHED, unless a game is already above 5 (STOP) or a line is beate
 Games that rest on another game's certificate by the rule of the same problem (`same_problem`) have no search: they are
 counted, not rated.  A game whose N is not a finished search's (the plan priced it by the cost model) is shown, not
 rated.  The report also gives, for each searched game, its |O| (the open members), its root gap (from the barred
-bounds, `prover/data/upper_*.jsonl`) and its GF(2) block words (the problems file), the search time in thread-hours
-against the plan's, and what that is on one machine at the plan's prices.
+bounds, `solver/noframe/data/upper_*.jsonl`) and its GF(2) block words (the problems file), the search time in
+thread-hours against the plan's, and what that is on one machine at the plan's prices.
 
 usage: certify_pilot.py CERTS... [--list pilot7.txt] [--plan plan.jsonl] [--plan-md plan.md] [--upper FILE...]
            [--problems FILE...] [--bands]
@@ -41,7 +41,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I leaves the
 import certify_campaign  # noqa: E402
 from certify_plan import INT, NUMBER, PlanError, need, read_lines  # noqa: E402
 
-CRATE = Path(__file__).resolve().parent.parent
+TOOLS = Path(__file__).resolve().parent
+CERTIFY = TOOLS / "certify"  # the plan, the problems and the lists of the campaign
+DATA = TOOLS.parent / "noframe" / "data"  # the prover's files
 GO_MEDIAN = 3.0  # go on if the median R is at most this
 GO_MAXIMUM = 5.0  # and no R is above this
 PLANNED_R = 2.0  # the plan's overhead, which the report compares with
@@ -279,11 +281,11 @@ def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("certificates", nargs="+", metavar="CERTS", help="files of certificates (taxman certify --out)")
     ap.add_argument("--list", type=Path, default=None, metavar="FILE", help="the pilot's list: the games to wait for")
-    ap.add_argument("--plan", default=str(CRATE / "bench/certify/plan.jsonl"), metavar="FILE")
-    ap.add_argument("--plan-md", default=str(CRATE / "bench/certify/plan.md"), metavar="FILE")
-    ap.add_argument("--upper", nargs="+", default=sorted(map(str, (CRATE / "prover/data").glob("upper_*.jsonl"))),
+    ap.add_argument("--plan", default=str(CERTIFY / "plan.jsonl"), metavar="FILE")
+    ap.add_argument("--plan-md", default=str(CERTIFY / "plan.md"), metavar="FILE")
+    ap.add_argument("--upper", nargs="+", default=sorted(map(str, DATA.glob("upper_*.jsonl"))),
                     metavar="FILE", help="the barred bounds, for the root gaps")
-    ap.add_argument("--problems", nargs="+", default=[str(CRATE / "bench/certify/problems_600_3440.jsonl")],
+    ap.add_argument("--problems", nargs="+", default=[str(CERTIFY / "problems_600_3440.jsonl")],
                     metavar="FILE", help="the extended problems, for the GF(2) block words")
     ap.add_argument("--bands", action="store_true", help="also the median R by band of gap and of |O|")
     return ap.parse_args(argv)

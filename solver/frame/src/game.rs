@@ -49,7 +49,7 @@ pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
 /// `moves` followed by legal moves for as long as there are any, the largest each time: the game over.  One descending
 /// pass finds them all, for a move only takes numbers out of the pot, so a number that is not legal now never
 /// becomes legal.  (After a game of n − 1 followed by n, or a game of n + 1 less its move n + 1, these are the
-/// completions of the ledger's Lemmas L1 and L2, heuristics/THEORY.md.)
+/// completions of the ledger's Lemmas L1 and L2, docs/THEORY.md.)
 pub fn complete(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     let (_, mut in_pot) = play(n, moves)?;
     let mut game = moves.to_vec();
@@ -191,11 +191,11 @@ fn is_prime(p: u32) -> bool {
 /// Sanity bound on `n` when reading a file of games, so a corrupt file cannot request a huge allocation.
 const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 
-/// The text of `src/main/resources/optimal.json` when the crate was compiled: the table
+/// The text of `results/optimal.json` when the crate was compiled: the table
 /// [`Optimal::built_in`] reads.
-pub const BUILT_IN: &str = include_str!("../../src/main/resources/optimal.json");
+pub const BUILT_IN: &str = include_str!("../../../results/optimal.json");
 
-/// The known optimal games, by board size: the table `src/main/resources/optimal.json` ([`built_in`](Self::built_in)),
+/// The known optimal games, by board size: the table `results/optimal.json` ([`built_in`](Self::built_in)),
 /// possibly overlaid with the completed games of results files ([`with_results`](Self::with_results)).  For each
 /// board size, the best score and a game that achieves it.
 #[derive(Clone)]
@@ -205,7 +205,7 @@ pub struct Optimal {
 }
 
 impl Optimal {
-    /// The table of optimal games built into this binary: `src/main/resources/optimal.json` as it was when the crate
+    /// The table of optimal games built into this binary: `results/optimal.json` as it was when the crate
     /// was compiled, read once.  The solver and the verifiers confirm every score against it, wherever the binary
     /// runs; a changed file takes a rebuild (`build.rs` marks the build dirty until it is committed).
     pub fn built_in() -> &'static Optimal {

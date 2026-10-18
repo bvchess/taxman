@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Tests of the unattended-run scripts that need no cloud: chain.sh with the wall and the ledger (run.sh), wall-node.sh
 # and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file) and for sudo
-# and shutdown.  Needs the release build of the solver (cd rust && cargo build --release; or TAXMAN_BIN names another
+# and shutdown.  Needs the release build of the solver (cd solver/frame && cargo build --release; or TAXMAN_BIN names another
 # build of the same sources, say the one `cargo build --profile test` makes) and rsync.  sweep.sh's scenario also runs
 # the real verify.sh on the sweep's files, which replays the committed games three times.
 #
-#   rust/tools/cloud/test/run.sh [SCENARIO...]     all of them, or the named (chain, ledger, node, launch, sweep)
+#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, node, launch, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -13,7 +13,7 @@ set -u
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 real_cloud="$(cd "$here/.." && pwd)"
-crate="$(cd "$real_cloud/../.." && pwd)"
+crate="$(cd "$real_cloud/../../frame" && pwd)"
 export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
 [ -x "$TAXMAN_BIN" ] || {
     echo "build the solver first: cd $crate && cargo build --release" >&2
@@ -40,7 +40,7 @@ printf '%s\n' '#!/usr/bin/env bash' \
     '[ -z "${STUB_SETUP_SLEEP:-}" ] || sleep "$STUB_SETUP_SLEEP"' \
     '[ -z "${STUB_SETUP_FAIL:-}" ] || exit 1' >"$cloud/setup.sh"
 chmod +x "$cloud"/*.sh
-export TAXMAN_ROOT="$(cd "$crate/.." && pwd)"
+export TAXMAN_ROOT="$(cd "$crate/../.." && pwd)"
 export PATH="$here/bin:$PATH"
 export FAKE_S3="$tmp/s3" FAKE_STATE="$tmp/state" FAKE_LOG="$tmp/aws.log"
 export AWS_DEFAULT_REGION=us-east-1
@@ -470,7 +470,7 @@ game_lines() {
 
 # Whether the sweep of the merged file $1 over $2..$3 has nothing left to search again (sweep_plan.py's count is 0).
 converged() {
-    equals "$(python3 -I "$crate/tools/sweep_plan.py" excerpt "$1" "$2" "$3" /dev/null | awk '{print $2}')" 0
+    equals "$(python3 -I "$TAXMAN_ROOT/solver/tools/sweep_plan.py" excerpt "$1" "$2" "$3" /dev/null | awk '{print $2}')" 0
 }
 
 scenario_sweep() {
@@ -483,7 +483,7 @@ scenario_sweep() {
     # 1301..1340 in four blocks and one second a game: the first block chains from the known games (1..1300), the other
     # blocks start standalone; the passes then search again the games that have more to give.
     known="$tmp/known1300.jsonl"
-    head -n 1300 "$crate/results/strict.jsonl" >"$known"
+    head -n 1300 "$TAXMAN_ROOT/results/strict.jsonl" >"$known"
     (
         export TAXMAN_WORK="$w" KNOWN="$known" BLOCKS=4 GAME_SECONDS=1 PROGRESS=0 MERGE_EVERY=5 S3_DEST=s3://b/sweep
         export SAVE_EVERY=3600
@@ -526,7 +526,7 @@ scenario_sweep() {
     # after it go on from it, as in an unbroken chain.
     # The known file here goes past FIRST - 1 (to 1420): the games of the range it holds are not taken.
     local w2="$tmp/sweep-boundary"
-    head -n 1420 "$crate/results/strict.jsonl" >"$tmp/known1420.jsonl"
+    head -n 1420 "$TAXMAN_ROOT/results/strict.jsonl" >"$tmp/known1420.jsonl"
     mkdir -p "$w2/results/explore-blocks"
     printf '1411 1412\n1413 1416\n' >"$w2/results/explore-blocks/plan"
     (

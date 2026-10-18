@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # The prover's proofs of opt(n) for a range of board sizes, on all the CPUs of a machine, resumable.
 #
-#   rust/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: rust/results/strict.jsonl)
-#   rust/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
-#   OUT=FILE rust/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
+#   solver/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: results/strict.jsonl)
+#   solver/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
+#   OUT=FILE solver/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
-# It runs `exact` of the prover (rust/prover, README section 3), which knows nothing of the solver's frame
+# It runs `exact` of the prover (solver/noframe, README section 3), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may
@@ -35,13 +35,13 @@
 # (and exits 0) when every listed game has a line in OUT.
 #
 # Output: $OUT (default $TAXMAN_WORK/results/exact_parity_A_B.jsonl, one line per game, the format of
-# rust/prover/data/exact_parity_2_1300.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
+# solver/noframe/data/exact_parity_2_1300.jsonl), logs in $LOGS: prover.log (this script), prover.err (`exact`).
 #
 # Environment (all optional, but OUT in list mode):
 #   THREADS         threads, default every CPU
 #   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
 #   OUT             the output file (required in list mode)
-#   STRICT          the recorded optima, default rust/results/strict.jsonl (committed)
+#   STRICT          the recorded optima, default results/strict.jsonl (committed)
 #   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
 #                   data/exact_parity_2_1300.jsonl)
 #   EXTRA_ARGS      more flags for `exact`
@@ -55,7 +55,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$here/env.sh"
 
-STRICT="${STRICT:-$CRATE/results/strict.jsonl}"
+STRICT="${STRICT:-$TAXMAN_ROOT/results/strict.jsonl}"
 BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
 SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
