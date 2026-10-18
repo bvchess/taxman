@@ -3,7 +3,7 @@
 # and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file) and for sudo
 # and shutdown.  Needs the release build of the solver (cd rust && cargo build --release; or TAXMAN_BIN names another
 # build of the same sources, say the one `cargo build --profile test` makes) and rsync.  sweep.sh's scenario also runs
-# the real verify.sh on the sweep's files, which replays the 3,440 committed games three times.
+# the real verify.sh on the sweep's files, which replays the committed games three times.
 #
 #   rust/tools/cloud/test/run.sh [SCENARIO...]     all of them, or the named (chain, ledger, node, launch, sweep)
 #
@@ -26,7 +26,7 @@ command -v rsync >/dev/null 2>&1 || {
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
-# The scripts under test are a copy of the directory's, but for verify.sh, which replays the 3,440 committed games
+# The scripts under test are a copy of the directory's, but for verify.sh, which replays the committed games
 # (half a minute) every time a chain completes.
 cloud="$tmp/cloud"
 mkdir -p "$cloud"

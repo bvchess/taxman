@@ -532,7 +532,8 @@ prove games the run to the wall will not reach: find the easiest spots past 4500
 
 **The run.**  4400..8191 (3,792 boards) on one `c8g.16xlarge`, commit b3ed8ac, 64 workers, the finder 10 s, climbs both
 ways with a limit of 1 hour, nothing given; 360 core-hours (about $3.80), 2026-10-18 02:41-08:22 UTC
-(`s3://taxman-013764204840-us-east-1/ledger-frontier/out`).
+(`s3://taxman-013764204840-us-east-1/ledger-frontier/out`).  The run data kept in the repository for the cloud runs
+of this entry is described in [bench/ledger/README.md](../../bench/ledger/README.md).
 
 **Results.**  Every board was mapped and given the finder's game (it improved 1,720 of 2,042 runs) within about 50
 minutes; then 242 boards were proven: 4446-4475, 4477-4507, 4540-4542, 4554-4622, 4626-4639, 4664-4757 and 4779,

@@ -13,7 +13,7 @@ sentence.  Pure Python; the inputs are found relative to this file, so it runs f
     ./wall.py --chain-end 3440      the committed chain's games 1..3440 instead of 1..CHAIN_END
 
 The tables of the committed chain (phases, zero, fixed and check) take its games 1..CHAIN_END = 2175, the chain as it
-was when `wall_output.md` was made; `strict.jsonl` has grown since, to 3440.
+was when `wall_output.md` was made; `strict.jsonl` has grown since.
 
 The tables, with their inputs (files of this directory unless a path says otherwise):
 

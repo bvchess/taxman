@@ -24,7 +24,7 @@ byte the `.jsonl` files) are not kept.
 | `low.jsonl.gz` | `wall landscape 2-2175 --known results/strict.jsonl --out low.jsonl` on the laptop (2026-10-17, about two minutes, 497 CPU s), then gzipped; the command is that of `cal.jsonl` for the stretch below it (the run's own record was not kept) | the quick bounds of the 2,174 games of 2-2175 with their optima: the lines of `cal.jsonl` for the games before it |
 | `plot_gap.py`, `gap_landscape.svg` | `./plot_gap.py gap_landscape.svg` | the standalone gap (`upper` less `lower`) of every game 2-8191 from `low.jsonl.gz`, `cal.jsonl` and `map.jsonl.gz`, dots of one game each and rolling medians of 101 games, and the quick upper bound less the proven optimum to 3440: an SVG with a linear y axis (it was at the repository's root; the script reproduces it byte for byte) |
 | `land.py` | | what the scripts share: the paths, and loading a file of lines (gzipped or not) |
-| `cal.py` | `./cal.py` | the calibration's table from `cal.jsonl` and `../../results/strict.jsonl` (the committed chain, games 1..3440): the shortfall, the root gap and the standalone gap, and the fits of the chain's nodes (log10) to the two gaps |
+| `cal.py` | `./cal.py` | the calibration's table from `cal.jsonl` and `../../results/strict.jsonl` (the committed chain): the shortfall, the root gap and the standalone gap, and the fits of the chain's nodes (log10) to the two gaps |
 | `map.py` | `./map.py` | the standalone searches against the chain's own search (`sa/`, `cal.jsonl`, `../../results/strict.jsonl`), and the map by bands of 500 games (`map.jsonl.gz`) |
 
 The entry quotes the output of `cal.py`, `map.py` and `ttb/ttb.py`.

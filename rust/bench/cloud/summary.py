@@ -6,7 +6,7 @@ The first file is the reference (the laptop); every table has a column per machi
 the machine's (above 1: faster than the reference's core).  The committed results file (-r, default
 ../../results/strict.jsonl) gives the seconds the chain's games took when the reference solved them, for the re-solved
 range.  Its games 1..LAST count (-e, default CHAIN_END = 2175, the length of the chain when the entry was written; the
-file has grown since, to 3440, and its later games would add a row for the games that the chain run solved new).
+file has grown since, and its later games would add a row for the games that the chain run solved new).
 Standard library only.
 """
 

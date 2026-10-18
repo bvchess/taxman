@@ -26,12 +26,12 @@ The scaling run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) a
 crash and a deadline; `run.sh` changed for it (`run_start` and `run_reap`), and `chain.sh` ran through the change to a
 complete chain, a SIGTERM stop and a deadline.  Not run on EC2: `certify.sh`, `scaling.sh` (the calibration and the
 scaling run did by hand what it does), and nothing has run on Ubuntu.  `wall.sh`, `wall-node.sh` and the ledger of
-`run.sh` (section 12) ran on macOS against a stand-in for aws (`test/run.sh`) and have not run on EC2; section 12.5
-is the rehearsal that tests them there.  The build cache and the release suite
-(section 15) ran on macOS against a directory for the bucket, the stand-in for aws and a stand-in for cargo, and the
-suite's runner ran the whole solver and prover suites in the test profile; none of it has run on EC2.  Sections 2
-and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
-of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
+`run.sh` (section 12) ran on macOS against a stand-in for aws (`test/run.sh`) and on EC2, in the rehearsal of
+section 12.5 and in [the run to the wall](../../docs/experiments/the-run-to-the-wall-2026-10.md).  The build cache and
+the release suite (section 15) ran on macOS against a directory for the bucket, the stand-in for aws and a stand-in
+for cargo, and the suite's runner ran the whole solver and prover suites in the test profile; none of it has run on
+EC2.  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed of
+a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/experiments/scaling-to-192-threads-2026-10.md)); what is not is in section 8.
 
 * [Rules for every launch](#rules-for-every-launch)
@@ -105,8 +105,9 @@ calibration.  The sections below point here instead of repeating them.
 3. The production instance (section 1: mid-size), on spot, for the checks: the large-machine tests, the sweep to
    its CPU count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with deliberate
    interruptions (section 4).
-4. The production chain, from n = 1 or from the committed `results/strict.jsonl` (which holds it to 3440), in
-   tmux, on spot, with a deadline and a copy of the state kept off the machine (section 5).
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` ([its
+   range](../../results/README.md)), in tmux, on spot, with a deadline and a copy of the state kept off the machine
+   (section 5).
 5. Verify, bring the results home, shut everything down (section 6).
 
 The files in this directory:
@@ -142,11 +143,11 @@ All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `res
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
 Nothing is taken from `optimal.json` (it is only compared with, to n = 1300), so nothing assumes it.  The committed
-`results/strict.jsonl` is exactly such a file for n = 1 to 3440, its first 2175 games made on a laptop and the rest by
-the cloud run of section 5 ([results/README.md](../../results/README.md)): a run from n = 1 reproduces its scores (the
-run is checked against it by `verify.sh`), and the production chain can instead start from it, as section 5 says, so
-that only the games above 3440 are new.  The solver is the same code as on a laptop; the machine only changes how long
-it takes.
+`results/strict.jsonl` is exactly such a file, its first 2175 games made on a laptop and the rest on cloud machines,
+the first of those runs the one of section 5 ([results/README.md](../../results/README.md) has its range and how each
+part was made): a run from n = 1 reproduces its scores (the run is checked against it by `verify.sh`), and the
+production chain can instead start from it, as section 5 says, so that only the games above its end are new.  The
+solver is the same code as on a laptop; the machine only changes how long it takes.
 
 **With the GF(2) bound** (the default since 2026-10;
 [docs/EXPERIMENTS.md](../../docs/experiments/the-gf2-bound-in-the-search-2026-10.md)): a chain from `optimal.json`'s
@@ -170,7 +171,7 @@ Cost grew by a factor of 10 for every 55 to 70 in n past 1200 ([bench/curve/READ
 From that file, the cost of extending the chain from 1231 to N on a 192-CPU machine, taking it to be 10 to 19 times
 the 8 M1 threads of the measurements (an assumption, not a measurement), and the prices it assumes ($3.33/h spot,
 $8.35/h on-demand for the 48xlarge; check the current ones).  Starting from a file that holds 1..1300 (the committed
-file did when this was written; it now holds 3440), the part of the cost up to 1300 is already paid:
+file did when this was written; it has grown since), the part of the cost up to 1300 is already paid:
 
 | N | time | spot | on-demand |
 |---|---|---|---|
@@ -534,24 +535,24 @@ The cloud run began with a window of 16, then the default, and moved to 4 at gam
 games in flight at the move, 3311, 3312 and 3315, finished from their checkpoints under the new window).
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
-  committed `rust/results/strict.jsonl` (n = 1 to 3440; the scores equal, the moves may differ): the first 2175 games in
+  committed `rust/results/strict.jsonl` (the scores equal, the moves may differ): the first 2175 games in
   minutes on the big machine (the cloud run's rehearsal made 2176 to 2300 in 11 minutes, with two interruptions), the
   rest in the day that the cloud run took, and `verify.sh` then checks the machine and the build against it.  To skip
   those games, copy the committed file in before the first run, once:
 
   ```
   mkdir -p ~/taxman-work/results && cp rust/results/strict.jsonl ~/taxman-work/results/strict.jsonl
-  rust/tools/cloud/chain.sh 4095                    # skips the 3440 games it holds and solves 3441 on
+  rust/tools/cloud/chain.sh 4095                    # skips the games it holds and solves the next on
   ```
 
   The file is checked when `chain.sh` opens it, assumes nothing (a chain from n = 1), and its lines keep the builds that
-  made them (commit feba6d0 for 1 to 2175, 55287ff for 2176 to 3440), as the lines added will keep the cloud's.  It
-  holds no incomplete line.  The comparison of `verify.sh` with the committed file is then trivial for 1..3440, so the
-  games above 3440 are checked by the referees alone (each game replayed, the chain bounds, Franklín–Moniot, the
-  heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On a replacement machine,
-  restore the saved state instead (below), never the committed file over it.  The cloud run left game 3441 at 626
-  million nodes, and 3444 begun; their checkpoints (format 4, which the present build reads: DESIGN's checkpoint
-  section, and a laptop resumed 3441 from the saved file at its 625,763,557 nodes) are in
+  made them ([results/README.md](../../results/README.md) names them), as the lines added will keep the cloud's.  It
+  holds no incomplete line.  The comparison of `verify.sh` with the committed file is then trivial for the games it
+  holds, so the games above them are checked by the referees alone (each game replayed, the chain bounds,
+  Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On a
+  replacement machine, restore the saved state instead (below), never the committed file over it.  The cloud run left
+  game 3441 at 626 million nodes, and 3444 begun; their checkpoints (format 4, which the present build reads: DESIGN's
+  checkpoint section, and a laptop resumed 3441 from the saved file at its 625,763,557 nodes) are in
   `s3://taxman-013764204840-us-east-1/chain-2176/ckpt/`, and a run that restores them (`save.sh --restore`, below)
   resumes those games instead of starting them over.
 
@@ -736,8 +737,8 @@ on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads
 
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
-The committed chain (`results/strict.jsonl`) reached 2175 when the prover's run began (it reaches 3440 now, within the
-frame model), and the prover in `rust/prover` has proven opt(n) = V(n) without the frame model for every n to 2175:
+The committed chain (`results/strict.jsonl`) reached 2175 when the prover's run began (it reaches further now, within
+the frame model), and the prover in `rust/prover` has proven opt(n) = V(n) without the frame model for every n to 2175:
 1301..2175 in the run of 2026-10-14 and 15 that this section describes
 ([the prover's README](../../prover/README.md#to-2175-on-a-cloud-machine) has the results and their cost).
 `prover.sh` runs the same program, `exact`, over a range of games on a cloud machine.  It is a small job next to the
@@ -1149,8 +1150,8 @@ over V, and the pairs of largest margin matter most (a counterexample needs the 
 below the margin) but will not finish.  So the pairs run in **decreasing margin**, so that a run cut short has done the
 informative ones; those of **margin up to 900 run to completion** under a limit of 10 minutes (`MINUTES`), and those
 **above 900 are probes**: the solver's own start on the board without u (greedy set, dive, local search; the seed too
-if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has to 3440 only) and then 3 minutes of
-search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
+if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has only as far as the committed chain
+goes) and then 3 minutes of search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
 
 *Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
 report it, and solve n again on the whole board (the theory track's program, part I, section 6).  A `none` is
@@ -1275,7 +1276,7 @@ certificates and the plan (11.5).
   (`git fetch && git checkout M5COMMIT`), build again, and delete the checkpoint directory of `deferred` if an earlier
   attempt left one (a checkpoint of another build is refused).  Phases A and B never change build: a checkpoint is
   resumed only by the build that made it, and the lines of one list should come from one build.
-* **Inputs**, all committed: `rust/results/strict.jsonl` (the recorded games, 1..3440), `rust/prover/data/upper_*.jsonl`
+* **Inputs**, all committed: `rust/results/strict.jsonl` (the recorded games), `rust/prover/data/upper_*.jsonl`
   (the prover's barred bounds: 2..1300, 1301..2175, 2176..3314, 3315..3440), `rust/bench/certify/plan.jsonl` and
   `plan.md`, and the lists in `rust/bench/certify/lists/stage4/`.  `certify.sh` takes them from the checkout.
 
@@ -1485,12 +1486,13 @@ nothing of the project remains, delete the launch's security group.
 ## 12. The unattended run to the wall
 
 The chain from n = 1 on one `c8g.16xlarge` (64 threads, window 4) at spot, with the build of a pinned commit of master,
-re-solving 1 to 3440 (to be compared with the committed `results/strict.jsonl` at home, section 6) and going on past it,
-without anyone: it stops by itself at the wall, when its budget is used, or on a date, and a spot interruption is
-mended by the machine that replaces the one taken away.  Built, tested against a stand-in for aws and **not yet run on
-EC2**: Brian approved the rehearsal of 12.5 and the run of 12.4 on 2026-10-16 (the account changes are those of 12.3),
-and the rehearsal comes first.  The decision
-(Brian, 2026-10-16) and the reasons for the wall are in [docs/STATUS.md](../../docs/STATUS.md).
+re-solving the games of the committed `results/strict.jsonl` (to be compared with it at home, section 6) and going on
+past them, without anyone: it stops by itself at the wall, when its budget is used, or on a date, and a spot
+interruption is mended by the machine that replaces the one taken away.  Built, tested against a stand-in for aws and
+**run on EC2**, the rehearsal of 12.5 and the run of 12.4, on 2026-10-17 and 18
+([the run to the wall](../../docs/experiments/the-run-to-the-wall-2026-10.md)): Brian approved them on 2026-10-16 (the
+account changes are those of 12.3), the rehearsal first.  The decision (Brian, 2026-10-16) and the reasons for the wall
+are in [docs/STATUS.md](../../docs/STATUS.md).
 
 ### 12.1 How it ends
 
@@ -1631,28 +1633,28 @@ aws iam list-role-policies --role-name taxman-ec2 --query PolicyNames          #
 ```
 
 **After the end**: pull the results (`aws s3 sync s3://taxman-013764204840-us-east-1/wall-RUN/results results-from-cloud/`)
-and verify them at home as section 6 says: `verify.sh` must report that the games 1 to 3440 agree with the committed
-file with equal scores, "assumptions: none", and both referees agreeing; the games past 3440 are checked by the referees
+and verify them at home as section 6 says: `verify.sh` must report that the games of the committed file agree with it
+with equal scores, "assumptions: none", and both referees agreeing; the games past its end are checked by the referees
 alone.  The checkpoint of the walled game stays in `ckpt/` (a run that goes on needs it).  **To go on** after the wall
 or the budget (a longer wall, more money): `wall.sh launch --continue --commit THE-SAME-COMMIT --until DATE --budget-hours
 H --game-hours G`, with the commit the run began with (a checkpoint is resumed only by the build that made it,
 section 5) and the budget as the new total: `--continue` removes the end and the stop, writes the config again, and
 keeps the ledger, the results and the checkpoints.
 
-**Drawing on the known games.**  The chain above searches every game from n = 1, which is what re-proves 1 to 3440 with
-a build.  A run that goes on past what the repository holds needs none of that: with `--extra-args "--use-prev"`
-(`EXTRA_ARGS`; the machines run `taxman solve 1-N --use-prev ...` in the checkout of the pinned commit) the chain
-draws on the known games of that checkout's `rust/results`, which are the committed chain `strict.jsonl` (to 3440),
-the bounds store `bounds.jsonl` (the boards the ledger has proven, 4300 to 4783 at the commit of 2026-10-18) and the
-built-in `optimal.json` ([README, "Known games"](../../README.md#known-games)):
+**Drawing on the known games.**  The chain above searches every game from n = 1, which is what re-proves the committed
+chain with a build.  A run that goes on past what the repository holds needs none of that: with
+`--extra-args "--use-prev"` (`EXTRA_ARGS`; the machines run `taxman solve 1-N --use-prev ...` in the checkout of the
+pinned commit) the chain draws on the known games of that checkout's `rust/results`, which are the committed chain
+`strict.jsonl`, the bounds store `bounds.jsonl` (the boards the ledger has proven, 4300 to 4783 at the commit of
+2026-10-18) and the built-in `optimal.json` ([README, "Known games"](../../README.md#known-games)):
 
 ```
 rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "--use-prev"
 ```
 
-* **Games 1 to 3440 are taken from the committed chain**, each recorded in seconds with proof `known` (so nothing in
+* **The games of the committed chain are taken from it**, each recorded in seconds with proof `known` (so nothing in
   that stretch is re-proven by the build; the seconds of the first minutes of the run go to replaying them).  The game
-  after the committed chain's end is searched from its game of 3440, as the run from n = 1 does.
+  after the committed chain's end is searched from the chain's last game, as the run from n = 1 does.
 * **A board the store has proven is recorded with no search** (method `known`, citing the store's two lines), and the
   game after it is searched from it, with its ceiling and seed.  The boards the store has not proven still help: the
   lower bound's game seeds the search and the upper bound stops it, which can shorten the game that sets the wall (the
@@ -1667,9 +1669,10 @@ rust/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "--
   results/bounds.jsonl` on the store first (section 14): the chain takes its bounds on its word.
 * **A resumed machine** passes the flag again (it is in `run/config`, which every machine reads), and the results file it
   restores from S3 is checked with the same sources.  The checkpoint of a searched game is resumed as ever.
-* Without it the chain from n = 1 re-proves 1 to 3440 (1.76 hours on the machine, in the run of 2026-10-17); with it that
-  stretch costs seconds and the run checks nothing of the build against the committed chain.  It is the flag for a run
-  that goes past the repository's knowledge, and the wrong one for a run whose point is that check.
+* Without it the chain from n = 1 re-proves the committed chain (1 to 3440 in the run of 2026-10-17, 1.76 hours on the
+  machine); with it that stretch costs seconds and the run checks nothing of the build against the committed chain.  It
+  is the flag for a run that goes past the repository's knowledge, and the wrong one for a run whose point is that
+  check.
 
 ### 12.5 The rehearsal (designed, not run)
 
@@ -1684,10 +1687,10 @@ resumed from S3 (`games done so far: 1289`, the ledger's `base` the first machin
 `deadline: the budget of 0.2 instance-hours` at 0.18, the group at 0.
 
 The whole mechanism on the smallest machine of the family, `c8g.large` (2 vCPUs; $0.024 to $0.039 an hour at spot in
-us-east-1 on 2026-10-17), with the chain to 1300 instead of 3440 and the limits tiny.  Two runs, because the wall is
-the end of a run: the first shows the wall and the end that takes the group to 0, the second the replacement and the
-budget.  The setup of a `c8g.large` takes the longest of anything: expect 5 to 8 minutes of building before the chain
-starts, on every machine (`SKIP_TESTS` is on, the smoke checks run).
+us-east-1 on 2026-10-17), with the chain to 1300 instead of the whole committed chain and the limits tiny.  Two runs,
+because the wall is the end of a run: the first shows the wall and the end that takes the group to 0, the second the
+replacement and the budget.  The setup of a `c8g.large` takes the longest of anything: expect 5 to 8 minutes of
+building before the chain starts, on every machine (`SKIP_TESTS` is on, the smoke checks run).
 
 **The chain is slowed on purpose.**  No game up to 1300 takes a second under the default search (2 threads of an M1
 Max: 1232 takes 1.0 s, 1287 0.7 s, none up to 400 takes 10 ms), so neither a wall of seconds nor a chain that outlasts
@@ -1828,7 +1831,7 @@ unfinished line with its best game, and the next game goes on from that game as 
 ceiling `n + opt(n - 1)`, the prime formula and a repeat of an earlier search only from a game that is proven
 ([README, "Keeping going past limits"](../../README.md#keeping-going-past-limits-and-the-sweep)).  A block's first game
 has no game before it and is solved standalone, but for the first block's if `KNOWN` (default the committed
-`results/strict.jsonl`, to 3440) holds a proven game of FIRST - 1: that block's file starts as a copy of KNOWN's games,
+`results/strict.jsonl`) holds a proven game of FIRST - 1: that block's file starts as a copy of KNOWN's games,
 as one extends a chain, and the solver goes on from the last.  The blocks are merged into `explore.jsonl` every
 `MERGE_EVERY` seconds and at the end.
 

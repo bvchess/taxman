@@ -37,7 +37,7 @@
 #   --price P             PRICE           what an instance-hour is counted at in `status`, dollars    default 0.676
 #   --volume-gb G         VOLUME_GB       the root volume                                             default 40
 #   --extra-args "..."    EXTRA_ARGS      more flags for `taxman solve`; "--use-prev" makes the chain draw on the known games
-#                                         (the committed chain to 3440, the proven boards of the bounds store, ...) of the
+#                                         (the committed chain, the proven boards of the bounds store, ...) of the
 #                                         pinned commit's results/ (RUNBOOK.md, section 12.4)
 #   --margin S            LEDGER_MARGIN   seconds before the budget or the date that the chain stops  default 300
 #   --max-instances N     MAX_INSTANCES   machines in all before the run ends as a boot loop         default 20

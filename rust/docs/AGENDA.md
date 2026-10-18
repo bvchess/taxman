@@ -1,13 +1,13 @@
 # Research agenda (2026-10)
 
-What to pursue to push the wall (the largest n for which an optimal game is proven) much further than 3440: where the
-project stands, what limits it, the avenues ranked, the conjectures worth proving, the ideas worth borrowing, and what
-the coming cloud runs should measure.  Written on 2026-10-14, after the rule of symmetric pairs was merged.  It links
-to the measurements instead of repeating them; the ones made for it are in section 7.  On 2026-10-15 section 2 and the
-results of A4, C5 and C6 were brought up to date with the measurement of the chain past 2175 (section 7.4), and
-"Where we are" with the committed chain, which the cloud run took to 3440.  The
-register of [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) stays the record of what was tried; an
-avenue started from here gets its row there when it ends.
+What to pursue to push the wall (the largest n for which an optimal game is proven) much further than the committed
+chain ([results/README.md](../results/README.md)) reaches: where the project stands, what limits it, the avenues
+ranked, the conjectures worth proving, the ideas worth borrowing, and what the coming cloud runs should measure.
+Written on 2026-10-14, after the rule of symmetric pairs was merged.  It links to the measurements instead of repeating
+them; the ones made for it are in section 7.  On 2026-10-15 section 2 and the results of A4, C5 and C6 were brought up
+to date with the measurement of the chain past 2175 (section 7.4), and "Where we are" with the committed chain, which
+the cloud run took to 3440.  The register of [EXPERIMENTS.md](EXPERIMENTS.md#register-of-everything-tried) stays the
+record of what was tried; an avenue started from here gets its row there when it ends.
 
 * [1. Where we are](#1-where-we-are)
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
@@ -485,7 +485,7 @@ their output files, analysed afterwards on one thread; what needs the machine is
   1` over the results file, as in section 7.1): the gap's trend (C5, the two regimes of section 2) and the residuals
   of the cost model, with the thread count in the fit.  Done for a snapshot of the EC2 chain at game 3314 (509
   searched games, section 7.4, [EXPERIMENTS](experiments/the-gap-past-2175-2026-10.md)); it can be repeated on the
-  committed chain, which now reaches 3440, with `bench/wall/gap.py`, to see whether the waves keep their level.
+  committed chain as it stands, with `bench/wall/gap.py`, to see whether the waves keep their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, for
   converting 192-thread trees to one-thread equivalents in that fit.  Measured for 2170 and 2172 (1 to 192 threads)
   and 2184 (16 to 192): the trees differ by up to 18% with no trend in the threads

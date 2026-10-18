@@ -13,7 +13,7 @@ EC2 chain made of it.  Inputs (this directory unless a path says otherwise):
   EC2 chain, one thread, in order, with their roots' gaps (`./gap.py join-resolved` makes it).
 * ../../results/strict.jsonl and ../gf2/roots.jsonl: the committed chain to CHAIN_END = 2175 and its roots (the gaps of
   1301-2175, the committed chain's own nodes).  The chain was that long when `gap_output.md` was made; the file has
-  grown since, to 3440, and the tables read only its games to CHAIN_END (the EC2 chain's games begin past it).
+  grown since, and the tables read only its games to CHAIN_END (the EC2 chain's games begin past it).
 * ../cloud/c8g48/games.jsonl: the scaling run's per-game nodes at windows of 1, 4 and 16 (the speculation).
 * ../cloud/c8g.chain-2176.jsonl: the Graviton calibration's chain, 2176-2276 (the build against the EC2 chain's).
 * setup_c8g.jsonl: the fixed costs of a game on Graviton4.
@@ -50,7 +50,7 @@ ANATOMY = HERE / "anatomy_chain.jsonl"
 RESOLVED = HERE / "resolved_1301_2175.jsonl"
 CALIBRATION = RUST / "bench" / "cloud" / "c8g.chain-2176.jsonl"
 
-CHAIN_END = 2175  # the last game of the committed chain that the tables use (strict.jsonl runs on to 3440)
+CHAIN_END = 2175  # the last game of the committed chain that the tables use (strict.jsonl runs on past it)
 FIRST = CHAIN_END + 1  # the first game past it, where the EC2 chain's games begin
 LAST = 3312  # the last searched game of the snapshot
 MIN_NODES = 50  # the fits take the exhausted searches of at least this many nodes, as AGENDA section 7.1 does

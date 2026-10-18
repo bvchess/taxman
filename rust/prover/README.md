@@ -44,7 +44,7 @@ What the evidence is, in one paragraph each:
   with forced picks from the duals and learned nogoods; with the proven ceiling opt(n) ≤ n + opt(n−1) and the prime
   formula (in the data, `relation: chain` is a game at its ceiling, V(n) = n + V(n−1), and `relation: prime` one given
   by the prime formula), it proves the recorded optimum for every n ≤ 2175, the committed chain as far as it went when
-  the proofs were made (the Franklín–Moniot bound alone had reached 989).  The games 2176–3440 that the chain has
+  the proofs were made (the Franklín–Moniot bound alone had reached 989).  The games above 2175 that the chain has
   since gained are proven within the frame model alone, not by the prover.
 * **Every optimal set.**  The same search, run in an enumeration mode one below the optimum, lists every optimal
   set of a game for about the cost of proving the optimum.  The optimal set is unique for every n ≤ 424; from 425
@@ -269,8 +269,8 @@ dominate), 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot
 nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
 The committed chain (`../results/strict.jsonl`) reached 2175 when the prover's run began, and the next subsection is
-the run that proved it (the chain has since been extended to 3440, within the frame model; the prover has not proven
-the games past 2175).  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of
+the run that proved it (the chain has since been extended, within the frame model; the prover has not proven the games
+past 2175).  The extrapolation from the bands above (0.23 decades per 100 in n: to 2000 about 57 hours of
 thread time, the hardest proofs about 3 hours) was made before there was anything to measure it against, and it was
 low: 1301–1999 took 164 hours, the hardest proof (1475) 4.9.
 
@@ -361,8 +361,8 @@ Two files, one thread on the laptop: `data/upper_1301_2175.jsonl`, the committed
 4.1 s for the slowest game).  A third, `data/upper_2_1300.jsonl`, does the same for the table's games 2..1300 (1,299
 games, 665 needing it, 417 of those with nothing open, 1.0% of the members open; 65 s), for the tests of `taxman
 certify` (the frame solver's certificates of U, [DESIGN.md](../DESIGN.md#certificates-of-u)).  A fourth,
-`data/upper_3315_3440.jsonl`, the rest of the committed chain (126 games, 73 needing it, 3424, 3425 and 3440 among
-them; 277 s, 4.3 s for the slowest game), is the input of the campaign of certificates on 2176-3440
+`data/upper_3315_3440.jsonl`, the rest of the committed chain as it stood then (126 games, 73 needing it, 3424, 3425
+and 3440 among them; 277 s, 4.3 s for the slowest game), is the input of the campaign of certificates on 2176-3440
 (`../bench/certify/`).  By band (the open members and the margins of each game; the share is of all members):
 
 | n | games | the root's gap (mean) | members of U\*_{≥3} | open (least, median, most) | open | margin (median, largest) |
@@ -718,7 +718,7 @@ tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_par
 ./target/release/upper --from 2176 --to 3314 --results ../results/strict.jsonl --results CHAIN.jsonl \
     --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
 ./target/release/upper --from 3315 --to 3440 --results ../results/strict.jsonl \
-    --out data/upper_3315_3440.jsonl          # the committed chain's last games (5 minutes)
+    --out data/upper_3315_3440.jsonl          # the committed chain's games 3315 to 3440 (5 minutes)
 ./target/release/exact --list 1575,1584 --out B.jsonl                   # E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
 tools/summarize.py sources B.jsonl D.jsonl          # E6's table and criterion (RUNBOOK section 10 for the cloud run)
@@ -739,8 +739,8 @@ gzipped where large (`gunzip -k` to resume into it).
   rejection of descending greedy on an upper-half instance is a GF(2) dependency of what it kept above — a
   statement about cores and closed surfaces mod 2 that the adversarial results tie to the window law with the
   real ranking of the primes.
-* The prover's proofs reach 2175, where the committed chain ended when they were made (it reaches 3440 now, within the
-  frame model); 1301–2175 took 226 thread-hours (section 3), and a longer chain will need more.  What the parity
+* The prover's proofs reach 2175, where the committed chain ended when they were made (it reaches further now, within
+  the frame model); 1301–2175 took 226 thread-hours (section 3), and a longer chain will need more.  What the parity
   bound still misses are the odd cores (THEORY.md, Theorem 10): its root gap, 130 points on average at 1000–1300 and
   384 over the searched games of 1301–2175 (125 to 767, no steady rise), and the cost with it (tenfold the nodes per 210
   points); the conflicts of its heaviest sets are large (20–45 members at 990).
@@ -750,7 +750,7 @@ gzipped where large (`gunzip -k` to resume into it).
   on every board to 8191 ([THEORY.md](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains),
   Theorems B and M), and what the model's answers rest on is one statement, U: some optimal game plays every source of
   three or more prime factors that setup keeps.  The prover's proofs establish U at every n ≤ 2175.  Beyond, the
-  committed games of 2176–3440 that rest on U (an exhausted search or a repeat) have it uncertified, and the
+  committed games past 2175 that rest on U (an exhausted search or a repeat) have it uncertified, and the
   barred parity bounds certify 85% of those sources per game to 3314 but close no game alone
   ([section 3](#the-upper-part-game-by-game)); the rest needs a search that leaves the open sources optional, whose
   cost against the search with them fixed is the measurement E6 (`exact` against `exact --fix-upper 1`,
