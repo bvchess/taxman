@@ -118,6 +118,21 @@ minutes) and the pool (about a minute).  With the build of `setup.sh` (about 10 
 `c8g.16xlarge`'s $0.68, and the volume and the timer's slack; $0.64 an hour on demand).  The timer of 90 minutes
 bounds it at about $0.26 at spot for the machine.
 
+## The cloud run (2026-10-18)
+
+What it found: [the entry](../../docs/experiments/the-node-choice-where-the-strong-bound-pays-2026-10.md).  One
+`c8g.4xlarge`, 16 workers, commit 9d9dae3, the script's defaults (`NODE_STEPS` 200, `SUB` 1, `LIMIT` 900), 17:54:17Z to
+18:02:38Z.  Its output is in `cloud-20261018/`:
+
+| file | what it is |
+|---|---|
+| `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyses (all the steps; the floor entry's slope; the first 50 steps) |
+| `log` | the stages' times (UTC) and the commit |
+| `measure.jsonl.gz` | the 553 lines of `measure/worker-0.jsonl` to `worker-15.jsonl`, joined in the order of the workers and gzipped.  `analyze.py` reads plain files: `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I bench/node_choice/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the analyses again, byte for byte |
+
+Not kept: `prep/` (the files of `wall choice-prepare`, up to 2 MB a game) and `fixtures/` (the nodes of the six proofs,
+70-250 KB a game), which the commands above make again, and `logs/` (each worker's output, which repeats its lines).
+
 ## What it does not measure
 
 * **The sample is not a search's population.**  Nodes are spread over gaps (the made and probe sources) or picked for
