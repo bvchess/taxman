@@ -724,8 +724,10 @@ fn the_python_referee_prints_its_usage() {
 /// The committed store, `results/bounds.jsonl`, checked against the chain `STRICT` (`results/strict.jsonl`).
 const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/bounds.jsonl");
 
-/// The lines of the committed store that the quick check verifies.
-const QUICK_LINES: usize = 400;
+/// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these
+/// are games replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked
+/// at every export).
+const QUICK_LINES: usize = 60;
 
 /// The first lines of the committed store pass the verifier.  A prefix of an append-only store is a store too: a line
 /// cites only lines before it, so the first `QUICK_LINES` pass as the whole file does.

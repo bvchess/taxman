@@ -253,8 +253,8 @@ results/strict.jsonl` would add the 2140 games of 1301–3440.
 ## bounds.jsonl
 
 The bounds on opt(n) that [the ledger](../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md) finds, kept for
-good, for the boards the chain has not proven.  The file is made by the first `ledger export` and is not in the tree
-until then.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, `taxman
+good, for the boards the chain has not proven.  The first `ledger export` made it, from stage 1 of the ledger past 4400
+(2026-10-18), and each export since appends to it.  A line is a bound, not a game of `taxman solve`: it is not in the schema of the results lines, `taxman
 verify-results` and `tools/check_results.py` do not read it, a board that `strict.jsonl` has proven has no line in it,
 and it is not `explore.jsonl`'s kind of file either (that one is the sweep's games).  Its lines are bounds that hold:
 a lower bound is the score of a finished game that the referee replays, an upper bound is the frame model's, carried
