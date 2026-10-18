@@ -127,22 +127,15 @@ nodes).  It is in `wall finders`, `wall sound` and the ledger (below), not in th
   game.  The file is not a chain and never goes into `strict.jsonl`.  The ledger (next) may supersede it.
 * **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
-  cheapest; `examples/ledger/`; [the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)).  On 2176..3440
-  with the truth hidden (48 core-hours of a `c8g.16xlarge`, after a stalled first launch, fixed, and a crash at 2303,
-  fixed in `Board::seed`) it proved 916 of 1,265 boards, every one at the optimum, among them all of 2576..3075, for
-  about 2.2 times the chain's cost on the same games: most searches began before the board below was proven.  **Wedge
-  and climb** (built the same day): a board next to a proven board is searched first, seeded with its game, for 60 s
-  (`--climb up|down|both|off`, `--climb-limit`); a climb that stops parks the board; a board next to a climb waits; the
-  laptop's dry runs prove every board at the optimum.  **The finder** (built the same day): large neighbourhood search
-  for 1 s of a worker (`--lns-seconds`) after each map and before a search whose best seed has changed; its game is a
-  lower bound once the referee replays it, and seeds the search if better; the events say what it did and which game
-  seeded each search.  Dry runs: every board proven, 0 violations; 1301..1500 in 612 CPU s and 122 s against 557 and
-  145 without it (its game ends as the lower bound of 51 of the 89 boards searched); 2576..2700 at 900 CPU s proves 61
-  boards on or off.  Next (Brian approved $1, 2026-10-17): 2176..3440 again with everything on, to learn what sets up a
-  run past 3440 best ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).  **The bounds
-  store** (built the same day; not yet made): `results/bounds.jsonl`, the bounds a run finds kept for good, append-only,
-  a line each, for the boards the chain has not proven (`ledger export`; `run --bounds` starts from it, a board with both
-  bounds needing no map; `verify-bounds` and `tools/check_bounds.py` are its two referees; 778 bytes a board in the dry
-  run).  The first real export, of the run past 3440, waits for review
-  ([the entry's section](experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-bounds-store),
-  [results/README](../results/README.md#boundsjsonl)).
+  cheapest; `examples/ledger/`; [the entry](experiments/the-ledger-bounds-from-both-sides-2026-10.md)), with **wedge and
+  climb** (a board next to a proven one is searched first, from its game), **the finder** (large neighbourhood search
+  for a lower bound, replayed by the referee) and **the bounds store** (`results/bounds.jsonl`, append-only; `ledger
+  export`, `run --bounds`, `verify-bounds` and `tools/check_bounds.py`; [results/README](../results/README.md#boundsjsonl)).
+  On 2176..3440 with the truth hidden every proven board is at the optimum: 916 of 1,265 in 48 core-hours without the
+  climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
+* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): the games the run to the wall will not reach.
+  Stage 1, 4400..8191 on one `c8g.16xlarge` (360 core-hours, about $3.80): every board mapped with the finder (10 s),
+  then searches where the gap is smallest, climbs both ways (limit 1 hour).  It proved 242 boards, 4446-4475,
+  4477-4507, 4540-4542, 4554-4622, 4626-4639, 4664-4757 and 4779, all of them in 4400..4799; past 4800 the smallest
+  gap after the finder is 1,664 and nothing closed.  Its bounds of all 3,792 boards are the store's first lines, both
+  referees passing.  Stage 2 (2026-10-18, 12 hours, at most $8.20): 4300..4999 from stage 1's state.

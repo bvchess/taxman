@@ -523,3 +523,24 @@ checkpoint, which `--checkpoints` records but nothing reads.
 **Commits.**  14f36d6 (the store, its commands, the Python referee and the tests), e93d035 (the export on a thread with a big
 stack, a workaround), then the commit that follows citations with a worklist and drops the thread, and this record.
 
+## Later (2026-10-18): past 4400, stage 1
+
+**Why.**  The prep run (2176..3440, two ledgers side by side, 24 core-hours each, given the games to 2175) proved 876
+boards with the climbs and the finder against 837 with the climbs alone and 806 for the first run at the same
+core-hours; climbs proved their board 53-69% of the time at about 50 CPU s a proof.  Brian then approved up to $25 to
+prove games the run to the wall will not reach: find the easiest spots past 4500, drill on them, and spread both ways.
+
+**The run.**  4400..8191 (3,792 boards) on one `c8g.16xlarge`, commit b3ed8ac, 64 workers, the finder 10 s, climbs both
+ways with a limit of 1 hour, nothing given; 360 core-hours (about $3.80), 2026-10-18 02:41-08:22 UTC
+(`s3://taxman-013764204840-us-east-1/ledger-frontier/out`).
+
+**Results.**  Every board was mapped and given the finder's game (it improved 1,720 of 2,042 runs) within about 50
+minutes; then 242 boards were proven: 4446-4475, 4477-4507, 4540-4542, 4554-4622, 4626-4639, 4664-4757 and 4779,
+by repeats 96, their own search 95 (82 of them from the finder's game), the ceiling 35, primes 16.  Proven against
+core-hours: 112 at 72, 164 at 180, 212 at 288, 242 at 360.  The 4400..4799 boards took 60% of the search time and gave
+every proof; 4800..5399 took 30% and gave none.  After the finder the smallest U - L past 4800 is 1,664 (medians 2,054
+at 4800..5199 rising to 7,631 at 8000..8191).  Climbs: 22 of 30 up and 2 of 8 down proved their board.  The bounds of
+all 3,792 boards are the first lines of `results/bounds.jsonl` (8.4 MB), both referees passing.
+
+**Next.**  Stage 2: 4300..4999 for 12 hours from stage 1's state (its ledger and the checkpoints of 4400..4999 copied
+to `ledger-frontier-2`), commit afe4513.
