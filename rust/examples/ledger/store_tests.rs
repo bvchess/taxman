@@ -9,6 +9,7 @@ use super::store::{self, Best, Chain, Game, Line, Store};
 use super::support::TempDir;
 use super::tests::{book_of, give, opt, opt_game, write_results};
 use super::verify;
+use super::STRICT;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use taxman::board::Board;
@@ -718,4 +719,31 @@ fn the_python_referee_prints_its_usage() {
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/check_bounds.py");
     let run = Command::new("python3").arg("-I").arg(script).arg("--help").output().expect("python3 runs the referee");
     assert!(run.status.success() && String::from_utf8_lossy(&run.stdout).contains("--games"));
+}
+
+/// The committed store, `results/bounds.jsonl`, checked against the chain `STRICT` (`results/strict.jsonl`).
+const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/results/bounds.jsonl");
+
+/// The lines of the committed store that the quick check verifies.
+const QUICK_LINES: usize = 400;
+
+/// The first lines of the committed store pass the verifier.  A prefix of an append-only store is a store too: a line
+/// cites only lines before it, so the first `QUICK_LINES` pass as the whole file does.
+#[test]
+fn the_start_of_the_committed_bounds_passes_the_verifier() {
+    let dir = TempDir::new("committed-bounds");
+    let prefix = dir.join("bounds.jsonl");
+    let text: String = std::fs::read_to_string(COMMITTED).unwrap().split_inclusive('\n').take(QUICK_LINES).collect();
+    assert_eq!(text.lines().count(), QUICK_LINES, "the committed store has that many lines");
+    std::fs::write(&prefix, &text).unwrap();
+    let (report, ok) = verify::verify(&prefix, Path::new(STRICT), 4).unwrap();
+    assert!(ok, "{report}");
+}
+
+/// The whole committed store passes the verifier.
+#[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_start_of_the_committed_bounds_passes_the_verifier")]
+fn the_committed_bounds_pass_the_verifier() {
+    let (report, ok) = verify::verify(Path::new(COMMITTED), Path::new(STRICT), 4).unwrap();
+    assert!(ok, "{report}");
 }
