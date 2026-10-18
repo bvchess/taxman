@@ -118,11 +118,13 @@ impl Way {
         }
     }
 
-    /// The board a climb to `n` in this way goes from, whose proof starts it.
-    fn source(self, n: u32) -> u32 {
+    /// The board just outside the repeat class `class` (ascending) that a climb to it in this way goes from, whose
+    /// proof starts it: the board below the class's smallest for a climb up, the board above its largest for a climb
+    /// down.
+    fn source(self, class: &[u32]) -> u32 {
         match self {
-            Way::Up => n - 1,
-            Way::Down => n + 1,
+            Way::Up => class[0] - 1,
+            Way::Down => class[class.len() - 1] + 1,
         }
     }
 }
@@ -807,18 +809,19 @@ impl Scheduler {
     }
 
     /// The next climb, if any, and its way: to the board of smallest gap among those not proven, not on their way,
-    /// searched, not parked (a climb to them ended unproven) and next to a proven board, the board below them (up) or
-    /// the board above them (down); the climbs up first.  The first unproven, searched board above (or below) a proven
-    /// one is such a board, whatever boards between were settled by the relations (a board unproven but not searched
-    /// stops the climb until its own board is proven).  None if climbs are off.
+    /// searched, not parked (a climb to them ended unproven) and next to a proven board, the board just below their
+    /// repeat class (up) or just above it (down); the climbs up first.  The first unproven, searched board above (or
+    /// below) a proven one is such a board, whatever boards between were settled by the relations (a board unproven but
+    /// not searched stops the climb until its own board is proven).  None if climbs are off.
     fn next_climb(&self) -> Option<(Way, &Entry)> {
         let s = &self.settings;
         if s.climb_limit <= 0.0 {
             return None;
         }
         [(s.climb_up, Way::Up), (s.climb_down, Way::Down)].into_iter().filter(|&(on, _)| on).find_map(|(_, way)| {
-            let next_to_proven =
-                |e: &&Entry| !e.parked && self.book.entries.get(&way.source(e.n)).is_some_and(Entry::proven);
+            let next_to_proven = |e: &&Entry| {
+                !e.parked && self.book.entries.get(&way.source(&self.book.class(e.n))).is_some_and(Entry::proven)
+            };
             self.eligible().filter(next_to_proven).min_by_key(|e| (e.gap(), e.n)).map(|e| (way, e))
         })
     }
