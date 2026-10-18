@@ -10,10 +10,10 @@ not proven), is described at the end.
 
 | file | games | schema | tactics, as the lines record them | made by |
 |---|---|---|---|---|
-| `strict.jsonl` | 1–3440 | 5 | `default`: no tactic is unproven any more, so none is switched off | commit feba6d0 for 1–2175 and commit 55287ff for 2176–3440, a clean tree each (recorded in every line) |
+| `strict.jsonl` | 1–3914 | 5 | `default`: no tactic is unproven any more, so none is switched off | commit feba6d0 for 1–2175, commit 55287ff for 2176–3440 and commit eb84a6f for 3441–3914, a clean tree each (recorded in every line) |
 
 `strict.jsonl` is the file to build on: a chain from n = 1, with full provenance.  Its games 2..2175 are also proven on
-the whole board, by the prover; its games 2176..3440 are proven within the frame model, which is exact given statement
+the whole board, by the prover; its games 2176..3914 are proven within the frame model, which is exact given statement
 U (below, "What supports the scores"), and U is not yet certified past 2175.  Three other files were checked with
 it and agree with it (see "What supports the scores"): `default.jsonl` (1001–1231, the first run past 1000, made with
 the unproven tactics `reuse_prev` and `revise_freedoms` on, schema 1), which is gone from the tree (`git show
@@ -33,16 +33,17 @@ here; a sweep's results go to a file of their own, with a notebook entry saying 
 
 ## strict.jsonl
 
-The committed chain from n = 1 to n = 3440: every game is built from the one before, and nothing in it rests on
+The committed chain from n = 1 to n = 3914: every game is built from the one before, and nothing in it rests on
 `optimal.json` or on any other file.  (The name is from the builds that had unproven tactics, which the chain was made
-without; none is left, so every run from n = 1 is made without them.)  It has 3440 lines, the completed games in order
-of n, so there is no line of an unfinished search.  It was made in two runs, the second a continuation of the first:
-games 1–2175 in one invocation that nothing stopped, on a laptop, and games 2176–3440 appended to a copy of those lines
-on a cloud machine (below); the file as it was before the second run is `git show
-4f1c35b:rust/results/strict.jsonl`, and its 2175 lines are the first 2175 of this file, byte for byte.  It is the
-fourth file of its name.  The earlier three were chains to 1300 and are in git: the first of commit bd9bb5d (schema 3,
-`git show cd3d32f:rust/results/strict.jsonl`), the second of commit 243af9b (schema 4, `git show
-2487671:rust/results/strict.jsonl`) and the third of commit 271c817 (schema 5, 4 threads, `git show
+without; none is left, so every run from n = 1 is made without them.)  It has 3914 lines, the completed games in order
+of n, so there is no line of an unfinished search.  It was made in three runs, each a continuation of the one before:
+games 1–2175 in one invocation that nothing stopped, on a laptop, games 2176–3440 appended to a copy of those lines on a
+cloud machine, and games 3441–3914 appended to those from a run on a cloud machine of the same kind (below); the file as
+it was before the second run is `git show 4f1c35b:rust/results/strict.jsonl`, and its 2175 lines are the first 2175 of
+this file, byte for byte; as it was before the third, `git show b23f497:rust/results/strict.jsonl`, and its 3440 lines
+are the first 3440, byte for byte.  It is the fourth file of its name.  The earlier three were chains to 1300 and are in
+git: the first of commit bd9bb5d (schema 3, `git show cd3d32f:rust/results/strict.jsonl`), the second of commit 243af9b
+(schema 4, `git show 2487671:rust/results/strict.jsonl`) and the third of commit 271c817 (schema 5, 4 threads, `git show
 0133afe:rust/results/strict.jsonl`).  All three have this file's scores in games 1–1300, and the second and the third
 its proofs and methods too; the first, made before the tactic `same_search` existed, searched the 545 games that this
 file concludes as repeats.  Their moves differ from this file's in a few games (below).
@@ -97,21 +98,36 @@ has the run's story and cost; [the runbook](../tools/cloud/RUNBOOK.md) the proce
   `seconds.search_all_runs`: 7 s at 2200, 97 s at 3400), with about one decade of scatter around it (sd 1.0),
   concentrated in the patches.  The queue of work units never held more than 7,298, and none spilled to disk.
 * The run was left in the middle of game 3441, at 626 million nodes after 5.9 hours, with 3444 also begun; their
-  checkpoints (format 4) are not part of the results, and there is no line for either.
+  checkpoints (format 4) are not part of the results, and it left no line for either (the third run made them).
+
+How the third run, games 3441–3914, was made:
+
+* The command was `taxman solve` from n = 1, with a window of 4 games in flight on 64 threads, on one `c8g.16xlarge`
+  at spot, with the build of commit eb84a6f; it was launched on 2026-10-17 at 00:15 PDT and stopped on request on
+  2026-10-18 at 18:58Z, in the middle of game 3915 (no line for it).  It solved games 1–3440 again first, with this
+  file's scores in all (checked), and only its lines from 3441 on were kept, so the lines before them are the second
+  run's, unchanged; the game of 3440 that line 3441 names (`prev`, by digest) is this file's.  Every kept line records
+  that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or `--node-limit` and the `default`
+  tactics, and its `prev.source` is `run`, 3441's too.
+* The 474 games are 221 searches (178 exhausted, 43 at the ceiling), 193 repeats and 60 primes.  The searches took
+  21.28 G nodes and 49.0 hours of game time (the games overlap in the window): 107 games of 30 M nodes or more took
+  20.65 G of them, and the dearest were 3441 (0.79 G nodes, 9,973 s or 2.77 h), 3864, 3807, 3885 and 3744 (0.68, 0.68,
+  0.67 and 0.50 G); by time, after 3441, 3888 (5,271 s) and 3444 (4,687 s).  The queue of work units never held more
+  than 5,815, and none spilled to disk.
 
 What the lines say, as `taxman verify-results` and `tools/check_results.py` report them:
 
-| | 1–1300 | 1301–2175 | 2176–3440 | `strict.jsonl` |
-|---|---|---|---|---|
-| games | 1300 | 875 | 1265 | 3440 |
-| proof `trivial` | 13 | 0 | 0 | 13 |
-| proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 1178 |
-| proof `cap`: the search reached the ceiling n + score(n − 1) | 115 | 77 | 119 | 311 |
-| proof `prime_formula` | 211 | 115 | 155 | 481 |
-| proof `same_search`: a repeat of an earlier game's search | 545 | 369 | 543 | 1457 |
-| rest on nothing beyond the frame model | 1300 | 875 | 1265 | 3440 |
-| score = n + score(n − 1) | 424 | 270 | 402 | 1096 |
-| score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 480 |
+| | 1–1300 | 1301–2175 | 2176–3440 | 3441–3914 | `strict.jsonl` |
+|---|---|---|---|---|---|
+| games | 1300 | 875 | 1265 | 474 | 3914 |
+| proof `trivial` | 13 | 0 | 0 | 0 | 13 |
+| proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 178 | 1356 |
+| proof `cap`: the search reached the ceiling n + score(n − 1) | 115 | 77 | 119 | 43 | 354 |
+| proof `prime_formula` | 211 | 115 | 155 | 60 | 541 |
+| proof `same_search`: a repeat of an earlier game's search | 545 | 369 | 543 | 193 | 1650 |
+| rest on nothing beyond the frame model | 1300 | 875 | 1265 | 474 | 3914 |
+| score = n + score(n − 1) | 424 | 270 | 402 | 148 | 1244 |
+| score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 60 | 540 |
 
 (`default.jsonl` had 34 prime, 78 exhausted and 119 proofs by `reuse_prev`, 19 games resting on nothing unproven;
 `chain.jsonl` 34 prime, 127 exhausted and 70 at the ceiling, all 231 resting on nothing unproven.)
@@ -121,11 +137,12 @@ repeats; 1001–1231, 81 exhausted, 16 at the ceiling, 34 prime and 100 repeats;
 ceiling, 9 prime and 29 repeats (the 69 games of 1232–1300 are 31 searches and 29 repeats, and the primes 1237, 1249,
 1259, 1277, 1279, 1283, 1289, 1291 and 1297); 1301–2175, 314 exhausted, 77 at the ceiling, 115 prime and 369 repeats
 (the 875 games are 391 searches, 369 repeats and the 115 primes); 2176–3440, 448 exhausted, 119 at the ceiling, 155
-prime and 543 repeats (the 1265 games are 567 searches, 543 repeats and the 155 primes).  The 1489 games that searched
-are 1178 exhausted and 311 at the ceiling; the proofs at the ceiling were all decided before the search explored a node
-(0 nodes) but four: 686's, which took 29, and 2695's, 3052's and 3306's, which took 7,175, 2,826 and 5,366.  A repeat
-takes the promotions of the latest earlier game that posed the same search problem: n − 1 for 1287 of the 1457 and n − 2
-for the other 170 (n − 1 is prime for each of those).
+prime and 543 repeats (the 1265 games are 567 searches, 543 repeats and the 155 primes); 3441–3914, 178 exhausted, 43 at
+the ceiling, 60 prime and 193 repeats (the 474 games are 221 searches, 193 repeats and the 60 primes).  The 1710 games
+that searched are 1356 exhausted and 354 at the ceiling; the proofs at the ceiling were all decided before the search
+explored a node (0 nodes) but five: 686's, which took 29, and 2695's, 3052's, 3306's and 3796's, which took 7,175,
+2,826, 5,366 and 5,530.  A repeat takes the promotions of the latest earlier game that posed the same search problem:
+n − 1 for 1458 of the 1650 and n − 2 for the other 192 (n − 1 is prime for each of those).
 
 Several games have more than one optimal set of moves, and which one a run finds depends on the order of its search:
 scores are reproducible, move lists need not be.  The sets of this file differ from the earlier files' in these games:
@@ -173,7 +190,7 @@ the store's bound) inherits what it assumes, as for a game from `optimal.json`.
 
 "Optimal" here means optimal within the frame model, which is opt(n) wherever one open statement about the game,
 U, holds ([DESIGN.md](../DESIGN.md#what-optimal-means); it holds for every n ≤ 2175, where the prover proves the
-optimum on the whole board, and is not yet certified past it: `taxman certify` will check it game by game for 2176–3440;
+optimum on the whole board, and is not yet certified past it: `taxman certify` will check it game by game for 2176–3914;
 a game proven at its ceiling or by the prime formula does not need it), and given that the solver is right.  Two
 verifiers, about 10 s (42 s of CPU, on several threads) and 3 s on the laptop:
 
@@ -195,11 +212,11 @@ What that evidence amounts to:
 
 1. **Arithmetic certificates.**  A score equal to n + score(n − 1) (the ceiling opt(n) ≤ n + opt(n − 1)), or for a
    prime n to n + score(n − 1) − P with P the largest prime below n (proven in `src/accelerate.rs`), is optimal
-   whenever the game of n − 1 is, whatever found it: 1576 of `strict.jsonl`'s games (1096 at n + score(n − 1), among
-   them its 311 proofs at the ceiling, and 480 prime ones).
-2. **Exhaustive searches.**  `strict.jsonl`'s 1178 `exhausted` games are proven by a search that explored its whole
-   tree, as the solver reports it.  The rest of the file is its 311 proofs at the ceiling, its 481 prime games, its 13
-   trivial ones (no promotion candidate, so there is only one game) and its 1457 repeats, which take the promotions and
+   whenever the game of n − 1 is, whatever found it: 1784 of `strict.jsonl`'s games (1244 at n + score(n − 1), among
+   them its 354 proofs at the ceiling, and 540 prime ones).
+2. **Exhaustive searches.**  `strict.jsonl`'s 1356 `exhausted` games are proven by a search that explored its whole
+   tree, as the solver reports it.  The rest of the file is its 354 proofs at the ceiling, its 541 prime games, its 13
+   trivial ones (no promotion candidate, so there is only one game) and its 1650 repeats, which take the promotions and
    the proof of an earlier game that posed the same search problem (both verifiers check it, `src/results.rs`).
 3. **Standalone re-solves.**  `bench/curve/calib.jsonl` holds 197 standalone searches, one for every non-prime n in
    1001–1231, with no seed and no ceiling (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads, commit
@@ -209,8 +226,8 @@ What that evidence amounts to:
    games, 24 are proven by an exhausted search of their own, and the 7 proofs at the ceiling, the 9 prime ones and the
    29 repeats rest on the game before them or on the game they repeat, so on the chain from n = 1 (see 5).  Past 1300,
    `bench/curve/bands.jsonl` has ten games of 1302–1352 solved standalone (the matching path, 8 threads), each finishing
-   with the promotion sum recorded here; the rest of 1301–3440 is the chain's (762 exhausted searches of their own, and
-   196 proofs at the ceiling, 270 prime ones and 912 repeats that rest on the games before them).
+   with the promotion sum recorded here; the rest of 1301–3914 is the chain's (940 exhausted searches of their own, and
+   239 proofs at the ceiling, 330 prime ones and 1105 repeats that rest on the games before them).
 4. **Agreement between builds and files.**
    * n ≤ 1000: `strict.jsonl`'s scores are optimal.json's, all 1000 (each line's `optimal_match` is true;
      `tests/results.rs` checks it), 797 of the games are optimal.json's move for move, and 995 are its sets of moves
@@ -233,6 +250,9 @@ What that evidence amounts to:
      committed), has 2176–2300, 125 in all.  Both have this file's scores, proofs, methods, promotions and moves in
      every game they share with it (checked on the final file).  Past 2300 the evidence is the run's own: the referees
      on the whole file.
+   * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
+     before these games, with this file's scores in all of them (the lines it made of those games are not kept), and
+     the referees pass the whole file.
    * 1001–1231: the scores of `strict.jsonl`, `bench/curve/chain.jsonl` (commit e710d16, 8 threads, a chain with the
      unproven tactics off) and `default.jsonl` (the earlier solver, with unproven tactics on) are equal in all 231
      games.  `strict.jsonl`'s games are `default.jsonl`'s move for move but 1215, and `chain.jsonl`'s but 1215 and
@@ -242,13 +262,13 @@ What that evidence amounts to:
      and 1215; the first's differ at those and at 1221–1224.
 5. **Assumptions.**  `strict.jsonl` assumes nothing beyond the frame model: it starts at n = 1, so no game of it is
    built from optimal.json (which is only compared with, up to 1300: a score that differs would be a hard error), and
-   all 3440 games record that they assume nothing.
+   all 3914 games record that they assume nothing.
 6. **The prover's proofs.**  The prover proves every n up to 2175 optimal without the frame model (no frames or
    promotions: [the prover's README](../prover/README.md); [THEORY.md](../../heuristics/THEORY.md),
    Theorem 10), so `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are the optimum on
    the whole board (1301–2175 in the cloud run of 2026-10-14 and 15,
-   [EXPERIMENTS](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md)).  The 1265
-   games of 2176–3440 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model: what is
+   [EXPERIMENTS](../docs/experiments/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10.md)).  The 1739
+   games of 2176–3914 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model: what is
    proven and what remains"](../../heuristics/THEORY.md#the-frame-model-what-is-proven-and-what-remains)), and U is
    not yet certified past 2175: `taxman certify` will check it game by game, with the prover's barred bounds
    ([the prover's README](../prover/README.md#the-upper-part-game-by-game) has them to 3314).  Until then their
@@ -269,7 +289,7 @@ rest on it say so ("the game of n in optimal.json is optimal"); a chain that ass
 starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reproduce optimal.json's scores with no unproven
 tactic on: 416 repeats, 311 exhausted, 92 at the ceiling, 168 prime and 13 trivial, 7.5 s of search in all on 8 threads,
 the slowest n = 992 at 0.7 s.  The table has not been extended past 1300, and stays there: `taxman extend-optimal
-results/strict.jsonl` would add the 2140 games of 1301–3440.
+results/strict.jsonl` would add the 2614 games of 1301–3914.
 
 ## bounds.jsonl
 
@@ -384,4 +404,4 @@ if any check fails and name the line (`line K (n=N)`).
 board, from lines of 330 bytes for a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155
 for an upper bound.  At the end of the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, a cited
 game and an upper bound about 150 and 220 bytes: of the order of 3 kilobytes a board in a first export (about 12
-megabytes for 3,800 boards), less than `strict.jsonl`'s 5 (17.7 megabytes for 3,440 games).
+megabytes for 3,800 boards), less than `strict.jsonl`'s 6 (22.7 megabytes for 3,914 games).

@@ -2211,20 +2211,23 @@ fn a_proof_with_another_score_than_the_results_is_an_error() {
 }
 
 /// The committed prover files prove every game of the chain to 2175 (the prover's own proofs, without a certificate),
-/// and the committed chain past it, to 3440, is not proven at 2176, the first game that needs a certificate: nothing
-/// past it is proven, since each game rests on the one before it.
+/// and the committed chain past it, to 3914, is not proven at 2176, the first game that needs a certificate: nothing
+/// past it is proven, since each game rests on the one before it.  The barred bounds and the certificates in
+/// `bench/certify` reach 3440 at most, so the games 3441..=3914 have neither: they are in the chain, and the test
+/// claims nothing of them but that, with a game before them unproven, they are unproven too.
 #[test]
 fn the_prover_proves_the_committed_chain_to_2175() {
     let exact = read_exact(&taxman::paths::exact_files_in_repository().unwrap()).unwrap();
     let scores: BTreeMap<u32, u64> = fixtures().known.games().map(|(n, score, _)| (n, score)).collect();
-    assert_eq!(scores.keys().next_back(), Some(&3440));
+    assert_eq!(scores.keys().next_back(), Some(&3914));
     let to_2175: BTreeMap<u32, u64> = scores.range(..=2175).map(|(&n, &score)| (n, score)).collect();
     let reached = frontier(&to_2175, &exact, &BTreeSet::new()).unwrap();
     assert_eq!(reached, Frontier { through: 2175, first_gap: None, beyond: vec![] });
 
     let reached = frontier(&scores, &exact, &BTreeSet::new()).unwrap();
     assert_eq!(reached, Frontier { through: 2175, first_gap: Some((2176, Gap::Unproven)), beyond: vec![] });
-    // With every game of 2176..=3440 that needs a certificate certified, the whole chain is proven.
+    // With every game of 2176..=3314 that needs a certificate certified (the barred bounds say which), the chain is
+    // proven to 3314 at least; past the bounds a game is proven only at a ceiling given a proven game before it.
     let bounds = read_upper(&upper_files_to_3314()).unwrap();
     let certified: BTreeSet<u32> =
         bounds.values().filter(|line| line.needs && line.n > 2175).map(|line| line.n).collect();
