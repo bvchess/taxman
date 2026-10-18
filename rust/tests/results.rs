@@ -38,6 +38,15 @@ fn with(line: &Json, path: &str, value: &Json) -> Json {
     Json::Obj(fields)
 }
 
+/// The Python referee `tools/check_results.py` on the files `paths`.  Their lines cite no known source, so it is given
+/// none (a path that is not there): by default it reads the committed chain and the bounds store, 0.4 s each time.
+fn python_referee(paths: &[PathBuf]) -> std::process::Output {
+    let none = "/nonexistent/none.jsonl";
+    let mut command = Command::new("python3");
+    command.arg("-I").arg(crate_path("tools/check_results.py")).args(["--committed", none, "--bounds", none]);
+    command.args(paths).output().expect("python3 runs tools/check_results.py")
+}
+
 /// A change to a line: the field at a path (as [`with`] takes it) and its new value.
 type Edit<'a> = (&'a str, Json);
 
@@ -69,9 +78,7 @@ fn verifiers_agree(dir: &TempDir, cases: &[(Vec<Json>, Verdict)]) {
         paths.push(path);
     }
 
-    let script = crate_path("tools/check_results.py");
-    let run = Command::new("python3").arg("-I").arg(&script).args(&paths).output();
-    let run = run.expect("python3 runs tools/check_results.py");
+    let run = python_referee(&paths);
     let report = String::from_utf8_lossy(&run.stdout);
     let refusals = cases.iter().filter(|(_, verdict)| matches!(verdict, Verdict::Refused { .. })).count();
     assert_eq!(run.status.code(), Some(if refusals == 0 { 0 } else { 1 }), "{report}");
@@ -370,8 +377,7 @@ fn forged_repeats_are_refused_by_both_verifiers() {
         assert!(err.contains(&format!("line {n} (n={n}): ")) && err.contains(&expected), "{case}: {err}");
         paths.push(path);
     }
-    let run = Command::new("python3").arg("-I").arg(crate_path("tools/check_results.py")).args(&paths).output();
-    let run = run.expect("python3 runs tools/check_results.py");
+    let run = python_referee(&paths);
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stdout));
 }
 

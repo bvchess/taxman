@@ -170,6 +170,17 @@ class Toy(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertIn("TIMED OUT", report)
 
+    def test_the_summary_says_which_tests_used_the_most_cpu_and_a_wait_is_no_cpu(self):
+        done, summary, report = self.run_suite()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        costliest = {test["id"]: test for test in summary["costliest"]}
+        self.assertEqual(set(costliest["solver/lib:toy/tests::slow"]), {"id", "seconds", "cpu"})
+        slow = costliest["solver/lib:toy/tests::slow"]  # sleeps for 1.2 s
+        self.assertGreaterEqual(slow["seconds"], 1.2)
+        self.assertLess(slow["cpu"], 0.5)
+        self.assertEqual(summary["costliest"], sorted(summary["costliest"], key=lambda t: -t["cpu"]))
+        self.assertIn("most CPU: ", report)
+
     def test_a_crate_that_does_not_build_is_an_error_of_its_own(self):
         broken = Path(self.tmp.name) / "broken"
         (broken / "src").mkdir(parents=True)
@@ -186,6 +197,28 @@ class Scheduling(unittest.TestCase):
         tests = [module.Test(name, binary, name) for name in ("a", "b", "c", "d", "e")]
         order = module.schedule(tests, {"a": 1.0, "c": 30.0, "d": 5.0})
         self.assertEqual([t.id for t in order], ["b", "e", "c", "d", "a"])
+
+
+class Measuring(unittest.TestCase):
+    def test_a_command_that_computes_uses_cpu_and_one_that_sleeps_does_not(self):
+        module = load("run_tests", SCRIPT)
+        spin = "import time; t = time.process_time()\nwhile time.process_time() - t < 0.3: pass"
+        status, _, seconds, cpu = module.run([sys.executable, "-c", spin], Path("."), None)
+        self.assertEqual(status, "exit 0")
+        self.assertGreaterEqual(cpu, 0.25)
+        status, _, seconds, cpu = module.run([sys.executable, "-c", "import time; time.sleep(0.5)"], Path("."), None)
+        self.assertEqual((status, seconds >= 0.5), ("exit 0", True))
+        self.assertLess(cpu, 0.3)
+
+    def test_a_command_over_its_timeout_is_killed_and_one_that_finishes_is_not_called_timed_out(self):
+        module = load("run_tests", SCRIPT)
+        child = "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])"
+        program = f"import subprocess, sys, time; {child}; time.sleep(30)"
+        status, _, seconds, _ = module.run([sys.executable, "-c", program], Path("."), 0.3)
+        self.assertEqual(status, "timed out")
+        self.assertLess(seconds, 5)
+        status, output, _, _ = module.run([sys.executable, "-c", "print('done')"], Path("."), 30)
+        self.assertEqual((status, output.strip()), ("exit 0", "done"))
 
 
 if __name__ == "__main__":

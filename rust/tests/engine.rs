@@ -363,7 +363,7 @@ fn eight_threads_are_correct() {
 #[test]
 fn many_workers_on_few_cores_are_correct() {
     let inst = instance();
-    let cfg = EngineConfig { cores: Some(2), ..config(16) };
+    let cfg = EngineConfig { cores: Some(2), ..config(if QUICK { 8 } else { 16 }) };
     let out = solve(&cfg, fresh(), &inst);
     assert!(out.completed && !out.optimal_declared);
     assert_optimal(&out, &inst, inst.dp());

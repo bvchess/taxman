@@ -785,15 +785,18 @@ fn a_checkpoint_directory_in_use_is_refused() {
     assert!(stderr.contains("in use by another process"), "{stderr}");
 }
 
-/// Runs `solve 944` (on optimal.json's game of 943) with progress lines, and once the search is under way sends
-/// `signal` (if any); returns the exit status and stdout.  The tactics are the matching path's, whose search of 944
-/// lasts long enough to be stopped (the GF(2) search's takes under a tenth of a second).
+/// The board of the signal test: 944, whose search on the matching path lasts long enough to be stopped (the GF(2)
+/// search takes under a tenth of a second), and in a quick run 935, which does too and costs two thirds as much.
+const SIGNALLED: u32 = if QUICK { 935 } else { 944 };
+
+/// Runs `solve` of the board `SIGNALLED` (on optimal.json's game of the one before it) with progress lines, and once
+/// the search is under way sends `signal` (if any); returns the exit status and stdout.
 #[cfg(unix)]
-fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
+fn solve_signalled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let out = dir.join("results.jsonl");
     let ckpt = dir.join("ckpt");
     let mut child = taxman()
-        .args(["solve", "944", "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
+        .args(["solve", &SIGNALLED.to_string(), "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
         .args(["--tactic", "gf2=off", "--tactic", "lagrange=on", "--tactic", "symmetry=off"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
@@ -810,7 +813,7 @@ fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     if let Some(signal) = signal {
         // The first progress line says the search is running.
         let line = rx.recv_timeout(Duration::from_secs(60)).expect("a progress line");
-        assert!(line.starts_with("n=944 ") && line.contains(" nodes "), "{line}");
+        assert!(line.starts_with(&format!("n={SIGNALLED} ")) && line.contains(" nodes "), "{line}");
         let pid = child.id().to_string();
         assert!(Command::new("kill").args([signal, &pid]).status().unwrap().success());
     }
@@ -830,12 +833,12 @@ fn solve_944(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
 #[test]
 fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
     let dir = TempDir::new("signal");
-    let ckpt = dir.join("ckpt").join("n0944.ckpt");
+    let ckpt = dir.join("ckpt").join(format!("n{SIGNALLED:04}.ckpt"));
     let mut nodes = 0;
     // SIGINT and SIGTERM stop the search alike; a quick run sends the first.
     let signals = [("-INT", 130), ("-TERM", 143)];
     for (signal, code) in &signals[..if QUICK { 1 } else { 2 }] {
-        let (status, stdout) = solve_944(&dir, Some(*signal));
+        let (status, stdout) = solve_signalled(&dir, Some(*signal));
         assert_eq!(status.code(), Some(*code), "{signal}: {stdout}");
         assert!(stdout.contains("stopped by a signal"), "{signal}: {stdout}");
         assert!(ckpt.exists(), "{signal}: the final checkpoint");
@@ -848,7 +851,7 @@ fn a_signal_stops_the_search_with_a_checkpoint_to_resume() {
         let head = engine::read_checkpoint(&ckpt).unwrap();
         assert_eq!(head.stats.nodes, so_far, "{signal}: the checkpoint holds the work done");
     }
-    let (status, stdout) = solve_944(&dir, None);
+    let (status, stdout) = solve_signalled(&dir, None);
     assert!(status.success(), "{stdout}");
     let lines = results(&dir.join("results.jsonl"));
     assert_eq!(lines.len(), if QUICK { 2 } else { 3 });

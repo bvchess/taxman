@@ -146,18 +146,34 @@ fn both_refuse(file: &Path, sources: &KnownSources, line: usize, n: u32, expecte
 const BOARDS: [u32; 6] = [906, 907, 910, 920, 930, 944];
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
+)]
 fn proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_accept_them() {
+    proven_boards_of_the_store_are_recorded_to(960, &BOARDS);
+}
+
+/// [`proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_accept_them`] for the games to 913,
+/// the store's boards among them 906, 907 and 910.
+#[test]
+fn proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them() {
+    proven_boards_of_the_store_are_recorded_to(913, &BOARDS[..3]);
+}
+
+/// The test of the games 900..=`hi`, with the games of `boards` in the store.
+fn proven_boards_of_the_store_are_recorded_to(hi: u32, boards: &[u32]) {
     let dir = TempDir::new("known-store");
-    let store = store_of(&dir, &BOARDS);
+    let store = store_of(&dir, boards);
     let sources = sources(None, Some(&store));
     let out = dir.join("out.jsonl");
-    let games = run(900, 960, &options(sources.clone()), &out);
+    let games = run(900, hi, &options(sources.clone()), &out);
 
     // The control: the same range from the same game before it, with nothing but the search to find the games.
-    let control = run(900, 960, &options(KnownSources::default()), &dir.join("control.jsonl"));
+    let control = run(900, hi, &options(KnownSources::default()), &dir.join("control.jsonl"));
     assert_eq!(games.len(), control.len());
 
-    let proven: BTreeSet<u32> = BOARDS.into_iter().collect();
+    let proven: BTreeSet<u32> = boards.iter().copied().collect();
     for game in &games {
         let (score, _) = truth(game.n);
         assert_eq!(game.score, score, "n={}", game.n);
@@ -207,7 +223,9 @@ fn proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_a
     // The report counts them.
     let known = Known::load(Optimal::built_in(), &sources).unwrap();
     let report = verify_files_with(std::slice::from_ref(&out), &known, 1).unwrap().to_string();
-    assert!(report.contains("known 6") && report.contains("statement U at 6 boards in all"), "{report}");
+    let count = boards.len();
+    let statement = format!("statement U at {count} boards in all");
+    assert!(report.contains(&format!("known {count}")) && report.contains(&statement), "{report}");
 }
 
 #[test]
@@ -246,13 +264,36 @@ fn a_game_that_the_store_carries_from_the_game_of_another_line_is_played_and_cit
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_sample_of_the_tampered_stores_makes_both_verifiers_refuse_the_results"
+)]
 fn a_tampered_store_or_a_store_that_was_not_given_makes_both_verifiers_refuse_the_results() {
+    both_verifiers_refuse_the_cases(|_| true);
+}
+
+/// [`a_tampered_store_or_a_store_that_was_not_given_makes_both_verifiers_refuse_the_results`] for four of its thirteen
+/// cases: the first, fifth, ninth and last.
+#[test]
+fn a_sample_of_the_tampered_stores_makes_both_verifiers_refuse_the_results() {
+    both_verifiers_refuse_the_cases(|case| case % 4 == 1);
+}
+
+/// The test of the cases `sampled` picks (counting from 1).
+fn both_verifiers_refuse_the_cases(sampled: impl Fn(usize) -> bool) {
     let dir = TempDir::new("known-tampered");
     let store = store_of(&dir, &[906, 910]);
     let sources_ok = sources(None, Some(&store));
     let out = dir.join("out.jsonl");
     let games = run(906, 911, &options(sources_ok.clone()), &out);
     both_accept(&out, &sources_ok);
+    let mut case = 0;
+    let mut refuse = |file: &Path, sources: &KnownSources, line: usize, n: u32, expected: &str| {
+        case += 1;
+        if sampled(case) {
+            both_refuse(file, sources, line, n, expected);
+        }
+    };
     let line_of = |n: u32| (n - 906) as usize + 1;
     let (score, _) = truth(910);
 
@@ -278,33 +319,33 @@ fn a_tampered_store_or_a_store_that_was_not_given_makes_both_verifiers_refuse_th
         l[i] = with(&l[i], "value", Json::from(score + 1));
         l
     });
-    both_refuse(&out, &value_changed, line_of(910), 910, "has no upper bound of board 910 worth");
+    refuse(&out, &value_changed, line_of(910), 910, "has no upper bound of board 910 worth");
     let upper_gone = tampered("upper-gone.jsonl", &|mut l| {
         let i = at(&l, 910, "upper");
         l.remove(i);
         l
     });
-    both_refuse(&out, &upper_gone, line_of(910), 910, "has no upper bound of board 910 worth");
+    refuse(&out, &upper_gone, line_of(910), 910, "has no upper bound of board 910 worth");
     let lower_gone = tampered("lower-gone.jsonl", &|mut l| {
         let i = at(&l, 906, "lower");
         l.remove(i);
         l
     });
-    both_refuse(&out, &lower_gone, line_of(906), 906, "has no lower bound of board 906 worth");
+    refuse(&out, &lower_gone, line_of(906), 906, "has no lower bound of board 906 worth");
     let other_rule = tampered("rule.jsonl", &|mut l| {
         let i = at(&l, 906, "upper");
         l[i] = with(&l[i], "rule", Json::from("exhausted"));
         l
     });
-    both_refuse(&out, &other_rule, line_of(906), 906, "is by exhausted from test-run, not by given from test-run");
+    refuse(&out, &other_rule, line_of(906), 906, "is by exhausted from test-run, not by given from test-run");
     let other_run = tampered("source.jsonl", &|mut l| {
         let i = at(&l, 906, "lower");
         l[i] = with(&l[i], "source", Json::from("another-run"));
         l
     });
-    both_refuse(&out, &other_run, line_of(906), 906, "lower bound of board 906");
+    refuse(&out, &other_run, line_of(906), 906, "lower bound of board 906");
     // A store that was not given at all.
-    both_refuse(&out, &sources(None, None), line_of(906), 906, "which was not given to the check");
+    refuse(&out, &sources(None, None), line_of(906), 906, "which was not given to the check");
 
     // The results lines changed: a citation of another line, an assumption dropped or added, the citation gone.
     let results = read_lines(&out);
@@ -324,30 +365,46 @@ fn a_tampered_store_or_a_store_that_was_not_given_makes_both_verifiers_refuse_th
         ])
     };
     let refused = edit_line("cite.jsonl", 906, "known", cite("elsewhere"));
-    both_refuse(&refused, &sources_ok, 1, 906, "lower bound of board 906");
+    refuse(&refused, &sources_ok, 1, 906, "lower bound of board 906");
     let refused = edit_line("assumes.jsonl", 906, "assumes", Json::array(Vec::<&str>::new()));
-    both_refuse(&refused, &sources_ok, 1, 906, "records the assumptions");
+    refuse(&refused, &sources_ok, 1, 906, "records the assumptions");
     let refused = edit_line("assumes2.jsonl", 906, "assumes", Json::array([assumed_u(906), assumed_u(907)]));
-    both_refuse(&refused, &sources_ok, 1, 906, "records the assumptions");
+    refuse(&refused, &sources_ok, 1, 906, "records the assumptions");
     let refused = edit_line("nocite.jsonl", 906, "known", Json::Null);
-    both_refuse(&refused, &sources_ok, 1, 906, "cites no source");
+    refuse(&refused, &sources_ok, 1, 906, "cites no source");
     let refused = edit_line("proof.jsonl", 906, "proof", Json::from("exhausted"));
-    both_refuse(&refused, &sources_ok, 1, 906, "records the proof exhausted, but it is known");
+    refuse(&refused, &sources_ok, 1, 906, "records the proof exhausted, but it is known");
     // The game of a known line is checked as any game: a score that the moves do not make is refused.
     let refused = edit_line("score.jsonl", 906, "score", Json::from(games[0].score + 1));
-    both_refuse(&refused, &sources_ok, 1, 906, "the moves score");
+    refuse(&refused, &sources_ok, 1, 906, "the moves score");
     // A citation on a line that is not a known game, a prime game say, is a contradiction.
     let refused = edit_line("prime.jsonl", 907, "known", cite("test-run"));
-    both_refuse(&refused, &sources_ok, 2, 907, "known");
+    refuse(&refused, &sources_ok, 2, 907, "known");
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it_to_913"
+)]
 fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it() {
+    an_open_board_of_the_store_seeds_its_search_to(960);
+}
+
+/// [`an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it`] for the boards of 900..913, where 910
+/// is the dearest to search.
+#[test]
+fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it_to_913() {
+    an_open_board_of_the_store_seeds_its_search_to(913);
+}
+
+/// The test of the boards 900..=`hi`.
+fn an_open_board_of_the_store_seeds_its_search_to(hi: u32) {
     let dir = TempDir::new("known-open");
-    // The control: the boards of 900..960 whose search is dear enough to show, searched with nothing but the table.
-    let control = run(900, 960, &options(KnownSources::default()), &dir.join("control.jsonl"));
+    // The control: the boards of 900..=`hi` whose search is dear enough to show, searched with nothing but the table.
+    let control = run(900, hi, &options(KnownSources::default()), &dir.join("control.jsonl"));
     let dear = control.iter().filter(|g| g.method == Method::Search && g.proof == Some(Proof::Exhausted));
-    let target = dear.max_by_key(|g| g.nodes).expect("a searched board in 900..960");
+    let target = dear.max_by_key(|g| g.nodes).expect("a searched board in the range");
     let n = target.n;
     let (score, moves) = truth(n);
     assert!(target.nodes > 300, "n={n} has {} nodes", target.nodes);

@@ -8,7 +8,7 @@ use super::report;
 use super::schedule::{self, read_ledger, Done, Floor, Job, Kind, Running, Scheduler, Settings, Way};
 use super::support::TempDir;
 use super::tests::{
-    attempted, climbing, ended, finder, job_events, job_of, opt, opt_game, quiet, seeded_with, start, stepping,
+    attempted, climbing, ended, finder, job_events, job_of, opt, opt_game, quiet, seeded_with, start, stepping, LAST,
 };
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -313,14 +313,14 @@ fn a_run_with_floor_steps_proves_the_stretch_and_the_events_and_the_report_say_h
         save_every: 0.5,
         ..Settings::default()
     };
-    assert_eq!(schedule::run(901, 960, &dir, &settings, None).unwrap(), "all proven");
+    assert_eq!(schedule::run(901, LAST, &dir, &settings, None).unwrap(), "all proven");
     let entries = read_ledger(&dir).unwrap();
     for e in &entries {
         assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}: {e:?}", e.n);
     }
     let steps: Vec<Json> =
         job_events(&dir).into_iter().filter(|e| text(e, "job").as_deref() == Some("floor")).collect();
-    assert!(steps.len() > 10, "{} floor steps", steps.len());
+    assert!(steps.len() > (LAST - 900) as usize / 6, "{} floor steps", steps.len());
     for e in &steps {
         let outcome = text(e, "outcome").unwrap();
         assert!(["held", "proved", "moot", "found", "stalled"].contains(&outcome.as_str()), "{e}");

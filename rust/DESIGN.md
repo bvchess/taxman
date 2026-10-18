@@ -1261,11 +1261,17 @@ of the chain is 2175: the prover proved every game to there, and the first game 
 
 ## 9. Testing
 
-**Two runs.**  The *quick check* is a non-release `cargo test` in `rust/`, with `cargo clippy --all-targets` and `cargo
-fmt --check`: about 12 s to rebuild after a one-line change and about 16 s of tests on a laptop of ten cores.  It
-verifies most merges, a refactoring included.  The *full suite* is `cargo test --release`: every test, the long ones
-too (about 3 minutes of tests, after a build of 6 minutes).  It runs before a cloud run, after any change that changes
-search trees or results, and in the gates (the one-thread re-solve of 1301-2175).
+**Two runs.**  The *quick check* is the command `tools/quick_check.py` in `rust/`: `cargo fmt --check`, `cargo clippy
+--all-targets` and the tests of a non-release build, which `tools/cloud/run_tests.py` runs, every test a process of its
+own and all the CPUs busy.  After a one-line change it takes about 12 s to rebuild and about 13 s to run the tests on a
+laptop of ten cores (a plain non-release `cargo test`, one binary after another, takes about 22 s).  It verifies most
+merges, a refactoring included.  **It fails**, with the tests that are over named, if the tests take more than 15 s (the
+target is 10 s; the build is not counted) or if one test uses more than 2 s of CPU (CPU, not seconds on the clock, which
+grow several times over when every CPU is busy); the limits are the constants at the top of the script, and raising
+either needs Brian's approval: a test that goes over is made smaller or long, as below, never allowed more.  The *full
+suite* is `cargo test --release`: every test, the long ones too (about 3 minutes of tests, after a build of 6 minutes).
+It runs before a cloud run, after any change that changes search trees or results, and in the gates (the one-thread
+re-solve of 1301-2175).
 A default build (and so every run above, and the cloud setup) covers the library, the binary, the tests and the examples
 `ledger`, `perf` and `ladder`; the study tools, the examples `tune`, `extended`, `structure` and `wall` with the tests
 of `tune` and `wall`, are behind the Cargo feature `studies`: build them with `--features studies`, and run `cargo test
@@ -1274,8 +1280,10 @@ of `tune` and `wall`, are behind the Cargo feature `studies`: build them with `-
 **Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
 below, the probe in section 10):
 
-* every change: the quick check in `rust/`, and `cargo test --release` in `rust/prover/`, then `cargo clippy
-  --all-targets` and `cargo fmt --check` in both;
+* every change: `tools/quick_check.py` in `rust/`, and `cargo test --release`, `cargo clippy --all-targets` and `cargo
+  fmt --check` in `rust/prover/`;
+* a test added or made bigger: `tools/quick_check.py` again; it fails a test that is too slow, which is then shrunk or
+  made long with a `quick_one` (below);
 * a change that can change a search tree or a result (the next three items): the full suite in `rust/` besides;
 * a bound, or anything that prunes: the bound-soundness tests and the soundness harness pass, and a bound never falls
   below the best completion of its node;
@@ -1290,10 +1298,11 @@ Correctness, all on games that finish in seconds: the fast fixtures and small bo
 that cannot be run in a test, and the tripwires and soundness tests catch the failures that no assertion on an
 answer sees.  The tests run in the test profile (`opt-level = 2`, because they replay real games; debug assertions on,
 which the release profile does not have), and there are two sizes of suite.  A test that takes more than about a second
-there is *long*: `#[cfg_attr(debug_assertions, ignore = "long: the quick check is quick_one")]` skips it in a
-non-release run, where debug assertions are on, and `--release` runs it.  `quick_one` is the quick test that checks the
-same property at a small size: a prefix of the range the long test walks (which then takes the rest of it), a sample of
-the chain or of the golden games, fewer random draws, a smaller board or game.  A few tests that draw a count, or build
+there is *long* (the quick check fails one that is far over, as above): `#[cfg_attr(debug_assertions, ignore = "long:
+the quick check is quick_one")]` skips it in a non-release run, where debug assertions are on, and `--release` runs it.
+`quick_one` is the quick test that checks the same property at a small size: a prefix of the range the long test walks
+(which then takes the rest of it), a sample of the chain or of the golden games, fewer random draws, a smaller board or
+game.  A few tests that draw a count, or build
 an instance that must outlast a script, take a smaller one in a non-release run (`QUICK` in `tests/common/support.rs`,
 shared with the unit tests: the engine's instances, the random configurations of `robustness`).  Tests with a plain
 `#[ignore]` are ignored in both.  The descriptions below are of the full suite.

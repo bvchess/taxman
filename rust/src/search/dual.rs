@@ -205,11 +205,27 @@ mod tests {
 
     /// [`falls`] on games whose trees take a few thousand to a few tens of thousands of steps on one thread.
     #[test]
+    #[cfg_attr(
+        debug_assertions,
+        ignore = "long: the quick check is the_dual_bound_brackets_the_optimum_and_falls_as_the_node_limit_grows_at_999"
+    )]
     fn the_dual_bound_brackets_the_optimum_and_falls_as_the_node_limit_grows() {
+        falls_on(&[996, 1020, 1218], 6);
+    }
+
+    /// [`the_dual_bound_brackets_the_optimum_and_falls_as_the_node_limit_grows`] for the game 999, whose tree takes two
+    /// thousand steps.
+    #[test]
+    fn the_dual_bound_brackets_the_optimum_and_falls_as_the_node_limit_grows_at_999() {
+        falls_on(&[999], 1);
+    }
+
+    /// [`falls`] on the games `ns`, at least `min_stops` of whose searches a limit stops.
+    fn falls_on(ns: &[u32], min_stops: u32) {
         let dir = TempDir::new("dual-falls");
         let ckpt = dir.0.join("falls.ckpt");
-        let stops: u32 = [996, 1020, 1218].into_iter().map(|n| crate::with_width!(n, W => falls::<W>(n, &ckpt))).sum();
-        assert!(stops >= 6, "only {stops} searches were stopped by their limit");
+        let stops: u32 = ns.iter().map(|&n| crate::with_width!(n, W => falls::<W>(n, &ckpt))).sum();
+        assert!(stops >= min_stops, "only {stops} searches were stopped by their limit");
     }
 
     /// A checkpoint of another game's search is refused.
