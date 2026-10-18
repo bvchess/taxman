@@ -69,6 +69,7 @@
 //! | | [`board`] | a board analysed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
+//! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |
 //! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board; `certify::verify` checks them |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
@@ -101,6 +102,7 @@ pub mod results;
 pub mod sacrifice;
 pub mod search;
 pub mod solver;
+pub mod store;
 pub mod tactics;
 
 /// Helpers the unit tests share with the integration tests (`tests/common/support.rs`: temporary directories and a

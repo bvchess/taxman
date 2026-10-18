@@ -875,10 +875,11 @@ comment that is worth reading first; section 6 above is the map of how the piece
 11. `src/bounds.rs`: two small functions the Java has too, the limit on a node's further promotions and the greedy
     incumbent.
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
-13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/certify.rs`, `src/paths.rs`: the
-    switchable tactics, a board prepared for a search, the per-game pipeline, provenance and verification, the
-    certificates of `taxman certify`, the default files.  The range driver is `src/solver/window.rs`, the window of
-    games in flight, and its child `window/allot.rs` how they share the threads.
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/certify.rs`,
+    `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline, provenance and
+    verification, the bounds store's line and the relations between boards, the certificates of `taxman certify`, the
+    default files.  The range driver is `src/solver/window.rs`, the window of games in flight, and its child
+    `window/allot.rs` how they share the threads.
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
 15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).
