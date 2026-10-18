@@ -27,7 +27,7 @@
 //! `target` the node was made with (`need - 1`: the most a completion may reach for the incumbent to stand).
 
 #[path = "fields/cores.rs"]
-mod cores;
+pub mod cores;
 #[path = "fields/dw.rs"]
 mod dw;
 #[path = "fields/fit.rs"]

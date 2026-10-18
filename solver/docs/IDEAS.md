@@ -337,7 +337,8 @@ frame, or a candidate that is a factor of the frame behind, which would be promo
 of its maximal factors that is a factor of the frame; a candidate belongs to the component of its own number.  At the
 root of 936, 1000, 1100, 1215, 1232, 1287 and 1300, and at all 600 search nodes of the probe's fixtures (936 and
 1215; each node's state rebuilt from its promotions, the candidates its own), there is exactly one component holding
-candidates.  Nothing to split.
+candidates.  Nothing to split.  The version that conditions on a separator home instead (agenda A5) was measured
+later and killed too ([A5's test](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
 
 ### 4.5 Disjoint conflicts from the dual (killed)
 

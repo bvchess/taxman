@@ -8,7 +8,7 @@
 //! process plays one game at a time.  The commands, and what their lines hold, are defined in `choice.rs`.
 
 use super::{beyond, counters, set_up, Line, Options};
-use crate::{choice, lns};
+use crate::{choice, decompose, lns};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -59,6 +59,17 @@ pub struct Params {
     pub a1: bool,
     pub a1_pricings: usize,
     pub a1_seconds: f64,
+    /// `decompose`: the pauses of the game's proof that supply nodes, the steps between them, the steps at which a
+    /// node's subtree solve and its best-completion solve are stopped (`--pauses`, `--span`, `--unit-cap`,
+    /// `--best-cap`; no limit on the subtree, no best completion, by default), and the evaluations at which the OR
+    /// part of the AND/OR search stops, for the nodes of at least `and_or_min` steps (`--and-or-cap`, `--and-or-min`;
+    /// the search is not run by default).
+    pub pauses: usize,
+    pub span: u64,
+    pub unit_cap: Option<u64>,
+    pub best_cap: u64,
+    pub and_or_cap: u64,
+    pub and_or_min: u64,
 }
 
 impl Default for Params {
@@ -83,6 +94,12 @@ impl Default for Params {
             a1: false,
             a1_pricings: 20,
             a1_seconds: 30.0,
+            pauses: 0,
+            span: 1024,
+            unit_cap: None,
+            best_cap: 0,
+            and_or_cap: 0,
+            and_or_min: 500,
         }
     }
 }
@@ -196,6 +213,8 @@ pub enum Command {
     ChoicePrepare,
     /// `wall choice` (`choice.rs`): the strong bound against the subtree at each node of a prepared file.
     Choice,
+    /// `wall decompose` (`decompose.rs`): how the conflicts of a node lie against each separator home.
+    Decompose,
 }
 
 impl Command {
@@ -204,6 +223,7 @@ impl Command {
         match name {
             "choice-prepare" => Some(Command::ChoicePrepare),
             "choice" => Some(Command::Choice),
+            "decompose" => Some(Command::Decompose),
             _ => None,
         }
     }
@@ -236,6 +256,7 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
     match command {
         Command::ChoicePrepare => choice::prepare(&case),
         Command::Choice => choice::measure(&case),
+        Command::Decompose => decompose::measure(&case),
     }
 }
 

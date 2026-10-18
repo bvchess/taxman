@@ -17,6 +17,8 @@
 //!     --prep DIR --known FILE N|A-B...
 //! cargo run --release --example wall -- choice [--node-steps K] [--cap S] [--sub-nogoods] [--a1] [--a1-pricings K]
 //!     [--a1-seconds S] --prep DIR [--results DIR --worker K] [--claims DIR] N|A-B...
+//! cargo run --profile test --example wall --features studies -- decompose --known FILE [--fixtures DIR [--keep K]]
+//!     [--pauses P --span STEPS] [--unit-cap STEPS] [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N|A-B...
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -109,7 +111,14 @@
 //!   and `choice` measures each node of the file: its gap, the strong bounds and whether they cut, the subtree today's
 //!   search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the options and the
 //!   lines; `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in the cloud and reads the
-//! lines.
+//!   lines.
+//! * **decompose**: do the conflicts of a node that heads a big subtree split, across some home, into two sides that do
+//!   not interact (A5, the decomposition across the frames)?  For the nodes of a game's proof (the probe's fixtures,
+//!   the open units of pauses of the proof, the root): how the conflicts of the node's heaviest set and the nogoods
+//!   its subtree learns lie against each separator home, how the node's gap splits by home, the two sides solved
+//!   apart under the separator of the node's best completion, and the AND/OR search itself.  Defined in
+//!   `wall/decompose.rs`, whose module comment has the options and the lines;
+//!   `solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -143,6 +152,9 @@ mod case;
 mod choice;
 #[path = "common/counters.rs"]
 mod counters;
+/// `decompose`: whether the conflicts of a node split across a separator home (A5's cheapest experiment).
+#[path = "wall/decompose.rs"]
+mod decompose;
 /// The A1 bound (GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
 #[path = "wall/fields.rs"]
 mod fields;
@@ -198,16 +210,23 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 8] = ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice"];
+const COMMANDS: [&str; 9] =
+    ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice", "decompose"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 37] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare"]),
+const OPTIONS: [(&str, &[&str]); 43] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose"]),
     ("--cap", &["choice"]),
-    ("--fixtures", &["choice-prepare"]),
+    ("--fixtures", &["choice-prepare", "decompose"]),
+    ("--pauses", &["decompose"]),
+    ("--span", &["decompose"]),
+    ("--unit-cap", &["decompose"]),
+    ("--best-cap", &["decompose"]),
+    ("--and-or-cap", &["decompose"]),
+    ("--and-or-min", &["decompose"]),
     ("--suite", &["choice-prepare"]),
     ("--paths", &["choice-prepare"]),
-    ("--keep", &["choice-prepare"]),
+    ("--keep", &["choice-prepare", "decompose"]),
     ("--prep", &["choice-prepare", "choice"]),
     ("--results", &["choice"]),
     ("--worker", &["choice"]),
@@ -408,6 +427,12 @@ fn parse() -> Result<Options, String> {
             "--suite" => o.params.suite = Some(value("--suite")?.into()),
             "--paths" => o.params.paths = number("--paths", value("--paths")?)?,
             "--keep" => o.params.keep = number::<usize>("--keep", value("--keep")?)?.max(1),
+            "--pauses" => o.params.pauses = number("--pauses", value("--pauses")?)?,
+            "--span" => o.params.span = number::<u64>("--span", value("--span")?)?.max(1),
+            "--unit-cap" => o.params.unit_cap = Some(number("--unit-cap", value("--unit-cap")?)?),
+            "--best-cap" => o.params.best_cap = number("--best-cap", value("--best-cap")?)?,
+            "--and-or-cap" => o.params.and_or_cap = number("--and-or-cap", value("--and-or-cap")?)?,
+            "--and-or-min" => o.params.and_or_min = number("--and-or-min", value("--and-or-min")?)?,
             "--prep" => o.params.prep = Some(value("--prep")?.into()),
             "--results" => o.params.results = Some(value("--results")?.into()),
             "--worker" => o.params.worker = number("--worker", value("--worker")?)?,

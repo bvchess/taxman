@@ -18,8 +18,7 @@ results and how they are proven are in the [README](../frame/README.md); the res
 
 ## The priority: a larger n
 
-Brian's priority (2026-10-16) is a larger n, the end of the chain pushed further; certifying U past 2175 is not a
-priority for now.
+Brian's priority (2026-10-16): a larger n, the end of the chain pushed further; certifying U past 2175 is not one for now.
 
 The cost of a searched game grows tenfold for about every 1,040 in n, in patches: the valley 2576-2975 cost minutes,
 the last forty games of the run held three of its four dearest (3440 alone 5 hours on 64 threads).  At the run's own
@@ -58,7 +57,8 @@ What has been tried for the bound, and where it stands:
 * **The strong bound at the nodes: closed** (2026-10-18).  Refitted at a node it cuts 92% of the open nodes with a gap
   under 50, 19% at 100-199 and none from 300, where the cost is, and costs 164-234 GF(2) bounds: every policy of
   computing it loses ([the entry](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
-* **A5, decomposing across the frames: next** (agenda A5; high risk), the lead after the two bounds at the nodes.
+* **A5, decomposing across the frames: closed** (2026-10-18): the conflicts sit in frames 1-3 and the work is the
+  separator's, not the sides' ([the entry](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
 
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
 ([solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196

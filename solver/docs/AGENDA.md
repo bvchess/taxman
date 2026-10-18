@@ -324,6 +324,14 @@ sit in adjacent frames (homes 1 and 2), as at the roots of 1251-1300, so that no
 *Payoff.*  A change of slope where the gap is spread over separable frames; nothing where it is concentrated.
 *Risk:* high, given the anatomy's homes.  *Proven first:* the decomposition (the frame-by-frame promotion criterion).
 
+*Result* (412 open nodes of the proofs of 936, 1215, 2112 and 2170,
+[A5's test](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)): killed at the
+measurement.  Every conflict lies in two adjacent homes (none of 11,197 crosses a separator) and all of them in frames
+1-3, so a home always splits them, but it touches 8-10 of the heaviest set's 9-16 cores and 22-40 candidates (a quarter
+to a half of the home's), and the bound's error sits at that home.  With the separator fixed as the best completion has
+it, the two sides cost 0.01-2% of the subtree; the cost is the separator's enumeration, which the AND/OR search has to
+do too: its OR part alone took 5.7 to 154 times the plain tree's steps at 936, 1215 and 2112, mostly without finishing.
+
 ### A6. The prover's node (a constant factor that keeps verification in pace)
 
 A node of the prover costs 9 to 17 times the solver's (section 2) because it solves the parity matroids at each node
