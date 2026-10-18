@@ -283,6 +283,10 @@ impl Side {
             Side::Upper => "upper",
         }
     }
+
+    pub fn of(name: &str) -> Option<Side> {
+        [Side::Lower, Side::Upper].into_iter().find(|side| side.name() == name)
+    }
 }
 
 /// A bound that improved.
@@ -462,43 +466,26 @@ impl Book {
         let s_value = s.lower.as_ref().map(|l| l.value);
         let t = &self.entries[&target];
         let (t_bag, t_prime, t_value) = (t.bag, t.prime, t.lower.as_ref().map_or(0, |l| l.value));
-        // The relation, the upper bound it gives the target, and the most that the game it makes can score, where that
-        // is known without making the game: one function (`gain`) carries the source's upper bound and its score.
-        let (relation, upper, at_most) = match link {
-            // Lemma L3 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange of the opening q for p scores that
-            // much more; Lemma L2 (the ceiling): U(n) <= U(n - 1) + n; Lemma L1 (monotone): the game of n - 1 scores
-            // as it did, or n more.
-            Link::Up if t_prime => {
-                let q = largest_prime_at_most(source).map_or(0, u64::from);
-                let gain = |value: u64| (value + u64::from(target)).saturating_sub(q);
-                (Rule::Prime, s_upper.map(|u| gain(u.value)), s_value.map(gain))
-            }
-            Link::Up => {
-                let gain = |value: u64| value + u64::from(target);
-                (Rule::Monotone, s_upper.map(|u| gain(u.value)), s_value.map(gain))
-            }
-            // Lemma L3 (prime): U(p - 1) <= U(p) - p + q, and the exchange of p for q scores that much less; Lemma L1
-            // (monotone): U(n - 1) <= U(n); Lemma L2 (the ceiling): the game of n + 1 less the move n + 1, completed.
-            Link::Down if s_prime => {
-                let q = largest_prime_at_most(target).map_or(0, u64::from);
-                let gain = |value: u64| (value + q).saturating_sub(u64::from(source));
-                (Rule::Prime, s_upper.map(|u| gain(u.value)), s_value.map(gain))
-            }
-            Link::Down => (Rule::Ceiling, s_upper.map(|u| u.value), None),
-            // Lemma L4: U(n) - bag(n) <= U(m) - bag(m), and the promotions of the source's game on the target's board
-            // score its bag and their sum.  (A game that was not made from promotions is made only if it has more
-            // to give than the target's, on the same terms.)
-            Link::Repeat => {
-                let gain = |value: u64| (value + t_bag).saturating_sub(s_bag);
-                (Rule::Repeat, s_upper.map(|u| gain(u.value)), s_value.map(gain))
-            }
+        // The relation that carries a game across the link, and the rule that names the upper bound (up a board it is
+        // the ceiling, down a board monotonicity).  Lemma L3 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange
+        // of the opening q for p scores that much more, and the same down; Lemma L2 (the ceiling): U(n) <= U(n - 1) +
+        // n; Lemma L1 (monotone): the game of n - 1 scores as it did, or n more, and U(n - 1) <= U(n); Lemma L4: U(n) -
+        // bag(n) <= U(m) - bag(m), and the promotions of the source's game on the target's board score its bag and
+        // their sum (a game that was not made from promotions is made only if it has more to give than the target's,
+        // on the same terms).  `upper_by` has the arithmetic, which bounds the score of a game too, except down a board.
+        let (relation, upper_rule) = match link {
+            Link::Up if t_prime => (Rule::Prime, Rule::Prime),
+            Link::Up => (Rule::Monotone, Rule::Ceiling),
+            Link::Down if s_prime => (Rule::Prime, Rule::Prime),
+            // The game below that of n + 1: its moves less n + 1, completed.
+            Link::Down => (Rule::Ceiling, Rule::Monotone),
+            Link::Repeat => (Rule::Repeat, Rule::Repeat),
         };
-        // The upper bound's rule names the lemma's inequality: up a board it is the ceiling, down a board monotonicity.
-        let upper_rule = match (link, relation) {
-            (Link::Up, Rule::Monotone) => Rule::Ceiling,
-            (Link::Down, Rule::Ceiling) => Rule::Monotone,
-            _ => relation,
+        let gain = |value: u64| {
+            upper_by(upper_rule, source, target, value, Some((s_bag, t_bag))).expect("a relation between linked boards")
         };
+        let upper = s_upper.map(|u| gain(u.value));
+        let at_most = if relation == Rule::Ceiling { None } else { s_value.map(gain) };
         if let Some(value) = upper {
             if let Some(change) =
                 self.offer_upper(target, Upper { value, rule: upper_rule, from: Some(source) }, s_proven)?
@@ -516,10 +503,7 @@ impl Book {
         let lower = self.entries[&source].lower.as_ref().expect("a source with a score has its lower bound");
         let from_promotions = lower.promotions.is_some();
         let (moves, promotions) = match relation {
-            Rule::Prime if link == Link::Up => (prime_up(target, &lower.moves), None),
-            Rule::Prime => (prime_down(target, &lower.moves), None),
-            Rule::Monotone => (monotone_game(target, &lower.moves)?, None),
-            Rule::Ceiling => (ceiling_game(target, &lower.moves)?, None),
+            Rule::Prime | Rule::Monotone | Rule::Ceiling => (carry_game(relation, source, target, &lower.moves)?, None),
             _ => {
                 let promotions = lower.promotions.clone().unwrap_or_else(|| {
                     let cands: HashSet<u32> = self.candidates[&source].iter().copied().collect();
@@ -588,9 +572,66 @@ pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
     }
 }
 
+/// Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `from` to the
+/// board `n`: `Monotone` up a board to a composite, `Ceiling` down a board from a composite, `Prime` across a prime, in
+/// either direction (Lemmas L1 to L3).  The game is made by [`carry_game`].
+pub fn carries(rule: Rule, from: u32, n: u32) -> bool {
+    let prime = |m: u32| largest_prime_at_most(m) == Some(m);
+    match rule {
+        Rule::Monotone => from + 1 == n && !prime(n),
+        Rule::Ceiling => from == n + 1 && !prime(from),
+        Rule::Prime => (from + 1 == n && prime(n)) || (from == n + 1 && prime(from)),
+        _ => false,
+    }
+}
+
+/// The game of `n` that the relation `rule` makes of the finished game `moves` of the board `from` (see [`carries`]).
+///
+/// # Errors
+///
+/// `rule` does not carry a game from `from` to `n`, or the game is not a game of `from`.
+pub fn carry_game(rule: Rule, from: u32, n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
+    if !carries(rule, from, n) {
+        return Err(format!("the {} relation does not carry a game from {from} to {n}", rule.name()));
+    }
+    match rule {
+        Rule::Monotone => monotone_game(n, moves),
+        Rule::Ceiling => ceiling_game(n, moves),
+        _ if from < n => Ok(prime_up(n, moves)),
+        _ => Ok(prime_down(n, moves)),
+    }
+}
+
 /// Lemma L4: `promotions` played on the board of `n` (`solution_for_promotions`).
 pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
     taxman::with_width!(n, W => solution_for_promotions::<W>(&Tables::new(n), Bits::<W>::from_slice(promotions)))
+}
+
+/// The upper bound that the relation `rule` gives opt(`target`) from the upper bound `value` on opt(`source`): for the
+/// boards next to each other, `Ceiling` (the target is the board after the source: opt(n) <= opt(n − 1) + n),
+/// `Monotone` (the board before: opt(n − 1) <= opt(n)) and `Prime` (either way, across a prime p, q the largest prime
+/// below it: opt(p) = opt(p − 1) + p − q); and for boards with the same search problem, `Repeat`, with their bags
+/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (heuristics/THEORY.md, "The
+/// ledger: bounds between boards"); the book and the store's checkers use this one copy of the arithmetic.
+///
+/// # Errors
+///
+/// `rule` is not a relation, the boards are not so related, or a repeat has no bags.
+pub fn upper_by(rule: Rule, source: u32, target: u32, value: u64, bags: Option<(u64, u64)>) -> Result<u64, String> {
+    let prime_below = |n: u32| u64::from(largest_prime_at_most(n).unwrap_or(0));
+    let is_prime = |n: u32| largest_prime_at_most(n) == Some(n);
+    let (s, t) = (u64::from(source), u64::from(target));
+    match rule {
+        Rule::Ceiling if target == source + 1 => Ok(value + t),
+        Rule::Monotone if source == target + 1 => Ok(value),
+        Rule::Prime if target == source + 1 && is_prime(target) => Ok((value + t).saturating_sub(prime_below(source))),
+        Rule::Prime if source == target + 1 && is_prime(source) => Ok((value + prime_below(target)).saturating_sub(s)),
+        Rule::Repeat if source != target => {
+            let (s_bag, t_bag) = bags.ok_or("a repeat needs the bags of its two boards")?;
+            Ok((value + t_bag).saturating_sub(s_bag))
+        }
+        _ => Err(format!("the {} bound of {target} cannot come from {source}", rule.name())),
+    }
 }
 
 /// How two boards are related: the target is the board after the source, the one before it, or one of its repeat

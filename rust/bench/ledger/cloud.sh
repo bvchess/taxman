@@ -14,6 +14,8 @@
 #   LNS_SECONDS the seconds of one thread the finder (large neighbourhood search) gets after a board's map and before a
 #               search whose best seed has changed (the program's default, 1; 0: no finder)
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
+#   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
+#               ledger is exported to it afterwards with `ledger export` (RUNBOOK section 14)
 #   KNOWN       the results file the report checks against (default results/strict.jsonl)
 #   LEDGER_BIN  the program (default target/release/examples/ledger; a laptop's test is target/debug/examples/ledger,
 #               built by `cargo build --profile test --example ledger`)
@@ -47,7 +49,8 @@ stamp "start $range workers=$workers cpu_hours=$cpu_hours"
 # shellcheck disable=SC2086 # an option and its value, or nothing
 "$ledger" run "$range" --dir "$out/run" --workers "$workers" --cpu-hours "$cpu_hours" --base "${BASE:-2}" \
     --max-limit "${MAX_LIMIT:-3600}" ${CLIMB:+--climb "$CLIMB"} ${CLIMB_LIMIT:+--climb-limit "$CLIMB_LIMIT"} \
-    ${LNS_SECONDS:+--lns-seconds "$LNS_SECONDS"} ${PROVEN:+--proven "$PROVEN"} > "$out/run.out" 2> "$out/run.err"
+    ${LNS_SECONDS:+--lns-seconds "$LNS_SECONDS"} ${PROVEN:+--proven "$PROVEN"} ${BOUNDS:+--bounds "$BOUNDS"} \
+    > "$out/run.out" 2> "$out/run.err"
 stamp "run done, status $?"
 "$ledger" report "$out/run" --known "$known" > "$out/report.txt" 2>&1
 status=$?
