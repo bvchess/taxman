@@ -11,6 +11,8 @@
 #   CLIMB       the ways of the climbs, the searches of a board next to a proven one: up, down, both or off (the
 #               program's default, both)
 #   CLIMB_LIMIT the limit of a climb in seconds (the program's default, 60; 0: no climbs)
+#   LNS_SECONDS the seconds of one thread the finder (large neighbourhood search) gets after a board's map and before a
+#               search whose best seed has changed (the program's default, 1; 0: no finder)
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
 #   KNOWN       the results file the report checks against (default results/strict.jsonl)
 #   LEDGER_BIN  the program (default target/release/examples/ledger; a laptop's test is target/debug/examples/ledger,
@@ -45,7 +47,7 @@ stamp "start $range workers=$workers cpu_hours=$cpu_hours"
 # shellcheck disable=SC2086 # an option and its value, or nothing
 "$ledger" run "$range" --dir "$out/run" --workers "$workers" --cpu-hours "$cpu_hours" --base "${BASE:-2}" \
     --max-limit "${MAX_LIMIT:-3600}" ${CLIMB:+--climb "$CLIMB"} ${CLIMB_LIMIT:+--climb-limit "$CLIMB_LIMIT"} \
-    ${PROVEN:+--proven "$PROVEN"} > "$out/run.out" 2> "$out/run.err"
+    ${LNS_SECONDS:+--lns-seconds "$LNS_SECONDS"} ${PROVEN:+--proven "$PROVEN"} > "$out/run.out" 2> "$out/run.err"
 stamp "run done, status $?"
 "$ledger" report "$out/run" --known "$known" > "$out/report.txt" 2>&1
 status=$?

@@ -15,8 +15,8 @@
 //!   ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
 //!
 //! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map, as `wall
-//! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound), proven games given
-//! (`given`) and boards with nothing to promote (`trivial`).  Every bound only improves: L only rises and U only
+//! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound), the finder's games
+//! (`lns`: L only), proven games given (`given`) and boards with nothing to promote (`trivial`).  Every bound only improves: L only rises and U only
 //! falls, and a board is proven when they meet.  L > U anywhere is a violation, which [`Book::propagate`] reports as an
 //! error: a bug, or, since the U of the frame model rests on statement U, a counterexample to it.
 
@@ -42,6 +42,9 @@ pub enum Rule {
     Search,
     Dual,
     Exhausted,
+    /// The game the finder found (L): large neighbourhood search, which is not sound and proves nothing; its game is a
+    /// lower bound because the referee replays it.
+    Lns,
     /// A proven game given to the ledger: both bounds.
     Given,
     /// The relations between boards.
@@ -52,13 +55,14 @@ pub enum Rule {
 }
 
 impl Rule {
-    pub const ALL: [Rule; 11] = [
+    pub const ALL: [Rule; 12] = [
         Rule::Trivial,
         Rule::Start,
         Rule::Root,
         Rule::Search,
         Rule::Dual,
         Rule::Exhausted,
+        Rule::Lns,
         Rule::Given,
         Rule::Monotone,
         Rule::Ceiling,
@@ -74,6 +78,7 @@ impl Rule {
             Rule::Search => "search",
             Rule::Dual => "dual",
             Rule::Exhausted => "exhausted",
+            Rule::Lns => "lns",
             Rule::Given => "given",
             Rule::Monotone => "monotone",
             Rule::Ceiling => "ceiling",
@@ -120,11 +125,14 @@ pub struct Entry {
     pub lower: Option<Lower>,
     pub upper: Option<Upper>,
     /// The searches made of this board, the level of the next one (its limit doubles with each), and their seconds
-    /// and steps in all.
+    /// (the finder's included) and steps in all.
     pub attempts: u32,
     pub level: u32,
     pub search_s: f64,
     pub nodes: u64,
+    /// The score of the best seed the board had when the finder last ran on it, its own game included (none: it has
+    /// not run): the finder runs again before a search only if the best seed is another score.
+    pub lns_score: Option<u64>,
     /// The board's own map is made (`start` and `root`), which every board searched has first.
     pub mapped: bool,
     /// The bounds changed through a proven neighbour since the last search: the board goes before the others.
@@ -175,6 +183,7 @@ impl Entry {
             ("level", Json::from(self.level)),
             ("search_s", Json::from(self.search_s)),
             ("nodes", Json::from(self.nodes)),
+            ("lns_score", self.lns_score.map_or(Json::Null, Json::from)),
             ("mapped", Json::from(self.mapped)),
             ("boosted", Json::from(self.boosted)),
             ("parked", Json::from(self.parked)),
@@ -218,6 +227,8 @@ impl Entry {
             level: number("level")? as u32,
             search_s: field("search_s")?.as_f64().ok_or("bad \"search_s\"")?,
             nodes: number("nodes")?,
+            // Ledgers written before the finder have no such field.
+            lns_score: line.get("lns_score").and_then(Json::as_u64),
             mapped: field("mapped")?.as_bool().ok_or("bad \"mapped\"")?,
             boosted: field("boosted")?.as_bool().ok_or("bad \"boosted\"")?,
             // Ledgers written before the climbs have no such field.

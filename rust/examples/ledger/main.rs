@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! cargo run --release --example ledger -- run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S]
-//!     [--climb up|down|both|off] [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]
+//!     [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--save-every S]
 //! cargo run --release --example ledger -- report DIR [--known FILE]...
 //! ```
 //!
@@ -56,6 +56,15 @@
 //!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
 //!   run side by side.  A board next to one that is being climbed to waits (no ordinary search of it starts), as the
 //!   climb may prove that board within its limit.
+//! * **The finder** (`common/lns.rs`, which `wall finders` measures; `--lns-seconds` seconds of one thread, default 1; 0:
+//!   none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the rest
+//!   exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game: its game
+//!   is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other game.  It runs
+//!   on the worker, after a board's map from the start incumbent, and before a search whose best seed has changed since
+//!   it last ran on the board (`lns_score` in the ledger: the score of the best seed then, its own game included; a
+//!   climb, whose seed is a proven neighbour's game, always counts as changed), from that seed, and not at all if the
+//!   seed already reaches the ceiling.  The search is then seeded with its game if that is better.  Its time counts in
+//!   the CPU budget and in the board's `search_s`; the search's limit is the search's alone.
 //! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
 //!   result is small beside a search, `settle` aside.  A relation's upper bound is arithmetic; its lower bound is a game,
 //!   made once for each lower bound of its source, not at all when its score cannot beat the target's (the prime
@@ -68,13 +77,18 @@
 //! (`value`, `rule`, `from`: the board a relation took it from, `moves`, `promotions`: those of a game made from
 //! promotions, else null), `upper` (`value`, `rule`, `from`), `gap`, `proven`, `proven_cpu_s` (the run's CPU seconds
 //! when it was proven), `attempts`, `level`, `search_s` and `nodes` (its searches, climbs among them: their number,
-//! the number of the ordinary ones, their seconds, and their steps over all runs), `mapped` (its own map is made),
-//! `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to it ended
-//! unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu` (the CPU seconds of all runs); a
+//! the number of the ordinary ones, their seconds, the finder's included, and their steps over all runs), `lns_score`
+//! (see the finder), `mapped` (its own map is made), `boosted` (a proven neighbour changed its bounds since its last
+//! search) and `parked` (a climb to it ended unproven).  `events.jsonl`, one line an event, appended: each has `t`
+//! (seconds since the run began) and `cpu` (the CPU seconds of all runs); a
 //! run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`, `seconds`, `nodes` of this search,
 //! `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual bound, null if it completed), the
-//! bounds `before` and `after`, each [L, U]; a search also has its `job`, `ordinary` or `climb`, and a climb its
-//! `way` (`up` or `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved` (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
+//! bounds `before` and `after`, each [L, U]; `lns_s` (the finder's seconds, 0 if it did not run), `lns_from` and
+//! `lns_found` (the scores of the game it began from and of its game, null if it did not run), `seed_from` (which game
+//! seeded the search: `n-1`, `n`, `n+1` or `lns`, null for none) and `below_proven` and `above_proven` (whether the
+//! boards n − 1 and n + 1 were proven when the job started); a search also has its `job`, `ordinary` or `climb`, and a
+//! climb its `way` (`up` or `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved`
+//! (its search proved the board), `parked`, or `moot` (a relation had proven the board while it
 //! went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
 //! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
 //! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
@@ -95,6 +109,15 @@
 #[allow(dead_code, unused_imports)] // the ledger reads only the process's CPU time
 #[path = "../common/counters.rs"]
 mod counters;
+#[allow(dead_code)] // the ledger reads only `survivors`
+#[path = "../common/known.rs"]
+mod known;
+/// The finder, shared with `wall finders`.
+#[allow(dead_code)] // `wall finders` reads the counts of units that the ledger does not
+#[path = "../common/lns.rs"]
+mod lns;
+#[path = "../common/rng.rs"]
+mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
 #[cfg(test)]
 #[path = "../../tests/common/support.rs"]
@@ -110,7 +133,8 @@ use std::path::PathBuf;
 fn usage() -> ! {
     eprintln!(
         "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--climb up|down|both|off] \
-         [--climb-limit S] [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR [--known FILE]..."
+         [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR \
+         [--known FILE]..."
     );
     std::process::exit(2)
 }
@@ -139,6 +163,7 @@ fn main() {
             "--base" => settings.base = number(&arg, args.next()),
             "--max-limit" => settings.max_limit = number(&arg, args.next()),
             "--climb-limit" => settings.climb_limit = number(&arg, args.next()),
+            "--lns-seconds" => settings.lns_seconds = number(&arg, args.next()),
             "--climb" => {
                 (settings.climb_up, settings.climb_down) = match args.next().as_deref() {
                     Some("up") => (true, false),
@@ -166,6 +191,7 @@ fn main() {
                 || settings.workers == 0
                 || settings.base <= 0.0
                 || settings.climb_limit < 0.0
+                || settings.lns_seconds < 0.0
                 || settings.gap_unit <= 0.0
             {
                 usage();

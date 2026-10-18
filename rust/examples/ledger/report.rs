@@ -112,6 +112,27 @@ pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
         );
     }
 
+    // The finder: its runs (a map or a search with an `lns_found`), those that found a better game than they began
+    // from, and the boards whose lower bound at the end is its game.
+    let jobs = || events.iter().filter(|e| matches!(e.get("action").and_then(Json::as_str), Some("init" | "search")));
+    let runs: Vec<(u64, u64)> =
+        jobs().filter_map(|e| Some((e.get("lns_from")?.as_u64()?, e.get("lns_found")?.as_u64()?))).collect();
+    let better: Vec<u64> =
+        runs.iter().filter(|&&(from, found)| found > from).map(|&(from, found)| found - from).collect();
+    let lns_s = jobs().filter_map(|e| e.get("lns_s")?.as_f64()).sum::<f64>();
+    let ends_with_it: Vec<&Entry> =
+        entries.iter().filter(|e| e.lower.as_ref().is_some_and(|l| l.rule == Rule::Lns)).collect();
+    let _ = writeln!(
+        w,
+        "finder: {} runs, {lns_s:.0} s of them; {} found a better game than they began from (by {} in all); {} boards \
+         end with its game as the lower bound ({} of them proven)",
+        runs.len(),
+        better.len(),
+        better.iter().sum::<u64>(),
+        ends_with_it.len(),
+        ends_with_it.iter().filter(|e| e.proven()).count(),
+    );
+
     // How the proven boards were proven: the rules of their two bounds.
     let mut pairs: BTreeMap<(&str, &str), usize> = BTreeMap::new();
     for e in &proven {

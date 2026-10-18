@@ -3,6 +3,8 @@
 
 use crate::book::{facts, Book, Change, Entry, Facts, Lower, Rule, Upper};
 use crate::counters;
+use crate::known::survivors;
+use crate::lns::{self, Lns};
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
@@ -13,11 +15,13 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 use taxman::accelerate::solution_for_promotions;
+use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Control, EngineConfig};
 use taxman::game::{replay_finished, Optimal};
 use taxman::json::Json;
-use taxman::search::{self, dual_bound, SearchTactics};
+use taxman::matchbound::MatchGraph;
+use taxman::search::{self, dual_bound, Prepared, SearchSpace, SearchTactics};
 
 /// How a run goes.
 #[derive(Clone, Debug)]
@@ -38,6 +42,12 @@ pub struct Settings {
     /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
     pub climb_up: bool,
     pub climb_down: bool,
+    /// The seconds of one thread that the finder (large neighbourhood search, `common/lns.rs`) is given after a board's
+    /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game is
+    /// offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders' measurements
+    /// (docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md) it has most of its gain in the first
+    /// second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder included.
+    pub lns_seconds: f64,
     /// The gap that counts as one doubling of the expected cost, in the order of the searches.
     pub gap_unit: f64,
     /// Seconds between writes of the ledger (and at the end).
@@ -58,6 +68,7 @@ impl Default for Settings {
             climb_limit: 60.0,
             climb_up: true,
             climb_down: true,
+            lns_seconds: 1.0,
             gap_unit: 175.0,
             save_every: 30.0,
             checkpoint_every: 60.0,
@@ -151,15 +162,83 @@ impl Kind {
     }
 }
 
+/// A game that can seed a search: the moves of the lower bound of the board `from`, which is n − 1, n or n + 1.
+pub struct Seed {
+    pub from: u32,
+    pub moves: Vec<u32>,
+}
+
+/// Which game seeded a search, as its event says: the lower bound of the board below it (`n-1`), its own (`n`), the
+/// board above's (`n+1`), or the game the finder found (`lns`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeedFrom {
+    Below,
+    Own,
+    Above,
+    Lns,
+}
+
+impl SeedFrom {
+    /// The board `from`, as seen from the board `n`.
+    fn of(from: u32, n: u32) -> SeedFrom {
+        match from.cmp(&n) {
+            std::cmp::Ordering::Less => SeedFrom::Below,
+            std::cmp::Ordering::Equal => SeedFrom::Own,
+            std::cmp::Ordering::Greater => SeedFrom::Above,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            SeedFrom::Below => "n-1",
+            SeedFrom::Own => "n",
+            SeedFrom::Above => "n+1",
+            SeedFrom::Lns => "lns",
+        }
+    }
+}
+
+/// What the finder (large neighbourhood search) is asked to do in a job.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LnsPlan {
+    /// Seconds of one thread (0: it does not run).
+    pub seconds: f64,
+    /// The score of the best seed the board had when the finder last ran on it, its own game included: it runs before
+    /// a search only if the best seed is another score (or the job is a climb).  None: it has not run on the board.
+    pub last: Option<u64>,
+    /// The number of searches the board has had, so that the finder's random choices differ from run to run.
+    pub round: u32,
+}
+
 /// A search to make.
 pub struct Job {
     pub n: u32,
     pub kind: Kind,
     pub limit: Duration,
     /// The games whose candidates seed the search: the one that keeps the most is taken.
-    pub seeds: Vec<Vec<u32>>,
+    pub seeds: Vec<Seed>,
     /// The ceiling on the score.
     pub cap: Option<u64>,
+    /// Whether the boards n − 1 and n + 1 were proven when the job started, which its event says.
+    pub below_proven: bool,
+    pub above_proven: bool,
+    pub lns: LnsPlan,
+}
+
+/// What the finder did: the scores of the game it began from and of the game it found (the same if it found nothing
+/// better), the seconds it took, and the game, which the referee has replayed at `found`.
+pub struct LnsRun {
+    pub from: u64,
+    pub found: u64,
+    pub seconds: f64,
+    pub moves: Vec<u32>,
+    pub promotions: Vec<u32>,
+}
+
+impl LnsRun {
+    pub fn improved(&self) -> bool {
+        self.found > self.from
+    }
 }
 
 /// What a search gave.
@@ -173,7 +252,12 @@ pub struct Attempt {
     pub upper: Option<u64>,
     /// The search's steps over all its runs.
     pub nodes: u64,
+    /// The seconds of the search (of the map, for a map), the finder's not among them.
     pub seconds: f64,
+    /// What the finder did before the search (after the map, for a map), if it ran.
+    pub lns: Option<LnsRun>,
+    /// Which game seeded the search (none if nothing did).
+    pub seed_from: Option<SeedFrom>,
 }
 
 /// A search that has ended, with what it was asked, and when it ended (how long its result waited for the main thread
@@ -182,16 +266,63 @@ pub struct Done {
     pub n: u32,
     pub kind: Kind,
     pub limit: f64,
+    pub below_proven: bool,
+    pub above_proven: bool,
     pub result: Result<Attempt, String>,
     pub sent: Instant,
 }
 
+/// The game of the promotions `set` on `board`, replayed by the referee: its score and moves.  The score must be the
+/// bag and the sum of the promotions, so that a game that is legal but is not the promotions' is refused too.  Every
+/// game a worker offers the ledger, a search's or the finder's, passes through here before it counts.
+pub fn refereed<const W: usize>(board: &Board<W>, set: &Bits<W>) -> Result<(u64, Vec<u32>), String> {
+    let moves = solution_for_promotions(&board.tables, *set);
+    let value = replay_finished(board.n(), &moves)?;
+    if value == board.in_the_bag + set.sum() {
+        Ok((value, moves))
+    } else {
+        Err(format!("scores {value}, not {} and {}", board.in_the_bag, set.sum()))
+    }
+}
+
+/// The finder on `board` from the promotions `start`, for the seconds of the job's plan (less if `stop` is stopped or
+/// the process is told to stop), with the referee's replay of its game: the promotions of the game it found, and what it
+/// did.
+fn find<const W: usize>(
+    job: &Job,
+    board: &Board<W>,
+    p: &Prepared<W>,
+    start: &Bits<W>,
+    stop: &Control,
+) -> Result<(Bits<W>, LnsRun), String> {
+    let all = Instant::now();
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let space = SearchSpace::new(p, &graph);
+    let finder =
+        Lns { p, space: &space, options: lns::Options { seed: u64::from(job.lns.round), ..lns::Options::default() } };
+    let began = Instant::now();
+    let seconds = || began.elapsed().as_secs_f64();
+    let over = || seconds() >= job.lns.seconds || stop.stopped() || engine::stop_signal().is_some();
+    let out = finder.search(start, &mut finder.options.rng(job.n), &Control::new(), &seconds, &over);
+    let (found, moves) = refereed(board, &out.set).map_err(|e| format!("n={}: the finder's game: {e}", job.n))?;
+    let run = LnsRun {
+        from: board.in_the_bag + start.sum(),
+        found,
+        seconds: all.elapsed().as_secs_f64(),
+        moves,
+        promotions: out.set.to_vec(),
+    };
+    Ok((out.set, run))
+}
+
 /// Makes the search of `job` on its board, at the set width the board needs.
-fn attempt(job: &Job, control: &Arc<Control>, dir: &Path, every: Duration) -> Result<Attempt, String> {
+pub fn attempt(job: &Job, control: &Arc<Control>, dir: &Path, every: Duration) -> Result<Attempt, String> {
     let n = job.n;
     taxman::with_width!(n, W => attempt_at::<W>(job, control, dir, every), else Err(format!("n={n} is too large")))
 }
 
+/// The search of `job`, with the finder before it or, for a map, after it (`LnsPlan`): the finder starts from the best
+/// seed (or the map's start incumbent), and its game seeds the search if it beats the seed.
 fn attempt_at<const W: usize>(
     job: &Job,
     control: &Arc<Control>,
@@ -207,8 +338,31 @@ fn attempt_at<const W: usize>(
         engine::remove_checkpoint(&ckpt).map_err(|e| at("an old checkpoint", e.to_string()))?;
     }
     let resume = job.kind != Kind::Init && ckpt.exists();
-    let seed = job.seeds.iter().map(|moves| board.seed(moves)).max_by_key(|seed| search::seed_survivors_sum(&p, seed));
+    // The best seed: the game that keeps the most promotions (the last of equals), and what survives of it.
+    let best = job
+        .seeds
+        .iter()
+        .map(|seed| (SeedFrom::of(seed.from, n), board.seed(&seed.moves)))
+        .map(|(from, seed)| (from, search::seed_survivors_sum(&p, &seed), seed))
+        .max_by_key(|&(_, kept, _)| kept);
     let cap = job.cap.map(|score| score.saturating_sub(board.in_the_bag));
+    let (mut seed, mut lns) = (best.as_ref().map(|(from, _, seed)| (*from, *seed)), None);
+    if job.lns.seconds > 0.0 && job.kind != Kind::Init {
+        let start = match &best {
+            Some((_, _, seed)) => survivors(&p, seed).map_err(|e| at("the seed", e))?,
+            None => p.greedy,
+        };
+        let score = board.in_the_bag + start.sum();
+        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (the game of a proven neighbour).
+        let changed = matches!(job.kind, Kind::Climb(_)) || job.lns.last != Some(score);
+        if changed && !cap.is_some_and(|cap| start.sum() >= cap) {
+            let (found, run) = find(job, &board, &p, &start, control)?;
+            if run.improved() {
+                seed = Some((SeedFrom::Lns, found));
+            }
+            lns = Some(run);
+        }
+    }
     let cfg = EngineConfig {
         threads: 1,
         progress: None,
@@ -218,16 +372,18 @@ fn attempt_at<const W: usize>(
         ..EngineConfig::default()
     };
     let t0 = Instant::now();
-    let r = search::search(&p, &cfg, seed.as_ref(), cap, resume).map_err(|e| at("the search", e.to_string()))?;
-    let moves = solution_for_promotions(&board.tables, r.promotions);
-    let value = replay_finished(n, &moves).map_err(|e| at("the search's game", e))?;
-    if value != board.in_the_bag + r.sum {
-        return Err(at("the search's game", format!("scores {value}, not {} and {}", board.in_the_bag, r.sum)));
-    }
+    let seed_set = seed.as_ref().map(|(_, set)| set);
+    let r = search::search(&p, &cfg, seed_set, cap, resume).map_err(|e| at("the search", e.to_string()))?;
+    let (value, moves) = refereed(&board, &r.promotions).map_err(|e| at("the search's game", e))?;
     let upper = match r.completed {
         true => None,
         false => Some(board.in_the_bag + dual_bound(&p, &ckpt).map_err(|e| at("the dual bound", e))?.bound()),
     };
+    let seconds = t0.elapsed().as_secs_f64();
+    // A map is followed by the finder, from the start incumbent, unless that reaches the root's bound.
+    if job.lns.seconds > 0.0 && job.kind == Kind::Init && upper.is_some_and(|upper| value < upper) {
+        lns = Some(find(job, &board, &p, &r.promotions, control)?.1);
+    }
     Ok(Attempt {
         completed: r.completed,
         reached_cap: r.reached_cap,
@@ -236,7 +392,9 @@ fn attempt_at<const W: usize>(
         promotions: r.promotions.to_vec(),
         upper,
         nodes: r.stats.nodes,
-        seconds: t0.elapsed().as_secs_f64(),
+        seconds,
+        lns,
+        seed_from: seed.map(|(from, _)| from),
     })
 }
 
@@ -349,6 +507,20 @@ impl Climbs {
     }
 }
 
+/// The runs of the finder in this run, and how many of them found a better game than the one they began from.
+#[derive(Default)]
+struct LnsTally {
+    runs: u32,
+    improved: u32,
+}
+
+impl LnsTally {
+    fn add(&mut self, run: &LnsRun) {
+        self.runs += 1;
+        self.improved += u32::from(run.improved());
+    }
+}
+
 /// What the main thread did with its time: it is the one thread that applies results, and while it is busy the workers
 /// whose searches ended wait for it.
 #[derive(Default)]
@@ -379,6 +551,7 @@ pub struct Scheduler {
     last_status: Instant,
     main: MainThread,
     climbs: Climbs,
+    lns: LnsTally,
 }
 
 /// The CPU seconds of the earlier runs: the last `cpu` of the events file.
@@ -425,6 +598,7 @@ impl Scheduler {
             last_status: now,
             main: MainThread::default(),
             climbs: Climbs::default(),
+            lns: LnsTally::default(),
         };
         Ok((scheduler, changes))
     }
@@ -564,8 +738,7 @@ impl Scheduler {
         let ordinary =
             self.eligible().filter(|e| !self.held(e.n)).min_by(|a, b| key(a).partial_cmp(&key(b)).expect("no NaN"))?;
         if !ordinary.mapped {
-            let n = ordinary.n;
-            return Some(Job { n, kind: Kind::Init, limit: Duration::ZERO, seeds: Vec::new(), cap: None });
+            return Some(self.job(ordinary, Kind::Init, Duration::ZERO, Vec::new(), None));
         }
         if !self.pending.is_empty() || self.maps_running() {
             return None;
@@ -577,13 +750,31 @@ impl Scheduler {
         };
         let n = entry.n;
         let remaining = (s.cpu_budget - cpu) / s.workers as f64;
-        let limit = limit.min(s.max_limit).min(remaining.max(1.0));
+        let limit = Duration::from_secs_f64(limit.min(s.max_limit).min(remaining.max(1.0)));
         let seeds = [n.wrapping_sub(1), n, n + 1]
             .iter()
-            .filter_map(|m| self.book.entries.get(m)?.lower.as_ref().map(|l| l.moves.clone()))
+            .filter_map(|&m| {
+                self.book.entries.get(&m)?.lower.as_ref().map(|l| Seed { from: m, moves: l.moves.clone() })
+            })
             .collect();
-        let cap = entry.upper.map(|u| u.value);
-        Some(Job { n, kind, limit: Duration::from_secs_f64(limit), seeds, cap })
+        Some(self.job(entry, kind, limit, seeds, entry.upper.map(|u| u.value)))
+    }
+
+    /// The job of `kind` on the board of `entry`: what it is asked, and what the events say of its neighbours and the
+    /// finder (the neighbours are proven or not as the job starts).
+    fn job(&self, entry: &Entry, kind: Kind, limit: Duration, seeds: Vec<Seed>, cap: Option<u64>) -> Job {
+        let proven = |n: Option<u32>| n.is_some_and(|n| self.book.entries.get(&n).is_some_and(Entry::proven));
+        let n = entry.n;
+        Job {
+            n,
+            kind,
+            limit,
+            seeds,
+            cap,
+            below_proven: proven(n.checked_sub(1)),
+            above_proven: proven(n.checked_add(1)),
+            lns: LnsPlan { seconds: self.settings.lns_seconds, last: entry.lns_score, round: entry.attempts },
+        }
     }
 
     /// Starts `job` on a thread of its own.
@@ -598,6 +789,8 @@ impl Scheduler {
                 n: job.n,
                 kind: job.kind,
                 limit: job.limit.as_secs_f64(),
+                below_proven: job.below_proven,
+                above_proven: job.above_proven,
                 result,
                 sent: Instant::now(),
             });
@@ -617,16 +810,42 @@ impl Scheduler {
             _ if a.completed => (Rule::Search, Rule::Exhausted),
             _ => (Rule::Search, Rule::Dual),
         };
-        let lower =
-            Lower { value: a.value, moves: a.moves, promotions: Some(a.promotions), rule: lower_rule, from: None };
-        let mut changes: Vec<Change> = self.book.offer_lower(n, lower, false)?.into_iter().collect();
+        // The games offered as lower bounds, the lesser first (the finder's before an equal search's, which began from
+        // it and so has found nothing better): a game replaces the board's only if it is better.  The finder's counts
+        // only if it improved on the game it began from.  Every one has passed the referee on its worker.
+        let mut lowers = vec![Lower {
+            value: a.value,
+            moves: a.moves,
+            promotions: Some(a.promotions),
+            rule: lower_rule,
+            from: None,
+        }];
+        let found = a.lns.as_ref().filter(|run| run.improved());
+        lowers.extend(found.map(|run| Lower {
+            value: run.found,
+            moves: run.moves.clone(),
+            promotions: Some(run.promotions.clone()),
+            rule: Rule::Lns,
+            from: None,
+        }));
+        lowers.sort_by_key(|l| (l.value, l.rule != Rule::Lns));
+        let mut changes = Vec::new();
+        for lower in lowers {
+            changes.extend(self.book.offer_lower(n, lower, false)?);
+        }
         // A search that reached its ceiling proves its game by the bound that was its ceiling, which stands.
         let upper = if a.reached_cap { None } else { Some(a.upper.unwrap_or(a.value)) };
         if let Some(value) = upper {
             changes.extend(self.book.offer_upper(n, Upper { value, rule: upper_rule, from: None }, false)?);
         }
+        let lns_s = a.lns.as_ref().map_or(0.0, |run| run.seconds);
+        if let Some(run) = &a.lns {
+            self.lns.add(run);
+        }
         let entry = self.book.entries.get_mut(&n).expect("a board of the ledger");
         entry.mapped = true;
+        entry.search_s += lns_s;
+        entry.lns_score = a.lns.as_ref().map_or(entry.lns_score, |run| Some(run.found));
         if done.kind != Kind::Init {
             entry.attempts += 1;
             entry.search_s += a.seconds;
@@ -651,6 +870,17 @@ impl Scheduler {
             Json::array([l.map_or(Json::Null, Json::from), u.map_or(Json::Null, Json::from)])
         };
         fields.extend([("before", pair(before)), ("after", pair(after))]);
+        // The finder (its seconds, 0 if it did not run; the scores of its input and of its game), which game seeded the
+        // search, and whether the boards n − 1 and n + 1 were proven when the job started.
+        let run = a.lns.as_ref();
+        fields.extend([
+            ("lns_s", Json::from((lns_s * 1000.0).round() / 1000.0)),
+            ("lns_from", run.map_or(Json::Null, |run| Json::from(run.from))),
+            ("lns_found", run.map_or(Json::Null, |run| Json::from(run.found))),
+            ("seed_from", a.seed_from.map_or(Json::Null, |seed| Json::from(seed.name()))),
+            ("below_proven", Json::from(done.below_proven)),
+            ("above_proven", Json::from(done.above_proven)),
+        ]);
         if let Some(job) = done.kind.job() {
             fields.push(("job", Json::from(job)));
         }
@@ -761,14 +991,16 @@ impl Scheduler {
     fn status(&mut self) {
         let (proven, total) = (self.proven(), self.book.entries.len());
         eprintln!(
-            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; climbs up {}, down {}; main \
-             thread busy {:.1} s, results waited {:.1} s",
+            "ledger: {:.0} s, {:.0} CPU s of {:.0}: {proven} of {total} proven, {} searching; climbs up {}, down {}; \
+             finder {} runs, {} improved; main thread busy {:.1} s, results waited {:.1} s",
             self.t0.elapsed().as_secs_f64(),
             self.cpu(),
             self.settings.cpu_budget,
             self.running.len(),
             self.climbs.up,
             self.climbs.down,
+            self.lns.runs,
+            self.lns.improved,
             self.main.busy,
             self.main.waited,
         );
@@ -883,6 +1115,7 @@ pub fn run(first: u32, last: u32, dir: &Path, settings: &Settings, proven: Optio
         ("climb_limit_s", Json::from(s.climb_limit)),
         ("climb_up", Json::from(s.climb_up)),
         ("climb_down", Json::from(s.climb_down)),
+        ("lns_s", Json::from(s.lns_seconds)),
         ("gap_unit", Json::from(s.gap_unit)),
         ("proven_file", proven.map_or(Json::Null, |p| Json::from(p.display().to_string()))),
     ];

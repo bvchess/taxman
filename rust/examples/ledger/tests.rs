@@ -1,10 +1,13 @@
 //! The ledger's tests: the relations on the boards of optimal.json (every bound they derive brackets the optimum, and
-//! every game they make is legal), a violation, the choice of the next search (the climbs) and runs of the scheduler
-//! checked against optimal.json.
+//! every game they make is legal), a violation, the choice of the next search (the climbs), the finder, and runs of the
+//! scheduler checked against optimal.json.  The runs of the first tests leave the finder off (`lns_seconds` 0), whose
+//! default second a board would make them slow; the finder has tests of its own at the end.
 
 use super::book::{ceiling_game, monotone_game, prime_down, prime_up, Book, Entry, Lower, Rule, Upper};
 use super::report;
-use super::schedule::{self, read_ledger, Attempt, Done, Job, Kind, Running, Scheduler, Settings, Way};
+use super::schedule::{
+    self, read_ledger, Attempt, Done, Job, Kind, LnsPlan, LnsRun, Running, Scheduler, Seed, SeedFrom, Settings, Way,
+};
 use super::support::TempDir;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -181,6 +184,7 @@ fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
         cpu_budget: 1e9,
         base: 0.002,
         climb_limit: 0.004,
+        lns_seconds: 0.0,
         save_every: 0.5,
         ..Settings::default()
     };
@@ -233,7 +237,7 @@ fn a_run_takes_the_proven_games_it_is_given() {
     let dir = TempDir::new("ledger-given");
     let results = dir.join("given.jsonl");
     write_results(&results, &[700, 705]);
-    let settings = Settings { workers: 2, cpu_budget: 1e9, base: 0.01, ..Settings::default() };
+    let settings = Settings { workers: 2, cpu_budget: 1e9, base: 0.01, lns_seconds: 0.0, ..Settings::default() };
     assert_eq!(schedule::run(701, 712, &dir, &settings, Some(&results)).unwrap(), "all proven");
     let entries = read_ledger(&dir).unwrap();
     assert_eq!(entries.first().map(|e| e.n), Some(700), "the given board before the stretch is in the ledger");
@@ -284,8 +288,15 @@ fn ended(n: u32, kind: Kind, proven: bool) -> Done {
         upper: (!proven).then(|| opt(n)),
         nodes: 1000,
         seconds: 3.0,
+        lns: None,
+        seed_from: None,
     };
-    Done { n, kind, limit: 60.0, result: Ok(attempt), sent: Instant::now() }
+    Done { n, kind, limit: 60.0, below_proven: false, above_proven: false, result: Ok(attempt), sent: Instant::now() }
+}
+
+/// Whether `job` is seeded with the game `moves`.
+fn seeded_with(job: &Job, moves: &[u32]) -> bool {
+    job.seeds.iter().any(|seed| seed.moves == moves)
 }
 
 /// With the games of 900 and 906 given, the relations prove the boards of their repeat classes (900-902, 904-908, 907
@@ -313,7 +324,7 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
         assert_eq!(job.limit, Duration::from_secs(60));
         let (below, entry) = (&scheduler.book.entries[&(job.n - 1)], &scheduler.book.entries[&job.n]);
         assert!(below.proven() && !entry.proven());
-        assert!(job.seeds.contains(&below.lower.as_ref().unwrap().moves), "n={}: seeded with the game below", job.n);
+        assert!(seeded_with(&job, &below.lower.as_ref().unwrap().moves), "n={}: seeded with the game below", job.n);
         assert_eq!(job.cap, entry.upper.map(|u| u.value), "n={}: capped by the ledger's bound", job.n);
         assert!(job.cap.unwrap() <= opt(job.n - 1) + u64::from(job.n), "n={}: at most the ceiling", job.n);
         start(&mut scheduler, &job);
@@ -335,7 +346,7 @@ fn a_proven_board_is_climbed_to_with_its_game_and_the_board_above_waits() {
     assert!(scheduler.book.entries[&909].proven());
     let next = scheduler.next_job(0.0).unwrap();
     assert_eq!((next.kind, next.n), (Kind::Climb(Way::Up), 910));
-    assert!(next.seeds.contains(&scheduler.book.entries[&909].lower.as_ref().unwrap().moves));
+    assert!(seeded_with(&next, &scheduler.book.entries[&909].lower.as_ref().unwrap().moves));
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     let climb = events.lines().find(|line| line.contains("\"job\":\"climb\"")).expect("an event of the climb");
     assert!(climb.contains("\"action\":\"search\"") && climb.contains("\"outcome\":\"proved\""), "{climb}");
@@ -387,7 +398,7 @@ fn a_proven_board_is_climbed_down_from_after_the_climbs_up() {
     let down = scheduler.next_job(0.0).unwrap();
     assert_eq!((down.kind, down.n, down.limit), (Kind::Climb(Way::Down), 903, Duration::from_secs(60)));
     let above = &scheduler.book.entries[&904];
-    assert!(above.proven() && down.seeds.contains(&above.lower.as_ref().unwrap().moves), "seeded with the game above");
+    assert!(above.proven() && seeded_with(&down, &above.lower.as_ref().unwrap().moves), "seeded with the game above");
     assert_eq!(down.cap, scheduler.book.entries[&903].upper.map(|u| u.value), "capped by the ledger's bound");
     start(&mut scheduler, &down);
     scheduler.finish(ended(903, Kind::Climb(Way::Down), false)).unwrap();
@@ -445,6 +456,7 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
         cpu_budget: 1e9,
         base: 0.002,
         climb_limit: 0.01,
+        lns_seconds: 0.0,
         save_every: 0.5,
         ..Settings::default()
     };
@@ -494,4 +506,252 @@ fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
     assert_eq!(climbs_of(&Settings { climb_up: false, ..settings.clone() }), (false, true, true));
     assert!(!climbs_of(&Settings { climb_up: false, climb_down: false, ..settings.clone() }).2);
     assert!(!climbs_of(&Settings { climb_limit: 0.0, ..settings }).2, "climbs are off");
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The finder
+
+/// A job on board `n` for a worker: a map is a search of no time, any other a search of 20 ms.
+fn job_of(n: u32, kind: Kind, seeds: Vec<Seed>, cap: Option<u64>, lns: LnsPlan) -> Job {
+    let limit = if kind == Kind::Init { Duration::ZERO } else { Duration::from_millis(20) };
+    Job { n, kind, limit, seeds, cap, below_proven: false, above_proven: false, lns }
+}
+
+fn finder(seconds: f64, last: Option<u64>) -> LnsPlan {
+    LnsPlan { seconds, last, round: 0 }
+}
+
+/// What a worker makes of `job`, with its checkpoint in `dir`.
+fn attempted(dir: &Path, job: &Job) -> Attempt {
+    std::fs::create_dir_all(dir.join("ckpt")).unwrap();
+    schedule::attempt(job, &Control::new(), dir, Duration::from_secs(60)).unwrap()
+}
+
+/// The finder follows a board's map, from the start incumbent, and precedes a search whose best seed is another than
+/// the one it last ran from (a climb's always counts as another), from that seed; it does not run for an ordinary search
+/// that goes on from the same seed, nor when the seed reaches the ceiling, nor with no seconds.  Its game seeds the
+/// search when it beats the seed, and every game it returns plays at the score it says, by the referee.
+#[test]
+fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
+    let (dir, n) = (TempDir::new("ledger-finder"), 1218);
+    let referee = |run: &LnsRun| assert_eq!(replay_finished(n, &run.moves), Ok(run.found), "the finder's game");
+    // 1218's start incumbent is 204 short of the optimum, which the finder reaches in a fraction of a second.
+    let map = attempted(&dir, &job_of(n, Kind::Init, Vec::new(), None, finder(0.5, None)));
+    let run = map.lns.as_ref().expect("the finder follows the map");
+    assert_eq!(run.from, map.value, "it begins from the start incumbent");
+    assert!(run.improved() && run.found <= opt(n), "from {} to {}, the optimum {}", run.from, run.found, opt(n));
+    assert!(run.seconds >= 0.5 && map.seed_from.is_none());
+    referee(run);
+
+    // A search whose best seed is the start game, not the finder's game that the board has since.
+    let seeded = |moves: &[u32]| vec![Seed { from: n, moves: moves.to_vec() }];
+    let before = job_of(n, Kind::Search, seeded(&map.moves), None, finder(0.5, Some(run.found)));
+    let first = attempted(&dir, &before);
+    let again = first.lns.as_ref().expect("a seed it has not seen: it runs");
+    assert_eq!((again.from, first.seed_from), (map.value, Some(SeedFrom::Lns)));
+    assert!(again.improved() && first.value >= again.found);
+    referee(again);
+
+    // A search of the board with the game the finder left it with has nothing new.
+    let same = attempted(&dir, &job_of(n, Kind::Search, seeded(&again.moves), None, finder(0.5, Some(again.found))));
+    assert!(same.lns.is_none() && same.seed_from == Some(SeedFrom::Own));
+    // A climb runs the finder all the same.
+    let climb = job_of(n, Kind::Climb(Way::Up), seeded(&again.moves), None, finder(0.1, Some(again.found)));
+    assert!(attempted(&dir, &climb).lns.is_some());
+    // A seed that reaches the ceiling is settled by the search at once.
+    let capped = job_of(n, Kind::Search, seeded(&again.moves), Some(again.found), finder(0.5, None));
+    let capped = attempted(&dir, &capped);
+    assert!(capped.lns.is_none() && capped.reached_cap && capped.value == again.found);
+    // No seconds, no finder.
+    assert!(attempted(&TempDir::new("ledger-no-finder"), &job_of(n, Kind::Init, Vec::new(), None, finder(0.0, None)))
+        .lns
+        .is_none());
+}
+
+/// The referee accepts the promotions of a game that plays at the bag and their sum, and refuses a set that does not
+/// play as the game it claims.
+#[test]
+fn the_referee_refuses_promotions_that_do_not_play_as_the_game_they_claim() {
+    let n = 250;
+    let map = attempted(&TempDir::new("ledger-referee"), &job_of(n, Kind::Init, Vec::new(), None, finder(0.0, None)));
+    taxman::with_width!(n, W => {
+        let board = Board::<W>::for_n(n);
+        let set = taxman::bits::Bits::<W>::from_slice(&map.promotions);
+        assert_eq!(schedule::refereed(&board, &set), Ok((map.value, map.moves.clone())));
+        // Not every candidate can be promoted at once: what plays is not a game of all their sum.
+        let all = board.candidates();
+        assert!(all.sum() > set.sum());
+        assert!(schedule::refereed(&board, &all).is_err(), "all the candidates are not a game");
+    });
+}
+
+/// A search that ended after the finder, for `finish`: it stopped with a game of `value`, after the finder's run (if
+/// any), seeded by `seed_from`, with the board below proven.
+fn ended_after_finder(n: u32, value: u64, lns: Option<LnsRun>, seed_from: Option<SeedFrom>) -> Done {
+    let mut done = ended(n, Kind::Search, false);
+    let attempt = done.result.as_mut().unwrap();
+    (attempt.value, attempt.lns, attempt.seed_from) = (value, lns, seed_from);
+    done.below_proven = true;
+    done
+}
+
+/// The finder's game is a board's lower bound where it beats the board's and the search's (and credited to it when the
+/// search, which began from it, found nothing better); the search's where that is better, and nobody's but the
+/// search's where the finder did not improve on its seed.  The board keeps the score the finder left it with, and the
+/// event says what the finder and the seed were.
+#[test]
+fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_says_what_it_did() {
+    // A board alone in its ledger (so that no relation reaches it from a fabricated neighbour), its bounds 10 under the
+    // optimum and 400 over, that a search ended on after a finder whose run began 10 under the optimum and found `found`
+    // under it (the same if it found nothing better): the board after, and the event.
+    let finished = |n: u32, value: u64, found: Option<u64>, seed_from: Option<SeedFrom>| {
+        let dir = TempDir::new("ledger-finder-finish");
+        let (mut scheduler, _) = Scheduler::open(n, n, &dir, &quiet(), None).unwrap();
+        let lower = Lower { value: opt(n) - 10, moves: opt_game(n), promotions: None, rule: Rule::Start, from: None };
+        scheduler.book.offer_lower(n, lower, false).unwrap();
+        scheduler.book.offer_upper(n, Upper { value: opt(n) + 400, rule: Rule::Root, from: None }, false).unwrap();
+        scheduler.book.entries.get_mut(&n).unwrap().mapped = true;
+        let run = found.map(|found| LnsRun {
+            from: opt(n) - 10,
+            found: opt(n) - found,
+            seconds: 0.5,
+            moves: opt_game(n),
+            promotions: Vec::new(),
+        });
+        scheduler.finish(ended_after_finder(n, opt(n) - value, run, seed_from)).unwrap();
+        let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
+        let event = events.lines().map(|line| Json::parse(line).unwrap()).find(|e| e.get("n").is_some()).unwrap();
+        (scheduler.book.entries[&n].clone(), event)
+    };
+    let lower = |entry: &Entry, n: u32| entry.lower.as_ref().map(|l| (l.value, l.rule)).map(|(v, r)| (opt(n) - v, r));
+    let lns = Some(SeedFrom::Lns);
+
+    // The finder improved on its seed (4 under the optimum), and the search that began from its game found nothing
+    // better: the lower bound is the finder's.
+    let (entry, event) = finished(940, 4, Some(4), lns);
+    assert_eq!(lower(&entry, 940), Some((4, Rule::Lns)));
+    assert_eq!(entry.lns_score, Some(opt(940) - 4), "the score the finder left the board with");
+    assert_eq!(entry.search_s, 3.5, "the search's seconds and the finder's");
+    assert_eq!(Entry::from_json(&entry.to_json(None)).unwrap().lns_score, entry.lns_score, "the ledger keeps it");
+    assert_eq!(event.get("lns_s").and_then(Json::as_f64), Some(0.5));
+    assert_eq!(event.get("lns_from").and_then(Json::as_u64), Some(opt(940) - 10));
+    assert_eq!(event.get("lns_found").and_then(Json::as_u64), Some(opt(940) - 4));
+    assert_eq!(event.get("seed_from").and_then(Json::as_str), Some("lns"));
+    assert_eq!(event.get("below_proven").and_then(Json::as_bool), Some(true));
+    assert_eq!(event.get("above_proven").and_then(Json::as_bool), Some(false));
+
+    // The search found more: the search's game.
+    let (entry, _) = finished(944, 2, Some(4), lns);
+    assert_eq!((lower(&entry, 944), entry.lns_score), (Some((2, Rule::Search)), Some(opt(944) - 4)));
+    // The finder found nothing better than its seed: the search's game, and the board has the seed's score for the
+    // finder; the seed was the board's own.
+    let (entry, event) = finished(948, 8, Some(10), Some(SeedFrom::Own));
+    assert_eq!((lower(&entry, 948), entry.lns_score), (Some((8, Rule::Search)), Some(opt(948) - 10)));
+    assert_eq!(event.get("seed_from").and_then(Json::as_str), Some("n"));
+    // No finder: nothing of it on the board or in the event.
+    let (entry, event) = finished(950, 8, None, Some(SeedFrom::Below));
+    assert_eq!((lower(&entry, 950), entry.lns_score), (Some((8, Rule::Search)), None));
+    assert_eq!(event.get("seed_from").and_then(Json::as_str), Some("n-1"));
+    assert_eq!(event.get("lns_s").and_then(Json::as_f64), Some(0.0));
+    assert!(event.get("lns_from").unwrap().is_null() && event.get("lns_found").unwrap().is_null());
+}
+
+/// The events of the jobs of a run (a map or a search), parsed.
+fn job_events(dir: &Path) -> Vec<Json> {
+    let events = std::fs::read_to_string(schedule::events_path(dir)).unwrap();
+    let all = events.lines().map(|line| Json::parse(line).unwrap());
+    all.filter(|e| matches!(e.get("action").and_then(Json::as_str), Some("init" | "search"))).collect()
+}
+
+/// A run with the finder on: every board is proven at its optimum, every job's event says what the finder and the
+/// seed were (the finder's scores between its seed's and the optimum), the games of the finder pass the report's
+/// referee, and the report counts the finder's runs.
+#[test]
+fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_what_it_did() {
+    let dir = TempDir::new("ledger-finder-run");
+    let results = dir.join("given.jsonl");
+    write_results(&results, &[906]);
+    let settings = Settings {
+        workers: 3,
+        cpu_budget: 1e9,
+        base: 0.002,
+        climb_limit: 0.01,
+        lns_seconds: 0.05,
+        save_every: 0.5,
+        ..Settings::default()
+    };
+    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
+    for e in read_ledger(&dir).unwrap() {
+        assert!(e.proven() && e.upper.unwrap().value == opt(e.n), "n={}: {e:?}", e.n);
+    }
+    let jobs = job_events(&dir);
+    let mut runs = 0;
+    for e in &jobs {
+        let n = e.get("n").and_then(Json::as_u32).unwrap();
+        let seconds = e.get("lns_s").and_then(Json::as_f64).unwrap_or_else(|| panic!("no lns_s: {e}"));
+        let (from, found) = (e.get("lns_from").unwrap(), e.get("lns_found").unwrap());
+        if from.is_null() {
+            assert!(found.is_null() && seconds == 0.0, "{e}");
+        } else {
+            runs += 1;
+            let (from, found) = (from.as_u64().unwrap(), found.as_u64().unwrap());
+            // (A board proven by a relation while the job went on stops the finder early.)
+            assert!(seconds > 0.0 && from <= found && found <= opt(n), "n={n}: {e}");
+        }
+        let seed = e.get("seed_from").unwrap();
+        assert!(seed.is_null() || ["n-1", "n", "n+1", "lns"].contains(&seed.as_str().unwrap()), "{e}");
+        assert!(e.get("below_proven").and_then(Json::as_bool).is_some() && e.get("above_proven").is_some(), "{e}");
+    }
+    assert!(runs > 10, "the finder ran {runs} times in {} jobs", jobs.len());
+    let start = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
+    assert!(start.lines().next().unwrap().contains("\"lns_s\":0.05"), "the start event has the setting");
+    let (report, ok) = report::report(&dir, &[]).unwrap();
+    assert!(ok, "{report}");
+    assert!(report.contains(&format!("finder: {runs} runs")), "{report}");
+}
+
+/// With no seconds for the finder nothing of it is left in a run (no run, no game of its rule, no score kept, no seed
+/// from it), and the choice of the jobs is what it is with the finder on: its setting changes only what a job carries.
+#[test]
+fn with_no_seconds_for_the_finder_nothing_of_it_is_left_and_the_order_of_the_jobs_is_the_same() {
+    let dir = TempDir::new("ledger-finder-off");
+    let results = dir.join("given.jsonl");
+    write_results(&results, &[906]);
+    let settings = Settings {
+        workers: 3,
+        cpu_budget: 1e9,
+        base: 0.002,
+        climb_limit: 0.01,
+        lns_seconds: 0.0,
+        save_every: 0.5,
+        ..Settings::default()
+    };
+    assert_eq!(schedule::run(901, 960, &dir, &settings, Some(&results)).unwrap(), "all proven");
+    for e in read_ledger(&dir).unwrap() {
+        assert!(e.lns_score.is_none() && e.lower.as_ref().unwrap().rule != Rule::Lns, "n={}: {e:?}", e.n);
+    }
+    for e in job_events(&dir) {
+        assert_eq!(e.get("lns_s").and_then(Json::as_f64), Some(0.0), "{e}");
+        assert!(e.get("lns_from").unwrap().is_null() && e.get("lns_found").unwrap().is_null(), "{e}");
+        assert_ne!(e.get("seed_from").and_then(Json::as_str), Some("lns"), "{e}");
+    }
+    let (report, ok) = report::report(&dir, &[]).unwrap();
+    assert!(ok && report.contains("finder: 0 runs"), "{report}");
+
+    // The jobs that a scheduler hands out, with the finder on and off: the same boards, kinds, limits, seeds and
+    // ceilings in the same order; only the plan the job carries differs.
+    let jobs = |seconds: f64| {
+        let dir = TempDir::new("ledger-finder-order");
+        let mut scheduler = climbing(&dir, &[906], &Settings { lns_seconds: seconds, ..quiet() });
+        let mut out = Vec::new();
+        for _ in 0..8 {
+            let job = scheduler.next_job(0.0).unwrap();
+            assert_eq!(job.lns, LnsPlan { seconds, last: None, round: 0 });
+            start(&mut scheduler, &job);
+            let seeds: Vec<(u32, Vec<u32>)> = job.seeds.iter().map(|s| (s.from, s.moves.clone())).collect();
+            out.push((job.n, job.kind, job.limit, job.cap, seeds, job.below_proven, job.above_proven));
+        }
+        out
+    };
+    assert_eq!(jobs(0.0), jobs(1.0));
 }
