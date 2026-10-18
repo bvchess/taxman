@@ -53,14 +53,15 @@
 //!   completed), `nodes` (the engine's steps) and `cpu_s`.  A floor search that finds a set heavier than the floor, or
 //!   a root bound below the optimum, is an error after the line.
 //!
-//! The command `nogoods` (`nogoods.rs`) is played the same way, on the same [`Case`]; it takes the budgets, the start
-//! and the referee from here.
+//! The commands `nogoods` (`nogoods.rs`) and `relaxed` (`relaxed.rs`) are played the same way, on the same [`Case`];
+//! they take the budgets, the start and the referee from here.
 
 use super::{beyond, chained_of, counters, root_bound, set_up, Line, Options};
 use crate::known::known_incumbent;
 use crate::lns::{self, run_unit, Lns};
-use crate::nogoods;
+use crate::{nogoods, relaxed};
 use std::cmp::Reverse;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -138,7 +139,7 @@ impl FromStr for PoolScore {
     }
 }
 
-/// The options of `sound`, `finders`, `nogoods` and `target`, with their defaults.
+/// The options of `sound`, `finders`, `nogoods`, `target` and `relaxed`, with their defaults.
 #[derive(Clone)]
 pub struct Params {
     pub from: Source,
@@ -153,10 +154,15 @@ pub struct Params {
     /// How many candidates beyond the starts' [`Case::restricted`] begins with, and in which order it takes them.
     pub extra: usize,
     pub pool: PoolScore,
-    /// The subgradient steps of each bound of `nogoods`, and the steps of the longer fit that shows how far the
-    /// bound goes (at least `steps`).
+    /// The subgradient steps of each bound of `nogoods` (and of the fit of `relaxed`), and the steps of the longer fit
+    /// that shows how far the bound goes (at least `steps`).
     pub steps: usize,
     pub long: usize,
+    /// Where `relaxed` takes its nodes: a directory of `.nodes` fixtures, the tuning suite, and how many nodes on the
+    /// way to the optimum it makes.
+    pub fixtures: Option<PathBuf>,
+    pub suite: Option<PathBuf>,
+    pub paths: usize,
 }
 
 impl Default for Params {
@@ -171,6 +177,9 @@ impl Default for Params {
             pool: PoolScore::Chosen,
             steps: 200,
             long: 2000,
+            fixtures: None,
+            suite: None,
+            paths: 50,
         }
     }
 }
@@ -447,6 +456,8 @@ pub enum Command {
     /// `wall nogoods` (`nogoods.rs`): the nogoods the finder and the search learn, as bounds.
     Nogoods,
     Target,
+    /// `wall relaxed` (`relaxed.rs`): the root's multipliers over those nogoods, at sampled nodes.
+    Relaxed,
 }
 
 impl Command {
@@ -457,6 +468,7 @@ impl Command {
             "finders" => Some(Command::Finders),
             "nogoods" => Some(Command::Nogoods),
             "target" => Some(Command::Target),
+            "relaxed" => Some(Command::Relaxed),
             _ => None,
         }
     }
@@ -597,7 +609,7 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
     };
     let graph = MatchGraph::new(&p.model, &p.root);
     let mut space = SearchSpace::new(&p, &graph);
-    if command == Command::Nogoods {
+    if matches!(command, Command::Nogoods | Command::Relaxed) {
         // Every nogood a searcher learns is wanted, so none is forgotten (the unit searches of the finder are shorter
         // than the period anyway; the control's table would be cleared every NOGOOD_PERIOD steps).
         space.forgetting.period = None;
@@ -608,6 +620,7 @@ fn play<const W: usize>(command: Command, n: u32, o: &Options, optimal: &Optimal
         Command::Finders => Ok(finders_of(&case)),
         Command::Nogoods => Ok(nogoods::of(&case)),
         Command::Target => target_of(&case),
+        Command::Relaxed => relaxed::of(&case),
     }
 }
 
@@ -635,6 +648,7 @@ pub fn run(command: Command, o: &Options, optimal: &Optimal) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use taxman::json::Json;
 
     /// The options of a command with finders that run for `cpu` seconds.
@@ -745,6 +759,25 @@ mod tests {
             let cfg = EngineConfig { threads: 1, ..EngineConfig::default() };
             let at_the_optimum = search_above(&p, &cfg, opt, None, false).expect("the search");
             assert_eq!(number(&runs[3], "nodes"), at_the_optimum.stats.nodes, "n={n}: {line}");
+        }
+    }
+
+    #[test]
+    fn the_root_lambda_bound_is_valid_at_the_probes_nodes_and_on_the_way_to_the_optimum() {
+        let mut o = options("relaxed", 0.2);
+        (o.finders.steps, o.finders.paths) = (30, 10);
+        o.finders.fixtures = Some(Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/perf"));
+        for (n, fixture) in [(480, 0), (936, 300)] {
+            // `line_of` checks that no bound is below what a node on the way to the optimum reaches.
+            let line = line_of(Command::Relaxed, n, &o);
+            let (root, opt, relaxed_root) =
+                (number(&line, "root"), number(&line, "opt"), number(&line, "relaxed_root"));
+            assert!(opt <= relaxed_root && relaxed_root <= root, "n={n}: {line}");
+            let nodes = line.get("nodes").and_then(Json::as_arr).expect("nodes");
+            assert_eq!(nodes.len(), fixture + 10, "n={n}: the fixture's nodes and those on the way");
+            for node in nodes {
+                assert!(number(node, "tight") <= number(node, "relaxed"), "n={n}: {node}");
+            }
         }
     }
 

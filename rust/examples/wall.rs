@@ -20,6 +20,8 @@
 //! cargo run --release --example wall -- nogoods [--cpu S] [--steps K] [--long K] [--known FILE] [--seed S]
 //!     [--fix LO-HI] [--unit-nodes K] N|A-B...
 //! cargo run --release --example wall -- target [--fractions F,F,...] [--cap S] --known FILE N|A-B...
+//! cargo run --release --example wall -- relaxed [--cpu S] [--steps K] [--fixtures DIR] [--suite FILE] [--paths K]
+//!     [--seed S] [--fix LO-HI] [--unit-nodes K] --known FILE N|A-B...
 //! ```
 //!
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
@@ -128,6 +130,10 @@
 //!   the root's bound and the optimum below the root's bound, for each share, and the full proof (the sound search
 //!   from the known optimum), each for at most `--cap` CPU seconds; the nodes and CPU seconds of each.  It is defined
 //!   in `wall/finders.rs` too.
+//! * **relaxed**: whether nogood multipliers fitted once at the root (over the nogoods of `nogoods`) would cut the
+//!   nodes of a proof that today's bound leaves open: the bound with the root's multipliers against today's at sampled
+//!   nodes of games with known optima.  Defined in `wall/relaxed.rs`, whose module comment has the options and the
+//!   lines.
 //!
 //! **The sizes** (`setup`, `nodes` and `frames`): `frames` (the root's frame count), `candidates`, `max_total`
 //! (the most promotions a set can have), `members` (the distinct numbers in the moves and factors of the root's
@@ -155,6 +161,10 @@ mod counters;
 /// `sound` and `finders`: searches for good games that are not sound, and the sound search to weigh them against.
 #[path = "wall/finders.rs"]
 mod finders;
+/// `relaxed` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
+#[allow(dead_code)]
+#[path = "common/fixtures.rs"]
+mod fixtures;
 #[path = "common/known.rs"]
 mod known;
 #[path = "common/lns.rs"]
@@ -162,6 +172,9 @@ mod lns;
 /// `nogoods`: the Lagrangian bounds over the nogoods that the finder and the sound search learn.
 #[path = "wall/nogoods.rs"]
 mod nogoods;
+/// `relaxed`: the bound with the root's multipliers over those nogoods at sampled nodes, against today's.
+#[path = "wall/relaxed.rs"]
+mod relaxed;
 #[path = "common/rng.rs"]
 mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
@@ -198,21 +211,39 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 11] =
-    ["setup", "nodes", "grow", "start", "frames", "landscape", "chain", "sound", "finders", "nogoods", "target"];
+const COMMANDS: [&str; 12] = [
+    "setup",
+    "nodes",
+    "grow",
+    "start",
+    "frames",
+    "landscape",
+    "chain",
+    "sound",
+    "finders",
+    "nogoods",
+    "target",
+    "relaxed",
+];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 29] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods", "target"]),
+const OPTIONS: [(&str, &[&str]); 32] = [
+    (
+        "--known",
+        &["setup", "nodes", "grow", "start", "landscape", "chain", "sound", "finders", "nogoods", "target", "relaxed"],
+    ),
     ("--from", &["sound"]),
     ("--cap", &["sound", "target"]),
     ("--fractions", &["target"]),
-    ("--cpu", &["sound", "finders", "nogoods"]),
-    ("--steps", &["nogoods"]),
+    ("--fixtures", &["relaxed"]),
+    ("--suite", &["relaxed"]),
+    ("--paths", &["relaxed"]),
+    ("--cpu", &["sound", "finders", "nogoods", "relaxed"]),
+    ("--steps", &["nogoods", "relaxed"]),
     ("--long", &["nogoods"]),
-    ("--seed", &["sound", "finders", "nogoods"]),
-    ("--fix", &["sound", "finders", "nogoods"]),
-    ("--unit-nodes", &["sound", "finders", "nogoods"]),
+    ("--seed", &["sound", "finders", "nogoods", "relaxed"]),
+    ("--fix", &["sound", "finders", "nogoods", "relaxed"]),
+    ("--unit-nodes", &["sound", "finders", "nogoods", "relaxed"]),
     ("--extra", &["sound", "finders"]),
     ("--pool", &["sound", "finders"]),
     ("--repeat", &["setup"]),
@@ -329,7 +360,7 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
     let ranges = matches!(
         command,
-        "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods" | "target"
+        "setup" | "start" | "frames" | "landscape" | "chain" | "sound" | "finders" | "nogoods" | "target" | "relaxed"
     );
     let mut games = Vec::new();
     for text in texts {
@@ -410,6 +441,9 @@ fn parse() -> Result<Options, String> {
             "--from" => o.finders.from = value("--from")?.parse().map_err(|e| format!("--from {e}"))?,
             "--cap" => o.finders.cap = Some(number("--cap", value("--cap")?)?),
             "--fractions" => o.finders.fractions = finders::fractions(&value("--fractions")?)?,
+            "--fixtures" => o.finders.fixtures = Some(value("--fixtures")?.into()),
+            "--suite" => o.finders.suite = Some(value("--suite")?.into()),
+            "--paths" => o.finders.paths = number("--paths", value("--paths")?)?,
             "--cpu" => o.finders.cpu = number("--cpu", value("--cpu")?)?,
             "--steps" => o.finders.steps = number::<usize>("--steps", value("--steps")?)?.max(1),
             "--long" => o.finders.long = number("--long", value("--long")?)?,
