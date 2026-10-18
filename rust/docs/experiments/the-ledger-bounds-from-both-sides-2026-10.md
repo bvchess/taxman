@@ -486,8 +486,9 @@ nothing; after more is found an export appends exactly the improvements, each st
 accepts, and the old bytes are untouched; the export of a real run of 901..960 (the chain's 900 and 930 given, the rest
 hidden) proves 59 boards and a second export appends nothing and changes no byte; `verify-bounds` and the Python referee
 accept it (the Python one with `ledger games`' output, and refuse it without: "was not replayed"); a chain of three
-thousand boards, each citing the next, is exported in order (the export follows citations a board at a time, on a thread
-with a stack for a whole stretch); and tampered copies
+thousand boards, each citing the next, is exported in order and checked by both referees (the export keeps the boards
+that wait for a cited line on a worklist, not in recursive calls, so the depth of a chain costs heap, and the test runs
+on a 2 MB thread under Python's default limit of 1,000 calls); and tampered copies
 are refused by both and the line named: a game of moves with its first two moves swapped, a promotion set's value
 raised, a ceiling bound lowered by one, a line a relation cites removed, the board a repeat rests on dropped, its own
 board dropped, a line that improves nothing, a bound below the chain's score, a value that a carried game cites changed,
@@ -519,6 +520,6 @@ promotions could be cited too (its game is the source's moves filtered by the ca
 the frame model on both sides; it is 7 of 72 games here.  The check of a `dual` or `exhausted` bound against its
 checkpoint, which `--checkpoints` records but nothing reads.
 
-**Commits.**  14f36d6 (the store, its commands, the Python referee and the tests), e93d035 (the export's stack), then this
-record.
+**Commits.**  14f36d6 (the store, its commands, the Python referee and the tests), e93d035 (the export on a thread with a big
+stack, a workaround), then the commit that follows citations with a worklist and drops the thread, and this record.
 

@@ -1,6 +1,6 @@
 //! `ledger export`: the bounds of a run's ledger that improve on the store's best, as new lines of the store.
 
-use crate::book::{carries, carry_game, upper_by, Entry, Rule, Side, Upper};
+use crate::book::{carries, carry_game, upper_by, Entry, Lower, Rule, Side, Upper};
 use crate::schedule::read_ledger;
 use crate::store::{self, Best, Chain, Game, Line, Store};
 use std::collections::{HashMap, HashSet};
@@ -82,6 +82,46 @@ struct Bound {
     rests_on: Vec<u32>,
 }
 
+/// A line goes after the line it cites.  A set of lines that cite each other is made board by board: the export asks
+/// each board which board it cites that is not made yet, makes that first, and then the board itself.  The boards wait
+/// on a worklist of the driver ([`settle`]), not on the stack of recursive calls, so a chain of boards each citing the
+/// next, as long as a stretch, costs memory on the heap.
+trait Citing {
+    /// Whether the line of board `n` is made (or none is to be).
+    fn done(&self, n: u32) -> bool;
+    /// The board whose line `n`'s must come after, if `n` cites one.
+    fn cited(&self, n: u32) -> Option<u32>;
+    /// Makes the line of `n`, the board it cites being done.
+    fn finish(&mut self, n: u32) -> Result<(), String>;
+    /// What a circle of citations is, when `n` cites a board that waits for `n`: an error, or, if there is no need
+    /// for the cited line, nothing.
+    fn circle(&self, n: u32) -> Result<(), String>;
+}
+
+/// Makes the lines of `root` and of the boards it cites, those cited first.
+fn settle(lines: &mut impl Citing, root: u32) -> Result<(), String> {
+    let mut waiting = vec![root];
+    let mut on_the_list: HashSet<u32> = waiting.iter().copied().collect();
+    while let Some(&n) = waiting.last() {
+        let cited = lines.cited(n).filter(|&from| !lines.done(from));
+        match cited {
+            _ if lines.done(n) => {}
+            Some(from) if on_the_list.insert(from) => {
+                waiting.push(from);
+                continue;
+            }
+            Some(from) => {
+                lines.circle(from)?;
+                lines.finish(n)?;
+            }
+            None => lines.finish(n)?,
+        }
+        waiting.pop();
+        on_the_list.remove(&n);
+    }
+    Ok(())
+}
+
 /// The lower bounds to append: each after the line it cites, if it cites one.
 struct Lowers<'a> {
     ledger: &'a HashMap<u32, &'a Entry>,
@@ -92,25 +132,41 @@ struct Lowers<'a> {
     options: &'a Options<'a>,
     /// The lines checked so far: the store's, then the export's.
     checks: Chain<'a>,
-    /// The boards whose line is settled (a board whose line is being made counts: a circle of citations is not made).
+    /// The boards whose line is made.
     settled: HashSet<u32>,
     lines: Vec<Line>,
 }
 
-impl Lowers<'_> {
-    /// Appends the line of the ledger's lower bound of board `n` if it improves on the store's and the chain has not
-    /// proven the board.  A game that a relation made of the game of another board (monotone, ceiling or prime) is not
-    /// written but cited, if the ledger's lower bound of that board is that game and the file has it by then, after
-    /// the line of that board if the export has to append it (a game of the chain is never cited, as a run need not
-    /// have the chain).
-    fn settle(&mut self, n: u32) -> Result<(), String> {
-        if !self.settled.insert(n) || self.chain.score(n).is_some() {
-            return Ok(());
-        }
-        let Some(lower) = self.ledger.get(&n).and_then(|entry| entry.lower.as_ref()) else { return Ok(()) };
-        if lower.rule == Rule::Trivial || self.best.lower.get(&n).is_some_and(|have| have.value >= lower.value) {
-            return Ok(());
-        }
+impl<'a> Lowers<'a> {
+    /// The lower bound of the ledger for board `n` that is to be appended: it improves on the store's, the chain has not
+    /// proven the board, and it is not the trivial board's.
+    fn to_append(&self, n: u32) -> Option<&'a Lower> {
+        let entry: &'a Entry = self.ledger.get(&n).copied()?;
+        let lower = entry.lower.as_ref().filter(|l| l.rule != Rule::Trivial)?;
+        let proven = self.chain.score(n).is_some();
+        (!proven && self.best.lower.get(&n).is_none_or(|have| have.value < lower.value)).then_some(lower)
+    }
+}
+
+impl Citing for Lowers<'_> {
+    fn done(&self, n: u32) -> bool {
+        self.settled.contains(&n)
+    }
+
+    /// The board a game was carried from, if the line of `n` may cite its game (a game of the chain is never cited, as
+    /// a run need not have the chain); whether it does is decided when the line is made.
+    fn cited(&self, n: u32) -> Option<u32> {
+        let lower = self.to_append(n)?;
+        let from = lower.from.filter(|&from| carries(lower.rule, from, n))?;
+        self.ledger.get(&from)?.lower.as_ref().map(|_| from)
+    }
+
+    /// Appends the line of the ledger's lower bound of board `n`, if there is one to append.  A game that a relation
+    /// made of the game of another board (monotone, ceiling or prime) is not written but cited, if the ledger's lower
+    /// bound of that board is that game and the file has it by now.
+    fn finish(&mut self, n: u32) -> Result<(), String> {
+        self.settled.insert(n);
+        let Some(lower) = self.to_append(n) else { return Ok(()) };
         let game = lower.promotions.clone().map_or_else(|| Game::Moves(lower.moves.clone()), Game::Promotions);
         let mut line = Line {
             n,
@@ -128,16 +184,19 @@ impl Lowers<'_> {
         };
         let source = lower.from.and_then(|from| Some((from, self.ledger.get(&from)?.lower.as_ref()?)));
         if let Some((from, source)) = source.filter(|&(from, _)| carries(lower.rule, from, n)) {
-            if carry_game(lower.rule, from, n, &source.moves).is_ok_and(|moves| moves == lower.moves) {
-                self.settle(from)?;
-                if self.known.contains(&(from, source.value)) {
-                    (line.game, line.from_value) = (None, Some(source.value));
-                }
+            let carried = carry_game(lower.rule, from, n, &source.moves).is_ok_and(|moves| moves == lower.moves);
+            if carried && self.known.contains(&(from, source.value)) {
+                (line.game, line.from_value) = (None, Some(source.value));
             }
         }
         self.checks.add(&line).map_err(|e| format!("n={n}: its lower line: {e}"))?;
         self.known.insert((n, line.value));
         self.lines.push(line);
+        Ok(())
+    }
+
+    /// A circle of citations is not made: the line that waits for another is written out.
+    fn circle(&self, _n: u32) -> Result<(), String> {
         Ok(())
     }
 }
@@ -150,36 +209,18 @@ struct Uppers<'a> {
     options: &'a Options<'a>,
     /// The lines checked so far: the store's, then the export's.
     checks: Chain<'a>,
-    /// The boards whose bound is settled, and the boards being settled (a circle is an error).
+    /// The boards whose bound is settled: the best upper bound of each after the export, if it has one.
     settled: HashMap<u32, Option<Bound>>,
-    working: HashSet<u32>,
     lines: Vec<Line>,
 }
 
 impl Uppers<'_> {
-    /// The best upper bound of board `n` after the export, if it has one: a game of the chain, which is exact; else the
-    /// ledger's if that improves on the store's (appended, after the bounds it cites); else the store's.
-    fn settle(&mut self, n: u32) -> Result<Option<Bound>, String> {
-        if let Some(done) = self.settled.get(&n) {
-            return Ok(done.clone());
-        }
-        if !self.working.insert(n) {
-            return Err(format!("the upper bounds of board {n} come from each other in a circle"));
-        }
-        let stored = self.best.upper.get(&n).map(|line| Bound { value: line.value, rests_on: line.rests_on.clone() });
-        let bound = if let Some(score) = self.chain.score(n) {
-            Some(Bound { value: score, rests_on: vec![n] })
-        } else {
-            match self.ledger.get(&n).and_then(|entry| entry.upper) {
-                Some(upper) if stored.as_ref().is_none_or(|have| upper.value < have.value) => {
-                    self.append(n, upper, stored)?
-                }
-                _ => stored,
-            }
-        };
-        self.working.remove(&n);
-        self.settled.insert(n, bound.clone());
-        Ok(bound)
+    /// The ledger's upper bound of board `n` if it is to be appended: the chain has no game of the board (its score is
+    /// exact), and the bound improves on the store's.
+    fn to_append(&self, n: u32) -> Option<Upper> {
+        let upper = self.ledger.get(&n)?.upper?;
+        let stored = self.best.upper.get(&n);
+        (self.chain.score(n).is_none() && stored.is_none_or(|have| upper.value < have.value)).then_some(upper)
     }
 
     /// The line for the ledger's upper bound `upper` of board `n`, appended if it improves on `stored`.
@@ -209,7 +250,8 @@ impl Uppers<'_> {
             }
             rule if rule.is_relation() => {
                 let from = upper.from.ok_or_else(|| at("no board it came from".into()))?;
-                let source = self.settle(from)?.ok_or_else(|| at(format!("board {from} has no bound to come from")))?;
+                let source = self.settled.get(&from).cloned().flatten();
+                let source = source.ok_or_else(|| at(format!("board {from} has no bound to come from")))?;
                 // The bags of a repeat (the source's, the target's): the board it repeats is of its class, so the ledger
                 // has it.
                 let bags = if rule == Rule::Repeat {
@@ -251,29 +293,38 @@ impl Uppers<'_> {
     }
 }
 
+impl Citing for Uppers<'_> {
+    fn done(&self, n: u32) -> bool {
+        self.settled.contains_key(&n)
+    }
+
+    /// The board a relation's bound comes from, if the ledger's bound of `n` is to be appended.
+    fn cited(&self, n: u32) -> Option<u32> {
+        self.to_append(n).filter(|upper| upper.rule.is_relation())?.from
+    }
+
+    /// Settles the best upper bound of board `n` after the export, if it has one: a game of the chain, which is exact;
+    /// else the ledger's if that improves on the store's (appended, after the bound it cites); else the store's.
+    fn finish(&mut self, n: u32) -> Result<(), String> {
+        let stored = self.best.upper.get(&n).map(|line| Bound { value: line.value, rests_on: line.rests_on.clone() });
+        let bound = match (self.chain.score(n), self.to_append(n)) {
+            (Some(score), _) => Some(Bound { value: score, rests_on: vec![n] }),
+            (None, Some(upper)) => self.append(n, upper, stored)?,
+            (None, None) => stored,
+        };
+        self.settled.insert(n, bound);
+        Ok(())
+    }
+
+    fn circle(&self, n: u32) -> Result<(), String> {
+        Err(format!("the upper bounds of board {n} come from each other in a circle"))
+    }
+}
+
 /// The lines that an export of `entries` (a ledger's boards) to `store` appends, checked as the checker will check
 /// them, and what they are.  The lower bounds come first, in order of n, then the upper bounds, each after the ones it
 /// cites.  A board of the committed chain (`chain`) gets none.
-///
-/// A line goes after the line it cites, which the export finds by following the citations a board at a time: a chain of
-/// boards, each citing the next (a stretch's worth), is as deep as the stretch, so the work is done on a thread with a
-/// stack for it.
 pub fn plan(
-    entries: &[Entry],
-    store: &Store,
-    chain: &Optimal,
-    options: &Options,
-) -> Result<(Vec<Line>, Summary), String> {
-    std::thread::scope(|scope| {
-        let worker = std::thread::Builder::new().stack_size(1 << 29);
-        let work = worker.spawn_scoped(scope, || plan_deep(entries, store, chain, options));
-        work.map_err(|e| format!("the thread of the export: {e}"))?
-            .join()
-            .unwrap_or_else(|_| Err("the export panicked".into()))
-    })
-}
-
-fn plan_deep(
     entries: &[Entry],
     store: &Store,
     chain: &Optimal,
@@ -300,21 +351,13 @@ fn plan_deep(
         lines: Vec::new(),
     };
     for entry in entries {
-        lowers.settle(entry.n)?;
+        settle(&mut lowers, entry.n)?;
     }
     let (mut lines, checks) = (lowers.lines, lowers.checks);
-    let mut uppers = Uppers {
-        ledger: &ledger,
-        best: &best,
-        chain,
-        options,
-        checks,
-        settled: HashMap::new(),
-        working: HashSet::new(),
-        lines: Vec::new(),
-    };
+    let mut uppers =
+        Uppers { ledger: &ledger, best: &best, chain, options, checks, settled: HashMap::new(), lines: Vec::new() };
     for entry in entries {
-        uppers.settle(entry.n)?;
+        settle(&mut uppers, entry.n)?;
     }
     lines.append(&mut uppers.lines);
 

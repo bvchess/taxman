@@ -380,6 +380,14 @@ fn a_long_chain_of_citations_is_exported_in_order() {
     }
     assert_eq!(lines[1].from_value, Some(7_000_000));
     assert!(lines.iter().all(|l| l.rests_on == [top]));
+    // Both referees follow the citations along the file, without recursion (Python's limit is 1,000 calls deep, a test
+    // thread's stack 2 MB): 3,001 lines cite the line before them.
+    let bounds = dir.join("bounds.jsonl");
+    Store::append(&bounds, &lines).unwrap();
+    let (text, ok) = verify::verify(&bounds, &strict, 2).unwrap();
+    assert!(ok && text.contains("3001 lines"), "{text}");
+    let (status, report) = python(&bounds, None, &strict);
+    assert_eq!(status, Some(0), "{report}");
 }
 
 /// A file whose last line is torn is not appended to; a missing file is made; the old lines stay as they were.
