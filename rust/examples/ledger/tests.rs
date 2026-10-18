@@ -601,9 +601,9 @@ fn ended_after_finder(n: u32, value: u64, lns: Option<LnsRun>, seed_from: Option
 /// event says what the finder and the seed were.
 #[test]
 fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_says_what_it_did() {
-    // A board alone in its ledger (so that no relation reaches it from a fabricated neighbour), its bounds 10 under the
-    // optimum and 400 over, that a search ended on after a finder whose run began 10 under the optimum and found `found`
-    // under it (the same if it found nothing better): the board after, and the event.
+    // A board alone in its ledger (so that no relation reaches it from a fabricated neighbour), its bounds 10 under
+    // the optimum and 400 over, that a search ended on after a finder whose run began 10 under the optimum and found
+    // `found` under it (the same if it found nothing better): the board after, and the event.
     let finished = |n: u32, value: u64, found: Option<u64>, seed_from: Option<SeedFrom>| {
         let dir = TempDir::new("ledger-finder-finish");
         let (mut scheduler, _) = Scheduler::open(n, n, &dir, &quiet(), None).unwrap();

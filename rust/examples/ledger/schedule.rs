@@ -42,11 +42,11 @@ pub struct Settings {
     /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
     pub climb_up: bool,
     pub climb_down: bool,
-    /// The seconds of one thread that the finder (large neighbourhood search, `common/lns.rs`) is given after a board's
-    /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game is
-    /// offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders' measurements
-    /// (docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md) it has most of its gain in the first
-    /// second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder included.
+    /// The seconds of one thread that the finder (large neighbourhood search, `common/lns.rs`) is given after a
+    /// board's map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game
+    /// is offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders'
+    /// measurements (docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md) it has most of its gain in
+    /// the first second, and a search seeded with it costs 0.48 of the CPU of the unseeded, the finder included.
     pub lns_seconds: f64,
     /// The gap that counts as one doubling of the expected cost, in the order of the searches.
     pub gap_unit: f64,
@@ -286,8 +286,8 @@ pub fn refereed<const W: usize>(board: &Board<W>, set: &Bits<W>) -> Result<(u64,
 }
 
 /// The finder on `board` from the promotions `start`, for the seconds of the job's plan (less if `stop` is stopped or
-/// the process is told to stop), with the referee's replay of its game: the promotions of the game it found, and what it
-/// did.
+/// the process is told to stop), with the referee's replay of its game: the promotions of the game it found, and what
+/// it did.
 fn find<const W: usize>(
     job: &Job,
     board: &Board<W>,
@@ -353,7 +353,7 @@ fn attempt_at<const W: usize>(
             None => p.greedy,
         };
         let score = board.in_the_bag + start.sum();
-        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (the game of a proven neighbour).
+        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (a proven neighbour's game).
         let changed = matches!(job.kind, Kind::Climb(_)) || job.lns.last != Some(score);
         if changed && !cap.is_some_and(|cap| start.sum() >= cap) {
             let (found, run) = find(job, &board, &p, &start, control)?;

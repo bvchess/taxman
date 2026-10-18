@@ -56,15 +56,15 @@
 //!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
 //!   run side by side.  A board next to one that is being climbed to waits (no ordinary search of it starts), as the
 //!   climb may prove that board within its limit.
-//! * **The finder** (`common/lns.rs`, which `wall finders` measures; `--lns-seconds` seconds of one thread, default 1; 0:
-//!   none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the rest
-//!   exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game: its game
-//!   is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other game.  It runs
-//!   on the worker, after a board's map from the start incumbent, and before a search whose best seed has changed since
-//!   it last ran on the board (`lns_score` in the ledger: the score of the best seed then, its own game included; a
-//!   climb, whose seed is a proven neighbour's game, always counts as changed), from that seed, and not at all if the
-//!   seed already reaches the ceiling.  The search is then seeded with its game if that is better.  Its time counts in
-//!   the CPU budget and in the board's `search_s`; the search's limit is the search's alone.
+//! * **The finder** (`common/lns.rs`, which `wall finders` measures; `--lns-seconds` seconds of one thread, default
+//!   1; 0: none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the
+//!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:
+//!   its game is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other
+//!   game.  It runs on the worker, after a board's map from the start incumbent, and before a search whose best seed
+//!   has changed since it last ran on the board (`lns_score` in the ledger: the score of the best seed then, its own
+//!   game included; a climb, whose seed is a proven neighbour's game, always counts as changed), from that seed, and
+//!   not at all if the seed already reaches the ceiling.  The search is then seeded with its game if that is better.
+//!   Its time counts in the CPU budget and in the board's `search_s`; the search's limit is the search's alone.
 //! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
 //!   result is small beside a search, `settle` aside.  A relation's upper bound is arithmetic; its lower bound is a game,
 //!   made once for each lower bound of its source, not at all when its score cannot beat the target's (the prime
@@ -132,9 +132,9 @@ use std::path::PathBuf;
 
 fn usage() -> ! {
     eprintln!(
-        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] [--climb up|down|both|off] \
-         [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] [--save-every S]\n       ledger report DIR \
-         [--known FILE]..."
+        "usage: ledger run A-B --dir DIR --cpu-hours H [--workers P] [--base S] [--max-limit S] \
+         [--climb up|down|both|off] [--climb-limit S] [--lns-seconds S] [--gap-unit G] [--proven FILE] \
+         [--save-every S]\n       ledger report DIR [--known FILE]..."
     );
     std::process::exit(2)
 }

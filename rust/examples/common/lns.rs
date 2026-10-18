@@ -1,8 +1,8 @@
-//! Large neighbourhood search (LNS) for a good game: keep a random share of the incumbent's promotions fixed, search the
-//! rest exactly as a unit of the engine, take any better game, and repeat (`#[path = "common/lns.rs"] mod lns;` beside
-//! `rng`; `wall finders` measures it and the ledger uses it, so that they share one copy).  It is not sound: it may miss
-//! the optimum, and nothing it finds proves anything.  A lower bound needs only a legal game, so a caller may offer
-//! what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed it at its score.  The
+//! Large neighbourhood search (LNS) for a good game: keep a random share of the incumbent's promotions fixed, search
+//! the rest exactly as a unit of the engine, take any better game, and repeat (`#[path = "common/lns.rs"] mod lns;`
+//! beside `rng`; `wall finders` measures it and the ledger uses it, so that they share one copy).  It is not sound: it
+//! may miss the optimum, and nothing it finds proves anything.  A lower bound needs only a legal game, so a caller may
+//! offer what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed it at its score.  The
 //! measurements are in docs/experiments/finders-for-good-games-that-are-not-sound-2026-10.md.
 
 use crate::rng::Rng;
@@ -82,10 +82,10 @@ pub struct Lns<'a, const W: usize> {
 }
 
 impl<const W: usize> Lns<'_, W> {
-    /// Searches from the incumbent `start` until `over` says to stop (asked before each unit).  Each unit fixes a random
-    /// share of the incumbent's promotions and searches the rest exactly, with every other candidate, for at most
-    /// `unit_nodes` steps; a better game becomes the incumbent.  `control` steers the units (stopping it ends the one in
-    /// progress); `clock` is the caller's seconds so far, read when a better game is found.
+    /// Searches from the incumbent `start` until `over` says to stop (asked before each unit).  Each unit fixes a
+    /// random share of the incumbent's promotions and searches the rest exactly, with every other candidate, for at
+    /// most `unit_nodes` steps; a better game becomes the incumbent.  `control` steers the units (stopping it ends the
+    /// one in progress); `clock` is the caller's seconds so far, read when a better game is found.
     pub fn search(
         &self,
         start: &Bits<W>,

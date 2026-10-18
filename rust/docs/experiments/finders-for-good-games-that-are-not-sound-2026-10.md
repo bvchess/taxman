@@ -128,5 +128,9 @@ stage 3's 40 games that cost more CPU than (i) at 5 s, which a scaled budget wou
 against the 1 to 1.5 planned, from stage 2's 20 s and stage 3's second run.  The neighbours' starts of `restricted` in
 the tuning runs are not in its CPU.
 
+**Used in the ledger.**  LNS is the ledger's finder since 2026-10-17 (`--lns-seconds`, 1 s by default; its code moved to
+`examples/common/lns.rs`, which `wall finders` shares): [the finder in the
+ledger](the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-the-finder-in-the-ledger).
+
 **Commits.**  fa3127a (the commands `sound` and `finders`, their tests, and `examples/common/known.rs` and `rng.rs`,
 which `tune` and `wall` share); this entry adds the data and the scripts in `bench/finders/`.

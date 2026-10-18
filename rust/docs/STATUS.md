@@ -72,7 +72,7 @@ find it.  Large neighbourhood search from the start incumbent (keep a random 70-
 exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
 search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
 the nodes and 0.48 of the CPU, finder included, of the search from today's start (the optimum as the seed: 0.38 of the
-nodes).  It is in `wall finders` and `wall sound`, not in the solver; the ledger is to use it next
+nodes).  It is in `wall finders`, `wall sound` and the ledger (below), not in the solver
 ([the entry](experiments/finders-for-good-games-that-are-not-sound-2026-10.md)).
 
 ## Decided
@@ -133,6 +133,10 @@ nodes).  It is in `wall finders` and `wall sound`, not in the solver; the ledger
   about 2.2 times the chain's cost on the same games: most searches began before the board below was proven.  **Wedge
   and climb** (built the same day): a board next to a proven board is searched first, seeded with its game, for 60 s
   (`--climb up|down|both|off`, `--climb-limit`); a climb that stops parks the board; a board next to a climb waits; the
-  laptop's dry runs prove every board at the optimum.  Next (Brian approved $1, 2026-10-17): the finder in the ledger,
-  then 2176..3440 again with everything on, to learn what sets up a run past 3440 best
-  ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
+  laptop's dry runs prove every board at the optimum.  **The finder** (built the same day): large neighbourhood search
+  for 1 s of a worker (`--lns-seconds`) after each map and before a search whose best seed has changed; its game is a
+  lower bound once the referee replays it, and seeds the search if better; the events say what it did and which game
+  seeded each search.  Dry runs: every board proven, 0 violations; 1301..1500 in 612 CPU s and 122 s against 557 and
+  145 without it (its game ends as the lower bound of 51 of the 89 boards searched); 2576..2700 at 900 CPU s proves 61
+  boards on or off.  Next (Brian approved $1, 2026-10-17): 2176..3440 again with everything on, to learn what sets up a
+  run past 3440 best ([RUNBOOK section 14](../tools/cloud/RUNBOOK.md#14-the-ledgers-experiment)).
