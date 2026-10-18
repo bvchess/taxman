@@ -27,7 +27,9 @@ crash and a deadline; `run.sh` changed for it (`run_start` and `run_reap`), and 
 complete chain, a SIGTERM stop and a deadline.  Not run on EC2: `certify.sh`, `scaling.sh` (the calibration and the
 scaling run did by hand what it does), and nothing has run on Ubuntu.  `wall.sh`, `wall-node.sh` and the ledger of
 `run.sh` (section 12) ran on macOS against a stand-in for aws (`test/run.sh`) and have not run on EC2; section 12.5
-is the rehearsal that tests them there.  Sections 2
+is the rehearsal that tests them there.  The build cache and the release suite
+(section 15) ran on macOS against a directory for the bucket, the stand-in for aws and a stand-in for cargo, and the
+suite's runner ran the whole solver and prover suites in the test profile; none of it has run on EC2.  Sections 2
 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed
 of a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
 [scaling run](../../docs/experiments/scaling-to-192-threads-2026-10.md)); what is not is in section 8.
@@ -48,6 +50,7 @@ of a Graviton core and the scaling of the solver to 64 and 192 threads are measu
 * [12. The unattended run to the wall](#12-the-unattended-run-to-the-wall)
 * [13. The sweep](#13-the-sweep)
 * [14. The ledger's experiment](#14-the-ledgers-experiment)
+* [15. The build cache and the release suite](#15-the-build-cache-and-the-release-suite)
 
 ## Rules for every launch
 
@@ -70,6 +73,10 @@ calibration.  The sections below point here instead of repeating them.
 * **Tags** `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `certify`) on everything the launch creates that takes
   one: the instance, its volumes and spot request, a key pair, a security group.  The check at the end finds them by
   `Project`.
+* **The binaries come from the build cache, tested.**  A machine does not build what a machine has already built and
+  tested: `setup.sh` takes the release binaries of the commit from S3 (section 15), and builds only what the job needs
+  (`BUILD`) when the cache has none.  The release suite runs once a commit and CPU, on one machine, on every vCPU,
+  before the binaries are stored (`RELEASE_TESTS=1`); a failing suite stores nothing and the job does not start.
 * **The root volume is deleted on termination**, so what must outlive the instance is copied off it first (`S3_DEST`
   or `rsync`, sections 5 and 6).
 * **At the end**, once the results are home: terminate the instance, and confirm that nothing of the project is left,
@@ -108,7 +115,8 @@ The files in this directory:
 |---|---|
 | `env.sh` | settings and helpers the scripts share (paths, defaults, `env_report`); sourced, not run |
 | `run.sh` | what the long runs share (one at a time, log, pid, deadline, S3 saves, clean stop, power-off); sourced |
-| `setup.sh` | packages, Rust, the checkout, the builds (`target-cpu=native`; the solver and the prover), smoke checks and the tests; idempotent |
+| `setup.sh` | packages, Rust, the checkout, the binaries (from the build cache, or built with `target-cpu=native`: `BUILD` says what; section 15), smoke checks and the tests; `RELEASE_TESTS=1` runs the release suite and stores the binaries; idempotent |
+| `build_cache.py`, `run_tests.py` | what `setup.sh` calls (section 15): the cache of tested binaries in S3, keyed by commit, architecture and CPU; the release suite with every test a process of its own on every CPU |
 | `scaling.sh` | the scaling sweep (`--engine`: the engine benchmark; `--pauses`: the cost of checkpoints; `--quick`) |
 | `chain.sh N` | the production run: the chain 1..N in a loop, a window of games in flight (`WINDOW`), resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
@@ -120,6 +128,7 @@ The files in this directory:
 | `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command |
 | `wall-node.sh`, `wall-policy.json` | what each machine of that group does from boot to the end of the run; the one permission the machines need |
 | `test/run.sh` | tests of `chain.sh`'s wall and ledger, `wall-node.sh`, `wall.sh` and `sweep.sh` against a stand-in for aws (no cloud) |
+| `test/test_build_cache.py`, `test/test_run_tests.py`, `test/test_setup.py` | tests of the build cache (a directory for the bucket, and the stand-in for aws), of the release suite's runner (a toy crate) and of `setup.sh`'s build logic (a stand-in for cargo); no cloud, no release build |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 2) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
@@ -217,7 +226,8 @@ rerunning `chain.sh` with a larger N later continues the same file.
   CPU name (`neoverse-v2` on Graviton4), not `generic`.  That line is the only place the log names the CPU there: a
   known gap of `env_report`, which greps `lscpu` for `^Model name`, while on Graviton4 with Amazon Linux 2023 `lscpu`
   prints only `BIOS Model name: AWS Graviton4`, so the logs have no model line.  The gain of `native` has not been
-  measured on Graviton (expect 0 to 3 %; on the M1 it measured 0 %).
+  measured on Graviton (expect 0 to 3 %; on the M1 it measured 0 %).  The build cache (section 15) keys its binaries by
+  the CPU that `native` resolved to, so a machine takes only binaries built for its own CPU.
 * **Profile-guided optimization** (PGO) is optional: `rust/tools/pgo.sh` makes the build (its header says how; on the
   M1 it adds 0 to 2 % now, see [DESIGN.md](../../DESIGN.md#10-performance)).  PGO changes code
   generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
@@ -314,7 +324,9 @@ speed; the scaling numbers of a container on a laptop mean nothing for the cloud
    `setup.sh` installs packages, installs Rust with rustup if there is none (stable, at least 1.89), builds with
    `RUSTFLAGS="-C target-cpu=native"`, replays `optimal.json`, runs both result verifiers on the committed files, runs
    `taxman regress --to 400`, and runs `cargo test -- --test-threads=4`.  Its output is also in
-   `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick up new commits.
+   `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick up new commits.  In a clean checkout at a
+   commit it first looks for that commit's tested binaries in the build cache and, finding them, builds nothing
+   (section 15); `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` is how they get there.
 3. In `tmux new -s tx` (detach with Ctrl-b d, return with `tmux attach -t tx`), run the sweep:
 
    ```
@@ -947,6 +959,8 @@ scripts is a pushed branch, cloned, or a `git archive` tarball in the bucket, si
 dnf install -y git tmux                                              # as root; setup.sh would do it with sudo
 git clone https://github.com/bvchess/taxman.git && cd taxman           # BRANCH=... for another branch
 PROVER_ONLY=1 rust/tools/cloud/setup.sh                              # 46 s on a c8g.4xlarge, 10 s of it the build
+                                                                     # (BUILD_PROVER="--bin exact" builds `exact` alone; with
+                                                                     # the commit in the build cache, nothing: section 15)
 # ... the rehearsal below ...
 cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
     S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 rust/tools/cloud/prover.sh 1301 2175"
@@ -1509,7 +1523,7 @@ it no machine is launched, and the run waits).
 | `wall.sh` | your machine | `launch`, `status`, `stop`, `cleanup`: every aws command it runs is printed (`+ aws ...`), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
 | the launch template `taxman-wall`, the security group `taxman-wall` (no inbound rule), the group `taxman-wall` | the account | one `c8g.16xlarge` (or `INSTANCE_TYPE`) at spot, lowest price first among the zones (`SpotAllocationStrategy=lowest-price`, one pool), capacity rebalancing off, `min 0, max 1`, EC2 health checks, tags `Project=taxman`, `Purpose=wall` |
 | the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts `wall-node.sh` in a tmux session `tx` as `ec2-user`; if any of that fails after five tries it records the end and takes the group to 0 |
-| `wall-node.sh` | each machine | restores the logs, then `setup.sh` (no tests; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means (12.1) |
+| `wall-node.sh` | each machine | restores the logs, then `setup.sh` (the solver alone, `BUILD=--bin taxman`: from the build cache if it has the commit, tested; no tests of its own; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means (12.1) |
 | `run.sh`'s ledger | each machine | the budget and the date (below) |
 | `wall-policy.json` | the role `taxman-ec2` | the machines may set the capacity of this one group and read groups (12.3) |
 | `test/run.sh` | your machine | the tests of these scripts against `test/bin/aws`, a stand-in over directories |
@@ -1520,7 +1534,7 @@ and `run/`:
 
 | object | holds |
 |---|---|
-| `run/config` | the settings, written by `launch`: `COMMIT`, `INSTANCE_TYPE`, `CHAIN_TO`, `WINDOW`, `GAME_HOURS`, `BUDGET_HOURS`, `RUN_UNTIL` (seconds since the epoch), `THREADS`, `EXTRA_ARGS`, `CHECKPOINT_INTERVAL`, `SAVE_EVERY`, `LEDGER_MARGIN`, `MAX_INSTANCES`, `PRICE`; every machine reads it, so a budget or a date changed there (by `launch --continue`) reaches the next machine |
+| `run/config` | the settings, written by `launch`: `COMMIT`, `INSTANCE_TYPE`, `CHAIN_TO`, `WINDOW`, `GAME_HOURS`, `BUDGET_HOURS`, `RUN_UNTIL` (seconds since the epoch), `THREADS`, `EXTRA_ARGS`, `CHECKPOINT_INTERVAL`, `SAVE_EVERY`, `LEDGER_MARGIN`, `MAX_INSTANCES`, `PRICE`, and `RELEASE_TESTS` and `REQUIRE_CACHED` if the environment of `launch` had them (12.4); every machine reads it, so a budget or a date changed there (by `launch --continue`) reaches the next machine |
 | `run/ledger` | `start` (the run's first start), `boot` (the boot id of the machine that wrote it last), `base` (the instance-hours of the machines before it), `hours` (base plus its uptime), `updated` |
 | `run/boots/*` | one object a machine that started |
 | `run/ended`, `run/stop` | the end, and the request of `wall.sh stop` |
@@ -1571,9 +1585,21 @@ The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 ins
 spot ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` is the header of the script (every option has an
 environment variable).  It prints the files (the user data, the config, the mixed instances policy) and each command
 before it runs it: the config to S3, the policy, the security group, the launch template, the group at capacity 0, the
-scheduled action, and last the capacity 1 that starts the first machine.  The first machine takes about 10 minutes to
-install, build and start the chain on 64 cores (`setup.sh` builds the solver and the prover and runs its smoke checks;
-section 3 says 5 to 10 minutes on a small instance, with the tests).
+scheduled action, and last the capacity 1 that starts the first machine.  Each machine runs `setup.sh` for the solver
+alone (`BUILD=--bin taxman`) and its smoke checks, and starts the chain.  With the commit's tested binaries in the build
+cache (section 15) it builds nothing, and every machine of the run, the replacements after an interruption included,
+takes the same binary; without them it builds the solver (a few minutes on 64 vCPUs, untested, nothing stored).
+Two settings of the environment of `launch`, `RELEASE_TESTS` and `REQUIRE_CACHED`, go into the config for `setup.sh`
+on each machine (section 15); neither is set by default.
+
+* **Release first**, once for the commit on the CPU of the run (any `c8g` will do: the key is the CPU, not the size):
+  `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` on one machine, as section 15.3 says, or `RELEASE_TESTS=1` in the
+  environment of `launch`, which has the first machine of the run do it before the chain starts (the solver's suite
+  only, since the machine builds `taxman` alone: its entry serves the run, and not a launch of anything else).  A suite
+  that fails ends the run (`ended`: `setup.sh failed`) with `RELEASE_TESTS_FAILED`, the failing tests, in the run's
+  prefix in S3.
+* `REQUIRE_CACHED=1` makes a machine without tested binaries in the cache end the run instead of building them: use it
+  after a release, so that nothing untested runs for the hours of the run.
 
 ```
 rust/tools/cloud/wall.sh status          # the run, the ledger, the group, the last game done, the latest progress line
@@ -1802,7 +1828,7 @@ The work of 3441..8191 at `GAME_SECONDS` 180, by `sweep_plan.py`'s sizes: 4,751 
 238 of search, so at most **314 core-hours: 4.9 hours of 64 CPUs**, in 64 blocks of 4.83 to 4.97 core-hours each (the
 first of 95 games, 3441..3535, the last of 50, 8142..8191).  A `c8g.16xlarge` at spot was $0.66 to $0.81 an hour on
 2026-10-17 (counted at $0.676 in section 12): **about $3.3 for pass 1** at the cost of an hour, a build of about 10
-minutes, and the later passes, a fraction of the first (only the games that gained something); a deadline of 8 hours
+minutes (none from the build cache, section 15), and the later passes, a fraction of the first (only the games that gained something); a deadline of 8 hours
 (`DEADLINE_HOURS`) bounds the machine at about $5.4, and the 40 GB volume is a few cents.  The estimate is an upper
 bound for pass 1 (a game that is settled by a repeat or the prime formula costs its setup alone), and the setup times
 past 4000 are extrapolated from four measured points.  What finishes in 180 s past 3441 is not measured: most searches
@@ -1832,14 +1858,15 @@ sudo -u ec2-user git clone https://github.com/bvchess/taxman.git /home/ec2-user/
 sudo -u ec2-user git -C /home/ec2-user/taxman checkout COMMIT
 sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
     'export S3_DEST=s3://taxman-013764204840-us-east-1/sweep-3441-8191
-     SKIP_TESTS=1 NO_PULL=1 rust/tools/cloud/setup.sh &&
+     BUILD="--bin taxman" REQUIRE_CACHED=1 SKIP_TESTS=1 NO_PULL=1 rust/tools/cloud/setup.sh &&
          { rust/tools/cloud/save.sh --restore; DEADLINE_HOURS=8 POWEROFF=always GAME_SECONDS=180 \
                rust/tools/cloud/sweep.sh 3441 8191; }
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
-`setup.sh` builds the solver with `target-cpu=native` and runs its smoke checks (about 10 minutes on 64 vCPUs); the
-chain-style commands of section 5 then apply: `tail ~/taxman-work/logs/sweep.log` (one status line every
+`setup.sh` takes the solver from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, section
+15.3, or the machine ends at once; without it a miss builds the solver with `target-cpu=native`, a few minutes on 64
+vCPUs, untested) and runs its smoke checks; the chain-style commands of section 5 then apply: `tail ~/taxman-work/logs/sweep.log` (one status line every
 `STATUS_EVERY` seconds: the pass, the blocks done, the lines in the merged file), `ls ~/taxman-work/logs/sweep-*.err` for
 a block's own log, `kill -TERM $(cat ~/taxman-work/sweep.pid)` to stop cleanly (the games in progress have no line; the
 others are merged and saved), and the same command to go on after a stop or an interruption (on a replacement machine:
@@ -1874,10 +1901,10 @@ climbs from each board it proves (the board above, and the board below, are sear
 `CLIMB_LIMIT` seconds, 60 by default; [the entry's section on it](../../docs/experiments/the-ledger-bounds-from-both-sides-2026-10.md#later-2026-10-17-wedge-and-climb)),
 and a launch with the climbs needs Brian's approval (the [rules for every launch](#rules-for-every-launch)).
 
-**Cost.**  The build of `setup.sh` (about 10 minutes), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the
-searches still going when it is spent, each limited to the budget left over the workers), the report (a minute):
-about 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour), about $3.3 on demand; the timer of 150 minutes bounds
-it at about $1.7 at spot.  The 40 GB volume is a few cents.
+**Cost.**  The build of `setup.sh` (about 10 minutes, or none with the commit's binaries in the build cache, section
+15), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the searches still going when it is spent, each limited to the
+budget left over the workers), the report (a minute): about 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour),
+about $3.3 on demand; the timer of 150 minutes bounds it at about $1.7 at spot.  The 40 GB volume is a few cents.
 
 **Launch** as in section 13.3, with `Purpose=ledger` and this user data (`COMMIT` the pushed master that has the
 ledger, `DATE` the day):
@@ -1888,11 +1915,17 @@ shutdown -h +150
 export AWS_DEFAULT_REGION=us-east-1
 dnf install -y -q git tmux
 sudo -u ec2-user bash -lc 'cd ~ && git clone -q https://github.com/bvchess/taxman.git && cd taxman &&
-    git checkout -q COMMIT && SKIP_TESTS=1 rust/tools/cloud/setup.sh > ~/setup.log 2>&1'
+    git checkout -q COMMIT'
 sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman/rust \
-    'S3_DEST=s3://taxman-013764204840-us-east-1/ledger-DATE POWEROFF=1 bench/ledger/cloud.sh 2176-3440;
-     sudo shutdown -h now'
+    'export S3_DEST=s3://taxman-013764204840-us-east-1/ledger-DATE
+     BUILD="--bin taxman --example ledger" REQUIRE_CACHED=1 SKIP_TESTS=1 tools/cloud/setup.sh > ~/setup.log 2>&1 &&
+         POWEROFF=1 bench/ledger/cloud.sh 2176-3440;
+     sudo shutdown -h now'                          # also if the setup failed
 ```
+
+The setup is a step of the tmux session now, after the job's `S3_DEST` is exported and before the job, so that a
+setup that fails (no tested binaries in the cache with `REQUIRE_CACHED=1`, or, with `RELEASE_TESTS=1` in its place, a
+suite that fails: `RELEASE_TESTS_FAILED` in `S3_DEST`) ends the machine and the job never starts.
 
 **Options.**  The environment of `bench/ledger/cloud.sh` has the options (`WORKERS`, `CPU_HOURS`, `BASE`, `MAX_LIMIT`,
 `PROVEN`, and for the climbs `CLIMB`, their ways: `up`, `down`, `both` or `off`, unset the program's `both`; and
@@ -1943,4 +1976,123 @@ replacement machine, with `S3_DEST/out` copied back to `~/ledger` first).  Home:
 bench/ledger/cloud-DATE/ --exclude 'run/ckpt/*'`, then on the laptop `target/debug/examples/ledger report
 bench/ledger/cloud-DATE/run --known results/strict.jsonl` and `bench/ledger/events.py bench/ledger/cloud-DATE/run`;
 then the end of the rules for every launch.
+
+## 15. The build cache and the release suite
+
+A machine that needs the solver does not build it when a machine has already built and tested it: `setup.sh` takes the
+release binaries of the commit from S3.  The build is the dearest part of a start (about 10 minutes, with fat LTO and
+one codegen unit, which stay: the speed of the programs matters more than build minutes), and a run that is replaced
+after an interruption pays it again on every machine.  Nothing untested is stored, so a hit starts the job at once.
+Built, and tested on the laptop (below); **not yet run on EC2**.
+
+### 15.1 The key and the layout
+
+```
+s3://taxman-013764204840-us-east-1/builds/COMMIT-ARCH-CPU/SET/binaries.tar.gz
+                                                          /manifest
+s3://taxman-013764204840-us-east-1/builds/test-times.json
+```
+
+* **COMMIT** is `git rev-parse HEAD` of a clean checkout: no uncommitted change and no file git does not know of (build
+  outputs are ignored files and do not count).  **ARCH** is `uname -m`.  **CPU** is the CPU the build targets, which for
+  `-C target-cpu=native` (the default of `env.sh`) is the name the compiler reports (`rustc --print target-cpus`:
+  `neoverse-v2` on Graviton4), because that flag makes a binary for the CPU that builds it; no flag is `generic`.
+  `RUSTFLAGS` other than empty or one `-C target-cpu=...` is not in the key, so it bypasses the cache.  A dirty
+  checkout, no commit (a copy without `.git`), no `aws` command or no credentials, or `BUILD_CACHE=off` is a miss that
+  says why, and the build goes on as before.  The cache is never read or written then.
+* **SET** is what the tarball holds, named by its parts: `solver-bin-taxman+solver-example-ledger`,
+  `prover-bins+prover-examples+solver-bins+solver-examples` (everything: the default of `setup.sh`).  An entry serves a
+  request it covers: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or `--examples`.  So the entry
+  of the release, which is everything, serves any `BUILD`; an entry of a few binaries serves only those.  An entry is
+  never completed: a request that no entry covers builds what it needs, and nothing is stored.
+* **binaries.tar.gz** holds the executables only (paths relative to the checkout: `rust/target/release/taxman`,
+  `.../examples/ledger`, `rust/prover/target/release/exact`), not the objects, libraries or cargo's hash-named copies.
+  **manifest** (`key=value` lines, uploaded last: an entry without one does not exist) has the commit, architecture, CPU,
+  `RUSTFLAGS`, `rustc`, host and time of the build, the **sha256** of the tarball, the parts (`set=`), and the suite's
+  result: `tests=passed`, `tests_solver=608 passed, 0 failed, 138 ignored`, its seconds and the tests at once.  Only an
+  entry with `tests=passed` is used.  `test-times.json` is how long each test took last time, for ordering (15.2).
+* A download is **checked**: the tarball's sha256 against the manifest's before anything is unpacked, and every member of
+  the tarball must be a file under a crate's `target/release`.  A mismatch is a miss (the build goes on) and says so.
+* `aws s3 ls builds/` lists the commits; `aws s3 cp .../manifest -` says what an entry is.  Old entries are deleted by
+  hand (a deletion in the bucket is Brian's yes first, like every change there); they cost cents.
+
+### 15.2 How a launch uses it, and what it builds
+
+`setup.sh` looks for an entry that covers the set it was asked for (`BUILD`) and, finding one, downloads, checks and
+unpacks it, builds nothing, and goes on to the smoke checks (they show that this machine runs the binaries).  Finding
+none, it builds the set and does not store it.  `REQUIRE_CACHED=1` turns that miss into an error, for a launch that must
+run only tested binaries: the user data of 12.4, 13.3 and 14 use it, so that a commit that has not been released ends the
+machine at once and costs minutes, not a run of untested binaries.
+
+**Build only what a run needs**, with `BUILD`, cargo's arguments for `rust/` (`--bins`, `--examples`, `--bin NAME`,
+`--example NAME`; default `--bins --examples`, as before).  A `BUILD` leaves the prover out, unless `BUILD_PROVER` asks for
+it (the same for `rust/prover/`; `none` for none; `PROVER_ONLY=1` is the prover alone, as before); the smoke checks of a
+part that is not built are left out.  What the jobs need:
+
+| job | `BUILD` |
+|---|---|
+| the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
+| the ledger (14) | `--bin taxman --example ledger` |
+| the node-choice measurement | `--bin taxman --example wall --example perf` |
+| the scaling sweep (`scaling.sh`) | `--bin taxman --example ladder` |
+| the prover's proofs (9) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
+
+`taxman` is there for the smoke checks.  A machine of 32 CPUs or more builds the solver and the prover at the same time
+(each has fewer binaries to link than the machine has CPUs, and every link is a single thread); a smaller one builds them
+in turn.  Nothing passes `-j` to cargo, so every build and every test build uses every CPU.
+
+### 15.3 The release: the suite, then the cache
+
+The release is `RELEASE_TESTS=1 rust/tools/cloud/setup.sh` on **one machine, once for each commit and CPU**, with the
+default `BUILD` (everything, so that every smaller request hits it).  It is a launch under the rules at the top: a
+`c8g.16xlarge` on spot for about 10 to 20 minutes, **about $0.15 to $0.25**, Brian's yes first.  Any size serves (the key
+is the CPU, which every `c8g` shares); the suite gains nothing past about 64 vCPUs.
+
+```
+export S3_DEST=s3://taxman-013764204840-us-east-1/release-COMMIT       # where a failure is reported
+RELEASE_TESTS=1 NO_PULL=1 rust/tools/cloud/setup.sh                     # in the clone checked out at COMMIT
+```
+
+In order: a hit ends it ("the binaries come from the build cache": nothing to run).  On a miss it builds everything, runs
+the smoke checks, then the **whole release suite of every crate built**, then stores.  If the suite fails, **nothing is
+stored**, `setup.sh` exits 1 (so a user data that chains the job with `&&` does not start it), and the failing tests are
+in `~/taxman-work/logs/release-tests.txt` (also saved with the logs) and, when `S3_DEST` is set, in
+`$S3_DEST/RELEASE_TESTS_FAILED`.  With the cache unusable (a dirty checkout, `BUILD_CACHE=off`) the suite still runs and
+nothing is stored.  `RELEASE_TESTS=1` in a job's own environment is the same on the job's first machine: it releases
+what it needs before starting; `TEST_JOBS` and `TEST_TIMEOUT` (3600 s a test) adjust the suite.
+
+**How the suite runs** (`run_tests.py`; `cargo test` runs the test binaries one after another, and a long test in one
+leaves the other CPUs idle).  It builds the test executables of both crates at once (`cargo test --release --no-run
+--message-format=json`, which names them all), lists each one's tests (`--list`, leaving out the `#[ignore]`d ones
+that `cargo test` also leaves out, `--list --ignored`), and runs **every test as a process of its own** (`--exact NAME`),
+as many at once as there are CPUs, over all the binaries together: the tests with no time on record first, then the
+longest first (`test-times.json`, rewritten after each run, kept in the cache), so that the longest does not start last.
+The doc tests run as `cargo test --doc`.  A failing test does not stop the others (as `--no-fail-fast`); each is run
+once more alone afterwards, to say in the report whether it fails only in company.  A test that outlasts `TEST_TIMEOUT`
+is killed and fails.  Every test in its own process is stricter than threads of one process (no shared statics, no
+leftover environment) and costs each test its own start; the suite passes that way (below).  Tests that start a thread
+per CPU themselves share the machine with all the others, so a test that depends on its speed shows it: lower
+`TEST_JOBS` to see whether that is it.
+
+**Time**, by estimate for 64 vCPUs (measured on the laptop, below): the tests themselves about 30 to 60 seconds, the
+build of the test executables 3 to 5 minutes (the release profile, one codegen unit each: the library first, then the 35
+test executables side by side), so **4 to 6 minutes in all, against 13.5 minutes on the laptop**, where the test
+binaries run one after another.  The build is most of it.  **Measured** on the laptop, with the test profile (`cargo test`
+without `--release`), 5 tests at once, niced: the solver's 608 tests (138 ignored) and the prover's 41 passed in 73 s,
+276 CPU seconds in all, the longest test 24 s (so 64 CPUs cannot take less than that); a second run orders by the first's
+times.
+
+### 15.4 What was tested, and what was not
+
+On the laptop (macOS, bash 3.2 and 5): `python3 -I test/test_build_cache.py` (the key, the dirty and the commit-less
+refusals, other `RUSTFLAGS`, which entry serves which request, a corrupted tarball, an entry without its manifest or its
+passed suite, a build that lacks a file, a stranger in the tarball, the same through the stand-in for aws),
+`python3 -I test/test_run_tests.py` (a toy crate: a failure, an ignored test, a doc test, a timeout, the order, a build
+that fails), `python3 -I test/test_setup.py` (`setup.sh` with a stand-in for cargo: what `BUILD` builds, a hit and a miss,
+the release suite on a pass and on a failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once), and
+`test/run.sh node launch` (the settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both
+crates in the test profile; no release build was made on the laptop.  **Not run on EC2**: the S3 commands against S3
+(the listing's format, credentials from the instance profile, the transfer times), the release profile's build of the
+tests, and the suite at 64 processes at once.  The first release is its test: read its log for the build and suite
+times and the report for any test that fails only in company.
 
