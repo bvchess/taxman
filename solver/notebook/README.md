@@ -7,8 +7,8 @@ numbers.  Entries are dated by month (the whole record so far is from 2026-10 un
 name the commits that made each step, so `git show COMMIT` finds the code.  Statements are true of the code at the
 time of the entry; where a later entry changed the picture it says so, and DESIGN.md is the authority on the present.
 
-Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary of the
-README](../frame/README.md#7-glossary) and in DESIGN.md; the measurements were made with the ladder, the probe and
+Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary](../../docs/GLOSSARY.md) and in
+DESIGN.md; the measurements were made with the ladder, the probe and
 `taxman bench`, which DESIGN.md ("Performance") describes.
 
 * [Terms changed](#terms-changed-2026-10): the old words of the dated entries, and the words that replaced them.

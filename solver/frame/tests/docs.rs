@@ -517,7 +517,7 @@ fn unzips_moves_are_mandatory_not_forced() {
             }
         }
     }
-    assert!(found.is_empty(), "say \"mandatory move\" for unzip's moves (README, glossary):\n{}", found.join("\n"));
+    assert!(found.is_empty(), "say \"mandatory move\" for unzip's moves (docs/GLOSSARY.md):\n{}", found.join("\n"));
 }
 
 /// A word or phrase that the guides and comments no longer use, and what they say instead.

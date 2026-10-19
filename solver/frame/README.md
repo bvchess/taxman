@@ -8,9 +8,10 @@ solver got to 1000).  A second program, the prover ([solver/noframe/](../noframe
 frame model, so far to 2175.  Below, "the solver" is the frame solver.
 
 This page is the user guide: what the frame solver computes and what "optimal" means here, how to build and run it, how
-to read its output, why its answers can be trusted (and what they assume), the project's vocabulary,
-and where to start reading the code.  The design is in [DESIGN.md](../docs/DESIGN.md) and the measurements behind it in
-[solver/notebook/README.md](../notebook/README.md); this page links there instead of repeating them.
+to read its output, why its answers can be trusted (and what they assume), and where to start reading the code.  The
+design is in [DESIGN.md](../docs/DESIGN.md), the measurements behind it in
+[solver/notebook/README.md](../notebook/README.md) and the project's words in the [glossary](../../docs/GLOSSARY.md);
+this page links there instead of repeating them.
 
 * [1. What it solves](#1-what-it-solves)
 * [2. Build, test, run](#2-build-test-run)
@@ -51,7 +52,7 @@ tenfold per about 1,040 in n, with about a decade of scatter
 ### How the solver sees the game (the frame model)
 
 1. Every number above n/2 divides nothing else on the board, so it can only be a move, never tax: these are the
-   *sources* (played unless they are found impossible, see the glossary).  Every other number is a *factor*: it
+   *sources* (played unless they are found impossible, see the [glossary](../../docs/GLOSSARY.md#the-frame-model)).  Every other number is a *factor*: it
    can be tax for a larger number, and sometimes a move itself.
 2. A move m is paid for by one of its *maximal factors* m/p (p a prime dividing m); a factor can pay for one move.
    Maximal factors are enough although the game takes *every* divisor of a move: if some proper divisor d of m is
@@ -525,7 +526,7 @@ n=4754  score=7106699   known   nodes=0               0.147 s  optimal unknown  
 ```
 
 Board size; score (for an incomplete game, the best found so far); the method (`trivial`, `prime`, `repeat`,
-`search`, `known`); search nodes (steps, see the glossary); seconds for the game in this invocation; how it compares
+`search`, `known`); search nodes (steps, see the [glossary](../../docs/GLOSSARY.md#the-search)); seconds for the game in this invocation; how it compares
 with `optimal.json` (`optimal ok`: equal; `optimal unknown`: the table has no game of n; `incomplete`; a score that
 differs is a hard error, which stops the run naming the game); the proof kind, for `same_search` the game whose search
 it repeats and for `known` the source it cites; and what the proof assumes, if anything (section 5).
@@ -779,155 +780,8 @@ replaces, and of the module comment of `src/solver.rs`, which gives the checks o
 
 ## 7. Glossary
 
-Words that mean more than one thing in this code base are marked **(overloaded)**, with each meaning.  Words used
-inside one part of the code are defined where they are used, not here: the setup's (`unzip`, mandatory moves, claimed
-factors) in the module comment of `src/frames/mod.rs`; the peel, `reduce` and the home frame in `src/model/`; the
-bounds' internals (potentials, weight splits, contraction, refinement, refits) in [DESIGN.md, section
-4](../docs/DESIGN.md#4-the-search); the engine's (units, splits, steals, spills, pauses) in [section
-6](../docs/DESIGN.md#6-engine) and the module comment of `src/engine.rs`; the fields of the progress line in section 4 above;
-the Java's and the wiki's own words, mapped to these, in [DESIGN.md](../docs/DESIGN.md#the-java-solver-and-the-frame-solver).
-
-### The game
-
-* **board, pot, n**: the numbers 1..=n; the pot is what is still on it during a game.  In the code `board::Board` is a
-  board analysed for the search: its tables, frames, candidates and `in_the_bag`.
-* **move, tax**: a number the player takes, and the divisors the taxman takes with it.
-* **score, opt(n), optimal game**: the sum of the player's moves; the best score on the board 1..=n; a game that
-  scores it.
-* **maximal factor** of m: m/p for a prime p dividing m (a divisor reached by deleting one prime).  Its inverse is the
-  **maximal composite**; the **maximal factor graph** joins each number to its maximal factors.  A move is playable if
-  one of its maximal factors is still in the pot (equivalent, on a board without holes, to "some divisor is": the
-  lifting argument in `src/numtheory.rs`).
-
-### The frame model
-
-* **source**: a number with no maximal composite (every number above n/2): never tax, and played unless it is found
-  impossible (below).  **factor**: any number that is not a source.
-* **frame**: a connected group of sources together with all the factors they compete for (sources that share a factor
-  are in one frame).  Setup simplifies the frames, numbers the ones that have freedoms by layer, from the front (0 is
-  played first), and merges those with the same number, so that a promotion always has one frame to go to; the search works
-  on the merged frames.  In the code a frame is `frames::Frame` as setup forms it (`frames::BoardFrames` holds all of a
-  board's) and `model::Frame` as the search takes it (`frames::SearchFrames` holds those).
-* **front, back**: frame X is in front of frame Y (and Y behind X) when a number of Y has a maximal factor in X, that
-  is, when Y's numbers are multiples of X's.  Frames in front are played first, so frame 0 is the front, and a
-  promotion moves a factor of frame h to a move of frame h - 1, one frame forward.
-* **Taxman Mini**: the game a frame plays: a set of moves and a set of factors; each move must still have one of its
-  maximal factors in the frame when taken, and taking it removes all of its factors still there.
-* **impossible**: a source that cannot be played together with the sources already kept (found greedily from the
-  largest).  Impossible sources are dropped from the frame's moves.
-* **freedoms**: a frame's factors minus its moves: how many factors it can spare.  A promotion into or out of the frame
-  uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
-* **winnable**: some order takes every move of a frame.  A **peel** tests it ([DESIGN.md, section
-  2](../docs/DESIGN.md#2-the-game-and-the-frame-model)).
-* **promotion, promote**: play a factor as a move: take it out of its frame's factors and make it a move of the frame
-  in front of it.  Legal when both frames stay winnable.
-* **candidate** **(overloaded)**: (1) a number setup says could be promoted (`SearchFrames::candidates`,
-  `BoardFrames::promotion_candidates`); (2) `cands` in a search node: the candidates the node's loop still has to try;
-  (3) a vertex role in the matching graph: a number that may be matched as a promoted mover, may pay for one behind it,
-  or stay free.
-* **promotion set, promotable**: a set of candidates that can be promoted together from the root, keeping every frame
-  winnable and its freedoms at least 0.  The score of a game of the model is `in_the_bag` plus the sum of its promotion
-  set.
-* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.
-* **max_total** (`maxTotalPromotions`): the most promotions the frames' freedoms allow.
-* **the frame model**: this decomposition (section 1), exact given that the statement U holds (section 1, "What
-  optimal means").  `model::FrameGraph` is the immutable factor graph and home frames, not "the model".
-* **layer**: the number of prime factors of a number, counted with multiplicity; a frame's layer is its sources'.  The
-  frames in front of a frame lie one layer lower, and frame h is the frames with freedoms of the lowest layer that has
-  some, plus h.
-* **clean numbering** (N): every frame with freedoms directly in front of frame h is frame h - 1.  The numbering by
-  layer is clean by construction, and on every board the solver supports it is the Java's numbering (breadth first
-  from the front).
-
-### The search
-
-* **tactic**: a switchable piece of the algorithm (`--tactic`).  **sound / proven**: the grading in
-  [DESIGN.md](../docs/DESIGN.md#5-tactics); every tactic is one or the other.
-* **node, step**: a search node is a set of promotions made from the root plus the candidates left; the `nodes` that
-  results and progress lines count are *steps*, one per candidate a node's loop tries.
-* **incumbent**: the best promotion set found so far, shared by all threads.  **greedy**: promote every candidate that
-  can be, from the largest down; the search starts from the best of that, the previous game's promotions and a rounding
-  of the root's matching ([DESIGN.md, section 4](../docs/DESIGN.md#the-starting-incumbent-the-ceiling-and-the-seed)).
-* **GF(2) bound** (`gf2`, the default): what no completion of a node can exceed, from the heaviest set that is
-  independent in two matroids over GF(2), one for the even frames and one for the odd ones (docs/THEORY.md,
-  Theorem 11; DESIGN.md, section 4).  **matching bound** (`gf2=off`): winnability relaxed to matchability, the largest
-  sum of promotions such that every move and every promoted number gets a distinct maximal factor in its frame, a
-  maximum-weight bipartite matching kept along the search path (`matchbound`).
-* **conflict**: a subset of a promotion set that cannot be promoted together from a state.  Every completion leaves out
-  one of its members.  **nogood**: a conflict of the *root* learned from a conflict found at a node; valid at every
-  node, any thread, any path.  Each searcher keeps a table of them and forgets it every 50,000 of its steps
-  (`forget_nogoods`).
-* **strong branching**: which candidate a node promotes next: the member of the conflict whose removal lowers the
-  bound most (with `gf2`, exactly for each member: read off the exchange graph of the heaviest set where that
-  certifies it, solved where not).
-* **forced member**: a member of a node's heaviest set whose removal alone brings the bound below what the node
-  needs, so every completion that beats the incumbent promotes it (tactic `fix_forced`: the child promotes all of them
-  together).
-* **prime exchange, symmetric pair**: exchanging two primes `p < q` in every number; a pair whose exchange maps the
-  root's frames and candidates onto themselves is *symmetric*, and maps promotion sets to promotion sets worth
-  `(q − p)(c_p − c_q)` more (`c_r` the sum of a set's cofactors `x / r`), so every heaviest set keeps `c_p ≤ c_q`
-  for every symmetric pair (docs/THEORY.md, Theorem 13).  The search cuts a node none of whose completions
-  can keep them, and drops the candidates none that does holds (tactic `symmetry`; DESIGN.md, section 4).
-* **dual bound**: what a search that a limit stopped proves from above: the largest of its incumbent and, over the
-  open units of its final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
-  docs/THEORY.md, Lemma D).  Stopped before its first node, it is the root's bound.
-
-### Results and trust
-
-* **chain**: games each built from the one before (n = 1, 2, 3 ...): a game's search starts from the previous game's
-  promotions and stops at its ceiling.  A game solved with no predecessor is *standalone*.
-* **window** **(overloaded)**: (1) the games of a range in flight at once (`--window K`, `solver::window`; section 3,
-  "Games in flight"): a search started before the game before it is proven is *speculative*, seeded from that game's
-  *provisional game* (its best so far), and a speculative search may be *deferred* (not started while the ceiling
-  that its provisional game gives would settle it) or *suspended* (its workers taken for the oldest game, its units
-  kept); (2) the eight board sizes before a game among which it looks for one whose search it repeats
-  (`SAME_SEARCH_WINDOW`); (3) the probe's windows, a checkpoint resumed for 50,000 steps (DESIGN.md, "Performance").
-* **ceiling**: `n + score(n-1)`, which no game of n can exceed; a score that reaches it needs no search to prove (it is
-  recorded as a `results::CeilingProof`).  As a bound on the promotion *sum* it is `n + score(n-1) - in_the_bag`, which
-  the results lines and the tactic call `cap` (proof `cap`, `reached_cap`, `setup.cap`, tactic `prev_cap`).
-* **prime formula**: for a prime n, the game of n - 1 with its first move replaced by n (tactic `prime_shortcut`, proof
-  `prime_formula`).
-* **search problem, digest, repeat**: what a game's setup gives the search, in a canonical form (`search::Problem`:
-  the frames, the candidates, `max_total` and the factor graph among their numbers), and a 64-bit digest of it
-  (`setup.digest`).  A game whose problem an earlier game posed and settled *repeats* its search: the tactic
-  `same_search` concludes it with that game's promotions (method `repeat`, proof `same_search`).
-* **proof (kind)**: how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
-  `same_search`, `known` (section 5).  **assumes**: what a proof rests on beyond the frame model, inherited down the
-  chain; a game of n - 1 or of n taken from `optimal.json` (`--use-prev`) is assumed optimal, and a bound of the bounds
-  store assumes statement U at the boards it rests on (section 5).
-* **known game, known source**: a game that `--use-prev` takes from `optimal.json`, the committed chain
-  (`results/strict.jsonl`) or a board the bounds store (`results/bounds.jsonl`) has proven, instead of searching for it
-  (section 3, "Known games"; `src/known.rs`).  **bounds store**: the bounds on opt(n) that the ledger finds, a line
-  each, kept for good ([results/README.md](../../results/README.md#boundsjsonl); `src/store.rs`).
-* **optimal ok / optimal match**: the score equals `optimal.json`'s, the table built into the binary.  It is not a
-  proof, and does not exist above the table's last game; a score that differs is a hard error.
-* **referee**: code that checks a game or a results file independently of the code that made it: `game::replay`,
-  `taxman verify-results`, `solver/tools/check_results.py`.  **rejected**: a game that failed a check after it was found,
-  written to `<results>.rejected.jsonl`.
-* **results line, schema 5**: the format of a line of `--out` (section 4); this build reads no other.  Two words
-  survive only as field names there: `nodes` counts steps, and `prev.source` says where the game of n - 1 came from.
-* **checkpoint**: a periodic pause in which all workers stop and the engine writes the unexplored work, the incumbent
-  and statistics to `nNNNN.ckpt`; its **header** is what identifies the search (n, width, digests of candidates and
-  frames, `max_total`, the tactics).
-
-### Other programs and bounds
-
-* **the frame solver** (this crate, the binary `taxman`; "the solver" for short): a branch and bound over promotions
-  within the frame model, which finds the games.  **the Java solver** (not in the tree; the git tag `java-final` has it): the original, whose algorithm
-  the frame solver reimplements.  **optimal.json**: the table of optimal games, n <= 1300 (the Java's games 1 to 1000,
-  then those of the chain from n = 1, appended by `taxman extend-optimal`), built into the binary.
-* **the prover** ([solver/noframe/](../noframe/README.md)): a branch and bound over sets of moves on the whole board, which decides
-  playability by peel and uses only proven bounds; it proves that no set of moves beats a recorded score, with none of
-  the frame solver's code.
-  **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n);
-  `solver/tools/check_results.py` compares scores with it.  **parity bound**: the prover's sharper bound, from two matroids
-  over GF(2) split by the parity of Ω (docs/THEORY.md, Theorem 10).
-* **brute force**: `src/brute.rs`, the exhaustive search that is the test oracle for small boards.  **U\***:
-  the sources that setup keeps, by descending greedy on each frame; docs/THEORY.md's name for the heaviest
-  playable set of sources, which they are wherever the upper-half conjecture holds, so on every board to 100,000
-  ([solver/noframe/README.md, section 2](../noframe/README.md#2-conjecture--at-scale)).  **U**: the statement that some optimal
-  game plays every member of U\* with three or more prime factors, on which the frame solver's answers rest (section
-  1, "What optimal means").
+The project's glossary is a page of its own, [docs/GLOSSARY.md](../../docs/GLOSSARY.md): the words of the game, the frame
+model, the search, the bounds and the results, each with the one name the docs use for it.
 
 ## 8. Reading order and map of the documents
 
