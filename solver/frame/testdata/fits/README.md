@@ -1,10 +1,10 @@
 # The root fits
 
-`n{N}.json` is the fit of the A1 bound at the root of the board of `N`: the signings, the multipliers of the lowest L
-that the run evaluated, the final master's columns and its rank inequalities.  The format is specified by the module
-comment of [`examples/wall/fields/fit.rs`](../../examples/wall/fields/fit.rs) (`SavedFit`).  A file reads back
-(`SavedFit::load`) and gives its `bound` again at the root (`SavedFit::bound`); the run that wrote it asserted that
-first.  There are 52 files, 21 MB, made by the study of the A1 bound
+`n{N}.json` is the fit of the multi-field bound (A1) at the root of game `N`: the signings, the multipliers of the
+lowest L that the run evaluated, the final master's columns and its rank inequalities.  The module comment of
+[`examples/wall/fields/fit.rs`](../../examples/wall/fields/fit.rs) (`SavedFit`) specifies the format.  A file reads
+back (`SavedFit::load`) and gives its `bound` again at the root (`SavedFit::bound`), which the run that wrote it
+asserted first.  The 52 files, 21 MB, come from the study of the multi-field bound
 ([the entry](../../../notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) has the commands and
 the tables).
 
@@ -17,14 +17,14 @@ Two things read them by their place here:
 
 ## Where the fits come from
 
-* **E2's 17**: the main arm's 600 s run at the roots 2200 to 3400 by 100 and 3176, 3333, 3335 and 3336 (14 MB).  Five of
-  the 17 did not converge in 600 s (3100, 3176, 3300, 3336, 3400): their bounds are valid and their multipliers close
-  to the LP's.  The fits of the arm with a limit of 16 signings a frame (12 MB) were not kept: the study found the limit
-  of 8 the better at the dear roots.
+* **E2's 17**: the main arm's run of 600 s at the roots 2200 to 3400 by 100, and 3176, 3333, 3335 and 3336 (14 MB).
+  Five of the 17 did not converge in 600 s (3100, 3176, 3300, 3336, 3400): their bounds are valid and their
+  multipliers close to the LP's.  The study did not keep the fits of the arm with a limit of 16 signings a frame
+  (12 MB): it found the limit of 8 the better at the dear roots.
 * **The E3 pilot's two**, `n1215.json` and `n1472.json`
   ([the entry](../../../notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md)): the main arm,
-  certified, 300 s; every variant of a game started from its file.  They were written in the pilot's first format and
-  converted to this one with every value kept, so the pilot's trees and logs come out the same from them.
+  certified, 300 s; every variant of a game started from its file.  The pilot wrote them in its first format, and a
+  conversion to this one kept every value, so the pilot's trees and logs come out the same from them.
 * **U4's 33** (987 to 1352, apart from 1215): the roots of the slope test and of its patches
   ([the entry](../../../notebook/r3-and-the-slope-test-u4-of-a1-2026-10/README.md)): the main arm, certified, 60 s; all
   but 1350's converged.

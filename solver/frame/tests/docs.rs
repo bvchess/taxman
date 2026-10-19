@@ -599,7 +599,10 @@ const REWRITTEN: &[&str] = &[
     "README.md",
     "solver/README.md",
     "solver/frame/README.md",
+    "solver/frame/testdata/golden/README.md",
+    "solver/frame/testdata/fits/README.md",
     "solver/docs/REFERENCE.md",
+    "solver/docs/DESIGN.md",
     "solver/noframe/README.md",
     "results/README.md",
     "heuristics/README.md",
@@ -804,6 +807,9 @@ fn vocabulary_files() -> Vec<PathBuf> {
     let mut found = Vec::new();
     walk(&root.join("solver"), &mut found);
     walk(&root.join("results"), &mut found);
+    // The walk skips the test data, but for the READMEs among it that are rewritten.
+    let test_data = REWRITTEN.iter().filter(|path| path.contains("/testdata/")).map(|path| root.join(path));
+    found.extend(test_data.filter(|path| path.exists()));
     if root.join("README.md").exists() {
         walk(&root.join("docs"), &mut found);
         found.extend(["README.md", "heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
