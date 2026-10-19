@@ -1,46 +1,33 @@
-# Approaches for playing most of an optimal Taxman game in polynomial time
+# Heuristic strategies
 
-Taxman is played against a pot {1..n}: picking c (the solver's and
-the wiki's *move*) keeps c and surrenders every divisor of c still in
-the pot; every pick must surrender at least one divisor; the taxman
-sweeps the leftovers.  Finding an optimal game is hard (Franklín and
-Moniot prove a variant of the game NP-hard, below), but playing a
-mostly optimal game is not.
+Taxman is played on the pot {1..n}: picking c (the solver's and the wiki's *move*) keeps c and surrenders every divisor
+of c still in the pot; every pick must surrender at least one divisor, and the taxman takes the leftovers.  Finding an
+optimal game can be hard (Franklín and Moniot prove a variant of the game NP-hard, below), but playing a nearly optimal
+game is not.
 
-This is finished work: Python strategies that play good but not
-provably optimal games, and the tools that measured them.  It keeps
-some words of its own: a *pick* or *selection* is a move, the *upper
-half* is the numbers above n/2 (the frame solver's *sources*), and the
-*lower half* the numbers up to n/2.  The project's
+This is finished work: strategies that play good games quickly but don't guarantee optimal results, and the tools that
+measured them.  It keeps some words of its own: a *pick* or *selection* is a move, the *upper half* is the numbers above
+n/2 (the frame solver's *sources*), and the *lower half* the numbers up to n/2.  The project's
 [glossary](../docs/GLOSSARY.md) defines the rest.
 
-Two primary approaches:
+The two main strategies:
 
-1. **Solvent, a near-quadratic — O(n² log n) — strategy holds 99.85% of all
-    optimal points** over n = 1..1000, never dropping below 99.08% in any
-    game, with no search and no lookahead. All selections greater
-    than n/2 are part of an optimal game.
-2. **A self-fed continuation solver holds 99.97% of all optimal
-   points**, starting from nothing at n=2, and extends to n = 1001..2000,
-   provably within 0.35% of the Franklín–Moniot upper bound in
-   aggregate.  Proven optimal games exist out there too: the frame
-   solver in `solver/frame/` proves them (within its frame model), and
-   the prover (`solver/noframe`, a branch and bound over sets of moves
-   on the whole board) proves their scores optimal on the whole board;
-   [results/README.md](../results/README.md) says how far each reaches.
+1. **Solvent**, an O(n² log n) strategy with no search and no lookahead, scores **99.85% of all optimal points** over
+   n = 1..1000, and never below 99.08% in any game.  In every game to 1000, its selections above n/2 are those of an
+   optimal game.
+2. **The continuation solver**, which builds each game from its own game of n − 1, scores **99.97% of all optimal
+   points**, starting from nothing at n = 2.  It extends to n = 1001..2000, within 0.35% of the Franklín–Moniot upper
+   bound in aggregate.  The optimal games of those n are in `results/strict.jsonl`, and
+   [results/README.md](../results/README.md) says how they are proven.
 
-This chart shows the player's share of the pot using different
-strategies. Solvent and continuation hug the optimal line tightly.
+This chart shows the player's share of the pot under each strategy.  Solvent and continuation stay close to the optimal
+line.
 ![player's share of the pot, by strategy](results/pot_fraction.png)
 
-This chart divides every score by the Franklín–Moniot upper
-bound, which cancels the number-theoretic jitter all strategies share:
-the bound becomes the flat 100% line and the strategies separate into
-clean bands, with the continuation chain holding, beyond n=1000, the
-same altitude the true optimum occupies below it.
+This chart divides every score by the Franklín–Moniot upper bound, which removes the number-theoretic jitter all
+strategies share: the bound becomes a flat 100% line, and the strategies separate into bands.  Past n = 1000 the
+continuation chain stays at the level that the optimal scores reach below it.
 ![score as a share of the F-M bound](results/score_vs_bound.png)
-
-
 
 ## The theory: the upper half is a matching problem
 
@@ -61,33 +48,24 @@ one by the Franklín–Moniot lifting argument turned inward, whose
 payoff is that maximal factors are the only factor notion the whole
 project needs.
 
-For the upper half alone, the lifting argument gives a hard ceiling:
-every legal game's upper picks consume distinct outside
-maximal factors, so **no legal game's upper half can outscore M\*,
-the maximum-weight matchable upper set** — a pure matching quantity,
-needing no theory beyond "a maximum exists".  The set this project actually
-computes, U\* from `solve_upper_half`, is something subtly different:
-`optimize_mini` admits greedily with `peel` (the procedure the wiki
-calls `solve_mini`) — a *playability*
-test, stricter than matching — so U\* ≤ M\*, and the inequality is
-real: at n=1000, M\* ≥ 291,515 (the F–M bound's own matching
-witnesses it) while U\* = 291,258.  The 257-point difference is
-matchable-but-unplayable weight, upper-half siblings of the n=21 set.
-What is proven is that no game beats M\*; what is measured
-(`verify.py`, 1000/1000) is that optimal games' upper halves equal U\*
-exactly; "no *playable* upper set outweighs U\*" is proven wherever
-the frontier jam is hyperedge-free (THEORY.md), certified game by
-game for every n = 2..100,000 by a GF(2) linear-algebra certificate
-(THEORY.md, "The span certificate"), and open in general — both the
-exchange route (n=2873) and the single-sacrifice route (n=9170) are
-provably closed.
-`order_for_real_game` turns peel's assignment into a legal
-order.  The
-subtlety that makes the game hard lives in the *lower* half: an
-optimal game sometimes skips a larger prize to fund two smaller ones,
-and those one-for-two trades cascade through chains of reassignments.
+For the upper half alone, the lifting argument gives a hard ceiling: every legal game's upper picks use distinct maximal
+factors from outside, so **no legal game's upper half can outscore M\*, the maximum-weight matchable upper set**, a
+pure matching quantity that needs no theory.  The set the strategies compute, U\* from `solve_upper_half`, is
+different: `optimize_mini` admits greedily with `peel` (the procedure the wiki calls `solve_mini`), a *playability*
+test, stricter than matching.  So U\* ≤ M\*, and the inequality can be strict: at n=1000, M\* ≥ 291,515 (the F–M
+bound's own matching witnesses it) while U\* = 291,258.  The 257-point difference is matchable-but-unplayable weight,
+upper-half siblings of the n=21 set.
 
-What is proven vs. trusted, precisely:
+What is proven is that no game beats M\*.  What is measured (`verify.py`, 1000/1000) is that optimal games' upper
+halves equal U\* exactly.  That no *playable* upper set outweighs U\* is proven wherever the frontier jam is
+hyperedge-free (THEORY.md), certified game by game for every n = 2..100,000 by a GF(2) linear-algebra certificate
+(THEORY.md, "The span certificate"), and open in general; both the exchange route (n=2873) and the single-sacrifice
+route (n=9170) are provably closed.  `order_for_real_game` turns peel's assignment into a legal order.
+
+What makes the game hard lies in the *lower* half: an optimal game sometimes skips a larger number to fund two smaller
+ones, and those one-for-two trades cascade through chains of reassignments.
+
+What is proven, measured or conjectured:
 
 | claim | status |
 |---|---|
@@ -98,54 +76,45 @@ What is proven vs. trusted, precisely:
 | *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds wherever the prover has proven the game ([results/README.md](../results/README.md)) |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
 | optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
-| an optimal game plays the most moves any game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes a local form) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than the optimum (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`solver/noframe`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
-| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  Now known **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
+| an optimal game plays the most moves any game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than opt(833) (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`solver/noframe`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (THEORY.md, "The frontier argument"); the single-sacrifice route is **false** in general (n=9170 witness).  It is **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (THEORY.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (THEORY.md, "The span certificate").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
 | greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
 | on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
 | playability ⟺ maximal-factor matching + acyclic precedence | proven |
 | playable ⟺ residual empty (no self-covering subset), for separated instances (no member is another's maximal factor — automatic above n/2) | **theorem** (THEORY.md, "Unplayable sets: cores and the residual", via the extension lemma).  Unrestricted version: 30,000 fuzz trials clean, unproven — and its confinement cousin is **false** there ({2,4,8} witness) |
 | minimal exclusion sets live inside the residual (exclusion confinement) | **theorem** (same section, same separation hypothesis) — grounds the residual-restricted exact searches of the cardinality campaigns (validated 35/35 before the proof existed) |
 | for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
-| peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted loudly at runtime, as defense in depth |
-| peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — NOT reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; the optimum is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
+| peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
+| peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
 | optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10), the ceiling and the prime formula |
 
 ### The proofs
 
-The proof work lives in [THEORY.md](../docs/THEORY.md), the companion this
-ledger cites.  Its contents, in one breath: the **playability
-characterization** (lifting — maximal factors suffice); the
-**schedulability theorem** (peel's assignments can always be
-scheduled, so the ordering step never fails); the **completeness
-theorem** (a peel refusal is a proof of unplayability — the two
-theorems together make acceptance a proven decision procedure for
-playability); the **core/forest characterization** (playable ⟺
-core-free; on ≤2-prime members, playable ⟺ forest) with the n=2873
-gadget where the exchange property dies; the **frontier
-argument**, which proves greedy weight-optimal wherever the jam is
-hyperedge-free and pins the remaining open problem to its first hard
-witness at n=9170; the **cardinality reformulation**, which
-strips the weights from that open problem — greedy optimality is
-exactly the claim that descending greedy is maximum-cardinality on
-every component of the upper-half instance's incidence graph; and
-the **span certificate**, which bounds playable sets by a GF(2) rank
-and reduces the open problem to one linear-algebra statement,
-certified in every game to n = 100,000.
+The proofs are in [THEORY.md](../docs/THEORY.md), which the table cites:
 
-## Solvent: the O(n²) strategy
+* the **playability characterization** (lifting: maximal factors suffice);
+* the **schedulability theorem** (peel's assignments can always be scheduled, so the ordering step never fails) and the
+  **completeness theorem** (a peel refusal proves the set unplayable), which together make acceptance a proven decision
+  procedure for playability;
+* the **core/forest characterization** (playable ⟺ core-free; on ≤2-prime members, playable ⟺ forest), with the
+  n=2873 gadget where the exchange property fails;
+* the **frontier argument**, which proves greedy weight-optimal wherever the jam is hyperedge-free, and pins the
+  remaining open problem to its first hard witness at n=9170;
+* the **cardinality reformulation**, which strips the weights from that open problem: greedy optimality is exactly the
+  claim that descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph;
+* the **span certificate**, which bounds playable sets by a GF(2) rank and reduces the open problem to one statement of
+  linear algebra, certified in every game to n = 100,000.
 
-Named for its acceptance test: a number joins only if the whole set
-stays *solvent* — every selection can still pay its tax with a
-distinct maximal factor from outside the set.  (It was called "greedy"
-through most of this project's history, and it is greedy — over set
-membership — but the strategy players call
-"greedy Taxman" is take-the-biggest-legal-number-each-turn, `maxturn`
-below, a far weaker thing.)
+## Solvent: a near-quadratic strategy
 
-The algorithm of record is committed as a runnable reference
-implementation, `reference/solvent.py`, verified for exact set
-equality against the fast implementation:
+Solvent is named for its acceptance test: a number joins only if the whole set stays *solvent*, every selection still
+able to pay its tax with a distinct maximal factor from outside the set.  It is greedy over set membership, but it is
+not what players call "greedy Taxman", taking the largest legal number each turn: that is `maxturn` below, a much
+weaker strategy.
+
+`reference/solvent.py` is the algorithm written to be read and run, and it gives exactly the fast implementation's
+sets:
 
 ```python
 def solvent(n):
@@ -157,28 +126,20 @@ def solvent(n):
     return ordered(s, pay)
 ```
 
-where `playable` runs `peel` (minus the returned
-sequence) over the outside maximal
-factors, and `ordered` topologically sorts the precedence "s before t
-whenever pay(s) divides t, or s divides t".  This is `optimize_mini`
-promoted to the whole game — restrict it to the numbers above n/2 and
-it collapses back — and its rejections are peel refusals, which
-by the completeness theorem are proofs that the set is unplayable;
-since playable sets are downward-closed, a rejection is permanent,
-which makes the output set canonical: a deterministic function of
-playability, proven, not of tie-breaking.
-The fast version in `strategies/solvent.py` (incremental Kuhn
-matching; a failed augmenting search rejects outright, by Berge's
-lemma; peel is consulted only when the incremental matching
-goes precedence-cyclic — where it does real playability work) is
-bit-identical at a fraction of the cost.
+where `playable` runs `peel` (minus the returned sequence) over the outside maximal factors, and `ordered`
+topologically sorts the precedence "s before t whenever pay(s) divides t, or s divides t".  This is `optimize_mini`
+applied to the whole game; restricted to the numbers above n/2, it is `optimize_mini` again.  Its rejections are peel
+refusals, which by the completeness theorem prove the set unplayable.  Since playable sets are downward-closed, a
+rejection is permanent, so the output set is provably canonical: a function of playability, not of tie-breaking.
+The fast version in `strategies/solvent.py` gives the same output, bit for bit, at a fraction of the cost.  It uses
+incremental Kuhn matching: a failed augmenting search rejects outright, by Berge's lemma, and peel is consulted only
+when the incremental matching goes precedence-cyclic, where it does real playability work.
 
-Results over n = 2..1000 against the known optima (n=1 excluded — its
-optimal score is 0; `onetax` and `maxturn` are the two heuristics from
-[Robert Moniot's comparison](https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html),
-reimplemented and validated against his published table; `cascade` is
-the verified upper-half theory applied band by band with no
-promotions — what the theory achieves entirely on its own):
+Results over n = 2..1000 against the optimal scores (n=1 excluded: its optimal score is 0).  `onetax` and `maxturn` are
+the two heuristics from [Robert Moniot's
+comparison](https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html), reimplemented and validated against
+his published table; `cascade` is the verified upper-half theory applied band by band with no promotions, what the
+theory gives on its own:
 
 | strategy | avg % of optimal | point share | worst game | exact |
 |---|---|---|---|---|
@@ -189,51 +150,33 @@ promotions — what the theory achieves entirely on its own):
 | solvent-b | 99.937% | 99.929% | 99.20% | 337/999 |
 | continuation chain (below) | **99.978%** | **99.972%** | **99.52%** | **502/999** |
 
-Where solvent still loses, the mechanism is measured to be singular
-— "self-blocking" (`results/mistake_catalog_1000.json`,
-`results/signature_classification_1000.json`): the 785 imperfect
-games decompose into 104 persistent mistake episodes, and in every
-one of them solvent *picks* a number m that the optimal game instead
-reserves as the tax payment of 2m.  The patron is always exactly 2m,
-and that is forced: every mistake locus lies in (n/3, n/2], where 3m
-already exceeds n, so 2m is m's only possible payer.  In 100 of the
-104 episodes the reservation is provably necessary — ban m from the
-pool of usable tax payments and the optimal set becomes unplayable,
-typically by a
-cascade that strands a number sharing no factor with m.  The victims
-sit below m, unseen when the descending scan decides m; a one-pass
-strategy structurally cannot price them, and re-routing them by
-search is exactly what the continuation solver does.  (The band is
-where lower-half picks live at all, not where mistakes prefer to
-form: optimal games place only 1.3% of their picks below n/3 — a
-number there has two or more multiples demanding it as currency, and
-both players leave it as money.)
+Where solvent still loses, the measurements find one mechanism, "self-blocking" (`results/mistake_catalog_1000.json`,
+`results/signature_classification_1000.json`).  The 785 imperfect games decompose into 104 persistent mistake
+episodes, and in every one of them solvent *picks* a number m that the optimal game instead keeps as the tax payment
+of 2m.  The number paid for is always 2m, and that is forced: every mistake lies in (n/3, n/2], where 3m already
+exceeds n, so 2m is the only number m can pay for.  In 100 of the 104 episodes keeping m as a payment is provably
+necessary: ban m from the usable tax payments and the optimal set becomes unplayable, typically by a cascade that
+strands a number sharing no factor with m.  The numbers stranded lie below m, unseen when the descending scan decides
+m, so a one-pass strategy cannot price them; re-routing them by search is what the continuation solver does.  (The
+band is where lower-half picks occur at all, not where mistakes prefer to form: optimal games place only 1.3% of their
+picks below n/3, where a number has two or more multiples that want it as a payment, so both players leave it as tax.)
 
-**solvent-b** (`strategies/solvent_b.py`) turns that diagnosis into a
-strategy: after the base solvent pass, audit every kept pick that is
-also a maximal factor of another kept pick — the structural dual-use
-criterion, no thresholds anywhere — by re-completing the game with
-that pick banned and adopting on strict improvement, to a fixpoint.
-The reruns price the downstream victims by literally playing them,
-which is exactly the information a single descending pass cannot
-have.  Result: 99.929% of all optimal points (337/999 exact, worst
-game 99.20%), recovering ~52% of solvent's entire loss; the residue
-is the handful of episodes needing *coordinated* multi-number moves
-(the blocked-valley phenomenon that the continuation solver's
-bundles exist for).  Cost is one factor of n over solvent —
-Θ(n³ log n), softened ~2x by prefix-reuse forking (nothing above a
-fork point is ever recomputed): measured ~9x solvent at n=500, ~59x
-at n=1000.  Every audit is a fresh feasibility question answered by
-the same proven machinery; nothing is heuristic.
+**solvent-b** (`strategies/solvent_b.py`) turns that diagnosis into a strategy.  After the base solvent pass, it audits
+every kept pick that is also a maximal factor of another kept pick, a structural dual-use criterion with no thresholds,
+by completing the game again with that pick banned and adopting the result on strict improvement, to a fixpoint.  The
+reruns price the stranded numbers by playing them, which is the information a single descending pass cannot have.  It
+scores 99.929% of all optimal points (337/999 exact, worst game 99.20%), recovering about 52% of solvent's loss.  What
+remains is the handful of episodes that need *coordinated* moves of several numbers (the blocked valleys that the
+continuation solver's bundles exist for).  It costs one factor of n over solvent, Θ(n³ log n), softened about 2x by
+prefix-reuse forking (nothing above a fork point is computed again): about 9x solvent at n=500 and 59x at n=1000, as
+measured.  Every audit is a fresh feasibility question, answered exactly by the same proven test.
 
 ## The continuation solver: search near n−1
 
-Transition measurements motivated the design: the optimal solution of
-game n sits a tiny, local perturbation from game n−1's (76% of
-transitions are pure insertions; mean lower-half churn ~1.2 numbers;
-13.6% are "blocked valleys" crossable only by atomic multi-flip
-bundles).  `strategies/continuation.py` solves games in sequence, each
-warm-started from the previous game's own output:
+Measurements of the step from n−1 to n motivated the design: the optimal game of n is a small, local change from that of
+n−1 (76% of steps are pure insertions; mean lower-half churn ~1.2 numbers; 13.6% are "blocked valleys" crossable only
+by atomic multi-flip bundles).  `strategies/continuation.py` solves games in sequence, each warm-started from the
+previous game's own output:
 
 1. the U\* upper half (`solve_upper_half` — no search; capped by the
    proven matching ceiling M\*, and empirically the optimal game's
@@ -248,22 +191,15 @@ warm-started from the previous game's own output:
 7. replay the result as a legal game (`check_sequence`) before
    recording it.
 
-**Flagship result** (`results/chain_cold_1000.json`): started cold
-from n=2, no optimal.json anywhere in the loop, the chain holds
-**99.972% of all optimal points over 2..1000** (502/999 exact, worst
-game 99.52%), never scores below solvent, and beats the
-optimal-seeded chain on points — a perfect seed is worth nothing by
-mid-range.  **Past the Java solver's n=1000**
-(`results/chain_1001_2000.json`): seeded once from optimal(1000), the
-chain solved 1001..2000 holding a mean 99.64% of the F–M bound (worst
-99.40%) — the altitude the true optimum occupies below 1000, where the
-bound's own looseness averages 0.29% — beating solvent in 894 games and
-tying the other 106.  Each of those 1000 games has a per-game certified
-gap (the distance to the bound, which the true optimum also lives
-inside).  Proven optimal games to compare them with exist: the frame
-solver's committed chain (`results/strict.jsonl`, within the frame
-model), whose scores the prover proves optimal on the whole board as
-far as [results/README.md](../results/README.md) says.
+**The main result** (`results/chain_cold_1000.json`): started cold from n=2, with no optimal.json anywhere in the loop,
+the chain scores **99.972% of all optimal points over 2..1000** (502/999 exact, worst game 99.52%).  It never scores
+below solvent, and it beats the chain seeded with optimal games on points: by mid-range a perfect seed makes no
+difference.  **Past n = 1000** (`results/chain_1001_2000.json`): seeded once from the optimal game of 1000, the chain
+solved 1001..2000 at a mean 99.64% of the F–M bound (worst 99.40%), the level the optimal scores reach below 1000,
+where the bound's own looseness averages 0.29%.  It beats solvent in 894 of those games and ties the other 106.  Each
+of the 1000 games has a certified gap, its distance to the bound, which bounds its distance to opt(n) too.  The optimal
+games to compare them with are in `results/strict.jsonl` ([results/README.md](../results/README.md) says how they are
+proven).
 
 ### Certificates
 
@@ -288,7 +224,7 @@ Coverage: 688/999 cold-chain games (331 exact + 167 prime + 190
 upper-delta = 68.9%, matching the wiki's remembered "roughly 70%")
 and 633/1000 games in 1001..2000.
 
-What a certificate means depends on the anchor.  On a proven-optimal
+What a certificate means depends on the anchor.  On an optimal
 predecessor it proves optimality outright.  In a self-fed chain it
 proves something weaker but still sharp: since opt(n) ≤ n + opt(n−1),
 a certified game satisfies gap(n) ≤ gap(n−1) — it *added no error of
@@ -309,25 +245,17 @@ ones that must run regardless).
 
 ## The yardsticks
 
-**The Franklín–Moniot upper bound** (`evaluation/bound.py`, exact values for
-every n = 2..2000 in `results/fm_bound_2000.json`): from Franklín,
-A. F. and Moniot R. K.  [The difficulty of beating the
-Taxman](https://arxiv.org/abs/2211.00461).  *Discrete Applied
-Mathematics*, 339, 166–171, (2023) — the max-weight
-matching over maximal-factor edges — what optimal play would score if
-payments needed no schedule and sweeps took only the paid factor.
-The same paper proves NP-hardness of a Taxman variant via graph
-matching, which is the theoretical backdrop for everything here:
-the bound is the matching relaxation of the game, and our claims
-past n=1000 are measured against it (as well as against the proven
-games noted above).  It is tight only through n=122; over 500..1000
-the true optimum averages 99.71% of it (never below 99.57%), so most of
-the bound-to-chain band on the charts is bound looseness, not solver
-error.  Decomposed at n=1000 (gap 1168): 257 points of upper-half
-slack — the matching books 4 picks no legal order can deliver — and 911
-in the lower half.
-The matching's upper half is *never* a tie with the real one: where
-they differ it is strictly heavier, i.e. strictly fictional.
+**The Franklín–Moniot upper bound** (`evaluation/bound.py`, exact values for every n = 2..2000 in
+`results/fm_bound_2000.json`), from Franklín, A. F. and Moniot R. K., [The difficulty of beating the
+Taxman](https://arxiv.org/abs/2211.00461), *Discrete Applied Mathematics*, 339, 166–171, (2023): the max-weight
+matching over maximal-factor edges, what optimal play would score if payments needed no schedule and sweeps took only
+the paid factor.  The same paper proves a Taxman variant NP-hard via graph matching.  The bound is the matching
+relaxation of the game, and our claims past n=1000 are measured against it, as well as against the optimal games noted
+above.  It is tight only through n=122.  Over 500..1000, opt(n) averages 99.71% of it (never below 99.57%), so most of
+the band between the bound and the chain on the charts is the bound's looseness, not the strategy's error.  At n=1000
+the gap of 1168 is 257 points of upper-half slack (the matching counts 4 picks no legal order can deliver) and 911 in
+the lower half.  The matching's upper half never ties the real one: where they differ, the matching's is strictly
+heavier, and so cannot be played.
 
 **The born-free matching** (`evaluation/bornfree.py`) is the same
 paper's constructive counterpart to that bound.  Theorem 1 there
@@ -337,29 +265,21 @@ gives `bound.py`, while the born-free algorithm keeps it by building a
 matching that cannot contain such a cycle in the first place — for
 each prime p ≤ n descending, pair x with p·x whenever both are unused.
 No matching algorithm runs at all, and the pick set is always
-playable, so `core.order_for_real_game` schedules it directly.  It
-takes 90.39% of the optimal total over n=2..1000 (a shade above
-`maxturn`'s 90.29%) and
-settles at 56.89% of the pot out to n=100,000, matching the paper's
-figure.  Its interest is not strength but provability: it is the only
-strategy here with a proved guarantee, and the gap to `onetax` prices
-what refusing to search costs.  Two caveats found while implementing
+playable, so `core.order_for_real_game` schedules it directly.  It takes 90.39% of the optimal total over n=2..1000 (a
+shade above `maxturn`'s 90.29%), and settles at 56.89% of the pot out to n=100,000, matching the paper's figure.  Its
+interest is not strength but provability: it is the only strategy here with a proved guarantee, and its gap to `onetax`
+measures what refusing to search costs.  Two caveats found while implementing
 it: the construction itself does not win at N=7 and N=13 (confirmed
 here; the paper's proof of its Theorem 5 already notes it and plays
 those two games by hand, so only a blanket claim of a win for every
 N > 3 overstates it), and the descending order over x, though the paper
 specifies it, has no effect on the result.
 
-**Theory-free certification** (`evaluation/certify.py`): optimal.json
-was produced by the same theory this project tests, so the audit uses
-none of it — exhaustive
-bitmask search (unique optimal upper sets confirmed through n=62;
-it enumerates the whole optimal pick sets too, which
-`solver/noframe/tools/crosscheck_optsets.py` compares with the
-prover's enumeration of every optimal set: they agree, one set
-each, for every n ≤ 57),
-the naive all-divisors matching bound, and opt(n) ≤ n + opt(n−1)
-chains.  No contradiction has ever been found by any audit.
+**Theory-free certification** (`evaluation/certify.py`): optimal.json was produced by the same theory this project
+tests, so the audit uses none of it.  It uses an exhaustive bitmask search, the naive all-divisors matching bound, and
+chains of opt(n) ≤ n + opt(n−1).  The search confirms the unique optimal upper sets through n=62, and enumerates the
+whole optimal pick sets too, which `solver/noframe/tools/crosscheck_optsets.py` compares with the prover's enumeration
+of every optimal set: they agree, one set each, for every n ≤ 57.  No audit has found a contradiction.
 
 ## Performance
 
@@ -377,25 +297,18 @@ exponent in time ~ n^k:
 Exact complexities, fitted against models over n = 250..4000 (doubling
 ratios, not just exponents):
 
-* **solvent is Θ(n² log n)**, and the log is real: each of the ~0.44n
-  acceptances runs an acyclicity check that enumerates multiples (a
-  harmonic sum, Θ(n log n) per check) — and that check is
-  decision-relevant, not a safety ritual: without it, solvent accepts
-  the matchable-but-unplayable set at n=21.  What *was* a safety
-  ritual: consulting peel after a failed augmenting search
-  (Berge's lemma already decides).  Removing that halved the constant
-  (bit-identical output, verified over all 1000 games) without
-  changing the class.
-* **maxturn is a textbook Θ(n²)**: every turn scans the whole pot for
-  the max (doubling ratios 3.9–4.0, no drift).
-* **onetax is worst-case O(n²) but runs ~n^1.7**: its per-turn scan
-  early-exits near the top of the pot; the guaranteed work is the
-  harmonic-sum divisor-count updates, Θ(n log n).  Doubling ratios
-  drift up (3.0 → 3.7) as the worst case slowly asserts itself.
-* **the upper half (solve_upper_half) is Θ(n² log log n)** — one
-  peeling pass per candidate over a graph with Σω(c) edges; the
-  log log is invisible at these sizes (ratios ~4.2).
-* **cascade** rides the same machinery: Θ(n²)-ish, measured k≈2.1.
+* **solvent is Θ(n² log n)**, and the log is real: each of the ~0.44n acceptances runs an acyclicity check that
+  enumerates multiples (a harmonic sum, Θ(n log n) per check).  That check decides answers: without it, solvent accepts
+  the matchable-but-unplayable set at n=21.  What was only a safeguard is consulting peel after a failed augmenting
+  search, which Berge's lemma already decides.  Removing it halved the constant (bit-identical output, verified over
+  all 1000 games) without changing the class.
+* **maxturn is Θ(n²)**: every turn scans the whole pot for the max (doubling ratios 3.9–4.0, no drift).
+* **onetax is worst-case O(n²) but runs ~n^1.7**: its per-turn scan exits early near the top of the pot; the
+  guaranteed work is the harmonic-sum divisor-count updates, Θ(n log n).  Doubling ratios drift up (3.0 → 3.7) as the
+  worst case starts to show.
+* **the upper half (solve_upper_half) is Θ(n² log log n)**: one peeling pass per candidate over a graph with Σω(c)
+  edges; the log log is invisible at these sizes (ratios ~4.2).
+* **cascade** uses the same machinery: about Θ(n²), measured k≈2.1.
 * **the continuation chain** costs O(n²) per game before search (the
   solve_upper_half computation) plus the budgeted flip/bundle work, so a full
   chain 2..N is Θ(N³)-class in aggregate — ~78 minutes to N=1000
@@ -407,11 +320,11 @@ answer from scratch (a full peeling per candidate, O(n²) per
 question, n questions) and measures ~n^3.3, versus the fast
 version's incremental matching at Θ(n² log n) — the same strategy,
 one factor of n apart.  At n=500 that is 10.3 s vs 0.13 s; the
-reference exists to be read, not raced.
+reference is for reading, not for speed.
 
 The continuation chain runs ~2s/game (cold, full budget, PyPy, after
-the Berge early-reject sped its evaluator ~2.4x) — call it ~35
-minutes for the 2..1000 flagship, ~1.5 hours for 1001..2000.
+the Berge early-reject sped its evaluator ~2.4x): about 35
+minutes for the cold chain 2..1000, ~1.5 hours for 1001..2000.
 A budget-capped configuration (bundles ≤ 100) reaches 99.95% of
 optimal at roughly a quarter of the cost and is the recommended
 default; PyPy is ~2–3x CPython on all of it.
@@ -428,7 +341,7 @@ deliberately.
 python3 -m evaluation.verify            # the upper-half theory, n=1..1000
 python3 -m reference.solvent 21         # the readable strategy, one game
 python3 -m evaluation.scoreboard        # full strategy comparison (~10 min)
-pypy3   -m strategies.continuation --from 2 --to 1000 --reanchor-solvent   # the flagship chain (~80 min)
+pypy3   -m strategies.continuation --from 2 --to 1000 --reanchor-solvent   # the cold chain (~80 min)
 python3 -m evaluation.bound 21 128 1000 # F-M bound for specific games
 python3 -m evaluation.bornfree 21 1000  # F-M born-free matching, same games
 python3 -m evaluation.certify           # theory-free audit of optimal.json
@@ -436,7 +349,7 @@ python3 -m pytest evaluation/test_taxman.py
 ```
 
 The continuation solver checkpoints its `--out` file every 5 games and
-resumes with `--resume` — container restarts cost at most a few games.
+resumes with `--resume`, so an interruption costs at most a few games.
 
 ## Files
 
@@ -460,7 +373,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |
-| `results/chain_cold_1000.json` | the flagship cold chain, with certificates |
+| `results/chain_cold_1000.json` | the cold chain from n=2, with certificates |
 | `results/chain_seeded_500_1000.json` | the optimal-seeded chain (drift experiment) |
 | `results/chain_1001_2000.json` | the continuation chain's solutions for n=1001..2000 |
 | `results/solvent_2000.json`, `results/onetax_2000.json`, `results/maxturn_2000.json` | strategies extended to n=2000 |
@@ -470,31 +383,28 @@ resumes with `--resume` — container restarts cost at most a few games.
 
 ## Reading guide
 
-The codebase is small enough to read end to end, and it doubles as a
-tour of standard algorithmic material meeting a real problem.  A
+The code is small enough to read end to end, and it also tours standard algorithms applied to a real problem.  A
 suggested path: play n=21 by hand, read `reference/solvent.py` top to
 bottom, then `core.py`, then `docs/THEORY.md` for the proofs, then
 `strategies/solvent.py`, then `reference/continuation.py` — the
 warm-start chain in the same readable register — with
 `strategies/continuation.py`'s docstring as the fast version's tour.
 
-n=21 is the house example, cited wherever a concept needs a concrete
-case, because one small game happens to contain the whole story: [the
-wiki walks it through move by move](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21);
-`python3 -m reference.solvent 21` solves it (144, the optimal score);
-its optimal game opens with the highest prime and funds a
-one-for-two trade; the matchable-but-unplayable set
-{10,12,14,15,16,18,19,20,21} lives there, summing to 145 — one point
-more than any legal game can score — which makes it both the ledger's
-completeness counterexample and the reason the F–M bound reads 145
-against a true optimum of 144: the relaxation happily books exactly
-the fictional set that peel refuses.  Where the well-known
-ideas do real work:
+n=21 is the running example, cited wherever a concept needs a concrete case, because one small game shows every idea:
+
+* [the wiki walks it through move by move](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21), and
+  `python3 -m reference.solvent 21` solves it (144, the optimal score);
+* its optimal game opens with the highest prime and funds a one-for-two trade;
+* it has the matchable-but-unplayable set {10,12,14,15,16,18,19,20,21}, which sums to 145, one point more than any
+  legal game can score.  That set is the counterexample of the completeness row of the table of claims, and the reason
+  the F–M bound reads 145 against opt(21) = 144: the relaxation counts exactly the set that peel refuses.
+
+Where the well-known ideas do real work:
 
 | concept | where it does real work here |
 |---|---|
 | bipartite matching, Kuhn's augmenting paths, Berge's lemma | `strategies/solvent.py` (`_augment`; failed search = conclusive rejection) |
-| Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the ledger has perfect matchings and no legal order |
+| Hall's theorem — and its limits | matchability is *not* playability: the n=21 set in the table of claims has perfect matchings and no legal order |
 | topological sort (Kahn's algorithm), DAGs | `core.order_for_real_game`, `strategies/solvent.py` `_is_acyclic` / `_playable_order` |
 | greedy algorithms + matroids — and their limits | the natural matroid hypothesis for playable sets is *false* (n=2873; see "Dead ends") — the survival of greedy here is a fact about Taxman's weights, not about exchange |
 | sieve of Eratosthenes | `core.smallest_prime_factors` (storing witnesses, not booleans) |
@@ -505,21 +415,17 @@ ideas do real work:
 | local search, hill climbing, escaping local optima | `strategies/continuation.py` (flips, then valley-crossing bundles) |
 | undo logs / transaction rollback | `strategies/seteval.py` |
 | NP-hardness | Franklín & Moniot's paper (cited above) — the hardness and our upper bound are two faces of the same matching structure |
-| theorems vs. conjectures vs. measurements | the ledger table above — every claim in this project is tagged with its grade of evidence |
+| theorems vs. conjectures vs. measurements | the table of claims above: every claim has its grade of evidence |
 
-The working habits on display live in the ledger and the dead-ends
-section: label what is proven versus conjectured versus measured,
-test the elegant hypothesis before trusting it, and keep the
-falsified ones on display — the n=21 counterexample and the
-trust-certificates experiment taught more than several of the
-successes.
+The table of claims and the dead ends below show the working habits: label what is proven, conjectured or measured;
+test an elegant hypothesis before trusting it; and keep the falsified ones in view, such as the n=21 counterexample and
+the experiment that trusted certificates as cutoffs.
 
 ## Dead ends worth remembering
 
-Rejected ideas that carry real information (full details in git
-history):
+Rejected ideas worth knowing (git history has the details):
 
-* **A 2-tax rule cannot be bolted onto OneTax.**  Optimal games make
+* **A 2-tax rule cannot be added to OneTax.**  Optimal games make
   2-tax moves in 946/999 games, but every locally-visible version of
   the rule is either unnecessary (the pick wins anyway) or
   unaffordable (fires exactly backwards); the provably-safe variant
@@ -527,34 +433,26 @@ history):
   globally re-routed assignment — under 3% of any strategy's loss is
   2-tax residue; ~97% is one-for-one re-routing.
 * **The fork oracle** (pricing picks by re-derived continuations,
-  99.41% of optimal) was the champion until solvent's playability
+  99.41% of optimal) was the best strategy until solvent's playability
   test was made complete — its false cycle-vetoes (15:1 over genuine
   matching failures) were worth 1.32M points across the range, and
   fixing them (98.97% → 99.86% mean) made solvent the best single
   strategy and the oracle obsolete.
 * **Trusting certificates as search cutoffs** — see above: −511
   points for +7% speed.  Certificates label; they do not steer.
-* **The matroid frame.**  For most of the project, greedy's upper-half
-  optimality was explained by matroid theory: matchable sets do form
-  a transversal matroid, and on two-prime members playable sets form
-  a graphic one, so the frame kept passing tests.  It is false where
-  it matters: playable sets with three-prime members admit maximal
-  sets of different sizes (n=2873), so the exchange axiom fails and
-  no matroid argument can justify greedy over playable sets.  What
-  actually protects greedy is that Taxman's weights are the members
-  themselves — the stuck configurations are provably reachable only
-  through light members that descending greedy visits last.  Keep the
-  matroid lens for matchability; drop it for playability.
-* **"Acceptance is just matching-existence."**  Auditing solvent for
-  wasted safety checks found one real redundancy (the complete-tier
-  consultation after a *failed* augment — Berge's lemma already
-  decides; removing it is bit-identical and ~2x faster) and one
-  falsified one: dropping the per-acceptance acyclicity gate changes
-  answers, first at n=21, where a matchable-but-unschedulable set
-  out-sums the true optimum.  The failed half taught more than the
-  successful half: peel rejects some sets that have perfect
-  payment matchings, i.e. it is a playability oracle, not a matching
-  oracle — a fact the codebase had relied on without stating.
+* **The matroid explanation.**  For most of the project, greedy's upper-half optimality was explained by matroid
+  theory: matchable sets do form a transversal matroid, and on two-prime members playable sets form a graphic one, so
+  the explanation kept passing tests.  It is false where it matters: playable sets with three-prime members admit
+  maximal sets of different sizes (n=2873), so the exchange axiom fails and no matroid argument can justify greedy over
+  playable sets.  What protects greedy is that Taxman's weights are the members themselves: the stuck configurations
+  are provably reachable only through light members that descending greedy visits last.  Keep the matroid lens for
+  matchability; drop it for playability.
+* **"Acceptance is just matching-existence."**  Auditing solvent for wasted safety checks found one real redundancy
+  (the complete-tier consultation after a *failed* augment, which Berge's lemma already decides; removing it is
+  bit-identical and ~2x faster) and one falsified one: dropping the per-acceptance acyclicity gate changes answers,
+  first at n=21, where a matchable-but-unschedulable set out-sums opt(21).  The second showed that peel rejects some
+  sets that have perfect payment matchings: it is a playability oracle, not a matching oracle, which the code had
+  relied on without stating.
 * **Bitsets** win for state hashing (the brute-force certifier) and
   lose for whole-scan divisor work (harmonic-sum beats n²/64 past
   n≈600); PyPy beats both concerns at once for long runs.
