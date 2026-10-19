@@ -60,7 +60,7 @@ threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure a
 By list scheduling the wall time on 4, 8, 16, 32 and more threads is 36, 18, 11 and 11 hours at 2.5 ms a node; from 16
 threads up the dearest games (2170-2173, the model's 8 million nodes each) set it.  The range of the estimate is wider
 than the draws': the trend in n rests on 7 games above 1800 and a sample, not a random one, and the speed of a Graviton
-core is unmeasured.  The RUNBOOK ([section 9](../../docs/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175))
+core is unmeasured.  The RUNBOOK ([section 9](../../docs/RUNBOOK.md#8-the-provers-proofs-of-optn-1301-to-2175))
 gives the wall time and the price by size (about $3 to $4 on spot for 16 vCPUs) and says that the calibration on
 Graviton3, 4 and 5 (`rust/bench/cloud/`) refines the per-core figures.
 
@@ -81,7 +81,7 @@ owner's, and are below; the results are in `solver/noframe/data/exact_parity_130
 *The run (2026-10-14 and 15).*  The plan above ran, the check passed, and the cost came out higher than the projection's
 central figure, inside its ranges.
 
-*What ran.*  `solver/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../docs/RUNBOOK.md#94-run) describes, on one
+*What ran.*  `solver/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../docs/RUNBOOK.md#84-run) describes, on one
 `c8g.4xlarge` (Graviton4, 16 vCPUs, 31 GiB) on spot in us-east-1b at $0.2402 an hour, launched 2026-10-14 23:22:58 UTC
 (the run began at 23:28:46 and ended "complete" at 15:21:58 on the 15th: 15.9 hours), the build of commit 4db7a14 with
 `-C target-cpu=native`.  The instance shut itself down at the end (`POWEROFF=always`) and was terminated: 16.0

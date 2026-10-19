@@ -33,7 +33,7 @@ trend, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about:
 
 A single run can fall well short of its projection (the last one projected 4,100 and reached 3440).  Every doubling of
 speed or of spending is worth about 310 in n; only a tighter bound in the search changes the tenfold per 1,040.  The
-chain's launch is [RUNBOOK section 5](RUNBOOK.md#5-the-production-chain); it needs Brian's approval.
+chain's launch is [RUNBOOK section 4](RUNBOOK.md#4-the-production-chain); it needs Brian's approval.
 
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
 more than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game
@@ -101,7 +101,7 @@ entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
 * **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset
   (Brian, 2026-10-16: Monday night).  Its branch `worktree-agent-a2db9341d6d4e8cd9` holds three commits (the third is the edit of
   THEORY.md) and is on the old layout (`rust/`, `heuristics/THEORY.md`): its paths need the new ones before it merges.
-* **Certifying 2176-3440** ([RUNBOOK section 11](RUNBOOK.md#11-certifying-u-stage-4)): ready, not
+* **Certifying 2176-3440** ([RUNBOOK section 9](RUNBOOK.md#9-certifying-u-stage-4)): ready, not
   approved, shelved by Brian on 2026-10-16.  About 3,023 thread-hours, 47 hours of one `c8g.16xlarge`, $32 at spot
   ($121 on demand), the pilot first ($3); phases A and B on the build of 14beb7a, phase C on the claim-by-claim build
   ([certificates past 2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md),
@@ -122,13 +122,13 @@ entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
 
 * **The run to 5000**, launched 2026-10-18 at commit ca357bf with `--use-prev` (the chain draws on the committed
   chain, the bounds store and `optimal.json` and starts at 3915: [RUNBOOK
-  12.4](RUNBOOK.md#124-launch-watch-stop-clean-up)), budget 36 instance-hours.  The **run to the wall**
-  before it ([RUNBOOK section 12](RUNBOOK.md#12-the-unattended-run-to-the-wall), launched 2026-10-17 at
+  5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)), budget 36 instance-hours.  The **run to the wall**
+  before it ([RUNBOOK section 5](RUNBOOK.md#5-the-unattended-run-to-the-wall), launched 2026-10-17 at
   00:15 PDT with eb84a6f) was stopped at 3914 on 2026-10-18 after 35.7 instance-hours and $24.14, the wall far off: its
   dearest game took 2.77 hours ([the entry](../notebook/the-run-to-the-wall-2026-10/README.md)).
 * **The sweep**, built 2026-10-17 and not run: blocks of consecutive games of 3441..8191, one thread and a limited
   search a game each, passes over the merged `explore.jsonl` until nothing changes
-  ([RUNBOOK section 13](RUNBOOK.md#13-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
+  ([RUNBOOK section 7](RUNBOOK.md#7-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
   game.  The file is not a chain and never goes into `strict.jsonl`.  The ledger (next) may supersede it.
 * **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
@@ -141,10 +141,10 @@ entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
 * **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
   proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
   (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or `optimal.json` has proven is recorded
-  with no search, citing it; not run in the cloud; [RUNBOOK 12.4](RUNBOOK.md#124-launch-watch-stop-clean-up)).
+  with no search, citing it; not run in the cloud; [RUNBOOK 5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)).
 * **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
   section](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)): the ledger
   steps an open board down by searches under floors (150 points, a tenfold of cost a step; each lowers U), fits a line
   to each board's steps that forecasts its proof, and orders the boards by it.  On 2576..2700 at 900 CPU s 69 and 73
   boards were proven against 61; dry-run, not run in the cloud; the next stage resumes stage 2's ledger with it
-  ([RUNBOOK 14](RUNBOOK.md#14-the-ledgers-experiment)).
+  ([RUNBOOK 6](RUNBOOK.md#6-the-ledgers-experiment)).

@@ -7,7 +7,7 @@ for every n of a stretch a lower bound L(n), the score of a game held, and an up
 many games at once, and spend the effort where progress is cheapest; a game is proven when L(n) = U(n).  Does it prove
 much of a stretch for a small share of what the chain spends there?  This entry builds it and runs it on the laptop on
 1301..1500 with the truth hidden; the experiment of the design, 2176..3440 for an hour of a `c8g.16xlarge`, is ready
-and not run ([RUNBOOK section 14](../../docs/RUNBOOK.md#14-the-ledgers-experiment)).
+and not run ([RUNBOOK section 14](../../docs/RUNBOOK.md#6-the-ledgers-experiment)).
 
 **What was built.**
 

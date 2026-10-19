@@ -569,7 +569,7 @@ on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads
   before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
 * **PGO and `target-cpu=native` on Graviton.**  `solver/tools/pgo.sh` exists and was run on the M1 only; no gain from
   profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
-* **The scripts on Linux and on EC2.**  See [the RUNBOOK](RUNBOOK.md), on the scripts: `scaling.sh` has not run on EC2 (`chain.sh` has, in the
+* **The scripts on Linux and on EC2.**  See [the RUNBOOK, "What has run where"](RUNBOOK.md#what-has-run-where): `scaling.sh` has not run on EC2 (`chain.sh` has, in the
   cloud run), and `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes
   before the end, with no `spot-watch.sh` running), so neither has the restore after one: the cloud run's was after a
   stop on purpose.  The first run of `scaling.sh` on a small instance is the test of that one.

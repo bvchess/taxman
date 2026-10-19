@@ -175,7 +175,7 @@ sudo -u ec2-user tmux new-session -d -s choice -c /home/ec2-user/taxman \
 
 The binaries come from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, and with `STUDIES=1`,
 because `wall` is a study tool that a default build does not hold; [RUNBOOK section
-15](../../docs/RUNBOOK.md#15-the-build-cache-and-the-release-suite)); a setup that fails ends the machine and the
+15](../../docs/RUNBOOK.md#11-the-build-cache-and-the-release-suite)); a setup that fails ends the machine and the
 measurement does not start.
 
 ### Cost and time

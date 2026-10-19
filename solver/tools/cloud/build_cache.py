@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The cache of release binaries that setup.sh uses (RUNBOOK.md, section 15).  Standard library only.
+"""The cache of release binaries that setup.sh uses (RUNBOOK.md, section 11).  Standard library only.
 
 A machine that needs the release binaries of a commit looks here before it builds them, and the one release machine
 that has built and tested them puts them here.  Nothing is stored that has not passed the release suite.

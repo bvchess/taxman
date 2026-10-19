@@ -393,7 +393,7 @@ it does with them:
 
 A chain from n = 1 with `--use-prev` takes its games from the committed chain as far as that goes, so it proves nothing
 again there.  That is for a run that goes past the committed chain ([RUNBOOK, section
-12](../docs/RUNBOOK.md#12-the-unattended-run-to-the-wall)), not for one that checks the build.
+5](../docs/RUNBOOK.md#5-the-unattended-run-to-the-wall)), not for one that checks the build.
 
 ### A chain from n = 1
 
@@ -505,7 +505,7 @@ is 1).
 * **A signal** still ends the range, but with no line for the game it stopped, so that a rerun resumes it.
 * **`--pass N`** records N in `options.pass` of every line the run writes, and changes nothing else.
 
-**The sweep** (`solver/tools/cloud/sweep.sh FIRST LAST`, [RUNBOOK, section 13](../docs/RUNBOOK.md#13-the-sweep))
+**The sweep** (`solver/tools/cloud/sweep.sh FIRST LAST`, [RUNBOOK, section 7](../docs/RUNBOOK.md#7-the-sweep))
 goes over a long stretch of games for as many proven games as the time allows, holes allowed.  It splits the stretch
 into blocks of consecutive games of about equal expected work.  Each block is one `taxman solve --keep-going` on one
 thread, with a limit on each game's search (`GAME_SECONDS`, 180).  Then passes of `--retry-improved` go over the

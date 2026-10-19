@@ -302,7 +302,7 @@ proof, of 1475, 4.9.
 
 `data/exact_parity_1301_2175.jsonl` is `exact` over the 875 games of 1301–2175, each proven from scratch with the
 parity bound.  It ran on one `c8g.4xlarge` (Graviton4, 16 vCPUs, one game a thread) on spot in us-east-1b, run by
-`../tools/cloud/prover.sh` ([RUNBOOK, section 9](../docs/RUNBOOK.md#9-the-provers-proofs-of-optn-1301-to-2175)), with
+`../tools/cloud/prover.sh` ([RUNBOOK, section 8](../docs/RUNBOOK.md#8-the-provers-proofs-of-optn-1301-to-2175)), with
 the build of commit 4db7a14.  It ran from 2026-10-14 23:29 to 2026-10-15 15:22 UTC: 190 passes of 300 s, every one
 ending with status 0, with no interruption; 15.9 hours of run and 16.0 instance-hours at $0.2402, **$3.84**.
 

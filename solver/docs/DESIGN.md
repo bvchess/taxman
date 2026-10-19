@@ -1388,7 +1388,7 @@ root gaps; a game the rule settles goes into the list of the game it rests on, a
 own `--out` (`solver/tools/certify/`).  The campaign's phases (a pilot of seven dear games with a stop rule, the dear games,
 four balanced lists, the repeats the rule cannot settle) are cut from that work list by `solver/tools/certify_campaign.py`
 into `solver/tools/certify/lists/stage4/`, rated by `solver/tools/certify_pilot.py` and run by `solver/tools/cloud/certify.sh` (RUNBOOK,
-section 11).
+section 9).
 
 *Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
 [--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every
@@ -1652,9 +1652,9 @@ shared with the unit tests: the engine's instances, the random configurations of
   is not the table's fails the range at that game, with the lines before it, as a window of one does.  The cloud
   scripts that run the chain unattended have tests of their own that need no cloud (`solver/tools/cloud/test/run.sh`: the
   wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run ends, `wall.sh` through a launch, a
-  stop and a clean-up, against a stand-in for the aws CLI; RUNBOOK section 12.6), and so have the build cache and the
+  stop and a clean-up, against a stand-in for the aws CLI; RUNBOOK section 5.6), and so have the build cache and the
   release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`, `test_run_tests.py`
-  and `test_setup.py`, run with `python3 -I`; RUNBOOK section 15).  The policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
+  and `test_setup.py`, run with `python3 -I`; RUNBOOK section 11).  The policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
   workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
   youngest first and suspends them if need be, a suspended search claims one thread.
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not

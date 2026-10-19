@@ -39,14 +39,14 @@
 #   THREADS              worker threads, default all CPUs the solver may use
 #   WINDOW               the games in flight at once, default 4 (as `taxman solve --window`'s); 1 solves them one
 #                        after the other.  4 is the best measured on 64 threads past 2225, where 16 is 20 to 32%
-#                        slower than 1 (RUNBOOK.md, section 5; the notebook entries round-b-the-chain-on-many-threads
+#                        slower than 1 (RUNBOOK.md, section 4.2; the notebook entries round-b-the-chain-on-many-threads
 #                        and scaling-to-192-threads, both 2026-10)
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
 #                        (a checkpoint stops every worker for the slowest one's step, up to 0.4 s near n = 4000: 0.15%
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
 #   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000", or "--use-prev": the chain then
 #                        draws on the known games of the checkout's results/ (the committed chain, the
-#                        proven boards of the bounds store) instead of searching for them (RUNBOOK.md, section 12.4)
+#                        proven boards of the bounds store) instead of searching for them (RUNBOOK.md, section 5.4)
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; RUNBOOK.md, "Past 4095")
 #   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,

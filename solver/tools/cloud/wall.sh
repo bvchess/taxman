@@ -2,7 +2,7 @@
 # The unattended run to the wall: one spot instance in an Auto Scaling group that replaces it after an interruption,
 # running the chain from n = 1 until a game's own search passes the wall, the budget of instance-hours is used, the date
 # comes, or something fails.  This is the script for your machine; the instance's side is wall-node.sh (RUNBOOK.md,
-# section 12).
+# section 5).
 #
 #   solver/tools/cloud/wall.sh launch --commit SHA --until DATE [options]   create everything and start the run
 #   solver/tools/cloud/wall.sh status                                        where the run is, from S3 and the group
@@ -39,19 +39,19 @@
 #   --volume-gb G         VOLUME_GB       the root volume                                             default 40
 #   --extra-args "..."    EXTRA_ARGS      more flags for `taxman solve`; "--use-prev" makes the chain draw on the known games
 #                                         (the committed chain, the proven boards of the bounds store, ...) of the
-#                                         pinned commit's results/ (RUNBOOK.md, section 12.4)
+#                                         pinned commit's results/ (RUNBOOK.md, section 5.4)
 #   --margin S            LEDGER_MARGIN   seconds before the budget or the date that the chain stops  default 300
 #   --max-instances N     MAX_INSTANCES   machines in all before the run ends as a boot loop         default 20
 #   --save-every S        SAVE_EVERY      seconds between the copies to S3 (run.sh)                  default 600
 #   --checkpoint-interval S               seconds between checkpoints (CHECKPOINT_INTERVAL, chain.sh) default 300
 #   --continue                            go on with a run that has ended or been stopped (its S3 state is kept; the
 #                                         ended and stop objects are removed, the config is written again)
-# The build cache (RUNBOOK.md, section 15), by environment variables only; the config carries them to each machine's
+# The build cache (RUNBOOK.md, section 11), by environment variables only; the config carries them to each machine's
 # setup.sh: RELEASE_TESTS=1 (a machine whose cache has no tested build of the commit builds it, runs the release suite
 # and, if it passes, stores the binaries; if it fails the run ends with RELEASE_TESTS_FAILED in $S3_DEST),
 # REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
 # status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
-# time, in UTC, and how long ago) the last game recorded and a line for each game in flight (RUNBOOK.md, section 12.4).
+# time, in UTC, and how long ago) the last game recorded and a line for each game in flight (RUNBOOK.md, section 5.4).
 # Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1 for launch,
 # and for status, stop and cleanup the one run in progress, the one whose prefix has a config and no ended object; with
 # none they refuse and say so, and with several they refuse and list the runs to choose from),
@@ -434,7 +434,7 @@ launch() {
         die "--continue, but $S3_DEST/run/config does not exist: there is no run to go on with"
     fi
     read_aws iam get-instance-profile --instance-profile-name "$ROLE" --query 'InstanceProfile.Roles[].RoleName' \
-        --output text >/dev/null || die "the instance profile $ROLE does not exist (RUNBOOK.md, section 9.4)"
+        --output text >/dev/null || die "the instance profile $ROLE does not exist (RUNBOOK.md, section 2.1)"
 
     # Where: the zones, cheapest first, and their subnets in the default VPC.
     local vpc subnets zone subnet

@@ -9,7 +9,7 @@
 #   solver/tools/cloud/setup.sh         from inside a checkout
 #   ./setup.sh                          a copy of this script alone: it clones REPO_URL to $TAXMAN_DIR first
 #
-# The release binaries come from the build cache when it has them (RUNBOOK.md, section 15): a clean checkout at a commit
+# The release binaries come from the build cache when it has them (RUNBOOK.md, section 11): a clean checkout at a commit
 # looks for that commit's binaries, built for this architecture and CPU, in S3 and downloads them instead of building.
 # Everything in the cache has passed the release suite.  Only RELEASE_TESTS=1, on one machine, puts binaries there.
 #
@@ -220,7 +220,7 @@ if [ "$cache_usable" = 1 ]; then
         built_from_cache=1
     elif [ "${REQUIRE_CACHED:-0}" = 1 ]; then
         fail "REQUIRE_CACHED=1 and the cache has no tested build of $cache_key for this set: run RELEASE_TESTS=1" \
-            "setup.sh on a machine of this type first (RUNBOOK.md, section 15)"
+            "setup.sh on a machine of this type first (RUNBOOK.md, section 11)"
     fi
 elif [ "${REQUIRE_CACHED:-0}" = 1 ]; then
     fail "REQUIRE_CACHED=1 and the build cache cannot be used here (see above)"
