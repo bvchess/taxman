@@ -44,21 +44,21 @@ second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper 
 What has been tried for the bound, and where it stands:
 
 * **A1, the multi-field bound in the search: closed.**  At the roots it closes 0.4-0.6 of the gap; in a branch and
-  bound its trees are smaller by a factor that falls as the gap grows
-  ([E3 pilot](../notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md),
+  bound its trees are smaller by a factor that falls as the gap grows ([E3 pilot](../notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md),
   [R3 and the slope test](../notebook/r3-and-the-slope-test-u4-of-a1-2026-10/README.md)); at 840 sampled nodes (2026-10-18)
   its full bound cuts none from a gap of 500, where the cost is, and every policy of computing it loses
   ([the entry](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).
 * **Carrying a search's work to the next game: closed.**  The trees of neighbours share 0.15% of their steps
   ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * **A3, splitting by the number of promotions: closed.**  At 936, 1215 and 2112 every node's heaviest completion
-  already has the root's size, so a bound by size equals the plain one
-  ([A3's test](../notebook/split-by-the-number-of-promotions-a3s-test-2026-10/README.md)).
+  already has the root's size, so a bound by size equals the plain one ([A3's test](../notebook/split-by-the-number-of-promotions-a3s-test-2026-10/README.md)).
 * **The strong bound at the nodes: closed** (2026-10-18).  Refitted at a node it cuts 92% of the open nodes with a gap
   under 50, 19% at 100-199 and none from 300, where the cost is, and costs 164-234 GF(2) bounds: every policy of
   computing it loses ([the entry](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
 * **A5, decomposing across the frames: closed** (2026-10-18): the conflicts sit in frames 1-3 and the work is the
   separator's, not the sides' ([the entry](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
+* **Flat-cycle cuts: closed** (2026-10-18).  On the matching LP they add 0.12 of the gap; it does not beat A1, and the
+  rest is not cycle-shaped ([the entry](../notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md)).
 * **Why the trees are big** (2026-10-18): the gap is paid in exclusions priced at a tenth of the member left out (the
   bound substitutes a near-equal number), 5-8 a path ([the entry](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)).
 
