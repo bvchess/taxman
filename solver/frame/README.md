@@ -827,17 +827,4 @@ comment that is worth reading first; section 6 above is the map of how the piece
 15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
     sacrifice bound).
 
-| document | what it holds |
-|---|---|
-| this page | the user guide |
-| [DESIGN.md](../docs/DESIGN.md) | the design as it is now: goals, the game and the frame model, the architecture, the search, the tactics and their grades, the engine, the pipeline, the trust model, the tests, performance |
-| [solver/docs/STATUS.md](../docs/STATUS.md) | the current state of the work: what is in flight, paused, decided, waiting on a decision (read it first) |
-| [solver/notebook/README.md](../notebook/README.md) | the register of everything tried, kept or not (check it before proposing an experiment), and the lab notebook: every round of improvements with its measurements, one folder an entry in [solver/notebook/](../notebook/) |
-| [solver/docs/IDEAS.md](../docs/IDEAS.md) | ideas borrowed from other fields (SAT, MaxSAT, MIP, #SAT, ...), ranked, with pilot measurements, the profile of the hardest games and the study of nogoods at many threads |
-| [solver/docs/AGENDA.md](../docs/AGENDA.md) | the research agenda (2026-10): what limits the end of the chain, the avenues ranked, conjectures, and what the cloud runs should measure |
-| [results/README.md](../../results/README.md) | the committed results files and what supports their scores |
-| [solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | how the cost grows with n beyond the end of the chain, and projections for a larger machine |
-| [solver/noframe/README.md](../noframe/README.md) | the prover: independent proofs and checks of the frame solver's results on the whole board, and the conjecture checks |
-| [solver/docs/RUNBOOK.md](../docs/RUNBOOK.md) | running the solver, and the prover's proofs, on a many-core cloud machine |
-| [docs/THEORY.md](../../docs/THEORY.md) | the theory (maximal factors, playable sets) the model rests on |
-| the [wiki](https://github.com/bvchess/taxman/wiki) | the Java solver's algorithm and definitions |
+The map of the documents is [solver/README.md](../README.md#the-documents).
