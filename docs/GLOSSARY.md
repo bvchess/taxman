@@ -193,14 +193,15 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   * the tactic `lagrange`: the matching bound inside, with multipliers that each searcher fits at the root to the
     nogoods it has learned ([DESIGN.md](../solver/docs/DESIGN.md#the-lagrangian-bound-over-the-nogoods));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (`wall choice`).  The
-    notebook's entries call this form "the strong bound";
+    notebook's entries call this form the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.
 * **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in the frame
   matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  The bound is the
   linear program over all of them, computed by Lagrangian decomposition ([AGENDA.md, section
-  3](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook calls it "the fields bound".
+  3](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
+  bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
   [THEORY.md](THEORY.md), Lemma D).  A search stopped before its first node has the root's bound as its dual bound.
@@ -279,7 +280,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
 * **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): the register of
-  everything tried, the index of rounds, and the entries, one folder each.  Older text calls it EXPERIMENTS.
+  everything tried, the index of rounds, and the entries, one folder each.  Older text calls it "EXPERIMENTS".
 
 ## Labels
 

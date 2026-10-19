@@ -74,6 +74,17 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | frontier (the largest n solved in a row, or the hardest games) | the end of the chain, the hardest games |
 | cores (CPU) | CPUs, threads |
 | selection, pick | move |
+| board size | game n, the game of n, or n |
+| the optimum (a noun) | opt(n), the best score; P\*, the best promotion sum |
+| the strong bound (`wall choice`) | the Lagrangian bound over the nogoods, with the GF(2) bound inside, refitted at the node |
+| the nogood bound | the Lagrangian bound over the nogoods |
+| the A1 bound, the fields bound | the multi-field bound (the agenda's A1) |
+| checker | the referee (of one game); a verifier (of a whole results or bounds file) |
+| EXPERIMENTS, EXPERIMENTS.md | the notebook (this page and its entries) |
+
+The last seven rows are the names that [docs/GLOSSARY.md](../../docs/GLOSSARY.md) replaced on 2026-10-18.  The docs
+rewritten to [docs/WRITING.md](../../docs/WRITING.md) use the new names, and the docs test holds them to it; the
+others follow as they are rewritten.
 
 ## Register of everything tried
 
