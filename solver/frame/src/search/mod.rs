@@ -73,7 +73,8 @@
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
 //! * `diagnostics`: [`Diagnostics`], for tuning.
-//! * `hooks`: [`StepHook`], what a study is told of every step and asked by it (none in a search of the solver's).
+//! * `hooks`: `StepHook`, what a study is told of every step and asked by it; built only with the feature `studies`,
+//!   so that a default build's searcher has no site of it.
 //! * `dual`: [`dual_bound`], the upper bound that a stopped search's checkpoint proves, and [`NodeBound`], the bound
 //!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
@@ -86,6 +87,7 @@
 mod diagnostics;
 mod dual;
 mod header;
+#[cfg(feature = "studies")]
 mod hooks;
 mod incumbent;
 pub mod lagrange;
@@ -97,6 +99,7 @@ mod tactics;
 
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use dual::{dual_bound, DualBound, NodeBound};
+#[cfg(feature = "studies")]
 pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 pub use incumbent::Neighbourhood;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};

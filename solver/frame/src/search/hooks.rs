@@ -1,9 +1,10 @@
 //! A searcher's hook for studies ([`StepHook`]): told what every step saw and did, and asked which member of a
 //! conflict to branch on.
 //!
-//! A search runs without one ([`SearchSpace::hooks`](super::SearchSpace::hooks) is `None`, as
-//! [`SearchSpace::new`](super::SearchSpace::new) makes it), and then each site of the hook in a step is a test of an
-//! `Option` that is always `None`, as the sites of the [`Diagnostics`](super::Diagnostics) are.  With one, each
+//! The hook, and every site of it in the searcher, is built only with the feature `studies`: a default build's steps
+//! are what they were before it, with not even a test of an `Option`.  With the feature, a search runs without one
+//! ([`SearchSpace::hooks`](super::SearchSpace::hooks) is `None`, as [`SearchSpace::new`](super::SearchSpace::new)
+//! makes it), and then each site of the hook in a step is a test of an `Option` that is always `None`.  With one, each
 //! searcher makes its own hook when it is made, and the hook sees the steps of that searcher in their order.  What
 //! the hook is told is a copy: it cannot change the step.  What it is asked ([`StepHook::branch`]) can change the
 //! tree, never the answer: every completion of a node leaves out a member of the conflict of its heaviest set, so
