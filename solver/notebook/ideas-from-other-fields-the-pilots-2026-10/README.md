@@ -1,13 +1,15 @@
-# Ideas from other fields: a ranked proposal, with pilot measurements
+# Ideas from other fields: the pilots (2026-10)
+
+Part of the [lab notebook](../README.md).
 
 The solver already borrows from SAT solving (conflict analysis, nogoods, forgetting them) and from MIP (a
-relaxation bound, strong branching), and those borrowings paid a great deal ([EXPERIMENTS.md](../notebook/README.md)).
+relaxation bound, strong branching), and those borrowings paid a great deal ([EXPERIMENTS.md](../README.md)).
 This page asks what else to borrow, and answers with measurements rather than opinions: every idea that looked
 promising got a cheap pilot (a counter, a fixture, a node-limited or proof-only run), and the ones that did not
 survive their pilot are recorded with the number that killed them.  The pilots' code was discarded after the study
 (section 6), so each pilot is described here well enough to be rebuilt: what it computed, on which games and with
 which settings, and the numbers that decided it.  The register of everything tried, in
-[EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried), has a row for each.
+[EXPERIMENTS.md](../README.md#register-of-everything-tried), has a row for each.
 
 * [1. The recommended order](#1-the-recommended-order)
 * [2. Where the time goes in the hardest games](#2-where-the-time-goes-in-the-hardest-games)
@@ -23,7 +25,7 @@ something costs, and only as ratios within one run.  All searches use only prove
 tactic since removed) and, unless they say otherwise, *proof-only*: seeded with the game's own optimum
 (`ladder --seed-opt`), which makes the node count of a one-thread search exact and leaves the tree to the bound and the
 branching, the parts these ideas change.  "Fast set" is EXPERIMENTS' 880, 936, 1050, 1100, 1170, 1184 seeded from n − 1.
-What matters at the end of the chain is the slope of the cost curve ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md):
+What matters at the end of the chain is the slope of the cost curve ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../benchmarks-the-probe-pgo-and-scaling/cost-curve.md):
 ×10 per 55-70 in n), so each result says whether its effect grows with n where that could be measured.
 
 ## 1. The recommended order
@@ -235,20 +237,20 @@ it, replayed by the referee as always.  It needs a proof kind (a repeat of game 
 assumes), the digest in the result line or recomputed when the range starts, and the two verifiers.  The payoff is a
 constant fraction of the chain, at no risk, and it multiplies with everything else here.
 Implemented as the tactic and proof kind `same_search`
-([EXPERIMENTS, "Same search"](../notebook/same-search-2026-10/README.md)).
+([EXPERIMENTS, "Same search"](../same-search-2026-10/README.md)).
 
 ### 4.2 A Lagrangian bound over the nogoods (rank 2)
 
 Done since: kept incrementally, and with the forced members its potentials give, it is the tactic `lagrange`, on by
 default, about 3 times fewer cycles on the proofs of 1184-1300
-([EXPERIMENTS.md](../notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).
+([EXPERIMENTS.md](../a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).
 
 *Mechanism.*  The matching bound knows no nogood.  Every completion `F` of a node with promotions `P` promotes at most
 `|N − P| − 1` members of each nogood `N`; dualizing these inequalities with multipliers `λ_N ≥ 0` gives, for every
 `λ`, the bound `max_M Σ_{x ∈ Q(M)} (x − Σ_{N ∋ x} λ_N) + Σ_N λ_N (|N − P| − 1)`: a matching with each
 candidate's weight lowered by the multipliers of its nogoods, plus a constant.  A nogood with a member that has left
 the candidates cannot be broken any more and is left out (multiplier 0 at that node).  It is the prover's
-second bound ([the prover's README](../noframe/README.md), section 3: 3.3× fewer nodes at n = 793 in the
+second bound ([the prover's README](../../noframe/README.md), section 3: 3.3× fewer nodes at n = 793 in the
 prover), brought to the frame solver, and MaxSAT's core-guided bounds in spirit: each nogood is a core, and the
 multipliers say how much each costs.
 
@@ -338,7 +340,7 @@ of its maximal factors that is a factor of the frame; a candidate belongs to the
 root of 936, 1000, 1100, 1215, 1232, 1287 and 1300, and at all 600 search nodes of the probe's fixtures (936 and
 1215; each node's state rebuilt from its promotions, the candidates its own), there is exactly one component holding
 candidates.  Nothing to split.  The version that conditions on a separator home instead (agenda A5) was measured
-later and killed too ([A5's test](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
+later and killed too ([A5's test](../decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
 
 ### 4.5 Disjoint conflicts from the dual (killed)
 
@@ -447,10 +449,10 @@ experiment.  "Pilot" refers to section 4.
   candidates with the same neighbourhoods) is rare, since a number's maximal factors determine it (up to those
   missing from the frame).  High cost, unknown payoff; not tried.  A first, cheap look would count pairs with
   nested neighbourhoods in a frame.  *Piloted later*: [EXPERIMENTS, "Dominance and
-  symmetry"](../notebook/dominance-and-symmetry-2026-10/README.md) (no twins, literal dominance at a few percent of the nodes).
+  symmetry"](../dominance-and-symmetry-2026-10/README.md) (no twins, literal dominance at a few percent of the nodes).
 * *Symmetry breaking*: none found here; there are symmetries after all, exchanges of primes that the frame builder
   treats alike, and breaking them is a constant factor ([the same
-  entry](../notebook/dominance-and-symmetry-2026-10/README.md)).
+  entry](../dominance-and-symmetry-2026-10/README.md)).
 * *Nogood recording on restarts*: subsumed by the existing nogoods.
 
 **From #SAT and model counting**
@@ -505,7 +507,7 @@ reduced-cost fixing, components, disjoint conflicts and recency in section 4, wi
 games, with which settings, and the numbers that decided it.  The Lagrangian pilot (section 4.2) was taken over by
 the experiment that follows it up.
 
-The register in [EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried) has a row for each.  A pilot that
+The register in [EXPERIMENTS.md](../README.md#register-of-everything-tried) has a row for each.  A pilot that
 graduates (rank 2 first, once its incremental matching pays) comes to `master` as a tactic, rewritten for it.
 
 To reproduce what is still reproducible (from the top of the repository, after `cargo build --release --examples` in `solver/frame`;

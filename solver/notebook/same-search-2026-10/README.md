@@ -2,10 +2,10 @@
 
 Part of the [lab notebook](../README.md).
 
-*Question.*  Rank 1 of [IDEAS.md](../../docs/IDEAS.md#1-the-recommended-order): many games pose exactly the search problem of an
+*Question.*  Rank 1 of [IDEAS.md](../ideas-from-other-fields-the-pilots-2026-10/README.md#1-the-recommended-order): many games pose exactly the search problem of an
 earlier game of the chain (the same frames, candidates, `max_total` and factor graph; only the cap differs), so they
 have its best promotion sum, yet the solver proves it again.  How many, what does it cost, and does concluding them
-from the earlier game hold up?  The pilot ([IDEAS.md 4.1](../../docs/IDEAS.md#41-memoizing-searches-that-repeat-rank-1)) hashed the
+from the earlier game hold up?  The pilot ([IDEAS.md 4.1](../ideas-from-other-fields-the-pilots-2026-10/README.md#41-memoizing-searches-that-repeat-rank-1)) hashed the
 root frames, the candidates and `max_total` with Rust's `DefaultHasher`; this round makes it a proof kind (commits
 f5a2af3 and 1cc4067; DESIGN.md, ["Same search"](../../docs/DESIGN.md#same-search), has the argument).
 

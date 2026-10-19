@@ -4,10 +4,12 @@ What to pursue to push the wall (the largest n for which an optimal game is prov
 chain ([results/README.md](../../results/README.md)) reaches: where the project stands, what limits it, the avenues
 ranked, the conjectures worth proving, the ideas worth borrowing, and what the coming cloud runs should measure.
 Written on 2026-10-14, after the rule of symmetric pairs was merged.  It links to the measurements instead of repeating
-them; the ones made for it are in section 7.  On 2026-10-15 section 2 and the results of A4, C5 and C6 were brought up
-to date with the measurement of the chain past 2175 (section 7.4), and "Where we are" with the committed chain, which
-the cloud run took to 3440.  The register of [EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried) stays the
-record of what was tried; an avenue started from here gets its row there when it ends.
+them; the ones made for it are the entry [Measurements made for the research
+agenda](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as "measurements 7.1" to
+"7.4".  On 2026-10-15 section 2 and the results of A4, C5 and C6 were brought up to date with the measurement of the
+chain past 2175 (measurements 7.4), and "Where we are" with the committed chain, which the cloud run took to 3440.  The
+register of [EXPERIMENTS.md](../notebook/README.md#register-of-everything-tried) stays the record of what was tried; an
+avenue started from here gets its row there when it ends.
 
 * [1. Where we are](#1-where-we-are)
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
@@ -15,14 +17,13 @@ record of what was tried; an avenue started from here gets its row there when it
 * [4. Conjectures](#4-conjectures)
 * [5. Ideas from other domains](#5-ideas-from-other-domains)
 * [6. What the cloud runs should measure](#6-what-the-cloud-runs-should-measure)
-* [7. Measurements made for this agenda](#7-measurements-made-for-this-agenda)
 
 ## 1. Where we are
 
 **Known.**  The results and what each rests on are in the [README](../frame/README.md#what-optimal-means), and the
-current state of the work in [STATUS.md](STATUS.md); section 7.4 measures the root gaps of the cloud chain.  Outside
-the project the record stops at n = 1000 (OEIS A019312's table is this project's), and the literature has bounds and
-one asymptotic result, not optima (section 5).
+current state of the work in [STATUS.md](STATUS.md); measurements 7.4 has the root gaps of the cloud chain.  Outside the
+project the record stops at n = 1000 (OEIS A019312's table is this project's), and the literature has bounds and one
+asymptotic result, not optima (section 5).
 
 **The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
 matchable exactly when some payment set has one, an odd number, or at least one payment scheme
@@ -66,12 +67,12 @@ The one change of slope in the project's history is the GF(2) bound itself (the 
 ## 2. The diagnosis of the wall
 
 **The cost model.**  Over the 314 exhausted searches of 1301-2175 in `results/strict.jsonl` (8 threads, the build of
-feba6d0), against the root GF(2) gaps of `solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl` (section 7.1):
+feba6d0), against the root GF(2) gaps of `solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl` (measurements 7.1):
 
     log10 nodes ≈ 3.24 + G / 255        (G the root's GF(2) gap; R² 0.50, residual sd 0.46 decades)
 
 The build that now runs the chain makes trees 0.29 times as large (the same 391 games solved again on one thread: 0.27
-at 1301-1500, 0.41 near 2175; 0.44 for the 39 searches of 2176-2276 against the Graviton calibration's chain; section
+at 1301-1500, 0.41 near 2175; 0.44 for the 39 searches of 2176-2276 against the Graviton calibration's chain; measurements
 7.4), so the model to project with is refitted on that build, over 1301-3312 (714 exhausted searches: the games of
 1301-2175 solved again, and the EC2 chain's 400 of 2176-3312 with their nodes less 0.06 decades for the window and the
 threads):
@@ -92,7 +93,7 @@ root).  The gap is the cost.
 
 **Past 2175 the trees still follow their gaps, and the gaps rise.**  The wall regime found the dear games of the c8g
 chain 4 to 18 times larger than their gaps predict; those games were chosen for their trees.  With the root gaps of all
-509 searched games of 2176-3312 (section 7.4) the dear games are the games of high gap: the 47 searches of gap 1,100 or
+509 searched games of 2176-3312 (measurements 7.4) the dear games are the games of high gap: the 47 searches of gap 1,100 or
 more hold 77% of the chain's nodes, and against the scaled gap the 18 dearest are within +0.6 decades of the model (the
 most in excess 2346, 3.9 times, and 3300, 3.3 times; the residuals' sd is 0.48).  The level of the gap is new: about 450
 at 2100, 650-1,000 by 2400, then waves of a hundred games and more (mean 530 at 2601-2700, 1,130 at 3101-3200).  The
@@ -173,7 +174,7 @@ signing whose sums vanish column by column over GF(3), which is possible for eve
 (1 + 2, 1 + 1 + 1, ...).  So every core the search meets yields a signing whose matroids see it, and all its other
 rank inequalities come with it (GF(2) is the exception: a column listed three times cannot vanish there, which is
 exactly how odd cores escape).  Measured
-(section 7.2): at the roots of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), the bound's heaviest set is
+(measurements 7.2): at the roots of the 1,055 games of 78-1300 whose parity bound exceeds opt(n), the bound's heaviest set is
 dependent over GF(3), GF(5) or GF(7), with 0/1 entries or Koszul signs, in 566 (54%), and the share *rises* with n: 0%
 below 300, 49% at 300-599, 57%, 55%, 73% at 1100-1300, as the residuals grow.  Every cut family tried so far closed a
 share that fell with n; this is the first relaxation whose reach grows with the cores.  It is also a whole family, all
@@ -189,13 +190,13 @@ in an example, as the matroid study was (both files are removed from master now;
 *Metric:* the share of the root GF(2) gap closed, by band, and its trend in n;
 then at the 600 probe nodes (`testdata/perf`), the share of the open nodes it cuts.  *Kill:* a mean share under 20%, or
 one that falls with n as the cuts' did (−4 points per 100 n).  A pilot on the whole board first is cheaper still: the
-prover's `parity.rs` with a GF(3) twin, on 1000-1300, where section 7.2's sets come from.
+prover's `parity.rs` with a GF(3) twin, on 1000-1300, where measurements 7.2's sets come from.
 
 *Payoff.*  A share s that holds with n lowers the gap term of the slope by s.  At s = 0.5 and the steeper gap trend, the
 cost goes from ×10 per 380 n to ×10 per about 600 n.  Below that, a constant factor (×10 per 255 of gap closed).
 
 *Risk.*  The bound may move little where it bites: excluding one heaviest set leaves others nearly as heavy with other
-cores (the anatomy's lesson), and 54% of the square residuals have determinant ±1 under both entries tried (section
+cores (the anatomy's lesson), and 54% of the square residuals have determinant ±1 under both entries tried (measurements
 7.2), invisible to every prime field with those entries.  At nodes the multipliers must be refitted to pay (the cuts
 study: ×4.2 in nodes with the node's multipliers, ×1.26 with the root's), and a GF(3) level kept along the path doubles
 the node's work.  Random signings see small cores often and large ones rarely (the chance that a column listed k times
@@ -217,7 +218,7 @@ part: every optimal game plays U\*.  Barring a member u of U\* in the parity bou
 proves that every optimal set holds u when the bound falls below opt(n); with U\* maximal, every optimal set then has
 upper part U\*.
 
-*Why it might work.*  Measured (section 7.3): one barred parity bound each certifies 207 of the 224 members of U\* at
+*Why it might work.*  Measured (measurements 7.3): one barred parity bound each certifies 207 of the 224 members of U\* at
 600, 339 of 377 at 1000 and 472 of 490 at 1300 (92-96%), in about ten seconds a game.  The rest are open by margins up
 to the root's gap, and some are settled by theorems already (the largest prime is in every optimal set, THEORY.md's
 lemma, yet its barred bound is open at 1000 and 1300).  The prover then searches with the certified members forced,
@@ -291,7 +292,7 @@ explains more than 30% of the residual variance.
 *Payoff.*  A model of c that extrapolates, and possibly a branching that lowers it.  *Risk:* the runs may be noise of
 the incumbent's history.  *Proven first:* the branching's partition (as for conflicts).
 
-*Result* (the 400 exhausted searches of 2176-3312, section 7.4): killed.  Nineteen features of the root were tried
+*Result* (the 400 exhausted searches of 2176-3312, measurements 7.4): killed.  Nineteen features of the root were tried
 against the cost model's residual: the heaviest set's conflicts (their number, the first one's size, the mean, the
 largest, the members in all), the cores it runs into (the frames holding one, their movers, the movers with three or
 more live factors, the promoted members and factors inside), the forced members at the root, the start incumbent's
@@ -312,9 +313,10 @@ are the games of high gap, and what the gap leaves is not in the root.
 *Idea.*  The frames form a path (a candidate of home h touches frames h and h − 1 only), so fixing the decisions on the
 candidates of one home separates the frames in front from those behind, and the best completion is the sum of the two
 sides' bests.  An AND/OR branch and bound (branch on a separator home, then solve the two sides independently, caching
-nothing across) turns a product of the two sides' trees into a sum.  The component decomposition of IDEAS.md looked for
-disconnected parts and found one component; this conditions on a separator instead.  `max_total` couples all frames, but
-it never binds and can be dualized.
+nothing across) turns a product of the two sides' trees into a sum.  The component decomposition of [the pilots of ideas
+from other fields](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#44-component-decomposition-killed)
+looked for disconnected parts and found one component; this conditions on a separator instead.  `max_total` couples all
+frames, but it never binds and can be dualized.
 
 *Cheapest experiment.*  At the probe's nodes and along the proofs of 1215 and 2170: how the GF(2) gap of a node splits
 by frame (the anatomy did it at roots: homes 1-3), and whether the subtrees under a node resolve the cores of frame 1
@@ -343,8 +345,10 @@ member read off the exchange graph would cut its strong branching.  *Experiment:
 
 ### A7. The engineering the wall will need (constant factors, in this order)
 
-* 192 threads: the tree's growth with workers (10-20% at 32-128 emulated), the nogood period at 192 (IDEAS.md,
-  section 3), checkpoints at 300 s.  Measured on the cloud machine, not designed further here.
+* 192 threads: the tree's growth with workers (10-20% at 32-128 emulated), the nogood period at 192 ([ideas from other
+  fields, section
+  3](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)), checkpoints at
+  300 s.  Measured on the cloud machine, not designed further here.
 * The intersection's shortest paths (69% of a node at 4000): the GF(2) inner loop has left the solves of strong
   branching mostly certified; what remains is the augmentations of a level, a few dozen a node.
 * Boards past 4095: a width of 128, `MAX_FRAMES` 9, the GF(2) vectors to 5 words
@@ -354,12 +358,21 @@ member read off the exchange graph would cut its strong branching.  *Experiment:
   consecutive games share 0.15% of their steps (median of 14 pairs), and a run costs at least its dearest game, which
   limits the saving to 18-29% of the nodes past 2175
   ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
+* Strong branching's solves, 70% of the intersection's work, restart far below their answer: canceling the negative
+  cycles of the optimum less the member would start them next to it.  Untried ([the GF(2) bound in the
+  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), "Next on the inner loop").
+* What only the matching path uses and the GF(2) bound has made idle can be removed, once a production run has been made
+  with the GF(2) search: the Lagrangian bound in the search and refinement ([the same
+  entry](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), "To remove").
+* A unit that carries its GF(2) level, so that a rebuilt unit's first node checks the level instead of solving it, would
+  win at most the units' first nodes: 1 to 4% of a thread's time at 64 threads, nothing on long searches.  Not built
+  ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), "What to build next").
 
 ## 4. Conjectures
 
 **C1 (fields).**  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0/1 entries, Koszul signs, and
 the signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  *Evidence:*
-the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of 300-1300, rising (section
+the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of 300-1300, rising (measurements
 7.2); the signed GF(3) family is complete (Hershkowitz and Schneider, section 5).  *Test:* A1's root experiment.
 
 **C2 (sign coherence of three-prime cores).**  On numbers p^a q^b r^c of three primes, movers of degree d + 1 over
@@ -375,7 +388,7 @@ schemes; then regions with holes.
 
 **C3 (the upper part).**  Every optimal game plays U\*, and game by game this is certified by barred parity bounds and
 small searches.  *Evidence:* every game enumerated ([prover 5](../noframe/README.md#5-is-the-optimal-set-unique)); 92-96%
-of U\* certified at the root by one bound each (section 7.3).  *Attack:* the frontier argument of
+of U\* certified at the root by one bound each (measurements 7.3).  *Attack:* the frontier argument of
 [prover 8](../noframe/README.md#8-what-remains-open) for a proof; A2 for certificates.
 
 **C4 (one size, near the relaxation's).**  All optimal sets of a game have one size, and it is within one of the size
@@ -390,7 +403,7 @@ most.  Not needed for A3's soundness.  *Test:* the heaviest set of each size at 
 **C5 (the gap law).**  The true root gap of the searched games grows linearly in n past 2175, at a rate between the
 two regimes of section 2; or, in the form the fit of 1301-2175 prefers, G/n stays bounded.  *Test:* section 6's root
 gaps of the chain past 2175.  Everything about where the wall is rests on it.  *Result* (the EC2 chain's 509
-searched games of 2176-3312, section 7.4): both forms hold, and neither regime.  The gap is 341 to 1,443 (mean 818,
+searched games of 2176-3312, measurements 7.4): both forms hold, and neither regime.  The gap is 341 to 1,443 (mean 818,
 against 391 at 1301-2175), risen from about 450 at 2100 to 650 at 2160-2200 and then in waves of a hundred games and
 more (mean 530 at 2601-2700, 1,130 at 3101-3200).  Its slope is +37 per 100 n over 1301-3312 (95%: 22 to 50 with blocks
 of 100 games, 6 to 63 with blocks of 200) and +25 over 2176-3312 alone (−43 to +83: a window of 1,100 n holds too few
@@ -428,7 +441,7 @@ the relevant pages, the others were seen in abstracts.
   the field for some graphs) is the general setting.
 * **Integer linear algebra.**  A set's rows are independent over GF(p) exactly when p does not divide the gcd of its
   maximal minors, the last determinantal divisor of its Smith normal form (R. P. Stanley, "Smith normal form in
-  combinatorics", JCTA 144 (2016), arXiv:1602.00166).  *Transfers:* which fixed fields to add (section 7.2's census of
+  combinatorics", JCTA 144 (2016), arXiv:1602.00166).  *Transfers:* which fixed fields to add (measurements 7.2's census of
   determinants), and the fact that cores whose divisor is 1 escape every fixed-entry field, so signings are needed.
 * **Coding theory, the erasure channel.**  The cores are *stopping sets* of a parity-check matrix whose variable nodes
   are movers and check nodes factors; the even cores are supports of codewords; peeling is the erasure decoder.
@@ -484,15 +497,28 @@ the relevant pages, the others were seen in abstracts.
   Landau's count of numbers with k prime factors, x (log log x)^(k−1) / ((k − 1)! log x), says how fast the movers with
   three distinct primes, where all odd cores live, thicken in frames 1-3.
 
+Still open from [the pilots of ideas from other
+fields](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md) (2026-10), measured on the matching path:
+
+* **Knuth's estimate of a tree's size** (rank 3, not piloted): a game's cost before running it, and which units to split
+  first ([its section 5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered),
+  "Tree-size estimation").
+* **Reliability branching** (rank 4): pseudocosts in place of strong branching's exact solves, built only if they
+  predict the chosen member and the forced set ([its section
+  5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered)).
+* **The tree's growth at many workers, and the nogood period at 192 threads** (rank 5): A7.
+* **The ideas considered and not piloted**, each with its cheapest experiment: [its section
+  5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered).
+
 ## 6. What the cloud runs should measure
 
 The chain past 2175 and the prover's proofs of 1301-2175 decide C5 and A2's premise.  Most of what follows needs only
 their output files, analysed afterwards on one thread; what needs the machine is marked.
 
 * **The true root gap of every searched game** past 2175, from the chain's own optima (`examples/wall.rs nodes --nodes
-  1` over the results file, as in section 7.1): the gap's trend (C5, the two regimes of section 2) and the residuals
+  1` over the results file, as in measurements 7.1): the gap's trend (C5, the two regimes of section 2) and the residuals
   of the cost model, with the thread count in the fit.  Done for a snapshot of the EC2 chain at game 3314 (509
-  searched games, section 7.4, [EXPERIMENTS](../notebook/the-gap-past-2175-2026-10/README.md)); it can be repeated on the
+  searched games, measurements 7.4, [EXPERIMENTS](../notebook/the-gap-past-2175-2026-10/README.md)); it can be repeated on the
   committed chain as it stands, with `solver/notebook/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, for
   converting 192-thread trees to one-thread equivalents in that fit.  Measured for 2170 and 2172 (1 to 192 threads)
@@ -504,80 +530,46 @@ their output files, analysed afterwards on one thread; what needs the machine is
   in n, [EXPERIMENTS](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)), and where its
   tree branches (members above n/2 against below), which is A2's premise: the share of its nodes spent on U\*.  The
   run's lines hold totals only, so the second needs a rerun that counts them.
-* **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood
-  period (IDEAS.md, section 3), the checkpoint pause at 300 s
-  ([RUNBOOK 8](RUNBOOK.md#8-what-has-not-been-measured)).  Measured but for the nogood period, on
-  searches of up to 85 s ([EXPERIMENTS](../notebook/scaling-to-192-threads-2026-10/README.md)).
+* **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood period
+  ([ideas from other fields, section
+  3](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)), the checkpoint
+  pause at 300 s (below, "What has not been measured").  Measured but for the nogood period, on searches of up to 85 s
+  ([EXPERIMENTS](../notebook/scaling-to-192-threads-2026-10/README.md)).
 * **The fixed costs on Graviton** after round A
   ([solver/notebook/the-wall-regime-2026-10/README.md](../notebook/scaling-to-192-threads-2026-10/README.md#for-a-cloud-machine)): measured, the same entry.
 * **Keep every checkpoint of a dear game that does not finish**: a resumable tree past 2175 is the test bed for A1, A3
   and A4 at the size that matters.
 
-## 7. Measurements made for this agenda
+### What has not been measured
 
-Scratch code, not kept; what follows is enough to redo them.
+This list was the RUNBOOK's section 8 until 2026-10-18.
 
-### 7.1 The root gaps of the c8g chain
+The Graviton calibration measured the speed of a Graviton3 and a Graviton4 core against the M1 Max's, the contention
+among 64 one-thread copies (none), a proof's scaling to 64 threads, and the chain's games an hour on 64 threads: it is
+the entry [Graviton calibration](../notebook/graviton-calibration-2026-10/README.md), with its scripts and data in
+[solver/notebook/graviton-calibration-2026-10/README.md](../notebook/graviton-calibration-2026-10/README.md).  The scaling run of 2026-10-15 on a `c8g.48xlarge` (two sockets, two NUMA
+nodes) measured, after the inner loop's round, round A and round B, where a thread's time goes at 16, 64, 96 and 192
+threads, the window at 64 and 192 threads, the pause of a checkpoint and the memory at 192, the fixed costs of a game
+on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads: the entry
+[Scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md).  What neither measured:
 
-`examples/wall.rs nodes --known KNOWN --nodes 1 N...` (one thread, 29 s), `KNOWN` the committed chain followed by
-`solver/frame/testdata/c8g.chain-2176.jsonl`, for the 33 searched games of 2176-2276 that `gaps_c8g.jsonl` lacks:
-[solver/notebook/the-wall-regime-2026-10/gaps_c8g_rest.jsonl](../notebook/the-wall-regime-2026-10/gaps_c8g_rest.jsonl).  With `gaps_c8g.jsonl` that is every exhausted
-search of the c8g chain (39 of at least 50 nodes).  Fit: log10 of `results/strict.jsonl`'s nodes for its 314 exhausted
-searches of 1301-2175 (at least 50 nodes) against `gf2 − opt` of `solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl`, least squares; then the
-c8g chain's nodes (64 threads, the build before the inner-loop round, as `strict.jsonl`'s) against it.
-
-| fit over 1301-2175 | coefficients | residual sd | R² |
-|---|---|---|---|
-| gap | 0.00392 ± 0.00022 per unit (×10 per 255) | 0.46 | 0.50 |
-| gap, n | 0.00423 ± 0.00019, −0.00093 ± 0.00009 | 0.39 | 0.63 |
-| gap / n | 6.95 ± 0.31 per unit of 1000 G/n | 0.40 | 0.61 |
-
-The c8g chain's 39 searches: mean residual +0.08 ± 0.08 decades against the gap fit (sd 0.50), +0.45 against the fit
-with n, +0.67 against the fit on G/n; their own fit ×10 per 193 ± 40 of gap.  Largest residuals 2268 (+1.09), 2260
-(+0.95), 2272 (+0.77); smallest 2208 (−0.69), 2205 (−0.65).
-
-### 7.2 Other fields at the roots of the whole game
-
-For every n of 78-1300, the parity bound's heaviest common independent set I at the root (the prover's
-`parity::Meet::solve` with 0 and 1 barred, the weights the numbers; 17 s for all), the 1,055 games where it exceeds
-opt(n).  I is peeled (front moves: a member with one live factor takes it; back moves: a factor with one live lister
-goes to it; each keeps the rank over every field), and the residual R's matrix (its members against their maximal
-factors outside I) is tested for rank over GF(3), GF(5), GF(7) and a large prime (for the rationals), with 0/1 entries
-and with Koszul signs (the entry of s at s/p is (−1)^i, i the index of p among the distinct primes of s, increasing).
-
-| n | games | mean gap | mean residual | dependent over GF(3), 0/1 | in some other field or signing |
-|---|---|---|---|---|---|
-| 78-299 | 73 | 6 | 8 | 0% | 0% |
-| 300-599 | 281 | 28 | 17 | 43% | 49% |
-| 600-899 | 300 | 77 | 33 | 47% | 57% |
-| 900-1099 | 200 | 139 | 58 | 28% | 55% |
-| 1100-1300 | 201 | 138 | 65 | 48% | 73% |
-
-In all, 412 over GF(3) with 0/1 entries, 30 over GF(5), 12 over GF(7); with signs 209, 39 and 27; none over the
-rationals; the rank deficiency is 1 but in six residuals (2, over GF(3)).  Of the 658 square residuals, the integer
-determinant with 0/1 entries is ±1 in 408, divisible by 3 in 219, by 5 in 21, by 7 in 10; with signs ±1 in 572; ±1
-under both in 358 (54%).
-
-### 7.3 Barred bounds on the upper part
-
-For n = 600, 1000 and 1300 (30 s for the three), the parity bound with each member u of the recorded game above n/2
-barred, against opt(n): certified (below opt(n)) for 207 of 224, 339 of 377 and 472 of 490 members; the open ones are
-above opt(n) by at most 102, 208 and 147, at or below the root's gap (106, 214, 151).  The open members at 1300 include
-the largest prime, 1297, which THEORY.md's lemma puts in every optimal set.
-
-### 7.4 The root gaps of the EC2 chain
-
-`examples/wall.rs nodes --known SNAPSHOT --nodes 1 N...` (one thread, 9 minutes) over the 509 searched games of
-2176-3312 of a copy of the EC2 chain's results file (games 1..3314, taken on 2026-10-15: 64 threads on a
-`c8g.16xlarge`, the code of 55287ff, a window of 16 to about game 3310 and 4 after it, 6.4 hours for 2176..3314), and
-`examples/matroid.rs lagrange --limit 0` and `cores` (removed from master since; it builds at commit 8753189) for the
-conflicts and cores of the root's heaviest set (3 minutes); then the committed chain's 391 searched games of 1301-2175
-solved again by that build (`taxman solve 1301-2175 --threads 1`, in order), to put the two chains' trees on one
-build.  The data are in [solver/notebook/the-wall-regime-2026-10/README.md](../notebook/the-wall-regime-2026-10/README.md) (`gaps_chain.jsonl`, `anatomy_chain.jsonl`,
-`resolved_1301_2175.jsonl`), the tables in `gap_output.md` (`gap.py` makes them), and the study is the entry
-[The gap past 2175](../notebook/the-gap-past-2175-2026-10/README.md).  What it found, for sections 2, 3 and 4: the gaps (341
-to 1,443, +37 per 100 n over 1301-3312, G/n steady at 300), neither regime of section 2; the cost model on one build
-(a decade per 250 of gap, trees 0.29 times the committed chain's, the gap counting in units of n^0.3 with 0 and 0.5 as
-brackets); the dear games as the games of high gap; A4 killed; and the projection (a day on a `c8g.16xlarge` reaches
-about 4,100).  The day itself reached 3440, below the projection's 10th percentile for the centre model
-([the cloud run](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
+* **Why a 192-thread search after one-thread work in the same process steps 1.6 to 1.7 times slower.**  The ladder
+  showed it twice, `solve` never; the suspect is the kernel's automatic NUMA balancing.  The check (the threads' CPUs
+  during such a run, and the same under `numactl --interleave=all`) takes minutes on the next 192-thread machine; it
+  matters for a long `chain.sh` run on 192 threads.
+* **Where the second socket's cost goes.**  At 192 threads a step is 7 to 10% dearer than on one socket; remote memory
+  and the other chip's caches were not separated.
+* **Large trees on many threads.**  The longest search at 192 threads was 85 s (2288); hours of one tree (item 2 of
+  [solver/notebook/the-wall-regime-2026-10/README.md](../notebook/scaling-to-192-threads-2026-10/README.md#for-a-cloud-machine)) were not run, and nor was the size of a
+  checkpoint at 4000 on 192 threads (its standalone search ended in 43 s, before the first).
+* **The window's policy on many threads.**  Its constants (a tick of 5 ms, busy below 5% idle, giving back at 25% idle,
+  10 ms to settle) were not tuned; a window of 4 was the best of 1, 4, 16 and 32 on the games past 2225 at 64 and 192
+  threads in one run each, and 2, 3, 6 and 8 were not tried there.
+* **Graviton5.**  A `c9g.16xlarge` was launched for the calibration and the spot service took it back five minutes in,
+  before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
+* **PGO and `target-cpu=native` on Graviton.**  `solver/tools/pgo.sh` exists and was run on the M1 only; no gain from
+  profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
+* **The scripts on Linux and on EC2.**  See [the RUNBOOK](RUNBOOK.md), on the scripts: `scaling.sh` has not run on EC2 (`chain.sh` has, in the
+  cloud run), and `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes
+  before the end, with no `spot-watch.sh` running), so neither has the restore after one: the cloud run's was after a
+  stop on purpose.  The first run of `scaling.sh` on a small instance is the test of that one.

@@ -15,7 +15,7 @@ residual gap do conflicts close, at the root and at nodes, by n, and at what cos
 
 *What was kept.*  Nothing but this entry; the solver is unchanged.  The study's code lived on a branch that was never
 pushed and has been deleted, as the project does with research branches once they are harvested (the pilots of
-[IDEAS.md](../../docs/IDEAS.md#6-the-tools-and-what-became-of-the-pilot-code) went the same way).  It was a library module that
+[IDEAS.md](../ideas-from-other-fields-the-pilots-2026-10/README.md#6-the-tools-and-what-became-of-the-pilot-code) went the same way).  It was a library module that
 solves the LP below (Dantzig-Wolfe column generation with a dense revised simplex, and exact separation of conflicts),
 an example program that ran the measurements, a patch that instrumented the search, and a script that made the tables
 from the data; the data went with it.  So the method is written out here to be redone: which LP, with which inner

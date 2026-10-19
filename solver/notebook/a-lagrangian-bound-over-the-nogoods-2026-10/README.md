@@ -2,7 +2,7 @@
 
 Part of the [lab notebook](../README.md).
 
-The question (solver/docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](../../docs/IDEAS.md#42-a-lagrangian-bound-over-the-nogoods-rank-2))
+The question (solver/docs/IDEAS.md, rank 2): the pilot ([IDEAS.md 4.2](../ideas-from-other-fields-the-pilots-2026-10/README.md#42-a-lagrangian-bound-over-the-nogoods-rank-2))
 folded the nogoods into the matching bound by Lagrangian multipliers fitted once at the root, and cut the nodes of
 proofs by 13 to 67%, but it solved the weighted matching from scratch, 7 times slower per node.  Can the bound be kept
 incrementally, cheaply enough to pay in cycles?  Yes, and with the forced members its potentials give it pays far more

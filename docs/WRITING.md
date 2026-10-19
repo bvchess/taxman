@@ -8,8 +8,8 @@ Taxman but not this solver.  These rules get them there; the sources at the end 
 Each document serves one need, and the kinds stay apart, linked to each other.  A *how-to* gives the steps of a task
 (the RUNBOOK, the README's commands).  A *reference* describes, neutrally, for looking up (the glossary, the file
 formats).  An *explanation* says how something works and why (DESIGN.md, THEORY.md).  A *tutorial* teaches by doing.
-Two more kinds sit outside these four: the lab notebook is the record of what was tried, and STATUS, AGENDA and IDEAS
-are time-bound.  A passage in the wrong kind of document moves, or becomes a link.
+Two more kinds sit outside these four: the lab notebook is the record of what was tried, and STATUS and AGENDA are
+time-bound.  A passage in the wrong kind of document moves, or becomes a link.
 
 ## 2. Lead with the point
 

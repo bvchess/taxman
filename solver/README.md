@@ -31,7 +31,6 @@ something works and why, the *record* of what was tried, or a *time-bound* page 
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | guide | running the frame solver, and the prover's proofs, on a cloud machine of many CPUs |
 | [docs/STATUS.md](docs/STATUS.md) | time-bound | what is in flight, paused, decided and waiting on a decision; read it first |
 | [docs/AGENDA.md](docs/AGENDA.md) | time-bound | the research agenda: what limits the end of the chain, the avenues ranked, the conjectures, and what the cloud runs should measure |
-| [docs/IDEAS.md](docs/IDEAS.md) | time-bound | ideas borrowed from other fields (SAT, MaxSAT, MIP, ...), ranked, with pilot measurements, where the time goes in the hardest games, and nogoods on many threads |
 | [notebook/README.md](notebook/README.md) | record | the lab notebook: the register of everything tried, kept or not (search it before proposing an experiment), and the index of rounds; each entry is a folder beside it |
 | [the cost curve](notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n past the end of the chain, with projections for a larger machine |
 | [docs/WRITING.md](../docs/WRITING.md) | guide | how the docs are written |

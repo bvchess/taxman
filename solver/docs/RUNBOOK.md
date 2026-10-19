@@ -32,7 +32,8 @@ the release suite (section 15) ran on macOS against a directory for the bucket, 
 for cargo, and the suite's runner ran the whole solver and prover suites in the test profile; both ran on EC2 on
 2026-10-18 (section 15).  Sections 2 and 3 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed of
 a Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the
-[scaling run](../notebook/scaling-to-192-threads-2026-10/README.md)); what is not is in section 8.
+[scaling run](../notebook/scaling-to-192-threads-2026-10/README.md)); what is not is in [the research agenda, section
+6](AGENDA.md#6-what-the-cloud-runs-should-measure).
 
 * [Rules for every launch](#rules-for-every-launch)
 * [0. The plan](#0-the-plan)
@@ -43,9 +44,7 @@ a Graviton core and the scaling of the solver to 64 and 192 threads are measured
 * [5. The production chain](#5-the-production-chain)
 * [6. Verifying, and bringing the results home](#6-verifying-and-bringing-the-results-home)
 * [7. When something goes wrong](#7-when-something-goes-wrong)
-* [8. What has not been measured](#8-what-has-not-been-measured)
 * [9. The prover's proofs of opt(n), 1301 to 2175](#9-the-provers-proofs-of-optn-1301-to-2175)
-* [10. The theory track's measurements: E6 and E9(a)](#10-the-theory-tracks-measurements-e6-and-e9a)
 * [11. Certifying U (stage 4)](#11-certifying-u-stage-4)
 * [12. The unattended run to the wall](#12-the-unattended-run-to-the-wall)
 * [13. The sweep](#13-the-sweep)
@@ -123,7 +122,7 @@ The files in this directory:
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `sweep.sh FIRST LAST` | the sweep (section 13): FIRST..LAST in blocks of consecutive games, one thread each and a limited search a game, then passes that search again the games whose game before them has gained, into `explore.jsonl`; resumable, with `DEADLINE_HOURS`, `POWEROFF` and `S3_DEST` as the others; `../sweep_plan.py` sizes the blocks and cuts the excerpts of the passes |
 | `save.sh` | copy results, logs and checkpoints to S3 (`--restore` on a fresh machine) |
-| `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement (section 10.1) |
+| `prover.sh A B` | the prover's proofs of opt(n) for n = A..B (section 9): resumable passes, all CPUs; `--verify` checks the output; `--list N1,N2,...` runs `exact` on given games as a measurement ([E6](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#101-e6-does-leaving-the-sources-free-cost-the-provers-search-anything)) |
 | `certify.sh LIST[:THREADS]...` | the certificates campaign (section 11): `taxman certify` over the lists of `solver/tools/certify/lists/stage4`, several at once, resumable, with a final `verify-certificates` |
 | `spot-watch.sh` | on a spot interruption notice: stop `chain.sh`, `prover.sh` or `certify.sh` and save |
 | `wall.sh launch\|status\|stop\|cleanup` | the unattended run to the wall (section 12): the launch template, the Auto Scaling group of one spot instance and the policy, from your machine; prints every aws command that changes something |
@@ -703,38 +702,6 @@ with.
 | a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root: put the step in a script file and run `sudo -u ec2-user -i bash FILE` (section 9.4); a multi-line `bash -lc '...'` through `sudo -i` mangles its quoting |
 | the machine rebooted | tmux and `chain.sh` are gone; the state is in `~/taxman-work`: run `chain.sh N` again |
 
-## 8. What has not been measured
-
-The Graviton calibration measured the speed of a Graviton3 and a Graviton4 core against the M1 Max's, the contention
-among 64 one-thread copies (none), a proof's scaling to 64 threads, and the chain's games an hour on 64 threads: it is
-the entry [Graviton calibration](../notebook/graviton-calibration-2026-10/README.md), with its scripts and data in
-[solver/notebook/graviton-calibration-2026-10/README.md](../notebook/graviton-calibration-2026-10/README.md).  The scaling run of 2026-10-15 on a `c8g.48xlarge` (two sockets, two NUMA
-nodes) measured, after the inner loop's round, round A and round B, where a thread's time goes at 16, 64, 96 and 192
-threads, the window at 64 and 192 threads, the pause of a checkpoint and the memory at 192, the fixed costs of a game
-on a Graviton4 core, and the chain's speed and cost a game on 64 and 192 threads: the entry
-[Scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md).  What neither measured:
-
-* **Why a 192-thread search after one-thread work in the same process steps 1.6 to 1.7 times slower.**  The ladder
-  showed it twice, `solve` never; the suspect is the kernel's automatic NUMA balancing.  The check (the threads' CPUs
-  during such a run, and the same under `numactl --interleave=all`) takes minutes on the next 192-thread machine; it
-  matters for a long `chain.sh` run on 192 threads.
-* **Where the second socket's cost goes.**  At 192 threads a step is 7 to 10% dearer than on one socket; remote memory
-  and the other chip's caches were not separated.
-* **Large trees on many threads.**  The longest search at 192 threads was 85 s (2288); hours of one tree (item 2 of
-  [solver/notebook/the-wall-regime-2026-10/README.md](../notebook/scaling-to-192-threads-2026-10/README.md#for-a-cloud-machine)) were not run, and nor was the size of a
-  checkpoint at 4000 on 192 threads (its standalone search ended in 43 s, before the first).
-* **The window's policy on many threads.**  Its constants (a tick of 5 ms, busy below 5% idle, giving back at 25% idle,
-  10 ms to settle) were not tuned; a window of 4 was the best of 1, 4, 16 and 32 on the games past 2225 at 64 and 192
-  threads in one run each, and 2, 3, 6 and 8 were not tried there.
-* **Graviton5.**  A `c9g.16xlarge` was launched for the calibration and the spot service took it back five minutes in,
-  before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
-* **PGO and `target-cpu=native` on Graviton.**  `solver/tools/pgo.sh` exists and was run on the M1 only; no gain from
-  profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
-* **The scripts on Linux and on EC2.**  See the status box: `scaling.sh` has not run on EC2 (`chain.sh` has, in the
-  cloud run), and `spot-watch.sh` has not seen an interruption (the scaling run's instance had its notice two minutes
-  before the end, with no `spot-watch.sh` running), so neither has the restore after one: the cloud run's was after a
-  stop on purpose.  The first run of `scaling.sh` on a small instance is the test of that one.
-
 ## 9. The prover's proofs of opt(n), 1301 to 2175
 
 The committed chain (`results/strict.jsonl`) reached 2175 when the prover's run began (it reaches further now, within
@@ -1074,120 +1041,6 @@ register rows in [solver/notebook/README.md](../notebook/README.md); the READMEs
 Graviton CPU by n (the table of 9.2 is a prediction).  Then the end of the
 [rules for every launch](#rules-for-every-launch): terminate the instance (`POWEROFF=always` has shut it down, which
 terminates it) and confirm that nothing is left, the launch's security group included.
-
-## 10. The theory track's measurements: E6 and E9(a)
-
-*Removed from master (2026-10-17).*  The hunt of 10.2 (E9(a)) has no program or script on master any more: the example
-`hunt` and `solver/tools/cloud/hunt.sh` went with the examples of finished experiments (the certificates of section 11
-superseded the hunt, which was never run; its calibrations are in `bench/hunt/`).  Both build and run at commit
-8753189: launch from a checkout of it (`git checkout 8753189`), where the rest of 10.2 holds as written.  E6 (10.1)
-runs the prover and is unaffected.
-
-Two measurements of the theory track (docs/THEORY.md, "The upper part"; the account is the entry
-["The upper part game by game"](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)),
-built, tested and calibrated on the laptop and **not run**: each waits for Brian's approval with the estimate below
-([rules for every launch](#rules-for-every-launch)).  Both launch as section 9.4 does (an instance profile, steps
-through SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, a tmux session), from a checkout of a commit that has
-this section (pushed first: the instance clones it); only the instance, the setup and the command differ, and the
-results come home as in 9.6.  E6 may run first; E9(a) is independent of it.
-
-### 10.1 E6: does leaving the sources free cost the prover's search anything?
-
-*What.*  `exact` on 25 games of 1301-2175 with a root parity gap of 364 to 603 and a proof of 0.6 to 30 minutes in
-the run of section 9, twice: **B**, the default `--fix-low 1`, from the roles of Theorem B (the largest prime and
-U\*_2 forced, every other prime and number of layer 2 barred), the sources of layer 3 and up free, which is still a
-proof of opt(n); and **D**, `--fix-upper 1`, the whole upper part fixed to U\* as well, which is the frame model's
-problem on the whole board and proves nothing (its lines say `"search":"upper_fixed"`).  Each line also counts the
-nodes that branched on a source of layer 3 or up and those that barred a member of U\*_{≥3}.  The games, dearest first:
-
-```
-L=2159,2168,2166,2167,1800,2020,1537,1820,1504,1400,1551,2100,2160,2165,2163,1512,1482,1495,1547,1445,1573,1500,1480,1584,1575
-```
-
-*Criterion, fixed in advance* (`summarize.py sources` prints it part by part): B/D at most 1.2 on at least 90% of the
-games and never above 2, and B's nodes branching on a source of layer 3 or up at most 5% of all B's nodes → build the
-integrated search's stages 2 and 3; otherwise build its stage 1 only and measure stage 2 on two games first.
-
-*Cost.*  The 25 proofs took 4.8 thread-hours in the run of section 9, the dearest (2159) 30 minutes.  On the laptop,
-B at 1575 and 1584 had the plain proof's nodes within 2.1% and took half its time a node (Theorem B's roles leave the
-parity solves fewer free elements), and D had B's nodes; so B and D are about 2.5 thread-hours each, and each set
-of 25 is bounded by its dearest game, about 16 to 30 minutes on a `c8g.4xlarge` (16 threads).  With the setup (about
-10 minutes, `PROVER_ONLY=1`) and margin: **one to one and a half instance-hours, about $0.40 at the spot price of
-2026-10-14 ($0.24 an hour), $1 on demand.**  `DEADLINE_HOURS=3` and a timer of 200 minutes bound it.
-
-*Run* (the launch of 9.4 with `Purpose=e6` and the user data `shutdown -h +200`; then `PROVER_ONLY=1 setup.sh`):
-
-```
-export D=s3://taxman-013764204840-us-east-1/e6 W=/home/ec2-user/taxman-work/results
-cd ~/taxman && tmux new-session -d -s e6 "export DEADLINE_HOURS=3 S3_DEST=$D; \
-    OUT=$W/e6_low.jsonl solver/tools/cloud/prover.sh --list $L; \
-    POWEROFF=always OUT=$W/e6_upper.jsonl EXTRA_ARGS='--fix-upper 1' solver/tools/cloud/prover.sh --list $L"
-tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
-```
-
-The two runs share the deadline (it is fixed at the first start), the second powers the machine off, and each is
-resumable as in 9.5 (`prover.sh --list` skips the games its `OUT` has).  A stop with "a playable set worth X beats the
-recorded Y" in `prover.err` is a counterexample (9.5).  At home:
-
-```
-aws s3 cp $D/results/e6_low.jsonl solver/noframe/data/e6_low_25.jsonl
-aws s3 cp $D/results/e6_upper.jsonl solver/noframe/data/e6_upper_25.jsonl
-python3 solver/noframe/tools/summarize.py sources solver/noframe/data/e6_low_25.jsonl solver/noframe/data/e6_upper_25.jsonl
-```
-
-### 10.2 E9(a): a counterexample hunt at the games of largest gap
-
-*What.*  For the 20 games of largest root gap past 2175 that rest on the frame model (`solver/noframe/data/
-upper_2176_3314.jsonl`, from the copy of the EC2 chain's results of 2026-10-15: 3300, 3174-3176, 3104, 2346,
-3304, 3305, 3309, 2340, 3311, 3102, 3103, 3312, 3172, 3173, 3105, 3107, 3168, 3171, gaps 1257 to 1443) and each of
-their open sources u (those the barred parity bounds did not certify; 4,499 pairs), the frame solver on the board
-without u, searched from an incumbent worth the recorded score V, so that it looks only for a game above V
-(`examples/hunt.rs`; `sacrifice::hunt`), 4 threads a pair, 16 pairs at once.  A game of the board without u is a game
-of n, so a hit is a game better than the chain's.
-
-*Policy* (the theory track's, program part III, section 15(a)).  A pair's margin is the barred parity bound's excess
-over V, and the pairs of largest margin matter most (a counterexample needs the punctured problem's own slack to be
-below the margin) but will not finish.  So the pairs run in **decreasing margin**, so that a run cut short has done the
-informative ones; those of **margin up to 900 run to completion** under a limit of 10 minutes (`MINUTES`), and those
-**above 900 are probes**: the solver's own start on the board without u (greedy set, dive, local search; the seed too
-if `EXTRA_ARGS='--results FILE'` gives the recorded games, which the repository has only as far as the committed chain
-goes) and then 3 minutes of search (`PROBE_MINUTES`), recorded as `probed`, never as `none`.
-
-*Criterion.*  Any `found` line is a counterexample to U and to the chain's score at n: stop extending the chain,
-report it, and solve n again on the whole board (the theory track's program, part I, section 6).  A `none` is
-evidence, recorded with the margins searched, and a `probed` only says that the start and 3 minutes found no game
-(the line has `start_score`, how near V the start came, and `finished` if the search happened to end); a `timeout`,
-of a pair of margin up to 900 that outlasted 10 minutes, says nothing.
-
-*Cost.*  Calibrated on one laptop thread (`solver/notebook/theorem-b-by-default-in-the-prover-and-the-hunts-probes-2026-10/recalibration.jsonl`, 2026-10-15, with the code of this policy on
-master): a pair costs what its margin (the barred bound's excess over V) says, not what its game's gap does.  At 3311
-(gap 1303) and 2346 (gap 1346) every pair of margin up to 781 ended in under 6 seconds, 835 in 53 and 896-899 in 121 to
-185, with the nodes of the first calibration to the node (numbering by layer changed no tree); every one from 959 up
-(to 1215) is a probe, which takes its 3 minutes and a start of 2 to 7 seconds, and ends `probed` (they were
-`timeout`), the start reaching 598 to 854 below V.  Of the 4,499 pairs 3,533 have a margin up to 800, 388 between 800
-and 900 and 578 above 900.  The probes cost their time whatever happens: 578 × 3.1 minutes × 4 threads is about **120
-vCPU-hours**; the 388 pairs of 800 to 900 about a minute and a half of one thread each, 10 to 15 vCPU-hours; the 3,533
-below 800 a few seconds each, 3 to 5.  So **about 140 vCPU-hours (the first estimate, which let every pair use its
-whole 10 minutes, was 400): a `c8g.16xlarge` (64 vCPUs) for about 2.2 hours, 2.6 with the setup, about $2 at the spot
-price of 2026-10-14 ($0.68 an hour), $7 on demand.**  The probes come first, so about the first 2 hours are the
-informative ones.  The four-thread speed-up of a pair was not measured (the calibration is one thread); were it nil,
-the two cheaper bands would cost four times as much, 190 vCPU-hours in all.  `PROBE_MINUTES=2` takes a third off the
-probes; `PER_GAME=K` keeps the K open sources of largest margin of each game.  `DEADLINE_HOURS=5` and a timer of 320
-minutes bound it at about $3.40 at spot.
-
-*Run* (the launch of 9.4 on a `c8g.16xlarge` with `Purpose=hunt` and `shutdown -h +320`; then the full `setup.sh`,
-which builds the solver's examples, `hunt` among them):
-
-```
-export D=s3://taxman-013764204840-us-east-1/hunt
-cd ~/taxman && tmux new-session -d -s hunt "DEADLINE_HOURS=5 POWEROFF=always S3_DEST=$D \
-    rust/tools/cloud/hunt.sh solver/noframe/data/upper_2176_3314.jsonl"
-tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
-```
-
-`hunt.sh` reruns the hunt after a crash and resumes it after a stop (finished pairs are in its output); exit status 2
-and "COUNTEREXAMPLE" lines in `hunt.log` are the finding to look for.  At home: `aws s3 cp $D/results/hunt.jsonl
-rust/bench/hunt/hunt_2176_3314.jsonl`, the summary from `hunt.out` beside it, and the README there brought up to date.
 
 ## 11. Certifying U (stage 4)
 

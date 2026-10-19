@@ -29,7 +29,6 @@ The other documents:
 * [8. Results and the trust model](#8-results-and-the-trust-model)
 * [9. Testing](#9-testing)
 * [10. Performance](#10-performance)
-* [11. Status and what is left](#11-status-and-what-is-left)
 
 ## 1. Goals and constraints
 
@@ -169,8 +168,9 @@ on the whole board.  The search takes the open members as one-sided candidates (
 Details of the extended problem: it keeps the claims of `unzip` that Lemma M5⁺ (THEORY.md) allows.  With nothing open
 that is all of them, so Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back
 (`examples/extended.rs --no-claims`).  A hunt for a counterexample on the boards without each open member, the example
-`hunt`, was prepared and never run.  It is removed from master; the
-[RUNBOOK](RUNBOOK.md#10-the-theory-tracks-measurements-e6-and-e9a) says where it builds.
+`hunt`, was prepared and never run.  It is removed from master; [its
+entry](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#later-2026-10-the-program-removed-from-master)
+says where it builds.
 
 What each kind of proof needs of the frame model, beyond the code's correctness and the games before it:
 
@@ -1837,27 +1837,3 @@ Where the time goes now (the proof of 1215, one thread): the Hungarian searches 
 Lagrangian levels 19%, the peels 19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%,
 the bounds from the potentials 6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a
 quarter, refinement 14% and strong branching 11%.
-
-## 11. Status and what is left
-
-Every n to 3440 has a game proven within the frame model: `results/strict.jsonl` is a chain from n = 1 whose games to
-1000 reproduce optimal.json's scores, whose games 1001–1300 go beyond it (and are now appended to optimal.json too, by
-`taxman extend-optimal`) and whose games 1301–3440 are past the table; those to 2175 are also proven on the whole
-board, by the prover, and U is not yet certified for the games past 2175 (`taxman certify`, "Certificates of U"
-above, will check it game by game); `results/README.md` says what supports each score.  The production chain on a
-many-core machine can start from `strict.jsonl` (`solver/docs/RUNBOOK.md`), and a chain from n = 1 reproduces its
-scores.  With the GF(2) bound (section 4), the chain goes past 1300 on a laptop (EXPERIMENTS, "The GF(2) bound in the
-search" and "The committed chain to 2175"), and a day on a 64-CPU cloud machine took it from 2176 to 3440 (the [cloud
-run](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).  What is left to try: strong
-branching's solves, 70% of the intersection's work, which restart far below their answer (canceling the negative cycles
-of the optimum less the member would start them next to it); the removal of the matching path's search machinery that
-the GF(2) bound leaves idle (refinement, the Lagrangian bound in the search; EXPERIMENTS has the list), once a
-production run has been made with it; and, for the many-core machine, whatever its first sweep shows that a laptop
-cannot.  The chain keeps several games in flight (section 7, "The window") and the engine reports what a thread loses
-at many threads (the units' starts, the lock, the ramp and the tail); on 4 threads of the laptop a step costs 7% more
-than on one, none of it in the units' starts, and the window makes 1..1300 16% faster and the games past 2225 no
-slower.  On Graviton4 at 64 threads a step inside a unit's tree costs what it does on one thread, and the loss is the
-units' first nodes (1.4 to 4%) and the ramp and tail; at 192 threads, on two sockets, the step is 7 to 10% dearer; a
-window of 16 makes the games past 2225 a fifth slower on 64 threads, and 4 is the best measured (EXPERIMENTS, "Scaling
-to 192 threads").  A unit that carries its GF(2) level, so that a rebuilt one is checked rather than solved, would win
-at most the units' first nodes, and is not built; what is still unmeasured is in `solver/docs/RUNBOOK.md`, section 8.

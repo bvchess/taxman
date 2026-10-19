@@ -103,7 +103,7 @@ default):
 * **Nogoods of at most 4 members do not occur.**  `size2`, `size3` and `size4` give the default's trees to the node: at
   no forgetting did the table hold one.  The nogoods of this search are large: 5% of the table has at most 8 members
   (20 of 424) and 28% at most 16 (117 of 421), and keeping the short ones (+7%, +17%) makes the trees larger, as it
-  did on the matching path ([IDEAS 3](../../docs/IDEAS.md#3-nogoods-with-very-many-threads)).  (Means over the forgettings
+  did on the matching path ([IDEAS 3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)).  (Means over the forgettings
   of the six games; the table averages 424 nogoods.)
 * **The counters say why the table does not pay, and what it does not cost.**  With no forgetting 5,379 nogoods were
   learned on the six games against 34,463 at the default: each is learned 6.4 times over, which by the notebook's
@@ -120,7 +120,7 @@ default):
 
 *Which policies deserve a test at 64 threads.*  None of the keeping policies.  If the campaign tries one, it is a
 period near 20,000-40,000, for which the data show no loss and a gain too small for ten games to see (the idea of
-[IDEAS 3](../../docs/IDEAS.md#3-nogoods-with-very-many-threads) that a period of about 30,000 might suit 192 threads is not
+[IDEAS 3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads) that a period of about 30,000 might suit 192 threads is not
 refuted); `nogood_period` is the only knob that has a chance, and at 64 threads each searcher's table is smaller than
 here, which can only shrink the differences between policies.
 
