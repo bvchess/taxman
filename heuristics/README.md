@@ -13,8 +13,8 @@ n/2 (the frame solver's *sources*), and the *lower half* the numbers up to n/2. 
 The two main strategies:
 
 1. **Solvent**, an O(n² log n) strategy with no search and no lookahead, scores **99.85% of all optimal points** over
-   n = 1..1000, and never below 99.08% in any game.  In every game to 1000, its selections above n/2 are those of an
-   optimal game.
+   n = 1..1000, and never below 99.08% in any game.  Its selections above n/2 are those of an optimal game, assuming
+   [statement U](../docs/GLOSSARY.md) holds.
 2. **The continuation solver**, which builds each game from its own game of n − 1, scores **99.97% of all optimal
    points**, starting from nothing at n = 2.  It extends to n = 1001..2000, within 0.35% of the Franklín–Moniot upper
    bound in aggregate.  The optimal games of those n are in `results/strict.jsonl`, and
@@ -311,8 +311,7 @@ ratios, not just exponents):
 * **cascade** uses the same machinery: about Θ(n²), measured k≈2.1.
 * **the continuation chain** costs O(n²) per game before search (the
   solve_upper_half computation) plus the budgeted flip/bundle work, so a full
-  chain 2..N is Θ(N³)-class in aggregate — ~78 minutes to N=1000
-  under PyPy.
+  chain 2..N is Θ(N³)-class in aggregate.
 
 The readable reference implementation is *not* in the same class as
 the fast one: `reference/solvent.py` re-derives every feasibility

@@ -3,24 +3,6 @@
 The docs should be readable by someone outside the project: a programmer new to the code, or a mathematician who knows
 Taxman but not this solver.  These rules get them there; the sources at the end give the reasons.
 
-## Voice
-
-Write plainly, modestly and briefly:
-
-* **Say a thing once.**  Leave out what a word already implies: "optimal" already means proven.
-* **Say what a thing does for the reader**, not how it was built or what came before it.  An overview names no
-  implementation language, and history belongs in the notebook and in git (rule 5).
-* **Prefer plain nouns to the project's labels.**  Name the file rather than the label the project gave it; a label the
-  reader does need is defined first (rule 4).
-* **Claim modestly and exactly.**  Say what a program can do, and no more, with no drama.
-* **"We" is fine.**
-* **In an overview, short beats complete.**  The details live a link away, and a line that does not serve the reader
-  goes.
-
-Not "This project finds optimal games of Taxman, a number game, and proves that they are optimal" but "This project
-finds optimal games of Taxman, a number game."  Not "The committed chain, `results/strict.jsonl`, holds an optimal game
-for every n" but "The file `results/strict.jsonl` holds a chain of optimal games for every n."
-
 ## 1. Know which kind of document it is
 
 Each document serves one need, and the kinds stay apart, linked to each other.  A *how-to* gives the steps of a task
@@ -71,6 +53,24 @@ An entry is dated, is never erased or rewritten to these rules, records failures
 files.  The [notebook's front page](../solver/notebook/README.md#how-this-notebook-is-kept) has the rules for filing it.
 A new entry opens with its question in a sentence and its answer in a sentence or two, then gives the method, the
 results and the decision.
+
+## Voice
+
+Write plainly, modestly and briefly:
+
+* **Say a thing once.**  Leave out what a word already implies: "optimal" already means proven.
+* **Say what a thing does for the reader**, not how it was built or what came before it.  An overview names no
+  implementation language, and history belongs in the notebook and in git (rule 5).
+* **Prefer plain nouns to the project's labels.**  Name the file rather than the label the project gave it; a label the
+  reader does need is defined first (rule 4).
+* **Claim modestly and exactly.**  Say what a program can do, and no more, with no drama.
+* **"We" is fine. Passive voice is bad.**
+* **In an overview, short beats complete.**  The details live a link away, and a line that does not serve the reader
+  goes.
+
+Not "This project finds optimal games of Taxman, a number game, and proves that they are optimal" but "This project
+finds optimal games of Taxman, a number game."  Not "The committed chain, `results/strict.jsonl`, holds an optimal game
+for every n" but "The file `results/strict.jsonl` holds a chain of optimal games for every n."
 
 ## The check
 
