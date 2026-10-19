@@ -1,8 +1,8 @@
 # Results of the solver
 
-This directory holds the project's results: the committed chain of proven games, the table of optimal games, the
-bounds store and the certificates of statement U.  This page is the home of what each file holds, how far it reaches,
-how it was made and what supports its scores; the other docs link here instead of repeating it.
+This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
+the games past the chain, and the certificates of statement U.  This page says what each file holds, how far it reaches,
+how it was made and what supports its scores.
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's README](../solver/frame/README.md#a-results-line---out-schema-5).  The
@@ -12,7 +12,7 @@ counts on this page are pinned by `tests/results.rs`, so changing a file means u
 
 | file | holds | games | made by |
 |---|---|---|---|
-| `strict.jsonl` | the committed chain: an optimal game for every n, each built from the one before, each proven | 1–3914 | three runs of `taxman solve` from n = 1 ([below](#strictjsonl)) |
+| `strict.jsonl` | the committed chain: an optimal game for every n, each built from the one before | 1–3914 | three runs of `taxman solve` from n = 1 ([below](#strictjsonl)) |
 | `optimal.json` | the table of optimal games, built into the frame solver | 1–1300 | the Java solver for 1–1000, the chain for 1001–1300 ([below](#optimaljson)) |
 | `bounds.jsonl` | the bounds store: bounds on opt(n) for games the chain has not proven, one line a bound | 3915–8191 | the ledger's exports ([below](#boundsjsonl)) |
 | `certificates/` | certificates of statement U | 600–1300 | `taxman certify` ([below](#certificates)) |
@@ -22,9 +22,9 @@ How far each kind of proof reaches:
 * **Every game of `strict.jsonl`** is proven within the frame model, and assumes nothing beyond it.
 * **Games 2 to 2175** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
   model.
-* **Games 2176 to 3914** are proven within the frame model, which is exact given statement U.  U is not yet certified
-  past 2175: `taxman certify` will check it game by game.  A game of them proven by the ceiling or the prime formula
-  is opt(n) wherever the game before it is.
+* **Games 2176 to 3914** are proven within the frame model, which is exact given statement U.  U is not certified past
+  2175, and `taxman certify` can check it game by game.  A game of them proven by the ceiling or the prime formula is
+  opt(n) wherever the game before it is.
 
 "What supports the scores", below, gives the evidence for each.
 
@@ -44,9 +44,9 @@ committed here: a sweep's results go to a file of their own, with a notebook ent
 
 ## strict.jsonl
 
-The committed chain from n = 1 to n = 3914, and the file to build on.  Every game is built from the one before, every
-line has its full provenance, and nothing in it rests on `optimal.json` or on any other file.  It has 3914 lines in
-schema 5, the completed games in order of n, and no line of an unfinished search.  Nor has it a line of proof
+The chain of optimal games from n = 1 to n = 3914, and the file to build on.  Every game is built from the one before,
+every line has its full provenance, and nothing in it rests on `optimal.json` or on any other file.  It has 3914 lines
+in schema 5, the completed games in order of n, and no line of an unfinished search.  Nor has it a line of proof
 `known`: such lines come from runs with `--use-prev` ([the frame solver's README, "Citing a known
 source"](../solver/frame/README.md#citing-a-known-source)).  The name is from the builds that had unproven tactics,
 which the chain was made without; none is left, so every run from n = 1 is made without them.
@@ -88,10 +88,9 @@ set is optimal.  `tests/results.rs` pins the games where this file differs from 
 differ from the earlier files' in these games:
 
 * **539, 684–687 and 770–773**, which the prover lists with two or three optimal sets each ([the prover's
-  README](../solver/noframe/README.md#5-is-the-optimal-set-unique) has the exchanges).  `optimal.json`'s games 1–1000
-  are the Java's, and this file has the same set of moves in each of them but 539 and 770–773, where the chain found
-  another optimal set.  The previous file, the chain of commit 271c817, and that of 243af9b, had the table's sets at
-  539 and 770–773 and another at 684–687, where this file has the table's.
+  README](../solver/noframe/README.md#5-is-the-optimal-set-unique) has the exchanges).  This file has `optimal.json`'s
+  set of moves in each of them but 539 and 770–773, where the chain found another optimal set.  The earlier chains of
+  commits 243af9b and 271c817 had the table's sets at 539 and 770–773 and another at 684–687.
 * **1215**, where `optimal.json` and every earlier chain have {312, 450} and this file {342, 420}: an exchange of two
   numbers of the same sum, 762.  The prover enumerates optimal sets only to n = 989.
 * **1221–1224**, where the chain of commit bd9bb5d and the cost-curve study's chain found {364, 456, 544}, and this
@@ -219,9 +218,8 @@ the first.
 ## What supports the scores
 
 "Optimal" here means optimal within the frame model, given that the solver is right.  That is opt(n) wherever statement
-U holds ([DESIGN.md](../solver/docs/DESIGN.md#what-optimal-means)).  U holds for every n ≤ 2175, where the prover proves
-opt(n) on the whole board.  Past 2175 it is not yet certified: `taxman certify` will check it game by game for
-2176–3914.  A game proven at its ceiling or by the prime formula does not need it.
+U holds ([DESIGN.md](../solver/docs/DESIGN.md#what-optimal-means)), and ["The files"](#the-files), above, says how far
+each kind of proof reaches.
 
 Two verifiers check the files.  From the top of the repository:
 
@@ -308,11 +306,9 @@ What that evidence amounts to:
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
    notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
    The 1739 games of 2176–3914 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model:
-   what is proven and what remains"](../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  U is not yet
-   certified past 2175: `taxman certify` will check it game by game, with the prover's barred bounds ([the prover's
-   README](../solver/noframe/README.md#the-upper-part-game-by-game) has them to 3440).  Until then those scores are
-   opt(n) wherever U holds at n, and a game of them proven at its ceiling or by the prime formula is opt(n) wherever
-   the game before it is.
+   what is proven and what remains"](../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  `taxman
+   certify` can check U there game by game, with the prover's barred bounds ([the prover's
+   README](../solver/noframe/README.md#the-upper-part-game-by-game) has them to 3440).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the game of n
 − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
@@ -328,11 +324,10 @@ first from the chain of commit bd9bb5d, then from that of commit 243af9b, which 
 The file records no proofs and no provenance.  So a game taken from it (`--use-prev`) is assumed optimal, and the
 results whose proofs rest on it say so: "the game of n in optimal.json is optimal".  A chain that assumes nothing
 beyond the frame model starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reproduce
-`optimal.json`'s scores with no unproven tactic on: 416 repeats, 311 exhausted, 92 at the ceiling, 168 prime and 13
-trivial, in 7.5 s of search in all on 8 threads, the slowest n = 992 at 0.7 s.
+`optimal.json`'s scores with no unproven tactic on, in 7.5 s of search in all on 8 threads, the slowest n = 992 at
+0.7 s.
 
-The table has not been extended past 1300, and stays there.  `taxman extend-optimal results/strict.jsonl` would add
-the 2614 games of 1301–3914.
+The table stays at 1300.  `taxman extend-optimal results/strict.jsonl` would add the 2614 games of 1301–3914.
 
 ## bounds.jsonl
 
