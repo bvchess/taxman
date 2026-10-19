@@ -12,7 +12,8 @@ Some words are used inside one part of the code only, and are defined there:
   4](../solver/docs/DESIGN.md#4-the-search);
 * the engine's (units, splits, steals, spills, pauses): [DESIGN.md, section 6](../solver/docs/DESIGN.md#6-engine) and
   the module comment of `solver/frame/src/engine.rs`;
-* the fields of the progress line: [the frame solver's README, section 4](../solver/frame/README.md#4-reading-the-output).
+* the fields of the progress line: [the frame solver's README, section
+  4](../solver/frame/README.md#4-reading-the-output).
 
 The Java solver's and the wiki's words map onto these in [DESIGN.md, "The Java solver and the frame
 solver"](../solver/docs/DESIGN.md#the-java-solver-and-the-frame-solver).  The old words of the notebook's dated
@@ -86,10 +87,10 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
   frame's layer is its sources'.  The frames in front of a frame lie one layer lower.
 * **frame number**: setup numbers the frames that have freedoms by layer, from the front.  If L is the lowest layer of
-  a frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged into one, so that a
-  promotion always has one frame to go to.  The numbering is **clean** (statement N of THEORY.md): every frame with
-  freedoms directly in front of frame h is frame h − 1.  On every board the solver supports it equals the Java's
-  numbering, breadth first from the front.
+  a frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged
+  into one, so that a promotion always has one frame to go to.  The numbering is **clean** (statement N of
+  THEORY.md): every frame with freedoms directly in front of frame h is frame h − 1.  On every board the solver
+  supports it equals the Java's numbering, breadth first from the front.
 * **promote**, **promotion**: to play a factor as a move.  Promoting a factor of frame h takes it out of the frame's
   factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  After
   promotions the frames are *reduced*: a move left with one live factor is paid by it, and the pair is dropped,
@@ -170,8 +171,8 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 A bound below is an upper bound on what a set of promotions or moves can score, unless it says otherwise.
 
 * **the gap**: how far an upper bound lies above the best completion, in promotion units (equal to score units, since
-  `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched games of
-  2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
+  `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched
+  games of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
   2175](../solver/notebook/the-gap-past-2175-2026-10/README.md)).  The tools also measure three related gaps, each named
   where it is used:
   * a node's gap (`examples/tune.rs`, `wall choice`): the node's bound less its need, how far the bound must fall to

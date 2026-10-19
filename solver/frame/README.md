@@ -488,8 +488,8 @@ them.
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  A searcher's state is bounded.  The shared queue of work units spills to `DIR/spill` beyond `--mem-cap`
-  units (default 1048576).  The runs of the committed chain never came near it ([results/README.md](../../results/README.md#strictjsonl)
-  gives their largest queues).
+  units (default 1048576).  The runs of the committed chain never came near it
+  ([results/README.md](../../results/README.md#strictjsonl) gives their largest queues).
 
 ### Keeping going past limits, and the sweep
 
@@ -772,8 +772,16 @@ A line of proof `known` has a `known` field that says which source it rests on:
 | `{"source":"bounds","lower":{..},"upper":{..}}` | method `known`: a game that the bounds store has proven; the `lower` bound is the game played | the store has a lower line and an upper line of game n worth the score, by the `rule` from the `source` (the run that found it) that the field says |
 | `{"source":"bounds","lower":null,"upper":{..}}` | method `search`: the search found the game and stopped at the store's upper bound, which it meets; `reached_cap` is false, since the ceiling of n − 1 is not what it reached | the store has an upper line of game n worth the score, as cited |
 
-The score is optimal wherever the cited bound holds: a finished game that scores what an upper bound allows is the
-best.  A lower bound is a game, and a game that the referee has replayed is a lower bound.
+The score of the line is the cited value of game n.  The store has one line of a game, side and value, so the game,
+the side and the score name the line; `rule` and `source` are that line's own, as `bounds.jsonl` has them.  The score
+is optimal wherever the cited bound holds: a finished game that scores what an upper bound allows is the best.  A lower
+bound is a game, and a game that the referee has replayed is a lower bound.
+
+When the game before the range came from the committed chain or the store, the first line's `prev.source` is `strict`
+or `bounds`, with that game's proof (`known` for the store's) and assumptions.  A proof that rests on such a game
+inherits what it assumes, as for a game from `optimal.json`: a proof by the ceiling or the prime formula, or a repeat of
+a search that stopped at the store's bound.  The `known` field, method and proof came after schema 5 was set, as names
+that a line without them does without, so every file of schema 5 reads as it did.
 
 The verifiers check that the game plays and scores the line's score, and that the cited lines are in the sources and
 say what the line says.  They do not check the sources again: `ledger verify-bounds` and
@@ -939,8 +947,8 @@ class each step replaces, and of the module comment of `src/solver.rs`, which gi
 
 ## 7. Glossary
 
-The project's glossary is a page of its own, [docs/GLOSSARY.md](../../docs/GLOSSARY.md): the words of the game, the frame
-model, the search, the bounds and the results, each with the one name the docs use for it.
+The project's glossary is a page of its own, [docs/GLOSSARY.md](../../docs/GLOSSARY.md): the words of the game, the
+frame model, the search, the bounds and the results, each with the one name the docs use for it.
 
 ## 8. Reading order of the code
 
