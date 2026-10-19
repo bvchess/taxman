@@ -39,8 +39,9 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 * **maximal factor**: of a number m, the quotient m/p for a prime p that divides m.  12 has the maximal factors 6 and
   4.  Its inverse is the **maximal composite**: on the board of 85, 8 has the maximal composites 16, 24, 40 and 56.
   The **maximal factor graph** joins each number to its maximal factors.  A move is legal exactly when one of its
-  maximal factors is still in the pot: whatever removed the others would have removed every smaller divisor too.  This
-  is the *lifting argument* (`solver/frame/src/numtheory.rs`; [THEORY.md](THEORY.md), Theorem 1).
+  maximal factors is still in the pot.  If a proper divisor d of m is in the pot, so is every f with d | f | m other
+  than m, since whatever removed f would have removed d; and one such f is a maximal factor of m.  This is the
+  *lifting argument* (`solver/frame/src/numtheory.rs`; [THEORY.md](THEORY.md), Theorem 1).
 * **playable**: a set of numbers is playable when all of its members can be played as moves, in some order.
   **peel**: the procedure that decides it.  It repeatedly drops a member that has a factor no other member has, and the
   set is playable exactly when nothing is left ([THEORY.md](THEORY.md), Theorems 1 to 3).  Inside a frame the same
@@ -79,7 +80,7 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   them greedily from the largest source down (`removeImpossible`) and drops them from the frame's moves.  On the board
   of 21 the sources 11, 13 and 17 are impossible: their frame's only factor, 1, pays for 19.
 * **U\***: the sources that setup keeps.  It is the heaviest playable set of sources wherever conjecture (★) holds,
-  which is certified on every board to 100,000 ([the prover's README, section
+  which is certified for every game to 100,000 ([the prover's README, section
   2](../solver/noframe/README.md#2-conjecture--at-scale)).  Its members with two prime factors are U\*_2,
   and those with three or more U\*_{≥3}.
 * **freedoms**: a frame's factors minus its moves, the number of factors it can spare.  A promotion into or out of the
@@ -179,7 +180,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
     cut the node;
   * the standalone root gap (`wall landscape`): the root's bound less the search's start incumbent, for a game solved
     with no game of n − 1;
-  * a board's gap in the ledger: its best upper bound less its best lower bound.
+  * a game's gap in the ledger: its best upper bound less its best lower bound.
 
   The prover's *parity gap* is the same idea on the whole board: the root's parity bound less opt(n), in points.
 * **matching bound** (`matchbound`; the tactic `gf2=off`): relaxes winnability to matchability.  It is the largest sum
@@ -235,9 +236,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   `same_search` or `known` ([the frame solver's README, "Proof
   kinds"](../solver/frame/README.md#proof-kinds)).
 * **assumes**: what a proof rests on beyond the frame model, inherited down the chain.  A game of n − 1, or of n, taken
-  from `optimal.json` is assumed optimal.  A bound of the bounds store assumes statement U at the boards it rests on.
+  from `optimal.json` is assumed optimal.  A bound of the bounds store assumes statement U at the games it rests on.
 * **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from
-  `optimal.json`, the committed chain, or a board that the bounds store has proven (`src/known.rs`).
+  `optimal.json`, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
 * **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
   ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).
 * **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
@@ -270,7 +271,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the prover**: the crate `solver/noframe/`, a branch and bound over sets of moves on the whole board.  It decides
   playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
   moves beats a recorded score ([its README](../solver/noframe/README.md)).
-* **brute force** (`src/brute.rs`): the frame solver's exhaustive search, the test oracle for small boards.
+* **brute force** (`src/brute.rs`): the frame solver's exhaustive search, the test oracle for small games.
 * **conjecture (★)**: on every component of the sources' incidence graph, and every truncation of it, descending
   greedy keeps a playable set of the largest size.  It is equivalent to THEORY.md's *upper-half conjecture*, that U\*
   is the heaviest playable set of sources.  **(♦)**: every source that descending greedy rejects is a GF(2)

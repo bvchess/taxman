@@ -149,7 +149,7 @@ n, the search prunes nothing that could win, and, for some proofs, the game of n
 
   U is open in general.  It holds at every game the [prover](../noframe/README.md) has proven, since the prover
   proves opt(n) on the whole board, without the frame model.  Past those games, a proof by an exhausted search, a
-  trivial board or a repeat assumes U at n, and `taxman certify` (section 3) checks it game by game.  A proof by the
+  trivial game or a repeat assumes U at n, and `taxman certify` (section 3) checks it game by game.  A proof by the
   ceiling or by the prime formula does not assume U at n (section 5).  The results lines do not record U;
   [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and [DESIGN.md, "What
   optimal means"](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the model.
@@ -382,7 +382,7 @@ at once by reaching the ceiling ([the cost curve](../notebook/benchmarks-the-pro
 |---|---|---|
 | `optimal.json` (built in) | the table of optimal games, n ≤ 1300 | nothing but the table's word: the line records that it assumes the game optimal |
 | `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes (nothing) |
-| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | statement U at the boards its upper bound rests on (`rests_on`), one assumption each |
+| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | statement U at the games its upper bound rests on (`rests_on`), one assumption each |
 
 Of a game that several sources hold, the solver takes the committed chain's, then the store's, then the table's.  What
 it does with them:
@@ -727,7 +727,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `completed` | false only if a limit or a signal stopped the search; such a line records an unfinished search, and its checkpoint is kept (a `--keep-going` run writes none for a signal) |
 | `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` or `known` (section 5); null if incomplete |
 | `reached_cap` | the promotions reach `cap`, where the search stops (a search started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; DESIGN.md, "What a window changes in the results") |
-| `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n − 1, the game a repeat repeats, or the known source a `known` proof cites): for a game of n − 1 or of n taken from `optimal.json`, "the game of n in optimal.json is optimal"; for a bound of the bounds store, "statement U holds at n=4501" for each board its upper bound rests on; `[]`: nothing |
+| `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n − 1, the game a repeat repeats, or the known source a `known` proof cites): for a game of n − 1 or of n taken from `optimal.json`, "the game of n in optimal.json is optimal"; for a bound of the bounds store, "statement U holds at n=4501" for each game its upper bound rests on; `[]`: nothing |
 | `in_the_bag` | what the game with no promotions scores (null for the prime formula and known games, which set no board up) |
 | `prev` | the game of n − 1 this one was built from: its score, where it came from (`run`, `results`, `optimal`, `strict`, `bounds`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 5, "What a game had from n − 1") |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its n, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
@@ -793,7 +793,7 @@ the repository's `results/`, the defaults of `taxman verify-results`; `solver/to
 A known game that is wrong would be caught three ways: by the chain, since a score outside `score(n − 1) <= score(n)
 <= n + score(n − 1)` is an error; by the table, where it has the game; and by the next `ledger verify-bounds`.  A search
 that finds a game above the store's bound stops the run, naming the game: either the store is wrong, or statement U
-fails at a board that its bound rests on.
+fails at a game that its bound rests on.
 
 ### Assumptions
 
@@ -805,15 +805,15 @@ What a game *assumes* is what its proof rests on beyond the frame model:
 * A game taken from `optimal.json` (`--use-prev`) is assumed optimal, since the table records nothing about how a game
   was found.  A proof that rests on its game of n − 1 assumes "the game of n − 1 in optimal.json is optimal", and a
   game of n taken from it "the game of n in optimal.json is optimal".
-* A bound of the bounds store holds wherever statement U holds at the boards its upper bound rests on (`rests_on`).  A
-  bound of the frame model at a board rests on that board, and a bound carried by a relation rests on what its source
-  rests on.  A game that rests on such a bound assumes "statement U holds at n=4501" for each of those boards, and a
-  game that rests on that game assumes the same.
+* A bound of the bounds store holds wherever statement U holds at the games its upper bound rests on (`rests_on`).  A
+  bound of the frame model at game n rests on n, and a bound carried by a relation rests on what its source rests on.
+  A game that rests on such a bound assumes "statement U holds at n=4501" for each of those games, and a game that
+  rests on that game assumes the same.
 * The committed chain's games assume what their lines do: nothing.
 
 A game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
 what a game assumes in its summary line, and `verify-results` counts together the games that assume statement U at
-some board.
+some game.
 
 What a proof rests on through the frame model, statement U at n (section 1, "What optimal means"), is not recorded
 for the proofs that the frame model gives: an exhausted search, a trivial game and a repeat.  It holds at every game
@@ -985,7 +985,7 @@ module comment that is worth reading first, and section 6 above maps how the pie
 12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
     `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
-    provenance and verification, the bounds store's line and the relations between boards, the known games that
+    provenance and verification, the bounds store's line and the relations between games, the known games that
     `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` says how they share the
     threads.
