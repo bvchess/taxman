@@ -336,7 +336,11 @@ impl<const W: usize> StepHook<W> for Recorder<W> {
 // The units
 
 /// The units `ids` of game `n` in the suite at `path`, each with its id and depth.
-fn suite_units<const W: usize>(path: &Path, n: u32, ids: &[String]) -> Result<Vec<(String, TaxUnit<W>)>, String> {
+pub(super) fn suite_units<const W: usize>(
+    path: &Path,
+    n: u32,
+    ids: &[String],
+) -> Result<Vec<(String, TaxUnit<W>)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut found = HashMap::new();
     for line in text.lines().filter(|line| !line.trim().is_empty()) {

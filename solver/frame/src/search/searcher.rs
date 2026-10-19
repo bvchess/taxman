@@ -571,6 +571,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(sym) = &space.symmetry {
             self.apply_symmetry(sym, node, need)?;
         }
+        #[cfg(feature = "studies")]
+        self.apply_hook_rule(node, need)?;
         let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
@@ -603,6 +605,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Ok(());
         }
         self.counts.symmetry_excluded += u64::from(dropped.len());
+        self.drop_candidates(node, &dropped, need)
+    }
+
+    /// Takes `dropped`, the candidates a rule has taken out of `node`'s loop, out of the bounds' levels too (safe for
+    /// the reasons [`apply_symmetry`](Self::apply_symmetry) gives), and makes the cheap checks of
+    /// [`check_node`](Self::check_node) again for what is left.
+    #[inline]
+    fn drop_candidates(&mut self, node: &Node<W>, dropped: &Bits<W>, need: u64) -> Result<(), usize> {
         for x in dropped.iter() {
             if let Some(g) = &mut self.gf2 {
                 g.remove_candidate(x);
@@ -618,6 +628,24 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Err(cut::LARGEST);
         }
         Ok(())
+    }
+
+    /// The rule of a study's hook at `node` ([`StepHook::narrow`]), as [`apply_symmetry`](Self::apply_symmetry)
+    /// applies the rule of symmetric pairs: `Err` with [`cut::SYMMETRY`] if the hook says no completion keeps its
+    /// rule, else the candidates it drops leave the node's loop and its bounds.
+    #[cfg(feature = "studies")]
+    fn apply_hook_rule(&mut self, node: &mut Node<W>, need: u64) -> Result<(), usize> {
+        let Some((hook, _)) = &mut self.hook else { return Ok(()) };
+        let before = node.cands;
+        if hook.narrow(&node.promoted, &mut node.cands) {
+            return Err(cut::SYMMETRY);
+        }
+        assert!(node.cands.is_subset(&before), "a hook's rule added candidates");
+        let dropped = before - node.cands;
+        if dropped.is_empty() {
+            return Ok(());
+        }
+        self.drop_candidates(node, &dropped, need)
     }
 
     /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
@@ -753,6 +781,15 @@ impl<'a, const W: usize> Stepper<'a, W> {
         ctx: &mut Ctx<'_, TaxUnit<W>>,
     ) -> Result<(), usize> {
         let need = (best + 1).saturating_sub(child.sum);
+        // A study's rule narrows the child's candidates before anything is pushed for it ([`StepHook::narrow`]).
+        #[cfg(feature = "studies")]
+        if let Some((hook, _)) = &mut self.hook {
+            let before = child.cands;
+            if hook.narrow(&child.promoted, &mut child.cands) {
+                return Err(cut::SYMMETRY);
+            }
+            assert!(child.cands.is_subset(&before), "a hook's rule added candidates");
+        }
         let cands = child.cands;
         if cands.sum_largest(max_next) < need {
             return Err(cut::LARGEST);
@@ -1047,6 +1084,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if conflict.is_some_and(|k| k.is_subset(&forced)) {
             // Every completion that reaches `need` promotes the whole conflict, so there is none.
             return None;
+        }
+        #[cfg(feature = "studies")]
+        if let Some((hook, _)) = &mut self.hook {
+            if !(space.fix_forced && !forced.is_empty()) {
+                hook.excluding(&node.state, &node.promoted, &node.cands, n);
+            }
         }
         node.cands.remove(n);
         let left = node.cands;

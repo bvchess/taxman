@@ -23,6 +23,8 @@
 //!     [--trace DIR] [--prefer FILE] [--best-cpu S] [--nodes K] [--tactic NAME=VALUE]... N
 //! cargo run --profile test --example wall --features studies -- cycles [--known FILE] [--suite FILE] [--units K]
 //!     [--seconds S] [--out FILE] N...
+//! cargo run --profile test --example wall --features studies -- exchanges --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) [--prune] [--below D] [--sample K] [--nodes K] [--tactic NAME=VALUE]... N|A-B...
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -131,6 +133,10 @@
 //!   its tuning-suite units, with cover, rank and flat-cycle cuts, against the GF(2) bound; defined in
 //!   `wall/cycles.rs`, whose module comment has the options and the stages, for
 //!   `solver/notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/`.
+//! * **exchanges**: units of the tuning suite, or whole games, solved with a hook that checks at every exclusion
+//!   whether an exchange of two primes that maps the member onto another candidate is a symmetry of the node, and with
+//!   `--prune` prunes by the ones that are; defined in `wall/exchanges.rs`, whose module comment has the check, the
+//!   rule and the lines.  `solver/notebook/local-prime-exchanges-at-the-nodes-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -173,6 +179,9 @@ mod cycles;
 /// `decompose`: whether the conflicts of a node split across a separator home (A5's cheapest experiment).
 #[path = "wall/decompose.rs"]
 mod decompose;
+/// `exchanges`: local prime exchanges at the nodes of a search, checked and pruned by.
+#[path = "wall/exchanges.rs"]
+mod exchanges;
 /// The A1 bound (GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
 #[path = "wall/fields.rs"]
 mod fields;
@@ -228,7 +237,7 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 11] = [
+const COMMANDS: [&str; 12] = [
     "setup",
     "nodes",
     "grow",
@@ -240,11 +249,26 @@ const COMMANDS: [&str; 11] = [
     "decompose",
     "anatomy",
     "cycles",
+    "exchanges",
 ];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 48] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose", "anatomy", "cycles"]),
+const OPTIONS: [(&str, &[&str]); 52] = [
+    (
+        "--known",
+        &[
+            "setup",
+            "nodes",
+            "grow",
+            "start",
+            "landscape",
+            "choice-prepare",
+            "decompose",
+            "anatomy",
+            "cycles",
+            "exchanges",
+        ],
+    ),
     ("--cap", &["choice"]),
     ("--fixtures", &["choice-prepare", "decompose"]),
     ("--pauses", &["decompose"]),
@@ -253,9 +277,13 @@ const OPTIONS: [(&str, &[&str]); 48] = [
     ("--best-cap", &["decompose"]),
     ("--and-or-cap", &["decompose"]),
     ("--and-or-min", &["decompose"]),
-    ("--suite", &["choice-prepare", "anatomy", "cycles"]),
+    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges"]),
     ("--units", &["cycles"]),
-    ("--ids", &["anatomy"]),
+    ("--ids", &["anatomy", "exchanges"]),
+    ("--prune", &["exchanges"]),
+    ("--below", &["exchanges"]),
+    ("--root", &["exchanges"]),
+    ("--sample", &["exchanges"]),
     ("--trace", &["anatomy"]),
     ("--prefer", &["anatomy"]),
     ("--best-cpu", &["anatomy"]),
@@ -278,13 +306,13 @@ const OPTIONS: [(&str, &[&str]); 48] = [
     ("--fix", &["choice-prepare"]),
     ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
-    ("--nodes", &["nodes", "grow", "anatomy"]),
+    ("--nodes", &["nodes", "grow", "anatomy", "exchanges"]),
     ("--seconds", &["nodes", "grow", "cycles"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
     ("--width", &["setup", "nodes"]),
     ("--no-seed", &["nodes"]),
-    ("--tactic", &["nodes", "grow", "anatomy"]),
+    ("--tactic", &["nodes", "grow", "anatomy", "exchanges"]),
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
@@ -338,8 +366,10 @@ struct Options {
     units: Option<usize>,
     /// The options of `choice-prepare` and `choice`.
     params: case::Params,
-    /// The options of `anatomy`.
+    /// The options of `anatomy` (and its `--ids`, of `exchanges`).
     anatomy: anatomy::Params,
+    /// The options of `exchanges`.
+    exchanges: exchanges::Params,
     games: Vec<u32>,
 }
 
@@ -367,6 +397,7 @@ impl Options {
             units: None,
             params: case::Params::default(),
             anatomy: anatomy::Params::default(),
+            exchanges: exchanges::Params::default(),
             games: Vec::new(),
         }
     }
@@ -494,6 +525,10 @@ fn parse() -> Result<Options, String> {
             "--trace" => o.anatomy.trace = Some(value("--trace")?.into()),
             "--prefer" => o.anatomy.prefer = Some(value("--prefer")?.into()),
             "--best-cpu" => o.anatomy.best_cpu = number("--best-cpu", value("--best-cpu")?)?,
+            "--prune" => o.exchanges.prune = true,
+            "--below" => o.exchanges.below = number("--below", value("--below")?)?,
+            "--root" => o.exchanges.root = true,
+            "--sample" => o.exchanges.sample = number("--sample", value("--sample")?)?,
             _ => texts.push(arg.clone()),
         }
     }
@@ -561,6 +596,10 @@ fn main() {
     }
     if o.command == "cycles" {
         cycles::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if o.command == "exchanges" {
+        exchanges::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     if let Some(command) = case::Command::named(&o.command) {

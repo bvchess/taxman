@@ -9,7 +9,9 @@
 //! the hook is told is a copy: it cannot change the step.  What it is asked ([`StepHook::branch`]) can change the
 //! tree, never the answer: every completion of a node leaves out a member of the conflict of its heaviest set, so
 //! branching on any member, and going on without it, explores every completion (DESIGN.md, section 4, "The default
-//! step", the second of the facts its exactness rests on).  The searcher checks that the member is one.
+//! step", the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may
+//! also narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric
+//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.
 //!
 //! The hook is the GF(2) path's (the tactic `gf2`, the default): on the matching path it is told of the steps, without
 //! their bound checks, and asked nothing.
@@ -33,6 +35,23 @@ pub trait StepHook<const W: usize> {
     fn branch(&mut self, conflict: &Bits<W>, strong: u32) -> u32 {
         let _ = conflict;
         strong
+    }
+
+    /// Before a node branches on `member` and goes on without it (no member is forced, so the node's loop goes on
+    /// after this child): the node's state, promotions and candidates (`member` among them).  Told only on the GF(2)
+    /// path.
+    fn excluding(&mut self, state: &FrameSet<W>, promoted: &Bits<W>, cands: &Bits<W>, member: u32) {
+        let _ = (state, promoted, cands, member);
+    }
+
+    /// The candidates `cands` of a node with the promotions `promoted`, at a step after its first (after the rule of
+    /// symmetric pairs), or of a child as it is checked, which a study may narrow by a rule of its own.  Returns true
+    /// if no completion keeps the rule: then the node's loop ends, or the child is cut, as for the rule of symmetric
+    /// pairs ([`cut::SYMMETRY`](super::cut::SYMMETRY)).  The candidates it drops leave the node's bounds as that rule's
+    /// do.  This is the one site where a hook can change the answer: the rule's soundness is the study's to prove.
+    fn narrow(&mut self, promoted: &Bits<W>, cands: &mut Bits<W>) -> bool {
+        let _ = (promoted, cands);
+        false
     }
 }
 
