@@ -1,76 +1,137 @@
 # The theory, with proofs
 
-This is the proof companion to [README.md](../heuristics/README.md): every theorem the ledger there cites lives here in
-full.  The README states what is claimed and how well it is tested; this file is *why*.
+This page proves the theorems that the project's programs rest on: the frame solver, which finds optimal games, and the
+prover, which checks them on the whole board, and the claims of the heuristics.  Each result is stated in words, then
+formally, then proved, and each says where it stands: proved, proved given a statement that is open, certified game by
+game, measured, or open.  The table below lists them all with their standing; the heuristics' claims table
+([heuristics/README.md](../heuristics/README.md)) cites them, and the evidence at the end gives the computations behind
+the statements that rest on computation.
 
-Everything below supports three headline facts:
+## The statements
 
-* **Proven.**  `peel` succeeds on a set **iff** the set is playable **iff** it contains no self-covering core (Theorems
-  1-6).  Acceptance is not a heuristic anywhere in this project: it is a decision procedure for playability, proven in
-  both directions.
-* **Open.**  The upper-half optimality conjecture: in every game, no playable subset of the upper half outweighs the one
-  descending greedy selects (the set the README calls U\*).  "The open problem" below states it precisely, gives its
-  weight-free working form — conjecture (★) — and maps the exact boundary between what is proven and what remains.  A
-  linear-algebra certificate, (♦), settles it game by game: every game to 100,000 is certified.
-* **Proven, but for one statement.**  The frame solver's answer (`solver/frame/`) is opt(n) exactly when *some optimal
-  game plays every member of U\* with three or more prime factors*, on every board the solver supports (Lemma Ω,
-  Theorems L, B and M; "The frame model: what is proven and what remains").  That statement, U, is open in general and
-  holds wherever the optimum has been proven on the whole board (every n ≤ 2175).  The solver's committed games of
-  2176..3440 rest on it, and it is not yet certified for them.
+Each statement, its standing, and the section that proves it or states it.  *Proved* means a proof below; *given* names
+the open statement a proof assumes; *certified* means checked game by game by a computation that proves it for that
+game; *measured* means observed on the data named, with no proof.  [results/README.md](../results/README.md) says how
+far the proofs of the committed chain reach.
 
-Empirical support for each claim is collected in the evidence table at the end.
+| label | statement | standing | section |
+|---|---|---|---|
+| Theorem 1 | a set of moves can be played iff its members have distinct maximal factors outside it whose precedence is acyclic | proved | [The decision procedure](#the-decision-procedure) |
+| Theorem 2 | when peel succeeds, its payments have an acyclic precedence, so a play order exists | proved | [The decision procedure](#the-decision-procedure) |
+| Theorem 3 | peel succeeds on every playable set | proved | [The decision procedure](#the-decision-procedure) |
+| Theorem 4 | every dismantling ends at the same residual, the union of all self-covering subsets | proved | [Unplayable sets](#unplayable-sets-cores-and-the-residual) |
+| the extension lemma | a playable set stays playable with a member that has a factor no member lists | proved (separated instances) | [Unplayable sets](#unplayable-sets-cores-and-the-residual) |
+| Theorem 5 | a set is playable iff its residual is empty | proved for separated instances; measured without separation | [Unplayable sets](#unplayable-sets-cores-and-the-residual) |
+| Theorem 6 | a set playable after excluding E is playable after excluding E's part in the residual | proved (separated instances) | [Unplayable sets](#unplayable-sets-cores-and-the-residual) |
+| the upper-half conjecture | no playable set of sources outweighs U\*, the set that descending greedy keeps | open; certified in every game to 100,000 (through (♦)) | [The open problem](#the-open-problem) |
+| the frontier argument | greedy is weight-optimal wherever the jam is hyperedge-free | proved | [The frontier argument](#the-frontier-argument-and-exactly-where-it-stops) |
+| the victim law | a single sacrifice repairs a jam iff it lies in every minimal core | checked by machine | [The frontier argument](#the-frontier-argument-and-exactly-where-it-stops) |
+| (★) | on every component of the sources' instance, and every truncation of one, descending greedy keeps a playable set of the largest size | open; certified in every game to 100,000 (through (♦)) | [The cardinality reformulation](#the-cardinality-reformulation) |
+| the independence lemma | the incidence vectors of a playable set are linearly independent over GF(2) | proved | [The span certificate](#the-span-certificate-) |
+| Theorem 7 | (♦) implies (★) and the upper-half conjecture | proved | [The span certificate](#the-span-certificate-) |
+| (♦) | every source that descending greedy rejects is a GF(2) combination of sources it kept above it | open; certified in every game to 100,000 and 902 games to 2,000,000 | [The span certificate](#the-span-certificate-) |
+| Theorem 8 | U\* is the unique heaviest playable set of sources, and every playable set of sources lies termwise below it | proved given (★), so certified to 100,000 | [Uniqueness](#uniqueness-of-the-optimal-set) |
+| the lemma of the prime | every optimal set holds the largest prime ≤ n and no other prime | proved | [Uniqueness](#uniqueness-of-the-optimal-set) |
+| Theorem 9 | the optimal sets of n follow from those of n − 1 at the ceiling and at a prime | proved | [Uniqueness](#uniqueness-of-the-optimal-set) |
+| the remark on matroids | no matroid relaxation of the whole game is exact | proved (by game 425) | [Uniqueness](#uniqueness-of-the-optimal-set) |
+| uniqueness of the optimal set | every game has one optimal set | measured to 424; false from 425 | [Uniqueness](#uniqueness-of-the-optimal-set) |
+| the lemma on the most moves | M(n) ≤ ν(n), M(n − 1) ≤ M(n) ≤ M(n − 1) + 1, and at most \|U\*\| moves are sources | proved (the last given (★)) | [Longest games](#longest-games) |
+| the proposition on longest games | an optimal game need not have the most moves | proved by computation (n = 833) | [Longest games](#longest-games) |
+| Theorem 10 | a playable set is independent in both parity matroids, so their heaviest common independent set bounds opt(n) | proved | [The parity matroids](#the-parity-matroids-a-bound-on-the-whole-game) |
+| Theorem 11 | a promotable set is independent in the even and the odd frames' matroids, so their heaviest common independent set bounds P\* | proved | [The frame matroids](#the-frame-matroids-a-bound-on-the-promotions) |
+| Theorem 13 | a prime exchange that maps the root onto itself orders the two primes' cofactor sums in every heaviest promotion set | proved | [Prime exchanges](#prime-exchanges-symmetries-of-the-promotions) |
+| Lemma Ω | the frames lie in layers, one frame in front of another one layer down | proved | [Frames are layers](#frames-are-layers) |
+| Theorem L | a set is playable iff each of its layer instances is | proved | [Playability splits by layer](#playability-splits-by-layer) |
+| Theorem B | every optimal set plays the largest prime alone in layer 1, and exactly U\*_2 among the sources of layer 2 | proved | [The bottom layers](#the-bottom-layers) |
+| N | every frame with freedoms directly in front of frame h is frame h − 1 | proved (by construction) | [Numbering by layer](#numbering-by-layer) |
+| M1 to M6 | each step of setup keeps the playable sets that contain U\* | proved | [The frame model is exact](#the-frame-model-is-exact-given-its-upper-part) |
+| Theorem M | U\* ∪ L is playable iff L is a promotion set of the root problem | proved | [The frame model is exact](#the-frame-model-is-exact-given-its-upper-part) |
+| U | some optimal set of n contains U\*_{≥3} | open; holds wherever the prover has proven opt(n), and at the games with a certificate | [The upper part](#the-upper-part) |
+| the corollary of U | the frame solver's answer is opt(n) iff U holds at n | proved | [The upper part](#the-upper-part) |
+| Theorem M⁺ | with a set O of sources left optional, a set is playable iff it is a promotion set of the extended problem Π⁺(O) | proved | [The extended problem](#the-extended-problem) |
+| Lemma M5⁺ | the claims of `unzip` that a frame keeps are moves of every instance, so Π⁺(O) has the same promotion sets with them and without | proved | [The extended problem](#the-extended-problem) |
+| the certificate of U | a search of Π⁺(O) that finds nothing better, with the other members certified, proves opt(n) | proved | [The extended problem](#the-extended-problem) |
+| Lemmas L1 to L4 | bounds pass between games: monotonicity, the ceiling, the prime formula both ways, repeats | proved (L4's inequality given U) | [The ledger](#the-ledger-bounds-between-boards) |
+| Lemma D | a stopped search bounds P\* by its incumbent and the bounds of its open units | proved | [The ledger](#the-ledger-bounds-between-boards) |
+| Lemma F | a search under a floor that completes with nothing found proves P\* at most the floor | proved | [The ledger](#the-ledger-bounds-between-boards) |
+| Theorem 14 | a promotable set is independent in every signed frame matroid, over any field | proved | [Signed frame matroids](#signed-frame-matroids-the-frame-bound-over-other-fields) |
+| Theorem 15 | the GF(2) and signed matroids combine into one Lagrangian bound, valid for every multiplier | proved | [Signed frame matroids](#signed-frame-matroids-the-frame-bound-over-other-fields) |
+| the bridge | a payment scheme has a flat alternating cycle iff its precedence is cyclic iff another scheme has its payment set | proved | [Their Theorem 1 is Theorem 1](#their-theorem-1-is-theorem-1) |
+| Theorem 12 | playable, independent and matchable are one count read three ways: exactly one, odd, at least one | proved | [One count, three conditions](#one-count-three-conditions) |
+| the two-factor proposition | a set whose members have at most two maximal factors outside it is playable iff independent iff a forest | proved | [What the parity bound keeps](#what-the-parity-bound-keeps-and-what-it-drops) |
+| the first odd core | no game n ≤ 44 has an odd core, and game 45 does | proved | [What the parity bound keeps](#what-the-parity-bound-keeps-and-what-it-drops) |
+| the parity bound's exactness | the parity bound equals opt(n) for every n ≤ 77, and first exceeds it at 78 | measured | [What the parity bound keeps](#what-the-parity-bound-keeps-and-what-it-drops) |
 
 ## Definitions
 
-The *maximal factors* of c are the divisors f with c/f prime — the divisors reached by deleting one prime from c
-(mf(4) = {2}, mf(6) = {2, 3}; a prime's only maximal factor is 1).  A *reduction instance* is a set of members C, a
-factor pool F disjoint from C, and each member's factor list mf(c) ∩ F; `core.peel` reduces such instances by forced
-moves only (a member with one live factor takes it; a factor with one live lister goes to that lister).  The upper half
-of game n — the numbers above n/2, which never divide one another — forms one naturally, with F the union of the
-members' maximal factors.  A number a game takes is a *pick* (the solver's and the wiki's *move*); Theorem 1 says
-*selection*.
+*The game.*  Game n is played on the numbers 1 to n.  A *move* takes a number that still has a proper divisor in the
+pot; the player scores it, and the taxman takes its divisors still in the pot.  The best score of game n is opt(n), and
+an *optimal set* is the set of moves of a game that scores it.  The most moves of a game of n is M(n).  A set of numbers
+is *playable* when some game plays all of them as moves, in some order.
+
+*Maximal factors.*  The *maximal factors* of c are the divisors f with c/f prime: the divisors reached by deleting one
+prime from c.  Their set is mf(c): mf(4) = {2}, mf(6) = {2, 3}, and a prime's only maximal factor is 1.
+
+*Layers.*  The number of prime factors of x, counted with multiplicity, is Ω(x): Ω(12) = 3, and Ω(1) = 0.  The *layer*
+of x is Ω(x): layer 0 is {1}, layer 1 the primes, layer 2 the products pq and the squares p², and so on.  A maximal
+factor of x lies one layer below x.  For a set S, S_k is its part in layer k, and S_{≥k} its part in the layers from k
+up.
+
+*Sources.*  The *sources* of game n are the numbers above n/2.  None divides another, so a source is never tax: it is a
+move or nothing.
+
+*Reduction instances.*  A *reduction instance* is a set of members C, a factor pool F disjoint from C, and each member's
+factor list mf(c) ∩ F.  The function `core.peel` reduces such an instance by forced moves only: a member with one live
+factor takes it, and a factor with one live lister goes to that lister.  The sources of game n form one naturally, with
+F the union of their maximal factors: the *sources' instance*.
+
+*U\* and the frame model.*  *Descending greedy* takes the members of an instance in decreasing order and keeps each one
+whenever it and the members kept so far are still playable.  The set that it keeps among the sources of game n is U\*,
+and U\*_k is its part in layer k.  The frame solver searches the promotion sets of its *root problem* Π_n (its frames,
+candidates and `max_total`; [The frame model](#the-frame-model-what-is-proven-and-what-remains)).  The score of the game
+with no promotions is in_the_bag = ΣU\*, and the weight of the heaviest promotion set of a problem Π is P\*(Π); P\*
+alone means P\*(Π_n).
 
 ## The decision procedure
 
-**Theorem 1 (playability).**  A set S of selections can all be played, in some order, **iff** there is a matching
-assigning each member a distinct maximal factor not in S such that the precedence relation "a before b whenever a's
-assigned factor divides b, or a divides b" is acyclic.  Any topological order of the precedence is a legal game.
+**Theorem 1 (playability).**  A set S of moves can all be played, in some order, **iff** there is a matching assigning
+each member a distinct maximal factor not in S such that the precedence relation "a before b whenever a's assigned
+factor divides b, or a divides b" is acyclic.  Any topological order of the precedence is a legal game.
 
-*Proof.*  One direction is a construction: play the topological order, and each pick's reserved payment provably
-survives until its turn.  The other is the Franklín–Moniot lifting argument turned inward.  Whatever divisor d a pick
+*Proof.*  One direction is a construction: play the topological order, and each move's reserved payment provably
+survives until its turn.  The other is the Franklín–Moniot lifting argument turned inward.  Whatever divisor d a move
 actually surrenders lifts to a maximal factor f with d | f | c; f must still be in the pot (anything that had removed f
-would have removed d with it), and f cannot itself be a selection, or the pick's sweep would destroy an unplayed number.
-So every legal game already pays each pick with at least one distinct outside maximal factor.  ∎
+would have removed d with it), and f cannot itself be a move of S, or the move's sweep would destroy an unplayed
+number.  So every legal game already pays each move with at least one distinct outside maximal factor.  ∎
 
 Maximal factors are therefore the only factor notion the whole project needs.  One boundary is worth marking:
 *feasibility* is pool-invariant, but raw play orders are not.  `cascade`, which plays peel's sequence directly under
-real sweeps, still needs true divisors — at n=5 a maximal-factor pool emits [4, 5], and playing 4 sweeps the 1 that 5
+real sweeps, still needs true divisors: at n=5 a maximal-factor pool emits [4, 5], and playing 4 sweeps the 1 that 5
 needed.
 
 **Theorem 2 (schedulability).**  Whenever `peel` succeeds on a reduction instance (members C, factor pool F with C ∩ F =
 ∅, each member's list L(c) = mf(c) ∩ F), its returned assignment pay(·) has an acyclic precedence "a before b whenever
-pay(a) | b, or a | b" — so a legal play order always exists, and the ordering step can never fail.
+pay(a) | b, or a | b".  So a legal play order always exists, and the ordering step can never fail.
 
-*Proof.*  Every payment is a maximal factor of its member, so Ω(pay(x)) = Ω(x) − 1 exactly (Ω = prime factors with
-multiplicity; primes pay 1, Ω(1) = 0).  Follow the potential Ω(pay(aᵢ)) around a supposed cycle.  If an edge has a | b
-(whether or not pay(a) | b also holds), then Ω(pay(a)) = Ω(a) − 1 < Ω(b) − 1 = Ω(pay(b)), strictly.  Otherwise pay(a) |
-b properly (payments lie in F, disjoint from C), so Ω(pay(a)) ≤ Ω(b) − 1 = Ω(pay(b)).  A cycle forces equality
-everywhere: no member-divides-member edges, and on every edge Ω(pay(a)) = Ω(b) − 1, which for a divisor of b means
-b/pay(a) is prime — pay(a) is a *maximal factor of b*.  Since pay(a) ∈ F, it lies in L(b): every cycle lives on pool
-edges.  (A prime paying 1 has out-edges to everything, but equality forces its cycle successor to be prime with L = {1},
-and the same collision below.)
+*Proof.*  Every payment is a maximal factor of its member, so Ω(pay(x)) = Ω(x) − 1 exactly (primes pay 1, and Ω(1) =
+0).  Follow the potential Ω(pay(aᵢ)) around a supposed cycle.  If an edge has a | b (whether or not pay(a) | b also
+holds), then Ω(pay(a)) = Ω(a) − 1 < Ω(b) − 1 = Ω(pay(b)), strictly.  Otherwise pay(a) | b properly (payments lie in F,
+disjoint from C), so Ω(pay(a)) ≤ Ω(b) − 1 = Ω(pay(b)).  A cycle forces equality everywhere: no member-divides-member
+edges, and on every edge Ω(pay(a)) = Ω(b) − 1, which for a divisor of b means b/pay(a) is prime: pay(a) is a *maximal
+factor of b*.  Since pay(a) ∈ F, it lies in L(b): every cycle lives on pool edges.  (A prime paying 1 has out-edges to
+everything, but equality forces its cycle successor to be prime with L = {1}, and the same collision below.)
 
 Now let c be the earliest-peeled member of such a cycle and lean on two invariants of the implementation: a factor
 leaves a member's live list only when globally consumed as some pair's payment, and `comps_of[f]` holds exactly the live
 members listing f.  If c was front-peeled, its live list at that step was {pay(c)}; its cycle predecessor a peels later,
-so pay(a) is unconsumed and still in c's live list — pay(a) = pay(c), contradicting distinct payments.  If c was
-back-peeled, pay(c) was listed by no other live member; its cycle successor d peels later, is live, and lists pay(c) —
+so pay(a) is unconsumed and still in c's live list, and pay(a) = pay(c), contradicting distinct payments.  If c was
+back-peeled, pay(c) was listed by no other live member; its cycle successor d peels later, is live, and lists pay(c),
 contradicting that uniqueness.  ∎
 
 The theorem covers exactly the assignments the code can emit: the fast Kuhn-matching tier checks acyclicity explicitly
-before accepting, and falls back to peel — whose output the theorem covers — whenever its matching goes cyclic.  The
-proof *requires* maximal-factor payments; the potential argument dies with all-divisor pools.  The n=39 set {39, 33, 22,
-26} — introduced properly in the next section — shows why peeling is structurally immune to cycles: a cycle core has no
+before accepting, and falls back to peel, whose output the theorem covers, whenever its matching goes cyclic.  The proof
+*requires* maximal-factor payments; the potential argument dies with all-divisor pools.  The n=39 set {39, 33, 22, 26},
+introduced properly in the next section, shows why peeling is structurally immune to cycles: a cycle core has no
 degree-1 vertex, so the forced-move discipline stalls and refuses rather than threads through it.
 
 **Theorem 3 (completeness).**  If a set is playable, peel succeeds on it.  (Contrapositive: every peel refusal is a
@@ -79,49 +140,50 @@ proof of unplayability.)
 *Proof.*  Three lemmas.  *Front moves preserve playability*: if live member c has exactly one live factor f, every
 covering matching must assign f to c, and removing the pair leaves an acyclic covering matching of the residue
 (restriction of acyclic is acyclic).  *Back moves preserve playability*: if live factor f is listed by exactly one live
-member c, take any acyclic covering matching M — nobody but c can be matched to f, so M minus c's own pair covers
+member c, take any acyclic covering matching M.  Nobody but c can be matched to f, so M minus c's own pair covers
 everyone else while avoiding f, and survives the removal of (c, f).  The invariant here is playability of the *residual
-instance*, which depends only on which pair was removed — not on the fact that the code pays c with f while M may pay it
+instance*, which depends only on which pair was removed, not on the fact that the code pays c with f while M may pay it
 with something else (that discrepancy belongs to Theorem 2, not this one).  *A stall is unplayable*: if no forced move
 exists with members remaining, every live factor has zero or at least two live members.  Take any covering matching of
-the residue: each member a's payment is a live factor with at least one lister (a itself), hence at least two — so some
+the residue: each member a's payment is a live factor with at least one lister (a itself), hence at least two, so some
 other live member b lists pay(a), and pay(a) | b is a precedence edge a → b.  Every vertex has an out-edge, so the
 finite digraph contains a directed cycle; every covering matching is precedence-cyclic, and the residue is unplayable.
 Chaining: a playable input stays playable through every forced move, a playable residue can never strand a member at
-zero factors, and a halt with members remaining would make the (playable) residue unplayable — contradiction.  ∎
+zero factors, and a halt with members remaining would make the (playable) residue unplayable, a contradiction.  ∎
 
-Note what each theorem needs.  Completeness holds for *any* pool of proper divisors — maximality unused — but the
-converse (Theorem 2) genuinely requires maximal factors: with lists {6: [1], 9: [3]} the unique matching is a perfect
-2-cycle (1 | 9 and 3 | 6), the set is unplayable, and peeling would accept it anyway.  Only in the maximal-factor regime
-do the two theorems interlock into the full equivalence: **peel succeeds ⟺ the set is playable.**
+Note what each theorem needs.  Completeness holds for *any* pool of proper divisors, maximality unused, but the converse
+(Theorem 2) genuinely requires maximal factors: with lists {6: [1], 9: [3]} the unique matching is a perfect 2-cycle (1
+| 9 and 3 | 6), the set is unplayable, and peeling would accept it anyway.  Only in the maximal-factor regime do the two
+theorems interlock into the full equivalence: **peel succeeds ⟺ the set is playable.**
 
 ## Unplayable sets: cores and the residual
 
-A *self-covering* set is a nonempty subset in which every member's every maximal factor is also some other member's
+An unplayable set is unplayable because of a *core*, and every way of taking members out ends at the same one.  A
+*self-covering* set is a nonempty subset in which every member's every maximal factor is also some other member's
 maximal factor.  *Dismantling* repeatedly removes any member holding a factor no other remaining member lists; a set
 with no self-covering subset dismantles to nothing.  The n=39 specimen {39, 33, 22, 26} is the minimal self-covering
 core.
 
-Standing hypothesis for this section: the instance is **separated** — no member is a maximal factor of another member.
-Every instance this project computes with satisfies it automatically: members of an upper-half or band instance all
-exceed n/2 (or the band floor), while a maximal factor of such a member is at most half of it.  Separation buys a
+Standing hypothesis for this section: the instance is **separated**, that is no member is a maximal factor of another
+member.  Every instance this project computes with satisfies it automatically: members of a sources' or band instance
+all exceed n/2 (or the band floor), while a maximal factor of such a member is at most half of it.  Separation buys a
 decisive simplification: under it, every member's live list is its full maximal-factor set in every subset, so
 self-covering and dismantling are intrinsic notions, stable under taking subsets.  The hypothesis is not decorative.
 With members doubling as each other's factors the pool shifts as members come and go, and Theorems 5 and 6 below become
-false: for K = {2, 4, 8} (residual {4, 8}), the exclusion E = {2, 8} leaves the playable {4} — 2 re-enters the pool —
-yet K∖(E∩R) = {2, 4} strands 4, violating Theorem 6; and the extension lemma dies at S = {8, 33, 37} with x = 4, whose
-arrival as a member removes 4 from the pool and strands 8.
+false: for K = {2, 4, 8} (residual {4, 8}), the exclusion E = {2, 8} leaves the playable {4}, since 2 re-enters the
+pool, yet K∖(E∩R) = {2, 4} strands 4, violating Theorem 6; and the extension lemma dies at S = {8, 33, 37} with x = 4,
+whose arrival as a member removes 4 from the pool and strands 8.
 
 **Theorem 4 (survival and confluence; no separation needed).**  A self-covering subset survives every dismantling
 sequence; all dismantling sequences of an instance end at the same fixpoint, the *residual*; a nonempty residual is
 itself self-covering, and the residual equals the union of all self-covering subsets.  In particular the residual is
 empty iff no self-covering subset exists.
 
-*Proof.*  If the next deletion removes x with private factor f and x belonged to a self-covering C, then f — like every
-factor of x — is listed by another member of C, all of C being alive; that contradicts privacy, so dismantling never
+*Proof.*  If the next deletion removes x with private factor f and x belonged to a self-covering C, then f, like every
+factor of x, is listed by another member of C, all of C being alive; that contradicts privacy, so dismantling never
 touches C.  A nonempty fixpoint is self-covering by definition of "no forced deletion remains" (a member with an empty
-list is vacuously covered and never removable).  Two fixpoints R₁, R₂ of different sequences: R₁ is self-covering, hence
-survives the second sequence, so R₁ ⊆ R₂, and symmetrically.  ∎
+list is vacuously covered and never removable).  Take two fixpoints R₁, R₂ of different sequences: R₁ is self-covering,
+hence survives the second sequence, so R₁ ⊆ R₂, and symmetrically.  ∎
 
 **Extension lemma (separated instances).**  Let S be playable and let x ∉ S be a member that is not a maximal factor of
 any member of S, with some f ∈ mf(x) listed by no member of S.  Then S ∪ {x} is playable.
@@ -130,43 +192,43 @@ any member of S, with some f ∈ mf(x) listed by no member of S.  Then S ∪ {x}
 Take an acyclic covering assignment of S and extend it by pay(x) = f; distinctness holds because every payment is listed
 by its payer and f is listed by no member of S.  Suppose the extended precedence has a cycle.  The precedence among old
 members is unchanged, so the cycle passes through x.  Now reuse the first half of Theorem 2's proof, which is
-assignment-agnostic — it needs only that every payment is a maximal factor of its member, so Ω(pay(v)) = Ω(v) − 1
-exactly: along a member-divides-member edge the potential strictly increases, so a cycle contains none; along a payment
-edge a → b it increases weakly, with equality forcing pay(a) ∈ mf(b).  A cycle forces equality everywhere — in
+assignment-agnostic: it needs only that every payment is a maximal factor of its member, so Ω(pay(v)) = Ω(v) − 1
+exactly.  Along a member-divides-member edge the potential strictly increases, so a cycle contains none; along a payment
+edge a → b it increases weakly, with equality forcing pay(a) ∈ mf(b).  A cycle forces equality everywhere, in
 particular on the cycle's edge leaving x, which then requires f ∈ mf(z) for some z ∈ S, contradicting f's privacy.  ∎
 
-**Theorem 5 (core characterization, separated instances).**  A set is playable iff its residual is empty — equivalently,
-iff it contains no self-covering subset.
+**Theorem 5 (core characterization, separated instances).**  A set is playable iff its residual is empty, or
+equivalently iff it contains no self-covering subset.
 
 *Proof.*  (⇒, no separation needed)  A self-covering C is unplayable: a member with an empty list can never pay, and
-otherwise any covering assignment gives each x ∈ C a payment listed by another member of C — an out-edge within C — so
-the finite digraph has a cycle and every covering assignment is precedence-cyclic.  Downward closure of playability
-finishes.  (⇐)  Let x₁, …, x_k be a complete dismantling order (empty residual) and T_j = {x_j, …, x_k}.  T_{k+1} = ∅ is
-playable; x_j has a factor private in T_j, is no member's maximal factor (separation), so the extension lemma lifts
-playability from T_{j+1} to T_j.  Induction ends at T₁ = M.  ∎
+otherwise any covering assignment gives each x ∈ C a payment listed by another member of C, an out-edge within C, so the
+finite digraph has a cycle and every covering assignment is precedence-cyclic.  Downward closure of playability
+finishes.  (⇐)  Let x₁, …, x_k be a complete dismantling order (empty residual) and T_j = {x_j, …, x_k}.  The empty set
+T_{k+1} is playable; x_j has a factor private in T_j and is no member's maximal factor (separation), so the extension
+lemma lifts playability from T_{j+1} to T_j.  Induction ends at T₁ = M.  ∎
 
 Without separation the characterization has never been observed to fail, but remains unproven (see the evidence table).
 
 **Theorem 6 (exclusion confinement, separated instances).**  Let K have residual R.  If K ∖ E is playable, so is K ∖ (E
 ∩ R).
 
-*Proof.*  Suppose K ∖ (E ∩ R) is unplayable.  By Theorem 5 it contains a self-covering C; by Theorem 4, C ⊆ R.  C avoids
-E ∩ R and lies in R, so it avoids E entirely: C ⊆ K ∖ E.  But K ∖ E is playable and by Theorem 5 contains no
+*Proof.*  Suppose K ∖ (E ∩ R) is unplayable.  By Theorem 5 it contains a self-covering C; by Theorem 4, C ⊆ R.  The set
+C avoids E ∩ R and lies in R, so it avoids E entirely: C ⊆ K ∖ E.  But K ∖ E is playable and by Theorem 5 contains no
 self-covering subset.  ∎
 
 Corollaries.  Minimal exclusion sets lie inside the residual (otherwise E ∩ R is a smaller valid exclusion).  Every
-maximum-weight playable subset — any positive weights, cardinality included — contains everything outside the residual.
-Exact searches restricted to subsets of the residual are therefore sound: the reduction every exhaustive campaign below
-leans on.
+maximum-weight playable subset, for any positive weights, cardinality included, contains everything outside the
+residual.  Exact searches restricted to subsets of the residual are therefore sound: the reduction every exhaustive
+campaign below leans on.
 
 ## The open problem
 
-*Descending greedy* considers the members of an instance in decreasing numeric order and admits each one whenever the
-set selected so far, plus it, is still playable (peel is the test).  Run on the upper-half instance of game n, this is
-`optimize_mini`, and the set it returns is the U\* of the README.
+The upper-half conjecture says that descending greedy finds the heaviest playable set of sources; it is open, and
+certified game by game wherever (♦) holds (Theorem 7).  Run on the sources' instance of game n, descending greedy is
+`optimize_mini`, and the set it keeps is U\*.
 
-> **Conjecture (upper-half optimality).**  For every game n, no playable subset of the upper-half instance outweighs the
-> set descending greedy selects.
+> **The upper-half conjecture.**  For every game n, no playable subset of the sources' instance outweighs the
+> set descending greedy keeps.
 
 Everything in this section locates the exact boundary between what is proven about this conjecture and what remains
 open.
@@ -183,100 +245,100 @@ is at **n = 2873**, on six members built from {11, 13, 17}:
     A = {1573, 2057, 2431, 2873}                (playable, size 4)
     B = {1573, 1859, 2057, 2197, 2873}          (playable, size 5)
 
-Both members of B∖A jam: A+1859 and A+2197 each contain a core.  Two maximal playable sets of *different sizes* — so
-playable sets do not support the exchange argument that justifies greedy in the textbook setting, and the optimality
+Both members of B∖A jam: A+1859 and A+2197 each contain a core.  Two maximal playable sets of *different sizes* means
+that playable sets do not support the exchange argument that justifies greedy in the textbook setting, and the
 conjecture cannot be proven that way.
 
 And yet greedy survives: in every three-prime gadget tested, descending greedy still returns the maximum-weight playable
-set — at n=2873 it takes a heavy size-5 set, {1859, 2057, 2197, 2431, 2873}, and never lands on the stuck size-4 A,
+set.  At n=2873 it takes a heavy size-5 set, {1859, 2057, 2197, 2431, 2873}, and never lands on the stuck size-4 A,
 because the stuck base is also the *light* one.  The arithmetic is load-bearing: on the same incidence structure, 48 of
-the 720 orderings of the six members make greedy fail — the actual member values land in the safe majority, and random
+the 720 orderings of the six members make greedy fail; the actual member values land in the safe majority, and random
 abstract weightings do not.
 
 ### The frontier argument, and exactly where it stops
 
-The natural direct proof gets remarkably far.  Compare greedy's set G to a supposedly heavier playable set T on the same
-instance, at their largest disagreement d.  T cannot be the one holding d (T would contain greedy's own rejection
-certificate — downward closure).  So d ∈ G, T skips it, and if T is maximum-weight then T+d must be unplayable: every
-core of T+d contains d (T is playable) and dips below d — the part of T+d at or above d is exactly G ∩ {≥ d}, playable
-*because* step one put d in G, so no core fits inside it.  Let R be the union of those cores — the 2-core of T+d in
-hypergraph terms.  Repairs live entirely inside R (Theorem 6 with K = T+d); a sacrifice t repairs T+d exactly when t
-lies in **every** minimal core of R (the "victim law"); and when every member of R has at most two distinct primes, R−d
-is a forest, R has *exactly one* minimal core (a forest plus one edge has one cycle), so a below-d victim always exists
-and the sacrifice T+d−t both restores playability and gains weight — contradiction.  **Greedy is provably weight-optimal
-wherever the jam is hyperedge-free.**
+The natural direct proof gets remarkably far: it proves greedy optimal wherever the jam is hyperedge-free.  Compare
+greedy's set G to a supposedly heavier playable set T on the same instance, at their largest disagreement d.  The set T
+cannot be the one holding d (T would contain greedy's own rejection certificate, by downward closure).  So d ∈ G, T
+skips it, and if T is maximum-weight then T+d must be unplayable: every core of T+d contains d (T is playable) and dips
+below d, since the part of T+d at or above d is exactly G ∩ {≥ d}, playable *because* step one put d in G, so no core
+fits inside it.  Let R be the union of those cores, the 2-core of T+d in hypergraph terms.  Repairs live entirely inside
+R (Theorem 6 with K = T+d); a sacrifice t repairs T+d exactly when t lies in **every** minimal core of R (the "victim
+law"); and when every member of R has at most two distinct primes, R−d is a forest, R has *exactly one* minimal core (a
+forest plus one edge has one cycle), so a below-d victim always exists and the sacrifice T+d−t both restores playability
+and gains weight, a contradiction.  **Greedy is provably weight-optimal wherever the jam is hyperedge-free.**
 
 Beyond that regime the single-sacrifice step is **false**.  At n = 9170, d = 6137 = 17·19², the six members {4913, 5491,
 6137, 6647, 7429, 8303} (all built from 17, 19, 23; the hyperedge is 7429 = 17·19·23) form an R with **two** minimal
-cores through d sharing nothing else — their below-d parts are {4913} and {5491}, disjoint — so no single below-d
+cores through d sharing nothing else.  Their below-d parts are {4913} and {5491}, disjoint, so no single below-d
 sacrifice repairs, and every single repair costs at least d.  Greedy is still right there: every d-avoiding way to break
 both cores costs more than d (any single alternative victim is heavier than d; any two members sum past n), and the
-full-context optimum does take d — skipping it costs 1,224 points net.  But proving that in general is now visibly a
+full-context optimal set does take d: skipping it costs 1,224 points net.  But proving that in general is now visibly a
 *non-local, weighted* question: whenever no single lighter sacrifice repairs the jam, the would-be improver's kept
 members must be charged for what they lock out elsewhere in the component, not just at the frontier.  That is the open
 problem's irreducible form, with n=9170 as the first test any proof must pass.
 
 ### The cardinality reformulation
 
-The weights can be removed from the open problem entirely.  Taxman's weights are the members themselves, so any weight
-assignment is consistent with the value ordering — and for order-consistent weights, the classic majorization fact
-applies: greedy's set outweighs a competitor for *every* consistent weighting iff it matches or beats the competitor's
-cardinality within every top segment of the ordering.  Since descending greedy's decisions above any threshold never
-depend on anything below it (its restriction to {> t} IS its run on the truncated instance), the optimality conjecture
-becomes one unweighted statement:
+The weights can be removed from the open problem entirely, which turns the conjecture into (★), a statement about sizes.
+Taxman's weights are the members themselves, so any weight assignment is consistent with the value ordering, and for
+order-consistent weights the classic majorization fact applies: greedy's set outweighs a competitor for *every*
+consistent weighting iff it matches or beats the competitor's cardinality within every top segment of the ordering.
+Since descending greedy's decisions above any threshold never depend on anything below it (its restriction to {> t} IS
+its run on the truncated instance), the conjecture becomes one unweighted statement:
 
-> **(★)** For every game n, on every connected component of the incidence graph of its upper-half instance — members the
-> numbers in (n/2, n], factors their maximal factors — and every truncation {> t} of one, descending greedy returns a
+> **(★)** For every game n, on every connected component of the incidence graph of its sources' instance (members the
+> numbers in (n/2, n], factors their maximal factors) and every truncation {> t} of one, descending greedy returns a
 > **maximum-cardinality** playable subset.
 
-(★) implies the optimality conjecture by summing the truncations (layer-cake); by majorization it is also *necessary* if
-optimality is to hold for every weighting consistent with the value order, so nothing is lost — or added — in dropping
-the weights.
+Statement (★) is open, and certified in every game to 100,000 through (♦).  It implies the conjecture by summing the
+truncations (layer-cake); by majorization it is also *necessary* if optimality is to hold for every weighting consistent
+with the value order, so nothing is lost, or added, in dropping the weights.
 
 Three facts sharpen what a proof of (★) must look like.
 
 *The ordering is the protection, not the magnitudes.*  Every one of the 48 trap orderings on the n=2873 (equally the
 n=9170) incidence structure is a pure cardinality upset: greedy is steered into excluding both members of a
-factor-sharing pair, keeping 4 where 5 fit.  No magnitude-style axiom blocks that — near-uniform weights realize it, and
+factor-sharing pair, keeping 4 where 5 fit.  No magnitude-style axiom blocks that: near-uniform weights realize it, and
 "all members exceed n/2" kills none of the 48.  The real numeric order simply never lands among the 48: at n=2873 the
 trap needs the sharing pair ranked last, and 11²·13 sits below both sharers.  A proof must therefore use the arithmetic
-of the ordering — the *window law*: among the members f·p sharing a factor f, the value order is the order of the
-cofactor primes, f·q < f·p iff q < p — because the incidence structure alone provably permits the trap.
+of the ordering, the *window law*: among the members f·p sharing a factor f, the value order is the order of the
+cofactor primes, f·q < f·p iff q < p.  It must, because the incidence structure alone provably permits the trap.
 
-*The component is the unit of proof; sub-instances lie.*  On the bare n=9170 sextet, greedy's 4-of-6 is not maximum —
-dropping only d leaves a playable 5-set — and it stays non-maximum with the first ring of attachments added.  What
+*The component is the unit of proof; sub-instances lie.*  On the bare n=9170 sextet, greedy's 4-of-6 is not maximum
+(dropping only d leaves a playable 5-set), and it stays non-maximum with the first ring of attachments added.  What
 restores it is 6859 = 19³, farther out in the component, whose demand for the factor 361 tightens the contest.
 Cardinality dominance genuinely fails on fragments and holds on the full component.  (Exact searches stay tractable
-there because Theorem 6 confines them to the component's residual — n=2873's 377-member component has a 70-member
+there because Theorem 6 confines them to the component's residual: n=2873's 377-member component has a 70-member
 residual.)
 
 *Matching certifies most components.*  Playable ⊆ matchable gives the free bound |G ∩ K| ≤ max-cardinality ≤ ν(K), the
 component's maximum-matching size (the *matching-number bound*); greedy meets ν on 86.8% of the large components,
-certifying (★) there with no search.  Where ν overshoots, every exactly-probed case found greedy still optimal — the
+certifying (★) there with no search.  Where ν overshoots, every exactly-probed case found greedy still optimal: the
 surplus was sets that admit a matching but no acyclic one, the cardinality twin of the weight slack in the
-Franklín–Moniot bound (first visible at n=21, where a 145-sum set is matchable but the true optimum is 144).
+Franklín–Moniot bound (first visible at n=21, where a 145-sum set is matchable but opt(21) is 144).
 
 A census of the full 3-prime shape space (parameters in the table) closed the known jam shapes at the ordering level.
-Inclusion- minimal self-covering shapes can never trap greedy — removing any member of one leaves no self-covering
-subset, so every victim repairs it.  Trap potential lives only in *padded* jams (a core plus outside members competing
-for the core's factors), and appears **iff the shape's maximal playable subsets come in two adjacent sizes**: trap
-potential is precisely the failure of the exchange property, the n=2873 phenomenon, now a characterization rather than
-an anecdote.  Of the 22,909 trap orderings found, all but seven are monomially impossible (they demand an
-exponent-vector inversion like p²q above pq², which no prime triple realizes) or never realized; the seven realizable
-ones were defeated at every realization tested by a *window guard* — a member (q³ or q²r, in the shape's primes p < q <
-r) that fixed comparisons among the shape's own members force into (n/2, n], breaking the trap.  The general lemma this
-points at — every trap ordering requires either a monomial inversion or the absence of a window resident the shape's own
-realization forces to exist — is the sharpest known form of why the integers protect greedy.  The guard's *sufficiency*
-in general still rests on measurement.
+Inclusion-minimal self-covering shapes can never trap greedy: removing any member of one leaves no self-covering subset,
+so every victim repairs it.  Trap potential lives only in *padded* jams (a core plus outside members competing for the
+core's factors), and appears **iff the shape's maximal playable subsets come in two adjacent sizes**: trap potential is
+precisely the failure of the exchange property, the n=2873 phenomenon, now a characterization rather than an anecdote.
+Of the 22,909 trap orderings found, all but seven are monomially impossible (they demand an exponent-vector inversion
+like p²q above pq², which no prime triple realizes) or never realized.  The seven realizable ones were defeated at every
+realization tested by a *window guard*: a member (q³ or q²r, in the shape's primes p < q < r) that fixed comparisons
+among the shape's own members force into (n/2, n], breaking the trap.  The general lemma this points at, that every
+trap ordering requires either a monomial inversion or the absence of a window resident the shape's own realization
+forces to exist, is the sharpest known form of why the integers protect greedy.  The guard's *sufficiency* in general
+still rests on measurement.
 
-The proof obligation, sharpened: *within one component's jam region — its residual, where Theorem 6 confines every
-exclusion — the numeric ordering makes greedy's exclusion count minimal* — with the window law as the engine, and
+The proof obligation, sharpened: *within one component's jam region (its residual, where Theorem 6 confines every
+exclusion), the numeric ordering makes greedy's exclusion count minimal*, with the window law as the engine, and
 n=9170's component as the first test any proof must pass.
 
 ### The span certificate (♦)
 
-Linear algebra over GF(2) gives a far stronger bound than matching.  Give each member its incidence vector: a 1 at each
-of its maximal factors.
+Linear algebra over GF(2) gives a far stronger bound than matching, and a certificate, (♦), that settles the conjecture
+game by game.  Give each member its incidence vector: a 1 at each of its maximal factors.
 
 **Lemma (playable sets are independent).**  The incidence vectors of a playable set are linearly independent over GF(2)
 (indeed over any field).
@@ -287,7 +349,7 @@ factor is 1.  ∎
 
 So no playable subset of a set K is larger than the GF(2) rank of K (the *rank bound*).  On members with at most two
 distinct primes this is the graphic matroid's rank, exact there; on three-prime members, whose factors pq, pr, qr are
-the edges of a triangle on the primes, a dependency is a closed surface mod 2 — every factor an even number of times, so
+the edges of a triangle on the primes, a dependency is a closed surface mod 2 (every factor an even number of times), so
 a minimal dependent set is a core.
 
 **Theorem 7 ((♦) implies (★)).**  Suppose that whenever descending greedy rejects a member x, x's vector is a sum of
@@ -299,17 +361,18 @@ trivially, the rejected ones by hypothesis): they are a basis of K_{≥t}, so gr
 bounds every playable subset.  The weighted claim is greedy optimality on the linear matroid, whose bases greedy's sets
 are.  ∎
 
-(♦) is stronger than (★): a rejection forced only by an *odd* core (self-covering, with no subset listing every factor
-an even number of times) would break it without breaking (★).  Odd cores exist in Taxman — the exchange failure at n =
-2873 needs one, since GF(2)-independent sets do satisfy exchange — but descending greedy has never rejected because of
-one.  Checking (♦) is greedy itself plus Gaussian elimination, a few seconds per game at n = 500,000, and it held in
-every game checked (Evidence, below).  The open problem becomes: **prove (♦)**.  The adversarial experiments of the
-prover (`solver/noframe`, a branch and bound over sets of picks on the whole board) locate what it needs: it holds under
-every order of the real incidence structure that obeys the window law, even adversarially chosen ones, and under the
-window law reversed, but fails as often as a uniformly random order under the window law for a random ranking of the
-primes, or for the primes perturbed by more than a few percent — while generalized primes perturbed by 50%, with the
-members and factors rebuilt from them, never fail.  The protection is the window law *for the ranking of the primes that
-also decides which products lie in the window*.
+Statement (♦) is open, and certified in every game checked: every game to 100,000 and 902 sampled games to 2,000,000
+(Evidence, below).  It is stronger than (★): a rejection forced only by an *odd* core (self-covering, with no subset
+listing every factor an even number of times) would break it without breaking (★).  Odd cores exist in Taxman (the
+exchange failure at n = 2873 needs one, since GF(2)-independent sets do satisfy exchange), but descending greedy has
+never rejected because of one.  Checking (♦) is greedy itself plus Gaussian elimination, a few seconds per game at n =
+500,000.  The open problem becomes: **prove (♦)**.  The adversarial experiments of the prover (`solver/noframe`, a
+branch and bound over sets of moves on the whole board) locate what it needs: it holds under every order of the real
+incidence structure that obeys the window law, even adversarially chosen ones, and under the window law reversed.  It
+fails as often as a uniformly random order under the window law for a random ranking of the primes, or for the primes
+perturbed by more than a few percent, while generalized primes perturbed by 50%, with the members and factors rebuilt
+from them, never fail.  The protection is the window law *for the ranking of the primes that also decides which
+products lie in the window*.
 
 ## Uniqueness of the optimal set
 
