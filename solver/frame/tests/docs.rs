@@ -585,7 +585,7 @@ const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sourc
 /// The reference docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of
 /// docs/GLOSSARY.md (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is
 /// rewritten.
-const REWRITTEN: &[&str] = &["docs/GLOSSARY.md", "docs/WRITING.md"];
+const REWRITTEN: &[&str] = &["docs/GLOSSARY.md", "docs/WRITING.md", "README.md"];
 
 /// Retired in the rewritten docs: the names that docs/GLOSSARY.md replaced (2026-10-18).
 const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
