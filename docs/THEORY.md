@@ -980,10 +980,12 @@ cores, whose members have three distinct primes.
 
 ### The extended problem
 
-To certify U game by game, a search can leave some sources of three or more prime factors optional instead of fixed.
-Let O ⊆ U\*_{≥3} be such a set, the *open* sources; F = U\* ∖ O the *fixed* ones (U\*_1 and U\*_2 among them); and R the
-sources that greedy rejected in the frames that hold a member of O.  "Frame" means here a frame as setup forms it,
-before any merge: a component of Lemma Ω, in one layer.
+The *extended problem* Π⁺(O) is the frame model with some sources of three or more prime factors left optional instead
+of fixed.  It is exact as the frame model is (Theorem M⁺), so a search of it that finds nothing better than a recorded
+score certifies U at that game (the corollary at the end of this section).  Let O ⊆ U\*_{≥3} be such a set, the *open*
+sources; F = U\* ∖ O the *fixed* ones (U\*_1 and U\*_2 among them); and R the sources that greedy rejected in the frames
+that hold a member of O.  "Frame" means here a frame as setup forms it, before any merge: a component of Lemma Ω, in one
+layer.
 
 *The problem Π⁺(O)* (`solver/frame/src/frames/extended.rs`):
 
@@ -1044,11 +1046,11 @@ which is acyclic: S is playable (Theorem 1), and ΣS = ΣF + ΣK + ΣL.  ∎
 
 The conditions on S cost nothing: a playable S ⊇ F holds no other prime (q pays with 1, the one factor of the frame of
 the primes above n/2) and no other source of layer 2 (the first point's argument).  With O = ∅, Theorem M⁺ is Theorem M
-without its lemma M5: the claims of `unzip` are needed for speed, not for exactness.  Π⁺(∅) has the form of the frame
-model's problem (frames of Taxman Mini numbered so that a candidate of frame h is promoted into frame h − 1, a reduced
-root, candidates), so the search, its bounds and its tactics apply to it unchanged: Theorems 11 and 13, the reduction
-lemma, the conflicts and the nogoods use nothing else.  The search takes the one-sided candidates too, each as a
-possible move of its frame (solver/docs/DESIGN.md, "Extended mode"), and a reference predicate (plain peels of the
+without its lemma M5: the claims of `unzip` are needed for speed, not for exactness.  The problem Π⁺(∅) has the form of
+the frame model's problem (frames of Taxman Mini numbered so that a candidate of frame h is promoted into frame h − 1, a
+reduced root, candidates), so the search, its bounds and its tactics apply to it unchanged: Theorems 11 and 13, the
+reduction lemma, the conflicts and the nogoods use nothing else.  The search takes the one-sided candidates too, each as
+a possible move of its frame (solver/docs/DESIGN.md, "Extended mode"), and a reference predicate (plain peels of the
 unreduced frames) decides the promotion sets of Π⁺(O) for the tests.
 
 *The claims of `unzip` in Π⁺(O).*  They cannot be reused as they are: a back claim (s, f) of Π_n is safe because no
@@ -1057,12 +1059,12 @@ freedoms⁺, can take on composites of f that Π_n's frame could not, and so mak
 above.  So the claims are kept frame by frame, with a check.  Take the claims of Π_n, the pairs (s, f) that `unzip`
 settled in the merged frames of the search as the last simplification left them, in the order made, and give each the
 frame C (as setup forms it, before any merge) of its source s, which holds f too (s lists only factors of its own
-frame).  C *keeps* its claims if it holds no member of O ∪ R and each of its back claims (s, f) passes the *check*: f is
-not a two-sided candidate of Π⁺(O), and no two-sided candidate of Π⁺(O) has f among its maximal factors.  *Π⁺(O) with
-claims* takes the pairs of the frames that keep them out of their frames of Π⁺(O) (s from the moves, f from the factors)
-before the root is reduced; everything else, the candidates and in_the_bag⁺ among it, is Π⁺(O)'s.  Let I_h(K, L) be
-frame h's instance in Theorem M⁺'s proof: its members are F ∩ frame h, the members of K of frame h and the members of L
-promoted into it, and its pool is frame h's factors less the members of L of home h.
+frame).  The frame C *keeps* its claims if it holds no member of O ∪ R and each of its back claims (s, f) passes the
+*check*: f is not a two-sided candidate of Π⁺(O), and no two-sided candidate of Π⁺(O) has f among its maximal factors.
+*Π⁺(O) with claims* takes the pairs of the frames that keep them out of their frames of Π⁺(O) (s from the moves, f from
+the factors) before the root is reduced; everything else, the candidates and in_the_bag⁺ among it, is Π⁺(O)'s.  Let
+I_h(K, L) be frame h's instance in Theorem M⁺'s proof: its members are F ∩ frame h, the members of K of frame h and the
+members of L promoted into it, and its pool is frame h's factors less the members of L of home h.
 
 **Lemma M5⁺ (the claims kept are moves of the instances).**  Let C be a frame that keeps its claims, in frame h of
 Π⁺(O), and (K, L) with K ⊆ O ∪ R and L ⊆ the two-sided candidates such that either S = F ∪ K ∪ L is playable (S as in
@@ -1091,10 +1093,10 @@ playable I_h(K, L) and take nothing from L, so what is left, the frame with clai
 pair every member of I_h(K, L) by front and back moves (the lemma, for the claims), an acyclic scheme (Theorem 2), and
 the rest of the proof is unchanged.
 
-**Corollary (the formulation does not matter).**  Π⁺(O) and Π⁺(O) with claims have the same promotion sets, and so the
-same heaviest promotion set, worth the same: by Theorem M⁺ for each, the promotion sets of both are the (K, L) with F ∪
-K ∪ L playable, and in_the_bag⁺ = ΣF in both.  So a certificate made in one formulation bounds the heaviest promotion
-set of the other.
+**Corollary (the formulation does not matter).**  The two formulations, Π⁺(O) and Π⁺(O) with claims, have the same
+promotion sets, and so the same heaviest promotion set, worth the same: by Theorem M⁺ for each, the promotion sets of
+both are the (K, L) with F ∪ K ∪ L playable, and in_the_bag⁺ = ΣF in both.  So a certificate made in one formulation
+bounds the heaviest promotion set of the other.
 
 With O = ∅ every frame keeps its claims, and Π⁺(∅) with claims is Π_n: every back claim of Π_n passes the check (its
 factor cannot go forward, so it fails test (b) and is no candidate, and M5 shows that no candidate lists it), Π⁺(∅) has
@@ -1122,7 +1124,7 @@ most V, say).  If no promotion set of Π⁺(U\* ∖ F) is worth more than V − 
 *Proof.*  If opt(n) > V, an optimal set S satisfies Theorem B, so by the certificates it holds every member of F, and by
 Theorem M⁺ it is a promotion set of Π⁺(U\* ∖ F) worth ΣS − in_the_bag⁺ > V − in_the_bag⁺.  ∎
 
-In a search for the optimum rather than a check of V, V can be the search's starting incumbent: members certified
+In a search for opt(n) rather than a check of V, V can be the search's starting incumbent: members certified
 against it cover every set that beats it.
 
 Equal problems have equal heaviest promotion sets, so if Π⁺ of game n is Π⁺ of an earlier game m whose certificate
@@ -1135,17 +1137,18 @@ the same problem, since a claimed pair that only one of them has is no longer pa
 
 ## The ledger: bounds between boards
 
-The chain proves the game of n from the game of n − 1 (the ceiling, the prime formula) or by a search of its own.  The
-ledger (`solver/frame/examples/ledger/`) keeps, for many boards at once, a lower bound L(n), the score of a game it
-holds, and an upper bound U(n) ≥ opt(n), and passes bounds between boards by the lemmas below; a board is proven when
-the two meet.  Each lemma is an inequality between optima, with the games that carry the lower bound across; the upper
-bounds cross by the inequality alone.  A *finished game* of n is one the referee (`replay_finished`) accepts: legal,
-over (no legal move left), and opening with the largest prime ≤ n.  Every optimal game is finished (Lemma A of
+The lemmas below pass bounds on opt(n) between games, both ways, so that many games can be proven at once.  The chain
+proves the game of n from the game of n − 1 (the ceiling, the prime formula) or by a search of its own.  The ledger
+(`solver/frame/examples/ledger/`) keeps, for many boards at once, a lower bound L(n), the score of a game it holds, and
+an upper bound U(n) ≥ opt(n), and passes bounds between boards by the lemmas below; a board is proven when the two meet.
+Each lemma is an inequality between optimal scores, with the games that carry the lower bound across; the upper bounds
+cross by the inequality alone.  A *finished game* of n is one the referee (`replay_finished`) accepts: legal, over (no
+legal move left), and opening with the largest prime ≤ n.  Every optimal game is finished (Lemma A of
 `accelerate::prime_shortcut`), so opt(n) is the best score of a finished game, and every lower bound of the ledger is
 the score of a finished game, replayed before it counts.
 
-**Lemma L1 (monotone).**  opt(n − 1) ≤ opt(n).  If n is composite and G is a finished game of n − 1, then G, followed by
-n if n is still legal after it, is a finished game of n scoring at least ΣG.
+**Lemma L1 (monotone).**  The best score never falls: opt(n − 1) ≤ opt(n).  If n is composite and G is a finished game
+of n − 1, then G, followed by n if n is still legal after it, is a finished game of n scoring at least ΣG.
 
 *Proof.*  n divides no other number of the board 1..n, so G's moves are legal there with the same taxes and leave the
 same pot with n added.  No number below n has a divisor in that pot (G is over, and n divides none of them), so n is the
@@ -1153,10 +1156,9 @@ only move that can be left, and playing it only takes numbers out of the pot: af
 G opens with the largest prime ≤ n − 1, which is the largest ≤ n since n is composite.  For a prime n the inequality
 holds too (Lemma L3 gives more).  ∎
 
-**Lemma L2 (the ceiling, and the game below it).**  opt(n) ≤ opt(n − 1)
-+ n.  If n is composite and G is a finished game of n, then G without
-the move n, followed by legal moves for as long as there are any, is a finished game of n − 1 scoring at least ΣG − n
-(ΣG if G does not play n).
+**Lemma L2 (the ceiling, and the game below it).**  No game of n scores more than the ceiling: opt(n) ≤ opt(n − 1) + n.
+If n is composite and G is a finished game of n, then G without the move n, followed by legal moves for as long as there
+are any, is a finished game of n − 1 scoring at least ΣG − n (ΣG if G does not play n).
 
 *Proof.*  Call G' the moves of G other than n.  Before each move of G', its pot holds the pot of G before the same move,
 less n: both start full; a move of both takes the same number and its divisors out of each pot; G's move n takes numbers
@@ -1165,9 +1167,9 @@ legal on 1..n − 1.  The moves added after it are legal by choice and leave the
 largest prime ≤ n, which is not n and so is the largest prime ≤ n − 1.  Applied to an optimal game of n this is opt(n
 − 1) ≥ opt(n) − n, the ceiling of Theorem 9 and `board::promotion_cap`.  ∎
 
-**Lemma L3 (the prime formula, both ways).**  Let p be prime and q the largest prime below it.  opt(p) = opt(p − 1) + p
-− q.  A finished game of p − 1 with its first move q exchanged for p is a finished game of p, and a finished game of p
-with its first move p exchanged for q is a finished game of p − 1; the score changes by p − q and by q − p.
+**Lemma L3 (the prime formula, both ways).**  Let p be prime and q the largest prime below it.  Then opt(p) = opt(p −
+1) + p − q.  A finished game of p − 1 with its first move q exchanged for p is a finished game of p, and a finished game
+of p with its first move p exchanged for q is a finished game of p − 1; the score changes by p − q and by q − p.
 
 *Proof.*  The equality is Theorem 9 (prime), proven again with the exchange in `accelerate::prime_shortcut` (Lemmas A
 and B there).  The exchange needs of the game only that it opens with q (with p), which a finished game does, not that
@@ -1217,30 +1219,30 @@ is a promotion set worth more than F, and if the search completes, the last one 
 only rises, so it is worth at least F at every moment.  Each pruning of the search drops only sets no heavier than the
 incumbent of its time, sets that cannot be promoted, and, with the tactic `symmetry`, sets that break an inequality
 every heaviest set keeps (Theorem 13), as in Lemma D; the search reads the incumbent's value and never its set, so a
-value with no set prunes as a set of that weight does.  H is not of the last two kinds, so a completed search either
-reached H and offered it, or dropped it as no heavier than the incumbent of that time.  Either way ΣH ≤ I, the incumbent
-at the end.  If nothing was found, I = F and P\*(Π_n) = ΣH ≤ F.  If a set S was found, I = ΣS, and S is a promotion set,
-so ΣS ≤ P\*(Π_n) = ΣH ≤ ΣS.  ∎
+value with no set prunes as a set of that weight does.  The set H is not of the last two kinds, so a completed search
+either reached H and offered it, or dropped it as no heavier than the incumbent of that time.  Either way ΣH ≤ I, the
+incumbent at the end.  If nothing was found, I = F and P\*(Π_n) = ΣH ≤ F.  If a set S was found, I = ΣS, and S is a
+promotion set, so ΣS ≤ P\*(Π_n) = ΣH ≤ ΣS.  ∎
 
-A floor at the optimum is a search seeded with the optimum, tree for tree; a floor above it prunes more, and a floor
-below it finds the optimum.  A floor at or above the root's bound, or the ceiling, ends the search at its first check.
-For a search that a limit stopped, Lemma D holds with the floor as the incumbent when nothing was found: P\*(Π_n) ≤
-max(I, max_u (ΣP_u + B_u)), I being the larger of F and the weight of the heaviest set found.
+A floor at P\* is a search seeded with an optimal set, tree for tree; a floor above it prunes more, and a floor below it
+finds an optimal set.  A floor at or above the root's bound, or the ceiling, ends the search at its first check.  For a
+search that a limit stopped, Lemma D holds with the floor as the incumbent when nothing was found: P\*(Π_n) ≤ max(I,
+max_u (ΣP_u + B_u)), I being the larger of F and the weight of the heaviest set found.
 
 *In the ledger.*  Every lower bound is a finished game, so L(n) ≤ opt(n) holds by the referee alone.  Every upper bound
 is a bound of the frame model at some board (a root bound, a dual bound, a completed search, a completed search under a
 floor with nothing found: each bounds in_the_bag + P\*, which is opt given U at that board, by the corollary of "The
-upper part"), carried by the lemmas, which hold unconditionally but for L4's upper half (U at the board it is carried
-to).  So a board whose bounds meet is proven within the frame model, as the chain past 2175 is, given U at the boards
-its upper bound came through.  An L above a U would be a bug, or a counterexample to U at one of those boards, since L
-is a real game.
+upper part"), carried by the lemmas, which hold unconditionally but for the second half of L4 (U at the board it is
+carried to).  So a board whose bounds meet is proven within the frame model, as the committed games past the prover's
+proofs are, given U at the boards its upper bound came through.  An L above a U would be a bug, or a counterexample to U
+at one of those boards, since L is a real game.
 
 ## Signed frame matroids: the frame bound over other fields
 
 Theorem 11's argument never uses that its entries are 1 or that the field is GF(2): a winnable frame's movers have a
 triangular matrix with a nonzero diagonal under every choice of nonzero entries, over every field.  Each such choice
 gives a matroid per frame in which every promotable set is independent, and the GF(2) bound and any number of them
-combine by Lagrangian multipliers into one bound (the fields study,
+combine by Lagrangian multipliers into one bound (the study of the multi-field bound,
 solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md, which measured it).
 
 Fix a state and a frame h of it, with factors F_h and moves M_h; its *movers* are its moves and the candidates of home
@@ -1283,14 +1285,14 @@ the deletion of coordinate q, so the matroid is unchanged.  (3): a promotable se
 zero, in an independent family.  ∎
 
 With σ ≡ 1 over GF(2), N_h^σ is Theorem 11's frame matroid, and the even frames' and odd frames' make A and B.  Over
-GF(3) the converse holds too, which the fields study uses to choose its signings and nothing below needs.  If frame h
-with Q applied is not winnable, its peel's residual C is self-covering on the pool (every pool factor a member of C
-lists is listed by two or more).  Give the listers of each such factor values that sum to 0 (pairs 1, 2 and, for an odd
-count, one triple 1, 1, 1).  Then Σ_{u∈C} v_σ(u) vanishes on the pool, so it is a combination of the e_y of Q's members
-of home h, and Q ∩ supp_h is dependent in N_h^σ: the relation has the coefficient 1 on each member of Q among C's
-movers, and if there were none and every e_y's coefficient were 0, C's moves would have vectors summing to 0, against
-their independence.  So the GF(3) signed frame matroids of all signings are together exact for winnability (Hershkowitz
-and Schneider's theorem, in this setting).
+GF(3) the converse holds too, which the study of the multi-field bound uses to choose its signings and nothing below
+needs.  If frame h with Q applied is not winnable, its peel's residual C is self-covering on the pool (every pool factor
+a member of C lists is listed by two or more).  Give the listers of each such factor values that sum to 0 (pairs 1, 2
+and, for an odd count, one triple 1, 1, 1).  Then Σ_{u∈C} v_σ(u) vanishes on the pool, so it is a combination of the e_y
+of Q's members of home h, and Q ∩ supp_h is dependent in N_h^σ: the relation has the coefficient 1 on each member of Q
+among C's movers, and if there were none and every e_y's coefficient were 0, C's moves would have vectors summing to 0,
+against their independence.  So the GF(3) signed frame matroids of all signings are together exact for winnability
+(Hershkowitz and Schneider's theorem, in this setting).
 
 **Theorem 15 (the decomposition bound).**  Let A, B be Theorem 11's matroids of a state, N_1, …, N_K signed frame
 matroids of it (each of one frame h_k and one signing, on supp_{h_k}), cap the most members a completion can have, and
@@ -1303,11 +1305,11 @@ where MI_cap(c) is the heaviest common independent set of A and B of at most cap
 elements of weight at most 0 left out, and G_k(μ) the heaviest independent set of N_k for the weights μ.  The same holds
 with the loops of the N_k (Theorem 14, (3)) left out of the intersection.
 
-*Proof.*  w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_{h_k}).  Q is common independent in A and B with at most cap
-members (Theorem 11), and so is its subset Q⁺ of positive reweighted weight, which weighs at least as much: the first
-term is at most MI_cap.  Q ∩ supp_{h_k} is independent in N_k (Theorem 14), so the k-th term is at most G_k.  Q holds no
-loop (Theorem 14, (3)), so leaving the loops out changes no term.  At a node, the same with the node's matroids (Theorem
-11 and Theorem 14, (2)) and its completions.  ∎
+*Proof.*  Split the weight: w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_{h_k}).  The set Q is common independent in A and
+B with at most cap members (Theorem 11), and so is its subset Q⁺ of positive reweighted weight, which weighs at least as
+much: the first term is at most MI_cap.  Its part Q ∩ supp_{h_k} is independent in N_k (Theorem 14), so the k-th term is
+at most G_k.  The set Q holds no loop (Theorem 14, (3)), so leaving the loops out changes no term.  At a node, the same
+with the node's matroids (Theorem 11 and Theorem 14, (2)) and its completions.  ∎
 
 The bound is evaluated exactly in integers: weights x·S and multipliers that are multiples of 1/S (S = 2^16), the
 intersection by the crate's `gf2::meet` and the greedy algorithm over GF(3), so ⌊L⌋ bounds every promotion sum whatever
