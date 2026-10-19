@@ -3,6 +3,24 @@
 The docs should be readable by someone outside the project: a programmer new to the code, or a mathematician who knows
 Taxman but not this solver.  These rules get them there; the sources at the end give the reasons.
 
+## Voice
+
+Write plainly, modestly and briefly:
+
+* **Say a thing once.**  Leave out what a word already implies: "optimal" already means proven.
+* **Say what a thing does for the reader**, not how it was built or what came before it.  An overview names no
+  implementation language, and history belongs in the notebook and in git (rule 5).
+* **Prefer plain nouns to the project's labels.**  Name the file rather than the label the project gave it; a label the
+  reader does need is defined first (rule 4).
+* **Claim modestly and exactly.**  Say what a program can do, and no more, with no drama.
+* **"We" is fine.**
+* **In an overview, short beats complete.**  The details live a link away, and a line that does not serve the reader
+  goes.
+
+Not "This project finds optimal games of Taxman, a number game, and proves that they are optimal" but "This project
+finds optimal games of Taxman, a number game."  Not "The committed chain, `results/strict.jsonl`, holds an optimal game
+for every n" but "The file `results/strict.jsonl` holds a chain of optimal games for every n."
+
 ## 1. Know which kind of document it is
 
 Each document serves one need, and the kinds stay apart, linked to each other.  A *how-to* gives the steps of a task
@@ -38,8 +56,9 @@ general statement: "12 has the maximal factors 6 and 4."
 Numbers, commands, status and terms each live in one place, and the other docs link to it.  A short summary of an idea
 plus a link is fine; a copied number is not, because it drifts ("the committed chain 1..3440" was wrong as soon as the
 chain grew).  Avoid time-relative words such as "currently", "now" and "new": state the fact, or date it.  A rewrite
-keeps every fact; one that matters to few readers moves to a paragraph of details at the end of its section, or becomes
-a link to the notebook entry that holds it.
+keeps every fact its reader needs, and moves one that matters to few readers to a paragraph of details at the end of its
+section.  History and provenance that the notebook, git or another doc already holds go, or become a link; a fact with
+no other home stays, among the details.
 
 ## 6. Mathematics
 
