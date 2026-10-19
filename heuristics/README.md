@@ -3,8 +3,16 @@
 Taxman is played against a pot {1..n}: picking c (the solver's and
 the wiki's *move*) keeps c and surrenders every divisor of c still in
 the pot; every pick must surrender at least one divisor; the taxman
-sweeps the leftovers.  Finding an optimal game is an NP-hard problem —
-but playing a mostly optimal game is not.
+sweeps the leftovers.  Finding an optimal game is hard (Franklín and
+Moniot prove a variant of the game NP-hard, below), but playing a
+mostly optimal game is not.
+
+This is finished work: Python strategies that play good but not
+provably optimal games, and the tools that measured them.  It keeps
+some words of its own: a *pick* or *selection* is a move, the *upper
+half* is the numbers above n/2 (the frame solver's *sources*), and the
+*lower half* the numbers up to n/2.  The project's
+[glossary](../docs/GLOSSARY.md) defines the rest.
 
 Two primary approaches:
 
@@ -15,10 +23,11 @@ Two primary approaches:
 2. **A self-fed continuation solver holds 99.97% of all optimal
    points**, starting from nothing at n=2, and extends to n = 1001..2000,
    provably within 0.35% of the Franklín–Moniot upper bound in
-   aggregate.  Ground truth now exists out there: the solver in `solver/frame/`
-   has proven games to n=3440 (within its frame model), and the prover
-   (`solver/noframe`, a branch and bound over sets of moves on the whole
-   board) proves their scores optimal on the whole board to n=2175.
+   aggregate.  Proven optimal games exist out there too: the frame
+   solver in `solver/frame/` proves them (within its frame model), and
+   the prover (`solver/noframe`, a branch and bound over sets of moves
+   on the whole board) proves their scores optimal on the whole board;
+   [results/README.md](../results/README.md) says how far each reaches.
 
 This chart shows the player's share of the pot using different
 strategies. Solvent and continuation hug the optimal line tightly.
@@ -86,7 +95,7 @@ What is proven vs. trusted, precisely:
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
 | U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) (THEORY.md, "Uniqueness of the optimal set", Theorem 8), so certified for every n ≤ 100,000 |
-| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds for every n ≤ 1300 |
+| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe`, section 5) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (THEORY.md, "The frame model: what is proven and what remains"), which holds wherever the prover has proven the game ([results/README.md](../results/README.md)) |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
 | optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
 | an optimal game plays the most moves any game of the board can (the wiki's open question; the Java's `reviseFreedoms` assumes a local form) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than the optimum (THEORY.md, "Longest games").  True of every other game to 1300, the gap never above one (`solver/noframe`, section 6).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
@@ -251,10 +260,10 @@ chain solved 1001..2000 holding a mean 99.64% of the F–M bound (worst
 bound's own looseness averages 0.29% — beating solvent in 894 games and
 tying the other 106.  Each of those 1000 games has a per-game certified
 gap (the distance to the bound, which the true optimum also lives
-inside).  The ground truth to compare them with now exists: the solver
-in `solver/frame/` has proven games to n=3440 (`results/strict.jsonl`,
-within the frame model) and the prover proves their scores optimal on
-the whole board to n=2175.
+inside).  Proven optimal games to compare them with exist: the frame
+solver's committed chain (`results/strict.jsonl`, within the frame
+model), whose scores the prover proves optimal on the whole board as
+far as [results/README.md](../results/README.md) says.
 
 ### Certificates
 
@@ -433,7 +442,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 
 | file | contents |
 |---|---|
-| `THEORY.md` | the proofs: the decision procedure (playability, schedulability, completeness), cores and the residual, the frontier argument, the cardinality reformulation, and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
+| [`../docs/THEORY.md`](../docs/THEORY.md) | the proofs: the decision procedure (playability, schedulability, completeness), cores and the residual, the frontier argument, the cardinality reformulation, and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
 | `core.py` | shared foundations: `maximal_factors`, the wiki's `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
 | `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |
@@ -464,7 +473,7 @@ resumes with `--resume` — container restarts cost at most a few games.
 The codebase is small enough to read end to end, and it doubles as a
 tour of standard algorithmic material meeting a real problem.  A
 suggested path: play n=21 by hand, read `reference/solvent.py` top to
-bottom, then `core.py`, then `THEORY.md` for the proofs, then
+bottom, then `core.py`, then `docs/THEORY.md` for the proofs, then
 `strategies/solvent.py`, then `reference/continuation.py` — the
 warm-start chain in the same readable register — with
 `strategies/continuation.py`'s docstring as the fast version's tour.
@@ -472,7 +481,7 @@ warm-start chain in the same readable register — with
 n=21 is the house example, cited wherever a concept needs a concrete
 case, because one small game happens to contain the whole story: [the
 wiki walks it through move by move](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21);
-`python3 -m reference.solvent 21` solves it (144, the optimum);
+`python3 -m reference.solvent 21` solves it (144, the optimal score);
 its optimal game opens with the highest prime and funds a
 one-for-two trade; the matchable-but-unplayable set
 {10,12,14,15,16,18,19,20,21} lives there, summing to 145 — one point

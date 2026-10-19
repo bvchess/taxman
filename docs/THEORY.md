@@ -951,7 +951,7 @@ tests run) finds the best of those that keep the inequalities.
 The frame solver (`solver/frame/`) does not search the games of n.  It
 searches the *promotion sets* of the frame model, and its answer is
 in_the_bag plus the heaviest of them (solver/frame/README.md, section 1, and
-its glossary define the words used here: sources, frames, `unzip`
+docs/GLOSSARY.md define the words used here: sources, frames, `unzip`
 and its mandatory moves, impossible sources, freedoms, closed frames,
 the numbering, candidates, promotion sets, `max_total`).  The model
 was built on five assumptions that were checked against data and

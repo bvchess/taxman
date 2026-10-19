@@ -11,7 +11,9 @@
 //!   setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
-//!   for the ceiling, ...) or the old names of the prover's directory and script.
+//!   for the ceiling, ...) or the old names of the prover's directory and script;
+//! * the reference docs rewritten to docs/WRITING.md (`REWRITTEN`) do not use the names that docs/GLOSSARY.md
+//!   replaced (board size, the optimum, strong bound, checker, EXPERIMENTS, ...).
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
@@ -451,7 +453,7 @@ fn lib_module_map() -> Vec<String> {
 #[test]
 fn the_reading_order_of_the_readme_is_the_module_map_of_lib_rs() {
     let readme = read(crate_dir().join("README.md"));
-    let reading = section(&readme, "## 8. Reading order and map of the documents");
+    let reading = section(&readme, "## 8. Reading order of the code");
     let list = reading.split("\n| document").next().unwrap();
     let declared = lib_module_map();
     let mut in_readme: Vec<String> = Vec::new();
@@ -517,7 +519,7 @@ fn unzips_moves_are_mandatory_not_forced() {
             }
         }
     }
-    assert!(found.is_empty(), "say \"mandatory move\" for unzip's moves (README, glossary):\n{}", found.join("\n"));
+    assert!(found.is_empty(), "say \"mandatory move\" for unzip's moves (docs/GLOSSARY.md):\n{}", found.join("\n"));
 }
 
 /// A word or phrase that the guides and comments no longer use, and what they say instead.
@@ -575,9 +577,43 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("one-level", "one frame forward"),
 ];
 
-/// Retired in the README, DESIGN.md and the code's comments, which name the numbers by their part in the frame model;
-/// the prover and the heuristics keep these words for the sets they study.
+/// Retired in the README, DESIGN.md and the code's comments, which name the numbers by their part in the frame model,
+/// and in the reference docs rewritten to docs/WRITING.md (`REWRITTEN`); the heuristics keep these words for the sets
+/// they study.
 const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sources"), retired("lower half", "factors")];
+
+/// The reference docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of
+/// docs/GLOSSARY.md (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is
+/// rewritten.
+const REWRITTEN: &[&str] = &[
+    "docs/GLOSSARY.md",
+    "docs/WRITING.md",
+    "README.md",
+    "solver/README.md",
+    "solver/frame/README.md",
+    "results/README.md",
+];
+
+/// Retired in the rewritten docs: the names that docs/GLOSSARY.md replaced (2026-10-18).
+const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
+    retired("board size", "game n, or n"),
+    retired("board sizes", "the games, or the values of n"),
+    retired("the optimum", "opt(n), the best score, or P*, the best promotion sum"),
+    retired("the optima", "the values of opt(n)"),
+    retired("strong bound", "the Lagrangian bound over the nogoods (the GF(2) bound inside, refitted at the node)"),
+    retired("strong bounds", "the Lagrangian bound over the nogoods, in its forms"),
+    retired("nogood bound", "the Lagrangian bound over the nogoods"),
+    retired("nogood bounds", "the Lagrangian bound over the nogoods, in its forms"),
+    retired("a1 bound", "the multi-field bound (A1)"),
+    retired("a1 bounds", "the multi-field bound (A1)"),
+    retired("fields bound", "the multi-field bound (A1)"),
+    retired("checker", "the referee (one game) or a verifier (a whole results or bounds file)"),
+    retired("checkers", "the verifiers"),
+];
+
+/// Retired in the rewritten docs and matched in their own case: the notebook's old name, which in lower case is a plain
+/// English word.
+const RETIRED_CASED: &[Retired] = &[retired("EXPERIMENTS", "the notebook (solver/notebook/README.md)")];
 
 /// Paths and names that must not appear at all, not even in code: they were renamed.
 const RETIRED_NAMES: &[Retired] = &[
@@ -634,7 +670,10 @@ fn without_link_targets(line: &str) -> String {
 /// Whether the guide or code at `shown` (a path from the repository) names the numbers of the board by their part in
 /// the frame model.
 fn names_numbers_by_frame(shown: &str) -> bool {
-    shown.starts_with("solver/frame/src/") || shown == "solver/frame/README.md" || shown == "solver/docs/DESIGN.md"
+    shown.starts_with("solver/frame/src/")
+        || shown == "solver/frame/README.md"
+        || shown == "solver/docs/DESIGN.md"
+        || REWRITTEN.contains(&shown)
 }
 
 /// Whether `word` occurs in `line` (lower case) as a whole word that is not quoted (`"forced moves" in its docs`).
@@ -659,6 +698,18 @@ fn retired_in(lines: &[String], lists: &[&[Retired]]) -> Vec<(usize, &'static st
             if has_word(&lower, entry.word) {
                 found.push((i + 1, entry.word, entry.instead));
             }
+        }
+    }
+    found
+}
+
+/// The retired words of `list` in `lines`, matched in their own case (`RETIRED_CASED`): `(line number, word, instead)`.
+fn retired_cased_in(lines: &[String], list: &[Retired]) -> Vec<(usize, &'static str, &'static str)> {
+    let mut found = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let line = without_link_targets(line);
+        for entry in list.iter().filter(|entry| has_word(&line, entry.word)) {
+            found.push((i + 1, entry.word, entry.instead));
         }
     }
     found
@@ -763,7 +814,13 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
         if names_numbers_by_frame(&shown) {
             lists.push(RETIRED_IN_THE_GUIDE_AND_CODE);
         }
-        for (at, word, instead) in retired_in(&prose_lines(&path, &text), &lists) {
+        let prose = prose_lines(&path, &text);
+        let mut retired = retired_in(&prose, &lists);
+        if REWRITTEN.contains(&shown.as_str()) {
+            retired.extend(retired_in(&prose, &[RETIRED_IN_THE_REWRITTEN_DOCS]));
+            retired.extend(retired_cased_in(&prose, RETIRED_CASED));
+        }
+        for (at, word, instead) in retired {
             found.push(format!("{shown}:{at}: {word:?}, say {instead}"));
         }
         // The renamed paths and names are looked for as they are written, code included.
@@ -791,6 +848,14 @@ fn the_vocabulary_check_finds_what_it_should() {
     let found: Vec<(usize, &str)> = found.iter().map(|&(at, word, _)| (at, word)).collect();
     assert_eq!(found, [(1, "hive"), (3, "hive"), (3, "downstream"), (4, "cap"), (4, "many cores")]);
     assert_eq!(without_link_targets("[a](b.md#c) and [d](e)"), "[a] and [d]");
+
+    let text = "every Board Size, the optimum's score, the `board size` and the \"strong bound\" (quoted)\n\
+                the experiments of EXPERIMENTS and [the notebook](EXPERIMENTS.md), and a type checker";
+    let prose = without_code(text);
+    let mut found = retired_in(&prose, &[RETIRED_IN_THE_REWRITTEN_DOCS]);
+    found.extend(retired_cased_in(&prose, RETIRED_CASED));
+    let found: Vec<(usize, &str)> = found.iter().map(|&(at, word, _)| (at, word)).collect();
+    assert_eq!(found, [(1, "board size"), (1, "the optimum"), (2, "checker"), (2, "EXPERIMENTS")]);
 }
 
 /// The value of the constant `name` at the top of `solver/tools/quick_check.py`.

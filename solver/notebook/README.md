@@ -7,8 +7,8 @@ numbers.  Entries are dated by month (the whole record so far is from 2026-10 un
 name the commits that made each step, so `git show COMMIT` finds the code.  Statements are true of the code at the
 time of the entry; where a later entry changed the picture it says so, and DESIGN.md is the authority on the present.
 
-Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary of the
-README](../frame/README.md#7-glossary) and in DESIGN.md; the measurements were made with the ladder, the probe and
+Terms (conflict, nogood, forced member, step, `W`, ...) are defined in the [glossary](../../docs/GLOSSARY.md) and in
+DESIGN.md; the measurements were made with the ladder, the probe and
 `taxman bench`, which DESIGN.md ("Performance") describes.
 
 * [Terms changed](#terms-changed-2026-10): the old words of the dated entries, and the words that replaced them.
@@ -74,6 +74,17 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | frontier (the largest n solved in a row, or the hardest games) | the end of the chain, the hardest games |
 | cores (CPU) | CPUs, threads |
 | selection, pick | move |
+| board size | game n, the game of n, or n |
+| the optimum (a noun) | opt(n), the best score; P\*, the best promotion sum |
+| the strong bound (`wall choice`) | the Lagrangian bound over the nogoods, with the GF(2) bound inside, refitted at the node |
+| the nogood bound | the Lagrangian bound over the nogoods |
+| the A1 bound, the fields bound | the multi-field bound (the agenda's A1) |
+| checker | the referee (of one game); a verifier (of a whole results or bounds file) |
+| EXPERIMENTS, EXPERIMENTS.md | the notebook (this page and its entries) |
+
+The last seven rows are the names that [docs/GLOSSARY.md](../../docs/GLOSSARY.md) replaced on 2026-10-18.  The docs
+rewritten to [docs/WRITING.md](../../docs/WRITING.md) use the new names, and the docs test holds them to it; the
+others follow as they are rewritten.
 
 ## Register of everything tried
 
