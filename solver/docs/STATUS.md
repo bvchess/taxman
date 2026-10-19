@@ -59,20 +59,20 @@ What has been tried for the bound, and where it stands:
   computing it loses ([the entry](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
 * **A5, decomposing across the frames: closed** (2026-10-18): the conflicts sit in frames 1-3 and the work is the
   separator's, not the sides' ([the entry](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
+* **Why the trees are big** (2026-10-18): the gap is paid in exclusions priced at a tenth of the member left out (the
+  bound substitutes a near-equal number), 5-8 a path ([the entry](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)).
 
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
 ([solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
 (4176-4179) and the median rises from about 1,800 at 3441-4440 to 4,600-8,300 from 5441, so with today's heuristic no
-game past 3440 is within a few minutes of one-thread search ([the
-entry](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)).
+game past 3440 is within a few minutes of one-thread search ([the entry](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)).
 
 **Finders for lower bounds** (2026-10-17): a lower bound needs only a legal game, so a search that is not sound may
 find it.  Large neighbourhood search from the start incumbent (keep a random 70-90% of its promotions, search the rest
 exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
 search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
 the nodes and 0.48 of the CPU, finder included, of the search from today's start.  It is in the ledger (below), not in
-the solver (`wall finders` and `wall sound` measured it and are removed; [the
-entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
+the solver (`wall finders` and `wall sound` measured it and are removed; [the entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
 
 **Floors for upper bounds** (2026-10-18): a search from a floor F, an incumbent worth F with no set
 (`search::search_above`, THEORY.md Lemma F), proves "nothing weighs more than F" for an F above the optimum far more
