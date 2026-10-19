@@ -21,6 +21,8 @@
 //!     [--pauses P --span STEPS] [--unit-cap STEPS] [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N|A-B...
 //! cargo run --profile test --example wall --features studies -- anatomy --suite FILE --known FILE --ids ID[,ID...]
 //!     [--trace DIR] [--prefer FILE] [--best-cpu S] [--nodes K] [--tactic NAME=VALUE]... N
+//! cargo run --profile test --example wall --features studies -- cycles [--known FILE] [--suite FILE] [--units K]
+//!     [--seconds S] [--out FILE] N...
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -125,6 +127,10 @@
 //!   step saw and did (its bound, conflict, branch and how it ended, and the residues of the frames), optionally with a
 //!   branching order of its own; defined in `wall/anatomy.rs`, whose module comment has the options and the files.
 //!   `solver/notebook/the-anatomy-of-a-hard-subtree-2026-10/` reads them.
+//! * **cycles**: do flat-cycle cuts close the gap the field-rank bounds leave?  The matching LP of a game's root and of
+//!   its tuning-suite units, with cover, rank and flat-cycle cuts, against the GF(2) bound; defined in
+//!   `wall/cycles.rs`, whose module comment has the options and the stages, for
+//!   `solver/notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/`.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -161,6 +167,9 @@ mod case;
 mod choice;
 #[path = "common/counters.rs"]
 mod counters;
+/// `cycles`: the matching LP with cover, rank and flat-cycle cuts, against the GF(2) bound.
+#[path = "wall/cycles.rs"]
+mod cycles;
 /// `decompose`: whether the conflicts of a node split across a separator home (A5's cheapest experiment).
 #[path = "wall/decompose.rs"]
 mod decompose;
@@ -219,12 +228,23 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 10] =
-    ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice", "decompose", "anatomy"];
+const COMMANDS: [&str; 11] = [
+    "setup",
+    "nodes",
+    "grow",
+    "start",
+    "frames",
+    "landscape",
+    "choice-prepare",
+    "choice",
+    "decompose",
+    "anatomy",
+    "cycles",
+];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 47] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose", "anatomy"]),
+const OPTIONS: [(&str, &[&str]); 48] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose", "anatomy", "cycles"]),
     ("--cap", &["choice"]),
     ("--fixtures", &["choice-prepare", "decompose"]),
     ("--pauses", &["decompose"]),
@@ -233,7 +253,8 @@ const OPTIONS: [(&str, &[&str]); 47] = [
     ("--best-cap", &["decompose"]),
     ("--and-or-cap", &["decompose"]),
     ("--and-or-min", &["decompose"]),
-    ("--suite", &["choice-prepare", "anatomy"]),
+    ("--suite", &["choice-prepare", "anatomy", "cycles"]),
+    ("--units", &["cycles"]),
     ("--ids", &["anatomy"]),
     ("--trace", &["anatomy"]),
     ("--prefer", &["anatomy"]),
@@ -258,7 +279,7 @@ const OPTIONS: [(&str, &[&str]); 47] = [
     ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
     ("--nodes", &["nodes", "grow", "anatomy"]),
-    ("--seconds", &["nodes", "grow"]),
+    ("--seconds", &["nodes", "grow", "cycles"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
     ("--width", &["setup", "nodes"]),
@@ -268,7 +289,7 @@ const OPTIONS: [(&str, &[&str]); 47] = [
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
     ("--threads", &["grow", "landscape"]),
-    ("--out", &["landscape"]),
+    ("--out", &["landscape", "cycles"]),
     ("--cores", &["grow"]),
     ("--mem-cap", &["grow"]),
 ];
@@ -313,6 +334,8 @@ struct Options {
     mem_cap: Option<usize>,
     /// The file `landscape` appends its lines to.
     out: Option<PathBuf>,
+    /// The suite units of a game that `cycles` measures (all of them without `--units`).
+    units: Option<usize>,
     /// The options of `choice-prepare` and `choice`.
     params: case::Params,
     /// The options of `anatomy`.
@@ -341,6 +364,7 @@ impl Options {
             cores: None,
             mem_cap: None,
             out: None,
+            units: None,
             params: case::Params::default(),
             anatomy: anatomy::Params::default(),
             games: Vec::new(),
@@ -438,6 +462,7 @@ fn parse() -> Result<Options, String> {
             "--cores" => o.cores = Some(number("--cores", value("--cores")?)?),
             "--mem-cap" => o.mem_cap = Some(number("--mem-cap", value("--mem-cap")?)?),
             "--out" => o.out = Some(value("--out")?.into()),
+            "--units" => o.units = Some(number("--units", value("--units")?)?),
             "--cap" => o.params.cap = Some(number("--cap", value("--cap")?)?),
             "--fixtures" => o.params.fixtures = Some(value("--fixtures")?.into()),
             "--suite" => o.params.suite = Some(value("--suite")?.into()),
@@ -532,6 +557,10 @@ fn main() {
     }
     if o.command == "anatomy" {
         anatomy::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if o.command == "cycles" {
+        cycles::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     if let Some(command) = case::Command::named(&o.command) {

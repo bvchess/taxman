@@ -36,8 +36,9 @@ mod fit;
 mod frames;
 #[path = "fields/gf3.rs"]
 mod gf3;
+/// The simplex, which `cycles.rs` uses as well.
 #[path = "fields/lp.rs"]
-mod lp;
+pub(crate) mod lp;
 
 use dw::{bound, refit_r2, tier1, Ctx, Family, Settings, Stats, Warm};
 use frames::{frame_matroids, FrameMatroids};
