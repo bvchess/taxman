@@ -27,7 +27,8 @@ in the docs listed at the end.
   docs, tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in solver/CLAUDE.md.
 * **results/**: the committed chain of proven games, the table of optimal games (optimal.json, built into the Rust
   frame solver), the bounds store and the certificates.
-* **docs/THEORY.md**: the theorems both programs rest on.
+* **docs/THEORY.md**: the theorems both programs rest on; **docs/GLOSSARY.md**: the terms; **docs/WRITING.md**: how docs
+  are written.
 * **heuristics/**: Python heuristic strategies, which play good but not provably optimal games, and the tools that
   measured them.  Finished work, not under active development.
 * **moniot/**: Robert Moniot's C++ heuristic strategies (see above).

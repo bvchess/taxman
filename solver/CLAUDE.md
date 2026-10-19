@@ -18,7 +18,9 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
 
 ## Where things are
 
-* **solver/frame/README.md**: the guide, glossary and reading order.
+* **solver/README.md**: the map of the solvers and their documents.
+* **solver/frame/README.md**: the frame solver's guide: build, a first run, the commands.
+* **docs/GLOSSARY.md**: every term, defined once.
 * **solver/docs/DESIGN.md**: the design, and how changes are tested.
 * **solver/docs/STATUS.md**: the current state: what is in flight, paused, decided, and waiting on a decision.
 * **solver/notebook/README.md**: the lab notebook's register and index, with its rules; its entries are the folders
