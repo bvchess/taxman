@@ -1,10 +1,15 @@
 # Running the solver, and the prover's proofs, on a cloud machine
 
-The target is an AWS Graviton instance of 4 to 64 vCPUs (`c8g`, `c9g`, `c7g`), running Linux; a mid-size one for hours
-or days, not the biggest one (section 1, "Instance"; section 8 for the prover's proofs, which need only 4 to 16 vCPUs).
-The scripts take the thread count from the machine, work on x86_64 too, and on Amazon Linux 2023 and Ubuntu.  What the
-solver is and how to read its output is in [solver/frame/README.md](../frame/README.md); this page is the procedure.
-Before launching anything, read [Rules for every launch](#rules-for-every-launch).
+This page is the procedure for running the frame solver and the prover on an AWS machine, for Brian or an agent he has
+approved.  The target is a Graviton instance of 4 to 64 vCPUs (`c8g`, `c9g` or `c7g`) running Linux, for hours or days
+(section 1, "Instance"); the prover's proofs (section 8) need only 4 to 16.  The scripts take the thread count from the
+machine, and they also work on x86_64, on Amazon Linux 2023 and on Ubuntu.  [The frame solver's
+README](../frame/README.md) says what the solver is, and [the reference](REFERENCE.md) says how to read its output.
+
+Read the [rules for every launch](#rules-for-every-launch) before you start anything.  Section 1 chooses the machine and
+section 2 launches it.  Section 3 is what to run before a big job.  Sections 4 to 9 are the jobs, one each; each says
+what it computes, what it costs, its command, and only what differs from section 2.  Section 10 is for when something
+goes wrong, section 11 describes the build cache, and section 12 lists the scripts.
 
 * [Rules for every launch](#rules-for-every-launch)
 * [1. Choosing the machine](#1-choosing-the-machine)
@@ -22,36 +27,34 @@ Before launching anything, read [Rules for every launch](#rules-for-every-launch
 
 ## Rules for every launch
 
-They hold for every instance this project starts: a trial of the scripts, the prover's proofs, the chain, a
-calibration.  The sections below point here instead of repeating them.
+These hold for every instance this project starts: a trial of the scripts, the prover's proofs, the chain, a
+calibration.  The jobs link here instead of repeating them.
 
-* **Approval first.**  Anything that costs money or changes the AWS account (an instance, a volume, a key pair or
-  security group, a spot request, a bucket, a role) needs Brian's explicit yes, with a cost estimate, before the call.
-  Reading (describe, the spot price history, quotas) does not.  The estimate is the hours at the spot price of the hour
-  (read the history first, section 1, "Quota, prices and spot interruptions"); the timer, below, bounds the hours.
-* **Spot, on `c8g`.**  Spot is the default (section 1, "Spot or on-demand", says where an interruption would ruin the
-  run), on the `c8g` family (Graviton4) at the sizes the calibration settled on: `c8g.xlarge` to try the scripts,
-  `c8g.4xlarge` for the prover's proofs, `c8g.16xlarge` for the chain (section 8.3).  What was measured is the entry
-  "Graviton calibration (2026-10)" of
-  [solver/notebook/graviton-calibration-2026-10/README.md](../notebook/graviton-calibration-2026-10/README.md); its
-  scripts and data are in
-  [solver/notebook/graviton-calibration-2026-10/README.md](../notebook/graviton-calibration-2026-10/README.md).
-* **A timer on every instance.**  `--instance-initiated-shutdown-behavior terminate` at launch, and `shutdown -h
-  +MINUTES` at boot (in the user data), with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, section
-  5).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance, and one that is forgotten
-  ends by itself.  It is the backstop that depends on no script.
-* **Tags** `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `certify`) on everything the launch creates
-  that takes one: the instance, its volumes and spot request, a key pair, a security group.  The check at the end finds
-  them by `Project`.
-* **The binaries come from the build cache, tested.**  A machine does not build what a machine has already built and
-  tested: `setup.sh` takes the release binaries of the commit from S3 (section 11), and builds only what the job needs
-  (`BUILD`) when the cache has none.  The release suite runs once a commit and CPU, on one machine, on every vCPU,
-  before the binaries are stored (`RELEASE_TESTS=1`); a failing suite stores nothing and the job does not start.
-* **The root volume is deleted on termination**, so what must outlive the instance is copied off it first (`S3_DEST`
-  or `rsync`, sections 2.5 and 2.7).
-* **At the end**, once the results are home: terminate the instance, and confirm that nothing of the project is left,
-  in the region of the launch (each command prints `[]`; the CLI takes its profile from `AWS_PROFILE`, and section 2.1
-  shows signing in):
+* **Get Brian's approval first.**  An instance, a volume, a key pair, a security group, a spot request, a bucket and a
+  role each cost money or change the AWS account, so each needs his explicit yes and a cost estimate before you make the
+  call.  Reading (describe, the spot price history, quotas) needs none.  The estimate is the hours times the spot price
+  of the hour: read the history first (section 1, "Quota, prices and spot interruptions"), and let the timer, below,
+  bound the hours.
+* **Use spot, on `c8g`.**  Spot is the default (section 1, "Spot or on demand", says where an interruption would ruin a
+  run), on the `c8g` family (Graviton4), in the sizes that the calibration settled on: `c8g.xlarge` to try the scripts,
+  `c8g.4xlarge` for the prover's proofs (section 8.3), `c8g.16xlarge` for the chain.  The entry [Graviton calibration
+  (2026-10)](../notebook/graviton-calibration-2026-10/README.md) holds the measurements, with their scripts and data.
+* **Set a timer on every instance.**  Launch with `--instance-initiated-shutdown-behavior terminate`, and put
+  `shutdown -h +MINUTES` in the user data, with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, section
+  2.5).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance, so a forgotten instance
+  ends by itself.  The timer is the backstop that depends on no script.
+* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `wall`, `ledger`, `sweep`,
+  `certify`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
+  a security group.  The check at the end finds them by `Project`.
+* **Take the binaries from the build cache.**  A machine does not build what a machine has already built and tested.
+  `setup.sh` takes the commit's release binaries from S3 (section 11) and, when the cache has none, builds only what the
+  job needs (`BUILD`).  The release suite runs once for each commit and CPU, on one machine with every vCPU busy, before
+  `setup.sh` stores the binaries (`RELEASE_TESTS=1`); a failing suite stores nothing, and the job does not start.
+* **Copy off what must outlive the instance.**  Termination deletes the root volume, so copy the results first
+  (`S3_DEST` or `rsync`, sections 2.5 and 2.7).
+* **End clean.**  Once the results are home, terminate the instance and confirm that nothing of the project remains, in
+  the region of the launch.  Each command prints `[]`; the CLI takes its profile from `AWS_PROFILE`, and section 2.1
+  shows signing in:
 
   ```
   aws ec2 describe-instances --filters Name=tag:Project,Values=taxman \
@@ -61,114 +64,125 @@ calibration.  The sections below point here instead of repeating them.
       --query 'SpotInstanceRequests[].SpotInstanceRequestId'
   ```
 
-  Then delete the key pairs and security groups the launch created, and only those (found by the same tag; a launch
-  may use a key pair or security group that existed before, and leaves it alone), and report the instance-hours (launch
-  to the terminate call), the spot price of the hour and the cost, as the "Cost" paragraph of the calibration entry
-  does.  The bucket and the role and instance profile `taxman-ec2` (section 2.1) are kept for the next run on purpose;
-  a finished run's prefix in the bucket can go once its results are home.
+  Then delete the key pairs and security groups that the launch created, and only those: find them by the same tag, and
+  leave alone any that the launch used but did not create.  Report the instance-hours (launch to the terminate call),
+  the spot price of the hour and the cost, as the "Cost" paragraph of the calibration entry does.  Keep the bucket and
+  the role and instance profile `taxman-ec2` (section 2.1) for the next run; a finished run's prefix in the bucket can
+  go once its results are home.
 
 ## 1. Choosing the machine
 
-Which instance, spot or on demand, the disk, the quota and the prices: what every launch decides first.  Each job
-(sections 4 to 9) names the instance it was sized for.
+Every launch decides four things first: the instance, spot or on demand, the disk, and whether the quota allows it.
+Each job (sections 4 to 9) names the instance that suits it; this section says why.
 
 ### Instance
 
-* **Workload.**  CPU-bound integer and bit-set code (no floating point, no SIMD requirement), one process, as many
-  threads as CPUs; memory is small: a proof's peak was 32 MB on one thread, 130 at 16 and 363 to 374 at 64 on Graviton
-  (the [calibration](../notebook/graviton-calibration-2026-10/README.md), which also has the chain's 400 to 540 MB
-  with the results file loaded), and at 192 threads 0.7 to 1.0 GB for the chain past 2225 and 2.3 GB at 4000 (the
-  [scaling run](../notebook/scaling-to-192-threads-2026-10/README.md)), plus 64 MiB of reserved
-  address space per thread for stacks, which is not memory.  Disk I/O is one checkpoint every 300 s by default, tens of
-  KB at 2 threads and at most a few MB at 192 (it holds the work stacks of all workers).  So: the cheapest vCPUs, with
-  1 GiB per vCPU or less.
-* **A mid-size instance, 16 to 64 vCPUs** (`c8g.4xlarge` to `c8g.16xlarge`; the same sizes of `c9g` or `c7g`), for
-  hours or days, rather than the largest for minutes.  Graviton has no SMT, so a vCPU is a core and each worker thread
-  gets a whole one; on Intel families a vCPU is a hyperthread and the throughput per thread is lower.  The price per
-  vCPU-hour is the same at every size of a family on demand and within a factor of 1.5 on spot, the largest spot pools
-  are the thinnest, and the prover's proofs need no more than 16.  (A new account's vCPU quota is 5, the owner's
-  account allows 640 spot vCPUs: below.)  Which family: `c8g` (Graviton4) is the safe default, and what the
-  calibration chose; `c9g` (Graviton5) is up to 25 % faster per vCPU by AWS's figure, 9 % dearer, and offered in four
-  regions only; `c7g` (Graviton3) is the cheapest per vCPU-hour and slower; the `m` families give 4 GiB per vCPU, which
-  this workload does not use, at 12 % more per vCPU.  Prices, spot interruption rates and their sources: below.
-  The solver chain's times below were estimated for 192 CPUs (they scale with the CPUs only as far as the engine
-  does, which the calibration measured to 64 threads and the scaling run to 192).  The 192-vCPU `c9g.48xlarge` this
-  page was first written for still works with every script, if you have the quota and want the chain in hours:
-  `scaling.sh` and `chain.sh` take the CPU count from the machine.  On x86_64 compare the nodes per second per thread
-  (`k/s/thr` in the sweep) before choosing.
-* **A small instance of the same family first** (`c8g.xlarge`, 4 vCPUs, which fits the default quota; or `2xlarge`): the
-  same CPU, so the same build and the same per-thread speed, for a sixteenth of the price (or less).  It is where setup
-  problems on Linux, the tests, the 1-to-4-thread part of the sweep and the single-thread rate are found.
-* **Check `lscpu` on a large one** for the number of NUMA nodes.  The engine does not pin threads; each searcher
+* **The workload is CPU-bound.**  It is integer and bit-set code, with no floating point and no SIMD requirement, in one
+  process with as many threads as CPUs.  Memory is small: the chain needs 400 to 540 MB with the results file loaded,
+  about 1 GB at 192 threads and 2.3 GB at n = 4000, and a proof needs 370 MB at most on 64 threads ([the
+  calibration](../notebook/graviton-calibration-2026-10/README.md), [the scaling
+  run](../notebook/scaling-to-192-threads-2026-10/README.md)).  Each thread also reserves 64 MiB of address space for
+  its stack, which is not memory.  Disk I/O is one checkpoint every 300 s by default: tens of KB at 2 threads and a few
+  MB at most at 192, since a checkpoint holds the work stacks of all workers.  So buy the cheapest vCPUs, with 1 GiB per
+  vCPU or less.
+* **Use a mid-size instance, 16 to 64 vCPUs,** for hours or days, rather than the largest one for minutes (`c8g.4xlarge`
+  to `c8g.16xlarge`, or the same sizes of `c9g` or `c7g`).  Graviton has no SMT, so a vCPU is a core and each worker
+  thread gets a whole one; on Intel a vCPU is a hyperthread, and the throughput per thread is lower.  The price of a
+  vCPU-hour changes little with the size (below), the largest spot pools are the thinnest, and the prover's proofs need
+  no more than 16 vCPUs.  A new account's quota is 5 vCPUs; the owner's account allows 640 on spot (below).  Every
+  script takes the CPU count from the machine, so any size works, up to a 192-vCPU `c8g.48xlarge`, if you have the quota
+  and want the chain in hours.  On x86_64, compare the nodes per second per thread (`k/s/thr` in the sweep) before you
+  choose.
+* **Choose the family.**  `c8g` (Graviton4) is the safe default, and what the calibration chose.  `c9g` (Graviton5) is
+  up to 25 % faster per vCPU by AWS's
+  [figure](https://aws.amazon.com/about-aws/whats-new/2026/06/ec2-c9g-c9gd-instances-graviton5-processors-available/), a
+  maximum that nobody measured here (AWS reclaimed the calibration's `c9g` before it ran), for 9 % more, and it is
+  offered in us-east-1, us-east-2, us-west-2 and eu-central-1 only.  `c7g` (Graviton3) is the cheapest per vCPU-hour and
+  slower.  The `m` families give 4 GiB per vCPU, which the run does not use (a thread needs about 25 to 50 MB), for 12 %
+  more per vCPU.
+* **Try a small instance of the same family first** (`c8g.xlarge`, 4 vCPUs, which fits the default quota; or `2xlarge`).
+  It has the same CPU, so the same build and the same per-thread speed, for a sixteenth of the price or less.  It is
+  where you find setup problems on Linux, test failures, and the single-thread rate and the 1-to-4-thread part of the
+  sweep (section 3.2).
+* **Check `lscpu` on a large machine** for the number of NUMA nodes.  The engine does not pin threads: each searcher
   allocates its own state on its own thread, so first touch keeps it local.  If there are several nodes and the sweep
   shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.  The 64-vCPU instances of the
   calibration were one socket and one node (`solver/notebook/graviton-calibration-2026-10/machines/`).
-* **Build on the machine type that runs it.**  `-C target-cpu=native` is opt-in: a plain `cargo build` is generic code
-  (README, section 2), and these scripts add it through `RUSTFLAGS` (the default of `env.sh`; set `RUSTFLAGS=` to build
-  generic code).  It tunes for the CPU that builds; a binary built on a newer CPU can fail with an illegal instruction
-  on an older one.  `setup.sh` prints the CPU that `native` resolved to (`native cpu:` line); it should be a Neoverse
-  CPU name (`neoverse-v2` on Graviton4), not `generic`.  That line is the only place the log names the CPU there: a
-  known gap of `env_report`, which greps `lscpu` for `^Model name`, while on Graviton4 with Amazon Linux 2023 `lscpu`
-  prints only `BIOS Model name: AWS Graviton4`, so the logs have no model line.  The gain of `native` has not been
-  measured on Graviton (expect 0 to 3 %; on the M1 it measured 0 %).  The build cache (section 11) keys its binaries by
-  the CPU that `native` resolved to, so a machine takes only binaries built for its own CPU.
-* **Profile-guided optimization** (PGO) is optional: `solver/tools/pgo.sh` makes the build (its header says how; on the
-  M1 it adds 0 to 2 % now, see [DESIGN.md](DESIGN.md#10-performance)).  PGO changes code
-  generation only: the search and its answers are the same, a checkpoint can be resumed by either binary, and
-  `TAXMAN_BIN` / `LADDER_BIN` point these scripts at another binary.  Keep a non-PGO build too if you want to profile.
+* **Build on the machine type that runs the binary.**  A plain `cargo build` makes generic code; `-C target-cpu=native`
+  is opt-in ([README, section 2](../frame/README.md#2-build-test-run)).  These scripts add it through `RUSTFLAGS`, the
+  default of `env.sh`; set `RUSTFLAGS=` to build generic code.  `native` tunes for the CPU that builds, so a binary
+  built on a newer CPU can fail with an illegal instruction on an older one.  The build cache (section 11) therefore
+  keys its binaries by the CPU that `native` resolved to, and a machine takes only binaries built for its own CPU.
+  `setup.sh` prints that CPU in its `native cpu:` line, which should name a Neoverse CPU (`neoverse-v2` on Graviton4),
+  not `generic`.  That line is the only place the logs name the CPU: `env_report` greps `lscpu` for `^Model name`, and
+  on Graviton4 with Amazon Linux 2023 `lscpu` prints only `BIOS Model name: AWS Graviton4`.  Nobody has measured the
+  gain of `native` on Graviton; expect 0 to 3 % (on the M1 it measured 0 %).
+* **Profile-guided optimization** (PGO) is optional.  `solver/tools/pgo.sh` makes the build (its header says how); on
+  the M1 it adds 0 to 2 % ([DESIGN.md](DESIGN.md#10-performance)).  PGO changes code generation only, so the search and
+  its answers stay the same, and either binary can resume a checkpoint.  `TAXMAN_BIN` and `LADDER_BIN` point the scripts
+  at another binary.  Keep a non-PGO build too if you want to profile.
 
-### Spot or on-demand
+### Spot or on demand
 
-* **Spot for section 3 too**, as a one-time request: an interruption in the middle of a measurement ruins that
-  measurement, which is repeated.  The calibration's `c9g.16xlarge` was taken back five minutes in and cost $0.06, and
-  on-demand costs about 3 to 4 times as much a vCPU-hour (below).  On-demand is for a measurement that must not be
-  lost, or when the spot pool has no capacity.
-* **Spot for the production chain is reasonable**, because the run is built for it: a stop by SIGTERM loses nothing, a
-  kill loses at most one checkpoint interval (300 s), and `chain.sh` is safe to start again.  What an interruption
-  really costs is the time to get a machine again (the spot pool of a large size can be thin) and your attention; fall
-  back to on-demand, or to a smaller size (`THREADS` can differ between resumes), if you cannot.  Use `spot-watch.sh` to
-  turn the two-minute notice into a clean stop and a save.
-* A **persistent** spot request launches a replacement after an interruption: that is convenient and also a way to
-  keep paying for something nobody watches.  If you use one, `DEADLINE_HOURS` and `POWEROFF` (section 2.5) are your
-  protection, and the request is cancelled at the end like everything else
-  ([Rules for every launch](#rules-for-every-launch)).
-* **The request names a price ceiling.**  `aws ec2 run-instances` needs `SpotOptions` with a `MaxPrice` in its market
-  options (`MarketType=spot,SpotOptions={MaxPrice=PRICE}`, PRICE in dollars an hour); the operators of the cloud run of
-  2026-10-15 found that `MarketType=spot` alone does not do.  The instance pays the spot price of the hour, never the
-  ceiling, which only bounds the price at which it is taken back; the cost estimate that Brian approves uses the spot
-  price (below), and the ceiling goes above it.  The launch command of section 2.2 shows where it goes.
+* **Use spot for the checks of section 3 too,** as one-time requests.  An interruption in the middle of a measurement
+  ruins it, and you repeat it: AWS took back the calibration's `c9g.16xlarge` five minutes in, at a cost of $0.06, and
+  on demand costs 3 to 4 times as much a vCPU-hour (below).  Use on demand for a measurement you cannot afford to lose,
+  or when the spot pool has no capacity.
+* **Use spot for the production chain.**  The run suits it: a stop by SIGTERM loses nothing, a kill loses at most one
+  checkpoint interval (300 s), and `chain.sh` is safe to start again.  An interruption really costs the time to get a
+  machine again (the spot pool of a large size can be thin) and your attention.  If you cannot get one, fall back to on
+  demand or to a smaller size (`THREADS` can differ between resumes).  Run `spot-watch.sh`, which turns the two-minute
+  notice into a clean stop and a save.
+* **A persistent spot request** launches a replacement after an interruption.  That is convenient, and it is also a way
+  to keep paying for something nobody watches.  If you use one, `DEADLINE_HOURS` and `POWEROFF` (section 2.5) protect
+  you, and you cancel the request at the end like everything else ([rules for every launch](#rules-for-every-launch)).
+* **Name a price ceiling.**  `aws ec2 run-instances` needs `SpotOptions` with a `MaxPrice` in its market options
+  (`MarketType=spot,SpotOptions={MaxPrice=PRICE}`, PRICE in dollars an hour); `MarketType=spot` alone does not work.
+  The instance pays the spot price of the hour, never the ceiling, which only bounds the price at which AWS takes it
+  back.  Brian approves a cost estimate at the spot price, and the ceiling goes above it.  Section 2.2 shows where it
+  goes.
 
 ### Storage
 
-Checkpoints and results go to a disk that survives a stop or reboot, with local semantics (`flock`, `fsync`): the
-root EBS volume (gp3, 40 GB is plenty: the toolchain and `target/` take 3 to 4 GB, results about 2 KB per game), or a
-separate EBS volume mounted somewhere and named by `TAXMAN_WORK`.  **Not tmpfs**: `/tmp` is tmpfs on Amazon Linux 2023,
-and `chain.sh` refuses a memory filesystem.  **Not instance-store NVMe** as the only copy: it is lost when the instance
-stops or is terminated.  Not a network filesystem either (`flock`, and an `fsync` per checkpoint).
+Put checkpoints and results on a disk that survives a stop or a reboot and has local semantics (`flock`, `fsync`).  Use
+the root EBS volume (gp3; 40 GB is plenty, since the toolchain and `target/` take 3 to 4 GB and the results about 2 KB
+per game), or a separate EBS volume that you mount and name with `TAXMAN_WORK`.  Turn "delete on termination" off for a
+separate volume if the state should outlive the instance; the end of the run deletes it with the rest.  Avoid three
+things:
 
-An EBS root volume is deleted when the instance is terminated ([Rules for every launch](#rules-for-every-launch)), so
-the copy that matters is the one off the machine: `S3_DEST` (section 2.5) or a pull with `rsync` from your laptop.
+* **tmpfs.**  `/tmp` is tmpfs on Amazon Linux 2023, and `chain.sh` refuses a memory filesystem.
+* **Instance-store NVMe as the only copy.**  A stop or a termination loses it.
+* **A network filesystem.**  It lacks local `flock`, and each checkpoint does an `fsync`.
 
 ### Quota, prices and spot interruptions
 
 * **Quota.**  AWS's documented default for a new account is 5 vCPUs for Standard (A, C, D, H, I, M, R, T, Z) On-Demand
-  instances and 5 for Standard Spot requests, per region, raised automatically with use
-  ([EC2 instance type quotas](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-quotas.html),
+  instances and 5 for Standard Spot requests, per region, raised automatically with use ([EC2 instance type
+  quotas](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-quotas.html),
   [On-Demand](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-on-demand-instances.html),
-  [Spot](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-limits.html)): a 4-vCPU shape fits, 8 does not.
-  The owner's account, read with the AWS CLI in us-east-1 on 2026-10-14, allows **1280 vCPUs On-Demand and 640 Spot**,
-  so any shape here launches without a request.  To read it again, in the console (Service Quotas, Amazon EC2, the
-  region at the top right, "Applied quota value" of "Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"
-  and "All Standard (A, C, D, H, I, M, R, T, Z) Spot Instance Requests") or:
+  [Spot](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-limits.html)).  A 4-vCPU shape fits, and an
+  8-vCPU shape does not.  The owner's account, read with the AWS CLI in us-east-1 on 2026-10-14, allows **1280 vCPUs
+  On-Demand and 640 Spot**, so any shape here launches without a request.  To read it again, use the console (Service
+  Quotas, Amazon EC2, the region at the top right, "Applied quota value" of "Running On-Demand Standard (A, C, D, H, I,
+  M, R, T, Z) instances" and "All Standard (A, C, D, H, I, M, R, T, Z) Spot Instance Requests") or:
 
   ```
   aws login --profile bvc                      # short-lived credentials; or export AWS_PROFILE=bvc after it
-  aws service-quotas get-service-quota --profile bvc --region us-east-1 --service-code ec2 --quota-code L-1216C47A --query Quota.Value  # on-demand
-  aws service-quotas get-service-quota --profile bvc --region us-east-1 --service-code ec2 --quota-code L-34B43A08 --query Quota.Value  # spot
+  aws service-quotas get-service-quota --profile bvc --region us-east-1 --service-code ec2 \
+      --quota-code L-1216C47A --query Quota.Value                                            # on demand
+  aws service-quotas get-service-quota --profile bvc --region us-east-1 --service-code ec2 \
+      --quota-code L-34B43A08 --query Quota.Value                                            # spot
   ```
-* **Price per vCPU-hour** (Linux, US East; on demand from Vantage's pages of 2026-10-14, spot from the owner's price
-  history of us-east-1 on 2026-10-14, cheapest zone, divided by the vCPUs; spot moves by the hour, look at the price
-  history before launching):
+
+* **Prices.**  The table gives Linux prices in US East per vCPU-hour.  On-demand prices come from Vantage's pages of
+  2026-10-14; spot prices are the cheapest zone of the owner's price history of us-east-1 on 2026-10-14, divided by the
+  vCPUs.  Spot moves by the hour, so read the history before you launch:
+
+  ```
+  aws ec2 describe-spot-price-history --instance-types c8g.16xlarge --product-descriptions Linux/UNIX \
+      --start-time $(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ) --query 'SpotPriceHistory[].[AvailabilityZone,SpotPrice]' \
+      --output text                                          # GNU date: -d '3 hours ago' in place of -v-3H
+  ```
 
   | family | CPU | on demand | spot: 16 vCPUs | 32 | 64 | 96 | 192 |
   |---|---|---|---|---|---|---|---|
@@ -177,56 +191,48 @@ the copy that matters is the one off the machine: `S3_DEST` (section 2.5) or a p
   | `c9g` | Graviton5, 3.3 GHz | $0.0435 | | | 0.0119 | | 0.0123 |
   | `m8g` | Graviton4, 4 GiB a vCPU | $0.0449 | | | | | |
 
-  Within a family the price per vCPU on demand is the same at every size and on spot it varies by 1.5 times between
-  sizes, so the size is chosen by wall time, not by price.  `c9g` is up to 25 % faster than `c8g` per vCPU (AWS's
-  [announcement](
-  https://aws.amazon.com/about-aws/whats-new/2026/06/ec2-c9g-c9gd-instances-graviton5-processors-available/),
-  a maximum, not measured here: the calibration's `c9g` was reclaimed before it ran) for 9 % more, and is offered in
-  us-east-1, us-east-2, us-west-2 and eu-central-1 only; `c7g` is slower per CPU; the `m` families give memory the run
-  does not use (a thread needs about 25 to 50 MB).
-* **Spot interruptions.**  The Spot Instance Advisor's rate for us-east-1 (the
-  [public data](https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json) behind the
-  [advisor page](https://aws.amazon.com/ec2/spot/instance-advisor/), fetched 2026-10-14; the share of instances
-  interrupted in the trailing month) is `c8g`: 4 vCPUs above 20 %, 8 10 to 15 %, 16 above 20 %, 32 5 to 10 %, 64 5 to
-  10 %, 96 above 20 %, 192 10 to 15 %; `c7g`: 16 and 32 under 5 %, 64 5 to 10 %; `c9g` is not listed yet.  At even 20 %
-  a month a run of 12 hours has a chance of about one in 300 if the rate is uniform, and an interruption costs one pass
-  and a few minutes (section 8.5), so spot is fine; on demand costs about $4 to $7 more.
+  Within a family, a vCPU-hour costs the same on demand at every size and varies by up to 1.5 times on spot, so wall
+  time chooses the size, not price.
+* **Spot interruptions.**  The Spot Instance Advisor reports the share of instances interrupted in the trailing month
+  (the [public data](https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json) behind the [advisor
+  page](https://aws.amazon.com/ec2/spot/instance-advisor/), fetched 2026-10-14).  For us-east-1 it said:
 
-### Launch checklist (console fields)
+  | family | 4 vCPUs | 8 | 16 | 32 | 64 | 96 | 192 |
+  |---|---|---|---|---|---|---|---|
+  | `c8g` | above 20 % | 10 to 15 % | above 20 % | 5 to 10 % | 5 to 10 % | above 20 % | 10 to 15 % |
+  | `c7g` | | | under 5 % | under 5 % | 5 to 10 % | | |
 
-* AMI: Amazon Linux 2023, arm64 (user `ec2-user`); or Ubuntu 22.04 or 24.04 arm64 (user `ubuntu`).
-* Storage: one gp3 root volume, 40 GB.  A second, if you want the state to outlive the instance: mount it, set
-  `TAXMAN_WORK` to a directory on it, and turn "delete on termination" off (it is deleted at the end, with the rest).
-* Access, one of two.  Session Manager (SSM), as the prover's run does (section 2.1): a security group with no inbound
-  rules and no key pair, and an instance profile with `AmazonSSMManagedInstanceCore`.  Or SSH: a security group with SSH
-  from your address only, nothing else inbound, and a key pair.  Require IMDSv2 either way (`spot-watch.sh` uses it).
-* Instance role: for S3, list, get, put and delete on the one bucket the runs use, nothing else (section 2.1 has the
-  role `taxman-ec2` that exists), and for SSM the managed policy above.
-* Shutdown behaviour, the timer, and the tags (with a `Name`): as in [Rules for every launch](#rules-for-every-launch).
-* A budget alert on the account, before the first launch.  Cost guardrails for the run itself are in section 2.5.
+  It did not list `c9g`.  At even 20 % a month, a run of 12 hours has a chance of about one in 300 of an interruption if
+  the rate is uniform, and an interruption costs a few minutes and, for the prover, one pass (section 8.1).  So spot is
+  fine; for the prover's proofs on 16 vCPUs, on demand costs about $4 to $7 more.
 
 ## 2. Every launch, step by step
 
-Every job of sections 4 to 9 launches the same way.  This section has the steps, and each job says only what differs:
-its instance, its timer, its setup and its command.
+Every job of sections 4 to 9 launches the same way.  This section has the steps; each job says only what differs: its
+instance, its timer, its setup and its command.
 
 ### 2.1 Access, and what the account holds
 
-A launch needs no SSH: the instance has an instance profile (for S3 and SSM), its security group has no inbound rule,
-it has no key pair, and the steps are sent to it through AWS Systems Manager (SSM) with `aws ssm send-command`.  SSH is
-the fallback (section 2.3).  Everything here is under the [rules for every launch](#rules-for-every-launch),
-and every `aws` command runs as `AWS_PROFILE=bvc` in us-east-1 (`export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1`
-after `aws login --profile bvc`).
+A launch needs no SSH.  The instance has an instance profile (for S3 and SSM), its security group has no inbound rule,
+and it has no key pair; you send it the steps through AWS Systems Manager (SSM) with `aws ssm send-command`.  SSH is the
+fallback (section 2.3).  The [rules for every launch](#rules-for-every-launch) govern all of it.  Run every `aws`
+command as `AWS_PROFILE=bvc` in us-east-1:
 
-**What the run needs, and what exists in the account.**  The bucket and the role are made once and kept between runs
-(they were created with Brian's approval on 2026-10-14; the commands are here for another account or region); the
-security group is made for each launch and deleted at its end:
+```
+aws login --profile bvc
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1
+```
+
+The bucket and the role exist (Brian approved making them on 2026-10-14) and stay between runs.  The security group is
+made for each launch and deleted at its end.
 
 | what | name | content |
 |---|---|---|
 | S3 bucket | `taxman-013764204840-us-east-1` | the state of every run, one prefix a run: `prover-1301-2175/` holds `results/`, `logs/` and `ckpt/`, the layout `save.sh` writes |
 | IAM role and instance profile | `taxman-ec2` | trusted by EC2; an inline policy that lists that bucket and gets, puts and deletes its objects; the managed policy `AmazonSSMManagedInstanceCore` |
 | security group | one a launch | no inbound rules (the SSM agent connects out, over HTTPS); tagged like everything else |
+
+For another account or region, make the bucket and the role like this:
 
 ```
 aws s3api create-bucket --bucket taxman-013764204840-us-east-1 --region us-east-1
@@ -245,39 +251,43 @@ aws iam add-role-to-instance-profile --instance-profile-name taxman-ec2 --role-n
 
 ### 2.2 Launch
 
-The launch of the prover's run (section 8) is the model, and the other jobs change its values: the instance type, the
-zone, the volume, `Purpose`, the name and the timer.
-
-**Launch.**  One `c8g.4xlarge` on spot, in the zone with the lowest price in the spot price history (us-east-1b, $0.2402
-an hour, when the first run was launched), Amazon Linux 2023 arm64 (`ec2-user`), no key pair.  The timer is 37 hours, a
-little past the `DEADLINE_HOURS=36` below (the dearest games alone take about 9 hours: section 8.2).  The AMI parameter
-can be checked first with `aws ssm get-parameter --name ...`:
+Each job gives its own instance type, volume, `Purpose` and timer.  The values below are the prover's (section 8): one
+`c8g.4xlarge` on spot, Amazon Linux 2023 arm64 (user `ec2-user`; Ubuntu 22.04 or 24.04 arm64 has `ubuntu`), no key pair,
+in the zone with the lowest price in the spot price history.  The timer is the job's `DEADLINE_HOURS` plus an hour, in
+minutes: 36 + 1 hours is 2220.  The ceiling `MAX_PRICE` goes above the spot price (section 1, "Spot or on demand").
+`run-instances` resolves the AMI from an SSM parameter; check the parameter first with
+`aws ssm get-parameter --name ...` if you like.
 
 ```
-export D=s3://taxman-013764204840-us-east-1/prover-1301-2175           # this run's prefix, for 8.5 and 8.6
-tags='{Key=Project,Value=taxman},{Key=Purpose,Value=prover}'
+INSTANCE_TYPE=c8g.4xlarge ZONE=us-east-1b VOLUME_GB=20 PURPOSE=prover TIMER_MINUTES=2220 MAX_PRICE=0.40
+tags="{Key=Project,Value=taxman},{Key=Purpose,Value=$PURPOSE}"
 vpc=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text)
-sg=$(aws ec2 create-security-group --group-name taxman-prover-$(date +%Y%m%d) --vpc-id $vpc \
-    --description 'taxman prover, no inbound' --tag-specifications "ResourceType=security-group,Tags=[$tags]" \
+sg=$(aws ec2 create-security-group --group-name taxman-$PURPOSE-$(date +%Y%m%d) --vpc-id $vpc \
+    --description "taxman $PURPOSE, no inbound" --tag-specifications "ResourceType=security-group,Tags=[$tags]" \
     --query GroupId --output text)
-aws ec2 run-instances --instance-type c8g.4xlarge --placement AvailabilityZone=us-east-1b \
+I=$(aws ec2 run-instances --instance-type $INSTANCE_TYPE --placement AvailabilityZone=$ZONE \
     --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
     --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 --metadata-options HttpTokens=required \
-    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=20,VolumeType=gp3,DeleteOnTermination=true}' \
-    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +2220' \
-    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-prover},$tags]" \
+    --block-device-mappings "DeviceName=/dev/xvda,Ebs={VolumeSize=$VOLUME_GB,VolumeType=gp3,DeleteOnTermination=true}" \
+    --instance-initiated-shutdown-behavior terminate \
+    --user-data "$(printf '#!/bin/bash\nshutdown -h +%s' $TIMER_MINUTES)" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-$PURPOSE},$tags]" \
         "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
-    --instance-market-options 'MarketType=spot,SpotOptions={MaxPrice=PRICE}'   # PRICE: a ceiling above the spot price
+    --instance-market-options "MarketType=spot,SpotOptions={MaxPrice=$MAX_PRICE}" \
+    --query 'Instances[0].InstanceId' --output text)
 # on demand: leave out the market options and the spot request's tags
 ```
 
-(`SpotOptions` with a `MaxPrice` is needed: `MarketType=spot` alone does not do; section 1, "Spot or on-demand".)
+The instance requires IMDSv2 (`HttpTokens=required`), which `spot-watch.sh` uses.  A job that starts itself adds its
+steps to the user data (sections 6 and 7.3).  To launch from the console, set the same fields: the image, the volume, no
+inbound rule, the instance profile, shutdown behaviour "terminate", the timer in the user data, and the tags with a
+`Name`.  For SSH access, see section 2.3.
 
 ### 2.3 Steps through SSM, or SSH
 
-**Steps through SSM.**  The instance is ready for commands when `aws ssm describe-instance-information --filters
-Key=InstanceIds,Values=$I --query 'InstanceInformationList[].PingStatus'` says `Online` (`$I` is the instance id that
-`run-instances` printed).  A step is then a `send-command` and a read of its result:
+**Steps through SSM.**  The instance is ready for commands when
+`aws ssm describe-instance-information --filters Key=InstanceIds,Values=$I --query 'InstanceInformationList[].PingStatus'`
+says `Online` (`$I` is the instance id from section 2.2).  A step is then a `send-command` and a read of its result:
 
 ```
 aws ssm send-command --instance-ids $I --document-name AWS-RunShellScript --timeout-seconds 60 \
@@ -287,15 +297,16 @@ aws ssm get-command-invocation --instance-id $I --command-id CID \
     --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
 ```
 
-`send-command` runs as root, with no login shell, so the steps run as `ec2-user`, from script files, with
-`sudo -u ec2-user -i bash FILE` (a multi-line `bash -lc '...'` through `sudo -i` mangled its quoting).  A first
+`send-command` runs as root, with no login shell, so run the steps as `ec2-user`, from script files, with
+`sudo -u ec2-user -i bash FILE` (a multi-line `bash -lc '...'` through `sudo -i` mangles its quoting).  A first
 `send-command` writes the file (its text base64-encoded, `base64 -d > /tmp/step.sh`), or the step fetches it from the
-bucket, which the role may read.  A command is cut off at its `executionTimeout` (an hour unless set), so a step that
-lasts hours is not a foreground command: the full run starts in a detached tmux session and its step returns at once.
+bucket, which the role may read.  A command stops at its `executionTimeout` (an hour unless you set it), so a step that
+lasts hours is not a foreground command: the full run starts in a detached tmux session, and its step returns at once.
 
-**With SSH instead** (a console launch, say): a key pair and a security group with SSH from your address only, the
-instance profile only if you use `S3_DEST`; then the same commands in a shell on the instance, the run in tmux
-(`tmux new -s pv`), and `rsync`/`scp` for the code and the results (section 3.2).
+**With SSH instead** (a console launch, say), the security group allows SSH from your address only and nothing else
+inbound, and the instance has a key pair.  It needs the instance profile only if you use `S3_DEST`.  Run the same
+commands in a shell on the instance, the run in tmux (`tmux new -s pv`), and use `rsync` or `scp` for the code and the
+results (section 3.2).
 
 ### 2.4 Setup
 
@@ -308,32 +319,40 @@ solver/tools/cloud/setup.sh                          # 5 to 10 minutes
 ```
 
 The scripts must be on the branch that gets cloned (`BRANCH=...` chooses another).  Without a pushed branch, copy the
-tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and
-run `setup.sh` from inside it: it then works on that tree and does not pull (results record no commit, then).
-`setup.sh` installs packages, installs Rust with rustup if there is none (stable, at least 1.89), builds with
-`RUSTFLAGS="-C target-cpu=native"` (the solver and the examples `ledger`, `perf` and `ladder`; `STUDIES=1` adds the
-study tools `tune`, `extended`, `structure` and `wall`, which a default build skips), replays `optimal.json`, runs
-both result verifiers on the committed files, runs `taxman regress --to 400`, and runs `cargo test --
---test-threads=4`.  Its output is also in `~/taxman-work/logs/setup.log`.  Run it again after any reboot or to pick
-up new commits.  In a clean checkout at a commit it first looks for that commit's tested binaries in the build cache
-and, finding them, builds nothing (section 11); `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` is how they get there.
+tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and run
+`setup.sh` from inside it; it then works on that tree and does not pull, and the results record no commit.
+
+`setup.sh`:
+
+* installs packages, and installs Rust with rustup if there is none (stable, at least 1.89);
+* looks first, in a clean checkout at a commit, for that commit's tested binaries in the build cache, and builds nothing
+  when it finds them (section 11); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the solver and the examples
+  `ledger`, `perf` and `ladder` (`STUDIES=1` adds the study tools `tune`, `extended`, `structure` and `wall`, which a
+  default build skips);
+* replays `optimal.json`, runs both result verifiers on the committed files, and runs `taxman regress --to 400`;
+* runs `cargo test -- --test-threads=4`.
+
+Its output is also in `~/taxman-work/logs/setup.log`.  Run it again after any reboot, or to pick up later commits.
+`RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries into the cache (section 11).
 
 ### 2.5 Cost guardrails
 
-* `DEADLINE_HOURS`: after that many hours from the first start (on a replacement machine, from its own first start:
-  section 2.6), `chain.sh` stops the solver cleanly (final checkpoint) and ends with status 3.  `POWEROFF=done` powers
-  the machine off when the range is complete, `POWEROFF=always` whenever `chain.sh` ends for any reason (needs
-  passwordless `sudo`, as on both AMIs): the choice for an unattended run, since an idle machine after an error or a
-  deadline costs as much as a busy one.  `chain.sh` saves to `S3_DEST` before it powers off, which matters because a
-  shutdown terminates the instance.
-* `GAME_HOURS`: the wall.  The chain stops at the first game whose own search has passed that many hours, over every run
-  of it, with every checkpoint kept and nothing recorded for the game; the log says `wall at N after H hours` and the
-  status is 4.  `BUDGET_HOURS` (instance-hours over every machine of the run, counted in the ledger in S3) and
-  `RUN_UNTIL` (a date) stop the solver cleanly five minutes before they are reached, with status 3 like
-  `DEADLINE_HOURS`.  Section 5 puts them together with a group that restarts the machine.
-* The timer (a backstop that depends on no script), the tags and the cleanup are in [Rules for every
-  launch](#rules-for-every-launch); a budget alert on the account is the other half.
-* When done: what the rules say for the end, and the S3 prefix you no longer need.
+These variables bound a run.  `DEADLINE_HOURS`, `POWEROFF`, `BUDGET_HOURS` and `RUN_UNTIL` belong to `run.sh`, so every
+long-run script reads them; `GAME_HOURS` is `chain.sh`'s.  The table says what `chain.sh` does.
+
+| variable | effect |
+|---|---|
+| `DEADLINE_HOURS` | after that many hours from the first start (on a replacement machine, from its own first start: section 2.6), `chain.sh` stops the solver cleanly with a final checkpoint and ends with status 3 |
+| `POWEROFF` | `done` powers the machine off when the range is complete; `always` powers it off whenever `chain.sh` ends for any reason, which needs passwordless `sudo`, as on both AMIs |
+| `GAME_HOURS` | the wall: the chain stops at the first game whose own search has passed that many hours, over every run of it, keeping every checkpoint and recording nothing for the game; the log says `wall at N after H hours`, and the status is 4 |
+| `BUDGET_HOURS` | instance-hours over every machine of the run, counted in the ledger in S3; the solver stops cleanly five minutes before they are used up, with status 3 like `DEADLINE_HOURS` |
+| `RUN_UNTIL` | a date, treated like `BUDGET_HOURS` |
+
+Use `POWEROFF=always` for an unattended run, since an idle machine after an error or a deadline costs as much as a busy
+one.  `chain.sh` saves to `S3_DEST` before it powers off, which matters because a shutdown terminates the instance.
+Section 5 puts the budget and the date together with a group that restarts the machine.  The timer (a backstop that
+depends on no script), the tags and the cleanup are in the [rules for every launch](#rules-for-every-launch); a budget
+alert on the account, set before the first launch, is the other half.
 
 ### 2.6 Surviving a spot interruption
 
@@ -345,47 +364,45 @@ and, finding them, builds nothing (section 11); `RELEASE_TESTS=1 solver/tools/cl
    priority is time: against 16 busy threads a save took about 80 s of wall time on a `c8g.4xlarge`, and the next waits
    `SAVE_EVERY` after it ends, so the copies are `SAVE_EVERY` plus the save apart (about 380 s for `prover.sh`, whose
    `SAVE_EVERY` is 300 s).  That is harmless: the final saves, at a stop or the end, run after the work has stopped.
-   The copy of `save.log` in S3 trails by one save: a save logs that it is done after it has uploaded the logs, so its
-   line reaches S3 with the next save (the file on the machine is current).
-3. On a replacement machine: `setup.sh` (same commit: `git checkout` it if the branch moved, or the checkpoint may be
-   refused), then `S3_DEST=... solver/tools/cloud/save.sh --restore`, then `chain.sh N` again.  It refuses to restore
-   over an existing results file unless `FORCE=1`.  With a separate EBS volume instead, attach it in the same
-   availability zone, mount it, and set `TAXMAN_WORK`.  Two things of the old machine are not brought back, and the
-   cloud run's second instance had to see to both:
+   The copy of `save.log` in S3 trails by one save, because a save logs that it is done after it uploads the logs; the
+   file on the machine is current.
+3. On a replacement machine, run `setup.sh` at the same commit (`git checkout` it if the branch moved, or the solver may
+   refuse the checkpoint), then `S3_DEST=... solver/tools/cloud/save.sh --restore`, then `chain.sh N` again.
+   `--restore` refuses to overwrite an existing results file unless `FORCE=1`.  With a separate EBS volume instead,
+   attach it in the same availability zone, mount it, and set `TAXMAN_WORK`.  Two things of the old machine do not come
+   back, and you must see to both:
    * **The logs.**  `--restore` copies the results and the checkpoints, not `logs/`.  Copy them back before the chain
-     starts (`aws s3 sync $S3_DEST/logs ~/taxman-work/logs`), or the first save of the new machine uploads its own
+     starts (`aws s3 sync $S3_DEST/logs ~/taxman-work/logs`), or the first save of the replacement uploads its own
      `chain.log`, `chain.out`, `chain.err`, `save.log` and `spot-watch.log` over the old machine's in S3, which share
      their names.
-   * **The deadline.**  `~/taxman-work/deadline` is not saved, so a replacement machine starts a new deadline at its
-     first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls where the first
-     one did (the second instance of the cloud run was given the remainder, and the deadline stopped it 24 hours after
-     the first instance started).  A run that replacements continue by themselves does not count that way: its
+   * **The deadline.**  `save.sh` does not save `~/taxman-work/deadline`, so a replacement machine starts a fresh
+     deadline at its first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls
+     where the first one did.  A run that replacements continue by themselves does not count that way: its
      `BUDGET_HOURS` and `RUN_UNTIL` live in S3 ([section 5](#5-the-unattended-run-to-the-wall)).
 
 ### 2.7 Getting the results off the machine
 
-Pull from your own machine (no credentials on the instance):
+Pull from your own machine, so that the instance holds no credentials:
 
 ```
 rsync -av ec2-user@HOST:taxman-work/results/ ./results-from-cloud/        # ubuntu@HOST on Ubuntu
 rsync -av ec2-user@HOST:taxman-work/logs/ ./logs-from-cloud/
 ```
 
-or `S3_DEST` as above and `aws s3 sync` from your laptop.  A git push from the instance needs a deploy key or a token on
-it; if you do that, push the results file alone to a branch.  The results file is a valid copy at any moment (lines are
-appended and synced one at a time; a torn last line is dropped when the file is read).
+or set `S3_DEST` as in section 2.6 and run `aws s3 sync` from your laptop.  A git push from the instance needs a deploy
+key or a token on it; if you do that, push the results file alone to a branch.  The results file is a valid copy at any
+moment: the script appends and syncs lines one at a time, and the reader drops a torn last line.
 
 ### 2.8 The spending, and the end
 
-**Recording the spending against the estimate.**  The bill is the instance's hours, not the search's.  For each
-instance, from its launch to its termination
+The bill is the instance's hours, not the search's.  For each instance, find its launch and termination times
 (`aws ec2 describe-instances --instance-ids I --query 'Reservations[].Instances[].[LaunchTime,StateTransitionReason]'`
-while it exists, the console's instance history or CloudTrail after), and the spot price of those hours
-(`describe-spot-price-history`, as in section 9.3); multiply, and set it beside the estimate (for the certificates,
-section 9.1's, per phase), with the report's search time (`certify_pilot.py` prints the thread-hours of the search
-against the plan's, and what they come to on one machine).  The "Cost" paragraph of the calibration entry is the model.
-Then the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that nothing of
-the project remains, delete the launch's security group.
+while it exists; the console's instance history or CloudTrail afterwards), multiply the hours by the spot price of those
+hours (`describe-spot-price-history`: section 1), and set the product beside the estimate Brian approved.  Report the
+job's own measure of work beside it where it prints one: `certify_pilot.py` prints the thread-hours of the search
+against the plan's, and what they come to on one machine.  The "Cost" paragraph of the calibration entry is the model.
+Then do the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that nothing
+of the project remains, and delete the launch's security group.
 
 ## 3. Before a big run
 
@@ -394,12 +411,11 @@ Before a long run on a big instance, in this order:
 1. Optional, on your machine: build and test in Docker (section 3.1).
 2. A small instance of the same family, on spot like every launch, for an hour or two (cents): `setup.sh`, the tests,
    the scaling sweep up to its CPU count (section 3.2).
-3. The production instance (section 1: mid-size), on spot, for the checks: the large-machine tests, the sweep to
-   its CPU count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with deliberate
-   interruptions (sections 3.3 to 3.7).
-4. The production chain, from n = 1 or from the committed `results/strict.jsonl` ([its
-   range](../../results/README.md)), in tmux, on spot, with a deadline and a copy of the state kept off the machine
-   (section 4).
+3. The production instance (section 1: mid-size), on spot, for the checks: the large-machine tests, the sweep to its CPU
+   count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with deliberate interruptions
+   (sections 3.3 to 3.7).
+4. The production chain, from n = 1 or from the committed `results/strict.jsonl` ([its range](../../results/README.md)),
+   in tmux, on spot, with a deadline and a copy of the state kept off the machine (section 4).
 5. Verify, bring the results home, shut everything down (section 4.4).
 
 ### 3.1 Dry run in Docker (optional)
@@ -1341,7 +1357,7 @@ in the merged file), `ls ~/taxman-work/logs/sweep-*.err` for a block's own log,
 `kill -TERM $(cat ~/taxman-work/sweep.pid)` to stop cleanly (the games in progress have no line; the others are merged
 and saved), and the same command to go on after a stop or an interruption (on a replacement machine: `save.sh --restore`
 first, with the same `S3_DEST`; the plan is in the saved directory, so it finds the same blocks).  Results home:
-`aws s3 sync $D/results/ results-from-cloud/`, then `solver/tools/cloud/verify.sh results-from-cloud/explore.jsonl`.
+`aws s3 sync s3://taxman-013764204840-us-east-1/sweep-3441-8191/results/ results-from-cloud/`, then `solver/tools/cloud/verify.sh results-from-cloud/explore.jsonl`.
 `taxman verify-results results-from-cloud/explore.jsonl` reports the completed games, the missing board sizes, the board
 sizes that only an unfinished search is recorded for, and the proofs.  To spend more on the failures, search them again
 with a longer limit by hand, `taxman solve A-B --keep-going --retry --time-limit 600 --out BLOCKFILE` on a block's file,
@@ -1474,8 +1490,7 @@ cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
 tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh              # on spot: stops the run, saves
 ```
 
-The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 8.5 and 8.6 reach it as
-`$D`, exported with the launch.  `S3_DEST` needs the instance profile above.  It is not optional with `POWEROFF`: the
+The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 8.5 and 8.6 reach it as `$D`: `export D=s3://taxman-013764204840-us-east-1/prover-1301-2175`.  `S3_DEST` needs the instance profile above.  It is not optional with `POWEROFF`: the
 instance is terminated when it shuts down, and its root volume with it (the rules above), so `prover.sh` copies the
 results to S3 first.  Without `S3_DEST`, leave `POWEROFF` out and pull the files yourself (below) before the timer ends.
 `POWEROFF=always` shuts the machine down whenever the script ends (all 875 games and the check, the deadline, an error:
@@ -1509,7 +1524,7 @@ games of the first passes on a `c8g.4xlarge`, more for the latest games: section
 
 ### 8.5 Watch, stop, resume, the tail
 
-From the laptop, with no access to the instance, the saves in S3 (`$D` of 2.2; as old as the last save, about 6 minutes
+From the laptop, with no access to the instance, the saves in S3 (`$D` of 8.4; as old as the last save, about 6 minutes
 at most):
 
 ```
@@ -1546,7 +1561,7 @@ ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished s
 
 ```
 export AWS_PROFILE=bvc                                                    # after: aws login --profile bvc
-aws s3 cp $D/results/exact_parity_1301_2175.jsonl solver/noframe/data/       # $D: the exports of 2.2
+aws s3 cp $D/results/exact_parity_1301_2175.jsonl solver/noframe/data/       # $D: as in 8.4
 aws s3 sync $D/logs/ ./prover-logs/
 # or, over SSH, without S3:
 rsync -av ec2-user@HOST:taxman-work/results/exact_parity_1301_2175.jsonl solver/noframe/data/
