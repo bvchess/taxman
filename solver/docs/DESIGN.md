@@ -255,343 +255,399 @@ story](../notebook/the-port-and-its-first-improvements/README.md)).
 
 ## 3. Architecture
 
-One Cargo crate in `solver/frame/`: a library and one binary, `taxman`, with no third-party dependencies.  `src/lib.rs`
-has the module map with a line on each module, in the order the modules are read (below, "Reading order of the code").
-The layers, bottom up:
+The frame solver is one Cargo crate, `solver/frame/`: a library, the binary `taxman`, examples and integration tests,
+with no third-party dependencies.  The library's modules form layers, each using only the layers before it, and a solve
+passes through all of them but the studies.  The module map of [`src/lib.rs`](../frame/src/lib.rs) lists the modules in
+that order, a line each.  The list below follows the same order, with advice for a first read.  Each module starts with
+a comment that says what it is for; read it first.  The pipeline of section 7 shows how the pieces fit together, so keep
+it open.
 
-| layer | modules | responsibility |
-|---|---|---|
-| foundations | `game`, `numtheory`, `bits`, `json` | the rules as a referee and the table of optimal games; maximal factors and composites; fixed-width bitsets; a small JSON reader and writer |
-| frame model | `frames`, `model`, `accelerate` | the board as frames (`frames` forms and simplifies them, numbers and merges them); the search state (frames, winnability, promotion, conflicts, nogoods); deriving a game from the previous one |
-| search | `matchbound`, `gf2`, `search`, `bounds` | the matching bound, and the Lagrangian bound over nogoods built on it; the GF(2) bound, the default node bound; the branch-and-bound searcher with its setup and checkpoint header, and the dual bound of a stopped search; the greedy incumbent and the count of promotions a node can still make |
-| engine | `engine` | the problem-independent parallel depth-first driver |
-| solving | `tactics`, `board`, `solver`, `results`, `paths` | the switchable tactics; a board prepared for a search; the per-game pipeline and the range driver; what a result records and the checks of a results file; the default files |
-| studies | `brute`, `sacrifice` | exhaustive search to certify small boards; the sacrifice bound and punctured games (not used by the solver) |
-| front end | `main.rs`, `cli.rs`, `commands.rs` | `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables`, `certify`, `verify-certificates` |
+**Foundations.**
 
-On the path of a solve are all the layers but the studies.  `examples/` holds the ladder (standalone searches of hard
-games with time limits, thread scaling, diagnostics), the probe `perf` (the hot paths from fixtures, in cycles and
-instructions), `tune` (the tuning benchmark: units of a search at the end of the chain, each solved on one thread),
-`structure` (the census of the frames' structure, board by board), `extended` (chains and problems of the extended
-problem) and `wall` (what grows with n and with a tree: a game's fixed costs piece by piece, a node's cost at any set
-width, large trees with their memory and checkpoints, the frames of any board, and the `landscape` of a range of
-boards: each standalone, the root's GF(2) bound over the incumbent a search starts from), and the `ledger` (bounds on
-opt(n) for many boards at once, tightened by limited searches and the relations between boards: section 8, "The
-ledger"); `tests/` the integration
-tests (section 9); `tools/` the results referee in Python, the PGO build, the Java golden export and the cloud scripts.  The
-programs of finished studies (`fields`, `matroid`, `dominance`, `slope`, `repeats`, `promotions`, `diff`, `hunt` and
-`sacrifice`) were removed from master; [the notebook](../notebook/README.md#how-this-notebook-is-kept) says where they
-build.
-
-**Width dispatch.**  Everything that holds sets of game numbers is generic over `const W: usize`, the number of 64-bit
-words, and the macro `with_width!` (in `bits`, used by the solver, the examples and the tests) picks the narrowest of
-`bits::WIDTHS` = {8, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 128} that holds n (n ≤ 511, 1023, 1279, 1535, 1791, 2047,
-2303, 2559, 3071, 3583, 4095, 8191).  Every set operation is a loop over all W words, so the steps of 4 to 8 words past
-n = 1023 pay; past 4095 they would not (a node at 4100 costs 1% more at 128 words than at 72, the board layer the
-same), so 128 is the only width there.  Each width is a copy of the search's code, which costs build time (a release
-build takes about 100 seconds on an M1 Max, 12 more for a width; EXPERIMENTS has the times as widths were added).  The
-largest board, 8191 (`solver::MAX_N`, from the widest width), is also what the other fixed sizes hold, every board to
-it checked in 2026-10: at most nine frames (`model::MAX_FRAMES`), a peel's worklist of two summary words, and the
-GF(2) bound's vectors of at most five words (section 4).  A checkpoint records its width, and one made at another
-width than this build gives its game is refused, so a checkpoint of a game of 2048 to 3583 made at 64, before the
-widths of 36, 40, 48 and 56 were added, is refused by a build that has them; adding 128 moved no board, so the
-checkpoints of the games to 4095 resume with the build that goes past it.
-
-### Reading order of the code
-
-The code, in the order to read it, which is the order of the module map in `src/lib.rs`.  Each file starts with a module
-comment that is worth reading first, and section 7's pipeline maps how the pieces fit, so keep it open.
-
-1. `src/game.rs`: the rules as a referee, and `optimal.json`.
+1. `src/game.rs`: the rules as a referee, and `optimal.json`, the table of optimal games.
 2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
-   on the whole board, with nothing of the frame model (the oracle of the tests of the model, and the referee of
+   on the whole board, with nothing of the frame model (the oracle of the model's tests, and the referee of
    `taxman certify`).
-3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
-   set widths.  The module comment is enough at first.
+3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything above is generic over, and the set
+   widths.  The module comment is enough at first.
 4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.
-5. `src/frames/`: forming and simplifying the frames, numbering and merging them.  The module comment of `mod.rs` is
-   the story (sources, factors, `unzip`, impossible moves, freedoms, numbering, merging) and builds `SearchFrames`;
-   `board_frames.rs` has `Frame` and `BoardFrames`.
-6. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `FrameGraph`, winnability and reduction
-   (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
-7. `src/accelerate.rs`: the shortcuts from the game of n − 1 (read the comment of `prime_shortcut` for the proof of the
-   prime formula), and the last step from promotions to moves.
-8. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
+
+**The frame model.**
+
+5. `src/frames/`: forming and simplifying the frames, numbering them and merging them.  The module comment of `mod.rs`
+   tells the story (sources, factors, `unzip`, impossible moves, freedoms, numbering, merging) and builds
+   `SearchFrames`; `board_frames.rs` has `Frame` and `BoardFrames`.
+6. `src/model/`: the search state.  `mod.rs` says what is where: `Frame` and `FrameSet` (`frame.rs`), `FrameGraph`,
+   winnability and reduction (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods
+   (`nogoods.rs`).
+7. `src/accelerate.rs`: the shortcuts from the game of n − 1 (the comment of `prime_shortcut` proves the prime formula),
+   and the last step, from promotions to moves.
+
+**The search.**
+
+8. `src/matchbound.rs`: the matching bound; its module comment is the best explanation of it.  Its child
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
-9. `src/gf2.rs`: the GF(2) bound, the default node bound.  The module comment explains the two frame matroids, how a
-   node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their weighted
-   intersection (the tableau, the augmenting paths, the weight split).  `docs/THEORY.md`, Theorem 11, is the proof.
-10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
-    whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
-    refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where, forced members, refits),
-    `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
-    `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation (`diagnostics.rs`), which can be
-    skipped.
-11. `src/bounds.rs`: two small functions, the limit on a node's further promotions and the greedy incumbent.
-12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
+9. `src/gf2.rs`: the GF(2) bound, the default node bound.  The module comment explains the two frame matroids, how the
+   search keeps a node's matroids by contraction along its path, and the forced members; `src/gf2/meet.rs` is their
+   weighted intersection (the tableau, the augmenting paths, the weight split).  `docs/THEORY.md`, Theorem 11, is the
+   proof.
+10. `src/search/`: the searcher.  `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and
+    `Stepper::step`, whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs`
+    (`Refiner`: conflicts, refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where it
+    applies, its forced members, its refits), `symmetry.rs` (the rule of symmetric pairs), `dual.rs` (the dual bound of
+    a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).
+    The `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation (`diagnostics.rs`), and a first
+    read can skip them.
+11. `src/bounds.rs`: two small functions, the limit on a node's further promotions (`max_additional`) and the greedy
+    incumbent.
+
+**The engine.**
+
+12. `src/engine.rs`: the problem-independent parallel depth-first driver.  Its module comment is the protocol
+    (conservation, splitting, checkpoint, termination).
+
+**Solving.**
+
 13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
     `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
     provenance and verification, the bounds store's line and the relations between games, the known games that
     `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
-    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` says how they share the
-    threads.
-14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
-15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
-    sacrifice bound).
+    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` shares the threads among
+    them.
 
-The map of the documents is [solver/README.md](../README.md#the-documents).
+**The front end.**
+
+14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line, with the commands `solve`, `regress`, `bench`,
+    `verify-optimal`, `verify-results`, `extend-optimal`, `tables`, `certify` and `verify-certificates`.
+
+**Studies**, which the solver does not use and a first read skips:
+
+15. `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the sacrifice bound and punctured
+    games).
+
+**Beside the library.**  `examples/` holds the programs that use the library but are not the solver:
+
+* built by `cargo build --examples`: the ladder `ladder` (standalone searches of hard games with time limits, thread
+  scaling and diagnostics), the probe `perf` (the hot paths, replayed from fixtures and measured in cycles and
+  instructions), and `ledger` (bounds on opt(n) for many games at once, tightened by limited searches and the relations
+  between games; section 8, "The ledger");
+* behind the Cargo feature `studies` (`--features studies`), the study tools: `tune` (the tuning benchmark: units of a
+  search at the end of the chain, each solved on one thread), `structure` (the census of the frames' structure, game by
+  game), `extended` (chains and problems of the extended problem) and `wall` (what grows with n and with a tree: a
+  game's fixed costs piece by piece, a node's cost at any set width, large trees with their memory and checkpoints, the
+  frames of any game, and the `landscape` of a range of games, each solved standalone: the root's GF(2) bound over the
+  incumbent a search starts from).
+
+`tests/` holds the integration tests (section 9), and `solver/tools/` the scripts around the programs: the second
+verifiers in Python, the quick check, the profile-guided build and the cloud scripts ([solver/README.md, "The
+tools"](../README.md#the-tools)).  The programs of finished studies (`fields`, `matroid`, `dominance`, `slope`,
+`repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) are gone from master; [the
+notebook](../notebook/README.md#how-this-notebook-is-kept) says where they build.
+
+**Width dispatch.**  A set of game numbers is a bitset of W words of 64 bits, and everything that holds one is generic
+over `const W: usize`.  The macro `with_width!` (in `bits`; the solver, the examples and the tests use it) picks the
+narrowest width of `bits::WIDTHS` that holds n:
+
+| W | 8 | 16 | 20 | 24 | 28 | 32 | 36 | 40 | 48 | 56 | 64 | 128 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| n up to | 511 | 1023 | 1279 | 1535 | 1791 | 2047 | 2303 | 2559 | 3071 | 3583 | 4095 | 8191 |
+
+Every set operation loops over all W words, so a narrower set makes every step cheaper, and the steps of 4 to 8 words
+between 1023 and 4095 pay.  Past 4095 they would not: a node at 4100 costs 1% more at 128 words than at 72, with the
+board layer the same, so 128 is the only width there ([boards past
+4095](../notebook/boards-past-4095-2026-10/README.md)).  The price is build time, since each width is a copy of the
+search's code: a release build takes about 100 seconds on an M1 Max, about 12 more for each width ([the
+engine](../notebook/the-engine/README.md) has the times as widths were added).  The largest game, 8191 (`solver::MAX_N`,
+from the widest width), also sets the other fixed sizes, each checked on every game to 8191: at most nine frames
+(`model::MAX_FRAMES`), a peel's worklist of two summary words, and GF(2) vectors of at most five words (section 4, "The
+GF(2) bound").
+
+*Details.*  A checkpoint records its width, and a build refuses a checkpoint made at another width than it gives the
+game.  So a checkpoint of a game of 2048 to 3583 made at 64 words, by a build before the widths of 36, 40, 48 and 56
+words, does not resume on a build that has them.  Adding 128 moved no game, so the checkpoints of the games to 4095
+resume on the builds past it.
 
 ## 4. The search
 
+The search is a branch and bound over promotion sets.  It keeps the best promotion set found so far, the *incumbent*,
+and explores the sets that could beat it, pruning every part of the tree that a bound shows cannot.  This section builds
+it up: the state and the order of the search, three bounds on a node (the matching bound, the Lagrangian bound over the
+nogoods, and the GF(2) bound, the default), the conflicts and nogoods that the branching rests on, and the rule of
+symmetric pairs.  "The default step" then puts them together, and the last two parts are the search's start and its
+extended mode.  The [glossary](../../docs/GLOSSARY.md#the-search) defines the search's words.
+
 ### Search state and order
 
-The search runs over *nodes*.  A node is `(state: FrameSet, promoted: Bits, cands: Bits, max_add: u32)`: `state` is
-the root with `promoted` promoted (in any order: the result does not depend on it), `cands` the candidates the
-node's loop has still to try, and `max_add` a bound on how many more can be promoted
-(`max_additional = min(max_total − |promoted|, state.max_promotions(cands))`, where `max_total` comes from the
-frames' freedoms).  A *work unit*, what the engine passes between threads and writes to checkpoints, is just
-`(promoted, cands)`, two bitsets, from which the state is rebuilt in one pass.  Rebuilding recomputes `max_add` from
-the remaining candidates, which can only tighten it; and what a searcher has learned along its path (conflicts,
-nogoods) is a cache that units do not record, so a rebuilt node may prune a little differently from the node it
-replaces, with the same answer.
+The search runs depth first over *nodes*, one *step* at a time.  A node is a set of promotions made from the root, with
+the candidates left to it.  A step tries one candidate at a node: it promotes the candidate in a *child*, the node with
+one more promotion, and explores the child before the node tries its next candidate.  The search counts steps, not the
+nodes of the tree, and `nodes` in the output is the count of steps.  One explicit stack, reused from node to node, holds
+the path, with no recursion and no allocation per node.
 
-A node's loop tries its candidates one at a time, each time making a child (the node with one more promotion) and
-exploring it depth-first before going on; the search keeps an explicit stack that is reused from node to node (no
-recursion, no allocation per node).  The unit of work counted everywhere (`nodes` in the output) is one *step* of a
-node's loop, one candidate attempt, not one tree node.
+In the code a node is `(state: FrameSet, promoted: Bits, cands: Bits, max_add: u32)`:
 
-The loop is the Java's (`BranchExplorer.explore`, made lazy so that children are explored as they are made rather
-than all generated first): end the loop when a bound on the node's completions cannot beat the incumbent, else take
-a candidate out of the loop, promote it in a child, narrow the child's candidates, and explore the child if its own
-bound can.  What bounds a node, which candidate it branches on and what the child promotes are this solver's own;
-the next sections build them up, and "The default step" below puts them together.  A bound equal to `best` cannot
-lead to a better incumbent, so loops break then (the Java breaks only below).
+* `state` is the root with the numbers of `promoted` promoted, in any order, since the result does not depend on it;
+* `cands` holds the candidates that the node has still to try;
+* `max_add` bounds how many more the node can promote,
+  `max_additional = min(max_total − |promoted|, state.max_promotions(cands))`, where `max_total` is the most promotions
+  the frames' freedoms allow.
+
+A *work unit*, what the engine passes between threads and writes to checkpoints, is just `(promoted, cands)`, two
+bitsets, from which a thread rebuilds the state in one pass.  A rebuilt node may prune a little differently from the
+node it replaces, with the same answer: the rebuild recomputes `max_add` from the remaining candidates, which can only
+tighten it, and the conflicts and nogoods that a searcher learns along its path are a cache that units do not record.
+
+A node's *need* is what its completions must reach to beat the incumbent: `need = best + 1 − sum(promoted)`, where
+`best` is the incumbent's promotion sum.  A node's loop is the Java's (`BranchExplorer.explore`), made lazy, so that the
+search explores each child as soon as it makes it, instead of generating them all first.  The loop ends when a bound on
+the node's completions is below its need.  Otherwise it takes a candidate out of the loop, promotes it in a child,
+narrows the child's candidates, and explores the child if the child's own bound reaches the child's need.  A bound that
+only equals the incumbent cannot lead to a better one, so the loop ends then too, where the Java ended only below it.
+The bounds, the choice of candidate and what the child promotes are the frame solver's own: the parts below build them
+up, and "The default step" puts them together.
 
 ### The matching bound
 
-Winnability relaxes to *matchability*.  Each move of a winning order takes at least one factor that is present when
-it is taken and removes it, so a winnable frame gives its moves distinct maximal factors.  A promotable set
-`Q` therefore gives every move of every frame, and every promoted number (in the frame in front of its home), a distinct
-maximal factor, and no member of `Q` is used as a factor.  Every edge `v → v/p` changes the number of prime factors
-by one, so the graph is bipartite and the *matching bound* — the largest sum of a candidate set that has such an
-assignment — is a maximum-weight bipartite matching (a min-cost flow), exactly solvable and an upper bound on the
-sum of the best promotable completion.  It ignores freedoms and `max_total`, the most promotions the freedoms allow,
-which only remove completions.  Measured at the root of all 94 golden games that need search, its mean gap to the
-optimum is 31 against 76 for the Java's bound; on the former benchmark games (n = 480–760) 107–292 against 363–769.
+The *matching bound* relaxes winnability to *matchability*: a winnable frame gives its moves distinct maximal factors.
+Each move of a winning order takes at least one factor that is still in the frame and removes it, so no factor pays for
+two moves.  A promotable set `Q` therefore gives a distinct maximal factor to every move of every frame and to every
+promoted number (in the frame in front of its home), and uses no member of `Q` as a factor.  Every edge `v → v/p`
+changes the number of prime factors by one, so the graph is bipartite.  The matching bound is the largest sum of a
+candidate set that has such an assignment: a maximum-weight bipartite matching (a min-cost flow), solved exactly.  It
+bounds the best promotable completion from above, and ignores the freedoms and `max_total`, which only remove
+completions.
 
-It is used incrementally.  `matchbound::MatchGraph` is the root's graph, whose edges never change; every node's
-problem is that graph with each vertex in one of three roles (required: the root's moves and the promoted numbers;
-candidate; factor).  `MatchBound` keeps an optimal matching and an optimal dual solution (potentials) for every node
-on the search's path, and repairs them after each change by Hungarian searches on a radix heap; the changes along a
-depth-first path are small, so an evaluation costs 0.7–2.4 µs where a solve from scratch costs 30–170 µs (at n = 480 to
-760).  The potentials also give, at once, an upper bound on the matching *without* a given candidate
-(`bound_excluding`): lowering that candidate's potential and its partner's as far as their remaining edges allow.  The
-module comment of `matchbound.rs` is the best explanation of all this.
+The bound is an upper bound on `sum(promoted)` plus a completion's sum, so the search cuts a node whose matching value
+is below its need.  At the roots of the 94 golden games that need a search, its mean gap above P\* is 31, against 76 for
+the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.  The Java's `blameGame`
+bound, which the matching bound replaced, never pruned where the matching bound did not: the diagnostics counted none at
+every check.
 
-The Java's `blameGame` bound, which it replaced, never pruned where the matching bound did not (diagnostics: zero at
-every check).  The bound is an upper bound on `sum(promoted) +` completions, so a node whose matching value is below
-`need = best + 1 − sum(promoted)` is cut.
+*Incremental.*  The search keeps the bound along its path instead of solving it at each node.  `matchbound::MatchGraph`
+is the root's graph, whose edges never change, and a node's problem is that graph with each vertex in one of three
+roles: required (the root's moves and the promoted numbers), candidate, or factor.  `MatchBound` keeps an optimal
+matching and an optimal dual solution, the *potentials*, for every node on the search's path, and repairs them after
+each change by Hungarian searches on a radix heap.  The changes along a depth-first path are small, so an evaluation
+costs 0.7 to 2.4 µs, where a solve from scratch costs 30 to 170 µs (at n = 480 to 760).  The potentials also bound the
+matching *without* a given candidate at once (`bound_excluding`): lower that candidate's potential and its partner's as
+far as their remaining edges allow.  The module comment of `matchbound.rs` is the best explanation of all this.
 
 ### Conflicts of the matching bound
 
-When the heaviest matching's candidates `Q*` cannot all be promoted, some frame is unwinnable with them.  Let a *peel*
-of that frame run: the moves it cannot drop, its *residual* (docs/THEORY.md's word for what every dismantling
-ends at), are stuck however the order goes, and the members of `Q*` that the residual needs (promoted into the frame and
-residual moves, or promoted out of it and factors of residual moves) cannot be promoted together.  Minimized by peeling
-only the residual, such a set `K ⊆ Q*` is a *conflict*: a set of candidates that
-cannot be promoted together from the node's state (`FrameGraph::conflict_using`).  Conflicts are tiny (a median of two
-members at n = 760–1000, a quarter of them single members).
+When the candidates `Q*` of the heaviest matching cannot all be promoted, the matching bound yields a *conflict*: a few
+candidates that cannot be promoted together from the node.  Some frame is unwinnable with all of `Q*`.  A peel of that
+frame stops at its *residual*, the moves that no order can take (THEORY.md's word for where every dismantling ends).
+The members of `Q*` that the residual needs cannot be promoted together: those promoted into the frame that are residual
+moves, and those promoted out of it that are factors of residual moves.  Peeling only the residual makes the set
+minimal, and the result `K ⊆ Q*` is the conflict (`FrameGraph::conflict_using`).  Conflicts are tiny: a median of two
+members at n = 760 to 1000, and a quarter of them have one.
 
-The idea behind everything that follows: a subset of a promotable set is promotable (moves left out and factors kept
-only help a frame), so **every promotable completion leaves out some member of a conflict**.
+Everything that follows rests on one fact.  A subset of a promotable set is promotable, since moves left out and factors
+kept only help a frame.  So **every promotable completion leaves out some member of a conflict**.
 
-* **Refinement** (`match_refine`, default 1).  Where the matching bound does not prune, bound the branches of the
-  conflict too: with members `k₁ < k₂ < … < k_r`, every promotable completion `F` is in exactly one branch
-  "`k₁ … k_{j−1}` in `F`, `k_j` not", and the best completion is at most the largest of the branches' matching bounds
-  (the matching with `k_j` no longer a candidate and `k₁ … k_{j−1}` required).  Each branch is refined the same way, one
-  level less deep.  By induction the refined bound is never below the best completion (`search::refine::Refiner`).
-* **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest
-  candidate: the child promotes it, and the node goes on without it, so that neither can reproduce the heaviest
-  matching.  The member is the one whose removal lowers the matching bound most (one bound without each member; with
-  `bound_excluding` most are settled by the potentials alone).  A node with no conflict among its candidates
-  branches on its largest.  (The smallest member, the largest, and the Java's largest candidate were once tactics; at
-  the hardest games they took 6 to more than 17 times as long, and were removed.)
-* **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: it is offered as the
-  incumbent and the node is done.
-* **Propagation into children.**  A conflict known at the node, of which a child promotes all but one member, rules
-  that member out of the child's candidates (the child's state is the node's with more promotions, so promoting it
-  would promote the whole conflict).  Without it the child's matching bound equals the node's.
-* **Starting incumbent.**  See "The starting incumbent, the ceiling and the seed", below.
+* **Refinement** (`match_refine`, default 1).  Where the matching bound does not prune, the search bounds the branches
+  of the conflict too.  With members `k₁ < k₂ < … < k_r`, every promotable completion `F` is in exactly one branch
+  "`k₁ … k_{j−1}` in `F`, `k_j` not".  So the best completion is at most the largest of the branches' matching bounds,
+  each the matching with `k_j` no longer a candidate and `k₁ … k_{j−1}` required.  Each branch is refined the same way,
+  one level less deep, and by induction the refined bound is never below the best completion
+  (`search::refine::Refiner`).
+* **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest candidate:
+  the child promotes the member, and the node goes on without it, so that neither can reproduce the heaviest matching.
+  The member is the one whose removal lowers the matching bound most.  That takes one bound without each member, and
+  `bound_excluding` settles most of them from the potentials alone.  A node with no conflict among its candidates
+  branches on its largest.  The smallest member, the largest, and the Java's largest candidate were once tactics; at the
+  hardest games they took 6 to more than 17 times as long, and were removed.
+* **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: the search offers it as
+  the incumbent, and the node is done.
+* **Propagation into children.**  A conflict known at a node, of which a child promotes all but one member, rules that
+  member out of the child's candidates: the child's state is the node's with more promotions, so promoting the member
+  would promote the whole conflict.  Without this rule the child's matching bound would equal the node's.
+
+"The starting incumbent, the ceiling and the seed", below, says where the incumbent starts.
 
 ### Forced members and nogoods
 
-The tree is mostly chains: at four nodes in five the node's loop ends right after its first child, because
-removing the member that strong branching chose already brings the bound below what the node needs.  Such a member
-is *forced*: every completion that beats the incumbent promotes it.
+The tree is mostly chains, and two devices make the most of it: forced members turn a node whose loop would end after
+one child into a single step, and nogoods carry conflicts across the tree.  At four nodes in five a node's loop ends
+right after its first child, because removing the member that strong branching chose already brings the bound below the
+node's need.  Such a member is *forced*: every completion that beats the incumbent promotes it.
 
-* **Forced members** (`fix_forced`).  The child promotes every forced member of the conflict, not only the chosen
-  one; the node's loop ends after that child, since the child covers every completion that can beat the incumbent.
-  If they cannot all be promoted, or the child's candidate filter dropped one, the child has no such completion at
-  all.  They are promoted together, each frame checked once (`FrameGraph::promote_all_using`).  The forced members are
-  found from the potentials for every member of the heaviest matching, and strong branching solves only where none
-  is found; a conflict all of whose members are forced ends the node at once.
-* **Nogoods** (`nogoods`).  A conflict `K` found at a node with promotions `P` is relative to `P`; a minimal subset of
-  `P ∪ K` that keeps a frame of the *root* unwinnable is a *nogood*: it cannot be promoted from the root, so at every
-  node anywhere in the tree, on any thread and after any resume, the nogood minus that node's promotions is a conflict
-  of the node (`model::Nogoods` has the proof).  Each searcher keeps a table of them: a node's conflict is the smallest
-  the table knows within `P ∪ Q*` (of those as small, the one with the largest member), and a conflict is computed
-  and learned only when the table knows none.  Nogoods also rule candidates out of children, beyond the conflicts known
-  along the path.  The table is scanned over compact member indices, exactly.  Because what is learned depends on the
-  order the search went, the tree depends on the searcher's history (threads, interruptions), not only on the node;
-  the answers do not.
-* **Forgetting nogoods** (`forget_nogoods`).  A lookup scans the whole table, so a larger table makes every node
-  slower and old nogoods cost more than they help: each searcher clears its table after every 50,000 of its own steps
-  (`search::NOGOOD_PERIOD`).  The table is a cache, so this is sound; it is deterministic on one thread, and a game of
-  fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
-  checkpoints, was measured and does not pay (EXPERIMENTS: "Carrying nogoods over").  Which nogoods a searcher keeps,
-  and for how long, is a policy and nothing more, since any subset of the nogoods that hold is as sound as all of
-  them: three research knobs set it (`nogood_period`, `nogood_keep`, `nogood_limit`, section 5; the defaults are the
-  behaviour above, with trees unchanged), and the table counts what it did (nogoods learned, lookups and the share
-  answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), which the ladder
-  and the solver's progress lines print.  The policies are not recorded in a checkpoint (the answer does not depend on
-  them, and a resumed search starts with empty tables); the run that resumes says which.
-* **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate
-  that cannot be promoted from the root at all and could be filtered once.  It is not: the frame builder's
-  candidates all pass that test at the root for every game from 2 to 1230 (a test), and a single-member conflict is a
-  candidate that cannot be promoted *once the node's promotions are made* (its frame may have used it up in a forced
-  pair, say), which in another branch is a nogood of two or more members.  The promotions that fail are under 4%
-  of steps, so little is left to save.
+* **Forced members** (`fix_forced`).  The child promotes every forced member of the conflict, not only the chosen one,
+  and the node's loop ends after that child, which covers every completion that can beat the incumbent.  If the forced
+  members cannot all be promoted, or the child's candidate filter dropped one, the child has no such completion at all.
+  The child promotes them together, checking each frame once (`FrameGraph::promote_all_using`).  The search finds the
+  forced members from the potentials, for every member of the heaviest matching, and solves strong branching's bounds
+  only where it finds none.  A conflict whose members are all forced ends the node at once.
+* **Nogoods** (`nogoods`).  A conflict `K` found at a node with promotions `P` holds relative to `P`.  A minimal subset
+  of `P ∪ K` that keeps a frame of the *root* unwinnable is a *nogood*: it cannot be promoted from the root, so at every
+  node of the tree, on any thread and after any resume, the nogood less the node's promotions is a conflict of the node
+  (`model::Nogoods` has the proof).  Each searcher keeps a table of nogoods.  A node's conflict is the smallest one the
+  table knows within `P ∪ Q*` (of those as small, the one with the largest member), and the searcher computes and learns
+  a conflict only when the table knows none.  Nogoods also rule candidates out of children, beyond the conflicts known
+  along the path.  The table is scanned exactly, over compact member indices.  What a searcher learns depends on the
+  order its search went, so the tree depends on the searcher's history (its threads, its interruptions), not only on the
+  node; the answers do not.
+* **Forgetting nogoods** (`forget_nogoods`).  Each searcher clears its table after every 50,000 of its own steps
+  (`search::NOGOOD_PERIOD`), because a lookup scans the whole table: a larger table slows every node, and old nogoods
+  cost more than they help.  The table is a cache, so forgetting is sound; it is deterministic on one thread, and a game
+  of fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
+  checkpoints, does not pay ([carrying nogoods
+  over](../notebook/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher keeps, and
+  for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.  Three
+  research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; section 5), whose defaults are the
+  behaviour above, with the same trees.  The table counts what it does (nogoods learned, lookups and the share they
+  answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and the ladder and
+  the progress lines print the counts.  A checkpoint does not record the policies, since the answer does not depend on
+  them and a resumed search starts with empty tables; the run that resumes says which it uses.
+* **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
+  cannot be promoted from the root at all and could be filtered out once.  It cannot: on every game from 2 to 1230 the
+  frame builder's candidates all pass that test at the root, which a test checks.  A single-member conflict is a
+  candidate that cannot be promoted *once the node's promotions are made*: its frame may have used it to pay for a move
+  left with one live factor, say.  In another branch it is part of a nogood of two or more members.  The promotions that
+  fail are under 4% of the steps, so little would be saved ([single-member
+  conflicts](../notebook/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
 
 ### The Lagrangian bound over the nogoods
 
-The matching bound knows no nogood, and its heaviest matching often promotes all of one.  The *Lagrangian bound*
-(tactic `lagrange`) takes them in.  At a node with promotions `P` and candidates `C`, a nogood `N` is *live* when its
-members outside `P` are all still candidates; every completion then leaves out one of them, `|F ∩ N| ≤ |N − P| − 1`.
-Moving these inequalities into the objective with multipliers `λ_N ≥ 0`, as Lagrangian relaxation does in integer
-programming, gives a bound for any multipliers (weak duality): the heaviest matching with each candidate weighed by
-its number less the multipliers of the live nogoods it is in, plus `Σ λ_N (|N − P| − 1)`.  It is computed in integers
-(weights in 64ths, nothing rounded); the module comment of `matchbound::lagrange` has the argument.
+The *Lagrangian bound* (tactic `lagrange`, off by default) puts the nogoods into the matching bound, which knows none:
+its heaviest matching often promotes all of a nogood.  At a node with promotions `P` and candidates `C`, a nogood `N` is
+*live* when its members outside `P` are all still candidates, and then every completion `F` leaves one of them out:
+`|F ∩ N| ≤ |N − P| − 1`.  Lagrangian relaxation, as in integer programming, moves these inequalities into the objective
+with multipliers `λ_N ≥ 0`.  The result bounds the completions for any multipliers (weak duality): the heaviest matching
+with each candidate weighed by its number less the multipliers of the live nogoods it is in, plus `Σ λ_N (|N − P| − 1)`.
+The search computes it in integers (weights in 64ths), with nothing rounded; the module comment of
+`matchbound::lagrange` has the argument.
 
-* **Incremental.**  A second stack of matching levels, with weights of their own (`matchbound::lagrange`; the
-  levels and the Hungarian repairs are the matching bound's, generic over how a level weighs its candidates).  A
-  level is made for a node when the bound is asked for there, from the nearest level on its path: what the node
-  promoted is promoted, the candidates it no longer has are dropped, and the live nogoods they were in die, so the
-  weights of their other members *rise*, which needs a repair only where a member's potential must rise past a tight
-  edge.  Weights fall only when the multipliers change, and then the levels are dropped and solved afresh.  A level
-  costs about what a matching level does.
-* **Where, and what for.**  At every check of a node or a child that the matching bound and refinement leave open:
-  below `need` it cuts (cut reason `lagrange`); otherwise the members of its heaviest matching without which the
-  bound, read off its potentials as `bound_excluding` reads the matching's, would be below `need` are forced members
-  too (every completion that beats the incumbent promotes them), and with `fix_forced` the node's child promotes
-  them with the matching's.  The forced members are most of the gain.
+* **Incremental.**  The bound keeps a second stack of matching levels, with weights of its own (`matchbound::lagrange`;
+  the levels and the Hungarian repairs are the matching bound's, generic over how a level weighs its candidates).  The
+  searcher makes a level for a node when it asks for the bound there, from the nearest level on its path: what the node
+  promoted is promoted, the candidates it no longer has are dropped, and the live nogoods they were in die.  So the
+  weights of those nogoods' other members only *rise*, which needs a repair only where a member's potential must rise
+  past a tight edge.  Weights fall only when the multipliers change, and then the searcher drops the levels and solves
+  them afresh.  A level costs about what a matching level does.
+* **Where, and what for.**  The search asks for the bound at every check of a node or a child that the matching bound
+  and refinement leave open.  Below the need it cuts the node (cut reason `lagrange`).  Otherwise it yields forced
+  members: the members of its heaviest matching without which the bound, read off its potentials as `bound_excluding`
+  reads the matching's, would be below the need.  Every completion that beats the incumbent promotes them, and with
+  `fix_forced` the node's child promotes them with the matching's.  The forced members are most of the gain.
 * **The multipliers.**  Each searcher fits its own, at the root, to the nogoods it has learned: after 2,000 of its
-  steps and then just before each forgetting of its table (every 50,000), 50 subgradient steps (Polyak's rule towards
-  what the root needs) over the table's nogoods and those of the multipliers it had, keeping the nogoods whose
-  multipliers are positive (`search::lagrange`).  Any multipliers give a bound, so the schedule decides speed only;
-  like the nogoods, the multipliers are a cache that units and checkpoints do not record, and the tree depends on
-  the searcher's history.  A search of fewer than 2,000 steps is unchanged.
-* **What it is worth.**  Proofs of the hardest games (1184 to 1300) take 2 to 6 times fewer cycles on one thread, about
-  3 times on average, with no trend in n; the chain 1201–1231 on four threads 2.4 times less game time.  Each
-  step costs about half as much again, so a search whose time goes into finding the optimum late, as 992's does, is
-  slower (EXPERIMENTS: "A Lagrangian bound over the nogoods").
+  steps, and then just before each forgetting of its table (every 50,000), it takes 50 subgradient steps (Polyak's rule,
+  towards what the root needs) over the table's nogoods and those of its present multipliers, and keeps the nogoods
+  whose multipliers are positive (`search::lagrange`).  Any multipliers give a bound, so the schedule decides only the
+  speed.  Like the nogoods, the multipliers are a cache that units and checkpoints do not record, and the tree depends
+  on the searcher's history.  A search of fewer than 2,000 steps is unchanged.
+* **What it is worth** (on the matching path).  Proofs of the hardest games, 1184 to 1300, take 2 to 6 times fewer
+  cycles on one thread, about 3 times on average, with no trend in n; the chain 1201–1231 on four threads takes 2.4
+  times less game time.  Each step costs about half as much again, so a search whose time goes into finding its best set
+  late, as 992's does, is slower ([a Lagrangian bound over the
+  nogoods](../notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it changes no tree
+  measured (below).
 
 ### The GF(2) bound
 
-The default node bound (tactic `gf2`) relaxes winnability less than matchability does.  In each frame, give the
-factors coordinates over GF(2), each mover (a move of the frame, or a number promoted into it) the vector of its
-maximal factors there, and each number promoted out of it its own unit vector: a winnable frame peels completely, and
-the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so its condition is a
-linear matroid on the candidates that touch it (contracted by the moves; its rank is the frame's freedoms).  A
-candidate of home `h` touches frames `h` and `h − 1`, one even and one odd, so the even frames' matroids are the
-blocks of a matroid `A` on the candidates and the odd frames' of a matroid `B`; every promotable set is independent
-in both, and the heaviest common independent set of at most `max_add` members (weighted matroid intersection,
-polynomial) bounds a node's completions.
-[docs/THEORY.md](../../docs/THEORY.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof
-(the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses); the module
-comments of `src/gf2.rs` and `src/gf2/meet.rs` the algorithms.  It is never above the matching bound (independent
-vectors have a system of distinct representatives, which is a matching); what it misses are the *odd* cores of movers
-with three or more factors.  At the roots of 880–1300 its gap to the optimum is a tenth of the matching bound's
-(EXPERIMENTS: "Matroid intersection bounds").
+The *GF(2) bound*, the default node bound (tactic `gf2`), relaxes winnability less than matchability does, and so prunes
+more: at the roots of 880 to 1300 its gap is a tenth of the matching bound's ([matroid intersection
+bounds](../notebook/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors coordinates over
+GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal factors in the frame,
+and each number promoted out of it its own unit vector.  A winnable frame peels completely, and the peel's order makes
+these vectors linearly independent.  The moves of a frame are fixed, so its condition is a linear matroid on the
+candidates that touch it, contracted by the moves, whose rank is the frame's freedoms.  A candidate of home `h` touches
+frames `h` and `h − 1`, one even and one odd.  So the even frames' matroids are the blocks of a matroid `A` on the
+candidates, the odd frames' the blocks of a matroid `B`, and every promotable set is independent in both.  The heaviest
+common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial time), the
+node's *heaviest set* `I*`, bounds its completions.
 
-* **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once per search; `gf2::Gf2Bound` keeps a level
-  per node of the searcher's path, a child's being its parent's contracted by what the child promoted (one pivot per
-  member and matroid) with the candidates it lost deleted.  The intersection (`gf2::meet`: Lawler's shortest
+[THEORY.md](../../docs/THEORY.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof; the theorem
+is the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses.  The
+module comments of `src/gf2.rs` and `src/gf2/meet.rs` have the algorithms.  The GF(2) bound is never above the matching
+bound, since independent vectors have a system of distinct representatives, which is a matching.  What it misses are the
+*odd* cores of movers with three or more factors.
+
+* **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once a search, and `gf2::Gf2Bound` keeps a level
+  for each node of the searcher's path.  A child's level is its parent's, contracted by what the child promoted (one
+  pivot per member and matroid), with the candidates it lost deleted.  The intersection (`gf2::meet`: Lawler's shortest
   augmenting paths, over a tableau of bitset rows that a pivot updates per exchange) starts from the last of the sets
-  the parent's augmentations passed through that the changes keep (every one is the heaviest of its size and heavier
-  than all smaller ones); when that is the parent's optimum, the child inherits it with no solve.  The parent here
-  is the node as it was before it went on without the member the child promotes (it is kept aside for that), so
-  that the child finds the node's optimum among those sets.
-* **Tableaux derived, not built.**  A solved level whose tableau the workspace no longer holds (a child that inherited
-  or was certified, a node going on without the member it branched on) needs it for its weight split.  A solve from
-  its optimum would build it, a pivot per member over its block; `Meet::derive` makes the same tableau (the same free
-  elements, circuits, slots and lists, which is all that is read of a tableau outside a solve) from a related one, at
-  a cost linear in the elements: from the parent's, which the workspace still holds when the child is checked (the
-  promoted members' slots dropped from the circuits, a contraction, and for a certified child the set first flipped
-  along the cycle by exchanges, each a pivot that keeps the span), or for the node from a copy of its own tableau
-  saved when it kept the certified level (`Snapshot`).  A block where an exchange would change the span is built, and
-  the elements the parent did not have (its own loops, candidates again in the child) are reduced by the block's
-  members.  The module comment of `src/gf2/meet.rs` ("Deriving a tableau") has the argument; the random paths of the
-  tests check every derived tableau against the one a solve builds.  The trees are the same.
-* **The heaviest set without a member, with no solve.**  The heaviest set without a member `x` of the optimum `I*`
-  is, in practice, `I*` flipped along one cycle of its exchange graph through `x`; `Meet::without` finds the shortest
-  such cycle by Dijkstra's search over the weight split's reduced lengths (below), checks the flipped set common
-  independent, and certifies it the heaviest when what the sets of other sizes lose against `I*` is at least the
-  cycle's length (the symmetric difference of `I*` and any set without `x` splits into cycles and paths of the
-  exchange graph, all of non-negative length but the one through `x`; the module comment of `src/gf2/meet.rs` has the
-  proof).  What the smaller sets lose comes from the level's history (a dominant set one smaller), a floor carried
-  along the path, or a search for the shortest path between members; what the larger sets lose is the solve's last
-  shortest path.  A child that loses one member of its parent's optimum besides those it promotes gets its own
-  optimum the same way, from the parent's exchange graph with the dropped elements banned from the cycle.
-* **Forced members.**  The optimum's weight split (Frank: `w = w1 + w2` with the optimum heaviest in `A` for `w1` and
-  in `B` for `w2`, from difference constraints by Bellman–Ford, each round from the vertices that changed) bounds the
-  intersection without each member in one pass, by weak duality; a member without which it is below `need` is
-  forced, as the matching's are.  The split's bound is loose, so for the members it leaves free within the tactic
-  `force_window` of `need` (all of them by default; before 2026-10-16 those within 80, `gf2::LEGACY_FORCE_WINDOW`), the
-  exchange graph decides: a member is forced too when no cycle through it is shorter than the slack `value − need` and
-  the sets of other sizes lose more than that (`Meet::has_cycle_within`); a member on a cycle that the search for
-  another found within the slack is not searched, since that cycle passes through it.  (The window `all` costs each
-  node more, every member being checked exactly, and the trees fall by more: the tuning campaign measured 0.41-0.43 of
-  the nodes for 0.60-0.63 of the CPU at the end of the chain.)  The searches reach the elements free in `A` from the
-  members, and the members from the elements free in `B`, through one hub each (the least distance plus `w1`, less
-  `w2`), which keeps their distances, order and cycles; their queue is a radix heap of the packed (distance, vertex)
-  keys, which come out in the binary heap's order.
-* **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection
-  is lowest, each bound read off the exchange graph where it is certified and solved where not (in the order of the
-  split's bounds, each solve stopped once it reaches both the lowest so far and `need`, a greedy lower bound tried
-  first); a member whose bound falls below `need` is forced too, and the chosen member's level, certified or solved,
-  is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more nodes
-  and more time (EXPERIMENTS: "The GF(2) bound in the search"); the tactics `branching`, `strong_limit`,
-  `strong_depth`, `deep_branching` and `more_forced` choose among them, and how far strong branching goes (section 5).
-* **What it replaces.**  With `gf2` the matching bound is not computed (as a first check before the intersection it
-  costs more than the cuts it saves), so `match_refine` has no effect; the conflicts, nogoods, forced members and
-  exact sets are used as with the matching bound.  The Lagrangian bound over nogoods still applies after it when on,
-  but changes no tree of the GF(2) search measured and costs 2–4%, so `lagrange` is off by default.
+  that the parent's augmentations passed through and that the changes keep.  Each such set is the heaviest of its size
+  and heavier than all smaller ones, and when the set kept is the parent's heaviest set, the child inherits it with no
+  solve.  The parent here is the node as it was before it went on without the member the child promotes (the search
+  keeps it aside for that), so that the child finds the node's heaviest set among those sets.
+* **Tableaux derived, not built.**  A solved level needs its tableau for its weight split even when the workspace no
+  longer holds it: a child that inherited its heaviest set or was certified, or a node going on without the member it
+  branched on.  A solve from `I*` would build the tableau, a pivot per member over its block.  `Meet::derive` makes the
+  same tableau (the same free elements, circuits, slots and lists, which is all that is read of a tableau outside a
+  solve) from a related one, at a cost linear in the elements.  It derives a child's from the parent's, which the
+  workspace still holds when the child is checked: the promoted members' slots are dropped from the circuits, a
+  contraction, and for a certified child the set is first flipped along its cycle by exchanges, each a pivot that keeps
+  the span.  It derives a node's from a copy of its own tableau, saved when it kept the certified level (`Snapshot`).  A
+  block where an exchange would change the span is built instead, and the elements the parent did not have (its own
+  loops, candidates again in the child) are reduced by the block's members.  The module comment of `src/gf2/meet.rs`
+  ("Deriving a tableau") has the argument, and the random paths of the tests check every derived tableau against the one
+  a solve builds.  The trees are the same.
+* **The heaviest set without a member, with no solve.**  In practice the heaviest set without a member `x` of `I*` is
+  `I*` flipped along one cycle through `x` of its exchange graph.  `Meet::without` finds the shortest such cycle by
+  Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent,
+  and certifies it the heaviest when what the sets of other sizes lose against `I*` is at least the cycle's length.  The
+  proof: the symmetric difference of `I*` and any set without `x` splits into cycles and paths of the exchange graph,
+  all of non-negative length but the one through `x` (the module comment of `src/gf2/meet.rs`).  What the smaller sets
+  lose comes from the level's history (a dominant set one smaller), from a floor carried along the path, or from a
+  search for the shortest path between members; what the larger sets lose is the solve's last shortest path.  A child
+  that loses one member of its parent's heaviest set besides those it promotes gets its own the same way, from the
+  parent's exchange graph with the dropped elements banned from the cycle.
+* **Forced members.**  The weight split of `I*` bounds the intersection without each member in one pass, by weak
+  duality, and a member without which that bound is below the need is forced, as the matching's are.  The split is
+  Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by
+  Bellman–Ford, each round from the vertices that changed.  Its bound is loose, so for the members it leaves free within
+  the tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too
+  when no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
+  (`Meet::has_cycle_within`).  A member on a cycle that the search for another found within the slack is not searched,
+  since that cycle passes through it.  The window `all` costs each node more, since every member is checked exactly, and
+  the trees fall by more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the
+  former window, 80 (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
+  campaign](../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach the
+  elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the least
+  distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of packed
+  (distance, vertex) keys, which come out in the binary heap's order.
+* **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection is
+  lowest.  The search reads each such bound off the exchange graph where it certifies it, and solves it where not: in
+  the order of the split's bounds, each solve stopped once it reaches both the lowest so far and the need, after a
+  greedy lower bound.  A member whose bound falls below the need is forced too, and the chosen member's level, certified
+  or solved, is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more
+  nodes and more time ([the GF(2) bound in the search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md)).  The
+  tactics `branching`, `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how
+  far strong branching goes (section 5).
+* **What it replaces.**  With `gf2` the search does not compute the matching bound, which as a first check before the
+  intersection costs more than the cuts it saves; so `match_refine` has no effect.  The conflicts, nogoods, forced
+  members and exact sets work as with the matching bound.  The Lagrangian bound over the nogoods still applies after the
+  GF(2) bound when it is on, but changes no tree of the GF(2) search measured and costs 2 to 4%, so `lagrange` is off by
+  default.
 * **Block words.**  A level's vectors are as wide as the root's largest frame rank (its freedoms) needs: one to three
-  words of 64 bits on every board to 4095 (ranks up to 169), four from 4740 and five from 6392 (up to 314 at 8191; the
-  scan of every board is in EXPERIMENTS, "Boards past 4095").  Each word count is a copy of the bound's code
-  (`Levels<W, R>`, R = 1 to `gf2::MAX_WORDS` = 5) for every set width that has it; only the sets of 128 words have the
-  copies of four and five words, so the narrower widths are built as before.  Tests run those copies on small boards
-  with the vectors padded with zero words (`Gf2Graph::padded`), where they must search the same tree.
-* **Open for other weights.**  `meet::Problem` takes any positive weights, but the start from the heaviest
-  uncontended elements and the greedy lower bound assume that weights do not decrease with an element's index (the
-  root's candidates by increasing number).  A bound that reweighs the candidates (a Lagrangian over nogoods or a
-  cover LP with this intersection as its inner problem, as the nogoods study suggests) needs its own element order,
-  or those two starts switched off; the levels, the contraction and the split do not depend on the order.
+  words of 64 bits on every game to 4095 (ranks up to 169), four from 4740 and five from 6392 (ranks up to 314 at 8191;
+  [boards past 4095](../notebook/boards-past-4095-2026-10/README.md) has the scan of every game).  Each word count is a
+  copy of the bound's code (`Levels<W, R>`, R from 1 to `gf2::MAX_WORDS` = 5) for every set width that has it.  Only the
+  sets of 128 words have the copies of four and five words, so the narrower widths build as before.  Tests run those
+  copies on small games with the vectors padded with zero words (`Gf2Graph::padded`), where they must search the same
+  tree.
+* **Open for other weights.**  `meet::Problem` takes any positive weights, but two of its starts assume that weights do
+  not decrease with an element's index, as the root's candidates, in increasing order, have them: the start from the
+  heaviest uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian
+  over the nogoods, or a cover LP with this intersection as its inner problem, as the nogoods study suggests) needs its
+  own element order, or those two starts switched off.  The levels, the contraction and the split do not depend on the
+  order.
 
 ### Prime exchanges
 
 Exchanging two primes `p < q` in every number (`p^a q^b m ↦ p^b q^a m`) is an automorphism of divisibility.  Where it
 maps every frame of the root onto itself (moves to moves, factors to factors) and the candidates onto themselves, it
 maps promotion sets to promotion sets, worth `(q − p)(c_p − c_q)` more, `c_r(S)` being the sum of `x / r` over the
-members of `S` divisible by `r` (no candidate is divisible by `pq`, `p²` or `q²` in the pairs used).  So every
-heaviest promotion set keeps `c_p ≤ c_q` for every such *symmetric pair* at once: a set that breaks one pair's
-inequality is beaten by its image under that pair's exchange alone
-([docs/THEORY.md](../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).  The
-pairs come in classes of primes that the frame builder treats alike (at 1300 {41, 43}, {59, 61}, {67, 71}, {73, 79},
-{89, …, 107}, {109, …, 139}, {149, 151, 157}: 32 pairs; 99 at 2175, 300 at 4000), and `search::symmetry::root_pairs`
-finds them when a search is set up, in under a millisecond: the full check only for the primes whose multiples have
-the same places and exponents in the frames, and over the multiples alone (EXPERIMENTS: "Dominance and symmetry"
-found the exchanges, "Prime exchanges in the search" put them in).
+members of `S` divisible by `r` (no candidate is divisible by `pq`, `p²` or `q²` in the pairs used).  So every heaviest
+promotion set keeps `c_p ≤ c_q` for every such *symmetric pair* at once: a set that breaks one pair's inequality is
+beaten by its image under that pair's exchange alone
+([docs/THEORY.md](../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).  The pairs come in
+classes of primes that the frame builder treats alike (at 1300 {41, 43}, {59, 61}, {67, 71}, {73, 79}, {89, …, 107},
+{109, …, 139}, {149, 151, 157}: 32 pairs; 99 at 2175, 300 at 4000), and `search::symmetry::root_pairs` finds them when a
+search is set up, in under a millisecond: the full check only for the primes whose multiples have the same places and
+exponents in the frames, and over the multiples alone (EXPERIMENTS: "Dominance and symmetry" found the exchanges, "Prime
+exchanges in the search" put them in).
 
 With the tactic `symmetry` (the default) the search uses them, from the cofactor sums of a node's promotions `P` and
 candidates `C` (`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):
