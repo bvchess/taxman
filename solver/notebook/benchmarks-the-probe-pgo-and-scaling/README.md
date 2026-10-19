@@ -66,3 +66,66 @@ use them).
   by construction), a warm-started unit rebuild (another optimal matching can change the tree after a split or a
   resume), candidate-index sets for every search-level set (a large refactor), and watched members for the nogoods
   (now 3% of the time).
+
+## Later (2026-10): the measurements that DESIGN.md held
+
+DESIGN.md's section 10, "Performance", held these figures of past builds until 2026-10-18, when they moved here
+unchanged; DESIGN.md keeps the tools and where performance stands.  "Now" in them is the date they were written.
+
+*The probe's fixtures and fingerprints.*  The probe's fingerprint with `--tactic gf2=on` was f3deaac0dbdc030a before the
+window of the forced members became `all`, which `--tactic gf2=on --tactic force_window=80` still gives.  (The windows
+were made again when the search's counters were renumbered and the checkpoint header went to version 4, 2026-10, and
+again for version 5, with the tactics they record, the matching path's, and the same fingerprints, and again when
+`force_window` became `all`, as a header of version 6, with the same trees for the matching path; the fingerprints
+EXPERIMENTS quotes before version 4, 36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before
+`lagrange`.)
+
+*Profile-guided optimization.*  Before the hot loop was inlined by hand, PGO gained 12%.
+
+**Where it stands with the GF(2) bound** (the default since commit 7af8b0e; EXPERIMENTS, "The GF(2) bound in the search"
+and "The inner loop of the GF(2) search", have the tables; on the M1 Max): the proof of 1215 takes 4,634 nodes and 0.85
+G cycles on one thread, against the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the slope study
+287,101 nodes and 52 G cycles (697,346 and 232 G before the inner-loop round; 3,408 s on the matching path); the proofs
+of 2170 and 2172 65 s each on one thread; `taxman regress --to 1000` on one thread 15.4 s; the chain 1..1300 on one
+thread 63 s (34 s of search), against the 988 s for 1001–1300 that the chain of commit 271c817 (the
+`results/strict.jsonl` before it; git has it) records on 4 threads.  Strong branching makes almost no augmentations (the
+bounds without each member are read off the exchange graph), and most children inherit or are certified: where the time
+goes now (the proof of 1521, one thread) is the searches for forced members about a quarter, the weight split a quarter,
+the solves that are left a fifth (with the tableaux they build, a quarter), and the cycles of strong branching a ninth.
+A node costs 180k cycles on average over the 146 proofs (330k before the round), in trees 2.4 times smaller.  These are
+without the rule of symmetric pairs (section 4, "Prime exchanges"), on by default since: it takes the proof of 1215 to
+3,647 nodes and 0.74 G cycles, 2170 and 2172 to 55 s and 62 s, the chain 1..1300 on one thread to 36 s (26 s of search)
+and 290,503 nodes against 42 s (31 s) and 402,205 just before it; the one-thread proofs of the quick set and the bench
+set 0.75 of the nodes and 0.81 of the cycles (geometric means; EXPERIMENTS, "Prime exchanges in the search").  The
+window `all` of the forced members, the default since 2026-10-16, takes the chain 1..1300 on one thread to 276,918 nodes
+against 290,503 and 24.8 s of search against 23.7 (the small games' trees are too small for the extra searches to pay),
+and the trees at the end of the chain to 0.41-0.43 of the nodes and 0.60-0.63 of the CPU ([the tuning
+campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  A chain from optimal.json's game of 1300
+reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1 to 2175 took 27 minutes on 8
+([results/README.md](../../../results/README.md)); its cost comes in waves that follow the root's GF(2) gap, with no
+growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about 1,040 in n, and a day on one 64-CPU
+cloud machine took the chain from 2176 to 3440 (the [cloud run](../the-frontier-chain-to-3440-2026-10/README.md) sets it
+beside the projections of the day: near 4,100, and 3,400 to 3,700 at their pessimistic end); the widths go to 8191.  At
+the end of that chain (3441 resumed from the cloud run's checkpoint, one thread) a step cost 888k cycles, 92% of it in
+the GF(2) bound; with its tableaux derived, a hub for the elements free in `B` and the other changes of [cheaper GF(2)
+nodes](../cheaper-gf2-nodes-same-trees-2026-10/README.md) it costs 543k, the same trees (3,570 to 5,865 nodes a
+CPU-second).
+
+**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
+proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
+game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed
+`solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (1001–1231), made by the build before it (e710d16),
+records 318 s, and 207 s for 1201–1231.  The cost of a game grows by a factor of ten for every 55 to 70 in n past 1200
+([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](cost-curve.md)).  The chain 1..1300 of commit
+bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history, `results/strict.jsonl` being a
+later run, whose times [results/README.md](../../../results/README.md) gives) records 3359 s of search, 2866 s of it for
+1232–1300; its slowest game is 1232 at 439 s.  All of this is without the Lagrangian bound (tactic `lagrange`, section
+4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G
+cycles, and the chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound
+over the nogoods").  The round after it took about a tenth off the cycles with the same trees (commit 31b9c95: the proof
+of 1215 30 G cycles, 1184 1.5 G, the chain 1201–1231 on one thread 315 s instead of 345 s; a step of the probe's window
+of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes with the Lagrangian bound, same trees").
+Where the time goes now (the proof of 1215, one thread): the Hungarian searches of the matching 33% and of the
+Lagrangian levels 19%, the peels 19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%,
+the bounds from the potentials 6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a
+quarter, refinement 14% and strong branching 11%.

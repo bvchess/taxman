@@ -1419,133 +1419,147 @@ problems' equality on trust, as it takes an exhausted search.
 
 ### Certificates of U
 
-A score whose proof uses the frame model (`exhausted`, `trivial`, `same_search`) is the optimum on the whole board when
-U holds at n (section 2).  `taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`
-(`src/certify.rs`) proves that game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem").  For
-a game whose line in the prover's barred parity bounds (`solver/noframe/data/upper_*.jsonl`) says it needs one, it takes that
-line's open members O, sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), the other
-members of U\*_{≥3} fixed, and searches it from the recorded game, as the promotion set (O, its moves up to n/2),
-with the ceiling n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score,
-plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says a playable one is).
+A *certificate* proves statement U at one game: that the recorded score of a game whose proof uses the frame model
+(`exhausted`, `trivial`, `same_search`) is opt(n) on the whole board (section 2).  `taxman certify` makes certificates
+game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem"), and `taxman verify-certificates`
+checks them.  [results/README.md](../../results/README.md#certificates) says which games have one.
 
-*The formulation.*  Π⁺(O) has two formulations (`Board::extended`; THEORY.md, Lemma M5⁺): with the claims of `unzip`
-that the lemma allows to keep (the default), and without any (`certify --no-claims`; every certificate made before the
-lemma).  The two have the same promotion sets and so the same heaviest promotion set (the corollary of the lemma), so
-a certificate made in one bounds the heaviest promotion set of the problem in the other.  A line records the
-formulation it was made in (`claims`, true or false); a line with no such field is read as false.
+*What `certify` does* (`taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`;
+`src/certify.rs`).  It certifies the games whose lines in the prover's barred parity bounds
+(`solver/noframe/data/upper_*.jsonl`) say they need a certificate.  For such a game it takes the line's open members
+O, and sets up the extended problem Π⁺(O) in extended mode (section 4, "Extended mode"), with the other members of
+U\*_{≥3} fixed.  It searches that problem from the recorded game, as the promotion set (O, its moves up to n/2), with
+the ceiling n + score(n − 1) − in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\*
+above n/2, and is a promotion set of Π⁺(O) worth the score (Theorem M⁺ says that a playable one is).  The search ends
+with one of two verdicts:
 
 * *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
-  certified against it; a line of the bounds whose score is above the recorded one certifies nothing against it, and
+  certified against it.  A line of the bounds whose score is above the recorded one certifies nothing against it, and
   is refused.
 * *beaten*: the search found a promotion set worth more.  Its set F ∪ K ∪ L is played in the order of the peel of
-  `playable` (the whole-board oracle, which shares nothing with the frame model), finished with the largest legal
-  move left until none is, and refereed by `game::replay_finished`: a counterexample to the score, and to U if the
-  score rests on the frame model.  It is written to `<out>.counterexample.jsonl` as well, and the run exits with
+  `playable` (the whole-board oracle, which shares nothing with the frame model), finished with the largest legal move
+  left until there is none, and refereed by `game::replay_finished`.  It is a counterexample to the score, and to U if
+  the score rests on the frame model.  It goes to `<out>.counterexample.jsonl` as well, and the run exits with the
   status 2.
+
+*The formulation.*  Π⁺(O) has two formulations (`Board::extended`; THEORY.md, Lemma M5⁺): with the claims of `unzip`
+that the lemma allows to keep (the default), and without any (`certify --no-claims`, the formulation of every
+certificate made before the lemma).  The two have the same promotion sets, and so the same heaviest promotion set (the
+lemma's corollary), so a certificate made in one bounds the heaviest promotion set of the problem in the other.  A line
+records the formulation it was made in (`claims`, true or false); a line with no such field reads as false.
 
 *The same problem.*  Consecutive games often pose the same Π⁺(O) (the same `search::Problem`, which has no n in it:
 "Same search"), and then an earlier game's certificate settles the later one with no search.  If game m is certified,
-by a search or by this rule, and Π⁺(n) equals Π⁺(m), the heaviest promotion set of Π⁺(n) is worth best(m) = score(m) −
-in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth the same has nothing above it.  After the
-checks of n's recorded game and before its search (a checkpoint of n, if there is one, changes nothing) `certify` looks
-at the certified games of the `SAME_SEARCH_WINDOW` = 8 board sizes before n, those of the file `--out` and those of the
-run, latest first, and never further.  The problems are compared in the run's formulation, whatever formulation m's
-certificate was made in.  A game of the run's formulation whose line records another digest than Π⁺(n)'s is passed
-over; so is a game of the other formulation (whose digest says nothing of Π⁺(n)'s) unless its frames and candidates
-are Π⁺(n)'s, which the claims do not change.  For a game that is not passed over, its problem in the run's formulation
-is the one the run set up when it certified it (kept for the last eight sizes; only if its line is of the run's
-formulation) or, for a line of the file, the one set up again from m's board size and the open members the line
-records (`certify::extended_problem`) in the line's own formulation, which must reproduce the line (its formulation,
-digest, frames, candidates, rejected sources and in_the_bag⁺), or the line is dropped, and then, for a line of the
-other formulation, set up again in the run's.  It is compared with Π⁺(n) whole, so that the answer never rests on two
-digests alone, and the first game with an equal problem is m.  Then, with worth(n) = score(n) − in_the_bag⁺(n):
+by a search or by this rule, and Π⁺(n) equals Π⁺(m), then the heaviest promotion set of Π⁺(n) is worth best(m) =
+score(m) − in_the_bag⁺(m), which m's certificate proved, and a recorded game of n worth as much has nothing above it.
 
-* worth(n) = best(m): n is *certified* with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
-  "worth": ...}` in its line;
-* worth(n) < best(m): the recorded game is not optimal, so the rule is not used and n is searched (the search finds the
-  better set and says *beaten*);
-* worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
-  certificate says nothing beats), so the run fails naming n, m and both values, and nothing is certified.
+* *Where it looks.*  After the checks of n's recorded game and before its search (a checkpoint of n, if there is one,
+  changes nothing), `certify` looks at the certified games of the `SAME_SEARCH_WINDOW` = 8 games before n, those of the
+  file `--out` and those of the run, latest first, and never further.
+* *What it compares.*  It compares the problems in the run's formulation, whatever formulation m's certificate was made
+  in.  It passes over a game of the run's formulation whose line records another digest than Π⁺(n)'s, and a game of
+  the other formulation (whose digest says nothing of Π⁺(n)'s) unless its frames and candidates are Π⁺(n)'s, which the
+  claims do not change.  For a game that is not passed over, m's problem in the run's formulation is the one the run
+  set up when it certified m (kept for the last eight games, and only if m's line is of the run's formulation).  For a
+  line of the file it is set up again from m's game and the open members the line records (`certify::extended_problem`),
+  in the line's own formulation, which must reproduce the line (its formulation, digest, frames, candidates, rejected
+  sources and in_the_bag⁺), or the line is dropped; then, for a line of the other formulation, it is set up again in the
+  run's.  `certify` compares it with Π⁺(n) whole, so that the answer never rests on two digests alone, and the first
+  game with an equal problem is m.
+* *What it concludes*, with worth(n) = score(n) − in_the_bag⁺(n):
+  * worth(n) = best(m): n is *certified*, with `nodes` 0 and `"same_problem": {"n": m, "digest": ..., "best": ...,
+    "worth": ...}` in its line;
+  * worth(n) < best(m): the recorded game is not optimal, so the rule is not used and n is searched (the search finds
+    the better set and says *beaten*);
+  * worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
+    certificate says nothing beats), so the run fails, naming n, m and both values, and certifies nothing.
 
-The rule is sound because equal problems have equal heaviest promotion sets (the form holds the frames, the candidates,
-`max_total` and the graph's lists, and nothing of n), and the heaviest promotion set of a problem does not depend on
-the formulation it was certified in, so nothing beats n's recorded game, and n's own barred bounds then give opt(n) =
-score(n) by the corollary, exactly as after a search.  The refusal of a line of bounds that was found against a
-higher score applies to a game settled by the rule too.
+The rule is sound because equal problems have equal heaviest promotion sets: the form holds the frames, the
+candidates, `max_total` and the graph's lists, and nothing of n.  The heaviest promotion set of a problem does not
+depend on the formulation it was certified in, so nothing beats n's recorded game, and n's own barred bounds then give
+opt(n) = score(n) by the corollary, exactly as after a search.  The refusal of a line of the bounds that was found
+against a higher score applies to a game the rule settles too.
 
-One line a game in `--out`: the board, the score, the open members, how many sources greedy rejected beside them,
-the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the formulation
-(`claims`), the verdict, the digest of Π⁺(O), the game it rests on if the rule settled it (`same_problem`) and the
-build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its checkpoint (the same flags
-as `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose GF(2) bound needs more
-block words than the engines of the board's set width have is searched at the widest set width (128 words, five words
-of engine).  The width is `certify::certificate_width`, the one place it is decided; the line records it.
+*The line.*  `--out` gets one line a game: the game, the score, the open members, how many sources greedy rejected
+beside them, the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the
+formulation (`claims`), the verdict, the digest of Π⁺(O), the game it rests on if the rule settled it
+(`same_problem`), and the build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its
+checkpoint (the flags are `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose
+GF(2) bound needs more block words than the engines of the game's set width have is searched at the widest set width
+(128 words, five words of engine); `certify::certificate_width` is the one place that decides the width, and the line
+records it.
 
-*A list of boards.*  `certify` takes the boards of a list file (`--list FILE`) in place of a range `A-B`, exactly one of
-the two: one board size a line, in the order to certify them, blank lines and lines whose first non-blank character is
-`#` skipped, no board twice.  A line that is none of these is a usage error that names the file and the line.  The games
-are taken in the file's order by the loop of the range, with the same rules: the game's line of the barred bounds must
-exist, a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips
-the game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
-were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.  The lists of the
-campaign on 2176-3440 and its estimate are made by `solver/tools/certify_plan.py` (standard library only) from the results,
-the barred bounds, the extended problems of `examples/extended.rs problems` (which games the rule will settle) and the
-root gaps; a game the rule settles goes into the list of the game it rests on, after it, since the rule reads only its
-own `--out` (`solver/tools/certify/`).  The campaign's phases (a pilot of seven dear games with a stop rule, the dear games,
-four balanced lists, the repeats the rule cannot settle) are cut from that work list by `solver/tools/certify_campaign.py`
-into `solver/tools/certify/lists/stage4/`, rated by `solver/tools/certify_pilot.py` and run by `solver/tools/cloud/certify.sh` (RUNBOOK,
-section 9).
+*A list of games.*  `certify` takes the games of a list file (`--list FILE`) in place of a range `A-B`, exactly one of
+the two.  The file has one n a line, in the order to certify them; it skips blank lines and those whose first non-blank
+character is `#`, and has no game twice.  Any other line is a usage error that names the file and the line.  The loop
+of the range takes the games in the file's order, with the same rules: the game's line of the barred bounds must exist,
+a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips the
+game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
+were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.
+
+*The campaign's lists.*  `solver/tools/certify_plan.py` (standard library only) makes the lists of the campaign on
+2176-3440, and its estimate, from the results, the barred bounds, the extended problems of
+`examples/extended.rs problems` (which games the rule will settle) and the root gaps.  A game that the rule settles goes
+into the list of the game it rests on, after it, since the rule reads only its own `--out`
+([solver/tools/certify/](../tools/certify/README.md)).  `solver/tools/certify_campaign.py` cuts the campaign's phases
+from that work list into `solver/tools/certify/lists/stage4/` (a pilot of seven dear games with a stop rule, the dear
+games, four balanced lists, and the repeats the rule cannot settle), `solver/tools/certify_pilot.py` rates the pilot,
+and `solver/tools/cloud/certify.sh` runs them ([RUNBOOK, section 9](RUNBOOK.md#9-certifying-u-stage-4)).
 
 *Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
-[--threads K]` (`src/certify/verify.rs`) reads the files `certify --out` wrote, without changing them, and checks every
-line.  A last line without its newline is noted and ignored, as the file cuts it when it is opened; a complete line that
-is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or the `dirty` flag, is an error; an
-`incomplete` line is counted and skipped.  A line with a final verdict is checked in this order:
+[--threads K]` (`src/certify/verify.rs`) reads the files that `certify --out` wrote, without changing them, and checks
+every line.  It notes and ignores a last line without its newline, as the file cuts it when it is opened.  A complete
+line that is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or the `dirty` flag, is an
+error.  It counts and skips an `incomplete` line, and checks a line with a final verdict in this order:
 
-1. the barred bounds have a line for the board, it says it needs a certificate, and its open members and its score are
-   the line's;
-2. the results have a game of the board with the line's score, the game passes the checks `certify` makes of it (it
+1. the barred bounds have a line for the game, which says it needs a certificate, and whose open members and score
+   are the line's;
+2. the results have a game of n with the line's score, the game passes the checks that `certify` makes of it (it
    replays to its score, plays U\* above n/2 and is a promotion set of Π⁺(O) worth the score: `check_recorded_game`,
    shared by the two), and the line's `width` is the one `certificate_width` gives; both are set up in the line's own
    formulation (`claims`);
 3. Π⁺(O) set up again reproduces the line: its formulation, digest, frames, candidates, rejected sources and
    `in_the_bag⁺`;
 4. a `certified` line has no `beaten_by`, and the file of counterexamples beside the certificates
-   (`<certificates>.counterexample.jsonl`) has no line for its board;
-5. a `certified` line with `same_problem` {m, digest, best, worth} rests on a game m among the 8 board sizes before it
-   whose last final line before it in the same file is `certified`; the rule of the same problem (`apply_rule`, the
-   function `certify` applies, so that the rule is written once) is applied again to the two problems, which must be
-   equal whole in the formulation of the line that rests on m (m is set up again in it if m's line is of the other), and
-   must give exactly the `same_problem` the line records (the digest, `best` = score(m) − `in_the_bag⁺`(m), `worth` =
-   the line's score − `in_the_bag⁺`, equal);
+   (`<certificates>.counterexample.jsonl`) has no line for its game;
+5. a `certified` line with `same_problem` {m, digest, best, worth} rests on a game m among the 8 games before it, whose
+   last final line before it in the same file is `certified`.  The rule of the same problem (`apply_rule`, the function
+   that `certify` applies, so that the rule is written once) is applied again to the two problems, which must be equal
+   whole in the formulation of the line that rests on m (m is set up again in it if m's line is of the other), and must
+   give exactly the `same_problem` that the line records (the digest, `best` = score(m) − `in_the_bag⁺`(m), and `worth`
+   = the line's score − `in_the_bag⁺`, equal);
 6. a `beaten` line has a finished legal game (`game::replay_finished`) that scores what the line says, which is more
    than the recorded score, and the counterexample file has an identical line;
-7. a board with final lines in more than one place (one file or several) has only `certified` ones: a `beaten` line
+7. a game with final lines in more than one place (one file or several) has only `certified` ones: a `beaten` line
    beside another is a contradiction of verdicts.
 
-The first line to fail ends the command with status 1, naming the file, the line and the board; the dear checks (the
-problems set up again) run on K threads (default: all CPUs), and the first line to fail is the same for any K.  What
-it cannot check is that a search explored its whole tree: a `certified` line made by a search is taken on trust, as an
-exhausted proof is, and the summary says so.  The summary has, for each file, the lines, the final and `incomplete`
-ones, the `certified` ones by search and by the same problem, and the `beaten` ones; the boards certified; the
-counterexamples (the board, the recorded score, the score of the game that beats it); the builds that wrote the lines
-(commit, `dirty`, lines); and the proven end of the chain.
+The first line to fail ends the command with the status 1, naming the file, the line and the game.  The dear checks
+(the problems set up again) run on K threads (default: all CPUs), and the first line to fail is the same for any K.
+What the command cannot check is that a search explored its whole tree: it takes a `certified` line made by a search on
+trust, as an exhausted proof is, and the summary says so.  The summary has, for each file, the lines, the final and
+`incomplete` ones, the `certified` ones by search and by the same problem, and the `beaten` ones; then the games
+certified; the counterexamples (the game, the recorded score, the score of the game that beats it); the builds that
+wrote the lines (commit, `dirty`, lines); and the proven end of the chain.
 
-*How far the proofs reach.*  A game n (1 to the largest board of the results) is *proven* when n = 1, or the prover
-proved it, or it has a certificate that passed, or its score reaches a proven ceiling and the game n − 1 is proven.  The
-prover's proofs are the lines of `--exact` (default every `solver/noframe/data/exact_*.jsonl`, by name; a later file's
-line for a board replaces an earlier file's, and lines with `fix_upper` set are measurements and skipped), whose score
-must be the results' (a line with another score is an error naming the board and both scores).  A line proves its game
-by the rule of `exact_proofs` in `solver/noframe/tools/summarize.py`: its Franklín–Moniot bound or its parity bound is the
-score, or its search is `proven` (a search that used the segment cuts counts only if every smaller game is proven), or
-its relation is `chain` or `prime` and the game n − 1 is proven.  A ceiling is `results::CeilingProof`: the score
-n + score(n − 1), or the prime formula.  The command prints `proven frontier: every game to N is proven; the first that
-is not is M (reason)`, where the reason is that the results have no game of M or that it needs a certificate (the barred
-bounds say so) and the files given have none, and then how many games past M are proven all the same, which are those
-that no gap stops (a bound of the prover, a certificate); `verify::frontier` is that function of plain data (the
-results' scores, the prover's lines, the boards certified).  With the committed prover files and no certificate the end
-of the chain is 2175: the prover proved every game to there, and the first game past it that needs a certificate is
-2176.
+*How far the proofs reach.*  A game n, from 1 to the largest game of the results, is *proven* when n = 1, or the prover
+proved it, or it has a certificate that passed, or its score reaches a proven ceiling and the game of n − 1 is proven:
+
+* the prover's proofs are the lines of `--exact` (by default every `solver/noframe/data/exact_*.jsonl`, by name; a
+  later file's line for a game replaces an earlier file's, and the lines with `fix_upper` set are measurements, and
+  skipped).  Their score must be the results' (a line with another score is an error naming the game and both
+  scores).  A line proves its game by the rule of `exact_proofs` in `solver/noframe/tools/summarize.py`: its
+  Franklín–Moniot bound or its parity bound is the score, or its search is `proven` (a search that used the segment
+  cuts counts only if every smaller game is proven), or its relation is `chain` or `prime` and the game of n − 1 is
+  proven;
+* a ceiling is `results::CeilingProof`: the score n + score(n − 1), or the prime formula.
+
+The command prints `proven frontier: every game to N is proven; the first that is not is M (reason)`, where the reason
+is that the results have no game of M, or that it needs a certificate (the barred bounds say so) and the files given
+have none.  Then it says how many games past M are proven all the same: those that no gap stops (a bound of the
+prover, a certificate).  `verify::frontier` is that function of plain data (the results' scores, the prover's lines,
+the games certified).  With the committed prover files and no certificate, the end is that of the prover's proofs,
+whose first game past them needs a certificate ([results/README.md](../../results/README.md#what-supports-the-scores)
+says how far they reach).
 
 ## 9. Testing
 
@@ -1835,111 +1849,69 @@ the comment on each says what the whole run costs.
 
 ## 10. Performance
 
-Performance is worked on in cycles and instructions retired, on one thread and a plain release build, because other load
-on the machine moves wall times by up to 3×.  What measures what:
+Performance is worked on in cycles and instructions retired, on one thread and a plain release build, because other
+load on the machine moves wall times by up to 3×.  Five tools measure it:
 
-* **`taxman bench`** runs a fixed set of games that need search and take about a second each on one thread — n = 936
-  (W = 16) and 1050, 1100, 1133, 1170, 1184 (W = 20) — standalone (n − 1 from optimal.json, past it from
-  `results/strict.jsonl`; acceleration off), prints per-phase times and node counts, and appends them to
-  `solver/frame/bench/history.jsonl` (the commit the binary was built from, every tactic's value, per game the nodes, seconds per
-  phase and search counters), so that performance can be followed across changes.  `--history FILE` and `--known FILE`
-  name other files; by default they are found in the repository.
-* **The probe** (`cargo run --release --example perf`): replays of the hot paths of the hardest games from fixtures in
-  `testdata/perf/` (0.2 MB), measured in cycles and instructions retired of the process (`proc_pid_rusage`); each with a
-  fingerprint of what it computes, which an exact optimization must leave unchanged.  F1: 300 search nodes each of the
-  proofs of 936 and 1215, every kernel over all of them (the rebuild of a node, the promotion of every candidate,
-  conflicts, the matching from scratch and warm-started, bounds without each member, strong branching's exact solves,
-  children, nogood lookups and rule-outs).  F2: the frame checks of those promotions.  F3: a checkpoint of each proof
-  with the default tactics of the time, the matching path's (`perf make-window 936 4500`, `perf make-window 1215
-  600000`), resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself,
-  fingerprinted by its counters, with the tactics its checkpoint records (`--tactic` changes them; a search that ends
-  inside the window is costed by the steps it took).  F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1
-  nodes (the bound from scratch; with its weight split and forced members; without each member of its heaviest set's
-  conflict, solved, and as strong branching reads them, certified or solved), and the windows resumed with the GF(2)
-  bound, which finish both searches; a window's fingerprint leaves out the GF(2) bound's counts of solves and
-  augmentations, which measure work.  The kernels and the windows search the forced members as `--tactic force_window`
-  says (the default, `all`).  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic
-  lagrange=off`, and a58ade4629ab6186 with `--tactic gf2=on` (f3deaac0dbdc030a before the window became `all`, which
-  `--tactic gf2=on --tactic force_window=80` still gives).  (The windows were made again when the search's
-  counters were
-  renumbered and the checkpoint header went to version 4, 2026-10, and again for version 5, with the tactics they
-  record, the matching path's, and the same fingerprints, and again when `force_window` became `all`, as a header of
-  version 6, with the same trees for the matching path; the fingerprints EXPERIMENTS quotes before version 4,
-  36981d0eaeeae319 and 6197a47eae6cf8c8, are of the earlier windows, made before `lagrange`.)  About 5 s in all;
-  `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.
-  For whole searches, `/usr/bin/time -l` reports the same counters per process.
-  `cargo test --release` rebuilds the examples in its own configuration, with about 2% more instructions: run
-  `cargo build --release --examples` again before measuring.
-* **Profile-guided optimization** (`solver/tools/pgo.sh`): an instrumented build runs the probe and a short search at every
-  set width (code a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and
-  the examples.  The same trees and fingerprints.  Since the hot loop is inlined by hand it adds 0–2% (it was 12%
-  before).  Profile the plain build: with PGO the search is inlined into a few functions and a profiler sees little.
+* **`taxman bench`** runs a fixed set of games that need a search and take about a second each on one thread: n = 936
+  (W = 16), and 1050, 1100, 1133, 1170 and 1184 (W = 20).  It solves them standalone, with acceleration off (the game
+  of n − 1 from `optimal.json`, past it from `results/strict.jsonl`), prints the times of each phase and the node
+  counts, and appends them to `solver/frame/bench/history.jsonl`, so that performance can be followed across changes.
+  Each line has the commit the binary was built from, every tactic's value, and for each game the nodes, the seconds
+  of each phase and the search's counters.  `--history FILE` and `--known FILE` name other files; by default the
+  command finds them in the repository.
+* **The probe** (`cargo run --release --example perf`) replays the hot paths of the hardest games from fixtures in
+  `testdata/perf/` (0.2 MB), and measures them in cycles and instructions retired of the process (`proc_pid_rusage`).
+  Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
+  * F1: 300 search nodes from each of the proofs of 936 and 1215, every kernel over all of them (the rebuild of a node,
+    the promotion of every candidate, conflicts, the matching from scratch and warm-started, the bounds without each
+    member, strong branching's exact solves, children, nogood lookups and rule-outs);
+  * F2: the frame checks of those promotions;
+  * F3: a checkpoint of each proof (`perf make-window 936 4500`, `perf make-window 1215 600000`), resumed on one thread
+    for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its counters, with the
+    tactics its checkpoint records, the matching path's (`--tactic` changes them; a search that ends inside the window
+    is costed by the steps it took);
+  * F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1 nodes (the bound from scratch; with its weight
+    split and forced members; without each member of its heaviest set's conflict, solved, and as strong branching
+    reads them, certified or solved), and the windows resumed with the GF(2) bound, which finish both searches.  A
+    window's fingerprint leaves out the GF(2) bound's counts of solves and augmentations, which measure work.  The
+    kernels and the windows search the forced members as `--tactic force_window` says (the default, `all`).
+
+  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, a58ade4629ab6186 with
+  `--tactic gf2=on`, and f3deaac0dbdc030a with `--tactic gf2=on --tactic force_window=80`.  It takes about 5 s in all;
+  `perf make-nodes` and `perf make-window` make the fixtures again, deterministically.  For whole searches,
+  `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples in its
+  own configuration, with about 2% more instructions: run `cargo build --release --examples` again before measuring.
+* **Profile-guided optimization** (`solver/tools/pgo.sh`) gains 0 to 2%, with the same trees and fingerprints, since
+  the hot loop is inlined by hand.  An instrumented build runs the probe and a short search at every set width (code
+  that a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and the
+  examples.  Profile the plain build: with PGO the search is inlined into a few functions, and a profiler sees little.
   On Linux, rustup's `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the script adds whatever
   `RUSTFLAGS` it is given (for instance `-C target-cpu=native`, which a plain build does not use) to the profile flags.
 * **The ladder** (`cargo run --release --example ladder -- [--threads T[,T…] | --scaling] [--seconds S] [--diag]
-  [--seed-opt] [--known FILE] [--tactic …] [--node-limit N] N…`; its flags are documented at the top of
-  `examples/ladder.rs`): standalone
-  searches of hard games from the frame builder, seeded from the known n − 1 game and capped as the solver does, each
-  with a time limit; it reports completion, nodes, time, when the final incumbent was found, and the engine's counters.
-  `--seed-opt` seeds with the game for n itself, to measure the proof alone; `--diag` prints `search::Diagnostics`
-  (nodes by depth, what pruned, bound gaps, conflict sizes, matching work).  Fast progress benchmarks (one thread):
-  880, 936, 1050, 1100, 1170, 1184; harder ones: 992, 996, 1025, 1215, 1216 on several threads.
-* **Scaling**: the ladder with a list of thread counts (`--threads 1,2,4,8`, or `--scaling` for 1, 2, 4, … up to all
-  CPUs) searches each game with each count and prints a table per game and one summed over the games: search time,
-  speedup, nodes per second per thread, effective parallelism, idle and lock-wait time, splits and the units they gave,
-  steals, runs, tiny runs and the time to full occupancy.  With `--seed-opt` the node count barely depends on the
-  threads, so the speedup measures the parallel proof alone.  `--cores C` lets only C of the threads search at once
-  (`EngineConfig::cores`), to measure in counts, not time, what many more workers than CPUs would do.  The engine's
-  own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, sizes and thread counts set by
-  `TXENGINE_BENCH_*`) measures its overhead per node with no work per node.
-* **The cloud** (`solver/tools/cloud`) has the scripts for a many-core machine: the sweep to 192 threads, the cost of a
-  checkpoint pause, and the production chain (RUNBOOK.md).
+  [--seed-opt] [--known FILE] [--tactic …] [--node-limit N] N…`; the top of `examples/ladder.rs` documents its flags)
+  makes standalone searches of hard games from the frame builder, seeded from the known game of n − 1 and capped as
+  the solver does, each with a time limit.  It reports completion, nodes, time, when the final incumbent was found,
+  and the engine's counters.  `--seed-opt` seeds with an optimal game of n itself, to measure the proof alone; `--diag`
+  prints `search::Diagnostics` (nodes by depth, what pruned, bound gaps, conflict sizes, matching work).  Games for
+  fast progress benchmarks (one thread): 880, 936, 1050, 1100, 1170, 1184; harder ones: 992, 996, 1025, 1215, 1216 on
+  several threads.
+* **Scaling** is the ladder with a list of thread counts (`--threads 1,2,4,8`, or `--scaling` for 1, 2, 4, … up to all
+  the CPUs).  It searches each game with each count, and prints a table for each game and one summed over the games:
+  search time, speedup, nodes per second per thread, effective parallelism, idle and lock-wait time, splits and the
+  units they gave, steals, runs, tiny runs, and the time to full occupancy.  With `--seed-opt` the node count barely
+  depends on the threads, so the speedup measures the parallel proof alone.  `--cores C` lets only C of the threads
+  search at once (`EngineConfig::cores`), to measure in counts, not time, what many more workers than CPUs would do.
+  The engine's own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, its sizes and thread
+  counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
 
-**Where it stands with the GF(2) bound** (the default since commit 7af8b0e; EXPERIMENTS, "The GF(2) bound in the
-search" and "The inner loop of the GF(2) search", have the tables; on the M1 Max): the proof of 1215 takes 4,634 nodes
-and 0.85 G cycles on one thread, against the matching path's 1.1 M nodes and 29 G; the 146 one-thread proofs of the
-slope study 287,101 nodes and 52 G cycles (697,346 and 232 G before the inner-loop round; 3,408 s on the matching
-path); the proofs of 2170 and 2172 65 s each on one thread; `taxman regress --to 1000` on one thread 15.4 s; the
-chain 1..1300 on one thread 63 s (34 s of search), against the 988 s for 1001–1300 that the chain of commit 271c817
-(the `results/strict.jsonl` before it; git has it) records on 4 threads.  Strong branching makes almost no
-augmentations (the bounds without each member are read off the exchange graph), and most children inherit or are
-certified: where the time goes now (the proof of 1521, one thread) is the searches for forced members about a
-quarter, the weight split a quarter, the solves that are left a fifth (with the tableaux they build, a quarter), and
-the cycles of strong branching a ninth.  A node costs 180k cycles on average over the 146 proofs (330k before the
-round), in trees 2.4 times smaller.  These are without the rule of symmetric pairs (section 4, "Prime exchanges"),
-on by default since: it takes the proof of 1215 to 3,647 nodes and 0.74 G cycles, 2170 and 2172 to 55 s and 62 s,
-the chain 1..1300 on one thread to 36 s (26 s of search) and 290,503 nodes against 42 s (31 s) and 402,205 just
-before it; the one-thread proofs of the quick set and the bench set 0.75 of the nodes and 0.81 of the cycles
-(geometric means; EXPERIMENTS, "Prime exchanges in the search").  The window `all` of the forced members, the default
-since 2026-10-16, takes the chain 1..1300 on one thread to 276,918 nodes against 290,503 and 24.8 s of search against
-23.7 (the small games' trees are too small for the extra searches to pay), and the trees at the end of the chain to
-0.41-0.43 of the nodes and 0.60-0.63 of the CPU ([the tuning
-campaign](../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  A chain from
-optimal.json's game of 1300 reached 2175 in 92 minutes of game time on 2 threads, and the committed chain from n = 1
-to 2175 took 27 minutes on 8 ([results/README.md](../../results/README.md)); its cost comes in waves that
-follow the root's GF(2) gap, with no growth that a fit over 1301–2175 resolves.  Past 2175 it grows, tenfold per about
-1,040 in n, and a day on one 64-CPU cloud machine took the chain from 2176 to 3440 (the [cloud
-run](../notebook/the-frontier-chain-to-3440-2026-10/README.md) sets it beside the projections of the day: near 4,100, and
-3,400 to 3,700 at their pessimistic end); the widths go to 8191.  At the end of that chain (3441 resumed from the cloud
-run's checkpoint, one thread) a step cost 888k cycles, 92% of it in the GF(2) bound; with its tableaux derived, a hub
-for the elements free in `B` and the other changes of [cheaper GF(2)
-nodes](../notebook/cheaper-gf2-nodes-same-trees-2026-10/README.md) it costs 543k, the same trees (3,570 to 5,865 nodes a
-CPU-second).
+The cloud scripts (`solver/tools/cloud`) run the scaling sweep, the cost of a checkpoint pause and the chain on a
+machine of many CPUs ([RUNBOOK.md, sections 3 and 4](RUNBOOK.md#3-before-a-big-run)).
 
-**The matching path** (the default before the GF(2) bound; these are the build of commit 4b6ef38, on the M1 Max): the
-proof of 1215 takes 33 s on one thread (106 G cycles), and 1184 takes 3.2 G cycles.  The chain 1..1231 took 279 s of
-game time on 8 threads, 145 s of it for 1201–1231, at that commit; the committed `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (1001–1231),
-made by the build before it (e710d16), records 318 s, and 207 s for 1201–1231.  The cost of a game grows by a factor of
-ten for every 55 to 70 in n past 1200 ([solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).  The chain 1..1300 of commit
-bd9bb5d (on 6 threads of an M1 Max shared with another CPU-heavy job; in git history, `results/strict.jsonl` being a
-later run, whose times [results/README.md](../../results/README.md) gives) records 3359 s of search, 2866 s of it for
-1232–1300; its slowest game is 1232 at 439 s.  All of this is without the Lagrangian bound (tactic `lagrange`, section
-4), which came later: with it the proof of 1215 takes 1.1 M nodes and 34 G cycles instead of 5.5 M and 108 G, 1184 1.6 G
-cycles, and the chain 1201–1231 on four threads 117 s of game time instead of 283 s (EXPERIMENTS: "A Lagrangian bound
-over the nogoods").  The round after it took about a tenth off the cycles with the same trees (commit 31b9c95: the proof
-of 1215 30 G cycles, 1184 1.5 G, the chain 1201–1231 on one thread 315 s instead of 345 s; a step of the probe's window
-of 1215 22.0k cycles, 14.6k with `lagrange=off`; EXPERIMENTS: "Faster nodes with the Lagrangian bound, same trees").
-Where the time goes now (the proof of 1215, one thread): the Hungarian searches of the matching 33% and of the
-Lagrangian levels 19%, the peels 19%, the node's own work 10%, the nogood table 4%, the refits of the multipliers 3%,
-the bounds from the potentials 6%, level copies 4%; by purpose the Lagrangian bound a quarter, making children a
-quarter, refinement 14% and strong branching 11%.
+**Where it stands.**  At the end of the chain a step of the search cost 888k cycles on one thread of the M1 Max, 92% of
+it in the GF(2) bound, and [cheaper GF(2) nodes](../notebook/cheaper-gf2-nodes-same-trees-2026-10/README.md) took it to
+543k, with the same trees.  The cost of a game comes in waves that follow the root's GF(2) gap, and past 2175 it grows
+tenfold for about every 1,040 in n ([the chain to 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md));
+[results/README.md](../../results/README.md#how-the-file-was-made) says how long the committed chain took.  The
+measurements of the earlier builds, from the matching path to the GF(2) bound's rounds, are in [the benchmarks
+entry](../notebook/benchmarks-the-probe-pgo-and-scaling/README.md#later-2026-10-the-measurements-that-designmd-held) and
+the entries of each round.
