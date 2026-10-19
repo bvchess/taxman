@@ -595,6 +595,7 @@ const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sourc
 /// (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is rewritten.
 const REWRITTEN: &[&str] = &[
     "docs/GLOSSARY.md",
+    "docs/THEORY.md",
     "docs/WRITING.md",
     "README.md",
     "solver/README.md",

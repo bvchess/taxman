@@ -58,12 +58,12 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 ## The frame model
 
 * **source**: a number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.
-  On the board of 21 the sources are 11 to 21.  The frame solver's docs and code never say "upper half" for them;
-  [THEORY.md](THEORY.md) and the heuristics do.
+  On the board of 21 the sources are 11 to 21.  The frame solver's docs and code, and THEORY.md, never say "upper half"
+  for them; the heuristics do.
 * **factor**: a number up to n/2.  It is tax for a larger number, and sometimes a move itself.  Not "lower half".
-* **frame**: a group of sources that share factors, with all the factors they can be paid with.  On the board of 21,
-  one frame has the sources 14, 15 and 21 and the factors 2, 3, 5 and 7.  In the code a frame is `frames::Frame` as
-  setup forms it and `model::Frame` as the search takes it; `frames::BoardFrames` holds all of a board's, and
+* **frame**: a group of sources that share factors, with all the factors they can be paid with.  On the board of 21, one
+  frame has the sources 14, 15 and 21 and the factors 2, 3, 5 and 7.  In the code a frame is `frames::Frame` as setup
+  forms it and `model::Frame` as the search takes it; `frames::BoardFrames` holds all of a board's, and
   `frames::SearchFrames` those the search works on.
 * **in front of**, **behind**: frame X is in front of frame Y, and Y is behind X, when a number of Y has a maximal
   factor in X.  Y's numbers are then multiples of X's.  Frames in front are played first, so frame 0 is the front.  Not
