@@ -695,13 +695,13 @@ own best (as some tests run) finds the best of those that keep the inequalities.
 
 ## The frame model: what is proven and what remains
 
-The frame solver (`solver/frame/`) does not search the games of n.  It searches the *promotion sets* of the frame model,
-and its answer is in_the_bag plus the heaviest of them (solver/frame/README.md, section 1, and docs/GLOSSARY.md define
-the words used here: sources, frames, `unzip` and its mandatory moves, impossible sources, freedoms, closed frames, the
-numbering, candidates, promotion sets, `max_total`).  The model was built on five assumptions that were checked against
-data and never proven: setup's greedy removal of impossible sources, the mandatory moves of `unzip`, freedoms = factors
-− sources, closed frames taking no part, and a promoted number paying only in the frame one forward.  This section
-replaces all five with theorems, which leave one statement:
+The frame model is exact given one open statement about a game, U.  The frame solver (`solver/frame/`) does not search
+the games of n.  It searches the *promotion sets* of the frame model, and its answer is in_the_bag plus the heaviest of
+them (solver/frame/README.md, section 1, and docs/GLOSSARY.md define the words used here: sources, frames, `unzip` and
+its mandatory moves, impossible sources, freedoms, closed frames, the numbering, candidates, promotion sets,
+`max_total`).  The model rests on five rules that data supported and nothing proved: setup's greedy removal of
+impossible sources, the mandatory moves of `unzip`, freedoms = factors − sources, closed frames taking no part, and a
+promoted number paying only in the frame one forward.  This section proves all five, and leaves one statement:
 
 * **U (the upper part)**, a statement about a game, and open: *some optimal set of n plays every source with three or
   more prime factors that setup keeps.*
@@ -712,11 +712,8 @@ needed the model.  (Setup numbers the frames by layer, which makes the numbering
 that the proof needs; the Java's numbering, breadth first from the front, is the same on every board the solver
 supports.)
 
-*Words.*  The *layer* of a number x is Ω(x), its number of prime factors counted with multiplicity: layer 0 is {1},
-layer 1 the primes, layer 2 the products pq and the squares p², and so on.  A maximal factor x/p of x lies one layer
-below x.  The *sources* are the numbers above n/2 (nobody's factors).  U\* is the set of sources setup keeps: descending
-greedy on each frame, which is the U\* of "The open problem" (M1, below).  For a set S, S_k is its part in layer k; so
-U\*_k is the part of U\* in layer k, and U\*_{≥3} its part in the layers from 3 up.
+*Words.*  Layers, sources, U\* and the parts S_k of a set are those of [Definitions](#definitions).  The sources that
+setup keeps, by descending greedy on each frame, are U\* (M1, below).
 
 ### Frames are layers
 
@@ -742,7 +739,7 @@ For S ⊆ {2, …, n}, the *layer instance* of S at k is the reduction instance 
 numbers of layer k − 1 up to n/2 that are not in S (P_1 = {1}), and in which each member lists its maximal factors in
 P_k.
 
-**Theorem L (layer decomposition).**  S is playable iff every layer instance of S is playable.
+**Theorem L (layer decomposition).**  A set S is playable iff every layer instance of S is playable.
 
 *Proof.*  By Theorem 1, S is playable iff its own reduction instance is: members S, pool the maximal factors of the
 members that are not in S, each member listing its maximal factors in the pool.  A maximal factor of a member of layer k
@@ -772,16 +769,16 @@ layer 2 is playable in S's game iff it is a forest* (the two-factor proposition 
 same fact).  So the playable sets of layer 2 are the independent sets of a graphic matroid, and setup's greedy on the
 sources of layer 2 is Kruskal's algorithm: U\*_2 is the heaviest forest of sources.
 
-Let W = S_2 ∪ U\*_2 and G the forest descending greedy picks from W.  The sources of W come before its other members,
+Let W = S_2 ∪ U\*_2 and G the forest descending greedy keeps from W.  The sources of W come before its other members,
 and among them greedy keeps exactly U\*_2: setup's greedy kept each member of U\*_2 because the sources above it do not
 span it, so neither do those of W above it; and it rejected every other source because the members of U\*_2 above it
 span it, and these are in W and kept.  So G = U\*_2 ∪ A, with A among S_2's numbers up to n/2.  In a matroid greedy
 finds the heaviest independent set, so ΣG ≥ ΣS_2.  Replace S_2 by G in S: layer 2 stays playable; the pool of layer 3
 only grows, since A ⊆ S_2, and a larger pool keeps every payment scheme; the other layers do not change.  By Theorem L
-the new set is playable, and it weighs at least as much as S.  S is optimal, so ΣG = ΣS_2: S_2 is a heaviest independent
-subset of W too, and with distinct positive weights there is only one, so S_2 = G.  Where the frames of layer 2 are
-closed, U\*_2 has as many edges as there are primes up to n/2, so it spans every one of them, and any further edge
-closes a cycle: A is empty.  ∎
+the new set is playable, and it weighs at least as much as S.  Since S is optimal, ΣG = ΣS_2: S_2 is a heaviest
+independent subset of W too, and with distinct positive weights there is only one, so S_2 = G.  Where the frames of
+layer 2 are closed, U\*_2 has as many edges as there are primes up to n/2, so it spans every one of them, and any
+further edge closes a cycle: A is empty.  ∎
 
 The frames of layer 2 have freedoms on 80 boards, all at most 186, and are closed on every other board to 8191
 (`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`).  Theorem B settles the members of U\* that the
@@ -797,8 +794,8 @@ empty frame there, with no moves and no factors, through which nothing can be pr
 
 **N (clean numbering).**  Every frame with freedoms directly in front of a frame numbered h is numbered h − 1.
 
-N holds on every board, by construction: a frame directly in front of a frame of layer ℓ lies in layer ℓ − 1 (Lemma Ω).
-It is the one fact about the numbering that the proof of Theorem M uses (in M3 and M5).
+Statement N holds on every board, by construction: a frame directly in front of a frame of layer ℓ lies in layer ℓ − 1
+(Lemma Ω).  It is the one fact about the numbering that the proof of Theorem M uses (in M3 and M5).
 
 The Java numbered the frames breadth first from the front instead: number 0 for those with no frame with freedoms in
 front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  It is the numbering by layer
@@ -853,10 +850,10 @@ of a playable S ⊇ U\*, the sources of C pay with distinct factors of C (all th
 factor of C pays a source of C: none is in S, and none pays for anything else.
 
 **M3 (one frame forward; this is where the numbering is needed).**  Let S = U\* ∪ L be playable with a payment scheme,
-and x ∈ L a factor of the frame A.  By M2, A is not closed, so it has a number h.  x pays with one of its maximal
-factors, which lies in a frame X in front of A (Lemma Ω: not in A), and X is not closed (M2).  By N, X has the number h
-− 1: so h ≥ 1, and x pays in the merged frame h − 1.  In the scheme, every member of L pays in the frame the model
-promotes it into, and every source in its own frame.
+and x ∈ L a factor of the frame A.  By M2, A is not closed, so it has a number h.  The number x pays with one of its
+maximal factors, which lies in a frame X in front of A (Lemma Ω: not in A), and X is not closed (M2).  By N, X has the
+number h − 1: so h ≥ 1, and x pays in the merged frame h − 1.  In the scheme, every member of L pays in the frame the
+model promotes it into, and every source in its own frame.
 
 **M4 (the candidate filter is necessary).**  With S and x as in M3, x passes both tests of step 3.  (b) Restrict the
 scheme to the sources of frame h − 1 and x: they are playable against its factors, so frame h − 1, merged by the time
@@ -872,17 +869,17 @@ playable: restrict the scheme, by M3) or L a promotion set (then no claimed fact
 frame of the root, so it has no home).  The claims of a numbered frame h, in the order made, are front and back moves of
 I_h(L), and no claimed factor is in L.
 
-*Front claim (s, f).*  f is s's only unclaimed factor, so after the earlier pairs s lists f alone in I_h(L), unless f ∈
-L.  In the first case f ∈ L would leave s nothing in a residual that the earlier moves kept playable.
+*Front claim (s, f).*  The factor f is s's only unclaimed factor, so after the earlier pairs s lists f alone in I_h(L),
+unless f ∈ L.  In the first case f ∈ L would leave s nothing in a residual that the earlier moves kept playable.
 
 *Back claim (s, f).*  Only s among the remaining sources wants f; what matters is that **no candidate lists f**.
-Suppose a candidate c had f as a maximal factor.  c is a factor of a numbered frame Y, and f's frame lies in front of Y,
-so by N, Y has the number h + 1.  When c passed test (b), the frames that could have taken it were the frames in front
-of Y: a closed one cannot take a source on, and those with freedoms all have the number h and had been merged into one
-frame, with the sources and factors that frame h had when the claim was made.  The claim says that frame could not take
-c on (f had no outside move), so c failed (b): a contradiction.  So in I_h(L), f is listed by s alone; and f ∉ L (in the
-first case f would pay in a frame in front, by M3, which could then take it on, so f could go forward).  It is a back
-move.
+Suppose a candidate c had f as a maximal factor.  The candidate c is a factor of a numbered frame Y, and f's frame lies
+in front of Y, so by N, Y has the number h + 1.  When c passed test (b), the frames that could have taken it were the
+frames in front of Y: a closed one cannot take a source on, and those with freedoms all have the number h and had been
+merged into one frame, with the sources and factors that frame h had when the claim was made.  The claim says that frame
+could not take c on (f had no outside move), so c failed (b): a contradiction.  So in I_h(L), f is listed by s alone;
+and f ∉ L (in the first case f would pay in a frame in front, by M3, which could then take it on, so f could go
+forward).  It is a back move.
 
 Two quirks of the code, kept for parity with the Java, can only make `unzip` claim less, and the argument covers
 whatever it claims: a frame not yet simplified counts as having freedoms, and a composite left in a frame that has been
@@ -952,11 +949,12 @@ A result proven at the ceiling or by the prime formula rests on the game before 
 
 *What is known of U.*
 
-* It holds wherever the prover has proven the optimum on the whole board, every n ≤ 2175: the recorded game plays U\*
-  and is optimal.  In its strong form, every optimal set contains U\*, it holds in every game whose optimal sets were
-  enumerated (954 games of 2..989; `solver/frame/tests/bottom_layers.rs` checks Theorem B on all of them).  Past 2175 it
-  is not yet certified: the committed games of 2176..3440 that are proven by an exhausted search or a repeat (991 of
-  the 1265) rest on it, and `taxman certify` will check it game by game.
+* It holds wherever the prover has proven opt(n) on the whole board, where the recorded game plays U\* and is optimal
+  ([results/README.md](../results/README.md#what-supports-the-scores) says how far that reaches).  In its strong form,
+  every optimal set contains U\*, it holds in every game whose optimal sets were enumerated (954 games of 2..989;
+  `solver/frame/tests/bottom_layers.rs` checks Theorem B on all of them).  Past the prover's proofs, the committed games
+  proven by an exhausted search or a repeat rest on it, and `taxman certify` checks it game by game
+  ([results/README.md](../results/README.md#certificates) says which games have a certificate).
 * U\*_{≥3} is nearly all the sources of three or more prime factors: greedy rejects none of layer 4 or more on any board
   to 8191, and in layer 3 none before 741 and 10 of 523 at 4000 (the census).  So U says: some optimal game plays every
   source of four or more prime factors, and every source of layer 3 that greedy keeps.
