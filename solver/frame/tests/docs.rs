@@ -6,13 +6,14 @@
 //! * the lab notebook keeps its register and index on one page, `solver/notebook/README.md`, and its entries in the
 //!   folders beside it, one README.md each: every entry opens with its title and a link back, and the register or the
 //!   index links to it; `solver/docs/STATUS.md` is short and dated;
-//! * README's table of the fields of a result line has the keys the code writes, and its example line shows them;
-//! * README's reading order is the module map of `src/lib.rs`, and `rust-version` is what the docs and the cloud
-//!   setup say;
+//! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
+//!   and its example line shows them;
+//! * DESIGN.md's reading order (section 3) is the module map of `src/lib.rs`, and `rust-version` is what the README
+//!   and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
 //!   for the ceiling, ...) or the old names of the prover's directory and script;
-//! * the reference docs rewritten to docs/WRITING.md (`REWRITTEN`) do not use the names that docs/GLOSSARY.md
+//! * the docs rewritten to docs/WRITING.md (`REWRITTEN`) do not use the names that docs/GLOSSARY.md
 //!   replaced (board size, the optimum, strong bound, checker, EXPERIMENTS, ...).
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
@@ -43,6 +44,11 @@ fn notebook_dir() -> PathBuf {
 /// DESIGN.md, in the docs of the solver.
 fn design_md() -> PathBuf {
     repo_dir().join("solver/docs/DESIGN.md")
+}
+
+/// REFERENCE.md, the frame solver's reference, in the docs of the solver.
+fn reference_md() -> PathBuf {
+    repo_dir().join("solver/docs/REFERENCE.md")
 }
 
 fn read(path: impl AsRef<Path>) -> String {
@@ -420,17 +426,20 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
 }
 
 #[test]
-fn readme_documents_exactly_the_keys_of_a_result_line() {
-    let readme = read(crate_dir().join("README.md"));
-    let part = section(&readme, "### A results line");
+fn the_reference_documents_exactly_the_keys_of_a_result_line() {
+    let reference = read(reference_md());
+    let part = section(&reference, "### A results line");
     let (complete, stopped) = keys_written();
 
     let documented = first_column_words(part);
     let written: BTreeSet<String> = complete.union(&stopped).cloned().collect();
-    assert_eq!(documented, written, "README's table of the fields of a result line, and the keys the code writes");
+    assert_eq!(
+        documented, written,
+        "REFERENCE.md's table of the fields of a result line, and the keys the code writes"
+    );
 
     let example = part.split("```").nth(1).expect("the example line is the first code block");
-    assert_eq!(top_level_keys(example), complete, "README's example line, and the keys of a finished game");
+    assert_eq!(top_level_keys(example), complete, "REFERENCE.md's example line, and the keys of a finished game");
     assert!(example.contains("\"setup\":{"), "the example is a searched game");
     assert!(part.contains("null on a `trivial`, `prime` or `known` line"), "the table says when `setup` is null");
 }
@@ -451,20 +460,19 @@ fn lib_module_map() -> Vec<String> {
 }
 
 #[test]
-fn the_reading_order_of_the_readme_is_the_module_map_of_lib_rs() {
-    let readme = read(crate_dir().join("README.md"));
-    let reading = section(&readme, "## 8. Reading order of the code");
-    let list = reading.split("\n| document").next().unwrap();
+fn the_reading_order_of_design_is_the_module_map_of_lib_rs() {
+    let design = read(design_md());
+    let architecture = section(&design, "## 3. Architecture");
     let declared = lib_module_map();
-    let mut in_readme: Vec<String> = Vec::new();
-    for word in list.split('`').skip(1).step_by(2) {
+    let mut in_design: Vec<String> = Vec::new();
+    for word in architecture.split('`').skip(1).step_by(2) {
         let Some(path) = word.strip_prefix("src/") else { continue };
         let name = path.trim_end_matches('/').trim_end_matches(".rs");
-        if declared.iter().any(|d| d == name) && !in_readme.iter().any(|seen| seen == name) {
-            in_readme.push(name.to_owned());
+        if declared.iter().any(|d| d == name) && !in_design.iter().any(|seen| seen == name) {
+            in_design.push(name.to_owned());
         }
     }
-    assert_eq!(in_readme, declared, "README's reading order (section 8) and the module map in src/lib.rs");
+    assert_eq!(in_design, declared, "DESIGN.md's reading order (section 3) and the module map in src/lib.rs");
 }
 
 #[test]
@@ -496,6 +504,7 @@ fn prose_files() -> Vec<PathBuf> {
     }
     let mut files: Vec<PathBuf> = vec![
         crate_dir().join("README.md"),
+        reference_md(),
         design_md(),
         notebook_dir().join("README.md"),
         repo_dir().join("solver/docs/STATUS.md"),
@@ -578,21 +587,27 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
 ];
 
 /// Retired in the README, DESIGN.md and the code's comments, which name the numbers by their part in the frame model,
-/// and in the reference docs rewritten to docs/WRITING.md (`REWRITTEN`); the heuristics keep these words for the sets
-/// they study.
+/// and in the docs rewritten to docs/WRITING.md (`REWRITTEN`) but those that speak of the whole game
+/// (`SPEAK_OF_THE_WHOLE_GAME`).
 const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sources"), retired("lower half", "factors")];
 
-/// The reference docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of
-/// docs/GLOSSARY.md (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is
-/// rewritten.
+/// The docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of docs/GLOSSARY.md
+/// (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is rewritten.
 const REWRITTEN: &[&str] = &[
     "docs/GLOSSARY.md",
     "docs/WRITING.md",
     "README.md",
     "solver/README.md",
     "solver/frame/README.md",
+    "solver/docs/REFERENCE.md",
+    "solver/noframe/README.md",
     "results/README.md",
+    "heuristics/README.md",
 ];
+
+/// The rewritten docs that speak of the whole game, not of the frame model: the heuristics keep "upper half" and
+/// "lower half" for the sets they study, as docs/GLOSSARY.md allows.
+const SPEAK_OF_THE_WHOLE_GAME: &[&str] = &["heuristics/README.md"];
 
 /// Retired in the rewritten docs: the names that docs/GLOSSARY.md replaced (2026-10-18).
 const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
@@ -673,7 +688,7 @@ fn names_numbers_by_frame(shown: &str) -> bool {
     shown.starts_with("solver/frame/src/")
         || shown == "solver/frame/README.md"
         || shown == "solver/docs/DESIGN.md"
-        || REWRITTEN.contains(&shown)
+        || (REWRITTEN.contains(&shown) && !SPEAK_OF_THE_WHOLE_GAME.contains(&shown))
 }
 
 /// Whether `word` occurs in `line` (lower case) as a whole word that is not quoted (`"forced moves" in its docs`).

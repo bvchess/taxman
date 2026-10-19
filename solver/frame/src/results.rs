@@ -114,7 +114,8 @@
 //! already stand for, so it is appended like any other.  Its scores must agree with the table's wherever the two
 //! overlap, so a results file of another game cannot be mistaken for the table's continuation.
 //!
-//! The fields of a line are described in README.md ("A results line"); [`SCHEMA`] is the version of the format.
+//! The fields of a line are described in solver/docs/REFERENCE.md ("A results line"); [`SCHEMA`] is the version of
+//! the format.
 
 use crate::board::search_problem;
 use crate::game::{largest_prime_at_most, replay, replay_finished, Optimal};

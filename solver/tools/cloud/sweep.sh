@@ -33,7 +33,8 @@
 # that only an unfinished search is recorded for, or that no block reached), and the proofs in it rest only on the games
 # it holds.  Both referees (verify.sh) accept it: each line is checked against what it rests on in the same file.  The
 # line of a game says what it had from the game before it in its `prev` (null: nothing; no proof: the best game of an
-# unfinished search, as a seed; a proof: a proven game) and the pass that made it in `options.pass` (README, section 5).
+# unfinished search, as a seed; a proof: a proven game) and the pass that made it in `options.pass`
+# (solver/docs/REFERENCE.md, "What a game had from n - 1").
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: each block resumes its file
 # (the solver skips the games it has a completed or unfinished line for), the games a stopped pass left are merged

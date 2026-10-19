@@ -1879,7 +1879,7 @@ blocks, kept so that a rerun finds them), `block-NNN.jsonl` (each block's file, 
 pass made).  `save.sh` copies the directory, so both reach S3.  The pass work files are in `$TAXMAN_WORK/sweep-pass/`
 (not saved; a pass that was stopped leaves its lines there, and the next start merges them first).  Each line says what
 its game had from n - 1 in `prev` and which pass made it in `options.pass`
-([README, section 5](../frame/README.md#what-a-game-had-from-n---1)); pass 1 is the blocks, and a pass is numbered by the
+([REFERENCE.md, "What a game had from n − 1"](REFERENCE.md#what-a-game-had-from-n---1)); pass 1 is the blocks, and a pass is numbered by the
 launch of the pass (a rerun after an interruption counts as another).  `explore.jsonl` has holes and games built on
 unfinished ones: it is **not a chain and never goes into `results/strict.jsonl`**, and
 [`verify.sh`](#6-verifying-and-bringing-the-results-home) accepts it (both referees, and the agreement of its scores

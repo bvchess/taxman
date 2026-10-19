@@ -21,7 +21,8 @@ something works and why, the *record* of what was tried, or a *time-bound* page 
 
 | document | kind | what it holds |
 |---|---|---|
-| [frame/README.md](frame/README.md) | guide and reference | the frame solver: what it computes, a first run, its commands, its output and why its answers can be trusted |
+| [frame/README.md](frame/README.md) | guide | the frame solver: what it computes, how to build it, a first run and the common tasks |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | reference | the frame solver's flags and commands, its output, and what a result records and why it can be trusted |
 | [docs/GLOSSARY.md](../docs/GLOSSARY.md) | reference | the project's words, each with the one name the docs use |
 | [results/README.md](../results/README.md) | reference | the committed results files, how each was made, and what supports their scores |
 | [noframe/README.md](noframe/README.md) | explanation and reference | the prover: its proofs and checks of the frame solver's results on the whole board, and its checks of the conjectures |

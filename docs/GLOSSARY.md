@@ -12,8 +12,8 @@ Some words are used inside one part of the code only, and are defined there:
   4](../solver/docs/DESIGN.md#4-the-search);
 * the engine's (units, splits, steals, spills, pauses): [DESIGN.md, section 6](../solver/docs/DESIGN.md#6-engine) and
   the module comment of `solver/frame/src/engine.rs`;
-* the fields of the progress line: [the frame solver's README, section
-  4](../solver/frame/README.md#4-reading-the-output).
+* the fields of the progress line: [the frame solver's reference, section
+  3](../solver/docs/REFERENCE.md#3-reading-the-output).
 
 The Java solver's and the wiki's words map onto these in [DESIGN.md, "The Java solver and the frame
 solver"](../solver/docs/DESIGN.md#the-java-solver-and-the-frame-solver).  The old words of the notebook's dated
@@ -232,8 +232,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   concludes it with the earlier game's promotions instead of searching.  `same_search` is the name of the tactic and of
   the proof; the method of the line is `repeat`.
 * **proof** (kind): how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
-  `same_search` or `known` ([the frame solver's README, "Proof
-  kinds"](../solver/frame/README.md#proof-kinds)).
+  `same_search` or `known` ([the frame solver's reference, "Proof
+  kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
 * **assumes**: what a proof rests on beyond the frame model, inherited down the chain.  A game of n − 1, or of n, taken
   from `optimal.json` is assumed optimal.  A bound of the bounds store assumes statement U at the games it rests on.
 * **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from
@@ -259,7 +259,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   `solver/tools/check_bounds.py`; certificates have `taxman verify-certificates`.  The two verifiers of a kind of file
   share no code.  Not "checker".
 * **results line**: one line of a results file, the JSON object that `taxman solve --out` writes for a game, in schema
-  5 ([the frame solver's README](../solver/frame/README.md#a-results-line---out-schema-5)).  Two old words survive
+  5 ([the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5)).  Two old words survive
   only as field names there: `nodes` counts steps, and `prev.source` says where the game of n − 1 came from.
 
 ## Programs, files and documents

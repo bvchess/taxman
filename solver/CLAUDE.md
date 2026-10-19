@@ -20,6 +20,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
 
 * **solver/README.md**: the map of the solvers and their documents.
 * **solver/frame/README.md**: the frame solver's guide: build, a first run, the commands.
+* **solver/docs/REFERENCE.md**: the frame solver's reference: every flag and command, the output, the proofs.
 * **docs/GLOSSARY.md**: every term, defined once.
 * **solver/docs/DESIGN.md**: the design, and how changes are tested.
 * **solver/docs/STATUS.md**: the current state: what is in flight, paused, decided, and waiting on a decision.

@@ -11,8 +11,9 @@ The other documents:
 
 * [STATUS.md](STATUS.md) is the current state of the work: what is in flight, paused, decided and waiting.  Read it
   first.
-* The [README](../frame/README.md) is the user guide: how to build, run and read the output.  It has the
-  [glossary](../frame/README.md#7-glossary).
+* The [README](../frame/README.md) is the user guide: how to build and run the solver.  The [reference](REFERENCE.md)
+  has every flag and command, the output, and what a result records.  The [glossary](../../docs/GLOSSARY.md) defines the
+  project's words.
 * The [lab notebook](../notebook/README.md) says what each part was worth and what was tried instead.  Its front page is
   the register of everything tried, kept or not; each entry is a folder in [solver/notebook/](../notebook/).
 * In the code, each module starts with a comment that says what it is for, and [`src/lib.rs`](../frame/src/lib.rs) has
@@ -254,9 +255,9 @@ story](../notebook/the-port-and-its-first-improvements/README.md)).
 
 ## 3. Architecture
 
-One Cargo crate in `solver/frame/`: a library and one binary, `taxman`, with no third-party dependencies.  `src/lib.rs` has the
-module map with a line on each module, in the order the modules are read (README, "Reading order").  The layers, bottom
-up:
+One Cargo crate in `solver/frame/`: a library and one binary, `taxman`, with no third-party dependencies.  `src/lib.rs`
+has the module map with a line on each module, in the order the modules are read (below, "Reading order of the code").
+The layers, bottom up:
 
 | layer | modules | responsibility |
 |---|---|---|
@@ -295,6 +296,50 @@ GF(2) bound's vectors of at most five words (section 4).  A checkpoint records i
 width than this build gives its game is refused, so a checkpoint of a game of 2048 to 3583 made at 64, before the
 widths of 36, 40, 48 and 56 were added, is refused by a build that has them; adding 128 moved no board, so the
 checkpoints of the games to 4095 resume with the build that goes past it.
+
+### Reading order of the code
+
+The code, in the order to read it, which is the order of the module map in `src/lib.rs`.  Each file starts with a module
+comment that is worth reading first, and section 7's pipeline maps how the pieces fit, so keep it open.
+
+1. `src/game.rs`: the rules as a referee, and `optimal.json`.
+2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
+   on the whole board, with nothing of the frame model (the oracle of the tests of the model, and the referee of
+   `taxman certify`).
+3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything below is generic over, and the
+   set widths.  The module comment is enough at first.
+4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.
+5. `src/frames/`: forming and simplifying the frames, numbering and merging them.  The module comment of `mod.rs` is
+   the story (sources, factors, `unzip`, impossible moves, freedoms, numbering, merging) and builds `SearchFrames`;
+   `board_frames.rs` has `Frame` and `BoardFrames`.
+6. `src/model/`: `mod.rs` says what is where: `Frame`, `FrameSet` (`frame.rs`), `FrameGraph`, winnability and reduction
+   (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods (`nogoods.rs`).
+7. `src/accelerate.rs`: the shortcuts from the game of n − 1 (read the comment of `prime_shortcut` for the proof of the
+   prime formula), and the last step from promotions to moves.
+8. `src/matchbound.rs`: the matching bound; the module comment is the best explanation of it.  Its child
+   `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
+9. `src/gf2.rs`: the GF(2) bound, the default node bound.  The module comment explains the two frame matroids, how a
+   node's are kept by contraction along the search path, and the forced members; `src/gf2/meet.rs` is their weighted
+   intersection (the tableau, the augmenting paths, the weight split).  `docs/THEORY.md`, Theorem 11, is the proof.
+10. `src/search/`: `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and `Stepper::step`,
+    whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs` (`Refiner`: conflicts,
+    refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where, forced members, refits),
+    `setup.rs` (`prepare`), `tactics.rs`, `incumbent.rs`, and `header.rs` (the checkpoint header).  The
+    `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation (`diagnostics.rs`), which can be
+    skipped.
+11. `src/bounds.rs`: two small functions, the limit on a node's further promotions and the greedy incumbent.
+12. `src/engine.rs`: the protocol in the module comment (conservation, splitting, checkpoint, termination).
+13. `src/tactics.rs`, `src/board.rs`, `src/solver.rs`, `src/results.rs`, `src/store.rs`, `src/known.rs`,
+    `src/certify.rs`, `src/paths.rs`: the switchable tactics, a board prepared for a search, the per-game pipeline,
+    provenance and verification, the bounds store's line and the relations between games, the known games that
+    `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
+    `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` says how they share the
+    threads.
+14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line.
+15. Studies, skipped on a first read: `src/brute.rs` (exhaustive search, the test oracle) and `src/sacrifice.rs` (the
+    sacrifice bound).
+
+The map of the documents is [solver/README.md](../README.md#the-documents).
 
 ## 4. The search
 
@@ -809,7 +854,7 @@ design in outline.
   fixed); splits and the units they gave, steals, runs and tiny runs; when all workers first ran at once; the workers
   added and retired; the idle time of the ramp and of the tail, the time to a unit's first step (the rebuild) and the
   time in it; the pauses and the longest wait for the workers to park.  Every progress line ends with them in short
-  (README, "Reading the output").
+  ([REFERENCE.md, "Reading the output"](REFERENCE.md#3-reading-the-output)).
 
 ## 7. Per-game pipeline (`solver`)
 
@@ -825,6 +870,55 @@ comment of `src/solver.rs`.  Each step, with the Java class it reimplements:
 | 4 | the search (method `search`): the frame set and greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`, section 8); the starting incumbent, ceiling and seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
 | 5 | `conclude`: replay and check the game, confirm its score against optimal.json, assign its proof and what it assumes | `game.Solution.verify` |
 | 6 | record the result (a range) | |
+
+The pipeline, with the functions that take each step:
+
+```
+ taxman solve A-B --out FILE --checkpoint-dir DIR
+   |  solver::solve_range_each        n = A..B, concluded in order (with --window K up to K games in flight, each set
+   |                                  up and searched on threads of its own: solver/window.rs); the game of n-1 comes
+   |                                  from this run, FILE or (--use-prev) the known games (known::Known),
+   |                                  and is checked (legal, over, opens with the largest prime) before anything uses it
+   v
+ solver::set_up(n) -> set_up_with_width::<W>      W = 8 to 128 words of 64 bits (bits::WIDTHS), by n
+   |
+   |  [1] numtheory::Tables            maximal factors and maximal composites of 1..=n; the set width W
+   |  [2] n prime ............ accelerate::prime_shortcut   the game of n-1 with its first move replaced by n
+   |                                                         method=prime        proof=prime_formula
+   |  [3] board::Board::new            frames::BoardFrames: sources (never tax) + factors -> frames; unzip,
+   |                                   removeImpossible
+   |                                   frames::build_frames: frames with freedoms numbered from the front (0 = front)
+   |                                   and merged; candidates; in_the_bag
+   |      no candidates ...... the game with no promotions   method=trivial      proof=trivial
+   |  [4] search ............. method=search                 proof=exhausted | cap
+   |        Board::prepare             search::prepare: model::FrameGraph::build -> the root FrameSet; greedy set;
+   |                                   max_total; the search::Problem it poses, and its digest
+   |        same_search ...... one of the 8 games before it posed the same problem and settled it: its promotions
+   |                                                         method=repeat       proof=same_search
+   |        search::search             starting incumbent = best of greedy / seed (n-1's promotions) / rounded root
+   |                                   matching + local search; ceiling = n + score(n-1) - in_the_bag
+   |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
+   |            Stepper::step          per node (search/searcher.rs): check_node = the rule of symmetric pairs
+   |                                   (symmetry, search::symmetry) -> GF(2) bound (gf2; with gf2=off
+   |                                   the matching bound, matchbound, and its refinement) -> conflicts, forced
+   |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
+   |                                   Lagrangian bound over the nogoods (search::lagrange);
+   |                                   choose_branch (a candidate) -> make_child -> check_child
+   |      promotions -> accelerate::solution_for_promotions   (frames::BoardFrames with the promotions as sources)
+   |                                                         -> ordered moves
+   |
+   |  [2] and same_search are skipped by --force-search and when the game has a checkpoint (a search is resumed,
+   |  never replaced)
+   v
+ [5] solver::conclude                replay (game::replay_finished); score == in_the_bag + promotions; the ceilings;
+   |                                 confirm the score against optimal.json; the proof and what it assumes
+   v
+ [6] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
+                                     the game becomes the previous game of n+1
+```
+
+The step numbers are the table's, and those of the module comment of `src/solver.rs`, which gives the checks of
+each.
 
 Step 2 needs the previous game, and the repeat of step 4 an earlier one; both are skipped by `force_search` and when
 the game has a checkpoint (a search that was interrupted is resumed, never replaced by a derivation), and so is step 1a.
@@ -946,12 +1040,12 @@ no check can catch is a game that is legal, finished and within the bounds but n
 not optimal either; that is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
 [results/README.md](../../results/README.md) says what supports each committed score.
 
-**Result lines** are one JSON object per line (README, "A results line"): the game, its proof and assumptions, the
-game of n − 1 it was built from (score, source, digest of its moves, proof, assumptions), node counts and search
-counters, seconds per
-phase, the tactics, limits, options and the commit the binary was built from; the digest of the search problem a
-setup poses and a repeat's record of the game it repeats, and, on a line that has one, the known source it cites.  A
-line is never rewritten, and a run locks the results file it appends to.
+**Result lines** are one JSON object per line ([REFERENCE.md, "A results
+line"](REFERENCE.md#a-results-line---out-schema-5)): the game, its proof and assumptions, the game of n − 1 it was built
+from (score, source, digest of its moves, proof, assumptions), node counts and search counters, seconds per phase, the
+tactics, limits, options and the commit the binary was built from; the digest of the search problem a setup poses and a
+repeat's record of the game it repeats, and, on a line that has one, the known source it cites.  A line is never
+rewritten, and a run locks the results file it appends to.
 
 **What identifies a checkpoint.**  The header the search stores: a format version, the set width, n, digests of the root
 candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the one-sided candidates of the
@@ -1004,21 +1098,20 @@ what a multi-threaded search may vary:
 
 ### Past limits
 
-With `--keep-going` a game whose search a limit stops is recorded as an unfinished line (its best game so far, no
-proof) and the range goes on (`solver::SolveOptions::keep_going`; the driver is `window`, "Past limits").  What the
-next game may take from that game is what does not rest on its being optimal.  A *seed* is any promotable set the board
-can use, offered as an incumbent, so it cannot change what a search proves.  The three things that do rest on
-opt(n − 1) are the ceiling `n + opt(n − 1)` (a `cap` proof), the prime formula (Lemma B above), and the tripwire that
-a score above that ceiling proves the game before it not optimal; each is taken from a game only if `Prev::proven`,
-which is true of a completed game and of `optimal.json`'s (assumed), and false of the best game of a stopped search.
-A repeat rests on the earlier game it repeats, which is a completed game of the file or the range, never an unfinished
-one.  The check that a completed game scores no less than the game before it stays: a game of n − 1 is a game of n,
-whether optimal or not.  The lines say so: a game built on an unfinished one has `prev` with no proof, `setup.cap`
-null and no `cap` or `prime_formula` proof, and both referees refuse a line that claims one of these on it
-([README, "What a game had from n − 1"](../frame/README.md#what-a-game-had-from-n---1)).  The format of a line is the same,
-except that `options` also names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of
-such a range are solved one at a time because a game that went on from a game in flight would not know whether to take
-its ceiling.
+With `--keep-going` a game whose search a limit stops is recorded as an unfinished line (its best game so far, no proof)
+and the range goes on (`solver::SolveOptions::keep_going`; the driver is `window`, "Past limits").  What the next game
+may take from that game is what does not rest on its being optimal.  A *seed* is any promotable set the board can use,
+offered as an incumbent, so it cannot change what a search proves.  The three things that do rest on opt(n − 1) are the
+ceiling `n + opt(n − 1)` (a `cap` proof), the prime formula (Lemma B above), and the tripwire that a score above that
+ceiling proves the game before it not optimal; each is taken from a game only if `Prev::proven`, which is true of a
+completed game and of `optimal.json`'s (assumed), and false of the best game of a stopped search.  A repeat rests on the
+earlier game it repeats, which is a completed game of the file or the range, never an unfinished one.  The check that a
+completed game scores no less than the game before it stays: a game of n − 1 is a game of n, whether optimal or not.
+The lines say so: a game built on an unfinished one has `prev` with no proof, `setup.cap` null and no `cap` or
+`prime_formula` proof, and both referees refuse a line that claims one of these on it ([REFERENCE.md, "What a game had
+from n − 1"](REFERENCE.md#what-a-game-had-from-n---1)).  The format of a line is the same, except that `options` also
+names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of such a range are solved
+one at a time because a game that went on from a game in flight would not know whether to take its ceiling.
 
 ### Known games
 
@@ -1621,14 +1714,14 @@ shared with the unit tests: the engine's instances, the random configurations of
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors through the real binary;
   `bench --history FILE` keeps the tracked `solver/frame/bench/history.jsonl` out of the tests.
 * **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and
-  `#anchor` in the markdown files resolves; each entry of the lab notebook (`solver/notebook/`) opens with its title
-  and a link back and is linked from the register or the index of `solver/notebook/README.md`, whose only sections are the
-  introduction's; `solver/docs/STATUS.md` is dated and has at most 150 lines; the README's table of the fields of a result
-  line, and its example line, have the keys the code writes; its reading order is the module map of `src/lib.rs`;
-  `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never *forced*; and
-  the guides and comments of the repository do not use the words the project has retired (the list, with what to say
-  instead, is in the test; the entries of solver/notebook/ and the note of EXPERIMENTS.md that maps their words are
-  exempt).
+  `#anchor` in the markdown files resolves; each entry of the lab notebook (`solver/notebook/`) opens with its title and
+  a link back and is linked from the register or the index of `solver/notebook/README.md`, whose only sections are the
+  introduction's; `solver/docs/STATUS.md` is dated and has at most 150 lines; REFERENCE.md's table of the fields of a
+  result line, and its example line, have the keys the code writes; the reading order of section 3 is the module map of
+  `src/lib.rs`; `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never
+  *forced*; and the guides and comments of the repository do not use the words the project has retired (the list, with
+  what to say instead, is in the test; the entries of solver/notebook/ and the note of EXPERIMENTS.md that maps their
+  words are exempt).
 
 A few tests sample what an exhaustive run would cover (every 18th golden board for the peeling agreement, every sixth
 board above 511 for the root promotability of the frame builder's candidates, every second line of the Java fixtures);

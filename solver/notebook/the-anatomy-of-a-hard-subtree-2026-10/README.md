@@ -29,7 +29,7 @@ test.
 * Two numbers are *twins* when they share a maximal factor: x = m·p and y = m·q with p and q prime.  1292 = 68·19 and
   1156 = 68·17 are twins, sharing 68.
 * The other terms, such as conflict, forced member, strong branching and step, are the
-  [glossary's](../../frame/README.md#7-glossary).
+  [glossary's](../../../docs/GLOSSARY.md).
 
 ## What was run
 
@@ -164,7 +164,7 @@ swaps, and a twin or a close kin in 57-69%; a kin shares a divisor m with it, x 
 is x − y = (p − q)·m.  A third of the two-for-two swaps are the same exchange on two cofactors at once: at 3441,
 leaving 1704 = 24·71 out brings 1608 = 24·67 in and swaps 1340 = 20·67 for 1420 = 20·71, a price of
 (71 − 67)·(24 − 20) = 16.  That is the formula of the solver's symmetric pairs ("prime exchange" in the
-[glossary](../../frame/README.md#7-glossary)), applied to two numbers instead of the whole board.  In all, 31-41% of
+[glossary](../../../docs/GLOSSARY.md)), applied to two numbers instead of the whole board.  In all, 31-41% of
 the swaps are one exchange of two primes.  The twin swaps met most often:
 
 | left out | its substitute | price | times |

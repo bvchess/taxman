@@ -5,7 +5,7 @@ the games past the chain, and the certificates of statement U.  This page says w
 how it was made and what supports its scores.
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
-`src/results.rs` and in [the frame solver's README](../solver/frame/README.md#a-results-line---out-schema-5).  The
+`src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
 counts on this page are pinned by `tests/results.rs`, so changing a file means updating both together.
 
 ## The files
@@ -47,8 +47,8 @@ committed here: a sweep's results go to a file of their own, with a notebook ent
 The chain of optimal games from n = 1 to n = 3914, and the file to build on.  Every game is built from the one before,
 every line has its full provenance, and nothing in it rests on `optimal.json` or on any other file.  It has 3914 lines
 in schema 5, the completed games in order of n, and no line of an unfinished search.  Nor has it a line of proof
-`known`: such lines come from runs with `--use-prev` ([the frame solver's README, "Citing a known
-source"](../solver/frame/README.md#citing-a-known-source)).  The name is from the builds that had unproven tactics,
+`known`: such lines come from runs with `--use-prev` ([the frame solver's reference, "Citing a known
+source"](../solver/docs/REFERENCE.md#citing-a-known-source)).  The name is from the builds that had unproven tactics,
 which the chain was made without; none is left, so every run from n = 1 is made without them.
 
 Its games, by proof, as `taxman verify-results` and `solver/tools/check_results.py` report them:
