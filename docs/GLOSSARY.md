@@ -80,8 +80,8 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   of 21 the sources 11, 13 and 17 are impossible: their frame's only factor, 1, pays for 19.
 * **U\***: the sources that setup keeps.  It is the heaviest playable set of sources wherever conjecture (★) holds,
   which is certified on every board to 100,000 ([the prover's README, section
-  2](../solver/noframe/README.md#2-conjecture--at-scale)).  U\*_2 is its members with two prime factors, and U\*_{≥3}
-  those with three or more.
+  2](../solver/noframe/README.md#2-conjecture--at-scale)).  Its members with two prime factors are U\*_2,
+  and those with three or more U\*_{≥3}.
 * **freedoms**: a frame's factors minus its moves, the number of factors it can spare.  A promotion into or out of the
   frame uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
@@ -110,8 +110,8 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   candidates, `max_total` and the factor graph among their numbers.  `search::Problem` writes it out canonically, and
   `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n ([DESIGN.md, "Same
   search"](../solver/docs/DESIGN.md#same-search)).
-* **P\***: the best promotion sum, the largest sum of a promotion set.  P\*(Π) is that of the problem Π, and P\* alone
-  means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
+* **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
+  and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
   `in_the_bag` + P\* = opt(n) ([the frame solver's README, "What optimal
   means"](../solver/frame/README.md#what-optimal-means)).  `model::FrameGraph` is the immutable factor graph and home

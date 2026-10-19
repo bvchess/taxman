@@ -607,16 +607,17 @@ What the data shows, observed and not proven:
 * **The canonical set survives every step to a game at its ceiling or to a prime** observed from a game with several
   sets: 13 of 13 such steps.  The canonical set is the largest in decreasing lexicographic order, and canonical(n) =
   canonical(n − 1) + n at a ceiling, or − p + n at a prime.  The prime part is a theorem, since the bijection preserves
-  the lexicographic order.  optimal.json records the canonical set in 23 of the 30 games with several sets; not at 684
-  and 685, where it records the third of three, or at 775–779, the second of two.
+  the lexicographic order.  The table optimal.json records the canonical set in 23 of the 30 games with several sets;
+  not at 684 and 685, where it records the third of three, or at 775–779, the second of two.
 * **The recorded game of n − 1 is not always extendable.**  At 686, a game at its ceiling, the recorded optimal game of
-  685 plus 686 is unplayable.  opt(686) = 686 + opt(685) holds through another optimal set of 685, the canonical one.
+  685 plus 686 is unplayable.  The equality opt(686) = 686 + opt(685) holds through another optimal set of 685, the
+  canonical one.
 
 ### What it buys a solver
 
-* **The sources.**  Fixing the sources to U\*, as the frame model does, gives up nothing that ties.  U\* is the unique
-  heaviest playable set of sources (proven given (★), so to 100,000), and every optimal game observed has upper part
-  U\*.  The second statement is the one still open in general.
+* **The sources.**  Fixing the sources to U\*, as the frame model does, gives up nothing that ties.  The set U\* is the
+  unique heaviest playable set of sources (proven given (★), so to 100,000), and every optimal game observed has upper
+  part U\*.  The second statement is the one still open in general.
 * **Reuse of n − 1 (Theorem 9).**  The prime step is exact: the optimal sets of a prime n are those of n − 1 with p
   swapped for n.  The step to a game at its ceiling is decidable from the complete list of the optimal sets of n − 1:
   n meets the bound n + opt(n − 1) iff one of them stays playable with n added, and then the optimal sets of n are
@@ -653,7 +654,7 @@ of the largest playable set of picks.
 
 ### Method
 
-`src/moves.rs` and `src/bin/moves.rs` work the games in increasing order.  M(n) lies between two bounds:
+`src/moves.rs` and `src/bin/moves.rs` work the games in increasing order.  The number M(n) lies between two bounds:
 
 * below, the longer of the recorded optimal game and the longest game of n − 1;
 * above, the smaller of ν(n), computed for every board at once by augmenting paths, and what M(n − 1) allows.
