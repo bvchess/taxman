@@ -453,7 +453,7 @@ fn lib_module_map() -> Vec<String> {
 #[test]
 fn the_reading_order_of_the_readme_is_the_module_map_of_lib_rs() {
     let readme = read(crate_dir().join("README.md"));
-    let reading = section(&readme, "## 8. Reading order and map of the documents");
+    let reading = section(&readme, "## 8. Reading order of the code");
     let list = reading.split("\n| document").next().unwrap();
     let declared = lib_module_map();
     let mut in_readme: Vec<String> = Vec::new();
@@ -585,7 +585,8 @@ const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sourc
 /// The reference docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of
 /// docs/GLOSSARY.md (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is
 /// rewritten.
-const REWRITTEN: &[&str] = &["docs/GLOSSARY.md", "docs/WRITING.md", "README.md", "solver/README.md"];
+const REWRITTEN: &[&str] =
+    &["docs/GLOSSARY.md", "docs/WRITING.md", "README.md", "solver/README.md", "solver/frame/README.md"];
 
 /// Retired in the rewritten docs: the names that docs/GLOSSARY.md replaced (2026-10-18).
 const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
