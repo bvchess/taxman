@@ -1,7 +1,7 @@
 # Taxman
 
-This project finds optimal games of Taxman, a number game, and proves that they are optimal.  It also has heuristic
-strategies, which play good games quickly but without a proof.
+This project finds optimal games of Taxman, a number game.  It also has heuristic strategies, which play good games
+quickly but don't guarantee optimal results.
 
 ![game 10 move 3](web/img/10.3.png)
 
@@ -14,42 +14,37 @@ remains.  An *optimal game* scores the most.  For game 4, the player takes 3 (th
 takes 2), and scores 7, the best possible.
 
 The best scores for n = 1, 2, 3, ... are the Taxman sequence, [A019312](https://oeis.org/A019312) in the OEIS.  Finding
-an optimal game is a search over an enormous tree, and the hard part is proving that no game scores more.  The [project
+an optimal game can turn into a search over an enormous tree of possibilities.  The [project
 wiki](https://github.com/bvchess/taxman/wiki) explains the game and the algorithm, with a walkthrough of game 21.  The
-[glossary](docs/GLOSSARY.md) defines the project's words.
+[glossary](docs/GLOSSARY.md) defines the project's vocabulary.
 
 ## The results
 
-The committed chain, `results/strict.jsonl`, holds an optimal game for every n from 1 to its end.  Each game is built
-from the one before, and each is proven with nothing assumed beyond the frame model.  The first part of the chain is
-also proven on the whole board by a second program that shares no code with the first.  The rest is proven within the
-*frame model*, a decomposition of the game that is exact given one open statement about it, called U.
+The file `results/strict.jsonl` holds a chain of optimal games for every n from 1 to its end.  Each game is built
+from the one before, and each is proven with nothing assumed beyond the frame model.  The games up to a smaller n are
+also proven on the whole board by a second program that shares no code with the first.  The rest are proven within
+the *frame model*, a decomposition of the game that is exact given one open statement about it, called U.
 [results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and what
 supports every score.
 
-The table of optimal games, [results/optimal.json](results/optimal.json), holds the Java solver's games 1 to 1000 and
-the frame solver's 1001 to 1300.  The [results](results/README.md) directory also keeps the bounds on opt(n), the best
-score, found for the games past the chain, and the certificates of U.
+For a larger set of games past the end of the chain, the [results](results/README.md) directory also keeps an upper
+bound on opt(n) along with the best score we've found so far.
 
 ## The programs
 
-* **The frame solver** ([solver/frame](solver/frame/README.md)), in Rust, finds the games.  It reimplements the
-  algorithm of the original Java solver, which the wiki describes: it splits the board into independent groups of
-  numbers, the *frames*, and searches for the best set of numbers to play beyond the ones the frames settle.  It runs
-  on many CPUs, and its long runs resume after an interruption.
-* **The prover** ([solver/noframe](solver/noframe/README.md)), also in Rust, proves games optimal on the whole board,
-  without the frame model.  It shares no code with the frame solver, so each checks the other.
-* **The heuristics** ([heuristics](heuristics/README.md)), in Python, play near-optimal games in polynomial time.
-* **Robert Moniot's seven heuristic strategies** ([moniot](moniot)), in C++, redistributed with his permission.
-
-The Java solver reached n = 1000; it is no longer in the tree, and the git tag `java-final` is the last commit that
-has it.  [solver/README.md](solver/README.md) maps the Rust programs' documents, and [web/img](web/img) holds the
-pictures of this page.
+* **The frame solver** ([solver/frame](solver/frame/README.md)) splits the board into independent groups of numbers,
+  the *frames*, and searches for the best set of numbers to play.  It can run on many CPUs, and its long runs can be
+  resumed after an interruption.
+* **The prover** ([solver/noframe](solver/noframe/README.md)) finds optimal solutions over the whole board, without the
+  frame model.  It shares no code with the frame solver, so each checks the other.
+* **The heuristics** ([heuristics](heuristics/README.md)) play near-optimal games quickly.
+* **Robert Moniot's seven heuristic strategies** ([moniot](moniot)) provide additional approaches and are redistributed
+  with his permission.
 
 ## Running it
 
-The frame solver runs on Linux or macOS.  It needs Rust and a C linker, and nothing to download.  From the top of the
-repository:
+The frame solver runs on Linux or macOS.  It needs only Rust and a C linker; it uses no third-party libraries.  From the
+top of the repository:
 
 ```
 cd solver/frame && cargo build --release && cd ../..
@@ -57,8 +52,8 @@ solver/frame/target/release/taxman solve 1-22
 solver/frame/target/release/taxman verify-results results/strict.jsonl
 ```
 
-The first command builds the solver, the second solves the games 1 to 22, and the third checks every game of the
-committed chain.  [The frame solver's README](solver/frame/README.md) walks through this first run and documents every
+The first command builds the solver, the second solves the games 1 to 22, and the third checks every game in the
+chain.  [The frame solver's README](solver/frame/README.md) walks through this first run and documents every
 command.
 
 ## Where to read on
@@ -81,8 +76,3 @@ command.
   game.
 * Taxman can be played online at <http://davidbau.com/archives/2008/12/07/taxman_game.html> and
   <https://www.cryptool.org/en/cto/taxman>.
-
-## Acknowledgements
-
-Thanks to EJ Technologies for the use of their excellent [Java
-profiler](https://www.ej-technologies.com/products/jprofiler/overview.html).
