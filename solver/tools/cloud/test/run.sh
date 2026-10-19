@@ -637,6 +637,77 @@ scenario_status() {
     env -u RUN "$wall" status >"$tmp/s9.out" 2>&1
     check "no run in progress is an error" equals $? 1
     check "which says so" matches "$tmp/s9.out" 'no run is in progress'
+
+    default_run
+}
+
+# --- wall.sh stop and cleanup: the run in progress ---------------------------------------------------------------
+
+# stop and cleanup take the run in progress when RUN is not set, as status does, and launch takes run1.  The bucket holds
+# the ended run t-ended, and no run is in progress.
+default_run() {
+    echo "== wall.sh stop and cleanup: the run in progress when RUN is not set"
+    local wall="$cloud/wall.sh" commit=0123456789abcdef0123456789abcdef01234567 writes
+    export WALL_DIR="$tmp/wall"
+    # What the log of the fake aws holds of the calls that write: the stop and the end objects, the group, the rest.
+    writes='^s3 cp [^ ]* s3://\|set-desired-capacity\|delete-\|create-\|put-'
+
+    env -u RUN DRY_RUN=1 "$wall" launch --commit "$commit" --until 2099-01-01 >"$tmp/d0.out" 2>&1
+    check "launch with no RUN takes run1, in progress or not" matches "$tmp/d0.out" 'run run1: s3://.*/wall-run1'
+
+    : >"$FAKE_LOG"
+    env -u RUN "$wall" stop >"$tmp/d1.out" 2>&1
+    check "a stop with no run in progress is an error" equals $? 1
+    check "which says so" matches "$tmp/d1.out" 'no run is in progress'
+    env -u RUN "$wall" stop --now >"$tmp/d2.out" 2>&1
+    check "so is stop --now" equals $? 1
+    env -u RUN "$wall" cleanup --force >"$tmp/d3.out" 2>&1
+    check "so is cleanup, --force or not" equals $? 1
+    check "which says so too" matches "$tmp/d3.out" 'no run is in progress'
+    check "none of them wrote anything, or touched the account" lacks "$FAKE_LOG" "$writes"
+    check "nor took run1 for the run" lacks "$tmp/d1.out" 'run run1'
+
+    # Two in progress: neither is chosen.
+    fake_run t-live
+    fake_run t-live2
+    : >"$FAKE_LOG"
+    env -u RUN "$wall" stop >"$tmp/d4.out" 2>&1
+    check "a stop with two runs in progress is an error" equals $? 1
+    check "which says so" matches "$tmp/d4.out" 'more than one run is in progress'
+    check "and lists them" equals "$(grep -c '^    t-live2\{0,1\}$' "$tmp/d4.out")" 2
+    env -u RUN "$wall" cleanup >"$tmp/d5.out" 2>&1
+    check "so is a cleanup" equals $? 1
+    check "which says so" matches "$tmp/d5.out" 'more than one run is in progress'
+    check "neither run is stopped" absent "$(sobj wall-t-live/run/stop)"
+    check "nor the other" absent "$(sobj wall-t-live2/run/stop)"
+    check "nothing was written, or touched in the account" lacks "$FAKE_LOG" "$writes"
+    RUN=t-live2 "$wall" stop >"$tmp/d6.out" 2>&1
+    check "RUN names the run when there are several" equals $? 0
+    check "and it is the one that is stopped" exists "$(sobj wall-t-live2/run/stop)"
+    check "not the other" absent "$(sobj wall-t-live/run/stop)"
+    check "the log does not call it the run in progress" lacks "$tmp/d6.out" 'the run in progress'
+    rm -rf "$(sobj wall-t-live2)"
+
+    # One in progress (t-live), and the run that ended beside it.
+    env -u RUN "$wall" cleanup >"$tmp/d7.out" 2>&1
+    check "a cleanup with no RUN takes the run in progress" equals $? 1
+    check "which has not ended, and is named" matches "$tmp/d7.out" 'wall-t-live/run/ended is not there'
+    env -u RUN "$wall" stop >"$tmp/d8.out" 2>&1
+    check "a stop with one run in progress succeeds" equals $? 0
+    check "it says which run, and why" matches "$tmp/d8.out" 'run t-live (the run in progress: RUN was not set)'
+    check "it puts the stop object in that run" exists "$(sobj wall-t-live/run/stop)"
+    check "and in the run that ended" absent "$(sobj wall-t-ended/run/stop)"
+    env -u RUN "$wall" stop --now >"$tmp/d9.out" 2>&1
+    check "stop --now ends that run" matches "$(sobj wall-t-live/run/ended)" 'stopped at once'
+    check "and takes the group to 0" has_line "$FAKE_STATE/desired" 0
+
+    # None again: the run has ended, and cleanup needs its name.
+    env -u RUN "$wall" cleanup >"$tmp/d10.out" 2>&1
+    check "a cleanup with no RUN finds no run in progress once the run has ended" matches "$tmp/d10.out" \
+        'no run is in progress'
+    RUN=t-live "$wall" cleanup >"$tmp/d11.out" 2>&1
+    check "and RUN names the run to clean up" equals $? 0
+    check "its end checks are printed" matches "$tmp/d11.out" '^+ aws ec2 describe-volumes'
 }
 
 # --- sweep.sh ----------------------------------------------------------------------------------------------------

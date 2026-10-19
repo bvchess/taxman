@@ -52,8 +52,9 @@
 # REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
 # status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
 # time, in UTC, and how long ago) the last game recorded and a line for each game in flight (RUNBOOK.md, section 12.4).
-# Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1, except for
-# status: the one run in progress, the one whose prefix has a config and no ended object, or the runs to choose from),
+# Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1 for launch,
+# and for status, stop and cleanup the one run in progress, the one whose prefix has a config and no ended object; with
+# none they refuse and say so, and with several they refuse and list the runs to choose from),
 # BUCKET, AWS_PROFILE (never defaulted: export it, aws login --profile NAME) and AWS_DEFAULT_REGION (us-east-1),
 # DRY_RUN, VERBOSE, AWS_CLI, and WALL_DIR (default ~/taxman-wall/RUN): where the files that the commands take are
 # written and kept (the user data, the launch template's data, the config).  The group, template, policy and security
@@ -209,9 +210,18 @@ check_account() {
     esac
 }
 
-need_account() {
+# Checks the account, and takes the run in progress as the run when RUN is not set (pick_run); status, stop and cleanup
+# go by this, and launch, which takes run1 when RUN is not set, never needs the pick.
+need_run() {
     check_account
-    log "account $ACCOUNT, region $AWS_DEFAULT_REGION, run $RUN: $S3_DEST"
+    [ -n "$RUN" ] || pick_run
+}
+
+need_account() {
+    need_run
+    local picked=""
+    if [ "$RUN_PICKED" = 1 ]; then picked=" (the run in progress: RUN was not set)"; fi
+    log "account $ACCOUNT, region $AWS_DEFAULT_REGION, run $RUN$picked: $S3_DEST"
 }
 
 # Takes the run in progress as the run when RUN is not set: the one run whose prefix in the bucket (wall-NAME) has a
@@ -224,7 +234,7 @@ pick_run() {
     done
     case "$found" in
         '') die "no run is in progress in s3://$BUCKET (no prefix wall-NAME has a run/config and no run/ended):" \
-            "RUN=NAME names one that has ended" ;;
+            "RUN=NAME names the run, one that has ended included" ;;
         ' '*' '*) die "more than one run is in progress; RUN=NAME says which:$(printf '\n    %s' $found)" ;;
     esac
     set_run "${found# }"
@@ -600,8 +610,7 @@ games_in_flight() {
 }
 
 status() {
-    check_account
-    [ -n "$RUN" ] || pick_run
+    need_run
     local config ended ledger hours start updated budget price until_epoch boots window chain_to wall_hours
     config="$(s3_text run/config)" || die "no run $RUN in $S3_DEST (nothing at $S3_DEST/run/config)"
     budget="$(printf '%s\n' "$config" | field BUDGET_HOURS)"
@@ -793,9 +802,9 @@ done
 set -- ${args[@]+"${args[@]}"}
 command="${1:-}"
 [ "$#" -gt 0 ] && shift
-# status finds the run in progress when RUN is not set; the other commands take run1.
+# launch starts a run, so it takes run1 when RUN is not set; status, stop and cleanup take the run in progress (need_run).
 case "$command" in
-    launch | stop | cleanup) [ -n "$RUN" ] || set_run run1 ;;
+    launch) [ -n "$RUN" ] || set_run run1 ;;
 esac
 case "$command" in
     launch) launch "$@" ;;

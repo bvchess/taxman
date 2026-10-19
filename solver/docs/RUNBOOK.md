@@ -1532,8 +1532,8 @@ it no machine is launched, and the run waits).
 | `test/run.sh` | your machine | the tests of these scripts against `test/bin/aws`, a stand-in over directories |
 
 The run's state is one prefix of the project's bucket, `s3://taxman-013764204840-us-east-1/wall-RUN` (`RUN`, default
-`run1`): `results/`, `ckpt/` (with each game's `nNNNN.clock` beside its checkpoint) and `logs/` as `save.sh` writes them,
-and `run/`:
+`run1` for `launch`; section 12.4 says what the other commands take): `results/`, `ckpt/` (with each game's
+`nNNNN.clock` beside its checkpoint) and `logs/` as `save.sh` writes them, and `run/`:
 
 | object | holds |
 |---|---|
@@ -1638,10 +1638,11 @@ stopped` or `failed`.  A game with no line, or whose line three lines of another
 line`: a setup, a prime or repeated game and a search not started look alike in the logs.  `own search` is the wall
 clock the oldest game keeps in `ckpt/nNNNN.clock` (up to a checkpoint interval old; `-` for a game without one),
 `elapsed` the time since its search began, waits included, and `best` the progress line's sum of promotions so far.
-Times are in the local time zone (`TZ`) with its abbreviation.  `RUN` defaults to the one run in progress (a config in
-S3 and no `ended` object; with several, `status` lists them and asks for `RUN`) and the region to us-east-1; the
-profile is never defaulted (export `AWS_PROFILE`).  The aws commands that read are printed (`+ aws ...`) only with
-`--verbose`.  To look at the
+Times are in the local time zone (`TZ`) with its abbreviation.  `RUN` names the run.  When it is not set, `launch` makes
+`run1`, and `status`, `stop` and `cleanup` take the one run in progress, the one with a config in S3 and no `ended`
+object.  With none, or several, they refuse and say so, and list the several; so a `cleanup` of a run that has ended
+needs `RUN`.  The region defaults to us-east-1, and the profile is never defaulted (export `AWS_PROFILE`).  The aws
+commands that read are printed (`+ aws ...`) only with `--verbose`.  To look at the
 machine: `aws ssm start-session --target INSTANCE` (the Session Manager plugin; the role has the SSM policy), then
 `sudo -u ec2-user tmux attach -t tx` (the node script and, in the window `sw`, `spot-watch.sh`).
 
