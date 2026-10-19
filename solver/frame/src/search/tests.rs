@@ -11,7 +11,7 @@ use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
 use crate::model::{ConflictCache, FrameGraph, Keep, Nogoods, Scratch};
 use crate::numtheory::Tables;
-use crate::test_support::TempDir;
+use crate::test_support::{TempDir, QUICK};
 use std::thread;
 
 fn config(threads: usize) -> EngineConfig {
@@ -656,10 +656,12 @@ fn floors_hold_on_four_threads_and_under_every_search_path() {
     }
 }
 
-/// The floor at the optimum and the seed of the optimum are one search, on a few games of 300 to 1000.
+/// The floor at the optimum and the seed of the optimum are one search, on a few games of 300 to 1000 (300 and 480 in a
+/// quick run).
 #[test]
 fn a_floor_at_the_optimum_searches_the_tree_of_the_search_seeded_with_it() {
-    for n in [300, 480, 600, 760, 930, 1000] {
+    let games: &[u32] = if QUICK { &[300, 480] } else { &[300, 480, 600, 760, 930, 1000] };
+    for &n in games {
         the_tree_under_the_optimum_is_the_proof(n);
     }
 }

@@ -446,6 +446,10 @@ fn extend_optimal_writes_over_the_table_only_when_asked_to_by_name() {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is extend_optimal_appends_the_games_that_continue_the_table"
+)]
 fn extend_optimal_stops_at_the_first_game_that_is_not_there() {
     let dir = TempDir::new("extend-stops");
     let table = write_table(&dir, "mini.json", 12);

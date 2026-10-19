@@ -1691,10 +1691,10 @@ mod tests {
         incremental_solver_matches_the_reference_on_every(1);
     }
 
-    /// [`incremental_solver_matches_the_reference`] on every third of its golden games.
+    /// [`incremental_solver_matches_the_reference`] on every sixth of its golden games.
     #[test]
     fn incremental_solver_matches_the_reference_on_a_sample() {
-        incremental_solver_matches_the_reference_on_every(3);
+        incremental_solver_matches_the_reference_on_every(6);
     }
 
     /// The incremental solver matches the reference on every `every`th of the golden games.

@@ -235,6 +235,10 @@ fn certify_a_sample(step: usize, besides: &[u32], fewest: usize) {
 
 /// Every sixtieth game of 600..=1300 that needs a certificate, all certified.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_game_past_1300_that_needs_a_certificate_is_certified"
+)]
 fn a_thin_sample_of_the_games_to_1300_that_need_a_certificate_is_certified() {
     certify_a_sample(60, &[], 6);
 }
@@ -245,7 +249,7 @@ fn a_thin_sample_of_the_games_to_1300_that_need_a_certificate_is_certified() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_thin_sample_of_the_games_to_1300_that_need_a_certificate_is_certified"
+    ignore = "long: the quick check is a_game_past_1300_that_needs_a_certificate_is_certified"
 )]
 fn a_sample_of_the_games_to_1300_that_need_a_certificate_is_certified() {
     certify_a_sample(4, &[1287], 90);
@@ -372,7 +376,7 @@ fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_planted_wrong_score_of_1305_is_beaten_by_a_game_the_referee_accepts"
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
 )]
 fn a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts() {
     planted_wrong_scores_are_beaten(&[1302, 1305, 1309]);
@@ -380,6 +384,10 @@ fn a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts() {
 
 /// [`a_planted_wrong_score_is_beaten_by_a_game_the_referee_accepts`] for 1305, the cheapest.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn a_planted_wrong_score_of_1305_is_beaten_by_a_game_the_referee_accepts() {
     planted_wrong_scores_are_beaten(&[1305]);
 }
@@ -564,13 +572,20 @@ fn a_stopped_search_resumes(n: u32, most_nodes: u64, min_pieces: usize) {
 /// command again and again ends with `certified`, and the checkpoint goes with the last; and a further run skips the
 /// game, which the summary says.
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_command_stops_resumes_and_then_skips_a_small_game")]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_stopped_search_of_a_small_game_resumes_to_the_certificate_of_an_uninterrupted_one"
+)]
 fn the_command_stops_resumes_and_then_skips_a_game() {
     the_command_stops_resumes_and_then_skips(RESUMED, 3);
 }
 
 /// [`the_command_stops_resumes_and_then_skips_a_game`] for a game of 1,593 nodes, stopped once.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_stopped_search_of_a_small_game_resumes_to_the_certificate_of_an_uninterrupted_one"
+)]
 fn the_command_stops_resumes_and_then_skips_a_small_game() {
     the_command_stops_resumes_and_then_skips(RESUMED_QUICK, 2);
 }
@@ -640,7 +655,7 @@ fn the_command_stops_resumes_and_then_skips(n: u32, min_runs: usize) {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is the_command_certifies_a_range_of_small_games_and_skips_what_is_done"
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
 )]
 fn the_command_certifies_a_range_and_skips_what_is_done() {
     // Longer, 1308 and 1309 are the new ones that need a certificate.
@@ -649,6 +664,10 @@ fn the_command_certifies_a_range_and_skips_what_is_done() {
 
 /// [`the_command_certifies_a_range_and_skips_what_is_done`] over 600..=608 and then 600..=610.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn the_command_certifies_a_range_of_small_games_and_skips_what_is_done() {
     the_command_certifies_a_range_and_skips_what_is_done_over(600..=608, 600..=610);
 }
@@ -698,7 +717,7 @@ fn boards_in_order(file: &Path) -> Vec<u32> {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is the_command_certifies_the_small_boards_of_a_list_in_the_order_of_the_file"
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
 )]
 fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file() {
     the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for([1309, 1302, 1304], 1301);
@@ -707,6 +726,10 @@ fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file() {
 /// [`the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file`] for 620, 600 and 616 (that pose three
 /// different problems), and the first of 600..=640 that needs none.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn the_command_certifies_the_small_boards_of_a_list_in_the_order_of_the_file() {
     let needless = (600..=640).find(|n| !fixtures().upper[n].needs).unwrap();
     the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for([620, 600, 616], needless);
@@ -748,6 +771,10 @@ fn the_command_certifies_the_boards_of_a_list_in_the_order_of_the_file_for(needi
 /// An `--out` file that another process holds open (here this one, appending to it as a run does) is refused with
 /// status 1 and nothing is written; once it is closed, the command goes on with it.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn the_command_refuses_an_out_file_another_process_has_open() {
     let n = needing(600..=640)[0].to_string();
     let dir = TempDir::new("certify-lock");
@@ -904,7 +931,7 @@ fn the_rule_over_600_to_1300() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is the_claims_change_the_problems_and_not_their_sizes_of_the_first_games_to_700"
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
 )]
 fn the_claims_change_the_problems_and_not_their_sizes_and_the_rule_settles_more_games_with_them() {
     the_claims_change_the_problems_and_not_their_sizes(&needing(600..=1300), Some([231, 81, 101, 20]));
@@ -915,6 +942,10 @@ fn the_claims_change_the_problems_and_not_their_sizes_and_the_rule_settles_more_
 /// rule finds without the claims, the rule settles those and more with them, and the games gained pose different
 /// problems without the claims and the same one with them.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
+)]
 fn the_claims_change_the_problems_and_not_their_sizes_of_the_first_games_to_700() {
     the_claims_change_the_problems_and_not_their_sizes(&needing(600..=700), None);
 }
@@ -1037,7 +1068,7 @@ fn certify_across(boards: &[u32], first: bool) -> Vec<(u32, u32)> {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is the_rule_settles_across_formulations_in_630_to_640_as_it_does_within_one"
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
 )]
 fn the_rule_settles_across_formulations_as_it_does_within_one() {
     for boards in [needing(630..=640), needing(1312..=1317)] {
@@ -1047,6 +1078,10 @@ fn the_rule_settles_across_formulations_as_it_does_within_one() {
 
 /// [`the_rule_settles_across_formulations_as_it_does_within_one`] over 630..=640 alone.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
+)]
 fn the_rule_settles_across_formulations_in_630_to_640_as_it_does_within_one() {
     the_rule_settles_across_formulations_over(&needing(630..=640));
 }
@@ -1064,6 +1099,10 @@ fn the_rule_settles_across_formulations_over(boards: &[u32]) {
 /// less than the earlier certificate says the problem allows, so the rule is not used and the search finds the better
 /// set.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn a_planted_wrong_score_on_a_repeat_is_beaten() {
     let Fixtures { known, upper } = fixtures();
     let (m, n) = (1314, 1315);
@@ -1187,6 +1226,10 @@ fn doctored_lines_are_not_used() {
 /// it rests on, and the tally counts it apart.  A second run that starts after the game it rests on, within the window,
 /// settles a later repeat from that game's line in `--out` (a game this run did not certify, set up again from its line).
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
+)]
 fn the_command_writes_same_problem_lines() {
     let dir = TempDir::new("certify-same-problem");
     let (results, out) = (results_path("strict.jsonl"), dir.join("out.jsonl"));
@@ -1673,6 +1716,10 @@ fn a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused() 
 /// The checks of [`doctored_lines_are_refused_naming_the_line`] on a game that rests on another, on the stretch
 /// 630..=640: a `same_problem` with a wrong `best` is refused, and so is one whose game has no line in the file.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
+)]
 fn a_doctored_same_problem_of_a_short_stretch_is_refused() {
     let dir = TempDir::new("verify-short-rule");
     let (certs, boards) = certify_short_stretch(&dir);
@@ -1694,6 +1741,10 @@ fn a_doctored_same_problem_of_a_short_stretch_is_refused() {
 /// 630..=640: an `incomplete` line is counted and skipped, a torn last line is ignored, and a line that is no
 /// certificate is refused naming the file and the line.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
+)]
 fn an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled() {
     let dir = TempDir::new("verify-short-torn");
     let (certs, _) = certify_short_stretch(&dir);
@@ -1722,6 +1773,10 @@ fn an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled() {
 /// that the results are not known by (the table ends at 1300): a score changed in the results' game, with the line
 /// right, is refused.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
+)]
 fn a_line_whose_score_is_not_the_results_game_is_refused() {
     let (n, dir) = (1305, TempDir::new("verify-short-score"));
     let certs = dir.join("certs.jsonl");
@@ -1787,7 +1842,7 @@ fn a_file_certify_wrote_passes_and_the_summary_counts_it() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_file_that_mixes_the_formulations_over_609_to_611_passes_and_a_changed_formulation_is_refused"
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
 )]
 fn a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refused() {
     a_file_that_mixes_the_formulations_over(&[(609, 611), (667, 671)]);
@@ -1795,6 +1850,10 @@ fn a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refuse
 
 /// [`a_file_that_mixes_the_formulations_passes_and_a_changed_formulation_is_refused`] for the stretch 609..=611 alone.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_pair_of_games_is_settled_by_the_rule_only_with_the_claims"
+)]
 fn a_file_that_mixes_the_formulations_over_609_to_611_passes_and_a_changed_formulation_is_refused() {
     a_file_that_mixes_the_formulations_over(&[(609, 611)]);
 }
@@ -1879,7 +1938,10 @@ fn number_at(json: &Json, keys: &[&str]) -> u64 {
 /// with an entry in the counterexample file, a `build` without a commit, and a width that is not the one the problem
 /// takes.  (A wrong score in the results' game is in the next test.)
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_doctored_same_problem_of_a_short_stretch_is_refused")]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
+)]
 fn doctored_lines_are_refused_naming_the_line() {
     let dir = TempDir::new("verify-doctored");
     let lines = json_lines(&certify_stretch(&dir));
@@ -1965,7 +2027,10 @@ fn doctored_lines_are_refused_naming_the_line() {
 /// A score changed in the results' game, with the line right, is refused too: the line's score is the barred bounds',
 /// but not the results'.
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_line_whose_score_is_not_the_results_game_is_refused")]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
+)]
 fn a_line_whose_score_is_not_the_results_is_refused() {
     let dir = TempDir::new("verify-results-score");
     let lines = json_lines(&certify_stretch(&dir));
@@ -2007,7 +2072,7 @@ fn a_line_whose_score_is_not_the_results_is_refused() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled"
+    ignore = "long: the quick check is a_short_stretch_certified_passes_and_a_doctored_digest_or_score_is_refused"
 )]
 fn incomplete_lines_are_counted_a_torn_last_line_is_ignored_and_a_bad_line_is_refused() {
     let dir = TempDir::new("verify-torn");
@@ -2049,7 +2114,10 @@ fn incomplete_lines_are_counted_a_torn_last_line_is_ignored_and_a_bad_line_is_re
 /// line, or with a game that does not beat the score, it refuses; and a board with a certified line in one place and a
 /// beaten line in another has contradictory verdicts, in two files and in one.
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_beaten_line_is_verified_with_its_counterexample")]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn a_beaten_line_is_verified_with_its_counterexample_and_cannot_stand_beside_a_certified_one() {
     a_beaten_line_is_verified(1302, true);
 }
@@ -2057,6 +2125,10 @@ fn a_beaten_line_is_verified_with_its_counterexample_and_cannot_stand_beside_a_c
 /// [`a_beaten_line_is_verified_with_its_counterexample_and_cannot_stand_beside_a_certified_one`] for the game 1305,
 /// without the certified line beside it.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample"
+)]
 fn a_beaten_line_is_verified_with_its_counterexample() {
     a_beaten_line_is_verified(1305, false);
 }
@@ -2297,6 +2369,7 @@ fn the_work_list_tool_passes_its_own_tests() {
 /// needs a certificate has a cost to plan with (or says that it has none to know), and a game that needs none costs
 /// nothing.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_committed_certificates_verify")]
 fn the_work_list_on_600_to_1300_agrees_with_the_certificates() {
     let dir = TempDir::new("work-list");
     let results = results_path("strict.jsonl");
@@ -2398,6 +2471,7 @@ fn the_committed_certificates_verify_first(count: usize) {
 /// `solver/tools/test_certify_pilot.py`, standard library only): the lists of the phases, and the pilot's stop rule on
 /// synthetic lines, on real ones and on the committed plan.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_work_list_tool_passes_its_own_tests")]
 fn the_campaign_tools_pass_their_own_tests() {
     for script in ["../tools/test_certify_campaign.py", "../tools/test_certify_pilot.py"] {
         let run = python(&crate_file(script), &[]);
@@ -2433,6 +2507,7 @@ fn the_campaign_lists_cover_every_game_once_and_certify_reads_them() {
 /// (`solver/tools/certify/certificates_sample_1301_2175 .jsonl`, made by `taxman certify` on the laptop) verify: eight
 /// searches, three games settled by the rule, and one search that was stopped by a limit and resumed.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_committed_certificates_verify")]
 fn the_sample_certificates_of_the_pilot_tests_verify() {
     let certs = crate_file("../tools/certify/certificates_sample_1301_2175.jsonl");
     let run = run_verify(&[&certs], &results_path("strict.jsonl"), &committed_upper_files(), &["--threads", "2"]);

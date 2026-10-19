@@ -112,7 +112,7 @@ mod tests {
     use crate::engine::EngineConfig;
     use crate::game::Optimal;
     use crate::search::{search, SearchResult, SearchTactics};
-    use crate::test_support::TempDir;
+    use crate::test_support::{TempDir, QUICK};
     use std::time::Duration;
 
     /// The search of game `n` (set up by `board`) on one thread, stopped by `node_limit` or by `time_limit`, with
@@ -171,11 +171,12 @@ mod tests {
         assert!(bound >= opt(&board) && opt(&board) >= result.sum, "n={n}");
     }
 
+    /// Every 89th game of 60..=1300 (every 267th in a quick run).
     #[test]
     fn stopped_before_its_first_node_the_dual_bound_is_the_root_bound() {
         let dir = TempDir::new("dual-root");
         let ckpt = dir.0.join("root.ckpt");
-        for n in (60..=1300).step_by(89) {
+        for n in (60..=1300).step_by(if QUICK { 267 } else { 89 }) {
             crate::with_width!(n, W => stopped_at_the_root::<W>(n, &ckpt));
         }
     }

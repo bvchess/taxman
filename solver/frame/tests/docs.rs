@@ -800,8 +800,9 @@ fn quick_check_limit(name: &str) -> f64 {
     line.split_whitespace().next().and_then(|value| value.parse().ok()).expect("a number")
 }
 
-/// The quick check (`solver/tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits as the script
-/// has them, so that the number in the one is the number in the other.
+/// The quick check (`solver/tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits and the
+/// thresholds of its wait for a quiet machine as the script has them, so that the number in the one is the number in
+/// the other.
 #[test]
 fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
     let tests = repo_dir().join("solver/tools/test_quick_check.py");
@@ -811,7 +812,13 @@ fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
     let design = read(design_md()).replace('\n', " ");
     let (target, limit, cpu) =
         (quick_check_limit("TOTAL_TARGET"), quick_check_limit("TOTAL_LIMIT"), quick_check_limit("TEST_LIMIT"));
-    for stated in [format!("more than {limit} s (the target is {target} s;"), format!("more than {cpu} s of CPU")] {
+    let (busy, wait) = ((quick_check_limit("BUSY_LIMIT") * 100.0).round(), quick_check_limit("BUSY_WAIT") / 60.0);
+    for stated in [
+        format!("more than {limit} s (the target is {target} s;"),
+        format!("more than {cpu} s of CPU"),
+        format!("more than {busy}% of the CPUs"),
+        format!("After {wait} minutes it fails with \"machine busy\""),
+    ] {
         assert!(design.contains(&stated), "DESIGN.md, section 9, does not say {stated:?}: the script's limits changed");
     }
 }
