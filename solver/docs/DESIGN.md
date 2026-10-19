@@ -636,49 +636,53 @@ bound, since independent vectors have a system of distinct representatives, whic
 
 ### Prime exchanges
 
-Exchanging two primes `p < q` in every number (`p^a q^b m ↦ p^b q^a m`) is an automorphism of divisibility.  Where it
-maps every frame of the root onto itself (moves to moves, factors to factors) and the candidates onto themselves, it
-maps promotion sets to promotion sets, worth `(q − p)(c_p − c_q)` more, `c_r(S)` being the sum of `x / r` over the
-members of `S` divisible by `r` (no candidate is divisible by `pq`, `p²` or `q²` in the pairs used).  So every heaviest
-promotion set keeps `c_p ≤ c_q` for every such *symmetric pair* at once: a set that breaks one pair's inequality is
-beaten by its image under that pair's exchange alone
-([docs/THEORY.md](../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).  The pairs come in
-classes of primes that the frame builder treats alike (at 1300 {41, 43}, {59, 61}, {67, 71}, {73, 79}, {89, …, 107},
-{109, …, 139}, {149, 151, 157}: 32 pairs; 99 at 2175, 300 at 4000), and `search::symmetry::root_pairs` finds them when a
-search is set up, in under a millisecond: the full check only for the primes whose multiples have the same places and
-exponents in the frames, and over the multiples alone (EXPERIMENTS: "Dominance and symmetry" found the exchanges, "Prime
-exchanges in the search" put them in).
+The rule of symmetric pairs (tactic `symmetry`, on by default) prunes the parts of the tree that are mirror images of
+others.  Exchanging two primes `p < q` in every number (`p^a q^b m ↦ p^b q^a m`) is an automorphism of divisibility.
+Where the exchange maps every frame of the root onto itself (moves to moves, factors to factors) and the candidates onto
+themselves, the pair is *symmetric*, and the exchange maps promotion sets to promotion sets worth `(q − p)(c_p − c_q)`
+more.  Here `c_r(S)` is the sum of `x / r` over the members `x` of `S` divisible by `r`; in the pairs used, no candidate
+is divisible by `pq`, `p²` or `q²`.  So every heaviest promotion set keeps `c_p ≤ c_q` for every symmetric pair at once:
+a set that breaks one pair's inequality is beaten by its image under that pair's exchange alone
+([docs/THEORY.md](../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).
 
-With the tactic `symmetry` (the default) the search uses them, from the cofactor sums of a node's promotions `P` and
-candidates `C` (`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):
+The pairs come in classes of primes that the frame builder treats alike.  At 1300 the classes are {41, 43}, {59, 61},
+{67, 71}, {73, 79}, {89, …, 107}, {109, …, 139} and {149, 151, 157}, which make 32 pairs; there are 99 at 2175 and 300
+at 4000.  `search::symmetry::root_pairs` finds them when a search is set up, in under a millisecond: it makes the full
+check only for the primes whose multiples have the same places and exponents in the frames, and only over the
+multiples.  [Dominance and symmetry](../notebook/dominance-and-symmetry-2026-10/README.md) found the exchanges, and
+[prime exchanges in the search](../notebook/prime-exchanges-in-the-search-2026-10/README.md) put them in.
 
-* a node is cut when some pair has `c_p(P) > c_q(P) + c_q(C)`: no completion lifts `c_q` to `c_p` (it is
+The search uses the pairs through the cofactor sums of a node's promotions `P` and candidates `C`
+(`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):
+
+* it cuts a node when some pair has `c_p(P) > c_q(P) + c_q(C)`, since no completion lifts `c_q` to `c_p` (the node is
   *hopeless*);
-* a candidate `mp` with `c_p(P) + m > c_q(P) + c_q(C)` is in no completion that keeps the pair's inequality, and is
-  dropped from the node's candidates, which tightens its bound (repeated until nothing more drops, a drop lowering
-  `c_q(C)` of other pairs).  Children are made without them, and a node's later steps drop more as the node goes on
-  without the members it branched on; the dropped candidates leave the GF(2) and matching levels as a branch member
-  does.
+* it drops from the node's candidates a candidate `mp` with `c_p(P) + m > c_q(P) + c_q(C)`, which is in no completion
+  that keeps the pair's inequality.  The drops tighten the node's bound, and repeat until nothing more drops, since a
+  drop lowers `c_q(C)` of other pairs.  The search makes children without the dropped candidates, a node's later
+  steps drop more as the node goes on without the members it branched on, and a dropped candidate leaves the GF(2) and
+  matching levels as a branch member does.
 
-The drops are most of the gain: the hopeless test alone takes 0.97 of the nodes at the proof of 1287, the rule
-0.57.  A Lagrangian of the inequality on the GF(2) bound (the heaviest set under weights `m(p − μ)` and `m(q + μ)`
-for the pairs its heaviest set breaks) was measured and not kept: it cut little that the drops left, and cost more.
+The drops are most of the gain: at the proof of 1287 the hopeless test alone leaves 0.97 of the nodes, and the whole
+rule 0.57.  A Lagrangian of the inequality on the GF(2) bound (the heaviest set under the weights `m(p − μ)` and
+`m(q + μ)` for the pairs that its heaviest set breaks) was measured and not kept: it cut little beyond the drops, and
+cost more.
 
-The rule is sound for the search of the root's problem: if the incumbent is not optimal, every heaviest set beats it
-and keeps every inequality, and the other prunings (bounds above every completion, members that every completion
-beating the incumbent promotes, sets that cannot be promoted) hold for the completions that keep the inequalities as
-for all.  It learns nothing: a cut ends a loop and a drop shrinks a candidate set, while the conflicts and nogoods the
-search learns are facts about promotability, which hold everywhere whatever the rule cut; the rule changes which
-conflicts a searcher meets, as any change of the tree does, never their truth.  It is a function of a node's `P` and
-`C`, so a unit (a subtree of the root) rebuilt from a checkpoint or on another thread keeps the guarantee.  A search
-of one node's completions for their own best, as the soundness harness runs below the root, finds the best of those
-that keep the inequalities, which can be lighter.  The matching path (`SearchTactics::matching`) is without the rule,
-as it was before it.
+*Why the rule is sound.*  It holds for the search of the root's problem.  If the incumbent is not optimal, every
+heaviest set beats it and keeps every inequality, and the other prunings (bounds above every completion, members that
+every completion beating the incumbent promotes, sets that cannot be promoted) hold for the completions that keep the
+inequalities as for all.  The rule learns nothing: a cut ends a loop and a drop shrinks a candidate set, while the
+conflicts and nogoods that the search learns are facts about promotability, true whatever the rule cut.  The rule
+changes which conflicts a searcher meets, as any change of the tree does, never their truth.  It is a function of a
+node's `P` and `C`, so a unit (a subtree of the root) rebuilt from a checkpoint or on another thread keeps the
+guarantee.  A search of one node's completions for their own best, as the soundness harness runs below the root, finds
+the best of those that keep the inequalities, which can be lighter.  The matching path (`SearchTactics::matching`)
+runs without the rule.
 
 ### The default step
 
-One step of a node's loop (`Stepper::step` in `src/search/searcher.rs`; the module comment of `src/search/mod.rs` says
-which of its four phases takes which of the steps below), with the default tactics:
+One step of a node's loop, with the default tactics, takes the parts above in this order (`Stepper::step` in
+`src/search/searcher.rs`; the module comment of `src/search/mod.rs` says which of its four phases takes which step):
 
 ```
 need = best + 1 − sum(promoted)                   # the loop goes on while the bound reaches this
@@ -704,213 +708,232 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
    that no completion keeping the symmetric pairs' inequalities holds (symmetry)
 8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
    child can make among its remaining candidates, the child's own max_add), or no completion of it keeps the
-   inequalities (symmetry), or its GF(2) bound is below it, or its
-   heaviest set is exact (offered as incumbent); a child that stays open keeps this verdict, with its forced
-   members, for its first step; a child with no candidates is not pushed
+   inequalities (symmetry), or its GF(2) bound is below it, or its heaviest set is exact (offered as incumbent); a
+   child that stays open keeps this verdict, with its forced members, for its first step; a child with no
+   candidates is not pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
-On the matching path (`SearchTactics::matching`, `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`: the
-default before the GF(2) bound, without the rule of symmetric pairs, which it takes too if asked) step 2 looks at
-the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is
-forced, refinement of its conflict `match_refine` levels deep (a cut if every branch is below `need`), then the
-Lagrangian bound over the nogoods (a cut, or more forced members); step 4 chooses the member whose removal lowers
-the matching bound most; and step 8 checks the child's matching bound, refinement and Lagrangian bound.
+The *matching path* (`SearchTactics::matching`, which is `--tactic gf2=off --tactic lagrange=on --tactic
+symmetry=off`) takes the matching bound in place of the GF(2) bound, and the rule of symmetric pairs only if asked.  Its
+step 2 looks at the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is forced,
+refinement of its conflict `match_refine` levels deep (a cut if every branch is below `need`), then the Lagrangian bound
+over the nogoods (a cut, or more forced members).  Its step 4 chooses the member whose removal lowers the matching bound
+most, and its step 8 checks the child's matching bound, refinement and Lagrangian bound.
 
-Exactness rests on five facts: the bound is an upper bound (the GF(2) bound by Theorem 11, the matching bound with
-refinement, and the Lagrangian bound for any multipliers); every promotable completion leaves out a member of a
-conflict, so branching on a member and then going on without it explores every promotable set; forced members (by
-weak duality, for the weight split and the potentials and the Lagrangian bound alike) are promoted by every
-completion that can beat the incumbent; nogoods and known conflicts hold at every node they are applied to
-(subset closure); and every heaviest promotion set keeps the symmetric pairs' inequalities (Theorem 13), so the
-completions the rule leaves out hold none of them.  A node is cut only when its bound is below `need` (a completion
-that merely ties the incumbent is of no use), and a unit rebuilt from a checkpoint is a node whose bound can only be
-tighter.  `tests/soundness.rs` attacks each of these (section 9).
+*Why the step is exact.*  Exactness rests on five facts:
+
+1. the bound is an upper bound: the GF(2) bound by Theorem 11, the matching bound with refinement, and the Lagrangian
+   bound for any multipliers;
+2. every promotable completion leaves out a member of a conflict, so branching on a member and then going on without
+   it explores every promotable set;
+3. every completion that can beat the incumbent promotes the forced members (by weak duality, for the weight split, the
+   potentials and the Lagrangian bound alike);
+4. nogoods and known conflicts hold at every node they are applied to, since a subset of a promotable set is
+   promotable;
+5. every heaviest promotion set keeps the symmetric pairs' inequalities (Theorem 13), so the completions that the rule
+   leaves out hold none of them.
+
+A node is cut only when its bound is below `need`, since a completion that merely ties the incumbent is of no use, and
+a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs` attacks each of these
+facts (section 9).
 
 ### The starting incumbent, the ceiling and the seed
 
-The search starts from the best of three promotable sets: the *greedy* set (promote every candidate that can be, from
-the largest down), the *seed* (the previous game's promotions that are candidates and still promotable, one by one
-from the largest), and a rounding of the root's matching (the *dive*: drop the smallest
-member of a conflict until the rest can be promoted); then a local search improves it (fill greedily, then drop one
-or two members and refill, until nothing improves).  The *ceiling* on the promotion sum,
-`n + score(n − 1) − in_the_bag`, is proven; reaching it ends the search (`prev_cap`).  When the greedy set or the
-seed's survivors already reach it, the dive is skipped, and the local search when the incumbent after the dive does:
-nothing can beat a set at the ceiling, so neither would change it, and the result is the same.  The local search runs
-on the search's threads, the refills of a pass in parallel, and keeps the first improvement in the order of the
-sequential pass, so its answer does not depend on the thread count; it reads the ceiling before each pass, so one given
-while it runs (the control's) ends it as soon as its set reaches it.  The start is offered to the run's control as it is
-made (after the greedy set and the seed, the dive and the local search), so whoever steers the search sees the best so
-far before the engine starts, and the engine's start is unchanged.  Board/search setup is in
-`board::Board`: it is the one place that knows the tables → frames → prepare → ceiling and seed path.
+The search starts from the best of three promotable sets, and stops as soon as it reaches a proven ceiling.  The three
+sets:
 
-A search can instead start from a *floor* (`search::search_above`): an incumbent worth a given promotion sum and no
-set, with no start made, so that nodes are pruned against the floor as against a set of that weight and a set found
-heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing is heavier
-than the floor (docs/THEORY.md, Lemma F, the argument of the dual bound of a stopped search), which
-`SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: the proof's, node for
-node, when the floor is the optimum (a search seeded with it), and smaller above it, by a factor of about 27 for each
-quarter of the gap between the root's bound and the optimum on the games measured
-([the entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
+* the *greedy* set: promote every candidate that can be, from the largest down;
+* the *seed*: the promotions of the game of n − 1 that are candidates here and still promotable, taken one by one from
+  the largest;
+* the *dive*: a rounding of the root's matching, which drops the smallest member of a conflict until the rest can be
+  promoted.
+
+A local search then improves the best of them: it fills the set greedily, then drops one or two members and refills,
+until nothing improves.  The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching
+it ends the search (tactic `prev_cap`).  When the greedy set or the seed's survivors already reach the ceiling, the
+search skips the dive, and it skips the local search when the incumbent after the dive reaches it: nothing can beat a
+set at the ceiling, so neither would change it, and the result is the same.
+
+*Details.*  The local search runs on the search's threads, the refills of a pass in parallel, and keeps the first
+improvement in the order of the sequential pass, so its answer does not depend on the thread count.  It reads the
+ceiling before each pass, so a ceiling given while it runs (through the control, section 6) ends it as soon as its set
+reaches it.  The start is offered to the run's control as it is made (after the greedy set and the seed, after the dive,
+after the local search), so whoever steers the search sees the best so far before the engine starts, and the engine's
+start is unchanged.  `board::Board` sets a board and its search up: it is the one place that knows the path from the
+tables to the frames, the prepared search, the ceiling and the seed.
+
+*A floor.*  A search can start instead from a *floor* (`search::search_above`): an incumbent worth a given promotion
+sum, with no set and no start made.  The search prunes nodes against the floor as against a set of that weight, and a
+set it finds heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing
+is heavier than the floor ([docs/THEORY.md](../../docs/THEORY.md), Lemma F, the argument of the dual bound of a stopped
+search), which `SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
+the proof's tree, node for node, as a search seeded with an optimal set makes it; above P\* a smaller one, by a factor
+of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
+floor](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
 
 ### Extended mode: one-sided candidates
 
-The search can also take the *extended problem* Π⁺(O) (THEORY.md, ["The extended
-problem"](../../docs/THEORY.md#the-extended-problem); `frames::build_extended`): the frame model with a set O of the
-sources of three or more prime factors that setup keeps left optional.  Besides the candidates of the frame model
-(*two-sided*: out of one frame, into the one in front) it has *one-sided* candidates, the members of O and the sources
-greedy rejected beside them, each a possible move of its *own* frame.  It is the problem that a certificate of U
-searches (THEORY.md, the corollary of Theorem M⁺; `taxman certify`, section 8, "Certificates of U").  Research code:
-the solver's own path never builds one, and with no one-sided candidate every piece below is what it was.
+The search can also take the *extended problem* Π⁺(O), the problem that a certificate of U searches (section 8,
+"Certificates of U").  It is the frame model with a set O of the sources of three or more prime factors that setup
+keeps made optional (THEORY.md, ["The extended problem"](../../docs/THEORY.md#the-extended-problem), and the
+corollary of Theorem M⁺; `frames::build_extended`).  Besides the candidates of the frame model, which are *two-sided*
+(out of one frame, into the one in front), it has *one-sided* candidates: the members of O and the sources that greedy
+rejected beside them, each a possible move of its *own* frame.  It is research code: the solver's own path never
+builds an extended problem, and with no one-sided candidate every piece below is what it is without them.
 
 *The claims of `unzip`* (THEORY.md, Lemma M5⁺).  The problem comes in two formulations, which have the same promotion
 sets (the lemma's corollary): without any claim, and, the default, with the claims of the frame model
-(`SearchFrames::claims`) that the lemma keeps.  `build_extended` gives each claim the frame (as setup forms it) of its
-source; a frame keeps its claims if it holds no member of O ∪ R and the factor of each of its back claims passes the
+(`SearchFrames::claims`) that the lemma keeps.  `build_extended` gives each claim the frame, as setup forms it, of its
+source.  A frame keeps its claims if it holds no member of O ∪ R and the factor of each of its back claims passes the
 check (`frames::ClaimCheck`): it is no two-sided candidate, and no candidate has it among its maximal factors.  The
 pairs of a frame that keeps them leave the moves and the factors before the root is reduced; the freedoms and the
 candidates do not change.  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
 every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
-H).  The check matters: a frame that holds an open source has more freedoms and can take on composites of a claimed
-factor that Π_n could not (at 24 with 16, 20 and 24 open, 12 becomes a candidate that lists 6, which 18 claims; taking
-the pair out anyway loses the promotion set {8, 12}, which the oracle catches); the census counts, board by board, the
-claims some O refuses (`m5_refused`).  `Board::extended(open, claims)` is the one place the board's claims are passed.
+H).  `Board::extended(open, claims)` is the one place the board's claims are passed.
 
-* **The model** (`model`, "One-sided candidates"): `FrameGraph::build_extended` gives each one-sided candidate its own
+The check matters.  A frame that holds an open source has more freedoms, and can take on composites of a claimed factor
+that Π_n could not.  At 24 with 16, 20 and 24 open, 12 becomes a candidate that lists 6, which 18 claims; taking the
+pair out anyway loses the promotion set {8, 12}, which the oracle catches.  The census counts, game by game, the
+claims that some O refuses (`m5_refused`).
+
+* **The model** (`model`, "One-sided candidates").  `FrameGraph::build_extended` gives each one-sided candidate its own
   frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
-  that frame's moves if the frame stays winnable, takes no factor, and spends one freedom of that frame only
-  (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing new: a
-  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted two-sided
-  candidate is no longer a factor of its home), so each is promoted once along a path, which the search's candidates
-  ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
+  that frame's moves if the frame stays winnable; it takes no factor, and spends one freedom of that frame only
+  (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing more: a
+  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted
+  two-sided candidate is no longer a factor of its home), so each is promoted once along a path, which the search's
+  candidates ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
   `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
-* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺): a one-sided candidate's element has
-  the vector of its maximal factors in its own frame's matroid and is a coloop of the other, its own unit vector in a
-  *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
-* **The search**: `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the search.
-  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header (format
-  5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for another (a
-  checkpoint of version 4, of a build before, resumes only a search without them: section 8).
-* **What it refuses** (`SearchTactics::refusal_with_one_sided`): with one-sided candidates the search needs `gf2` (the
-  matching bound gives a one-sided candidate no vertex, so it is no bound there; the dive, which rounds the root's
-  matching for a starting incumbent, still runs and never picks one), and refuses `lagrange` (built on the matching
-  bound) and `symmetry` (Theorem 13 is proven for the frame model; for Π⁺ each prime exchange would have to map the
-  one-sided candidates of each frame onto themselves, which nothing checks yet).  `SearchTactics::extended` is the
-  default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics; its search is the default
-  engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
-* **Its frames**: Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest, nine at most up to
-  4095 (layers 3 to 11) whatever O is, and ten from 4096 with every source open, which `build_extended` refuses
-  (`MAX_FRAMES`), naming the board and the layers; the census of the frames records the count with every such source
-  open for every board to 8191 (`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`).  Opening a source also adds one to its frame's rank, so a problem
-  with many open sources can need more words of the GF(2) bound than the narrow set widths compile (three, rank 192)
-  or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so, rather than fail in the search.
+* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺).  A one-sided candidate's element
+  has the vector of its maximal factors in its own frame's matroid, and is a coloop of the other: its own unit vector,
+  in a *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
+* **The search.**  `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the
+  search.  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header
+  (format 5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for
+  another.  A checkpoint of version 4 resumes only a search without them (section 8).
+* **What it refuses** (`SearchTactics::refusal_with_one_sided`).  With one-sided candidates the search needs `gf2`: the
+  matching bound gives a one-sided candidate no vertex, so it is no bound there (the dive, which rounds the root's
+  matching for a starting incumbent, still runs and never picks one).  It refuses `lagrange`, which is built on the
+  matching bound, and `symmetry`: Theorem 13 is proven for the frame model, and for Π⁺ each prime exchange would have
+  to map the one-sided candidates of each frame onto themselves, which nothing checks.  `SearchTactics::extended` is
+  the default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics, and its search is the
+  default engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
+* **Its frames.**  Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest: nine at most up to
+  4095 (layers 3 to 11), whatever O is.  From 4096 it has ten with every source open, which `build_extended` refuses
+  (`MAX_FRAMES`), naming the game and the layers.  The census of the frames records the count with every such source
+  open for every game to 8191 ([the claims of `unzip` in the extended
+  problem](../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).  Opening a source also adds one
+  to its frame's rank, so a problem with many open sources can need more words of the GF(2) bound than the narrow set
+  widths compile (three, rank 192) or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so,
+  rather than fail in the search.
 
 ## 5. Tactics
 
-Each row is a tactic in `tactics::Tactics`, set from the CLI with `--tactic name=value` (`on` or `off`; `match_refine`
-`0`…`7`; `nogood_period` and `nogood_limit` a whole number, `nogood_keep` a policy; the tactics that tune the GF(2)
-search, `force_window` to `more_forced`, as their rows say).  The ones that act inside the search are the fields of
-`search::SearchTactics`; `examples/ladder.rs` takes the same names for them.  A checkpoint records the search tactics in
-its header (section 6), but for the three that set how the nogoods are kept.  Status words: *proven* (a theorem, given
-a premise) and *sound* (never prunes a promotable optimum); every tactic is one or the other, and switching one off
-changes how fast an answer comes, never the answer.
-A test (`tests/docs.rs`) checks that this table lists the tactics of `tactics::Tactics`, in order, with their
-defaults.
+A *tactic* is a switchable piece of the search: each row below is one, in `tactics::Tactics`, set from the command line
+with `--tactic name=value`.  Every tactic is *proven* (a theorem, given a premise) or *sound* (it never prunes a
+promotable optimal set), so switching one off changes how fast an answer comes, never the answer.  The values are `on`
+or `off`, but for `match_refine` (`0` to `7`), `nogood_period` and `nogood_limit` (whole numbers), `nogood_keep` (a
+policy), and the tactics that tune the GF(2) search, `force_window` to `more_forced`, which their rows give.  The
+tactics that act inside the search are the fields of `search::SearchTactics`, and `examples/ladder.rs` takes the same
+names for them.  A checkpoint records the search tactics in its header (section 6), but for the three that set how the
+nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the tactics of `tactics::Tactics`, in order,
+with their defaults.
 
 | tactic | default | status | effect |
 |---|---|---|---|
-| `prime_shortcut` | on | proven (given an optimal n−1 game: proof at `accelerate::prime_shortcut`) | prime n: replace the n−1 solution's first move with n |
-| `same_search` | on | proven (given the proof of the earlier game: section 8, "Same search") | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`); new in the Rust |
-| `match_refine` | 1 | sound (see `search::refine::Refiner`) | refine the matching bound by branching on conflicts this many levels deep, where it does not prune (0 = off, at most 7); no effect with `gf2`, which does not use the matching bound |
-| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced candidates; the node's loop ends after that child |
-| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root and use the table at every node, for the conflict to branch on and refine with and to rule candidates out of children |
+| `prime_shortcut` | on | proven (given an optimal game of n − 1: the proof is at `accelerate::prime_shortcut`) | a prime n plays the game of n − 1 with its first move replaced by n |
+| `same_search` | on | proven (given the proof of the earlier game: section 8, "Same search") | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`) |
+| `match_refine` | 1 | sound (see `search::refine::Refiner`) | where the matching bound does not prune, refine it by branching on conflicts this many levels deep (0 = off, at most 7); no effect with `gf2`, which does not use the matching bound |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced members, and the node's loop ends after that child |
+| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root, and use the table at every node: for the conflict to branch on and refine with, and to rule candidates out of children |
 | `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each `nogood_period` of its steps, or keeps some (`nogood_keep`); off: never |
 | `nogood_period` | 50000 | sound (the table is a cache) | with `nogoods` and `forget_nogoods`, the steps of a searcher between its forgettings (a whole number from 1); a research knob, with the next two (section 4, "Forgetting nogoods") |
 | `nogood_keep` | none | sound (the table is a cache) | what a forgetting keeps: `none` (nothing), `hit` (the nogoods used since the last forgetting), `sizeN` (those of at most N members), `topN` (the N most used since the last forgetting, of those used at all) |
 | `nogood_limit` | 0 | sound (the table is a cache) | with `nogoods`, a searcher's table holds at most this many nogoods, the least recently used dropped to make room for a new one (0: no limit) |
-| `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path (over the matching bound), and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4).  On by default until `gf2`; with `gf2` it changes no tree and costs 2-4% |
-| `gf2` | on | proven (docs/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over nogoods, if on, applies after it |
+| `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path, over the matching bound, and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns (section 4); with `gf2` it changes no tree and costs 2 to 4% |
+| `gf2` | on | proven (docs/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound (section 4) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over the nogoods, if on, applies after it |
 | `symmetry` | on | proven (docs/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds (section 4, "Prime exchanges") |
-| `force_window` | all | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set the weight split leaves free are searched for being forced by the exchange graph: those whose split bound is less than this far above the need (`80`; `0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members (a smaller tree) for more searches (section 4, "Forced members").  `all` since 2026-10-16 (it was `80`): on subtrees of the end of the chain's searches it takes 0.60-0.63 of the CPU of 80 on one thread (0.41-0.43 of the nodes) and 64-thread proofs of 3179-3395 0.84 of the time ([the tuning campaign](../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)); on the one-thread chain 1..1300 it takes 5% fewer nodes and about 4.5% more time |
+| `force_window` | all | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set that the weight split leaves free the exchange graph searches for being forced: those whose split bound is less than this far above the need (`80`; `0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members, for a smaller tree, at the cost of more searches (section 4, "Forced members", has the measurements of `all` against `80`) |
 | `branching` | exact | sound (every completion leaves out some member of the conflict) | with `gf2`, how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
 | `strong_limit` | all | sound (as `branching`) | with `gf2`'s strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
 | `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
 | `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
 | `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
-| `prev_cap` | on | proven if opt(n−1) is optimal | stop as soon as the incumbent reaches n + opt(n−1) − in_the_bag (`FrameSolver.getMaxPromotionSum`) |
-| `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the better of greedy and the n−1 solution's promotions that are still promotable |
+| `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum (the Java's `FrameSolver.getMaxPromotionSum`) |
+| `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of the game of n − 1 that are still promotable |
 
-What each tactic was worth, and the order they were found in, is in [solver/notebook/README.md](../notebook/README.md); so
-are the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's promotions
-with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that the
-heaviest promotion set also has the most members, which is false at n = 833), and the tactics that lost, the Java's
-`blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
+**The frame model's own rules are not tactics.**  They define the search space, and cannot be switched off inside the
+model: the greedy removal of impossible sources inside frames (the Java's `Hive.removeImpossible`); the mandatory moves
+(its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set by `Hive.finishSetup`); closed frames
+taking no part in the search; and a promoted number paying tax only from the frame one forward.  Section 2 ("What
+optimal means") says what is proven of them, and what remains: statement U.
+
+**Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from
+the defaults (such as `lagrange=on,gf2=off`), and `tactic_switches`, every tactic's value.  A line of a build before
+`gf2` has no such key, and ran the matching path.  A checkpoint records the search tactics, and is refused when they
+differ: the error names each tactic that differs, and the `--tactic` flags that resume it.
+
+*The tactics removed.*  The [notebook](../notebook/README.md) has what each tactic was worth and the order they were
+found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's
+promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that
+the heaviest promotion set also has the most members, which is false at n = 833); and the tactics that lost, the
+Java's `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
 ([which tactics earn their keep](../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
-
-**The frame model's own rules** are not tactics: greedy removal of impossible sources inside frames (the Java's
-`Hive.removeImpossible`); mandatory moves (its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set
-by `Hive.finishSetup`); closed frames take no part in the search; a promoted number pays tax only from the frame one
-forward.  They define the search space and cannot be switched off inside this model.  They used to be its unproven
-assumptions; section 2 ("What optimal means") says what is now proven of them, and what remains (the statement U).
-
-**Where tactics are recorded.**  A result line records the tactics it was produced with (`tactics`: the changes from
-the defaults, such as `lagrange=on,gf2=off`; `tactic_switches`: every tactic's value; a line of a build before
-`gf2` has no such key, and ran the matching path).  A checkpoint records
-the search tactics and is refused when they differ (the error names each tactic that differs and the `--tactic`
-flags that resume it).
 
 ## 6. Engine
 
-`engine` is a problem-independent parallel depth-first branch-and-bound driver; the Taxman search is a `Searcher`
-that it runs.  Its protocol — conservation, splitting, spill, checkpoint, termination — is the module comment of
-`src/engine.rs`, with the types (`Unit`, `Searcher`, `Ctx`, `EngineConfig`, `run`) next to it; this section is the
-design in outline.
+The engine (`engine`) is a parallel depth-first branch-and-bound driver that knows nothing of Taxman: the Taxman search
+is a `Searcher` that it runs.  The module comment of `src/engine.rs` has its protocol (conservation, splitting, spill,
+checkpoint, termination), with the types (`Unit`, `Searcher`, `Ctx`, `EngineConfig`, `run`) next to it; this section is
+the design in outline.
 
-* **Units and workers.**  The caller's problem is a search tree whose subtrees are *units* (serialized by the `Unit`
-  trait: for Taxman two bitsets).  `threads` OS threads (std only), each with its own `Searcher` instance made on that
-  thread (so per-thread caches need no locks, and on a NUMA machine each searcher's state is local), explore units
-  depth-first.  A searcher calls `ctx.poll()` at least every ~1000 nodes; when it says `Yield`, the searcher pushes
-  all of its unexplored work as units (shallowest first) and returns.
-* **Work distribution.**  One shared deque of units, ordered shallow (front) to deep (back).  A worker that yields
-  pushes its stack's remaining work and then pops from the back, resuming its own deepest work; idle workers take from
-  the front, which holds the largest subtrees.  A worker yields when idle workers are left that the queued units
-  cannot serve (a *split*), when a checkpoint is due, or when a stop is requested.  With one thread the deque is a
-  pure stack: units are explored in exact depth-first order, unchanged by checkpoints and spilling.  The engine
-  keeps one open split request per idle worker, and any running worker can claim one with an atomic decrement, so as
-  many workers split at once as there are idle workers to feed; a worker answers only after 64 polls of its unit so
-  that a fresh unit first gets deep enough to have something to give.  One locked deque is enough because units
-  exist only after yields and a rebuild costs the searcher far more than the lock (EXPERIMENTS: "The engine").
-* **Memory bound.**  The in-memory deque holds at most `queue_mem_cap` units; beyond that the oldest are spilled to
-  segment files in `spill_dir` and reloaded when memory runs dry.  Searchers keep only their stack plus bounded
+* **Units and workers.**  The caller's problem is a search tree whose subtrees are *units*, serialized by the `Unit`
+  trait (for Taxman, two bitsets).  The engine runs `threads` OS threads (std only), each with its own `Searcher` made
+  on that thread, so per-thread caches need no locks and, on a NUMA machine, each searcher's state is local.  The
+  threads explore units depth first.  A searcher calls `ctx.poll()` at least every 1,000 nodes or so; when it answers
+  `Yield`, the searcher pushes all of its unexplored work as units, shallowest first, and returns.
+* **Work distribution.**  One shared deque holds the units, shallow at the front and deep at the back.  A worker that
+  yields pushes its stack's remaining work and then pops from the back, resuming its own deepest work; idle workers take
+  from the front, which holds the largest subtrees.  A worker yields when idle workers are left that the queued units
+  cannot serve (a *split*), when a checkpoint is due, or when a stop is requested.  With one thread the deque is a pure
+  stack: units are explored in exact depth-first order, whatever the checkpoints and the spilling.  The engine keeps one
+  open split request per idle worker, and any running worker can claim one with an atomic decrement, so as many workers
+  split at once as there are idle workers to feed.  A worker answers only after 64 polls of its unit, so that a fresh
+  unit first gets deep enough to have something to give.  One locked deque is enough, because units exist only after
+  yields and a rebuild costs the searcher far more than the lock ([the engine](../notebook/the-engine/README.md)).
+* **Memory bound.**  The in-memory deque holds at most `queue_mem_cap` units; beyond that the engine spills the oldest
+  to segment files in `spill_dir`, and reloads them when memory runs dry.  Searchers keep only their stack and bounded
   caches.
-* **Incumbent.**  An `AtomicU64` value plus a mutex-protected payload (the promotion set, encoded); offers only ever
-  raise it, and a searcher can declare it optimal, which ends the run, as an incumbent that reaches the ceiling given
+* **Incumbent.**  An `AtomicU64` value with a payload behind a mutex (the promotion set, encoded).  Offers only ever
+  raise it.  A searcher can declare it optimal, which ends the run, as an incumbent that reaches the ceiling given
   through the control (below) does.
-* **Checkpoint.**  Every `checkpoint_interval` all workers yield and park, the engine writes the caller's header, the
-  incumbent, statistics and every unit (memory and spilled) to `<checkpoint>.tmp`, fsyncs, renames it over the
-  checkpoint and syncs the directory, and releases the workers.  Resuming loads the file and continues; nothing is lost
-  or duplicated beyond partially explored nodes.  Any interval works, zero included.  The caller's header identifies the
-  search (section 8: it is what makes a checkpoint of another game, width, build or tactics refuse to resume).  A run
-  that completes deletes its checkpoint unless the caller asks to keep it until it has recorded the result.
+* **Checkpoint.**  Every `checkpoint_interval` all workers yield and park.  The engine writes the caller's header, the
+  incumbent, statistics and every unit, in memory and spilled, to `<checkpoint>.tmp`, fsyncs it, renames it over the
+  checkpoint, syncs the directory, and releases the workers.  Resuming loads the file and goes on, losing and
+  duplicating nothing beyond partly explored nodes.  Any interval works, zero included.  The caller's header identifies
+  the search, so that a checkpoint of another game, width, build or tactics refuses to resume (section 8).  A run that
+  completes deletes its checkpoint, unless the caller asks to keep it until it has recorded the result.
 * **Stopping and sharing.**  Time and node limits, and SIGINT and SIGTERM (after `stop_on_signals`), stop a run with a
   final checkpoint; a second signal kills the process.  A stop that already holds when a run starts (a time limit of
   zero, a signal received before) does no search work, however the threads are scheduled: the run checks before it
-  starts a worker (engine docs, "Starting stopped").  `taxman solve` takes an exclusive `flock` on `taxman.lock` in
-  its checkpoint directory, so a second process there fails at once.  Spill segments carry their process id, and a run
+  starts a worker (engine docs, "Starting stopped").  `taxman solve` takes an exclusive `flock` on `taxman.lock` in its
+  checkpoint directory, so a second process there fails at once.  Spill segments carry their process id, and a run
   deletes those of processes that no longer exist.  Progress lines and results on stdout ignore write errors, so a
-  closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`); the previous checkpoint stays
-  valid, which is the property that matters.
-* **Control** (`engine::Control`): a handle through which another thread steers a run while it goes: a ceiling (a
-  proven upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
-  workers, which grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands all
-  its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises again.
-  Requests made before the run apply when it starts (engine docs, "The control").
-* **Instrumentation** (`engine::Counters`, per invocation): each worker's time split into busy, idle, parked and lock
-  wait; the effective parallelism busy / capacity (the workers' lifetimes summed, wall × threads when their number is
-  fixed); splits and the units they gave, steals, runs and tiny runs; when all workers first ran at once; the workers
-  added and retired; the idle time of the ramp and of the tail, the time to a unit's first step (the rebuild) and the
-  time in it; the pauses and the longest wait for the workers to park.  Every progress line ends with them in short
-  ([REFERENCE.md, "Reading the output"](REFERENCE.md#3-reading-the-output)).
+  closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`), and the previous checkpoint
+  stays valid, which is the property that matters.
+* **Control** (`engine::Control`).  Another thread steers a run through this handle while it goes: a ceiling (a proven
+  upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
+  workers.  The number grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands
+  all its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises
+  again.  Requests made before the run apply when it starts (engine docs, "The control").
+* **Instrumentation** (`engine::Counters`, per invocation).  The engine measures each worker's time, split into busy,
+  idle, parked and waiting for the lock; the effective parallelism, busy time over capacity (the workers' lifetimes
+  summed, the wall time times the threads when their number is fixed); splits and the units they gave, steals, runs
+  and tiny runs; when all workers first ran at once; the workers added and retired; the idle time of the ramp and of
+  the tail; the time from a unit's start to its first step (the rebuild) and the time in that step; and the pauses and
+  the longest wait for the workers to park.  Every progress line ends with them in short ([REFERENCE.md, "Reading the
+  output"](REFERENCE.md#3-reading-the-output)).
 
 ## 7. Per-game pipeline (`solver`)
 
