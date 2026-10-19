@@ -68,9 +68,9 @@
 //!   that of least `level + gap / gap_unit`, where `level` counts the board's searches (each doubles the limit) and
 //!   `--gap-unit` (default 175) is the gap worth one doubling of the cost (the chain's steps rise a decade with about
 //!   580 of the standalone gap,
-//! `solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/`).   `--workers` searches at
-//! once (default all CPUs).  When a board is proven, its search is stopped if one is going,   and its checkpoints
-//! deleted; a search whose U falls is given the lower ceiling.
+//!   `solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/`).  `--workers` searches at
+//!   once (default all CPUs).  When a board is proven, its search is stopped if one is going, and its checkpoints
+//!   deleted; a search whose U falls is given the lower ceiling.
 //! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
 //!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
 //!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A

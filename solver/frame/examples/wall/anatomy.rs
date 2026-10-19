@@ -573,7 +573,7 @@ mod tests {
         let optimal = Optimal::built_in();
         let board = Board::<W>::for_n(N);
         let p = board.prepare(SearchTactics::default()).expect("prepare");
-        let (start, _) = known_incumbent(&board, &p, &optimal).expect("known").expect("a known game");
+        let (start, _) = known_incumbent(&board, &p, optimal).expect("known").expect("a known game");
         let graph = MatchGraph::new(&p.model, &p.root);
         let root = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
         let space = SearchSpace::new(&p, &graph);
