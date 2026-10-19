@@ -5,13 +5,17 @@ section 9). Standard library only.
 usage: solver/tools/quick_check.py   (from anywhere; it works in solver/frame and runs at a low priority)
 
 It runs `cargo fmt --check`, `cargo clippy --all-targets`, the build of the tests, and the tests of a non-release
-build, with solver/tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy).  The limits below are
-for a machine with nothing else to do, so the tests start only when it is quiet: if other work uses more than
-BUSY_LIMIT of the CPUs when the build has ended, the check says so and waits, for BUSY_WAIT seconds at most.  It exits
-with status 1 if
+build, with solver/tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy).  Two checks at once
+slow each other, in their builds as much as in their tests, so checks take turns: a check takes a lock (LOCK, a file in
+the system's temporary directory, one for every checkout) before it builds anything and holds it until it exits, and a
+second check waits for it, saying so.  The system frees the lock when the check ends, however it ends.  The limits
+below are for a machine with nothing else to do, so the tests start only when it is quiet: if other work uses more than
+BUSY_LIMIT of the CPUs when the build has ended, the check says so and waits.  The wait for the lock and the wait for a
+quiet machine count together, BUSY_WAIT seconds at most (the checks and the build between them do not count).  It
+exits with status 1 if
 
   * a check fails or a test fails, or
-  * the machine stays busy for BUSY_WAIT seconds (the tests are not run), or
+  * the waits reach BUSY_WAIT seconds together (nothing is built, or no test is run), or
   * the tests take more than TOTAL_LIMIT seconds (their time, not the build's), or
   * a test uses more than TEST_LIMIT seconds of CPU.
 
@@ -20,10 +24,12 @@ as it does alone, and its CPU seconds do not change.  The limits are here and no
 Brian's approval.  A test that takes more than about a second is long: DESIGN.md, section 9, says what to do with it.
 """
 import ctypes
+import fcntl
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional
@@ -34,13 +40,15 @@ TEST_LIMIT = 2.0  # seconds of CPU one test may use in a non-release run
 
 BUSY_LIMIT = 0.25  # the share of the CPUs that other work may use for the machine to be quiet enough for the limits
 BUSY_SAMPLE = 2.0  # seconds one sample of the machine's use of its CPUs takes
-BUSY_WAIT = 600.0  # seconds the check waits for the machine to be quiet before it fails
-BUSY_NOTICE = 30.0  # seconds between the messages that say the machine is still busy
+BUSY_WAIT = 600.0  # seconds the check waits, for the lock and for the machine to be quiet together, before it fails
+BUSY_NOTICE = 30.0  # seconds between the messages that say the machine is still busy, or the lock still held
+LOCK_POLL = 1.0  # seconds between the tries at the lock while another check holds it
 
 # Tests at once: a half as many again as there are CPUs, since a few tests wait (for a sync, a timer) with a CPU idle.
 JOBS = (os.cpu_count() or 1) * 3 // 2
 
 TOOLS = Path(__file__).resolve().parent
+LOCK = Path(tempfile.gettempdir()) / "taxman-quick-check.lock"  # held by the check that is running
 CRATE = TOOLS.parent / "frame"  # the frame solver's crate: where the checks run
 RUN_TESTS = TOOLS / "cloud" / "run_tests.py"
 TIMES = CRATE / "target" / "quick-check-times.json"  # how long the tests took last time: the longest start first
@@ -141,11 +149,12 @@ def who_is_busy() -> str:
 
 
 def wait_until_quiet(sample: Callable[[], Optional[float]], clock: Callable[[], float], say: Callable[[str], None],
-                     who: Callable[[], str] = lambda: "") -> Optional[str]:
+                     who: Callable[[], str] = lambda: "", waited_before: float = 0.0) -> Optional[str]:
     """Takes samples of the machine's use of its CPUs until one is BUSY_LIMIT or less, saying why it waits.  Returns
     None once the machine is quiet (or if it cannot be measured on this system: there is nothing to wait for), and the
-    message of the failure if it is still busy after BUSY_WAIT seconds."""
-    started = clock()
+    message of the failure if it is still busy when the waiting has reached BUSY_WAIT seconds, the `waited_before` of
+    the wait for the lock included."""
+    started = clock() - waited_before
     noticed: Optional[float] = None
     while True:
         share = sample()
@@ -169,6 +178,46 @@ def wait_until_quiet(sample: Callable[[], Optional[float]], clock: Callable[[], 
         say(f"machine busy: other work uses {share:.1%} of the CPUs{busiest_now}; the limits are for {BUSY_LIMIT:.0%} "
             f"or less, so the tests wait for it to be quiet (waited {waited:.0f} s, gives up at {BUSY_WAIT:.0f} s)")
         noticed = clock()
+
+
+# --- taking turns -----------------------------------------------------------------------------------------------------
+def open_lock(path: Path = LOCK) -> int:
+    """Opens (and makes, if it is not there) the lock's file, for reading only so that another user's file can be
+    locked too.  The descriptor is not inherited by the processes this check starts (Python's default), so none of them
+    can outlive it and keep the lock."""
+    return os.open(path, os.O_RDONLY | os.O_CREAT, 0o666)
+
+
+def take_lock(fd: int) -> bool:
+    """Tries once to take the exclusive lock on the open file `fd`: whether it is ours now.  A flock is held by the open
+    file, and the system frees it when the descriptor is closed or the process ends, a crash included."""
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def wait_for_turn(take: Callable[[], bool], clock: Callable[[], float], sleep: Callable[[float], None],
+                  say: Callable[[str], None]) -> Optional[str]:
+    """Tries `take` every LOCK_POLL seconds until the lock is ours, saying that another check holds it.  Returns None
+    once it is ours, and the message of the failure if it is still held after BUSY_WAIT seconds."""
+    started = clock()
+    noticed: Optional[float] = None
+    while not take():
+        waited = clock() - started
+        if waited >= BUSY_WAIT:
+            return (f"another quick check held the lock for the {BUSY_WAIT / 60:.0f} minutes this check waited, and "
+                    f"the limits are for one check at a time, so nothing was built or run; wait until it ends, and "
+                    f"run the check again")
+        if noticed is None or clock() - noticed >= BUSY_NOTICE:
+            say(f"another quick check is running; this one waits for it to end before it builds anything, so that the "
+                f"two do not slow each other (waited {waited:.0f} s, gives up at {BUSY_WAIT:.0f} s)")
+            noticed = clock()
+        sleep(LOCK_POLL)
+    if noticed is not None:
+        say(f"the other quick check has ended, after {clock() - started:.0f} s")
+    return None
 
 
 # --- the checks ------------------------------------------------------------------------------------------------------
@@ -200,8 +249,9 @@ def step(name: str, command: List[str]) -> bool:
     return subprocess.run(command, cwd=CRATE).returncode == 0
 
 
-def main() -> int:
-    os.nice(10)
+def run_checks(waited_for_lock: float) -> List[str]:
+    """Runs fmt, clippy and the build, waits for a quiet machine (the seconds already waited for the lock count against
+    BUSY_WAIT), then runs the tests.  Returns what failed, one message each."""
     failed = []
     for name, command in [("fmt", ["cargo", "fmt", "--check"]), ("clippy", ["cargo", "clippy", "--all-targets"]),
                           ("build", ["cargo", "test", "--no-run"])]:
@@ -209,7 +259,7 @@ def main() -> int:
             failed.append(f"{name} failed")
     SUMMARY.unlink(missing_ok=True)
     if "build failed" not in failed:
-        busy = wait_until_quiet(sample_busy_share, time.monotonic, say, who_is_busy)
+        busy = wait_until_quiet(sample_busy_share, time.monotonic, say, who_is_busy, waited_for_lock)
         if busy:
             failed.append(busy)
         else:
@@ -218,7 +268,19 @@ def main() -> int:
                      str(REPORT), "--summary", str(SUMMARY), f"solver={CRATE}"]
             if not step("tests", tests):
                 failed.append(f"tests failed (the report is {REPORT})")
-    over = problems(json.loads(SUMMARY.read_text())) if SUMMARY.is_file() else []
+    return failed
+
+
+def main() -> int:
+    os.nice(10)
+    began = time.monotonic()
+    lock = open_lock()  # held until this process ends, however it ends: the whole check runs while it is
+    busy = wait_for_turn(lambda: take_lock(lock), time.monotonic, time.sleep, say)
+    if busy:  # nothing was built or run: a summary in target/ is an earlier check's
+        failed, over = [busy], []
+    else:
+        failed = run_checks(time.monotonic() - began)
+        over = problems(json.loads(SUMMARY.read_text())) if SUMMARY.is_file() else []
     if failed or over:
         print("\nquick check FAILED", file=sys.stderr)
         for message in failed + over:

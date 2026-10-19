@@ -1358,12 +1358,14 @@ test`, one binary after another, takes about 19 s).  It verifies most merges, a 
 for a quiet machine**, because its limits are for one with nothing else to do: when the build has ended it samples what
 everything on the machine uses of the CPUs for 2 s, and if other work uses more than 25% of the CPUs it says so, names
 the busiest processes and samples again until the machine is quiet.  After 10 minutes it fails with "machine busy" and
-runs no test, so that a busy machine is never taken for a slow suite.  **It fails**, with the tests that are over named,
-if the tests take more than 15 s (the target is 10 s; the build and the wait are not counted) or if one test uses more
-than 2 s of CPU (CPU, not seconds on the clock, which grow several times over when every CPU is busy); the limits and
-the thresholds of the wait are the constants at the top of the script, and raising a limit needs Brian's approval: a
-test that goes over is made smaller or long, as below, never allowed more.  The *full suite* is `cargo test --release`:
-every test, the long ones too (about 3 minutes of tests, after a build of 6 minutes).
+runs no test, so that a busy machine is never taken for a slow suite.  Two checks do not run at once: the second waits
+for the first's lock (a file in the system's temporary directory, which the system frees when a check ends, however it
+ends) before it builds anything, says so, and counts that wait in the same 10 minutes.  **It fails**, with the tests
+that are over named, if the tests take more than 15 s (the target is 10 s; the build and the wait are not counted) or if
+one test uses more than 2 s of CPU (CPU, not seconds on the clock, which grow several times over when every CPU is
+busy); the limits and the thresholds of the wait are the constants at the top of the script, and raising a limit needs
+Brian's approval: a test that goes over is made smaller or long, as below, never allowed more.  The *full suite* is
+`cargo test --release`: every test, the long ones too (about 3 minutes of tests, after a build of 6 minutes).
 It runs before a cloud run, after any change that changes search trees or results, and in the gates (the one-thread
 re-solve of 1301-2175).
 A default build (and so every run above, and the cloud setup) covers the library, the binary, the tests and the examples

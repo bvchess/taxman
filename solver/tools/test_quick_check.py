@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Unit tests of quick_check.py's judgement of a run (the summary that run_tests.py writes) and of its wait for a quiet
-machine (the CPU ticks, the share they say is busy, and the decision to wait, go on or give up).
+machine (the CPU ticks, the share they say is busy, and the decision to wait, go on or give up) and of its lock, which
+makes two checks take turns.
 
 usage: python3 -I test_quick_check.py      (or python3 -I -m unittest test_quick_check, from this directory)
 """
+import os
+import signal
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import List, Optional
@@ -108,13 +113,16 @@ class Culprits(unittest.TestCase):
 
 
 class Machine:
-    """A machine for `wait_until_quiet`: each sample takes BUSY_SAMPLE seconds of a clock of its own and reads the next
-    of `shares` (the last for ever); `said` is what the wait said."""
+    """A machine for `wait_until_quiet` and `wait_for_turn`, with a clock of its own.  Each sample takes BUSY_SAMPLE
+    seconds and reads the next of `shares` (the last for ever).  Another check holds the lock for the first `held_for`
+    tries at it, and each sleep between tries takes the seconds it is given.  `said` is what the waits said."""
 
-    def __init__(self, *shares: Optional[float]):
+    def __init__(self, *shares: Optional[float], held_for: int = 0):
         self.shares = shares
+        self.held_for = held_for
         self.now = 0.0
         self.samples = 0
+        self.tries = 0
         self.said: List[str] = []
 
     def clock(self) -> float:
@@ -126,11 +134,21 @@ class Machine:
         self.samples += 1
         return share
 
+    def take(self) -> bool:
+        self.tries += 1
+        return self.tries > self.held_for
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
     def say(self, message: str) -> None:
         self.said.append(message)
 
-    def waited(self, who=lambda: "") -> Optional[str]:
-        return quick_check.wait_until_quiet(self.sample, self.clock, self.say, who)
+    def turn(self) -> Optional[str]:
+        return quick_check.wait_for_turn(self.take, self.clock, self.sleep, self.say)
+
+    def waited(self, who=lambda: "", waited_before: float = 0.0) -> Optional[str]:
+        return quick_check.wait_until_quiet(self.sample, self.clock, self.say, who, waited_before)
 
 
 class Waiting(unittest.TestCase):
@@ -186,10 +204,110 @@ class Waiting(unittest.TestCase):
         Machine(0.0).waited(lambda: looked.append(1) or "")
         self.assertEqual(looked, [])
 
+    def test_a_wait_that_follows_seconds_already_waited_gives_up_that_much_sooner(self):
+        machine = Machine(0.8)
+        self.assertIn("machine busy", machine.waited(waited_before=500.0))
+        self.assertEqual(machine.now, quick_check.BUSY_WAIT - 500.0)  # 100 s were left
+        self.assertEqual(machine.samples, int((quick_check.BUSY_WAIT - 500.0) / quick_check.BUSY_SAMPLE))
+
     def test_the_thresholds_make_sense(self):
         self.assertTrue(0 < quick_check.BUSY_LIMIT < 1)
         self.assertLess(quick_check.BUSY_SAMPLE, quick_check.BUSY_NOTICE)
         self.assertLess(quick_check.BUSY_NOTICE, quick_check.BUSY_WAIT)
+        self.assertLess(quick_check.LOCK_POLL, quick_check.BUSY_NOTICE)
+
+
+class Turns(unittest.TestCase):
+    """Two checks at once take turns: the second waits for the first, and says so."""
+
+    def test_a_free_lock_is_taken_at_once_without_a_word(self):
+        machine = Machine()
+        self.assertIsNone(machine.turn())
+        self.assertEqual(machine.tries, 1)
+        self.assertEqual(machine.now, 0.0)
+        self.assertEqual(machine.said, [])
+
+    def test_a_lock_another_check_holds_is_waited_for_until_it_ends_and_the_wait_says_so(self):
+        machine = Machine(held_for=5)
+        self.assertIsNone(machine.turn())
+        self.assertEqual(machine.tries, 6)
+        self.assertEqual(machine.now, 5 * quick_check.LOCK_POLL)
+        self.assertEqual(len(machine.said), 2, machine.said)
+        self.assertIn("another quick check is running; this one waits for it to end before it builds anything",
+                      machine.said[0])
+        self.assertIn("the other quick check has ended", machine.said[1])
+
+    def test_the_wait_says_the_lock_is_still_held_once_in_a_while_and_not_after_every_try(self):
+        machine = Machine(held_for=int(3.5 * quick_check.BUSY_NOTICE / quick_check.LOCK_POLL))
+        self.assertIsNone(machine.turn())
+        held = [message for message in machine.said if "another quick check is running" in message]
+        self.assertEqual(len(held), 4, machine.said)
+
+    def test_a_lock_that_is_never_let_go_fails_after_the_wait_and_nothing_is_built(self):
+        machine = Machine(held_for=10 ** 9)
+        failure = machine.turn()
+        self.assertIsNotNone(failure)
+        self.assertIn("another quick check", failure)
+        self.assertIn("nothing was built or run", failure)
+        self.assertGreaterEqual(machine.now, quick_check.BUSY_WAIT)
+        self.assertLess(machine.now, quick_check.BUSY_WAIT + 2 * quick_check.LOCK_POLL)
+
+    def test_the_wait_for_the_lock_and_the_wait_for_a_quiet_machine_count_together_but_not_the_build_between(self):
+        machine = Machine(0.9, held_for=50)
+        self.assertIsNone(machine.turn())
+        waited_for_lock = machine.now
+        self.assertEqual(waited_for_lock, 50 * quick_check.LOCK_POLL)
+        machine.now += 300.0  # the checks and the build
+        before_the_wait = machine.now
+        self.assertIn("machine busy", machine.waited(waited_before=waited_for_lock))
+        self.assertEqual(machine.now - before_the_wait, quick_check.BUSY_WAIT - waited_for_lock)
+
+
+# What a check does that crashes while it holds the lock: takes it, says so, and is killed.
+HOLDS_THE_LOCK_AND_IS_KILLED = """\
+import os, signal, sys
+sys.path.insert(0, sys.argv[1])
+import quick_check
+print(quick_check.take_lock(quick_check.open_lock(sys.argv[2])), flush=True)
+os.kill(os.getpid(), signal.SIGKILL)
+"""
+
+
+class Lock(unittest.TestCase):
+    """The real lock (`fcntl.flock`) on a file in a temporary directory of its own."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.path = Path(directory.name) / "lock"
+        self.open_files = []
+        self.addCleanup(lambda: [os.close(fd) for fd in self.open_files])
+
+    def opened(self) -> int:
+        fd = quick_check.open_lock(self.path)
+        self.open_files.append(fd)
+        return fd
+
+    def closed(self, fd: int) -> None:
+        self.open_files.remove(fd)
+        os.close(fd)
+
+    def test_the_lock_is_a_file_in_the_system_temporary_directory_so_that_every_checkout_shares_it(self):
+        self.assertEqual(quick_check.LOCK.parent, Path(tempfile.gettempdir()))
+
+    def test_a_second_check_cannot_take_the_lock_until_the_first_lets_go(self):
+        first, second = self.opened(), self.opened()
+        self.assertTrue(quick_check.take_lock(first))
+        self.assertFalse(quick_check.take_lock(second))
+        self.closed(first)
+        self.assertTrue(quick_check.take_lock(second))
+
+    def test_a_check_that_crashes_does_not_keep_the_lock(self):
+        run = subprocess.run([sys.executable, "-I", "-c", HOLDS_THE_LOCK_AND_IS_KILLED, str(HERE), str(self.path)],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.stdout.strip(), "True", run.stderr)
+        self.assertEqual(run.returncode, -signal.SIGKILL)
+        self.assertTrue(quick_check.take_lock(self.opened()))
 
 
 if __name__ == "__main__":
