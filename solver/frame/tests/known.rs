@@ -385,7 +385,7 @@ fn both_verifiers_refuse_the_cases(sampled: impl Fn(usize) -> bool) {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it_to_913"
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
 )]
 fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it() {
     an_open_board_of_the_store_seeds_its_search_to(960);
@@ -394,6 +394,10 @@ fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it() {
 /// [`an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it`] for the boards of 900..913, where 910
 /// is the dearest to search.
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
+)]
 fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it_to_913() {
     an_open_board_of_the_store_seeds_its_search_to(913);
 }

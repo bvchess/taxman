@@ -301,6 +301,7 @@ fn a_climb_into_a_class_holds_the_boards_beside_it_and_is_seeded_from_the_far_si
 /// A run with floor steps of 20 points over 901..960, the truth hidden: every board is proven at its optimum, the steps
 /// ended as the events say and the report counts them.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_run_with_floor_steps_proves_the_stretch_and_the_events_and_the_report_say_how_they_ended() {
     let dir = TempDir::new("ledger-floor-run");
     let settings = Settings {
@@ -347,6 +348,7 @@ fn a_run_with_floor_steps_proves_the_stretch_and_the_events_and_the_report_say_h
 /// search is in its directory) is read, its boards get their roots, and the run goes on to prove the board; the old
 /// checkpoint is resumed when the board comes to its proof, and none is left.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_ledger_from_before_the_floor_steps_goes_on() {
     let (dir, n) = (TempDir::new("ledger-old-format"), 1218);
     // What the earlier build left: the board mapped (the start game, the root's bound), and the file as that build

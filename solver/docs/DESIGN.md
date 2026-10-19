@@ -1350,15 +1350,20 @@ of the chain is 2175: the prover proved every game to there, and the first game 
 
 ## 9. Testing
 
-**Two runs.**  The *quick check* is the command `solver/tools/quick_check.py` (it works in `solver/frame`): `cargo fmt --check`, `cargo clippy
---all-targets` and the tests of a non-release build, which `solver/tools/cloud/run_tests.py` runs, every test a process of its
-own and all the CPUs busy.  After a one-line change it takes about 12 s to rebuild and about 13 s to run the tests on a
-laptop of ten cores (a plain non-release `cargo test`, one binary after another, takes about 22 s).  It verifies most
-merges, a refactoring included.  **It fails**, with the tests that are over named, if the tests take more than 15 s (the
-target is 10 s; the build is not counted) or if one test uses more than 2 s of CPU (CPU, not seconds on the clock, which
-grow several times over when every CPU is busy); the limits are the constants at the top of the script, and raising
-either needs Brian's approval: a test that goes over is made smaller or long, as below, never allowed more.  The *full
-suite* is `cargo test --release`: every test, the long ones too (about 3 minutes of tests, after a build of 6 minutes).
+**Two runs.**  The *quick check* is the command `solver/tools/quick_check.py` (it works in `solver/frame`): `cargo fmt
+--check`, `cargo clippy --all-targets`, the build of the tests and the tests of a non-release build, which
+`solver/tools/cloud/run_tests.py` runs, every test a process of its own and all the CPUs busy.  After a one-line change
+it takes about 12 s to rebuild and about 10 s to run the tests on a laptop of ten cores (a plain non-release `cargo
+test`, one binary after another, takes about 19 s).  It verifies most merges, a refactoring included.  **It waits
+for a quiet machine**, because its limits are for one with nothing else to do: when the build has ended it samples what
+everything on the machine uses of the CPUs for 2 s, and if other work uses more than 25% of the CPUs it says so, names
+the busiest processes and samples again until the machine is quiet.  After 10 minutes it fails with "machine busy" and
+runs no test, so that a busy machine is never taken for a slow suite.  **It fails**, with the tests that are over named,
+if the tests take more than 15 s (the target is 10 s; the build and the wait are not counted) or if one test uses more
+than 2 s of CPU (CPU, not seconds on the clock, which grow several times over when every CPU is busy); the limits and
+the thresholds of the wait are the constants at the top of the script, and raising a limit needs Brian's approval: a
+test that goes over is made smaller or long, as below, never allowed more.  The *full suite* is `cargo test --release`:
+every test, the long ones too (about 3 minutes of tests, after a build of 6 minutes).
 It runs before a cloud run, after any change that changes search trees or results, and in the gates (the one-thread
 re-solve of 1301-2175).
 A default build (and so every run above, and the cloud setup) covers the library, the binary, the tests and the examples
@@ -1391,7 +1396,10 @@ there is *long* (the quick check fails one that is far over, as above): `#[cfg_a
 the quick check is quick_one")]` skips it in a non-release run, where debug assertions are on, and `--release` runs it.
 `quick_one` is the quick test that checks the same property at a small size: a prefix of the range the long test walks
 (which then takes the rest of it), a sample of the chain or of the golden games, fewer random draws, a smaller board or
-game.  A few tests that draw a count, or build
+game.  Where several tests walk one path at different sizes (a ledger run for each of its features, a certify test for
+each refusal), the quick check keeps one small test of the path, and the `ignore` message of each long one names the
+test that stands in for it.  The target of 10 s on ten cores is a budget of about 80 CPU seconds for all the tests of the
+quick check together, so a test that is added is paid for by shrinking another.  A few tests that draw a count, or build
 an instance that must outlast a script, take a smaller one in a non-release run (`QUICK` in `tests/common/support.rs`,
 shared with the unit tests: the engine's instances, the random configurations of `robustness`).  Tests with a plain
 `#[ignore]` are ignored in both.  The descriptions below are of the full suite.

@@ -660,6 +660,7 @@ fn worker_panic_propagates() {
 
 /// A worker's panic gives its turn on the emulated CPUs up, so that the workers waiting for one do not wait forever.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is worker_panic_propagates")]
 fn worker_panic_propagates_on_one_core() {
     worker_panic_propagates_with(Some(1));
 }
@@ -985,6 +986,7 @@ fn a_ceiling_given_while_the_run_goes_ends_it_when_reached() {
 /// An incumbent offered from outside before the run is where the run starts from, and one offered while it goes joins
 /// it: the run's incumbent is at least as good, and is the one offered if the search finds nothing better.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is workers_added_and_retired_while_the_run_goes")]
 fn outside_incumbents_join_the_run() {
     let inst = instance();
     let raw = raw_search(&inst);

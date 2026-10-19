@@ -320,6 +320,7 @@ fn a_board_past_2047_builds_bounds_and_searches_at_w64() {
 /// The same for n = 4100 at W = 128, the set width of every board from 4096 up: a board with numbers above 4095 in
 /// its frames, which no narrower set holds.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_board_past_2047_builds_bounds_and_searches_at_w64")]
 fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
     builds_bounds_and_searches::<128>(4100, 4095);
 }
@@ -359,6 +360,7 @@ fn root_search<const W: usize>(game: &Game<W>, words: Option<usize>) -> (u64, Ve
 /// words at W = 128 (the only width that has them), and must end with the same best, set and nodes as at W = 16 and
 /// as at W = 128 with its own one word.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_board_past_4095_is_set_up_at_128_words")]
 fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
     assert!(Config::standard().gf2);
     let expected = root_search(&Game::<16>::of_board(1000).unwrap(), None);
@@ -626,13 +628,14 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
 /// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
 /// that keeps the symmetric pairs' inequalities, which can be lighter than the unit's best.
 #[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is deep_levels_of_a_large_game_below_a_few_units")]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is incremental_solver_matches_the_reference_on_a_sample")]
 fn deep_levels_of_a_large_game() {
     deep_levels_of_a_large_game_below(8);
 }
 
 /// [`deep_levels_of_a_large_game`] with the subtrees below 2 units searched under every tactic.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is incremental_solver_matches_the_reference_on_a_sample")]
 fn deep_levels_of_a_large_game_below_a_few_units() {
     deep_levels_of_a_large_game_below(2);
 }

@@ -214,6 +214,7 @@ fn a_lower_bound_above_an_upper_bound_is_a_violation() {
 /// proven at its optimum, by searches (stopped ones give dual bounds) and by the relations, and a second run on the
 /// same directory finds nothing to do and keeps every bound; the report's check passes.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_run_proves_a_stretch_at_the_optimum_and_goes_on_from_its_ledger() {
     let dir = TempDir::new("ledger-run");
     let settings = Settings {
@@ -501,6 +502,7 @@ fn a_board_next_to_a_climb_down_waits_as_one_next_to_a_climb_up_does() {
 /// board parked in the ledger, and the report counts the climbs of each way.  With one way only or with `climb_limit`
 /// 0, only the climbs that are asked for are made.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_run_climbs_and_parks_and_turns_the_climbs_off() {
     let dir = TempDir::new("ledger-climb-run");
     let results = dir.join("given.jsonl");
@@ -590,6 +592,7 @@ pub(crate) fn attempted(dir: &Path, job: &Job) -> Attempt {
 /// that goes on from the same seed, nor when the seed reaches the ceiling, nor with no seconds.  Its game seeds the
 /// search when it beats the seed, and every game it returns plays at the score it says, by the referee.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn the_finder_follows_a_map_and_precedes_a_search_whose_seed_it_has_not_seen() {
     let (dir, n) = (TempDir::new("ledger-finder"), 1218);
     // The seconds of each run of the finder, which has most of its gain in the first fraction of a second.
@@ -729,6 +732,7 @@ pub(crate) fn job_events(dir: &Path) -> Vec<Json> {
 /// seed were (the finder's scores between its seed's and the optimum), the games of the finder pass the report's
 /// referee, and the report counts the finder's runs.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_what_it_did() {
     let dir = TempDir::new("ledger-finder-run");
     let results = dir.join("given.jsonl");
@@ -775,6 +779,7 @@ fn a_run_with_the_finder_proves_the_stretch_and_the_events_and_the_report_say_wh
 /// With no seconds for the finder nothing of it is left in a run (no run, no game of its rule, no score kept, no seed
 /// from it), and the choice of the jobs is what it is with the finder on: its setting changes only what a job carries.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_run_is_exported_and_both_referees_accept_the_file")]
 fn with_no_seconds_for_the_finder_nothing_of_it_is_left_and_the_order_of_the_jobs_is_the_same() {
     let dir = TempDir::new("ledger-finder-off");
     let results = dir.join("given.jsonl");

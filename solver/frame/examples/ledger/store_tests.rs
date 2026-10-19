@@ -500,12 +500,11 @@ fn both_referees_refuse_a_tampered_file_and_name_the_line() {
     both_referees_refuse_the_tampered_files(|_| true);
 }
 
-/// [`both_referees_refuse_a_tampered_file_and_name_the_line`] for three of its cases: the third, eighth and last (a root
-/// bound lowered, a repeat's bag changed and an upper bound below the chain's score), the first two of which the Python
-/// referee cannot find.
+/// [`both_referees_refuse_a_tampered_file_and_name_the_line`] for its last case, an upper bound below the chain's score,
+/// which both referees find (each case costs a run of the Python referee).
 #[test]
 fn both_referees_refuse_a_sample_of_the_tampered_files_and_name_the_line() {
-    both_referees_refuse_the_tampered_files(|case| case % 5 == 2);
+    both_referees_refuse_the_tampered_files(|case| case == 12);
 }
 
 /// The test of the cases `sampled` picks (by their index).
