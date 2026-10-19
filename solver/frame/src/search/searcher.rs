@@ -14,6 +14,7 @@
 //! both checks compare with that value, even after one of them has offered a better incumbent.
 
 use super::diagnostics::{cut, Probe};
+use super::hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 use super::lagrange::{Lagrangian, Refits};
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
@@ -23,7 +24,7 @@ use super::{Diagnostics, Forgetting};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
-use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
+use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -125,6 +126,8 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
+    /// A study's hook, which each searcher makes for itself (see [`StepHook`]; `None` in the solver's searches).
+    pub hooks: Option<&'a MakeHook<W>>,
 }
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
@@ -168,6 +171,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
                 .filter(|pairs| !pairs.is_empty()),
+            hooks: None,
         }
     }
 }
@@ -338,6 +342,8 @@ struct Stepper<'a, const W: usize> {
     probe: Option<Probe<'a>>,
     /// The GF(2) bound's counters as of the last flush.
     gf2_flushed: Gf2Stats,
+    /// A study's hook, and the record of the step in progress that it is told of ([`SearchSpace::hooks`]).
+    hook: Option<(Box<dyn StepHook<W>>, StepRecord<W>)>,
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -371,6 +377,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 payload: Vec::with_capacity(8 * W),
                 probe: space.diagnostics.map(Probe::new),
                 gf2_flushed: Gf2Stats::default(),
+                hook: space.hooks.map(|make| (make(), StepRecord::default())),
             },
         }
     }
@@ -417,7 +424,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             self.stack.push(copy); // the slot for the children of a node this deep, made once
         }
         let (path, below) = self.stack.split_at_mut(depth + 1);
-        self.stepper.step(&mut path[depth], &mut below[0], depth > 0, ctx)
+        let next = self.stepper.step(&mut path[depth], &mut below[0], depth > 0, ctx);
+        if let Some((hook, record)) = &mut self.stepper.hook {
+            let made = !matches!(record.end, StepEnd::LoopEnd(_) | StepEnd::ChildFailed);
+            hook.step(record, &path[depth].state, made.then_some(&below[0].state));
+        }
+        next
     }
 }
 
@@ -466,6 +478,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         let best = ctx.best();
         let need = (best + 1).saturating_sub(node.sum); // what a completion must add to beat the incumbent
+        if let Some((_, record)) = &mut self.hook {
+            *record = StepRecord { promoted: node.promoted, cands: node.cands, need, ..StepRecord::default() };
+        }
 
         let open = match self.check_node(node, need, ctx) {
             Ok(open) => open,
@@ -481,12 +496,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
             if let Some(p) = &mut self.probe {
                 p.failed(branch.added.len() == 1);
             }
+            self.tell(StepEnd::ChildFailed);
             return Next::Same;
         };
         if let Err(reason) = self.check_child(child, &branch.added, max_next, best, ctx) {
             if let Some(p) = &mut self.probe {
                 p.child_cut(reason);
             }
+            self.tell(StepEnd::ChildCut(reason));
             return Next::Same;
         }
         self.offer(ctx, &child.promoted);
@@ -494,6 +511,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             if let Some(p) = &mut self.probe {
                 p.child_cut(cut::EMPTY);
             }
+            self.tell(StepEnd::Leaf);
             return Next::Same;
         }
         child.max_add =
@@ -527,6 +545,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
             // The node was checked when it was made, at the same need and with the same matching (this is its
             // first step): the verdict is the same, and so are the conflict and the forced members.  So is the
             // rule of `symmetry`, which `make_child` applied to the same promotions and candidates.
+            if let Some((_, record)) = &mut self.hook {
+                record.inherited = true;
+            }
             return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced });
         }
         let space = self.space;
@@ -864,6 +885,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let g = self.gf2.as_mut().expect("the tactic gf2");
         let eval = g.evaluate(cap, space.fix_forced.then_some(need));
         if eval.value < need {
+            self.tell_check(&eval, None);
             return Err(cut::GF2);
         }
         let forced = eval.forced;
@@ -879,6 +901,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         };
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
+        if self.hook.is_some() {
+            let k = match &found {
+                Lookup::Conflict(k) => Some((*k, computed)),
+                _ => None,
+            };
+            self.tell_check(&eval, k);
+        }
         let conflict = match found {
             Lookup::Conflict(k) => k,
             Lookup::None => {
@@ -976,7 +1005,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     if !to_need && !kept && !(space.fix_forced && !forced.is_empty()) {
                         g.keep_certified(best.1);
                     }
-                    if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
+                    // A study's hook may branch on another member (any member keeps the search exact; the level kept
+                    // for this one is then not used: `Gf2Bound::remove_candidate` takes it only for this member).
+                    let chosen = match &mut self.hook {
+                        Some((hook, _)) if forced.is_empty() && !to_need => {
+                            let x = hook.branch(&k, best.1);
+                            assert!(k.contains(x), "a hook chose {x}, which is not in the conflict {k:?}");
+                            x
+                        }
+                        _ => best.1,
+                    };
+                    if space.fix_forced { forced.max() } else { None }.or(Some(chosen))
                 }
             },
             Some(k) => k.max(),
@@ -999,6 +1038,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
         }
         let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
+        if let Some((_, record)) = &mut self.hook {
+            (record.branch, record.added, record.forced) = (Some(n), added, forced);
+        }
         Some(Branch { n, added, left })
     }
 
@@ -1009,6 +1051,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(p) = &mut self.probe {
             p.loop_end(reason);
         }
+        self.tell(StepEnd::LoopEnd(reason));
         if pushed {
             if self.matching_on {
                 self.matching.pop();
@@ -1021,6 +1064,34 @@ impl<'a, const W: usize> Stepper<'a, W> {
             l.leave(promoted);
         }
         Next::Parent
+    }
+
+    /// Records how the step ended, for the hook, if there is one.
+    #[inline]
+    fn tell(&mut self, end: StepEnd) {
+        if let Some((_, record)) = &mut self.hook {
+            record.end = end;
+        }
+    }
+
+    /// Records a GF(2) bound check, for the hook if there is one: the node's own, or once the node has chosen its
+    /// branch the child's.  `conflict` is the conflict of its heaviest set, if the check got as far as one.
+    #[inline]
+    fn tell_check(&mut self, eval: &Eval<W>, conflict: Option<(Bits<W>, bool)>) {
+        if let Some((_, record)) = &mut self.hook {
+            let check = BoundCheck {
+                value: eval.value,
+                chosen: eval.chosen,
+                forced: eval.forced,
+                conflict: conflict.map(|(k, _)| k),
+                computed: conflict.is_some_and(|(_, computed)| computed),
+            };
+            if record.branch.is_some() {
+                record.child = Some(check);
+            } else {
+                record.node = Some(check);
+            }
+        }
     }
 
     /// Offers `set` as the incumbent if it beats it, recording when.  A proven ceiling on the sum is the run's, not

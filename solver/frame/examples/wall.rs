@@ -19,6 +19,8 @@
 //!     [--a1-seconds S] --prep DIR [--results DIR --worker K] [--claims DIR] N|A-B...
 //! cargo run --profile test --example wall --features studies -- decompose --known FILE [--fixtures DIR [--keep K]]
 //!     [--pauses P --span STEPS] [--unit-cap STEPS] [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N|A-B...
+//! cargo run --profile test --example wall --features studies -- anatomy --suite FILE --known FILE --ids ID[,ID...]
+//!     [--trace DIR] [--prefer FILE] [--best-cpu S] [--nodes K] [--tactic NAME=VALUE]... N
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -119,6 +121,10 @@
 //!   apart under the separator of the node's best completion, and the AND/OR search itself.  Defined in
 //!   `wall/decompose.rs`, whose module comment has the options and the lines;
 //!   `solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/` reads them.
+//! * **anatomy**: units of the tuning suite solved with a hook on every step of the searcher, which writes what each
+//!   step saw and did (its bound, conflict, branch and how it ended, and the residues of the frames), optionally with a
+//!   branching order of its own; defined in `wall/anatomy.rs`, whose module comment has the options and the files.
+//!   `solver/notebook/the-anatomy-of-a-hard-subtree-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -144,6 +150,9 @@
 //! `tail_idle_s`), and the units' starts, the time to rebuild a unit's state (`rebuild_s`) and the time of the first
 //! node of the units that had one (`first_step_s`, over `first_steps` units).
 
+/// `anatomy`: a hard subtree's steps, told by a hook on the searcher.
+#[path = "wall/anatomy.rs"]
+mod anatomy;
 /// The game that `choice-prepare` and `choice` play: their options, budgets and the play of a command.
 #[path = "wall/case.rs"]
 mod case;
@@ -210,12 +219,12 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 9] =
-    ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice", "decompose"];
+const COMMANDS: [&str; 10] =
+    ["setup", "nodes", "grow", "start", "frames", "landscape", "choice-prepare", "choice", "decompose", "anatomy"];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 43] = [
-    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose"]),
+const OPTIONS: [(&str, &[&str]); 47] = [
+    ("--known", &["setup", "nodes", "grow", "start", "landscape", "choice-prepare", "decompose", "anatomy"]),
     ("--cap", &["choice"]),
     ("--fixtures", &["choice-prepare", "decompose"]),
     ("--pauses", &["decompose"]),
@@ -224,7 +233,11 @@ const OPTIONS: [(&str, &[&str]); 43] = [
     ("--best-cap", &["decompose"]),
     ("--and-or-cap", &["decompose"]),
     ("--and-or-min", &["decompose"]),
-    ("--suite", &["choice-prepare"]),
+    ("--suite", &["choice-prepare", "anatomy"]),
+    ("--ids", &["anatomy"]),
+    ("--trace", &["anatomy"]),
+    ("--prefer", &["anatomy"]),
+    ("--best-cpu", &["anatomy"]),
     ("--paths", &["choice-prepare"]),
     ("--keep", &["choice-prepare", "decompose"]),
     ("--prep", &["choice-prepare", "choice"]),
@@ -244,13 +257,13 @@ const OPTIONS: [(&str, &[&str]); 43] = [
     ("--fix", &["choice-prepare"]),
     ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
-    ("--nodes", &["nodes", "grow"]),
+    ("--nodes", &["nodes", "grow", "anatomy"]),
     ("--seconds", &["nodes", "grow"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
     ("--width", &["setup", "nodes"]),
     ("--no-seed", &["nodes"]),
-    ("--tactic", &["nodes", "grow"]),
+    ("--tactic", &["nodes", "grow", "anatomy"]),
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
@@ -302,6 +315,8 @@ struct Options {
     out: Option<PathBuf>,
     /// The options of `choice-prepare` and `choice`.
     params: case::Params,
+    /// The options of `anatomy`.
+    anatomy: anatomy::Params,
     games: Vec<u32>,
 }
 
@@ -327,6 +342,7 @@ impl Options {
             mem_cap: None,
             out: None,
             params: case::Params::default(),
+            anatomy: anatomy::Params::default(),
             games: Vec::new(),
         }
     }
@@ -449,6 +465,10 @@ fn parse() -> Result<Options, String> {
             "--seed" => o.params.lns.seed = number("--seed", value("--seed")?)?,
             "--fix" => o.params.lns.fix = case::fix_range(&value("--fix")?)?,
             "--unit-nodes" => o.params.lns.unit_nodes = number("--unit-nodes", value("--unit-nodes")?)?,
+            "--ids" => o.anatomy.ids = value("--ids")?.split(',').map(str::to_owned).collect(),
+            "--trace" => o.anatomy.trace = Some(value("--trace")?.into()),
+            "--prefer" => o.anatomy.prefer = Some(value("--prefer")?.into()),
+            "--best-cpu" => o.anatomy.best_cpu = number("--best-cpu", value("--best-cpu")?)?,
             _ => texts.push(arg.clone()),
         }
     }
@@ -508,6 +528,10 @@ fn main() {
     let optimal = Optimal::built_in().with_results_files(o.known.as_slice()).unwrap_or_else(|e| fail(&e));
     if o.command == "landscape" {
         landscape(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if o.command == "anatomy" {
+        anatomy::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     if let Some(command) = case::Command::named(&o.command) {

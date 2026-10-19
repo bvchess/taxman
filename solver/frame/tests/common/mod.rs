@@ -459,6 +459,7 @@ impl<const W: usize> Game<W> {
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
+            hooks: None,
         };
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {
