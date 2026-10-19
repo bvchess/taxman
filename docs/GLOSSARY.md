@@ -91,7 +91,7 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   a frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged
   into one, so that a promotion always has one frame to go to.  The numbering is **clean** (statement N of
   THEORY.md): every frame with freedoms directly in front of frame h is frame h − 1.  On every board the solver
-  supports it equals the Java's numbering, breadth first from the front.
+  supports it equals the numbering breadth first from the front.
 * **promote**, **promotion**: to play a factor as a move.  Promoting a factor of frame h takes it out of the frame's
   factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  After
   promotions the frames are *reduced*: a move left with one live factor is paid by it, and the pair is dropped,
@@ -104,9 +104,8 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 * **promotion set**: a set of candidates that can be promoted together from the root, keeping every frame winnable and
   its freedoms at least 0.  *Promotable* is its adjective: a promotable set is a promotion set.  The score of a game of
   the model is `in_the_bag` plus the sum of its promotion set.  On the board of 21, {9} and {4} are promotion sets.
-* **in the bag** (`in_the_bag`, the Java's `inTheBag`): what the game with no promotions scores.  Game 21 has
-  `in_the_bag` = 135.
-* **max_total** (the Java's `maxTotalPromotions`): the most promotions the frames' freedoms allow.
+* **in the bag** (`in_the_bag`): what the game with no promotions scores.  Game 21 has `in_the_bag` = 135.
+* **max_total**: the most promotions the frames' freedoms allow.
 * **search problem**, **Π**: what setup gives the search, less what only changes how the search runs: the frames, the
   candidates, `max_total` and the factor graph among their numbers.  `search::Problem` writes it out canonically, and
   `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n ([DESIGN.md, "Same
@@ -226,8 +225,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
 * **chain**: games each built from the one before (n = 1, 2, 3, ...).  A game's search starts from the previous game's
   promotions and stops at its ceiling.  A game solved with no game of n − 1 is **standalone**.
-* **the committed chain**: `results/strict.jsonl`, the chain from n = 1 that the repository keeps.  Every game in it is
-  proven and assumes nothing beyond the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its
+* **the committed chain**: the chain in the file `results/strict.jsonl`, from n = 1.  Every game in it is proven and
+  assumes nothing beyond the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its
   range.  The **end of the chain** is its last game.
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
   concludes it with the earlier game's promotions instead of searching.  `same_search` is the name of the tactic and of
@@ -248,9 +247,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
   game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
   score ([DESIGN.md, "Certificates of U"](../solver/docs/DESIGN.md#certificates-of-u)).
-* **optimal.json**: the table of optimal games, n ≤ 1300: the Java's games 1 to 1000, then the chain's, appended by
-  `taxman extend-optimal`.  It is built into the binary.  **optimal ok**: a score equals the table's.  That is not a
-  proof, and above the table's last game there is no table to match; a score that differs is a hard error.
+* **optimal.json**: the table of optimal games, n ≤ 1300, built into the binary
+  ([results/README.md](../results/README.md#optimaljson) says where its games came from).  **optimal ok**: a score
+  equals the table's.  That is not a proof, and above the table's last game there is no table to match; a score that
+  differs is a hard error.
 * **referee**: code that replays one game and checks it: legal, over, opening with the largest prime, scoring what is
   recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  A game that fails after it was found
   is **rejected**, written to `<results>.rejected.jsonl`.
@@ -266,8 +266,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
 * **the frame solver**: the crate `solver/frame/` and its binary `taxman`, a branch and bound over promotion sets
   within the frame model, which finds the games.  "The solver" for short.
-* **the Java solver**: the original solver, whose algorithm the frame solver reimplements.  It is not in the tree; the
-  git tag `java-final` has it, and the [wiki](https://github.com/bvchess/taxman/wiki) describes it.
+* **the Java solver**: the original solver, whose algorithm the [wiki](https://github.com/bvchess/taxman/wiki) describes
+  and the frame solver reimplements.  It is not in the tree; the git tag `java-final` has it.
 * **the prover**: the crate `solver/noframe/`, a branch and bound over sets of moves on the whole board.  It decides
   playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
   moves beats a recorded score ([its README](../solver/noframe/README.md)).
@@ -276,7 +276,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   greedy keeps a playable set of the largest size.  It is equivalent to THEORY.md's *upper-half conjecture*, that U\*
   is the heaviest playable set of sources.  **(♦)**: every source that descending greedy rejects is a GF(2)
   combination of sources it kept above it.  Statement (♦) implies (★) ([THEORY.md](THEORY.md), Theorem 7).
-* **the heuristics** (`heuristics/`): Python strategies that play good but not provably optimal games.
+* **the heuristics** (`heuristics/`): strategies that play good games quickly but don't guarantee optimal results.
 * **the probe** (`examples/perf.rs`), **the ladder** (`examples/ladder.rs`) and **`taxman bench`**: the performance
   tools of [DESIGN.md, section 10](../solver/docs/DESIGN.md#10-performance).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
