@@ -20,7 +20,7 @@
 //! files without changing them, `verify-certificates` does the same for the files `certify` wrote and says how far the
 //! proofs of the recorded scores reach, `extend-optimal` writes the table with the games of a results file that
 //! continue it appended, and `tables` prints the maximal factors and composites of numbers on a board.  Every
-//! command that meets a score of a board size `optimal.json` has checks it against the table built into the binary
+//! command that meets a score of a game `optimal.json` has checks it against the table built into the binary
 //! ([`Optimal::built_in`]): no flag turns that off or points at another file.
 
 use crate::cli::{
@@ -135,7 +135,7 @@ fn wall_line(wall: Wall, opts: &SolveOptions) -> String {
     )
 }
 
-/// `solve N|A-B [options]`: solves one board size or a range, each from the one before (`solver::solve_range_each`).
+/// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
     let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
@@ -221,7 +221,7 @@ pub fn solve(args: &[String]) -> CliResult {
 const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", "--list"];
 
 /// `certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]`: certifies, game by game, the
-/// recorded scores of A..B, or of the boards of the list FILE in its order (one board size a line, `#` for comments;
+/// recorded scores of A..B, or of the boards of the list FILE in its order (one n a line, `#` for comments;
 /// [`read_board_list`]), that rest on the frame model, by a search of the extended problem ([`taxman::certify`]).  The
 /// scores and games come from the results files (over the table of optimal games, which must agree with them), the
 /// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a
@@ -229,7 +229,7 @@ const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", 
 /// `--out` as it is made, and a rerun skips the games the file has a certificate for and resumes a stopped search
 /// from its checkpoint.  The extended problem is searched with the claims of `unzip` that Lemma M5⁺ keeps, unless
 /// `--no-claims` says to search it without them (the formulation of the certificates made before that lemma); each
-/// certificate records its formulation.  A game whose extended problem a certified game of the last 8 board sizes (of
+/// certificate records its formulation.  A game whose extended problem a certified game of the last 8 games (of
 /// this run, or of the file, made in either formulation) posed, with a recorded game worth what that game's
 /// certificate proved the most, is certified with no search (`same_problem`; [`taxman::certify`]).  A game found to
 /// beat its recorded score is printed, written to `<out>.counterexample.jsonl` too, and ends the run with status 2, as
@@ -455,7 +455,7 @@ pub fn regress(args: &[String]) -> CliResult {
 /// search of a second or so on one thread (DESIGN.md, "Performance").
 const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 
-/// Times the benchmark games (or the board sizes given), each standalone, and appends the run to the history.
+/// Times the benchmark games (or the games given), each standalone, and appends the run to the history.
 pub fn bench(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--history", "--known"]), &[])?;
     // Where the run is recorded, and where the previous games past optimal.json's come from: in the repository
@@ -469,7 +469,7 @@ pub fn bench(args: &[String]) -> CliResult {
     let ns: Vec<u32> = if args.positional().is_empty() {
         BENCH_GAMES.to_vec()
     } else {
-        let parse = |text: &String| text.parse().map_err(|_| CliError::Usage(format!("not a board size: {text:?}")));
+        let parse = |text: &String| text.parse().map_err(|_| CliError::Usage(format!("not a game n: {text:?}")));
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;

@@ -109,7 +109,7 @@ fn bound_and_independence_on_small_boards() {
         if seed.sum() == opt {
             assert!(independent(&graph, &seed), "n={n}: the optimal promotions are dependent");
         }
-        assert!(value >= opt, "n={n}: the bound {value} is below the optimum {opt}");
+        assert!(value >= opt, "n={n}: the bound {value} is below P* {opt}");
     }
     assert!(enumerated > 80, "{enumerated} boards enumerated");
 }
@@ -309,7 +309,7 @@ fn bound_and_independence_in_extended_problems(ns: std::ops::RangeInclusive<u32>
             }
             if let Some(score) = optimal.score(n) {
                 let opt = score.checked_sub(ext.in_the_bag).expect("the fixed sources score less than the game");
-                assert!(value >= opt, "n={n}, O={open:?}: the bound {value} is below the optimum {opt}");
+                assert!(value >= opt, "n={n}, O={open:?}: the bound {value} is below P* {opt}");
                 tally.optimum_checks += 1;
             }
         }
@@ -317,7 +317,7 @@ fn bound_and_independence_in_extended_problems(ns: std::ops::RangeInclusive<u32>
     let ExtendedTally { problems, with_one_sided, enumerated, capped, sets, sets_with_one_sided, optimum_checks } =
         tally;
     println!(
-        "{problems} problems, {with_one_sided} with a one-sided candidate, {optimum_checks} against the optimum, \
+        "{problems} problems, {with_one_sided} with a one-sided candidate, {optimum_checks} against P*, \
          in {:.1?}",
         start.elapsed()
     );

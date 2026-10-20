@@ -165,7 +165,7 @@ fn known_with(file: &Path, games: &[Game]) -> Optimal {
 /// A wrong game for board `n`: the chain's game with its smallest move up to n/2 left out and its score lowered by that
 /// move.  A game stays legal when a move is left out (what the move would have taxed stays in the pot, and none of its
 /// divisors is played after it), and it plays the same numbers above n/2, so it is still a promotion set of the
-/// extended problem; but its score is below the optimum, which the chain has proven, so a search must beat it.
+/// extended problem; but its score is below opt(n), which the chain has proven, so a search must beat it.
 /// Returns the planted score, the moves and the move left out.
 fn planted_game(n: u32) -> (u64, Vec<u32>, u32) {
     let known = &fixtures().known;
@@ -353,7 +353,7 @@ fn a_certificate_writes_the_fields_of_its_search_for(n: u32, open: impl Into<Vec
 // A planted wrong score
 
 /// Checks that `c` says the planted score of board `n` is beaten: the verdict is `Beaten` and the game found is one
-/// that the referee accepts, scores more than the planted score, and, since the chain's score is the optimum, scores
+/// that the referee accepts, scores more than the planted score, and, since the chain's score is opt(n), scores
 /// that.
 fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
     assert_eq!(c.verdict, Verdict::Beaten, "n={n}: {}", c.summary_line());
@@ -372,7 +372,7 @@ fn assert_beaten_by_the_optimum(c: &Certificate, n: u32, planted: u64) {
 
 /// A wrong score planted on a board (see [`plant_wrong_score`]) is beaten, with the real barred bounds: the verdict
 /// is `Beaten` and the game found is one that the referee accepts, scores more than the planted score, and, since the
-/// chain's score is the optimum, scores that.
+/// chain's score is opt(n), scores that.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -818,7 +818,7 @@ fn problems_of(boards: &[u32], claims: bool) -> BTreeMap<u32, Problem> {
 }
 
 /// The game the rule rests `n` on, given the problems of the games before it: the latest of the last
-/// `SAME_SEARCH_WINDOW` board sizes whose problem is `problem`, found by comparing the problems whole.
+/// `SAME_SEARCH_WINDOW` games whose problem is `problem`, found by comparing the problems whole.
 fn latest_with_problem(n: u32, problem: &Problem, problems: &BTreeMap<u32, Problem>) -> Option<u32> {
     (n.saturating_sub(SAME_SEARCH_WINDOW)..n).rev().find(|m| problems.get(m) == Some(problem))
 }
@@ -1414,7 +1414,7 @@ fn a_certificate_file_is_locked_while_it_is_open() {
     for (text, why) in [
         ("not json\n".to_owned(), "line 1"),
         (format!("{good}\n{{\"n\":32}}\n"), "line 2: no verdict"),
-        ("{\"verdict\":\"beaten\"}\n".to_owned(), "line 1: no board size"),
+        ("{\"verdict\":\"beaten\"}\n".to_owned(), "line 1: no n"),
         ("{\"n\":30,\"verdict\":\"maybe\"}\n".to_owned(), "line 1: no verdict"),
         (format!("{good}\n{without_digest}\n"), "line 2: missing \"digest\""),
     ] {
@@ -1999,7 +1999,7 @@ fn doctored_lines_are_refused_naming_the_line() {
     let wrong = doctored(0, &["verdict"], Json::from("beaten"));
     assert_refused(&dir, "beaten.jsonl", &wrong, 2, 1313, "whose last final line before it (line 1) is beaten");
     let wrong = doctored(1, &["same_problem", "n"], Json::from(1300u32));
-    assert_refused(&dir, "window.jsonl", &wrong, 2, 1313, "it rests on n=1300, which is none of the 8 board sizes");
+    assert_refused(&dir, "window.jsonl", &wrong, 2, 1313, "it rests on n=1300, which is none of the 8 games");
     let wrong = doctored(3, &["same_problem", "n"], Json::from(1313u32));
     assert_refused(&dir, "other.jsonl", &wrong, 4, 1315, "its problem is not that of n=1313, which it rests on");
 

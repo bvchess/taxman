@@ -57,7 +57,7 @@
 //! An edge counts when its upper end is required or a candidate and its lower end is not required.  The frames
 //! of a state reached by promotions are the root's minus the pairs a reduction drops (a move left with a single
 //! factor takes it, see [`FrameGraph`]); the graph keeps those pairs, but every matching that matches the required
-//! vertices pairs them up just as the reduction did, so the optimum is the same.
+//! vertices pairs them up just as the reduction did, so the matching's maximum weight is the same.
 //!
 //! # The incremental solver
 //!
@@ -66,11 +66,11 @@
 //! `y_u + y_w ≥ weight` on every edge, with equality on matched edges, and `y = 0` on every free vertex that is
 //! not required.  A change of roles breaks these conditions at a few vertices at most:
 //!
-//! * a candidate that is not promoted in the optimum stops being a candidate: nothing breaks;
+//! * a candidate that is not promoted in the matching stops being a candidate: nothing breaks;
 //! * a candidate that is promoted stops being one: its matched edge goes, and both ends may now be free with a
 //!   positive potential;
-//! * a candidate that is promoted in the optimum becomes required (the search promotes it): its potential drops
-//!   by its number and nothing breaks;
+//! * a candidate that is promoted in the matching becomes required (the search promotes it): its potential
+//!   drops by its number and nothing breaks;
 //! * any other number becomes required: it is free and must be matched, and if it was paying for a mover, that
 //!   mover is free now.
 //!
@@ -400,7 +400,7 @@ struct Level<const W: usize, K: Weighing = Numbers> {
     y: Vec<i64>,
     /// The numbers whose role is candidate.
     cands: Bits<W>,
-    /// The candidates matched to a factor (promoted in the optimum), and their sum.
+    /// The candidates matched to a factor (promoted in the matching), and their sum.
     chosen: Bits<W>,
     value: u64,
     /// Candidates to turn into factors before the next evaluation.
@@ -535,7 +535,7 @@ impl<const W: usize, K: Weighing> Level<W, K> {
         match self.role[v] {
             Role::Required => return,
             Role::Candidate if self.mate[v] != NONE && usize::from(self.mate[v]) < v => {
-                // Promoted in the optimum: it stays matched, and its edges now weigh 0 instead of its weight.
+                // Promoted in the matching: it stays matched, and its edges now weigh 0 instead of its weight.
                 self.tally(g, v, usize::from(self.mate[v]), false);
                 self.y[v] -= self.weighing.of(g, v);
                 self.role[v] = Role::Required;

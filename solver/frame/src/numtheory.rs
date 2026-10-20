@@ -1,9 +1,9 @@
 //! Number-theory tables for the board `1..=n`: the *maximal* factors and composites that the frame model is
 //! built on, plus the sieve and divisor lists they come from.
 //!
-//! Where this fits: the first step of every game.  `solver` builds one [`Tables`] for the board size; the frames
-//! as setup forms them ([`crate::frames`]) read the maximal-factor and maximal-composite lists to decide which number
-//! can pay for which move, and the search's factor provider ([`crate::model`]) is built from the same lists.
+//! Where this fits: the first step of every game.  `solver` builds one [`Tables`] for n; the frames as setup forms
+//! them ([`crate::frames`]) read the maximal-factor and maximal-composite lists to decide which number can pay for
+//! which move, and the search's factor provider ([`crate::model`]) is built from the same lists.
 //!
 //! # Maximal factors and composites
 //!
@@ -27,7 +27,7 @@
 /// source of [`is_prime`](Tables::is_prime); `divisors` is not read by the solver at all (it is the Java
 /// `FactorTable`'s list, kept for the tests that check the other lists against the definition).
 pub struct Tables {
-    /// The board size: the numbers are `1..=n`.
+    /// The game's n: the numbers are `1..=n`.
     pub n: u32,
     /// Smallest prime factor of each `k >= 2`; `spf[0] = spf[1] = 0`.
     pub spf: Vec<u32>,

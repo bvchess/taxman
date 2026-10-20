@@ -52,7 +52,7 @@ fn python_referee(paths: &[PathBuf]) -> std::process::Output {
 type Edit<'a> = (&'a str, Json);
 
 /// What both verifiers must say of a results file: accept it, or refuse it naming a line (counting from 1) and its
-/// board size, with a part of the Rust verifier's message.
+/// n, with a part of the Rust verifier's message.
 enum Verdict<'a> {
     Accepted,
     Refused { line: usize, n: u32, expected: &'a str },
@@ -471,7 +471,7 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     verifiers_agree(&dir, &[(hole, Verdict::Accepted)]);
 }
 
-/// How many games of the report in the board sizes `range` have the proof, the ceiling proof, or no assumption.
+/// How many games of the report in `range` have the proof, the ceiling proof, or no assumption.
 fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()
 }
@@ -484,7 +484,7 @@ fn clean(file: &FileReport) -> usize {
     file.contents.games.values().filter(|g| g.assumes.is_empty()).count()
 }
 
-/// The last board size of the committed results; of the run on a laptop that made their first part, which the prover
+/// The last game of the committed results; of the run on a laptop that made their first part, which the prover
 /// proved on the whole board; of the second run, which made the games past the first, on EC2; and of `optimal.json`,
 /// which they reproduce.  The third run, also on EC2, made the games past the second.
 const LAST: u32 = 3914;
@@ -589,8 +589,8 @@ fn check_the_committed_results_to(last: u32) {
     }
 
     // A chain from n = 1 assumes nothing.  Its proofs, in the order trivial, prime formula, `cap`, exhausted, same
-    // search: in all, in the board sizes of the table (where the previous chain, of commit 271c817, had every one
-    // of them), and past it, in the first run's, in the second's and in the third's.
+    // search: in all, in the games of the table (where the previous chain, of commit 271c817, had every one of
+    // them), and past it, in the first run's, in the second's and in the third's.
     let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch];
     let by = |range: RangeInclusive<u32>| kinds.map(|p| proofs(strict, range.clone(), p));
     assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");

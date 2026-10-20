@@ -21,7 +21,7 @@ const USAGE: &str = "\
 usage: taxman <command> [args]
 
 commands:
-  solve N|A-B [options]   solve one board size or a range, each from the one before; the first from the game
+  solve N|A-B [options]   solve game N or a range, each from the one before; the first from the game
                           of A-1 in --out FILE, or with --use-prev from the known games (with neither it is
                           solved standalone, which costs more: no seed from the game before and no ceiling).
                           Every score is checked against optimal.json, which is built into this program
@@ -86,16 +86,16 @@ commands:
                           against optimal.json, the committed chain and the bounds store of results
   extend-optimal RESULTS --out FILE [--table FILE]
                           write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
-                          results file RESULTS appended: from the board size after the table's last, each game that
+                          results file RESULTS appended: from the game after the table's last, each game that
                           RESULTS has completed, up to the first that it lacks.  A rebuild takes in a changed table
   certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]
-                          prove the recorded scores of A..B (or of the boards of the list FILE, one board size a
+                          prove the recorded scores of A..B (or of the boards of the list FILE, one n a
                           line in the order to certify them, blank lines and # comments skipped) that rest on the
                           frame model on the whole board, game by game: the extended problem with the open
                           members of the barred bounds (--upper, the prover's `upper` files) optional, searched
                           from the recorded game (--results, over optimal.json); one line a game in --out,
                           certified or beaten; a game whose extended problem an earlier certified game of the
-                          last 8 board sizes posed is certified without a search (same_problem); a game that
+                          last 8 games posed is certified without a search (same_problem); a game that
                           beats its score is also written to OUT.counterexample.jsonl and the run exits with
                           status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,

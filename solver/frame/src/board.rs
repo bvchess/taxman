@@ -1,9 +1,9 @@
 //! A board `1..=n` analysed for the search: its number-theory tables, its frames, and the numbers the per-game
 //! pipeline derives from them before it decides how to solve the game.
 //!
-//! This is the one path from a board size to a search that is ready to run (tables → frames → [`prepare`] → ceiling
-//! and seed → [`search`]).  The per-game pipeline ([`crate::solver`]), the ladder and the benchmarks, and the tests
-//! all take it, so that the facts that join the pieces are written once:
+//! This is the one path from n to a search that is ready to run (tables → frames → [`prepare`] → ceiling and seed →
+//! [`search`]).  The per-game pipeline ([`crate::solver`]), the ladder and the benchmarks, and the tests all take
+//! it, so that the facts that join the pieces are written once:
 //!
 //! * the score of a game of the frame model is `in_the_bag` plus the sum of its promotions, where `in_the_bag`
 //!   (the Java's `inTheBag`) is what the game with no promotions scores ([`Board::in_the_bag`]);
@@ -60,7 +60,7 @@ impl<const W: usize> Board<W> {
         Board::new(Tables::new(n))
     }
 
-    /// The board size.
+    /// The game's n.
     pub fn n(&self) -> u32 {
         self.tables.n
     }
@@ -295,8 +295,8 @@ mod tests {
         }
     }
 
-    /// What `taxman verify-results` and `same_search` set up again from a results line (the board size) is the
-    /// problem the setup posed, at any set width.
+    /// What `taxman verify-results` and `same_search` set up again from a results line (its n) is the problem
+    /// the setup posed, at any set width.
     #[test]
     fn the_problem_set_up_again_is_the_one_the_setup_posed() {
         for n in 2..=120 {
@@ -338,8 +338,8 @@ mod tests {
         }
     }
 
-    /// What `taxman certify` sets up again from a certificate's line (the board size and the open members) is the
-    /// extended problem the setup posed, at any set width, for all of U\*_{≥3} open and for every other member of it.
+    /// What `taxman certify` sets up again from a certificate's line (its n and the open members) is the extended
+    /// problem the setup posed, at any set width, for all of U\*_{≥3} open and for every other member of it.
     #[test]
     fn the_extended_problem_set_up_again_is_the_one_the_setup_posed() {
         let mut compared = 0;

@@ -28,7 +28,7 @@ pub struct PrepareTimings {
 
 /// A game set up for [`search`](super::search).
 pub struct Prepared<const W: usize> {
-    /// The board size.
+    /// The game's n.
     pub n: u32,
     pub model: Arc<FrameGraph>,
     /// The starting state of the search: the frames as built.
@@ -273,8 +273,8 @@ fn build_extended_root<const W: usize>(
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`, with the tactics the checkpoint records.  Fails,
-/// saying what differs, if the checkpoint was made for another board size, width, candidates, frames or `max_total`,
-/// or by a build whose checkpoint headers had another format.
+/// saying what differs, if the checkpoint was made for another n, width, candidates, frames or `max_total`, or by a
+/// build whose checkpoint headers had another format.
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],

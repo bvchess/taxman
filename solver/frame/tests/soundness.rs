@@ -288,8 +288,8 @@ impl<'a, const W: usize> Searched<'a, W> {
 /// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
 /// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
 /// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (Theorem 13:
-/// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40 the
-/// optimum is also checked against the exhaustive search without the frame model.
+/// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40
+/// opt(n) is also checked against the exhaustive search without the frame model.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -332,7 +332,7 @@ fn boards_with_pairs<const W: usize>(
         let truth = optimal_sum::<W>(optimal, n).unwrap();
         if n <= 40 {
             let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
-            assert_eq!(Board::<W>::for_n(n).in_the_bag + truth, exact, "n={n}: the optimum against the oracle");
+            assert_eq!(Board::<W>::for_n(n).in_the_bag + truth, exact, "n={n}: the best score against the oracle");
         }
         for cfg in configs {
             for k in [1, 5] {
@@ -432,11 +432,11 @@ fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
 
 /// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
 /// 30, 50 or 70 percent of its members, the candidates what the search leaves them, searched under each of `configs`
-/// from an incumbent one below the optimum.  Such a unit holds `S*`, which keeps every symmetric pair's inequality
-/// (Theorem 13), so the search with the rule of the pairs (tactic `symmetry`) must find the optimum; a rule that cuts
-/// a node on the path to `S*`, or drops a candidate `S*` needs, does not.  The nodes of such a search are deep enough
-/// that the promotions and the candidates leave the pairs' inequalities open, which a game searched from its root
-/// rarely does.  Returns the number of searches.
+/// from an incumbent one below P*.  Such a unit holds `S*`, which keeps every symmetric pair's inequality (Theorem
+/// 13), so the search with the rule of the pairs (tactic `symmetry`) must find P*; a rule that cuts a node on the
+/// path to `S*`, or drops a candidate `S*` needs, does not.  The nodes of such a search are deep enough that the
+/// promotions and the candidates leave the pairs' inequalities open, which a game searched from its root rarely does.
+/// Returns the number of searches.
 fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
     let game = Game::<W>::of_board(n).expect("a game");
     let (truth, sym) = (optimal_sum::<W>(optimal, n).unwrap(), game.symmetries());
@@ -449,7 +449,7 @@ fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units
     for _ in 0..units {
         let percent = rng.pick(&[30, 50, 70]);
         let promoted: Bits<W> = best.iter().filter(|_| !rng.chance(percent)).collect();
-        // A unit that already holds the optimum has nothing to find: the search offers only what a child promotes.
+        // A unit that already holds an optimal set has nothing to find: the search offers only what a child promotes.
         let Some(state) =
             game.model.promote_all_using(&mut scratch, &game.root, &promoted).filter(|_| promoted != best)
         else {
@@ -500,8 +500,8 @@ fn on_the_way_configs() -> [Config; 3] {
 
 /// A search interrupted every `node_limit` nodes or so and resumed (two threads, a checkpoint every millisecond, a
 /// tiny memory cap so that units spill to disk), from an incumbent `handicap` below the promotion sum `truth` of
-/// game `n`, ends with the optimum for the configurations `which` of [`configs`]: the unit tests of resuming use one
-/// game and a few tactics.  Returns the number of resumes.
+/// game `n`, ends with P* for the configurations `which` of [`configs`]: the unit tests of resuming use one game and
+/// a few tactics.  Returns the number of resumes.
 fn resumed_over_and_over<const W: usize>(
     n: u32,
     truth: u64,
@@ -556,8 +556,8 @@ fn a_small_search_resumed_over_and_over_finds_the_optimum() {
 fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("churn");
-    // On the matching path, game 600 takes 7,000 to 17,000 nodes from an incumbent that far below the optimum (two
-    // threads: the count depends on timing), so a limit of 1,000 stops it at least six times in each of the three
+    // On the matching path, game 600 takes 7,000 to 17,000 nodes from an incumbent that far below P* (two threads:
+    // the count depends on timing), so a limit of 1,000 stops it at least six times in each of the three
     // configurations: the matching tactics, the searchers forgetting their nogoods every two steps, and their
     // Lagrangian bounds refitted every four.  The bounds below only check that the resuming really happened; they
     // leave room for the smallest trees a loaded machine produces.

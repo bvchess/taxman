@@ -25,14 +25,14 @@ fn lines(path: &Path) -> Vec<Json> {
     fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
 }
 
-/// A line's board size.
+/// A line's n.
 fn n_of(line: &Json) -> u32 {
     line.get("n").and_then(Json::as_u32).expect("n")
 }
 
 /// What a line says that no window may change: the game's score, how it was found and proven, the ceiling its search
-/// had, what it assumes, the game a repeat repeats, and the previous game's board size, score and proof.  (The moves
-/// may be another optimal set, and with them the digest of the previous game's moves, as between thread counts.)
+/// had, what it assumes, the game a repeat repeats, and the previous game's n, score and proof.  (The moves may be
+/// another optimal set, and with them the digest of the previous game's moves, as between thread counts.)
 fn provenance(line: &Json) -> String {
     let field = |key: &str| line.get(key).map_or_else(String::new, ToString::to_string);
     let inner =

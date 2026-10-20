@@ -27,11 +27,11 @@
 //!   the frames of layer 2 have freedoms.
 //! * [`theorem_b_holds_for_every_enumerated_optimal_set`]: the prover's lists of all the optimal sets of a board
 //!   (`solver/noframe/data/optsets_*.jsonl`): the other sets of a board as well as the recorded game.  Each set is
-//!   checked to be playable and worth the optimum before the theorem is asked of it.
+//!   checked to be playable and worth opt(n) before the theorem is asked of it.
 //! * [`theorem_b_holds_for_every_optimal_set_of_the_small_boards`]: on the small boards the optimal sets are found
 //!   again, by an exhaustive search over the playable sets that uses no model of the game, only the oracle and the
-//!   optimum of the table.  The brute force of the rules has the optimum itself on the boards it reaches, and the
-//!   number of optimal sets is the prover's.
+//!   table's opt(n).  The brute force of the rules has opt(n) itself on the boards it reaches, and the number of
+//!   optimal sets is the prover's.
 
 mod common;
 
@@ -180,8 +180,8 @@ fn check_theorem_b(t: &Tables, set: &[u32]) -> Result<usize, String> {
     Ok(lower.len())
 }
 
-/// Theorem B on `set`; the numbers of layer 2 up to n/2 that it plays, if any, are noted in `plays_lower` as the board
-/// size and the numbers.
+/// Theorem B on `set`; the numbers of layer 2 up to n/2 that it plays, if any, are noted in `plays_lower` as n and the
+/// numbers.
 fn check_and_note(t: &Tables, set: &[u32], plays_lower: &mut Vec<(u32, Vec<u32>)>) -> Result<(), String> {
     if check_theorem_b(t, set)? > 0 {
         plays_lower.push((t.n, lower_layer_2(t, set)));
@@ -189,8 +189,8 @@ fn check_and_note(t: &Tables, set: &[u32], plays_lower: &mut Vec<(u32, Vec<u32>)
     Ok(())
 }
 
-/// `plays_lower` (ascending in the board size) as text, with a run of boards in a row that play the same numbers
-/// written once: `n=42..=53 [21]`.
+/// `plays_lower` (ascending in n) as text, with a run of boards in a row that play the same numbers written
+/// once: `n=42..=53 [21]`.
 fn runs(plays_lower: &[(u32, Vec<u32>)]) -> String {
     let mut runs: Vec<(u32, u32, &[u32])> = Vec::new();
     for (n, numbers) in plays_lower {
@@ -320,7 +320,7 @@ fn completed_games(path: &Path) -> Vec<(u32, Vec<u32>)> {
     table.games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect()
 }
 
-/// Theorem B on each of `games` (a board size and a game's moves, taken as a set).  Prints what it found under the name
+/// Theorem B on each of `games` (an n and a game's moves, taken as a set).  Prints what it found under the name
 /// `source`, and returns the failures.
 fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
     let start = Instant::now();
@@ -499,7 +499,7 @@ struct Search<'a> {
     t: &'a Tables,
     target: u64,
     found: Vec<Vec<u32>>,
-    /// The playable sets worth more than `target`, which the optimum rules out.
+    /// The playable sets worth more than `target`, which opt(n) rules out.
     beaten: Vec<Vec<u32>>,
     nodes: u64,
 }
@@ -563,9 +563,9 @@ fn enumerated_counts() -> BTreeMap<u32, usize> {
 /// The largest board on which the brute force of the rules is run (past this it takes too long).
 const BRUTE_FORCE_TO: u32 = 40;
 
-/// Theorem B on every optimal set of each board of `boards`, found by [`Search`]: there is one, the brute force has the
-/// optimum (on the boards it reaches), the number of optimal sets is the prover's, the recorded game is one of them,
-/// and the theorem holds of each.  Prints what it found and returns the failures.
+/// Theorem B on every optimal set of each board of `boards`, found by [`Search`]: there is one, the brute force has
+/// opt(n) (on the boards it reaches), the number of optimal sets is the prover's, the recorded game is one of them, and
+/// the theorem holds of each.  Prints what it found and returns the failures.
 fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
     let start = Instant::now();
     let (table, enumerated) = (Optimal::built_in(), enumerated_counts());
@@ -577,7 +577,7 @@ fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
         let (sets, nodes) = Search::run(&t, target);
         let mut fail = |why: String| failures.push(format!("n={n}: {why}"));
         if sets.is_empty() {
-            fail(format!("no playable set is worth the optimum {target}"));
+            fail(format!("no playable set is worth opt(n) = {target}"));
         }
         if n <= BRUTE_FORCE_TO {
             let brute_force = brute::solve(n, &[], Rule::Divisor).score;

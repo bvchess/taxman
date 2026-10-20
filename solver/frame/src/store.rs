@@ -214,7 +214,7 @@ pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
 /// `Monotone` (the board before: opt(n − 1) <= opt(n)) and `Prime` (either way, across a prime p, q the largest prime
 /// below it: opt(p) = opt(p − 1) + p − q); and for boards with the same search problem, `Repeat`, with their bags
 /// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (docs/THEORY.md, "The
-/// ledger: bounds between boards"); the book and the store's checkers use this one copy of the arithmetic.
+/// ledger: bounds between boards"); the book and the store's verifiers use this one copy of the arithmetic.
 ///
 /// # Errors
 ///

@@ -22,7 +22,7 @@
 //! (in the crate's directory) is the user guide; `docs/GLOSSARY.md` defines the project's words; `DESIGN.md` explains
 //! the design; `solver/notebook/README.md` is the lab notebook of how it got there.
 //!
-//! # From a board size to a game
+//! # From n to a game
 //!
 //! ```text
 //! n ──► numtheory::Tables               maximal factors and composites of 1..=n

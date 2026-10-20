@@ -145,7 +145,7 @@ impl Gf2Branching {
 
 /// How a searcher keeps and forgets its nogoods (the tactics `forget_nogoods`, `nogood_period`, `nogood_keep` and
 /// `nogood_limit`).  Every setting is sound: the table is a cache of nogoods that hold at every node
-/// ([`crate::model::Nogoods`]), so a policy changes how large the trees are, never the optimum.
+/// ([`crate::model::Nogoods`]), so a policy changes how large the trees are, never P*.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Forgetting {
     /// After how many of its steps a searcher forgets, if ever.

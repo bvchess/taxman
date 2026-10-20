@@ -46,7 +46,7 @@
 //!   candidate weighs more by the nogood's multiplier.
 //!
 //! Along a path weights only *rise* (nogoods only die).  A rise by `δ` of a candidate's weight breaks dual
-//! feasibility only on its edges as a mover; if it is promoted in the optimum its potential rises by `δ` (the
+//! feasibility only on its edges as a mover; if it is promoted in the matching its potential rises by `δ` (the
 //! matched edge stays tight, and the value grows by `δ`); otherwise its potential rises just as far as its edges
 //! need, if at all, and if it does, the candidate is unmatched from the mover it was paying for (or, free, left
 //! pending), and the Hungarian repairs of [`MatchBound`](super::MatchBound) restore optimality.  A candidate whose
@@ -398,8 +398,8 @@ impl<'g, const W: usize> LagrangeBound<'g, W> {
 }
 
 /// Raises the weight of the vertex `u` of `level` by `delta` (a nogood it is in died).  If it is a candidate
-/// promoted in the optimum, its potential rises with it (its matched edge stays tight) and so does the value; any
-/// other candidate is left in `touched` for [`fix_up`] once all the weights have risen.
+/// promoted in the matching, its potential rises with it (its matched edge stays tight) and so does the value;
+/// any other candidate is left in `touched` for [`fix_up`] once all the weights have risen.
 #[inline]
 fn raise<const W: usize>(
     g: &MatchGraph,
@@ -411,7 +411,7 @@ fn raise<const W: usize>(
 ) {
     if !cands.contains(g.num[u]) {
         // Promoted, or no longer a candidate: its weight counts no more, except that a candidate just gone and still
-        // promoted in the optimum leaves the value (when the drop is applied) by the weight it entered with.
+        // promoted in the matching leaves the value (when the drop is applied) by the weight it entered with.
         return;
     }
     level.weighing.w[u] += delta;
@@ -424,14 +424,14 @@ fn raise<const W: usize>(
     }
 }
 
-/// Restores dual feasibility at the candidate `u` of `level`, whose weight rose and which the optimum does not
+/// Restores dual feasibility at the candidate `u` of `level`, whose weight rose and which the matching does not
 /// promote: it becomes a candidate of the matching if its weight is positive now, and its potential rises as far
 /// as its edges as a mover need.  If it rises, the candidate was free (it is left pending) or paying for a mover
 /// above it, whose edge is no longer tight (the two are unmatched, and both left pending).
 fn fix_up<const W: usize>(g: &MatchGraph, level: &mut Level<W, Penalized<W>>, u: usize) {
     let mate = level.mate[u];
     if level.role[u] == Role::Candidate && mate != NONE && usize::from(mate) < u {
-        return; // promoted in the optimum: done by `raise`
+        return; // promoted in the matching: done by `raise`
     }
     let w = level.weighing.w[u];
     if w <= 0 || g.below(u).is_empty() {

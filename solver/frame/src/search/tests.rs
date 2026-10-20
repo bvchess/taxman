@@ -379,8 +379,8 @@ fn forgetting_nogoods_often_does_not_change_answers() {
 }
 
 /// Every policy of keeping and forgetting nogoods is sound: the table is a cache of nogoods that hold at every node,
-/// so whatever the searchers keep, however often they forget and however small the table's limit, the optimum is the
-/// same.  The periods are short, to make the policies act in searches of a few thousand steps.
+/// so whatever the searchers keep, however often they forget and however small the table's limit, P* is the same.
+/// The periods are short, to make the policies act in searches of a few thousand steps.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -506,7 +506,7 @@ fn checkpoint_and_resume_with_the_gf2_bound_of_a_small_game() {
 }
 
 /// The search of game `n` under each of `cases` (tactics and the node limit that stops it), on each of `threads`,
-/// stopped and resumed from its checkpoint until it finishes with the optimum.
+/// stopped and resumed from its checkpoint until it finishes with P*.
 fn resume_the_gf2_search(n: u32, cases: &[(SearchTactics, u64)], threads: &[usize]) {
     let board = crate::board::Board::<16>::for_n(n);
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
@@ -558,7 +558,7 @@ fn seeds_and_caps() {
     let g = load(300);
     let p = prepare_golden::<8>(&g, SearchTactics::default());
     let optimum = search_checked(&p, 1, "plain");
-    // Seeded with the optimum (plus a non-candidate), the search only has to prove it.
+    // Seeded with an optimal set (plus a non-candidate), the search only has to prove it.
     let seed = optimum.promotions.with(299);
     let seeded = search(&p, &config(1), Some(&seed), None, false).unwrap();
     assert_eq!((seeded.sum, seeded.promotions), (optimum.sum, optimum.promotions));
@@ -583,9 +583,9 @@ fn root_bound<const W: usize>(p: &Prepared<W>) -> u64 {
     bound.evaluate(p.max_total, None).value
 }
 
-/// The search of `p` (whose optimum is `opt`) under floors around the optimum, on `threads` threads: a floor below it
-/// finds it, a floor at it or above completes without finding anything, and a floor at the root's bound or above
-/// completes at once.
+/// The search of `p` (whose P* is `opt`) under floors around P*, on `threads` threads: a floor below it finds it, a
+/// floor at it or above completes without finding anything, and a floor at the root's bound or above completes at
+/// once.
 fn floors_around_the_optimum<const W: usize>(p: &Prepared<W>, opt: u64, threads: usize, what: &str) {
     let cfg = config(threads);
     for floor in [opt - 1, opt - opt.min(40), opt / 2, 0] {
@@ -597,7 +597,7 @@ fn floors_around_the_optimum<const W: usize>(p: &Prepared<W>, opt: u64, threads:
         assert!(r.start.is_empty() && r.found.is_some(), "{what}, floor {floor}: the floor is the start");
     }
     let root = root_bound(p);
-    assert!(opt <= root, "{what}: the root's bound {root} is below the optimum {opt}");
+    assert!(opt <= root, "{what}: the root's bound {root} is below P* {opt}");
     for floor in [opt, opt + 1, opt + (root - opt) / 2, root, root + 1] {
         let r = search_above(p, &cfg, floor, None, false).unwrap();
         assert!(r.completed && r.floor_held, "{what}, floor {floor}: nothing is above it");
@@ -611,8 +611,8 @@ fn floors_around_the_optimum<const W: usize>(p: &Prepared<W>, opt: u64, threads:
     }
 }
 
-/// With no set to find above the optimum the floor is the incumbent, so its tree is the proof of a search seeded
-/// with the optimum, step for step on one thread.
+/// With no set to find above P* the floor is the incumbent, so its tree is the proof of a search seeded with an
+/// optimal set, step for step on one thread.
 fn the_tree_under_the_optimum_is_the_proof(n: u32) {
     let board = crate::board::Board::<16>::for_n(n);
     let p = board.prepare(SearchTactics::default()).unwrap();
@@ -623,12 +623,12 @@ fn the_tree_under_the_optimum_is_the_proof(n: u32) {
     let floored = search_above(&p, &config(1), opt, None, false).unwrap();
     assert!(seeded.completed && floored.completed && floored.floor_held, "n={n}");
     assert_eq!(seeded.start, found.promotions, "n={n}: the seed is the start");
-    assert_eq!(floored.stats.nodes, seeded.stats.nodes, "n={n}: the floor at the optimum is the proof");
+    assert_eq!(floored.stats.nodes, seeded.stats.nodes, "n={n}: the floor at P* is the proof");
 }
 
-/// A floor below the optimum finds it, a floor at the optimum or above proves there is nothing heavier, and the root's
-/// bound or more ends the search at once, on every game of the Java's that needs a search and with the default
-/// tactics (the rule of the symmetric pairs among them), on one thread.
+/// A floor below P* finds it, a floor at P* or above proves there is nothing heavier, and the root's bound or more ends
+/// the search at once, on every game of the Java's that needs a search and with the default tactics (the rule of the
+/// symmetric pairs among them), on one thread.
 #[test]
 fn a_floor_below_the_optimum_finds_it_and_one_at_it_proves_nothing_is_heavier() {
     for g in &searched_games(400) {
@@ -656,8 +656,8 @@ fn floors_hold_on_four_threads_and_under_every_search_path() {
     }
 }
 
-/// The floor at the optimum and the seed of the optimum are one search, on a few games of 300 to 1000 (300 and 480 in a
-/// quick run).
+/// The floor at P* and the seed of an optimal set are one search, on a few games of 300 to 1000 (300 and 480 in a quick
+/// run).
 #[test]
 fn a_floor_at_the_optimum_searches_the_tree_of_the_search_seeded_with_it() {
     let games: &[u32] = if QUICK { &[300, 480] } else { &[300, 480, 600, 760, 930, 1000] };
@@ -676,7 +676,7 @@ fn a_floor_at_the_ceiling_ends_the_search_before_it_starts() {
         assert!(r.completed && r.reached_cap && r.floor_held && r.stats.nodes == 0, "floor {floor}, ceiling {ceiling}");
         assert_eq!((r.sum, r.promotions), (floor, Bits::EMPTY), "floor {floor}, ceiling {ceiling}");
     }
-    // Below the ceiling the floor is searched: the optimum is the ceiling, and a floor under it finds it and stops there.
+    // Below the ceiling the floor is searched: P* is the ceiling, and a floor under it finds it and stops there.
     let r = search_above(&p, &config(1), opt - 1, Some(opt), false).unwrap();
     assert!(r.completed && r.reached_cap && !r.floor_held && r.sum == opt, "floor {}", opt - 1);
 }
@@ -692,8 +692,8 @@ fn a_search_under_a_floor_resumes_under_the_same_floor() {
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
     let dir = TempDir::new("floor-resume");
     let ckpt = dir.0.join("ckpt.bin");
-    // The floors: one below the optimum (it is found) and one at it (nothing is), each stopped by a limit of 1,000
-    // steps (the engine checks it every 1,024).
+    // The floors: one below P* (it is found) and one at it (nothing is), each stopped by a limit of 1,000 steps
+    // (the engine checks it every 1,024).
     for floor in [opt - 100, opt] {
         let whole = search_above(&p, &config(1), floor, None, false).unwrap();
         assert!(whole.stats.nodes > 1100, "floor {floor}: {} steps, too few to stop", whole.stats.nodes);
@@ -748,8 +748,8 @@ fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
     let graph = MatchGraph::new(&p.model, &p.root);
     let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
 
-    // The seed (the optimum, plus a non-candidate) reaches the ceiling, which the optimum is: the start is the better
-    // of the greedy set and the seed's survivors, and the dive and the local search leave it as it is.
+    // The seed (an optimal set, plus a non-candidate) reaches the ceiling, which P* is: the start is the better of
+    // the greedy set and the seed's survivors, and the dive and the local search leave it as it is.
     let seed = optimum.promotions.with(299);
     let kept = surviving(&p, &seed);
     let begun = if kept.sum() > p.greedy.sum() { kept } else { p.greedy };
@@ -760,8 +760,8 @@ fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
     assert!(r.completed && r.reached_cap && r.stats.nodes == 0 && r.found.is_none());
     assert_eq!((r.start, r.promotions, r.sum), (begun, begun, optimum.sum));
 
-    // A ceiling below the optimum (which a game's proof never offers) that the greedy set reaches shows that the
-    // local search is skipped: it would have raised the start, as it does without the ceiling.
+    // A ceiling below P* (which a game's proof never offers) that the greedy set reaches shows that the local
+    // search is skipped: it would have raised the start, as it does without the ceiling.
     let improved = hood.improve(&mut Scratch::new(), &p.greedy, true);
     assert!(improved.sum() > p.greedy.sum(), "the local search leaves the greedy set of 300 as it is");
     let r = search(&p, &config(1), None, Some(p.greedy.sum()), false).unwrap();
@@ -851,7 +851,7 @@ fn a_ceiling_given_to_the_control_ends_the_search_of(n: u32, live: bool) {
     assert!(whole.completed && !whole.reached_cap && whole.sum == optimum);
     assert!(whole.start.sum() < optimum, "the search has nothing to do from its start");
 
-    // Given before the search, in the control or as `cap`: the same search, which ends where it finds the optimum.
+    // Given before the search, in the control or as `cap`: the same search, which ends where it finds P*.
     let control = Control::new();
     control.set_ceiling(optimum);
     let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
@@ -1140,7 +1140,7 @@ fn a_checkpoint_of_one_extended_problem_is_refused_for_another() {
     let (ext, prepared) = board.prepare_extended_with(&open, false, SearchTactics::extended()).unwrap();
     root_checkpoint(&prepared, &checkpoint);
 
-    // The same problem resumes, and finishes with the optimum.
+    // The same problem resumes, and finishes with P*.
     let (_, resumed) = board.prepare_extended_for_resume(&open, false, &checkpoint).unwrap();
     assert_eq!((resumed.problem(), resumed.tactics), (prepared.problem(), prepared.tactics));
     let cfg = EngineConfig { checkpoint: Some((checkpoint.clone(), Duration::from_secs(3600))), ..config(1) };

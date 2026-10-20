@@ -130,7 +130,7 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 /// The outcome of [`search`].
 #[derive(Clone, Debug)]
 pub struct SearchResult<const W: usize> {
-    /// The best promotion set found (the optimum when `completed`; empty if `floor_held`).
+    /// The best promotion set found (an optimal set when `completed`; empty if `floor_held`).
     pub promotions: Bits<W>,
     pub sum: u64,
     /// The search finished (or reached the ceiling); false when an engine limit or a stop stopped it.
@@ -201,7 +201,7 @@ pub fn search<const W: usize>(
 /// heavier than the floor becomes the incumbent as usual, and is a real game (so a lower bound on the game's optimum).
 /// If the search completes and finds none, no promotion set is heavier than `floor`
 /// ([`SearchResult::floor_held`], docs/THEORY.md, Lemma F): an upper bound on the game's best promotion sum,
-/// proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is the optimum.  `cap`
+/// proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is P*.  `cap`
 /// and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same floor.
 ///
 /// # Errors

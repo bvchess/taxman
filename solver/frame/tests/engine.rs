@@ -883,8 +883,8 @@ fn an_untouched_control_changes_nothing() {
     assert!(control.status().is_none());
 }
 
-/// The optimum given as the ceiling before the run ends it as soon as the incumbent reaches it; the lowest ceiling
-/// given counts.
+/// The best value given as the ceiling before the run ends it as soon as the incumbent reaches it; the lowest
+/// ceiling given counts.
 #[test]
 fn a_ceiling_given_before_the_run_ends_it_at_the_optimum() {
     let inst = instance();
@@ -900,7 +900,7 @@ fn a_ceiling_given_before_the_run_ends_it_at_the_optimum() {
         assert_optimal(&out, &inst, raw.best);
         assert_accounting(&out.counters);
         if threads == 1 {
-            // The order of the plain search, cut short where it finds the optimum.
+            // The order of the plain search, cut short where it finds the best value.
             assert!(out.stats.nodes < raw.nodes, "{} of {} nodes", out.stats.nodes, raw.nodes);
         }
     }
@@ -963,8 +963,8 @@ fn a_ceiling_the_incumbent_has_reached_ends_the_run_at_once() {
     assert_accounting(&out.counters);
 }
 
-/// The optimum given as the ceiling while the run goes ends the run when the search finds it; one thread explores no
-/// more nodes than the plain search.
+/// The best value given as the ceiling while the run goes ends the run when the search finds it; one thread explores
+/// no more nodes than the plain search.
 #[test]
 fn a_ceiling_given_while_the_run_goes_ends_it_when_reached() {
     let inst = big_instance();
@@ -999,14 +999,14 @@ fn outside_incumbents_join_the_run() {
     let out = solve(&controlled(config(1), &control), fresh(), &inst);
     assert!(out.completed);
     assert_optimal(&out, &inst, raw.best);
-    // The optimum is kept, with its payload, and one thread explores no more than from nothing.
+    // The best value is kept, with its payload, and one thread explores no more than from nothing.
     let control = Control::new();
     assert!(control.offer(raw.best, &solution) && !control.offer(raw.best, b"no better"));
     let out = solve(&controlled(config(1), &control), fresh(), &inst);
     assert!(out.completed && !out.optimal_declared);
     assert_eq!((out.best, &out.payload), (raw.best, &solution));
     assert!(out.stats.nodes <= raw.nodes, "{} of {} nodes", out.stats.nodes, raw.nodes);
-    // With the optimum as the ceiling as well, there is nothing to search.
+    // With the best value as the ceiling as well, there is nothing to search.
     control.set_ceiling(raw.best);
     let out = solve(&controlled(config(4), &control), fresh(), &inst);
     assert!(out.optimal_declared && out.counters.runs == 0, "{:?}", out.counters);
@@ -1028,7 +1028,7 @@ fn outside_incumbents_join_the_run() {
     assert!(out.completed);
     assert_optimal(&out, &big, opt);
     if accepted {
-        assert_eq!(out.payload, solution, "nothing beats the optimum");
+        assert_eq!(out.payload, solution, "nothing beats the best value");
     }
 }
 

@@ -325,7 +325,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     let left: Vec<_> = fs::read_dir(&ckpt).unwrap().map(|e| e.unwrap().path()).collect();
     assert!(left.is_empty(), "left behind: {left:?}");
 
-    // Every board size is in the file as a completed game exactly once, and the unfinished one also as such.
+    // Every n is in the file as a completed game exactly once, and the unfinished one also as such.
     let lines: Vec<Json> = fs::read_to_string(&results).unwrap().lines().map(|l| Json::parse(l).unwrap()).collect();
     let completed = |n: u32| {
         let is = |l: &&Json| {

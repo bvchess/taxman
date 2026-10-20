@@ -1,8 +1,8 @@
 //! The known games: what `taxman solve --use-prev` draws on besides what the run itself has made.
 //!
-//! Three sources hold games of board sizes the run has not solved, each with what its game rests on:
+//! Three sources hold games the run has not solved, each with what its game rests on:
 //!
-//! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary, to board size 1300.  It
+//! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary, to game 1300.  It
 //!   records no proofs, so a game of it is *assumed* optimal (`the game of n in optimal.json is optimal`).
 //! * **the committed chain** ([`Origin::Strict`]), `results/strict.jsonl`: a chain from n = 1, each game with its proof
 //!   and what it assumes (nothing, for the committed file).  A game of it is as proven as its line is.
@@ -13,10 +13,10 @@
 //!   with a gap, is *open*; the store still helps its search ([`Known::open`]): its lower bound's game is a seed, and
 //!   its upper bound a ceiling the search may stop at.
 //!
-//! [`Known::game`] is the game of a board size from the best source (the committed chain, which assumes nothing, then
-//! the store, then the table); the solver records it without a search (method `known`, proof `known`) or builds the
-//! next game on it.  A result line says which source it took the game from ([`Cite`]), and what the game assumes
-//! follows from the source; the referees check the citation against the same sources ([`Known::check_cite`]).
+//! [`Known::game`] is the game of n from the best source (the committed chain, which assumes nothing, then the store,
+//! then the table); the solver records it without a search (method `known`, proof `known`) or builds the next game on
+//! it.  A result line says which source it took the game from ([`Cite`]), and what the game assumes follows from the
+//! source; the referees check the citation against the same sources ([`Known::check_cite`]).
 //!
 //! The sources are read as they are given: the committed chain and the store are checked by their own referees
 //! (`taxman verify-results`, `solver/tools/check_results.py`; `ledger verify-bounds`, `solver/tools/check_bounds.py`),
@@ -191,14 +191,14 @@ pub struct KnownSources {
     pub committed: Option<PathBuf>,
     /// The bounds store.
     pub bounds: Option<PathBuf>,
-    /// Whether a board size that a source holds a proven game of is recorded without a search (`solve --use-prev`).
+    /// Whether an n that a source holds a proven game of is recorded without a search (`solve --use-prev`).
     /// Without it the sources give the game before the range, and the store helps the searches of its open boards.
     pub boards: bool,
 }
 
 impl KnownSources {
     /// What `solve --use-prev` draws on: every game of the table, the committed chain and the store in the repository's
-    /// `results`, for the board sizes of the range as well as the game before it.  The files that are not there
+    /// `results`, for the games of the range as well as the game before it.  The files that are not there
     /// are left out.
     ///
     /// # Errors

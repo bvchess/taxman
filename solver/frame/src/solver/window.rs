@@ -16,11 +16,10 @@
 //! 1. *Setup*, on a thread of the game's own, which holds one of the run's threads ([`set_up`]): the checks of a
 //!    previous game not made by this run, the tables, the checkpoint; then the prime shortcut, the trivial game, or the
 //!    search problem with its [`Job`].
-//! 2. *Repeat lookup*, on the driver's thread, in the order of the board sizes, once the setups of all the earlier
-//!    games of the window are done ([`Earlier::find`]).  A game of the window that set a search up and is not
-//!    concluded counts as a candidate, as the documentation of `find` argues, so a game repeats exactly the game it
-//!    repeats when the range is solved in order.  A repeat waits for the game it repeats, which is older and so is
-//!    concluded first.
+//! 2. *Repeat lookup*, on the driver's thread, in the order of n, once the setups of all the earlier games of the
+//!    window are done ([`Earlier::find`]).  A game of the window that set a search up and is not concluded counts
+//!    as a candidate, as the documentation of `find` argues, so a game repeats exactly the game it repeats when the
+//!    range is solved in order.  A repeat waits for the game it repeats, which is older and so is concluded first.
 //! 3. *Search*, on the game's thread, when the driver says go ([`Go`]): with the seed and the ceiling known then, and
 //!    the workers the driver grants it, not while it is deferred (see "Deferring").  Its outcome goes back to the
 //!    driver; the checkpoint stays.
@@ -73,7 +72,7 @@
 //! The lines are those of the range solved in order, but for what a multi-threaded search may vary:
 //!
 //! * A line is appended only after every line it rests on: that of `n − 1` (its `prev`) and, for a repeat, that of
-//!   the game it repeats.  Both are earlier, and lines are appended in the order of the board sizes.
+//!   the game it repeats.  Both are earlier, and lines are appended in the order of n.
 //! * `prev`, `same_search` and `assumes` are derived as the range solved in order derives them, from the concluded
 //!   games; the repeat names the same game (above).
 //! * The proofs are of the same kinds.  A completed search's promotion sum is its problem's best, and its proof is by
@@ -103,10 +102,10 @@
 //! # The wall
 //!
 //! `--game-hours H` ([`SolveOptions::game_limit`]) bounds how long one game's own search may take, to find the first
-//! board size that takes more than H hours on the machine (the *wall*) and stop there.  A game's own search is the
-//! time it has been the head of the window with its search running, summed over the invocations that searched it.  The
-//! chain waits for the head and for no other game; a search behind it is suspended, or shares the threads that the
-//! head leaves free, so the time it spends there is not what the game costs, and the search's elapsed time in its
+//! game that takes more than H hours on the machine (the *wall*) and stop there.  A game's own search is the time it
+//! has been the head of the window with its search running, summed over the invocations that searched it.  The chain
+//! waits for the head and for no other game; a search behind it is suspended, or shares the threads that the head
+//! leaves free, so the time it spends there is not what the game costs, and the search's elapsed time in its
 //! checkpoint (which counts it) would end a run at a game that follows a dear one.  The driver keeps the head's clock
 //! ([`clock`](super::clock)): it adds the time between its looks while the head's search runs, writes it beside the
 //! game's checkpoint every checkpoint interval and when the search ends, and reads it back when a search starts with a
@@ -173,7 +172,7 @@ use std::sync::Arc;
 use std::thread::{self, Scope};
 use std::time::{Duration, Instant};
 
-/// A range of board sizes for [`solve`].
+/// A range of games for [`solve`].
 pub(super) struct Range<'a> {
     pub(super) lo: u32,
     pub(super) hi: u32,
@@ -407,7 +406,7 @@ enum Seed<'w> {
     Moves(&'w [u32]),
     /// The game that promotions make on a game's board.
     On(&'w dyn Job, Vec<u32>),
-    /// The prime formula of the board size given, on the game before it.
+    /// The prime formula of the game given, on the game before it.
     Prime(u32, Box<Seed<'w>>),
 }
 
@@ -423,7 +422,7 @@ impl Seed<'_> {
     /// What the game's score is known by without its moves (see "Seeds"): the moves' sum of a game of moves (its
     /// score); the promotions' sum of a game of promotions (its score less the board's `in_the_bag`, as for every game
     /// of the frame model); for a prime game, the value of the game before it (whose score fixes the prime game's: less
-    /// the prime it opens with, plus the board size).  So the score of a provisional game changes only when its value
+    /// the prime it opens with, plus n).  So the score of a provisional game changes only when its value
     /// does: within one kind of game by the above, and from one kind to the other, from promotions to moves (its
     /// search ends, or it is concluded), the value goes from a promotions' sum to a score on the same board, which is
     /// larger.
@@ -467,11 +466,11 @@ struct Window<'a> {
     first: Before,
     /// The most games in flight.
     width: usize,
-    /// The games in flight, by board size: entered, and not yet concluded.
+    /// The games in flight, by n: entered, and not yet concluded.
     games: BTreeMap<u32, Game>,
-    /// The next board size to enter the window.
+    /// The next game to enter the window.
     entering: u32,
-    /// The next board size to conclude: the head of the window, or a game of the results file to pass over.
+    /// The next game to conclude: the head of the window, or a game of the results file to pass over.
     next: u32,
     /// The previous game of `next`, if it has one.
     last: Option<Prev>,
@@ -642,8 +641,8 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Makes the repeat lookups that are due: in the order of the board sizes, each once the setups of the games
-    /// before it are done.
+    /// Makes the repeat lookups that are due: in the order of n, each once the setups of the games before it are
+    /// done.
     fn look_up(&mut self) {
         let repeats = self.opts.tactics.same_search && !self.opts.force_search;
         let mut found = Vec::new();

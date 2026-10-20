@@ -2161,7 +2161,7 @@ mod tests {
             for (x, b) in bounds {
                 let rest: Vec<u32> = live.iter().copied().filter(|&e| e != x).collect();
                 assert!(b >= brute(&p, &rest, n), "trial {trial}: the split's bound without {x}");
-                assert!(b <= value, "trial {trial}: the split's bound without {x} above the optimum");
+                assert!(b <= value, "trial {trial}: the split's bound without {x} above the heaviest set's weight");
             }
             // Warm starts: a reported set without a deleted element that it does not hold.
             for set in &reported {
@@ -2533,7 +2533,7 @@ mod tests {
                     let sample: Vec<u32> = chosen.iter().copied().filter(|_| rng.chance(15)).collect();
                     let rests: Vec<Vec<u32>> = sample.iter().map(|&x| greedy(&owned, random, &live, Some(x))).collect();
                     for &(x, bound) in &bounds {
-                        assert!(bound <= value, "the split's bound without {x} is above the optimum");
+                        assert!(bound <= value, "the split's bound without {x} is above the heaviest set's weight");
                         if let Some(i) = sample.iter().position(|&y| y == x) {
                             assert!(bound >= weigh(&owned, &rests[i], n), "the split's bound without {x}");
                             split_checked += 1;

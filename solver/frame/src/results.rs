@@ -67,21 +67,21 @@
 //!   the file) stand;
 //! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
 //!   search ([`Proof::settles_search`]) and whose proof and assumptions the record gives; the search problems of
-//!   both games, set up again from their board sizes ([`search_problem`]), are as large as their lines record
-//!   (frames, candidates, `max_total`), are equal, and have the digest both lines record; the promotions are `m`'s,
-//!   and both games score their own `in_the_bag` (from the boards set up again) plus the recorded promotion sum;
+//!   both games, set up again from their n ([`search_problem`]), are as large as their lines record (frames,
+//!   candidates, `max_total`), are equal, and have the digest both lines record; the promotions are `m`'s, and both
+//!   games score their own `in_the_bag` (from the boards set up again) plus the recorded promotion sum;
 //! * a known line: the source it cites ([`Known::check_cite`]) holds a game of `n` that scores what the line does (the
 //!   table's, the committed chain's) or lines of the bounds store with that value as their bound of `n`, by the rules
 //!   and from the sources cited; the sources are given to the check ([`Known`]), and are not checked again by it;
 //! * the recorded proof and assumptions are the ones derived from the line and the game its proof rests on (for a
 //!   known line, from the source);
-//! * no board size has two completed lines.
+//! * no game has two completed lines.
 //!
 //! An incomplete line that records its game (`best_so_far`, with `moves` and `promotions`: the solver always writes
 //! them) is checked as far as it goes: the game is legal, scores the `best_so_far`, has ascending promotions that are
-//! moves, and is no better than `optimal.json`'s score.  A file may have holes, board sizes with no line or only
-//! incomplete ones (the file of a `--keep-going` run, or the sweep's `explore.jsonl`, which merges many); each line is
-//! checked against what it rests on in the same file, and a proof that rests on a game the file lacks is refused.
+//! moves, and is no better than `optimal.json`'s score.  A file may have holes, games with no line or only incomplete
+//! ones (the file of a `--keep-going` run, or the sweep's `explore.jsonl`, which merges many); each line is checked
+//! against what it rests on in the same file, and a proof that rests on a game the file lacks is refused.
 //!
 //! The digest a line that is not a repeat records is not checked against its problem: it is how the solver finds
 //! an earlier game to repeat, which it then sets up again and compares problem for problem, as the check of the
@@ -109,7 +109,7 @@
 //! # Extending the table of optimal games
 //!
 //! [`extend_optimal`] appends to the table `optimal.json` the games of a checked results file that continue it:
-//! from the board size after the table's last, every game that is completed, up to the first board size that is not
+//! from the game after the table's last, every game that is completed, up to the first game that is not
 //! (`taxman extend-optimal`).  A game that assumes a game of the table optimal assumes nothing the table does not
 //! already stand for, so it is appended like any other.  Its scores must agree with the table's wherever the two
 //! overlap, so a results file of another game cannot be mistaken for the table's continuation.
@@ -294,7 +294,7 @@ pub struct StoredGame {
     /// Which theorem the score reaches, given the game of `n − 1` (if the file or `optimal.json` has it).
     pub ceiling_proof: Option<CeilingProof>,
     /// For a game that set a search up (searched or repeat), the size of its search problem as the line records it
-    /// (`setup.frames`, `setup.candidates`, `setup.max_total`), which the problem set up again from its board size
+    /// (`setup.frames`, `setup.candidates`, `setup.max_total`), which the problem set up again from its n
     /// ([`search_problem`]) must have.
     pub size: Option<ProblemSize>,
     /// For such a game, the digest of its search problem (`setup.digest`).
@@ -370,11 +370,11 @@ pub struct BuiltOn {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Contents {
     pub games: BTreeMap<u32, StoredGame>,
-    /// Every incomplete line that records its game, by board size, in the order of the file (a board size can have
-    /// several, and a completed game as well: a search stopped, then resumed).  An incomplete line without the game
-    /// (one made by hand) counts in `incomplete_lines` and `runs` only.
+    /// Every incomplete line that records its game, by n, in the order of the file (an n can have several, and a
+    /// completed game as well: a search stopped, then resumed).  An incomplete line without the game (one made by
+    /// hand) counts in `incomplete_lines` and `runs` only.
     pub unfinished: BTreeMap<u32, Vec<UnfinishedGame>>,
-    /// For each board size whose search was stopped by a limit and not yet completed: how many invocations its
+    /// For each n whose search was stopped by a limit and not yet completed: how many invocations its
     /// incomplete lines record.
     pub runs: BTreeMap<u32, u32>,
     pub incomplete_lines: usize,
@@ -581,7 +581,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
     }
     let n = f.u32("n")?;
     if !(1..=MAX_N).contains(&n) {
-        return Err(format!("n={n} is not a board size from 1 to {MAX_N}"));
+        return Err(format!("n={n} is not a game from 1 to {MAX_N}"));
     }
     if !f.bool("completed")? {
         return Ok(Line::Incomplete { n, invocations: f.u32("invocations")?, best: parse_unfinished(&f, n, line)? });
@@ -654,13 +654,12 @@ pub struct CommittedGame {
     pub assumes: Assumptions,
 }
 
-/// The completed games of the results file at `path`, by board size.  The lines of unfinished searches are passed
-/// over.
+/// The completed games of the results file at `path`, by n.  The lines of unfinished searches are passed over.
 ///
 /// # Errors
 ///
 /// If the file cannot be read, a line is not a line of schema [`SCHEMA`], or two lines hold a completed game of one
-/// board size.
+/// n.
 pub fn committed_games(path: &Path) -> Result<BTreeMap<u32, CommittedGame>, String> {
     let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut games = BTreeMap::new();
@@ -747,12 +746,12 @@ pub fn read_results_with(text: &str, known: &Known, threads: usize) -> Result<Co
 }
 
 /// The search problems of the games of a file that the checks of its repeats set up again, and their boards'
-/// `in_the_bag`, by board size.  A board whose setup failed keeps the error, to be reported where a check reaches
-/// the board, whether the board was set up beforehand ([`set_up_boards`]) or when that check asked for it
+/// `in_the_bag`, by n.  A board whose setup failed keeps the error, to be reported where a check reaches the
+/// board, whether the board was set up beforehand ([`set_up_boards`]) or when that check asked for it
 /// ([`problem_of`]).
 type Problems = BTreeMap<u32, Result<(Problem, u64), String>>;
 
-/// The search problem of game `k` set up again from its board size, and the board's `in_the_bag` ([`search_problem`]).
+/// The search problem of game `k` set up again from its n, and the board's `in_the_bag` ([`search_problem`]).
 fn set_up(k: u32) -> Result<(Problem, u64), String> {
     search_problem(k).map_err(|e| format!("the search of game {k} cannot be set up: {e}"))
 }
@@ -761,7 +760,7 @@ fn set_up(k: u32) -> Result<(Problem, u64), String> {
 /// the one it repeats.  A repeat of a game that is not a completed game of the file below it fails ([`check_repeat`])
 /// before any setup, and asks for none.
 fn repeat_boards(entries: &[Entry]) -> BTreeSet<u32> {
-    // Every board size of a line is from 1 to `MAX_N` (`parse_line`), so a board size in this set is at least 1.
+    // Every n of a line is from 1 to `MAX_N` (`parse_line`), so an n in this set is at least 1.
     let completed: BTreeSet<u32> = entries.iter().map(|e| e.n).collect();
     let mut boards = BTreeSet::new();
     for e in entries {
@@ -947,7 +946,7 @@ fn check_repeat<'a>(
         return Err(format!("its promotions sum to {sum}, not the promotion_sum {} it records", record.promotion_sum));
     }
 
-    // The two search problems, set up again from the board sizes, and as large as the lines say (the frame builder of
+    // The two search problems, set up again from the values of n, and as large as the lines say (the frame builder of
     // the build that wrote a line posed the same problem as this build's, as far as the line tells).
     let Some((setup, size)) = e.setup.zip(earlier.size) else {
         return Err(format!("it or game {m} has no setup to set its search up from"));
@@ -1264,12 +1263,12 @@ impl ResultsFile {
         Ok(ResultsFile { path: path.to_owned(), file, contents })
     }
 
-    /// The completed game for board size `n`, if the file has one.
+    /// The completed game for `n`, if the file has one.
     pub fn completed(&self, n: u32) -> Option<&StoredGame> {
         self.contents.games.get(&n)
     }
 
-    /// The completed games of the file, by board size.
+    /// The completed games of the file, by n.
     pub fn games(&self) -> impl Iterator<Item = &StoredGame> {
         self.contents.games.values()
     }
@@ -1421,12 +1420,12 @@ pub struct FileReport {
 #[derive(Clone, Debug)]
 pub struct Report {
     pub files: Vec<FileReport>,
-    /// Board sizes completed in more than one file (all of them with equal scores).
+    /// Games completed in more than one file (all of them with equal scores).
     pub shared: usize,
 }
 
 /// Checks results files without changing them: each as [`read_results`] does (on `threads` threads), and that files
-/// agree on the score of every board size they share.
+/// agree on the score of every game they share.
 pub fn verify_files(paths: &[PathBuf], optimal: &Optimal, threads: usize) -> Result<Report, String> {
     verify_files_with(paths, &Known::table(optimal), threads)
 }
@@ -1539,11 +1538,11 @@ impl fmt::Display for Report {
 /// Why [`extend_optimal`] stopped.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StopReason {
-    /// The results end before the board size; `last` is the board size of their last completed game (0: none).
+    /// The results end before game n; `last` is the n of their last completed game (0: none).
     ResultsEnd { last: u32 },
-    /// The results hold games past the board size (up to `last`) but none completed for it.
+    /// The results hold games past game n (up to `last`) but none completed for it.
     Gap { last: u32 },
-    /// The results hold only searches of the board size that a limit stopped.
+    /// The results hold only searches of game n that a limit stopped.
     Incomplete,
 }
 
@@ -1561,24 +1560,24 @@ impl fmt::Display for StopReason {
 /// What [`extend_optimal`] did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Extension {
-    /// The board sizes of the games it appended to the table (an empty range if none).
+    /// The values of n of the games it appended to the table (an empty range if none).
     pub added: std::ops::RangeInclusive<u32>,
-    /// The first board size it did not append.
+    /// The first n it did not append.
     pub stopped_at: u32,
     /// Why it did not.
     pub reason: StopReason,
 }
 
-/// Appends to `optimal` the games of a checked results file that continue it: from the board size after the table's
-/// last, each game that `contents` ([`read_results`]) holds completed, up to the first board size that has none.  A
-/// game whose proof assumes a game of the table optimal is appended too: it assumes nothing the table does not
-/// stand for.  A search that a limit stopped and a completed game of the same board size may both be in the file (a
-/// run and its resume): the completed game is the game.
+/// Appends to `optimal` the games of a checked results file that continue it: from the game after the table's last,
+/// each game that `contents` ([`read_results`]) holds completed, up to the first game that has none.  A game whose
+/// proof assumes a game of the table optimal is appended too: it assumes nothing the table does not stand for.  A
+/// search that a limit stopped and a completed game of the same n may both be in the file (a run and its resume):
+/// the completed game is the game.
 ///
 /// # Errors
 ///
-/// If the results and the table score differently for a board size that both have, naming it: they are not
-/// results for the same game, or one of them is wrong.  The scores are compared before anything is appended.
+/// If the results and the table score differently for an n that both have, naming it: they are not results
+/// for the same game, or one of them is wrong.  The scores are compared before anything is appended.
 pub fn extend_optimal(optimal: &mut Optimal, contents: &Contents) -> Result<Extension, String> {
     for (&n, game) in &contents.games {
         if let Some(recorded) = optimal.score(n).filter(|&recorded| recorded != game.score) {
@@ -1812,9 +1811,9 @@ mod tests {
         ])
     }
 
-    /// A line's board size is checked against `MAX_N`, the largest board the solver supports (8191): the incomplete
-    /// line of a search stopped by a limit is read for the first board past 4095 and for the last, and is refused,
-    /// naming the range, for board 0 and for the first board past the last.
+    /// A line's n is checked against `MAX_N`, the largest board the solver supports (8191): the incomplete line of
+    /// a search stopped by a limit is read for the first board past 4095 and for the last, and is refused, naming
+    /// the range, for board 0 and for the first board past the last.
     #[test]
     fn a_lines_board_size_must_be_a_board_the_solver_supports() {
         assert_eq!(MAX_N, 8191);
@@ -1824,7 +1823,7 @@ mod tests {
         }
         for n in [0, 8192] {
             let err = read_results(&text(&[incomplete_line(n)]), Optimal::built_in(), 1).unwrap_err();
-            assert_eq!(err, format!("line 1: n={n} is not a board size from 1 to 8191"));
+            assert_eq!(err, format!("line 1: n={n} is not a game from 1 to 8191"));
         }
     }
 

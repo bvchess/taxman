@@ -39,7 +39,7 @@ pub(crate) fn golden_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata").join("golden")
 }
 
-/// The board sizes with a golden file, ascending.
+/// The values of n with a golden file, ascending.
 pub(crate) fn golden_ns() -> Vec<u32> {
     let mut ns: Vec<u32> = std::fs::read_dir(golden_dir())
         .expect("golden directory")

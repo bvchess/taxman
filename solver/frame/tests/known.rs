@@ -432,15 +432,15 @@ fn an_open_board_of_the_store_seeds_its_search_to(hi: u32) {
     }
     both_accept(&out, &sources);
 
-    // Only the lower bound: its game seeds the search, which starts at the optimum, and proves it as it did.  A search
-    // of the board on its own (no game before it) shows the seed: the nodes fall to those of a seed at the optimum.
+    // Only the lower bound: its game seeds the search, which starts at P*, and proves it as it did.  A search of the
+    // board on its own (no game before it) shows the seed: the nodes fall to those of a seed at P*.
     let store = dir.join("lower.jsonl");
     write_lines(&store, &[line(n, "lower", score, "given", &[("moves", Json::array(moves.clone()))])]);
     let seeded = options(self::sources(None, Some(&store)));
     let alone = |opts: &SolveOptions| solver::solve_game_with(n, None, opts, &table_of(&[])).unwrap();
     let (with, without) = (alone(&seeded), alone(&options(KnownSources::default())));
     assert_eq!((with.score, with.proof, with.known.is_some()), (score, Some(Proof::Exhausted), false));
-    assert!(with.nodes < without.nodes, "a seed at the optimum: {} nodes against {}", with.nodes, without.nodes);
+    assert!(with.nodes < without.nodes, "a seed at P*: {} nodes against {}", with.nodes, without.nodes);
     // ... and a forced search takes nothing from the store, but the ceiling and the seed of the game before it.
     let forced = SolveOptions { force_search: true, ..seeded };
     let forced = alone(&forced);

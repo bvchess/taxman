@@ -1,4 +1,4 @@
-//! The dual bound of a stopped search: what a search that a limit stopped proves about the optimum from above.
+//! The dual bound of a stopped search: what a search that a limit stopped proves about P* from above.
 //!
 //! A search that a limit (or a stop) ends early has an incumbent, its best promotion set so far, and the open units
 //! it has not explored: the engine's deque and the units its workers held, which its final checkpoint holds, exactly
@@ -158,7 +158,7 @@ mod tests {
     }
 
     /// Game `n` stopped before its first node: its checkpoint holds the root unit alone, and the dual bound is the
-    /// root's GF(2) bound (the upper end of the landscape), above the optimum.
+    /// root's GF(2) bound (the upper end of the landscape), above P*.
     fn stopped_at_the_root<const W: usize>(n: u32, ckpt: &Path) {
         let board = Board::<W>::for_n(n);
         let p = board.prepare(SearchTactics::default()).unwrap();
@@ -182,8 +182,8 @@ mod tests {
     }
 
     /// Game `n` searched on one thread, stopped after more and more steps (1,024, then twice as many each time)
-    /// until a search completes: the dual bound is never below the optimum nor above the root's bound, and it falls
-    /// (never rises) as the node limit grows; the search that completes has the optimum, which its bound is.  Returns
+    /// until a search completes: the dual bound is never below P* nor above the root's bound, and it falls
+    /// (never rises) as the node limit grows; the search that completes has P*, which its bound is.  Returns
     /// the number of searches its limit stopped.
     fn falls<const W: usize>(n: u32, ckpt: &Path) -> u32 {
         let board = Board::<W>::for_n(n);

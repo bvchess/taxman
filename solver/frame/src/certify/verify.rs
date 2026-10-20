@@ -13,7 +13,7 @@
 //! width and for the problem.  A `certified` line has no `beaten_by` and no line for its board in the counterexample
 //! file beside the certificates ([`counterexample_path`]); a `certified` line with `same_problem` rests on the last
 //! final line of the game it names before it in the same file, which must be `certified` and among the last
-//! `SAME_SEARCH_WINDOW` board sizes, and the rule of the same problem ([`apply_rule`], the one `certify` applies) must
+//! `SAME_SEARCH_WINDOW` games, and the rule of the same problem ([`apply_rule`], the one `certify` applies) must
 //! give what the line records, with the two problems equal whole, in the formulation of the line that rests on the
 //! other (the game it rests on is set up again in that formulation if its own line is of the other); a `beaten` line
 //! has a finished legal game scoring more than the recorded score, and an identical line in the counterexample file.  A
@@ -191,7 +191,7 @@ pub struct Verified {
 }
 
 /// The cheap checks of a line that rests on another game (`same_problem`): the game is among the last
-/// `SAME_SEARCH_WINDOW` board sizes before it, the file has a final line of it before this one, and that line is
+/// `SAME_SEARCH_WINDOW` games before it, the file has a final line of it before this one, and that line is
 /// certified.
 fn check_rests_on(f: &Final, rests_on: Option<&Final>) -> Result<(), String> {
     let c = &f.line.certificate;
@@ -200,9 +200,7 @@ fn check_rests_on(f: &Final, rests_on: Option<&Final>) -> Result<(), String> {
         return Err(f.fail(format!("a {} line has no business resting on the game of n={m}", c.verdict.as_str())));
     }
     if !(n.saturating_sub(SAME_SEARCH_WINDOW)..n).contains(&m) {
-        return Err(
-            f.fail(format!("it rests on n={m}, which is none of the {SAME_SEARCH_WINDOW} board sizes before it"))
-        );
+        return Err(f.fail(format!("it rests on n={m}, which is none of the {SAME_SEARCH_WINDOW} games before it")));
     }
     let Some(game) = rests_on else {
         return Err(f.fail(format!("it rests on n={m}, but the file has no final line of n={m} before it")));

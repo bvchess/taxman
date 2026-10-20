@@ -541,7 +541,7 @@ mod tests {
         let mut scratch = Scratch::new();
         let moves = optimal.moves(n).expect("a known game");
         let best: Bits<W> = moves.iter().copied().filter(|&x| p.candidates.contains(x)).collect();
-        assert!(p.model.promote_all_using(&mut scratch, &p.root, &best).is_some(), "n={n}: the optimum");
+        assert!(p.model.promote_all_using(&mut scratch, &p.root, &best).is_some(), "n={n}: an optimal set");
         check_images(&p, pairs, &mut scratch, &best);
         assert!(symmetries.keeps(&best), "n={n}: the optimal set breaks a constraint");
         let mut rng = Rng(0x5eed ^ u64::from(n));
@@ -570,7 +570,7 @@ mod tests {
                 stack.push((i + 1, set.with(cands[i]), next));
             }
         }
-        assert_eq!(best_kept, Some(best.sum()), "n={n}: the sets that keep the constraints miss the optimum");
+        assert_eq!(best_kept, Some(best.sum()), "n={n}: the sets that keep the constraints miss P*");
     }
 
     #[test]

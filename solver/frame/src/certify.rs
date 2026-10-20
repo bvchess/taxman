@@ -33,15 +33,15 @@
 //!
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often
 //! pose the same search problem in the solver (`solver::SAME_SEARCH_WINDOW`).  If an earlier game m of the last
-//! `SAME_SEARCH_WINDOW` board sizes is certified, and Π⁺(n) equals Π⁺(m) whole, then the heaviest promotion set of
-//! Π⁺(n) is worth what m's certificate proved the heaviest worth, V(m) − `in_the_bag⁺`(m), and a recorded game of n
-//! that is worth the same has nothing above it: [`certify_game_with`] concludes `certified` with no search, recording
-//! the game m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever
-//! formulation m's certificate was made in (a line of the other formulation is set up again in the run's): m's
-//! certificate bounds the heaviest promotion set, which does not depend on the formulation, so the rule proves what a
-//! search of Π⁺(n) would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.  A game
-//! worth less than m's certificate says is searched (it is not optimal, and the search finds the better set); one
-//! worth more contradicts the certificate and is refused.  Research code: the solver does not use it.
+//! `SAME_SEARCH_WINDOW` games is certified, and Π⁺(n) equals Π⁺(m) whole, then the heaviest promotion set of Π⁺(n) is
+//! worth what m's certificate proved the heaviest worth, V(m) − `in_the_bag⁺`(m), and a recorded game of n that is
+//! worth the same has nothing above it: [`certify_game_with`] concludes `certified` with no search, recording the game
+//! m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever formulation
+//! m's certificate was made in (a line of the other formulation is set up again in the run's): m's certificate bounds
+//! the heaviest promotion set, which does not depend on the formulation, so the rule proves what a search of Π⁺(n)
+//! would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.  A game worth less than
+//! m's certificate says is searched (it is not optimal, and the search finds the better set); one worth more
+//! contradicts the certificate and is refused.  Research code: the solver does not use it.
 //!
 //! The files `taxman certify` writes are checked again, line by line, by [`verify`] (`taxman verify-certificates`),
 //! which sets each certificate's problem up again, applies the same checks of the recorded game and the same rule of
@@ -111,7 +111,7 @@ impl Upper {
     }
 }
 
-/// The lines of the `upper` files `paths`, by board size.  A board in two files must have the same line in both.
+/// The lines of the `upper` files `paths`, by n.  A board in two files must have the same line in both.
 ///
 /// # Errors
 ///
@@ -234,7 +234,7 @@ impl Certificate {
     ///
     /// If a field is missing or has the wrong type, or the verdict is none of the three: the message names the field.
     pub fn from_json(json: &Json) -> Result<Certificate, String> {
-        let n = json.get("n").and_then(Json::as_u32).ok_or("no board size")?;
+        let n = json.get("n").and_then(Json::as_u32).ok_or("no n")?;
         let verdict = json.get("verdict").and_then(Json::as_str).and_then(Verdict::parse).ok_or("no verdict")?;
         let f = Fields(json);
         // The fields in the order `to_json` writes them, so that the first one wrong is the one named.
@@ -359,10 +359,9 @@ pub fn certify_game(
 
 /// [`certify_game`] with the certified games `earlier`, which a game may rest on instead of a search (the rule of the
 /// module docs): after the checks of the recorded game and before the search, a game whose problem an earlier game
-/// of the last `SAME_SEARCH_WINDOW` board sizes posed, and whose recorded game is worth what that game's certificate
-/// proved the most, is certified with no search, its [`Certificate::same_problem`] naming that game; the earlier game
-/// may have been certified in the other formulation.  A certified game, by search or by the rule, is added to
-/// `earlier`.
+/// of the last `SAME_SEARCH_WINDOW` games posed, and whose recorded game is worth what that game's certificate proved
+/// the most, is certified with no search, its [`Certificate::same_problem`] naming that game; the earlier game may
+/// have been certified in the other formulation.  A certified game, by search or by the rule, is added to `earlier`.
 ///
 /// # Errors
 ///
@@ -663,10 +662,10 @@ fn problem_in(line: &Certificate, claims: bool) -> Option<Problem> {
 /// appends to and of the games this run certified, and the problems this run set up for the latter.
 #[derive(Default)]
 pub struct EarlierCertificates {
-    /// The certificates with the verdict `certified`, by board size.
+    /// The certificates with the verdict `certified`, by n.
     games: BTreeMap<u32, Certificate>,
     /// The problems of the games this run certified ([`record`](Self::record)), each in the formulation of its
-    /// game's certificate, for the last `SAME_SEARCH_WINDOW` board sizes: what a comparison with an earlier game needs,
+    /// game's certificate, for the last `SAME_SEARCH_WINDOW` games: what a comparison with an earlier game needs,
     /// so that it need not set that game up again.
     problems: BTreeMap<u32, Problem>,
 }
@@ -681,7 +680,7 @@ impl EarlierCertificates {
         earlier
     }
 
-    /// Adds the certificate of a certified game, replacing one of the same board size (and forgetting the problem
+    /// Adds the certificate of a certified game, replacing one of the same n (and forgetting the problem
     /// remembered for it, which the new certificate may not be of); a certificate with another verdict is ignored.
     pub fn insert(&mut self, certificate: Certificate) {
         if certificate.verdict == Verdict::Certified {
@@ -701,7 +700,7 @@ impl EarlierCertificates {
         self.problems.retain(|&m, _| latest - m <= SAME_SEARCH_WINDOW);
     }
 
-    /// The latest certified game m of the last `SAME_SEARCH_WINDOW` board sizes before `n` whose problem is `ours`,
+    /// The latest certified game m of the last `SAME_SEARCH_WINDOW` games before `n` whose problem is `ours`,
     /// the problem of the recorded game of `n` in the formulation `claims`, worth `worth`, and what that means for `n`:
     /// `Some` with the record of m if `worth` is what m's certificate proved the most, `None` if there is no such game
     /// or if `worth` is less (`n` is searched, then).
@@ -710,10 +709,10 @@ impl EarlierCertificates {
     /// a digest that says nothing of `ours`, so it is passed over unless the sizes that do not depend on the
     /// formulation, the frames and the candidates, are those of `ours`.  For a game that is not passed over, its
     /// problem in the formulation `claims` (the one this run set up when it certified it, if its formulation is
-    /// `claims`, else set up again from its board size and open members, [`problem_in`]) is compared with `ours`
-    /// itself, so that the answer never rests on two digests alone.  The first game whose problem is `ours` decides.  A
-    /// game that cannot be set up again, or whose problem set up again is not the one its line records (the
-    /// formulation, the digest and the sizes), or whose score is below its `in_the_bag⁺`, is forgotten.
+    /// `claims`, else set up again from its n and open members, [`problem_in`]) is compared with `ours` itself, so that
+    /// the answer never rests on two digests alone.  The first game whose problem is `ours` decides.  A game that
+    /// cannot be set up again, or whose problem set up again is not the one its line records (the formulation, the
+    /// digest and the sizes), or whose score is below its `in_the_bag⁺`, is forgotten.
     ///
     /// # Errors
     ///
@@ -859,7 +858,7 @@ impl CertificateFile {
         self.finals.get(&n)
     }
 
-    /// The certificates with the verdict `certified` that the file has a final one for, by board size.
+    /// The certificates with the verdict `certified` that the file has a final one for, by n.
     pub fn certified(&self) -> impl Iterator<Item = &Certificate> {
         self.finals.values().filter(|certificate| certificate.verdict == Verdict::Certified)
     }
@@ -1009,8 +1008,8 @@ mod tests {
         };
         let refused = |json: Json| Certificate::from_json(&json).unwrap_err();
 
-        assert_eq!(refused(without("n")), "no board size");
-        assert_eq!(refused(with("n", Json::from("x"))), "no board size");
+        assert_eq!(refused(without("n")), "no n");
+        assert_eq!(refused(with("n", Json::from("x"))), "no n");
         assert_eq!(refused(without("verdict")), "no verdict");
         assert_eq!(refused(with("verdict", Json::from("maybe"))), "no verdict");
         let fields = ["score", "open", "rejected", "frames", "two_sided", "one_sided", "in_the_bag", "nodes"];

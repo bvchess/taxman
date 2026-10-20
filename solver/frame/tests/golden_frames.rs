@@ -1,9 +1,9 @@
 //! Checks the frame builder (forming, simplifying, numbering and merging the frames) and the prime shortcut against the
 //! Java solver's results (`testdata/golden`, `testdata/golden_wide`, `testdata/games_java.txt`).
 //!
-//! The golden files hold, for each board size, what the Java produced for the stages these modules
-//! reimplement.  Every comparison is exact, including list orders.  Mismatches are collected over all the
-//! files and reported together, so one bad board does not hide the rest.
+//! The golden files hold, for each n, what the Java produced for the stages these modules reimplement.
+//! Every comparison is exact, including list orders.  Mismatches are collected over all the files and
+//! reported together, so one bad board does not hide the rest.
 //!
 //! `testdata/golden` (n <= 760, and so `W <= 16`) is what the Java solved with its own assertions on.  Beyond its
 //! limit of 1023 the Java was run without them (`java` without `-ea`: its limit is an `assert`, and nothing else

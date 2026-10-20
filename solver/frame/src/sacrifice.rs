@@ -623,9 +623,9 @@ mod tests {
         }
     }
 
-    /// The bound is an oracle for the punctured frame model beyond the brute force's reach: it is at least the
-    /// optimum for every n, and each punctured game is exact.  Up to 200 (the punctured searches of W = 8), and a
-    /// sample of boards that need W = 16 (0.5 s in all).
+    /// The bound is an oracle for the punctured frame model beyond the brute force's reach: it is at least opt(n)
+    /// for every n, and each punctured game is exact.  Up to 200 (the punctured searches of W = 8), and a sample
+    /// of boards that need W = 16 (0.5 s in all).
     #[test]
     #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_bound_holds_and_is_tight_for_primes_to_100")]
     fn the_bound_holds_and_is_tight_for_primes() {
@@ -651,7 +651,7 @@ mod tests {
             if Tables::new(n).is_prime(n) {
                 assert_eq!(b.value, opt, "n={n}");
             }
-            // A decision proves the optimum exactly when the bound is tight.
+            // A decision proves opt(n) exactly when the bound is tight.
             let decided = sacrifice_bound(n, prev, prev_score, Some(opt), &opts).unwrap();
             assert_eq!(decided.proves(opt), b.value == opt, "n={n}");
             tight += u32::from(b.value == opt);

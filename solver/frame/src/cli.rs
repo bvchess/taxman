@@ -203,7 +203,7 @@ pub fn count(args: &Args, name: &str) -> Result<Option<usize>, CliError> {
 
 /// `N` or `A-B`.
 pub fn parse_range(text: &str) -> Result<(u32, u32), CliError> {
-    let bad = || CliError::Usage(format!("expected a board size N or a range A-B, got {text:?}"));
+    let bad = || CliError::Usage(format!("expected a game N or a range A-B, got {text:?}"));
     let (lo, hi) = match text.split_once('-') {
         Some((lo, hi)) => (lo.parse().map_err(|_| bad())?, hi.parse().map_err(|_| bad())?),
         None => {
@@ -217,9 +217,9 @@ pub fn parse_range(text: &str) -> Result<(u32, u32), CliError> {
     Ok((lo, hi))
 }
 
-/// The boards of a list file, `text`, in its order: one board size a line, from 1 to [`MAX_N`], none twice.  Blank
-/// lines and lines whose first non-blank character is `#` are skipped.  `name` is the file, for the messages, which
-/// also name the line.
+/// The boards of a list file, `text`, in its order: one n a line, from 1 to [`MAX_N`], none twice.  Blank lines and
+/// lines whose first non-blank character is `#` are skipped.  `name` is the file, for the messages, which also name
+/// the line.
 pub fn parse_board_list(name: &str, text: &str) -> Result<Vec<u32>, CliError> {
     let mut first_line: BTreeMap<u32, usize> = BTreeMap::new();
     let mut boards = Vec::new();
@@ -233,7 +233,7 @@ pub fn parse_board_list(name: &str, text: &str) -> Result<Vec<u32>, CliError> {
         let n: u32 =
             line.parse().ok().filter(|_| digits).ok_or_else(|| at(format!("expected a board size, got {line:?}")))?;
         if !(1..=MAX_N).contains(&n) {
-            return Err(at(format!("{n} is not a board size from 1 to {MAX_N}")));
+            return Err(at(format!("{n} is not a game from 1 to {MAX_N}")));
         }
         if let Some(first) = first_line.insert(n, i + 1) {
             return Err(at(format!("the board {n} is listed again (first on line {first})")));
@@ -395,8 +395,8 @@ mod tests {
             ("12\n-5\n", "boards.txt: line 2: expected a board size, got \"-5\""),
             ("+5\n", "boards.txt: line 1: expected a board size, got \"+5\""),
             ("12\n4294967296\n", "boards.txt: line 2: expected a board size, got \"4294967296\""),
-            ("0\n", "boards.txt: line 1: 0 is not a board size from 1 to 8191"),
-            ("# c\n12\n8192\n", "boards.txt: line 3: 8192 is not a board size from 1 to 8191"),
+            ("0\n", "boards.txt: line 1: 0 is not a game from 1 to 8191"),
+            ("# c\n12\n8192\n", "boards.txt: line 3: 8192 is not a game from 1 to 8191"),
             ("12\n\n30\n12\n", "boards.txt: line 4: the board 12 is listed again (first on line 1)"),
             ("", "boards.txt: no board is listed"),
             ("# only a comment\n\n", "boards.txt: no board is listed"),

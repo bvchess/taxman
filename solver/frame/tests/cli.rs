@@ -48,7 +48,7 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["frobnicate"], "unknown command");
     assert_usage_error(&["solve"], "usage: solve N|A-B");
     assert_usage_error(&["solve", "5-3"], "empty");
-    assert_usage_error(&["solve", "x"], "expected a board size N or a range A-B");
+    assert_usage_error(&["solve", "x"], "expected a game N or a range A-B");
     assert_usage_error(&["solve", "12", "--tactic", "nogoods=maybe"], "expected on or off");
     assert_usage_error(&["solve", "12", "--tactic", "fix_forced"], "expected name=value");
     assert_usage_error(&["solve", "12", "--tactic", "sparkle=on"], "unknown tactic");
@@ -65,7 +65,7 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--game-hours", "soon"], "--game-hours: cannot read");
     assert_usage_error(&["regress", "--game-hours", "1"], "unknown option --game-hours");
     assert_usage_error(&["regress", "12"], "regress takes no positional arguments");
-    assert_usage_error(&["bench", "many"], "not a board size");
+    assert_usage_error(&["bench", "many"], "not a game n");
     assert_usage_error(&["tables"], "usage: tables N K...");
     assert_usage_error(&["tables", "30"], "usage: tables N K...");
     assert_usage_error(&["tables", "30", "31"], "not on the board");
@@ -93,8 +93,8 @@ fn certify_command_lines_are_usage_errors() {
     assert_usage_error(&["certify"], "certify takes one range A-B");
     assert_usage_error(&with_files(&["certify"]), "certify takes one range A-B");
     assert_usage_error(&with_files(&["certify", "1302", "1303"]), "certify takes one range A-B");
-    assert_usage_error(&with_files(&["certify", "x"]), "expected a board size N or a range A-B");
-    assert_usage_error(&with_files(&["certify", "1302-"]), "expected a board size N or a range A-B");
+    assert_usage_error(&with_files(&["certify", "x"]), "expected a game N or a range A-B");
+    assert_usage_error(&with_files(&["certify", "1302-"]), "expected a game N or a range A-B");
     assert_usage_error(&with_files(&["certify", "1303-1302"]), "empty or starts below 1");
     assert_usage_error(&with_files(&["certify", "0-5"]), "empty or starts below 1");
 
@@ -166,8 +166,8 @@ fn certify_takes_a_range_or_a_list_of_boards_and_not_both() {
     };
     bad("word.txt", "1302\nboard\n", "2: expected a board size, got \"board\"");
     bad("note.txt", "1302 # a note\n", "1: expected a board size, got \"1302 # a note\"");
-    bad("zero.txt", "0\n", "1: 0 is not a board size from 1 to 8191");
-    bad("large.txt", "# c\n\n8192\n", "3: 8192 is not a board size from 1 to 8191");
+    bad("zero.txt", "0\n", "1: 0 is not a game from 1 to 8191");
+    bad("large.txt", "# c\n\n8192\n", "3: 8192 is not a game from 1 to 8191");
     bad("twice.txt", "1302\n1304\n\n1302\n", "4: the board 1302 is listed again (first on line 1)");
     let empty = list("empty.txt", "# nothing\n\n");
     refused(&["certify", "--list", path(&empty)], "empty.txt: no board is listed");
@@ -514,7 +514,7 @@ fn extend_optimal_refuses_what_it_cannot_trust() {
     let results = solve_into(&dir, "r.jsonl", "1-20");
     let out = dir.join("out.json");
 
-    // Results that score a board size differently from the table: not the same game, or one of them is wrong.
+    // Results that score a game differently from the table: not the same game, or one of them is wrong.
     let wrong = dir.join("wrong.json");
     fs::write(&wrong, mini_optimal(Some(10))).unwrap();
     let run = taxman(&["extend-optimal", &results, "--table", path(&wrong), "--out", path(&out)]);

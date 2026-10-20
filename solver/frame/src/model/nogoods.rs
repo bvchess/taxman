@@ -26,8 +26,8 @@
 //! takes to learn what it forgot.  So which nogoods a searcher keeps, and for how long, is a matter of speed alone, a
 //! policy: [`Nogoods::forget`] drops all of them or keeps some ([`Keep`]), and a table may be limited
 //! ([`Nogoods::set_limit`]) so that the least recently used goes when a new one comes.  (What the tree looks like does
-//! depend on the policy, because which conflict a node branches on depends on what the table knows; the optimum does
-//! not.)  A nogood is *used* when a lookup answers with it ([`Nogoods::lookup`]) or it rules a candidate out
+//! depend on the policy, because which conflict a node branches on depends on what the table knows; P* does not.)  A
+//! nogood is *used* when a lookup answers with it ([`Nogoods::lookup`]) or it rules a candidate out
 //! ([`Nogoods::ruled_out`]).
 
 use crate::bits::Bits;

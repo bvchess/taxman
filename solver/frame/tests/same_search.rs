@@ -28,8 +28,8 @@ fn options(same_search: bool) -> SolveOptions {
     opts
 }
 
-/// The games of `lo..=hi` whose search problem one of the [`SAME_SEARCH_WINDOW`] board sizes before it also posed,
-/// each with the latest of those: the games that a chain over the range, holding every game before `lo`, concludes
+/// The games of `lo..=hi` whose search problem one of the [`SAME_SEARCH_WINDOW`] games before it also posed, each
+/// with the latest of those: the games that a chain over the range, holding every game before `lo`, concludes
 /// without a search.  Prime and trivial boards set no search up.  Found from the setups alone, without a search.
 fn repeats_by_problem(lo: u32, hi: u32) -> Vec<(u32, u32)> {
     let mut problems: BTreeMap<u32, Problem> = BTreeMap::new();

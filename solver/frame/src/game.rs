@@ -195,9 +195,9 @@ const MAX_PLAUSIBLE_N: u32 = 1 << 20;
 /// [`Optimal::built_in`] reads.
 pub const BUILT_IN: &str = include_str!("../../../results/optimal.json");
 
-/// The known optimal games, by board size: the table `results/optimal.json` ([`built_in`](Self::built_in)),
-/// possibly overlaid with the completed games of results files ([`with_results`](Self::with_results)).  For each
-/// board size, the best score and a game that achieves it.
+/// The known optimal games, by n: the table `results/optimal.json` ([`built_in`](Self::built_in)), possibly
+/// overlaid with the completed games of results files ([`with_results`](Self::with_results)).  For each n, the
+/// best score and a game that achieves it.
 #[derive(Clone)]
 pub struct Optimal {
     /// Indexed by `n`; `None` where the file has no entry.
@@ -217,7 +217,7 @@ impl Optimal {
     }
 
     /// The table with the completed games of the results files `results` added (they replace the table's moves for
-    /// the same board sizes; an unfinished search's line is skipped): how a measurement (the ladder, `taxman
+    /// the same values of n; an unfinished search's line is skipped): how a measurement (the ladder, `taxman
     /// bench`) gets the previous game of a board past the table's end, to seed its search and give it a ceiling.
     ///
     /// # Errors
@@ -242,7 +242,7 @@ impl Optimal {
     }
 
     /// Reads a parsed JSON array of game objects (see [`load`](Self::load)); the error names the entry that is
-    /// malformed, or a board size that appears twice.
+    /// malformed, or an n that appears twice.
     pub fn from_json(json: &Json) -> Result<Optimal, String> {
         let entries = json.as_arr().ok_or("expected an array of games")?;
         let mut out = Optimal { by_n: Vec::new() };
@@ -256,7 +256,7 @@ impl Optimal {
     }
 
     /// These games with the completed games of the results file `path` (one JSON object per line, as `taxman
-    /// solve --out` writes them), which replace the games of the same board sizes.  Lines of searches that did
+    /// solve --out` writes them), which replace the games of the same values of n.  Lines of searches that did
     /// not complete are skipped.
     pub fn with_results(mut self, path: &Path) -> Result<Optimal, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -271,8 +271,8 @@ impl Optimal {
         Ok(self)
     }
 
-    /// The board size, score and moves of one game object; the error says what is wrong after a ": " (or after
-    /// " (n=…): " once the board size is known).
+    /// The n, score and moves of one game object; the error says what is wrong after a ": " (or after " (n=…):
+    /// " once n is known).
     fn parse_entry(entry: &Json) -> Result<(u32, u64, Vec<u32>), String> {
         let field = |name: &str| entry.get(name).ok_or_else(|| format!(": missing \"{name}\""));
         let n = field("n")?.as_u32().filter(|&n| n <= MAX_PLAUSIBLE_N).ok_or(": bad \"n\"")?;
@@ -281,7 +281,7 @@ impl Optimal {
         Ok((n, score, moves))
     }
 
-    /// Records the game of board size `n`; returns whether it replaced one.
+    /// Records game `n`; returns whether it replaced one.
     fn set(&mut self, n: u32, score: u64, moves: Vec<u32>) -> bool {
         if self.by_n.len() <= n as usize {
             self.by_n.resize(n as usize + 1, None);
@@ -289,11 +289,11 @@ impl Optimal {
         self.by_n[n as usize].replace((score, moves)).is_some()
     }
 
-    /// Appends the game of board size `n`, which must be past every board size the table has: a table is extended
-    /// past its end, and its games are never replaced.
+    /// Appends game `n`, which must be past every n the table has: a table is extended past its end, and its
+    /// games are never replaced.
     pub fn push(&mut self, n: u32, score: u64, moves: Vec<u32>) -> Result<(), String> {
         if n <= self.max_n() {
-            return Err(format!("n={n} is not past the largest board size of the table, {}", self.max_n()));
+            return Err(format!("n={n} is not past the table's largest n, {}", self.max_n()));
         }
         if n > MAX_PLAUSIBLE_N {
             return Err(format!("n={n} is more than the {MAX_PLAUSIBLE_N} that a table of games may hold"));
@@ -348,12 +348,12 @@ impl Optimal {
         self.by_n.get(n as usize)?.as_ref()
     }
 
-    /// The optimal score for board size `n`, if known.
+    /// The optimal score for game `n`, if known.
     pub fn score(&self, n: u32) -> Option<u64> {
         self.entry(n).map(|(score, _)| *score)
     }
 
-    /// An optimal game for board size `n`, if known.
+    /// An optimal game for `n`, if known.
     pub fn moves(&self, n: u32) -> Option<&[u32]> {
         self.entry(n).map(|(_, moves)| moves.as_slice())
     }
@@ -364,12 +364,12 @@ impl Optimal {
         present.filter_map(|(n, e)| e.as_ref().map(|(score, moves)| (n as u32, *score, moves.as_slice())))
     }
 
-    /// The board sizes that have an entry, ascending.
+    /// The values of n that have an entry, ascending.
     pub fn sizes(&self) -> impl Iterator<Item = u32> + '_ {
         self.games().map(|(n, _, _)| n)
     }
 
-    /// The largest board size with an entry (0 if there are none).
+    /// The largest n with an entry (0 if there are none).
     pub fn max_n(&self) -> u32 {
         self.sizes().last().unwrap_or(0)
     }
@@ -578,7 +578,7 @@ mod tests {
         let opt = Optimal::built_in();
         // The parse is ~10 ms when optimized; the generous bound only guards against something quadratic.
         assert!(start.elapsed().as_secs_f64() < 1.0, "loading took {:?}", start.elapsed());
-        // Every board size from 1 to the end of the table (the Java's 1000, and what has been appended since).
+        // Every n from 1 to the end of the table (the Java's 1000, and what has been appended since).
         let top = opt.max_n();
         assert!(top >= 1000);
         assert_eq!(opt.sizes().count(), top as usize);
@@ -613,7 +613,7 @@ mod tests {
         fs::write(&results, line(4, 7, "[2,3,4]") + &line(5, 12, "[5,4,3]")).unwrap();
 
         let known = table.with_results_files(std::slice::from_ref(&results)).unwrap();
-        // The results file's game replaces the table's, and adds a board size the table lacks.
+        // The results file's game replaces the table's, and adds an n the table lacks.
         assert_eq!((known.score(4), known.moves(4)), (Some(7), Some(&[2, 3, 4][..])));
         assert_eq!(known.score(5), Some(12));
         assert_eq!(table.with_results_files(&[]).unwrap().score(5), None);
@@ -640,7 +640,7 @@ mod tests {
         let sparse =
             "[\n  { \"n\": 3, \"score\": 3, \"moves\": [3] },\n  { \"n\": 7, \"score\": 17, \"moves\": [7, 4, 6] }\n]";
         assert_eq!(load(sparse).to_file_text(), sparse);
-        // The order of the text is that of the board sizes, whatever the order of the file it was read from.
+        // The order of the text is that of n, whatever the order of the file it was read from.
         let shuffled = r#"[{"n":7,"score":17,"moves":[7,4,6]},{"n":3,"score":3,"moves":[3]}]"#;
         assert_eq!(load(shuffled).to_file_text(), sparse);
     }

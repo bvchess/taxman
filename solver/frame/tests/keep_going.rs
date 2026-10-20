@@ -144,7 +144,7 @@ fn a_retry_searches_the_unfinished_games_again_and_each_gets_what_it_lacked() {
     assert_eq!(options(&all[5]).get("retry"), Some(&Json::Bool(true)));
     let report = verified(&results);
     assert_eq!(report.files[0].contents.games.len(), 5);
-    // Every board size is proven now, so the report says nothing is left unfinished.
+    // Every game is proven now, so the report says nothing is left unfinished.
     assert!(!report.to_string().contains("unfinished:"), "{report}");
 }
 

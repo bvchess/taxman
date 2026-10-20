@@ -325,10 +325,10 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
     builds_bounds_and_searches::<128>(4100, 4095);
 }
 
-/// At W = 20 the sacrifice bound (a search of punctured boards, which is the theorem that the optimum of `n` is at
-/// most the best of them plus a known term) is the only upper bound that does not come from the search being tested
-/// (the Java stops at 1023): it must be at least the recorded score, and where it is tight it proves it, as it does
-/// for game 1133 (not for game 1131, whose bound is larger).
+/// At W = 20 the sacrifice bound (a search of punctured boards, which is the theorem that opt(n) is at most the
+/// best of them plus a known term) is the only upper bound that does not come from the search being tested (the
+/// Java stops at 1023): it must be at least the recorded score, and where it is tight it proves it, as it does for
+/// game 1133 (not for game 1131, whose bound is larger).
 #[test]
 fn the_sacrifice_bound_proves_a_w20_result() {
     let games = stored_games("strict.jsonl");

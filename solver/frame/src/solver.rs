@@ -1,7 +1,7 @@
 //! The per-game pipeline and the range driver: what `taxman solve` runs.
 //!
-//! [`solve_game`] solves one board size and [`solve_range`] a range of them, each built on the one before.  They
-//! produce [`GameResult`]s: the game, its score, how it was found ([`Method`]) and how its optimality is established (a
+//! [`solve_game`] solves one game and [`solve_range`] a range of them, each built on the one before.  They produce
+//! [`GameResult`]s: the game, its score, how it was found ([`Method`]) and how its optimality is established (a
 //! [`Proof`], and what it assumes, see [`crate::results`]).  Around them are the options ([`SolveOptions`]) and the
 //! previous game ([`Prev`]).  The tactics are in [`crate::tactics`], the analysis of a board that every search starts
 //! from in [`crate::board`], the search in [`crate::search`] and the files in [`crate::results`].
@@ -39,7 +39,7 @@
 //! Consecutive boards often pose exactly the same search problem ([`search::Problem`]: the frames, the candidates,
 //! `max_total` and the factor graph among their numbers), only with another ceiling.  With the tactic `same_search`
 //! (proven, on by default), a game whose problem an earlier game `m` of the range or of the results file posed, within
-//! the [`SAME_SEARCH_WINDOW`] board sizes before it, and whose proof settles that problem's best promotion sum
+//! the [`SAME_SEARCH_WINDOW`] games before it, and whose proof settles that problem's best promotion sum
 //! ([`Proof::settles_search`]), is `m`'s promotions played on its own board, with no search: method `repeat`, proof
 //! `same_search`, resting on `m`'s proof and its assumptions.  The game is found by the problem's digest and confirmed
 //! by comparing the two problems, taking `m`'s from this run's own setup of its board when there was one and setting
@@ -60,7 +60,7 @@
 //!
 //! # A range
 //!
-//! [`solve_range_each`] solves the board sizes `lo..=hi` and concludes them in order.  The previous game of each is
+//! [`solve_range_each`] solves the games `lo..=hi` and concludes them in order.  The previous game of each is
 //! the one before it; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
 //! `optimal.json`'s (assumed optimal, which the results that rest on it record), else there is none and the game is
 //! solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
@@ -273,8 +273,8 @@ pub struct Prev {
 }
 
 impl Prev {
-    /// The game for board size `n` in `optimal`, if it has one.  The file records no proof, so the game is assumed
-    /// optimal ([`assumed_optimal`]).
+    /// The game of `n` in `optimal`, if it has one.  The file records no proof, so the game is assumed optimal
+    /// ([`assumed_optimal`]).
     pub fn from_optimal(optimal: &Optimal, n: u32) -> Option<Prev> {
         let (moves, score) = (optimal.moves(n)?, optimal.score(n)?);
         let assumes = Assumptions::from([assumed_optimal(n)]);
@@ -415,11 +415,11 @@ impl Method {
 }
 
 /// What a result records about the earlier game whose search problem it repeats (tactic `same_search`): that game's
-/// board size, the digest of the problem they share, its best promotion sum, and that game's proof and assumptions,
-/// which the repeat rests on.
+/// n, the digest of the problem they share, its best promotion sum, and that game's proof and assumptions, which
+/// the repeat rests on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SameSearch {
-    /// The board size of the earlier game.
+    /// The n of the earlier game.
     pub n: u32,
     /// [`Problem::digest`](crate::search::Problem::digest) of the search problem.
     pub digest: u64,
@@ -515,7 +515,7 @@ const STAT_NAMES: [(&str, usize); 4] = [
     ("match_bounds", stat::MATCH_BOUNDS),
 ];
 
-/// The outcome of solving one board size.
+/// The outcome of solving one game n.
 #[derive(Clone, Debug)]
 pub struct GameResult {
     pub n: u32,
@@ -698,8 +698,8 @@ impl GameResult {
         Json::object(fields)
     }
 
-    /// One line for a person: board size, score, method, nodes, time, the comparison with `optimal.json`, the
-    /// proof, and what it assumes, if anything.
+    /// One line for a person: n, score, method, nodes, time, the comparison with `optimal.json`, the proof,
+    /// and what it assumes, if anything.
     pub fn summary_line(&self) -> String {
         let optimal = match (self.completed, self.optimal_match) {
             (false, _) => "incomplete",
@@ -776,7 +776,7 @@ fn at(n: u32, failure: Failure) -> Failure {
     }
 }
 
-/// Solves board size `n`.  `prev` is the solution of `n − 1` if known.  The score is confirmed against
+/// Solves game `n`.  `prev` is the solution of `n − 1` if known.  The score is confirmed against
 /// `optimal.json` ([`Optimal::built_in`]).
 pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<GameResult, String> {
     solve_game_with(n, prev, opts, Optimal::built_in())
@@ -784,8 +784,8 @@ pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<Ga
 
 /// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests, and for `taxman bench`,
 /// whose known games extend the table.  The checkpoint of a completed game is deleted once the game has passed its
-/// checks.  This is the driver of a range (`window`) over the one board size `n`, from `prev`, with no results file
-/// and no earlier games to repeat.
+/// checks.  This is the driver of a range (`window`) over the one game `n`, from `prev`, with no results file and
+/// no earlier games to repeat.
 pub fn solve_game_with(
     n: u32,
     prev: Option<&Prev>,
@@ -892,7 +892,7 @@ struct Go {
 
 /// What came of a game's search, whatever its set width.
 struct Outcome {
-    /// The best promotion set found (the optimum when completed), ascending, and the game it makes.
+    /// The best promotion set found (an optimal set when completed), ascending, and the game it makes.
     promotions: Vec<u32>,
     moves: Vec<u32>,
     /// The search finished, or reached a ceiling it was given; false when a limit or a stop stopped it.
@@ -1021,7 +1021,7 @@ type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known) -> Result<SetUp, F
 
 /// The setup of game `n` (its first phase, on the game's thread): the checks of a previous game not made by this run,
 /// the tables, and then the game a known source holds, the prime shortcut, the trivial game, or the search problem
-/// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the board size.
+/// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the game.
 fn set_up(n: u32, before: &Before, opts: &SolveOptions, known: &Known) -> Result<SetUp, Failure> {
     let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
@@ -1390,12 +1390,11 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 // ---------------------------------------------------------------------------------------------------------
 // Repeats of earlier searches
 
-/// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the board
-/// sizes `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1650
-/// games of the committed chain 1..3914 whose problem an earlier game posed repeats the last board size before it that
-/// set a search up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/same-search-2026-10/README.md).  The
-/// window keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games
-/// alone.
+/// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the games
+/// `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1650 games of
+/// the committed chain 1..3914 whose problem an earlier game posed repeats the last game before it that set a search
+/// up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/same-search-2026-10/README.md).  The window keeps
+/// the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 
 /// An earlier completed game, as much of it as a repeat of its search needs.
@@ -1416,9 +1415,9 @@ struct Searched {
 #[derive(Default)]
 struct Earlier {
     games: BTreeMap<u32, Searched>,
-    /// The search problems of the boards this run set up ([`remember`](Self::remember)), by board size, for the last
-    /// [`SAME_SEARCH_WINDOW`] board sizes: what a comparison with an earlier game needs, so that it need not set
-    /// that game's board up again.
+    /// The search problems of the boards this run set up ([`remember`](Self::remember)), by n, for the last
+    /// [`SAME_SEARCH_WINDOW`] games: what a comparison with an earlier game needs, so that it need not set that
+    /// game's board up again.
     setups: BTreeMap<u32, Problem>,
     /// The boards this run set up whose games are not concluded yet.
     pending: BTreeSet<u32>,
@@ -1451,9 +1450,8 @@ impl Earlier {
     }
 
     /// Remembers the search problem that this run set board `n` up with (at the repeat lookup of its game, in the
-    /// order of the board sizes), with the game pending until it is concluded, and forgets the problems of the boards
-    /// more than [`SAME_SEARCH_WINDOW`] sizes before the latest one remembered: no game that follows looks that far
-    /// back.
+    /// order of n), with the game pending until it is concluded, and forgets the problems of the boards more than
+    /// [`SAME_SEARCH_WINDOW`] sizes before the latest one remembered: no game that follows looks that far back.
     ///
     /// The problem that this run's own setup of board `m` poses is the problem `search_problem(m)` builds
     /// ([`Board::problem`] is the problem [`Board::prepare`] poses, which a test in `board.rs` checks), so a
@@ -1467,7 +1465,7 @@ impl Earlier {
 
     /// The latest game of the window before `n` ([`SAME_SEARCH_WINDOW`]) whose search problem is `problem`: the game
     /// whose search game `n` repeats.  A game whose digest is not `problem`'s is passed over; for one whose digest
-    /// is, its problem (the one this run set its board up with when it did, else set up again from the board size,
+    /// is, its problem (the one this run set its board up with when it did, else set up again from its n,
     /// [`search_problem`]) is compared with `problem` itself, so that the answer never rests on two digests alone.  A
     /// game whose problem is not as large as its line says (a line made by a build whose frame builder posed another
     /// problem) is dropped: a verifier would refuse it too.
@@ -1518,8 +1516,8 @@ impl Earlier {
 }
 
 /// The search problem of board `m`: the one in `setups` (the boards this run set up), else the one set up again from
-/// the board size (a game of the results file), if the board can be set up.  The two are the same problem: the one a
-/// run's own setup of the board posed is what `search_problem(m)` builds, as [`Earlier::remember`] says.
+/// `m` (a game of the results file), if the board can be set up.  The two are the same problem: the one a run's own
+/// setup of the board posed is what `search_problem(m)` builds, as [`Earlier::remember`] says.
 fn problem_of_board(setups: &BTreeMap<u32, Problem>, m: u32) -> Option<Cow<'_, Problem>> {
     match setups.get(&m) {
         Some(problem) => Some(Cow::Borrowed(problem)),
@@ -1572,8 +1570,8 @@ fn stored_prev(results: &ResultsFile, n: u32) -> Option<Prev> {
     })
 }
 
-/// The best game of the last unfinished search of `n` in the results file (a board size it has no completed game of),
-/// as the previous game of `n + 1`: a seed, not a proven game.
+/// The best game of the last unfinished search of `n` in the results file (an n it has no completed game of), as the
+/// previous game of `n + 1`: a seed, not a proven game.
 fn stored_unfinished(results: &ResultsFile, n: u32) -> Option<Prev> {
     let game = results.unfinished(n)?;
     Some(Prev {
@@ -1633,7 +1631,7 @@ pub fn solve_range(
     Ok(results)
 }
 
-/// Solves the board sizes `lo..=hi`, each from the solution of the one before, and concludes them in order (with
+/// Solves the games `lo..=hi`, each from the solution of the one before, and concludes them in order (with
 /// up to [`SolveOptions::window`] games in flight, see `window`).  The solution of `lo − 1` comes from the results
 /// file, else, with [`SolveOptions::use_prev`], from `optimal.json`.  The results file is checked when it is opened
 /// ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is deleted).
@@ -1815,9 +1813,9 @@ mod tests {
         assert!(err.contains("does not stand up") && !err.contains("not a legal game of n=6"), "{err}");
     }
 
-    /// Solves the board sizes `lo..=hi` as a range does (its driver, [`window::solve`], on one thread, so one game
-    /// after the other), each from the one before (the first from `optimal.json`'s game before it), with the
-    /// `Earlier` that the run keeps; returns it and the results.
+    /// Solves the games `lo..=hi` as a range does (its driver, [`window::solve`], on one thread, so one game after
+    /// the other), each from the one before (the first from `optimal.json`'s game before it), with the `Earlier`
+    /// that the run keeps; returns it and the results.
     fn solved_with_earlier(lo: u32, hi: u32) -> (Earlier, Vec<GameResult>) {
         let (opts, optimal) = (one_thread(), Optimal::built_in());
         let mut earlier = Earlier::default();

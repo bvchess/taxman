@@ -161,8 +161,8 @@
 //! anyway (the ceiling is the least given, the incumbent the best, a stop a flag, the workers the last number given).
 //! The control's mutex comes before the `state` lock and the payload's, and the run never takes it holding either.
 //!
-//! **Ceiling.**  A proven upper bound on the optimum: an incumbent that reaches it is optimal, and the run ends as if
-//! a searcher had called `declare_optimal`.  Two events can make that so, an offer that raises the incumbent and a
+//! **Ceiling.**  A proven upper bound on the best value: an incumbent that reaches it is optimal, and the run ends as
+//! if a searcher had called `declare_optimal`.  Two events can make that so, an offer that raises the incumbent and a
 //! ceiling that comes down to it, and each checks for the other: an offer stores the incumbent and then loads the
 //! ceiling, and `set_ceiling` stores the ceiling and then loads the incumbent, all four accesses `SeqCst`.  In their
 //! single total order one side's store comes before the other side's load (the store-buffering pattern of Dekker's
@@ -413,7 +413,7 @@ impl Control {
         Arc::new(Control { state: Mutex::new(ControlState::default()) })
     }
 
-    /// A ceiling: a value the incumbent can never exceed (a proven upper bound on the optimum).  Once the incumbent
+    /// A ceiling: a value the incumbent can never exceed (a proven upper bound on the best value).  Once the incumbent
     /// reaches it, the incumbent is optimal and the run ends as if a searcher had called [`Ctx::declare_optimal`]
     /// ([`Outcome::optimal_declared`]).  It can be given before the run or while it runs, any number of times; the
     /// lowest value given counts.  A run whose incumbent already reaches it when the run starts does no search work

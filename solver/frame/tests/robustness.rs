@@ -561,7 +561,7 @@ fn options(dir: &Path) -> SolveOptions {
 }
 
 /// Games 140 and 141 have the same candidates and the same frame 0, but other frames: before checkpoints recorded the
-/// board size and the frames, 140's was resumed as 141's.
+/// n and the frames, 140's was resumed as 141's.
 #[test]
 fn a_checkpoint_renamed_to_another_game_is_refused() {
     let dir = TempDir::new("renamed");

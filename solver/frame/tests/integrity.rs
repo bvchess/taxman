@@ -43,8 +43,8 @@ fn prev(moves: Vec<u32>, score: u64) -> Prev {
     }
 }
 
-/// A game of 80 that is legal, over and opens with 79, as an optimal game does, but scores less than the
-/// optimum: optimal.json's game cut short and finished by always playing the smallest legal move.
+/// A game of 80 that is legal, over and opens with 79, as an optimal game does, but scores less than
+/// opt(n): optimal.json's game cut short and finished by always playing the smallest legal move.
 fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
     let optimal = Optimal::built_in();
     let best = optimal.moves(80).unwrap();
