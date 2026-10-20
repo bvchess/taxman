@@ -37,11 +37,11 @@ misses are the *odd* cores of movers with three or more factors.
   solve) from a related one, at a cost linear in the elements.  It derives a child's from the parent's, which the
   workspace still holds when the child is checked: the promoted members' slots are dropped from the circuits, a
   contraction, and for a certified child the set is first flipped along its cycle by exchanges, each a pivot that keeps
-  the span.  It derives a node's from a copy of its own tableau, saved when it kept the certified level (`Snapshot`).  A
-  block where an exchange would change the span is built instead, and the elements the parent did not have (its own
-  loops, candidates again in the child) are reduced by the block's members.  The docs of `Meet` in `src/gf2/meet.rs`
-  ("Deriving a tableau") have the argument, and the random paths of the tests check every derived tableau against the
-  one a solve builds.  The trees are the same.
+  the span.  It derives a node's from a copy of its own tableau, saved when it kept the certified level (`Snapshot`).  In
+  a block whose span changes, the circuits that hold no member leaving carry over, and the other elements are reduced
+  by the block's new members, as are the elements the parent did not have (its own loops, candidates again in the
+  child).  The docs of `Meet` in `src/gf2/meet.rs` ("Deriving a tableau") have the argument, and the random paths of
+  the tests check every derived tableau against the one a solve builds.  The trees are the same.
 * **The heaviest set without a member, with no solve.**  In practice the heaviest set without a member `x` of `I*` is
   `I*` flipped along one cycle through `x` of its exchange graph.  `Meet::without` finds the shortest such cycle by
   Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent,
