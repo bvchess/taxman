@@ -610,6 +610,7 @@ const REWRITTEN: &[&str] = &[
     "solver/tools/certify/README.md",
     "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
+    "solver/notebook/README.md",
     "results/README.md",
     "heuristics/README.md",
 ];
