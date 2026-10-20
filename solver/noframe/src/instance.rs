@@ -1,9 +1,9 @@
 //! Reduction instances: a set of members, each listing the factors it can pay with.
 //!
-//! The instances here are *separated* (no member is a factor of another member), as THEORY.md's residual
-//! theorems require: the upper half of a game, its truncations, their components and residuals, and synthetic
-//! instances built the same way.  Members are indexed in *greedy order*: member 0 is considered first (for a
-//! game, the largest number), so descending greedy is a scan of the indices in order.
+//! The instances here are *separated* (no member is a factor of another member), as the residual theorems of
+//! docs/theory/decision-procedure.md require: the upper half of a game, its truncations, their components and
+//! residuals, and synthetic instances built the same way.  Members are indexed in *greedy order*: member 0 is
+//! considered first (for a game, the largest number), so descending greedy is a scan of the indices in order.
 
 use crate::primes::maximal_factors;
 use std::collections::HashMap;

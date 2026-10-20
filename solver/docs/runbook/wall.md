@@ -111,6 +111,10 @@ DRY_RUN=1 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL     
 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL               # after Brian's yes
 ```
 
+A run past the committed chain should take the games that the chain and the bounds store already hold instead of
+solving them again: add `--extra-args "--use-prev"` to both commands (the paragraph "Drawing on the known games",
+below).
+
 The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 instance-hours, the chain to 8191, the spot
 ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` prints the header of the script, and every option has
 an environment variable.  `launch` prints the files (the user data, the config, the mixed instances policy) and each

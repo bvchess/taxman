@@ -1,10 +1,10 @@
 //! The tactics: every piece of the algorithm that can be switched, with its name, value and default.
 //!
-//! A *tactic* is one choice the solver makes that has a measurable effect on the answers' proof or on the time
-//! they take: a shortcut (`prime_shortcut`, `same_search`), or a way to bound or prune the search
-//! (`match_refine`, `nogoods`, `lagrange`, ...).  DESIGN.md's table of tactics ("Tactics") grades each as proven or
-//! sound and says what it does; this module is the one place in the code that knows their names.  The ones that act
-//! inside the search are [`SearchTactics`]; the others are only used by the per-game pipeline ([`crate::solver`]).
+//! A *tactic* is one choice the solver makes that has a measurable effect on the answers' proof or on the time they
+//! take: a shortcut (`prime_shortcut`, `same_search`), or a way to bound or prune the search (`match_refine`,
+//! `nogoods`, `lagrange`, ...).  the table of tactics (solver/docs/design/tactics.md) grades each as proven or sound
+//! and says what it does; this module is the one place in the code that knows their names.  The ones that act inside
+//! the search are [`SearchTactics`]; the others are only used by the per-game pipeline ([`crate::solver`]).
 //!
 //! A tactic has a value: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the
 //! nogood table, or a setting that tunes the GF(2) search: a window, a choice of branching, a count ([`Setting`]).
@@ -18,7 +18,7 @@ use crate::search::{Gf2Branching, SearchTactics};
 use std::fmt;
 
 /// The value of every tactic.  The ones that act inside the search are [`SearchTactics`].  `tests/docs.rs` checks
-/// that DESIGN.md's table of tactics lists these, in this order, with these defaults.
+/// that the table of solver/docs/design/tactics.md lists these, in this order, with these defaults.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tactics {
     pub search: SearchTactics,
@@ -181,7 +181,7 @@ impl Slot<'_> {
 }
 
 impl Tactics {
-    /// The names of the tactics paired with where their values are kept, in the order of DESIGN.md's table.  The
+    /// The names of the tactics paired with where their values are kept, in the order of the table of tactics.  The
     /// single place in the code that knows the names.
     fn slots_mut(&mut self) -> [(&'static str, Slot<'_>); TACTIC_COUNT] {
         [
@@ -214,7 +214,7 @@ impl Tactics {
         copy.slots_mut().map(|(name, slot)| (name, slot.get()))
     }
 
-    /// The names of the tactics, in the order of DESIGN.md's table.
+    /// The names of the tactics, in the order of the table of tactics.
     pub fn names() -> [&'static str; TACTIC_COUNT] {
         Tactics::default().settings().map(|(name, _)| name)
     }

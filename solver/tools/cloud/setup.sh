@@ -347,9 +347,9 @@ elif [ "${RELEASE_TESTS:-0}" = 1 ]; then
         rm -rf "$release_stage"
     fi
 elif [ "${SKIP_TESTS:-0}" != 1 ]; then
-    # A handful of test threads (DESIGN.md times the suite with two): many tests start a thread per CPU themselves,
-    # and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored large-machine tests
-    # are run by hand (RUNBOOK.md).
+    # A handful of test threads (solver/docs/design/testing.md times the suite with two): many tests start a thread per
+    # CPU themselves, and a test thread per CPU on top of that only oversubscribes a large machine.  The ignored
+    # large-machine tests are run by hand (RUNBOOK.md).
     if [ -n "$solver_args" ]; then
         say "cargo test${studies:+ $studies} -- --test-threads=4"
         # shellcheck disable=SC2086 # an option, or nothing

@@ -21,6 +21,6 @@ its file in the last column.
 | [bounds.md](theory/bounds.md) | the bounds on the whole game and on the promotions, over GF(2) and other fields | Theorems 10, 11, 13, 14 and 15 |
 | [frame-model.md](theory/frame-model.md) | what the frame model proves, and what rests on statement U | Lemma Ω, Theorems L, B and M, M1 to M6, N, U |
 | [extended-problem.md](theory/extended-problem.md) | the problem a certificate of U searches | Theorem M⁺, Lemma M5⁺ |
-| [ledger.md](theory/ledger.md) | the bounds carried from one game to others | Lemmas L1 to L4, D and F |
+| [ledger.md](theory/ledger.md) | the bounds carried from one game to others, among them the ceiling opt(n) ≤ n + opt(n − 1) | Lemmas L1 to L4, D and F |
 | [franklin-moniot.md](theory/franklin-moniot.md) | how these results relate to Franklín and Moniot's paper | Theorem 12, the bridge |
 | [evidence.md](theory/evidence.md) | the computations behind the statements that rest on computation | |
