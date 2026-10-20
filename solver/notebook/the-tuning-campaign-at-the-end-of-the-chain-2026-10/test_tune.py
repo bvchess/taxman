@@ -218,10 +218,23 @@ print(json.dumps({"id": ids, "game": int(game), "nodes": nodes if done else limi
 """
 
 
-def fake_world(directory):
+# A stand-in for `tune solve` on whole games: game G takes G million nodes.
+FAKE_WHOLE = """#!/usr/bin/env python3
+import json, sys
+argv = sys.argv[1:]
+game = int(argv[1])
+limit = int(argv[argv.index("--node-limit") + 1])
+nodes = game * 1_000_000
+done = nodes <= limit
+print(json.dumps({"id": f"{game}-root", "game": game, "nodes": nodes if done else limit, "cpu_s": 1.0, "wall_s": 1.0,
+                  "completed": done, "best": 5, "node_limit": limit}))
+"""
+
+
+def fake_world(directory, source=FAKE_SIZES):
     """The fake `tune solve` in `directory`, and the arguments the prober takes."""
     program = Path(directory) / "tune"
-    program.write_text(FAKE_SIZES)
+    program.write_text(source)
     program.chmod(program.stat().st_mode | stat.S_IEXEC)
     return type("Args", (), {"bin": program, "known": "none", "nice": 0})()
 
@@ -333,6 +346,121 @@ class Suite(unittest.TestCase):
             again = captured(prober.game, units, units, "units.jsonl", 5, 100_000, 3_000_000, 120_000, 2)[1]
             self.assertEqual(again, 0)
             self.assertEqual([probes.failed_limit(f"4-{i}") for i in range(4)], [3_000_000] * 4)
+
+
+    def test_a_solve_waits_for_the_load_to_fall(self):
+        with tempfile.TemporaryDirectory() as d:
+            args = fake_world(d)
+            args.max_load = 8.0
+            prober = make_suite.Prober(args, make_suite.Probes(Path(d) / "probes.jsonl"))
+            loads, slept = iter([9.5, 8.5, 7.9]), []
+            real = make_suite.os.getloadavg, make_suite.time.sleep
+            make_suite.os.getloadavg = lambda: (next(loads), 0, 0)
+            make_suite.time.sleep = slept.append
+            try:
+                captured(prober.solve, {"kind": "unit", "game": 3, "id": "3-2"}, 120_000, "units.jsonl")
+            finally:
+                make_suite.os.getloadavg, make_suite.time.sleep = real
+            self.assertEqual(slept, [30, 30])
+            self.assertEqual(len(prober.probes.records["3-2"]), 1)
+
+    def test_the_ladder_of_limits_can_be_cut_short(self):
+        with tempfile.TemporaryDirectory() as d:
+            args = fake_world(d)
+            parsed = make_suite.parse(["probe", "--units", "x", "--probes", "y", "--ladder", "20000,400000"])
+            args.ladder = parsed.ladder
+            self.assertEqual(args.ladder, [20_000, 400_000])
+            probes = make_suite.Probes(Path(d) / "probes.jsonl")
+            prober = make_suite.Prober(args, probes)
+            units = [{"game": 3, "id": f"3-{i}"} for i in range(5)]  # 150,000 nodes, 2 million, 50,000, ...
+            # 3-0 finishes at the second limit, 3-1 does not finish within the last (400,000), and 3-2 finishes at
+            # the second but is out of range.
+            have = captured(prober.game, units, units[:3], "units.jsonl", 3, 100_000, 3_000_000, 0)[1]
+            self.assertEqual(have, 1)
+            self.assertEqual([r["node_limit"] for r in probes.records["3-0"]], [20_000, 400_000])
+            self.assertEqual([r["node_limit"] for r in probes.records["3-1"]], [20_000, 400_000])
+            self.assertEqual(probes.failed_limit("3-1"), 400_000)
+            self.assertEqual(probes.solved("3-2")["nodes"], 50_000)
+            # The limits must increase.
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                make_suite.parse(["probe", "--units", "x", "--probes", "y", "--ladder", "400000,20000"])
+
+    def test_a_whole_game_is_tried_with_the_limits_in_turn_until_one_finishes_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            probes = make_suite.Probes(Path(d) / "probes.jsonl")
+            prober = make_suite.Prober(fake_world(d, FAKE_WHOLE), probes)
+            captured(prober.whole, 5, [1_000_000, 3_000_000, 8_000_000, 20_000_000])
+            self.assertEqual([r["node_limit"] for r in probes.records["5-root"]], [1_000_000, 3_000_000, 8_000_000])
+            self.assertEqual(probes.solved("5-root")["nodes"], 5_000_000)
+            # Tried again, nothing runs twice.
+            captured(prober.whole, 5, [1_000_000, 3_000_000, 8_000_000, 20_000_000])
+            self.assertEqual(len(probes.records["5-root"]), 3)
+            # A game that does not finish resumes from the limit it failed within.
+            captured(prober.whole, 9, [1_000_000, 3_000_000])
+            captured(prober.whole, 9, [1_000_000, 3_000_000, 4_000_000])
+            self.assertEqual([r["node_limit"] for r in probes.records["9-root"]], [1_000_000, 3_000_000, 4_000_000])
+            # The default is the last limit of the ladder alone, as before.
+            captured(prober.whole, 2)
+            self.assertEqual([r["node_limit"] for r in probes.records["2-root"]], [3_000_000])
+
+    def test_candidates_are_the_searched_games_of_a_range(self):
+        with tempfile.TemporaryDirectory() as d:
+            strict = Path(d) / "strict.jsonl"
+            rows = [{"n": n, "method": "search", "reached_cap": False, "nodes": 1_000_000 * (n % 7 + 1)}
+                    for n in range(10, 31)]
+            rows.append({"n": 20, "method": "prime", "reached_cap": False, "nodes": 0})
+            strict.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+            def listed(*extra):
+                args = make_suite.parse(["candidates", "--strict", str(strict), "--lo", "2000000", *extra])
+                return captured(make_suite.candidates_command, args)[0].strip()
+
+            self.assertEqual(listed("--from", "10", "--to", "19", "--count", "3"), "15,16,10")
+            self.assertEqual(listed("--from", "20", "--to", "24", "--count", "9"), "22,23,24,20")
+            # The defaults are the old suite's 3000-3440.
+            args = make_suite.parse(["candidates"])
+            self.assertEqual((args.first, args.last), (3000, 3440))
+
+    def test_a_default_search_counted_by_wall_images_is_a_probe_too(self):
+        with tempfile.TemporaryDirectory() as d:
+            names = ("units.jsonl", "probes.jsonl", "runs.jsonl", "suite.jsonl")
+            units, probes, runs, out = (Path(d) / name for name in names)
+            units.write_text(json.dumps({"kind": "game", "game": 5, "candidates": "f"}) + "\n")
+            probes.write_text("")
+            count = {"n": 5, "id": "5-root", "mode": "count", "tactics": "default", "nodes": 4_000_000,
+                     "completed": True, "best": 7, "opt": 7, "cpu_s": 1100.5, "wall_s": 1300.0}
+            other = {**count, "mode": "closure", "nodes": 3_000_000}
+            tuned = {**count, "tactics": "nogood_period=20000", "nodes": 9_000_000}
+            runs.write_text("".join(json.dumps(line) + "\n" for line in (count, other, tuned)))
+            args = ["assemble", "--units", str(units), "--probes", str(probes), "--out", str(out), "--count", "0",
+                    "--wholes", "5", "--whole-lo", "0", "--whole-hi", "9000000"]
+            captured(make_suite.assemble_command, make_suite.parse([*args, "--runs", str(runs)]))
+            whole = [r for r in map(json.loads, out.read_text().splitlines()) if r["kind"] == "whole"]
+            self.assertEqual([(r["id"], r["default"]["nodes"], r["default"]["cpu_s"]) for r in whole],
+                             [("5-root", 4_000_000, 1100.5)], "only the default search's count run")
+            self.assertEqual(probes.read_text(), "", "the runs are not copied into the probes file")
+            captured(make_suite.assemble_command, make_suite.parse(args))
+            self.assertFalse([r for r in map(json.loads, out.read_text().splitlines()) if r["kind"] == "whole"])
+
+    def test_the_gaps_of_whole_games_are_recorded_in_their_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            units, probes, out = (Path(d) / name for name in ("units.jsonl", "probes.jsonl", "suite.jsonl"))
+            units.write_text(json.dumps({"kind": "game", "game": 5, "candidates": "f"}) + "\n"
+                             + json.dumps({"kind": "unit", "game": 5, "id": "5-1", "gap": 900}) + "\n")
+            record = {"completed": True, "best": 7, "cpu_s": 1.0, "wall_s": 1.0}
+            solved = (("5-1", 5, 200_000), ("5-root", 5, 4_000_000), ("6-root", 6, 2_000_000))
+            probes.write_text("".join(json.dumps({**record, "id": id, "game": game, "nodes": nodes}) + "\n"
+                                      for id, game, nodes in solved))
+            base = ["assemble", "--units", str(units), "--probes", str(probes), "--out", str(out), "--count", "1",
+                    "--wholes", "5,6", "--whole-lo", "0", "--whole-hi", "9000000"]
+            captured(make_suite.assemble_command, make_suite.parse([*base, "--whole-gaps", "5=1234"]))
+            wholes = {r["id"]: r for r in map(json.loads, out.read_text().splitlines()) if r["kind"] == "whole"}
+            self.assertEqual(wholes["5-root"]["gap"], 1234)
+            self.assertNotIn("gap", wholes["6-root"])
+            self.assertEqual(wholes["6-root"]["default"]["nodes"], 2_000_000)
+            captured(make_suite.assemble_command, make_suite.parse(base))
+            self.assertTrue(all("gap" not in r for r in map(json.loads, out.read_text().splitlines())
+                                if r["kind"] == "whole"))
 
 
 if __name__ == "__main__":
