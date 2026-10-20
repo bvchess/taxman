@@ -59,9 +59,11 @@
 //!   cannot pass for an exhausted search, which does not rest on the game of `n − 1`); a prime game scores
 //!   `n + score(n − 1) − P`, `P` the largest prime below `n`;
 //! * the predecessor the line names is the game the file (or `optimal.json`) holds for `n − 1`: same score,
-//!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  A predecessor of a run or file with no
-//!   proof is the best game of an unfinished search (`solve --keep-going`): an earlier incomplete line of `n − 1`
-//!   with that score and those moves.  Such a game seeds the line and proves nothing, so the line has no ceiling
+//!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  But a record of the proof `known` of
+//!   the file's own game needs no more than the same score, moves and assumptions: it says where the run got its
+//!   copy of the game, and the file's line proves it.  A predecessor of a run or file with no proof is the best
+//!   game of an unfinished search (`solve --keep-going`): an earlier incomplete line of `n − 1` with that score and
+//!   those moves.  Such a game seeds the line and proves nothing, so the line has no ceiling
 //!   (`setup.cap`) and no proof that rests on `n − 1` (`cap`, `prime_formula`), and scores no less than that game;
 //!   the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and `same_search` on a completed game of
 //!   the file) stand;
@@ -1113,10 +1115,17 @@ fn check_entry(
                     }
                 }
             };
+            // A record of the proof `known` says where the run got its copy of the game of n − 1 (a known source,
+            // `--use-prev`), not how that game is proven.  When the lines of such a run are appended to the file it
+            // drew on, the game of n − 1 is the file's own line, which carries and checks its own proof, and this
+            // line's search depends only on that game's score and moves, which must still match, and on what it
+            // assumes, which must too.  So the record's proof need not be the line's, if the line is the file's.
+            let known_copy =
+                record.proof == Some(Proof::Known) && matches!(named.source, PrevSource::Run | PrevSource::Results);
             let same = record.n + 1 == n
                 && pred.score == record.score
                 && pred.moves.is_none_or(|moves| moves_digest(moves) == record.digest)
-                && record.proof == pred.proof
+                && (record.proof == pred.proof || known_copy)
                 && record.assumes == pred.assumes;
             if !same {
                 return Err(fail(format!("its record of the game of n − 1 does not match {}", pred.whence)));

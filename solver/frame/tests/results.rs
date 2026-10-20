@@ -14,7 +14,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use taxman::game::Optimal;
 use taxman::json::Json;
-use taxman::results::{assumed_optimal, moves_digest, verify_files, Assumptions, CeilingProof, FileReport, Proof};
+use taxman::known::{Known, KnownSources};
+use taxman::results::{
+    assumed_optimal, moves_digest, verify_files, verify_files_with, Assumptions, CeilingProof, FileReport, Proof,
+};
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn crate_path(relative: &str) -> PathBuf {
@@ -471,6 +474,54 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     verifiers_agree(&dir, &[(hole, Verdict::Accepted)]);
 }
 
+/// A record of the proof `known` stands on the file's own line of the game before, whatever proof that line has.  A run
+/// with `--use-prev` records the committed chain's games as `known`, so when its lines are appended to the committed
+/// file, its first line names a game of n − 1 as `known` while the file's line of that game has the proof it was made
+/// with.  Both verifiers accept such a record when the score, the moves and the assumptions are the line's, and refuse
+/// it when any of them differs, when the game is not in the file, when it names another source, and a record of any
+/// other proof that is not the line's.  Games 1..90.
+#[test]
+fn a_known_record_of_the_game_before_stands_on_the_files_own_line() {
+    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    // The index of the first game built on a game of each proof (the game of n is `games[n - 1]`).
+    let after = |proof: Proof| {
+        (1..games.len())
+            .find(|&i| games[i - 1].proof == Some(proof))
+            .unwrap_or_else(|| panic!("no game after a game of proof {} in 1..=90", proof.as_str()))
+    };
+    let s = |text: &str| Json::from(text);
+    let known = || ("prev.proof", s("known"));
+    let proofs = [Proof::Exhausted, Proof::Cap, Proof::SameSearch, Proof::PrimeFormula];
+    let accepted: Vec<(usize, Vec<Edit>)> = proofs.iter().map(|&proof| (after(proof), vec![known()])).collect();
+
+    let i = after(Proof::Exhausted);
+    let before = &games[i - 1];
+    let optimal = Optimal::built_in();
+    let digest = moves_digest(optimal.moves(before.n).unwrap());
+    let from_optimal: Vec<Edit> = vec![
+        ("prev.source", s("optimal")),
+        ("prev.moves_digest", s(&digest)),
+        known(),
+        ("prev.assumes", Json::array([assumed_optimal(before.n)])),
+    ];
+    let refused: Vec<(usize, Vec<Edit>, &str)> = vec![
+        (i, vec![known(), ("prev.score", Json::from(before.score + 1))], "does not match line"),
+        (i, vec![known(), ("prev.moves_digest", s("0000000000000000"))], "does not match line"),
+        (i, vec![known(), ("prev.assumes", Json::array(["a statement"]))], "does not match line"),
+        // Another proof than the line's, and than `known`.
+        (i, vec![("prev.proof", s("cap"))], "does not match line"),
+        // `known` is the record of the file's own game: the game of optimal.json has no proof to leave out.
+        (i, from_optimal, "does not match optimal.json"),
+    ];
+    both_verifiers(&TempDir::new("known-record"), &lines, &accepted, &refused);
+
+    // The game named is not in the file.
+    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([with(&lines[i], "prev.proof", &s("known"))]).collect();
+    let cases = vec![(hole, Verdict::Refused { line: i, n: games[i].n, expected: "which the file does not hold" })];
+    verifiers_agree(&TempDir::new("known-record-hole"), &cases);
+}
+
 /// How many games of the report in `range` have the proof, the ceiling proof, or no assumption.
 fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()
@@ -486,17 +537,21 @@ fn clean(file: &FileReport) -> usize {
 
 /// The last game of the committed results; of the run on a laptop that made their first part, which the prover
 /// proved on the whole board; of the second run, which made the games past the first, on EC2; and of `optimal.json`,
-/// which they reproduce.  The third run, also on EC2, made the games past the second.
-const LAST: u32 = 3914;
+/// which they reproduce.  The third run, also on EC2, made the games past the second, and the fourth the games past
+/// the third.
+const LAST: u32 = 4547;
+const LAST_OF_THIRD_RUN: u32 = 3914;
 const LAST_OF_SECOND_RUN: u32 = 3440;
 const LAST_OF_FIRST_RUN: u32 = 2175;
 const LAST_OF_TABLE: u32 = 1300;
-/// The builds that made the three runs (a prefix of the commit each line records), and the games of the second that two
-/// invocations solved: they were in flight when its first instance was stopped, and its second took them up.
+/// The builds that made the four runs (a prefix of the commit each line records), and the games that two invocations
+/// solved: they were in flight when an instance of the second run, or of the fourth, was stopped, and the next took
+/// them up.
 const FIRST_BUILD: &str = "feba6d0";
 const SECOND_BUILD: &str = "55287ff";
 const THIRD_BUILD: &str = "eb84a6f";
-const RESUMED: [u32; 3] = [3311, 3312, 3315];
+const FOURTH_BUILD: &str = "ca357bf";
+const RESUMED: [u32; 9] = [3311, 3312, 3315, 3940, 3942, 4340, 4431, 4432, 4433];
 
 /// The games of the committed chain that the quick check verifies: the first of them, which cost little to set up.
 const QUICK_LAST: u32 = 400;
@@ -528,7 +583,11 @@ fn check_the_committed_results_to(last: u32) {
         paths = vec![prefix];
     }
     let optimal = Optimal::built_in();
-    let report = verify_files(&paths, optimal, 1).unwrap_or_else(|e| panic!("{e}"));
+    // The games taken from the bounds store cite it and the committed chain, which is the file itself: the sources are
+    // the repository's.  (The start of the chain cites none.)
+    let sources = if last == LAST { KnownSources::in_repository().unwrap() } else { KnownSources::default() };
+    let known = Known::load(optimal, &sources).unwrap_or_else(|e| panic!("{e}"));
+    let report = verify_files_with(&paths, &known, 1).unwrap_or_else(|e| panic!("{e}"));
     println!("{report}");
     let [strict] = &report.files[..] else { panic!("one file") };
     // strict.jsonl is a chain from n = 1: it holds no line of a stopped search.
@@ -536,11 +595,17 @@ fn check_the_committed_results_to(last: u32) {
     assert!(games.keys().copied().eq(1..=last), "{}: not the games 1..={last}", strict.path.display());
     assert_eq!((strict.contents.incomplete_lines, strict.contents.torn), (0, false), "{}", strict.path.display());
     assert!(strict.contents.runs.is_empty(), "{}: a game left unfinished", strict.path.display());
-    for (n, score) in [(LAST_OF_FIRST_RUN, 1_492_209), (LAST_OF_SECOND_RUN, 3_727_726), (LAST, 4_820_492)] {
+    let last_scores = [
+        (LAST_OF_FIRST_RUN, 1_492_209),
+        (LAST_OF_SECOND_RUN, 3_727_726),
+        (LAST_OF_THIRD_RUN, 4_820_492),
+        (LAST, 6_498_966),
+    ];
+    for (n, score) in last_scores {
         assert!(n > last || games[&n].score == score, "n={n}");
     }
     // Every line records the one clean build that made its part of the file (the first run's to 2175, the second's to
-    // 3440, the third's after), a single invocation but at the games of the second run that the move to another
+    // 3440, the third's to 3914, the fourth's after), a single invocation but at the games that the stop of an
     // instance interrupted, and the verdict on optimal.json, which has the games to 1300 and none beyond:
     // `optimal_match` is true where it has the game and null where it has not.
     for (k, line) in text.lines().enumerate() {
@@ -552,8 +617,10 @@ fn check_the_committed_results_to(last: u32) {
             FIRST_BUILD
         } else if n <= LAST_OF_SECOND_RUN {
             SECOND_BUILD
-        } else {
+        } else if n <= LAST_OF_THIRD_RUN {
             THIRD_BUILD
+        } else {
+            FOURTH_BUILD
         };
         assert!(commit.starts_with(expected), "n={n}: built by {commit}, not {expected}");
         let invocations = if RESUMED.contains(&n) { 2 } else { 1 };
@@ -588,22 +655,25 @@ fn check_the_committed_results_to(last: u32) {
         assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
     }
 
-    // A chain from n = 1 assumes nothing.  Its proofs, in the order trivial, prime formula, `cap`, exhausted, same
-    // search: in all, in the games of the table (where the previous chain, of commit 271c817, had every one of
-    // them), and past it, in the first run's, in the second's and in the third's.
-    let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch];
+    // Its proofs, in the order trivial, prime formula, `cap`, exhausted, same search, known (taken from the bounds
+    // store, with no search): in all, in the games of the table (where the previous chain, of commit 271c817, had
+    // every one of them), and past it, in the first run's, in the second's, in the third's and in the fourth's.  The
+    // known games, which only the fourth run made, assume statement U; every other game assumes nothing.
+    let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch, Proof::Known];
     let by = |range: RangeInclusive<u32>| kinds.map(|p| proofs(strict, range.clone(), p));
     assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");
-    assert_eq!(clean(strict), last as usize);
+    let from_store = by(1..=last)[5];
+    assert_eq!(clean(strict), last as usize - from_store);
     if last == LAST {
-        assert_eq!(by(1..=LAST), [13, 541, 354, 1356, 1650]);
-        assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545]);
-        assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369]);
-        assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST_OF_SECOND_RUN), [0, 155, 119, 448, 543]);
-        assert_eq!(by(LAST_OF_SECOND_RUN + 1..=LAST), [0, 60, 43, 178, 193]);
+        assert_eq!(by(1..=LAST), [13, 596, 411, 1506, 1854, 167]);
+        assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545, 0]);
+        assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369, 0]);
+        assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST_OF_SECOND_RUN), [0, 155, 119, 448, 543, 0]);
+        assert_eq!(by(LAST_OF_SECOND_RUN + 1..=LAST_OF_THIRD_RUN), [0, 60, 43, 178, 193, 0]);
+        assert_eq!(by(LAST_OF_THIRD_RUN + 1..=LAST), [0, 55, 57, 150, 204, 167]);
         // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
         let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
-        assert_eq!(ceilings, [1244, 540]);
+        assert_eq!(ceilings, [1462, 615]);
     }
 }
 
@@ -614,7 +684,7 @@ fn the_start_of_the_committed_results_passes_the_verifier() {
     check_the_committed_results_to(QUICK_LAST);
 }
 
-/// All 3914 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
+/// All 4547 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
 #[test]
 #[cfg_attr(
     debug_assertions,

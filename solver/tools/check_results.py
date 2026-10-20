@@ -30,8 +30,9 @@ For every completed game:
   provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results), optimal.json's
               (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds), and
               the line's record of it matches that game (score, FNV-1a digest of the moves, proof, assumptions; not
-              the digest of a store's game, which only the Rust program can play); the recorded proof and
-              assumptions are the ones the rules below give
+              the digest of a store's game, which only the Rust program can play; a record of the proof known, of
+              the file's own game, needs no more than the same score, moves and assumptions); the recorded proof
+              and assumptions are the ones the rules below give
   known       a line that cites a known source (`known`: optimal, strict, or bounds with the rule and run of its lower
               and upper lines) has its citation checked: optimal.json or the committed chain (--committed) holds a
               game of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
@@ -500,11 +501,17 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
         elif record is not None:
             fail(f"unknown prev.source {source!r}")
         if prev is not None:
+            # A record of the proof `known` says where the run got its copy of the game of n-1 (a known source,
+            # `--use-prev`), not how that game is proven.  When the lines of such a run are appended to the file it
+            # drew on, the game of n-1 is the file's own line, which carries and checks its own proof, and this
+            # line's search depends only on that game's score and moves, which must still match, and on what it
+            # assumes, which must too.  So the record's proof need not be the line's, if the line is the file's.
+            known_copy = record["proof"] == "known" and source in ("run", "results")
             same = (
                 record["n"] == n - 1
                 and record["score"] == prev[0]
                 and (prev[1] is None or record["moves_digest"] == digest(prev[1]))
-                and record["proof"] == prev[2]
+                and (record["proof"] == prev[2] or known_copy)
                 and set(record["assumes"]) == prev[3]
             )
             if not same:

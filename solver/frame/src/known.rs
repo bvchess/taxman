@@ -5,7 +5,7 @@
 //! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary, to game 1300.  It
 //!   records no proofs, so a game of it is *assumed* optimal (`the game of n in optimal.json is optimal`).
 //! * **the committed chain** ([`Origin::Strict`]), `results/strict.jsonl`: a chain from n = 1, each game with its proof
-//!   and what it assumes (nothing, for the committed file).  A game of it is as proven as its line is.
+//!   and what it assumes.  A game of it is as proven as its line is.
 //! * **the bounds store** ([`Origin::Bounds`]), `results/bounds.jsonl` ([`crate::store`]): bounds on opt(n) that the
 //!   ledger finds.  A board whose best lower bound is its best upper bound is *proven*: the lower bound's game scores
 //!   what the upper bound allows, and the game is optimal wherever statement U holds at the boards its upper bound rests
@@ -13,10 +13,10 @@
 //!   with a gap, is *open*; the store still helps its search ([`Known::open`]): its lower bound's game is a seed, and
 //!   its upper bound a ceiling the search may stop at.
 //!
-//! [`Known::game`] is the game of n from the best source (the committed chain, which assumes nothing, then the store,
-//! then the table); the solver records it without a search (method `known`, proof `known`) or builds the next game on
-//! it.  A result line says which source it took the game from ([`Cite`]), and what the game assumes follows from the
-//! source; the referees check the citation against the same sources ([`Known::check_cite`]).
+//! [`Known::game`] is the game of n from the best source (the committed chain, then the store, then the table); the
+//! solver records it without a search (method `known`, proof `known`) or builds the next game on it.  A result line says
+//! which source it took the game from ([`Cite`]), and what the game assumes follows from the source; the referees check
+//! the citation against the same sources ([`Known::check_cite`]).
 //!
 //! The sources are read as they are given: the committed chain and the store are checked by their own referees
 //! (`taxman verify-results`, `solver/tools/check_results.py`; `ledger verify-bounds`, `solver/tools/check_bounds.py`),
@@ -332,8 +332,8 @@ impl<'a> Known<'a> {
         })
     }
 
-    /// The game of `n` from the best source that holds one: the committed chain (which assumes nothing), the store,
-    /// then the table.
+    /// The game of `n` from the best source that holds one: the committed chain, the store, then the
+    /// table.
     ///
     /// # Errors
     ///

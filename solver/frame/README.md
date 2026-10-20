@@ -331,9 +331,9 @@ skipped 300 games already done in mine.jsonl
 
 `optimal.json` stops at 1300, so a game above 1300 needs the game before it from the run or from the results file.
 Either extend a copy of a file that has it, or give `--use-prev`, which takes the known game of n − 1.  That is the
-game of `results/strict.jsonl`, which assumes nothing, or of the bounds store, where the store has proven the game.  A
-copy of `results/strict.jsonl` extended assumes nothing either.  The copy matters: `--out` appends to the file, and
-`results/` must not be overwritten.
+game of `results/strict.jsonl`, or of the bounds store, where the store has proven the game.  A copy of
+`results/strict.jsonl` extended is such a file.  The copy matters: `--out` appends to the file, and `results/` must not
+be overwritten.
 
 The games 1301 and 1302 are known, from `results/strict.jsonl`.  So to search them from the known game of 1300, as a
 range past the table does, `--force-search` leaves them to their searches:
@@ -364,7 +364,7 @@ at once by reaching the ceiling ([the cost curve](../notebook/benchmarks-the-pro
 | source | holds | a game of it rests on |
 |---|---|---|
 | `optimal.json` (built in) | the table of optimal games, n ≤ 1300 | nothing but the table's word: the line records that it assumes the game optimal |
-| `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes (nothing) |
+| `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes |
 | `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | statement U at the games its upper bound rests on (`rests_on`), one assumption each |
 
 Of a game that several sources hold, the solver takes the committed chain's, then the store's, then the table's.  What
