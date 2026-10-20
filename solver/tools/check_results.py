@@ -46,9 +46,9 @@ For every completed game:
               the line and proves nothing, so the line has no ceiling (setup.cap), no cap or prime_formula proof, and
               scores no less than it.  A file may have holes (games with no line, or only incomplete lines)
   repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
-              on an earlier line, whose proof is exhausted, cap or same_search; the record's proof and assumptions are
-              m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do the two
-              setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
+              on an earlier line, whose proof is exhausted, cap, known or same_search; the record's proof and
+              assumptions are m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do
+              the two setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
               score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
 and across files: every game that two files share has the same score in both.
 

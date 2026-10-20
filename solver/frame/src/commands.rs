@@ -9,9 +9,10 @@
 //!   it, `results::ResultsFile`) its results file, prints one summary line per game as it is concluded, and with
 //!   `--game-hours` ends at the first game whose own search passes the wall (exit status 4);
 //! * `regress` solves in memory and compares every score with `optimal.json`;
-//! * `bench` solves a fixed set of hard games standalone and appends the run to a history file, so that
-//!   performance can be followed from commit to commit.  Its files are found in the repository
-//!   ([`taxman::paths`]) unless `--history` and `--known` name them;
+//! * `bench` solves a fixed set of hard games, each on its own (given the game before it from `optimal.json` or the
+//!   committed chain, and nothing derived), and appends the run to a history file, so that performance can be followed
+//!   from commit to commit.  Its files are found in the repository ([`taxman::paths`]) unless `--history` and `--known`
+//!   name them;
 //! * `certify` searches as `solve` does (the same flags for checkpoints, limits and progress, the same lock and
 //!   signals), appends a certificate a game to its `--out` file (locked while it is open), takes the games of a range
 //!   or of a list file, and exits with status 2 on a game that beats a recorded score.
@@ -21,7 +22,8 @@
 //! proofs of the recorded scores reach, `extend-optimal` writes the table with the games of a results file that
 //! continue it appended, and `tables` prints the maximal factors and composites of numbers on a board.  Every
 //! command that meets a score of a game `optimal.json` has checks it against the table built into the binary
-//! ([`Optimal::built_in`]): no flag turns that off or points at another file.
+//! ([`Optimal::built_in`]): no flag turns that off, and only `verify-optimal FILE` and `extend-optimal --table FILE`
+//! name another table.
 
 use crate::cli::{
     count, errln, outln, parse_range, range_options, read_board_list, solver_options, Args, CliError, CliResult,
@@ -455,7 +457,8 @@ pub fn regress(args: &[String]) -> CliResult {
 /// search of a second or so on one thread (solver/docs/design/performance.md).
 const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 
-/// Times the benchmark games (or the games given), each standalone, and appends the run to the history.
+/// Times the benchmark games (or the games given), each on its own, given the game before it, and appends the run to
+/// the history.
 pub fn bench(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--history", "--known"]), &[])?;
     // Where the run is recorded, and where the previous games past optimal.json's come from: in the repository

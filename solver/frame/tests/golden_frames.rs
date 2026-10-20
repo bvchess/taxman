@@ -255,8 +255,8 @@ fn acceleration_matches_java() {
 }
 
 /// Every how-many-th line of the Java fixture below the test checks.  All of it takes 3.2 s (forming the frames of 171
-/// boards of 760 to 2049); half of it has the same power, as the lines are samples of the same few kinds.  Set to 1
-/// to check them all.
+/// lines on 59 boards of 511 to 2049); half of it has the same power, as the lines are samples of the same few kinds.
+/// Set to 1 to check them all.
 const FIXTURE_STRIDE: usize = 2;
 
 /// The data lines of a fixture of `testdata`: the lines that are not comments, split at `separator`.

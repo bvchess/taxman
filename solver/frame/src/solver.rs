@@ -63,8 +63,10 @@
 //!
 //! [`solve_range_each`] solves the games `lo..=hi` and concludes them in order.  The previous game of each is
 //! the one before it; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
-//! `optimal.json`'s (assumed optimal, which the results that rest on it record), else there is none and the game is
-//! solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every result is appended to
+//! the game of the known sources ([`SolveOptions::known`]: `optimal.json`'s, assumed optimal, and the committed chain's
+//! and the bounds store's if it names them; the results that rest on a known game record what it assumes), else there
+//! is none and the game is solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every
+//! result is appended to
 //! the results file (one JSON object per line) as soon as it is concluded, so that a restarted run skips what is
 //! finished; the file is checked when it is opened ([`ResultsFile::open`]).  A game whose search a limit or a signal
 //! stopped is recorded as incomplete, keeps its checkpoint, and ends the range; so does one that passes the wall
@@ -1634,7 +1636,8 @@ pub fn solve_range(
 
 /// Solves the games `lo..=hi`, each from the solution of the one before, and concludes them in order (with
 /// up to [`SolveOptions::window`] games in flight, see `window`).  The solution of `lo − 1` comes from the results
-/// file, else, with [`SolveOptions::use_prev`], from `optimal.json`.  The results file is checked when it is opened
+/// file, else, with [`SolveOptions::use_prev`], from the known sources ([`SolveOptions::known`]: `optimal.json` and, if
+/// it names them, the committed chain and the bounds store).  The results file is checked when it is opened
 /// ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is deleted).
 /// Every other result is appended to the file (if there is one), then given to `on_game`, and only then is its
 /// checkpoint deleted.  A game that fails a check after it was found goes to the file's

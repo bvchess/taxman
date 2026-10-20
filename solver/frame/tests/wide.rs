@@ -2,9 +2,10 @@
 //!
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
-//! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so nothing above n = 1023 meets anything but these
-//! tests and the committed results (`results/strict.jsonl`, n = 1..4547; `optimal.json` has its games to 1300, but
-//! that is the solver's own answer and no check of it).  What is cheap to run here: the same small game at every
+//! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so the boards above n = 1023 meet few tests besides
+//! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to 4546 and 2049) and the committed results
+//! (`results/strict.jsonl`, n = 1..4547; `optimal.json` has its games to 1300, but that is the solver's own answer and
+//! no check of it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
@@ -509,8 +510,8 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
 
 /// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics
 /// of the matching path (the tactics are part of the checkpoint's header and must read back as written; the GF(2)
-/// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes it on game 1000 at W = 20).  The
-/// unit tests resume only at W = 16.
+/// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes game 992 under it at W = 20, 24 and
+/// 64).  The unit tests resume only at W = 16.
 #[test]
 #[cfg_attr(
     debug_assertions,

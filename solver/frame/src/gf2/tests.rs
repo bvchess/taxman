@@ -76,7 +76,7 @@ fn promotable_sets<const W: usize>(
     out
 }
 
-/// On every board up to 140 with at most 22 candidates: every promotable set is independent in both matroids, and
+/// On every board up to 400 with at most 22 candidates: every promotable set is independent in both matroids, and
 /// the bound is at least the heaviest of them.  On every board up to 400: the optimal game's promotions (from the
 /// known games) are independent and the bound is at least their sum.
 #[test]

@@ -108,14 +108,14 @@ contraction by them; frames have disjoint coordinates, and the even and odd fram
 B.  At a node, F completes P exactly when P ∪ F is promotable from the root, so P ∪ F is independent in A and in B, and
 F is independent in their contractions by P (which P, independent, makes well defined).  ∎
 
-Three facts about it.  It is never above the matching bound of solver/docs/DESIGN.md, by Theorem 10's minor argument
-frame by frame: an assignment of the movers to distinct live factors in which each unit vector e_y takes y itself, so
-that no promoted number pays as a factor, is the matching bound's relaxation.  On movers with at most two live factors
-(graph edges, with a ground vertex for one) independence over GF(2) is being a forest, which is winnability itself, so
-what it misses are, as for Theorem 10, the odd cores of movers with three or more factors (the frames' residuals at the
-roots of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And Theorem 10's bound equals in_the_bag
-plus Theorem 11's at every root of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot bound's to 1300.  The
-measurements are in solver/notebook/matroid-intersection-bounds-2026-10/README.md and
+Three facts about it.  It is never above the matching bound of solver/docs/design/search.md, by Theorem 10's minor
+argument frame by frame: an assignment of the movers to distinct live factors in which each unit vector e_y takes y
+itself, so that no promoted number pays as a factor, is the matching bound's relaxation.  On movers with at most two
+live factors (graph edges, with a ground vertex for one) independence over GF(2) is being a forest, which is winnability
+itself, so what it misses are, as for Theorem 10, the odd cores of movers with three or more factors (the frames'
+residuals at the roots of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And Theorem 10's bound
+equals in_the_bag plus Theorem 11's at every root of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
+bound's to 1300.  The measurements are in solver/notebook/matroid-intersection-bounds-2026-10/README.md and
 solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md; the search's forced members rest on weak duality for a
 weight split, as Theorem 10's certificate does (`gf2::meet`).
 

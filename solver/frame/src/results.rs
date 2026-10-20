@@ -16,8 +16,8 @@
 //! * `prime_formula`: a prime `n` plays the game of `n − 1` with its first move replaced by `n`.  That is optimal
 //!   if the game of `n − 1` is (proved at `accelerate::prime_shortcut`).
 //! * `same_search`: the game's search problem is the one an earlier game `m` of the file posed, and `m`'s proof
-//!   settles that problem's best promotion sum (`exhausted`, `cap`, or `same_search` again); so this game's best
-//!   promotion sum is the same, and its game is `m`'s promotions played on this board (tactic `same_search`;
+//!   settles that problem's best promotion sum (`exhausted`, `cap`, `known` or `same_search` again); so this game's
+//!   best promotion sum is the same, and its game is `m`'s promotions played on this board (tactic `same_search`;
 //!   solver/docs/design/same-search.md, has the argument).
 //! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]): the
 //!   game is taken from the source without a search (method `known`: `optimal.json`, the committed chain, or a board

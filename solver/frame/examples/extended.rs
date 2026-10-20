@@ -42,8 +42,8 @@
 //! with `--compare` `default_nodes` and `default_secs`.  At the end a summary: the games by method, how many scores
 //! are known (all equal), the nodes and seconds in all, with `--compare` the games where Π⁺(∅) took more than 10% more
 //! nodes than the default problem and those where it took more than 10% fewer (their count and the ten with the
-//! largest, and the smallest, ratios), and the benchmark games (README.md, DESIGN.md) that were in range.  Exit status:
-//! 0 if every game passed, 1 if one failed, 2 for a usage error.
+//! largest, and the smallest, ratios), and the benchmark games (solver/docs/design/performance.md) that were in
+//! range.  Exit status: 0 if every game passed, 1 if one failed, 2 for a usage error.
 //!
 //! **`words`**: for each game of `FROM..=TO` that the prover's barred bounds (`--upper`,
 //! `solver/noframe/data/upper_*.jsonl`) say needs a certificate, how many block words the GF(2) bound of Π⁺(O), O its

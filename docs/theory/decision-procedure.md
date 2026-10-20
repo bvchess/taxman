@@ -79,10 +79,10 @@ member.  Every instance this project computes with satisfies it automatically: m
 all exceed n/2 (or the band floor), while a maximal factor of such a member is at most half of it.  Separation buys a
 decisive simplification: under it, every member's live list is its full maximal-factor set in every subset, so
 self-covering and dismantling are intrinsic notions, stable under taking subsets.  The hypothesis is not decorative.
-With members doubling as each other's factors the pool shifts as members come and go, and Theorems 5 and 6 below become
-false: for K = {2, 4, 8} (residual {4, 8}), the exclusion E = {2, 8} leaves the playable {4}, since 2 re-enters the
-pool, yet K∖(E∩R) = {2, 4} strands 4, violating Theorem 6; and the extension lemma dies at S = {8, 33, 37} with x = 4,
-whose arrival as a member removes 4 from the pool and strands 8.
+With members doubling as each other's factors the pool shifts as members come and go, and Theorem 6 below becomes false:
+for K = {2, 4, 8} (residual {4, 8}), the exclusion E = {2, 8} leaves the playable {4}, since 2 re-enters the pool, yet
+K∖(E∩R) = {2, 4} strands 4, violating Theorem 6; and the extension lemma, on which the proof of Theorem 5 rests, dies at
+S = {8, 33, 37} with x = 4, whose arrival as a member removes 4 from the pool and strands 8.
 
 **Theorem 4 (survival and confluence; no separation needed).**  A self-covering subset survives every dismantling
 sequence; all dismantling sequences of an instance end at the same fixpoint, the *residual*; a nonempty residual is
