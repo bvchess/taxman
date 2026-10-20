@@ -37,7 +37,7 @@ depends on:
   own, so a default build never claims to hold `wall`, and an entry with them also serves a request without them (the
   smaller entry first, when both exist).
 * **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result
-  (`tests=passed`, the counts in lines such as `tests_solver=608 passed, 0 failed, 138 ignored`, its seconds and the
+  (`tests=passed`, the counts in lines such as `tests_solver=P passed, 0 failed, I ignored`, its seconds and the
   tests at once); an entry without one does not exist.  The tarball holds the executables only
   (`solver/frame/target/release/taxman`, `.../examples/ledger`, `solver/noframe/target/release/exact`).
   `test-times.json` is how long each test took last time, for ordering the suite ([The
