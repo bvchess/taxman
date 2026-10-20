@@ -52,7 +52,7 @@ impl<const W: usize> Prepared<W> {
 
 /// The search problem a game's setup poses, in a canonical form: everything the search is given that its answer
 /// can depend on, so that two games with equal problems have the same promotable sets and the same best
-/// promotion sum (DESIGN.md, "Same search").
+/// promotion sum (solver/docs/design/same-search.md).
 ///
 /// The search is given the model (the factor graph and each number's home frame), the root frame set, the
 /// candidates and `max_total`, besides the tactics, the ceiling and the seed; the matching graph and the greedy set are

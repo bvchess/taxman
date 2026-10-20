@@ -100,13 +100,13 @@
 //!
 //! # Computing it
 //!
-//! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the
-//! hole is in no frame and no factor or composite list ([`BoardFrames`](crate::frames::BoardFrames), the board's
-//! frames), so the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found
-//! by the brute force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is
-//! optional, not a source, which the model plays), and the frames are ordered through the hole (a number still sweeps
-//! divisors whose maximal-factor chain to it passes through the hole).  The frame model's own rules (greedy
-//! impossible sources, mandatory moves, closed frames, one-frame promotions; DESIGN.md §2 and §5, and
+//! [`punctured`] computes `opt_M(B)` for `B = [n] ∖ {hole}` with the frame model on [`Tables::punctured`]: the hole is
+//! in no frame and no factor or composite list ([`BoardFrames`](crate::frames::BoardFrames), the board's frames), so
+//! the frame model plays exactly the maximal-factor rule.  Two things had to be right for that, both found by the brute
+//! force: the sources stay the numbers above `n/2` (a number whose only maximal composite is the hole is optional, not
+//! a source, which the model plays), and the frames are ordered through the hole (a number still sweeps divisors whose
+//! maximal-factor chain to it passes through the hole).  The frame model's own rules (greedy impossible sources,
+//! mandatory moves, closed frames, one-frame promotions; solver/docs/design/frame-model.md and tactics.md, and
 //! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and so does their proof: the frames are numbered
 //! by layer, so the frame model is exact on a board with holes as on `[n]`, given the sources setup keeps
 //! (docs/THEORY.md, Theorem M and "Boards with holes": the heaviest promotion set gives the best game, under the
@@ -114,9 +114,9 @@
 //! this way rests on is therefore the upper part of each punctured board: that some best game of `B_f` plays every
 //! source setup keeps there.  That is open, as U is on `[n]` (where Theorem B settles the sources of one and two prime
 //! factors; it is not proven for punctured boards, so on them the statement takes in all the kept sources), and it is
-//! validated against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  Each punctured
-//! game is warm-started from an optimal game of the unpunctured board, which is its ceiling: if that game replays on
-//! the punctured board, its score is the answer with no search.
+//! validated against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  Each punctured game
+//! is warm-started from an optimal game of the unpunctured board, which is its ceiling: if that game replays on the
+//! punctured board, its score is the answer with no search.
 //!
 //! # Findings (the negative result)
 //!

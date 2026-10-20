@@ -8,16 +8,16 @@ Some words are used inside one part of the code only, and are defined there:
 
 * setup's (`unzip`, claimed factors, sinks): the module comment of `solver/frame/src/frames/mod.rs`;
 * the peel inside a frame, `reduce` and the home frame: `solver/frame/src/model/`;
-* the bounds' internals (potentials, weight splits, contraction, refinement, refits): [DESIGN.md, section
-  4](../solver/docs/DESIGN.md#4-the-search);
-* the engine's (units, splits, steals, spills, pauses): [DESIGN.md, section 6](../solver/docs/DESIGN.md#6-engine) and
-  the module comment of `solver/frame/src/engine.rs`;
+* the bounds' internals (potentials, weight splits, contraction, refinement, refits):
+  [solver/docs/design/search.md](../solver/docs/design/search.md);
+* the engine's (units, splits, steals, spills, pauses): [solver/docs/design/engine.md,
+  "Engine"](../solver/docs/design/engine.md#engine) and the module comment of `solver/frame/src/engine.rs`;
 * the fields of the progress line: [the frame solver's reference, section
   3](../solver/docs/REFERENCE.md#3-reading-the-output).
 
-The Java solver's and the wiki's words map onto these in [DESIGN.md, "The Java solver and the frame
-solver"](../solver/docs/DESIGN.md#the-java-solver-and-the-frame-solver).  The old words of the notebook's dated
-entries map onto these in the notebook's ["Terms changed"](../solver/notebook/terms-changed.md).
+The Java solver's and the wiki's words map onto these in [solver/docs/design/frame-model.md, "The Java solver and the
+frame solver"](../solver/docs/design/frame-model.md#the-java-solver-and-the-frame-solver).  The old words of the
+notebook's dated entries map onto these in the notebook's ["Terms changed"](../solver/notebook/terms-changed.md).
 
 ## The game
 
@@ -114,8 +114,8 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/te
 * **max_total**: the most promotions the frames' freedoms allow.
 * **search problem**, **Π**: what setup gives the search, less what only changes how the search runs: the frames, the
   candidates, `max_total` and the factor graph among their numbers.  `search::Problem` writes it out canonically, and
-  `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n ([DESIGN.md, "Same
-  search"](../solver/docs/DESIGN.md#same-search)).
+  `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n
+  ([solver/docs/design/same-search.md](../solver/docs/design/same-search.md)).
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
@@ -125,26 +125,26 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/te
   frames, not "the model".
 * **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their
   proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
-  or by the prime formula does not ([DESIGN.md, “What "optimal" means”](../solver/docs/DESIGN.md#what-optimal-means)).
-  U is open in general, and proven at every n the prover has proven.  Past those games `taxman certify` checks it game
-  by game ([certificate of U](#results-and-trust)).
+  or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"
+  means”](../solver/docs/design/frame-model.md#what-optimal-means)).  U is open in general, and proven at every n the
+  prover has proven.  Past those games `taxman certify` checks it game by game ([certificate of U](#results-and-trust)).
 * **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional
   ([THEORY.md](THEORY.md), Theorem M⁺; `frames::build_extended`).  The certificates of U search it.
 
 ## The search
 
 * **tactic**: a switchable piece of the frame solver's algorithm (`--tactic NAME=VALUE`).  Each is graded *proven* or
-  *sound* in [DESIGN.md, section 5](../solver/docs/DESIGN.md#5-tactics), so switching one changes how fast an answer
-  comes, never the answer.
+  *sound* in [solver/docs/design/tactics.md](../solver/docs/design/tactics.md), so switching one changes how fast an
+  answer comes, never the answer.
 * **node**, **step**: a search node is a set of promotions made from the root, plus the candidates left to it.  The
   `nodes` that results and progress lines count are *steps*, one for each candidate a node's loop tries.
 * **completion**: of a node, a promotion set that extends the node's promotions with some of its candidates.  Its
   **best completion** is the heaviest.  At the root the best completion is worth P\*.
 * **incumbent**: the best promotion set found so far, shared by all threads.  A node's **need** is what its
   completions must reach to beat the incumbent: the incumbent's sum, less the node's own, plus one.
-* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best of the
-  greedy set, the seed and a rounding of the root's matching ([DESIGN.md, "The starting incumbent, the ceiling and the
-  seed"](../solver/docs/DESIGN.md#the-starting-incumbent-the-ceiling-and-the-seed)).
+* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best of the greedy
+  set, the seed and a rounding of the root's matching ([solver/docs/design/search.md, "The starting incumbent, the
+  ceiling and the seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).
 * **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, or the game of a lower
   bound that the bounds store holds.
 * **conflict**: a subset of a promotion set that cannot be promoted together from a node.  Every completion leaves out
@@ -169,7 +169,7 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/te
   speculative search may be *deferred*, not started while the ceiling its provisional game gives would settle it, or
   *suspended*, its workers taken for the oldest game and its units kept.  (2) The eight games before game n, among
   which the frame solver looks for one whose search n repeats (`SAME_SEARCH_WINDOW`).  (3) The probe's windows: a
-  checkpoint resumed for 50,000 steps ([DESIGN.md, section 10](../solver/docs/DESIGN.md#10-performance)).
+  checkpoint resumed for 50,000 steps ([solver/docs/design/performance.md](../solver/docs/design/performance.md)).
 * **checkpoint**: a periodic pause in which all workers stop and the engine writes the unexplored work, the incumbent
   and statistics to `nNNNN.ckpt`.  Its **header** identifies the search: n, the set width, digests of the candidates
   and frames, `max_total` and the tactics.
@@ -195,14 +195,14 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **matching bound** (`matchbound`; the tactic `gf2=off`): relaxes winnability to matchability.  It is the largest sum
   of promotions such that every move and every promoted number gets a distinct maximal factor in its frame.  It is a
   maximum-weight bipartite matching, kept along the search path.
-* **GF(2) bound** (`gf2`, the default node bound): the heaviest set that is independent in two matroids over GF(2),
-  one for the even frames and one for the odd ones ([THEORY.md](THEORY.md), Theorem 11; [DESIGN.md, "The GF(2)
-  bound"](../solver/docs/DESIGN.md#the-gf2-bound)).
+* **GF(2) bound** (`gf2`, the default node bound): the heaviest set that is independent in two matroids over GF(2), one
+  for the even frames and one for the odd ones ([THEORY.md](THEORY.md), Theorem 11; [solver/docs/design/gf2-bound.md,
+  "The GF(2) bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 * **the Lagrangian bound over the nogoods**: an inner bound, either the matching bound or the GF(2) bound, with each
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
   inner bound when it matters.  It comes in three forms:
   * the tactic `lagrange`: the matching bound inside, with multipliers that each searcher fits at the root to the
-    nogoods it has learned ([DESIGN.md](../solver/docs/DESIGN.md#the-lagrangian-bound-over-the-nogoods));
+    nogoods it has learned ([DESIGN.md](../solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (`wall choice`).  The
     notebook's entries call this form the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
@@ -258,7 +258,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   file, `explore.jsonl`, is not a chain.
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
   game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
-  score ([DESIGN.md, "Certificates of U"](../solver/docs/DESIGN.md#certificates-of-u)).
+  score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
 * **optimal.json**: the table of optimal games, n ≤ 1300, built into the binary
   ([results/README.md](../results/README.md#optimaljson) says where its games came from).  **optimal ok**: a score
   equals the table's.  That is not a proof, and above the table's last game there is no table to match; a score that
@@ -290,7 +290,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   combination of sources it kept above it.  Statement (♦) implies (★) ([THEORY.md](THEORY.md), Theorem 7).
 * **the heuristics** (`heuristics/`): strategies that play good games quickly but don't guarantee optimal results.
 * **the probe** (`examples/perf.rs`), **the ladder** (`examples/ladder.rs`) and **`taxman bench`**: the performance
-  tools of [DESIGN.md, section 10](../solver/docs/DESIGN.md#10-performance).
+  tools of [solver/docs/design/performance.md](../solver/docs/design/performance.md).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
 * **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): the register of

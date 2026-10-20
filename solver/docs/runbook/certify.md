@@ -9,7 +9,7 @@ campaign of the entry [Certificates past
 heading's "stage 4" names the campaign as the notebook's register does (the row "S4 preparation", after E8's stages 1
 and 2).  [STATUS](../STATUS.md) says where it stands, and a launch waits for Brian's approval with the estimate of [What
 it costs, and what to approve](#what-it-costs-and-what-to-approve) ([rules for every
-launch](launch.md#rules-for-every-launch)).  [DESIGN.md, "Certificates of U"](../DESIGN.md#certificates-of-u) says what
+launch](launch.md#rules-for-every-launch)).  [solver/docs/design/certificates.md](../design/certificates.md) says what
 a certificate is, and [solver/tools/certify/README.md](../../tools/certify/README.md) describes the work list, its data
 and the lists.  The campaign launches as [Every launch, step by step](launch.md#every-launch-step-by-step) says: an
 instance profile, steps through SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, tmux.  Only the machine, the

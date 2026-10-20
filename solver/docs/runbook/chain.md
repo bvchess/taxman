@@ -52,8 +52,8 @@ documents its variables, all optional: `THREADS`, `WINDOW`, `CHECKPOINT_INTERVAL
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that
 keep them busy, so one game's search does not leave a machine of many threads idle.  Games still conclude and record in
 order, with the scores, proofs and repeats of a window of 1, which solves them one after the other ([the
-README](../../frame/README.md#games-in-flight); [DESIGN.md](../DESIGN.md#the-window-games-in-flight)).  The default is
-4, in `chain.sh` and in `taxman solve --window`: on 64 and 192 threads the [scaling
+README](../../frame/README.md#games-in-flight); [DESIGN.md](../design/engine.md#the-window-games-in-flight)).  The
+default is 4, in `chain.sh` and in `taxman solve --window`: on 64 and 192 threads the [scaling
 run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best of 1, 4, 16 and 32 on the games past
 2225, and a window of 16 20 to 32 % slower than 1 on 64 threads.
 

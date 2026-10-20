@@ -4,7 +4,7 @@ Part of the [register](../README.md#register-of-everything-tried).
 
 | date | question | answer | where |
 |---|---|---|---|
-| 2026-10 | Is the prime shortcut (`prime_shortcut`) tight for every prime? | Kept, proven: tight for every prime; the proof is with `accelerate::prime_shortcut`. | [DESIGN 5](../../docs/DESIGN.md#5-tactics) |
+| 2026-10 | Is the prime shortcut (`prime_shortcut`) tight for every prime? | Kept, proven: tight for every prime; the proof is with `accelerate::prime_shortcut`. | [DESIGN 5](../../docs/design/tactics.md) |
 | 2026-10-13 | Can `reuse_prev` take the previous game's promotions without a search? | Removed 2026-10: with several optimal sets of n − 1 the result depends on which was recorded; 685's game plus 686 is unplayable, though opt(686) = 686 + opt(685). | [tactics review](../which-tactics-earn-their-keep-2026-10/README.md#reuse_prev-nothing-left-to-save) |
 | 2026-10 | Can the sacrifice bound (games on punctured boards) prove `reuse_prev`'s results? | Not kept: tight on 57 of the 152 `reuse_prev` games, and there it costs 1.1-8.7 times the direct search; the theorem stays, and `tests/wide.rs` uses it. | [`src/sacrifice.rs`](../../frame/src/sacrifice.rs) |
 | 2026-10 | Do the optimal scores of games above n give proven bounds on opt(n)? | Measured, not kept: holds on 2..1299, tight only at a prime n + 1 (204 of 204) and at 13 even m; settles 1023 alone of the 416 exhausted games. | [going higher 1](../going-higher-and-coming-back-down-2026-10/README.md) |

@@ -8,7 +8,7 @@
 //! a child is pushed on it while it is checked and for as long as it is on the stack) and the conflicts known along
 //! the path (`known`: `stack[d].known_end` of them hold for the node at depth `d`).
 //!
-//! A step ([`Stepper::step`]) is DESIGN.md's "The default step" in four phases (the module docs of
+//! A step ([`Stepper::step`]) is solver/docs/design/search.md's "The default step" in four phases (the module docs of
 //! [`crate::search`] map them): [`check_node`](Stepper::check_node), [`choose_branch`](Stepper::choose_branch),
 //! [`make_child`](Stepper::make_child) and [`check_child`](Stepper::check_child).  It reads the incumbent once:
 //! both checks compare with that value, even after one of them has offered a better incumbent.

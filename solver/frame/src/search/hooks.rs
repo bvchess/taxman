@@ -3,17 +3,17 @@
 //!
 //! The hook, and every site of it in the searcher, is built only with the feature `studies`: a default build's steps
 //! are what they were before it, with not even a test of an `Option`.  With the feature, a search runs without one
-//! ([`SearchSpace::hooks`](super::SearchSpace::hooks) is `None`, as [`SearchSpace::new`](super::SearchSpace::new)
-//! makes it), and then each site of the hook in a step is a test of an `Option` that is always `None`.  With one, each
-//! searcher makes its own hook when it is made, and the hook sees the steps of that searcher in their order.  What
-//! the hook is told is a copy: it cannot change the step.  What it is asked ([`StepHook::branch`]) can change the
-//! tree, never the answer: every completion of a node leaves out a member of the conflict of its heaviest set, so
-//! branching on any member, and going on without it, explores every completion (DESIGN.md, section 4, "The default
-//! step", the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may
-//! also narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric
-//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.  It may propose
-//! sets for the searcher to learn conflicts within, as nogoods ([`StepHook::propose`]): the searcher learns only what
-//! a peel shows cannot be promoted, so that changes the tree, never the answer.  And it may make the search count the
+//! ([`SearchSpace::hooks`](super::SearchSpace::hooks) is `None`, as [`SearchSpace::new`](super::SearchSpace::new) makes
+//! it), and then each site of the hook in a step is a test of an `Option` that is always `None`.  With one, each
+//! searcher makes its own hook when it is made, and the hook sees the steps of that searcher in their order.  What the
+//! hook is told is a copy: it cannot change the step.  What it is asked ([`StepHook::branch`]) can change the tree,
+//! never the answer: every completion of a node leaves out a member of the conflict of its heaviest set, so branching
+//! on any member, and going on without it, explores every completion (solver/docs/design/search.md, "The default step",
+//! the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may also
+//! narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric pairs
+//! does: that can change the answer, and is for a study of a rule whose soundness it has argued.  It may propose sets
+//! for the searcher to learn conflicts within, as nogoods ([`StepHook::propose`]): the searcher learns only what a peel
+//! shows cannot be promoted, so that changes the tree, never the answer.  And it may make the search count the
 //! completions that reach the need instead of beating it ([`StepHook::counting`]).
 //!
 //! The hook is the GF(2) path's (the tactic `gf2`, the default): on the matching path it is told of the steps, without

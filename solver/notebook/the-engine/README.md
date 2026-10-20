@@ -2,7 +2,7 @@
 
 Part of the [lab notebook](../README.md).
 
-How the engine ([DESIGN.md, "Engine"](../../docs/DESIGN.md#6-engine); the protocol is in the module comment of
+How the engine ([DESIGN.md, "Engine"](../../docs/design/engine.md#engine); the protocol is in the module comment of
 `src/engine.rs`) came to be as it is.  All of this is from 2026-10 unless noted.
 
 * **Yields leave out nodes with nothing to do.**  The Taxman searcher leaves out of its yield the nodes of its stack

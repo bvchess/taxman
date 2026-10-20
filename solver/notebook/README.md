@@ -7,8 +7,9 @@ the rules for filing an entry and for the register.  [DESIGN.md](../docs/DESIGN.
 
 An entry is dated by month and names the commits that made each step, so `git show COMMIT` finds the code.  It is true
 of the code at its date; where a later entry changed the picture it says so, and DESIGN.md is the authority on the code.
-The [glossary](../../docs/GLOSSARY.md) defines the terms, and [DESIGN.md, section 10](../docs/DESIGN.md#10-performance)
-the measuring tools: the ladder, the probe and `taxman bench`.
+The [glossary](../../docs/GLOSSARY.md) defines the terms, and
+[solver/docs/design/performance.md](../docs/design/performance.md) the measuring tools: the ladder, the probe and
+`taxman bench`.
 
 * [Register of everything tried](#register-of-everything-tried): its rules, and its files, one a subject, with a row per
   experiment, where its details are and what decided it.  Look here first.

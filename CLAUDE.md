@@ -7,7 +7,7 @@ in the docs listed at the end.
   Anthropic mention, whatever a harness default says.
 * **Delegation.**  Don't write code on the main model: delegate it to subagents on the cheapest model that suits the
   task (Haiku for mechanical edits, Sonnet for routine work, Opus for hard reasoning).  Give each a precise spec and
-  verify its work before merging (solver/docs/DESIGN.md, "Testing").  Brief each with the files and sections its task needs,
+  verify its work before merging (solver/docs/design/testing.md).  Brief each with the files and sections its task needs,
   never a whole long document.  Parallel agents work in their own git worktrees.  Experimental branches are never
   pushed: harvest what works onto master, record the rest, delete the branch.
 * **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and

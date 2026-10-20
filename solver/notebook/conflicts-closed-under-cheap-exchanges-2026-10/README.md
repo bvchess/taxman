@@ -139,7 +139,7 @@ that a peel shows cannot be promoted from the node's state.  That subset is a co
 below it, which have more promotions; its nogood is a minimal subset of the node's promotions and the conflict that
 keeps a frame of the root unwinnable, so a nogood of the root, as `FrameGraph::nogood` makes for the search's own
 conflicts.  These are the facts the search learns from its own conflicts, by the same functions, so the argument of
-its exactness covers them ([DESIGN.md, "Forced members and nogoods"](../../docs/DESIGN.md#forced-members-and-nogoods)).
+its exactness covers them ([DESIGN.md, "Forced members and nogoods"](../../docs/design/search.md#forced-members-and-nogoods)).
 A set that can be promoted teaches nothing.  The tests check the rest: the test's hook leaves the tree as it is (game
 1215), each image's verdict agrees with promoting it, and the learning finds the optimum of games 800, 1000 and 1215
 from a floor 60 below it, with the closure and without.

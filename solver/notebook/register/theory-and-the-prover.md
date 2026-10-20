@@ -8,7 +8,7 @@ The work of [the prover](../../noframe/README.md) and the proofs of [THEORY.md](
 
 | date | question | answer | where |
 |---|---|---|---|
-| 2026-10 | Does the frame model agree with exhaustive search? | Kept: `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the prover's proofs extend it to 989. | [DESIGN 2](../../docs/DESIGN.md#what-optimal-means) |
+| 2026-10 | Does the frame model agree with exhaustive search? | Kept: `brute` agrees with the frame model to n = 40 in the tests (52 in `sacrifice validate`) and `certify.py` to 62; the prover's proofs extend it to 989. | [DESIGN 2](../../docs/design/frame-model.md#what-optimal-means) |
 | 2026-10 | Can the prover's exact search prove opt(n), with the Franklín–Moniot bound and nogoods? | Kept: it proves optimal.json's score for every n ≤ 989 and 999-1019 in 10.0 CPU hours; incremental dual repair made it 160 times faster than solving each node from scratch. | [prover 3](../../noframe/README.md#3-the-proofs-of-optn) |
 | 2026-10 | Does a Lagrangian bound over the nogoods help the prover's search? | Kept: 3.3 times fewer nodes at 793. | [prover 3](../../noframe/README.md#3-the-proofs-of-optn) |
 | 2026-10 | Does bounding the sources by W(U\*) through a Lagrangian help the prover's search? | Not kept: it gains only 4%. | [prover 8](../../noframe/README.md#8-what-remains-open) |

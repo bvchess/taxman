@@ -111,7 +111,7 @@ each run, kept in the cache), so that the longest does not start last.  The doc 
   report says whether it fails only in company.  A test that outlasts `TEST_TIMEOUT` is killed and fails.
 * **The summary** (`--summary`) names the ten tests that used the most CPU, with their seconds of CPU: a test's own,
   which do not grow when the machine is busy.  `solver/tools/quick_check.py` runs the suite without `--release` and
-  judges it by them ([DESIGN.md, section 9](../DESIGN.md#9-testing)).
+  judges it by them ([solver/docs/design/testing.md](../design/testing.md)).
 * **Every test in its own process** is stricter than threads of one process (no shared statics, no leftover
   environment), and costs each test its own start; the suite passes that way.  Tests that start a thread per CPU
   themselves share the machine with all the others, so a test that depends on its speed shows it: lower `TEST_JOBS` to
@@ -123,7 +123,7 @@ apart.  The build of the test executables comes first, in the release profile wi
 then the test executables side by side.  The release of 260e74f took 16 minutes from the launch to the start of its job,
 with the build of the examples (5 minutes), the build of the tests and the suite ([the A1
 measurement](../../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).  The suite's
-times on a laptop are in [DESIGN.md, section 9](../DESIGN.md#9-testing).
+times on a laptop are in [solver/docs/design/testing.md](../design/testing.md).
 
 ## What was tested
 

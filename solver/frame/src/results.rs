@@ -18,7 +18,7 @@
 //! * `same_search`: the game's search problem is the one an earlier game `m` of the file posed, and `m`'s proof
 //!   settles that problem's best promotion sum (`exhausted`, `cap`, or `same_search` again); so this game's best
 //!   promotion sum is the same, and its game is `m`'s promotions played on this board (tactic `same_search`;
-//!   DESIGN.md, "Same search", has the argument).
+//!   solver/docs/design/same-search.md, has the argument).
 //! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]): the
 //!   game is taken from the source without a search (method `known`: `optimal.json`, the committed chain, or a board
 //!   that the bounds store has proven), or a search found a game that scores what the bounds store's upper bound of the
@@ -146,7 +146,8 @@ pub fn assumed_optimal(n: u32) -> String {
 }
 
 /// What a bound of the bounds store that rests on statement U at the board `n` assumes: "statement U holds at n=4501".
-/// (U is the statement of DESIGN.md, “What "optimal" means”; a bound of the store lists the boards it rests on.)
+/// (U is the statement of solver/docs/design/frame-model.md, “What "optimal" means”; a bound of the store lists the
+/// boards it rests on.)
 pub fn assumed_u(n: u32) -> String {
     format!("{U_STATEMENT}{n}")
 }
@@ -217,12 +218,13 @@ impl Proof {
         self.rests_on_prev() || self == Proof::SameSearch
     }
 
-    /// Whether the proof settles the best promotion sum of the game's search problem, so that a later game that
-    /// poses the same problem can repeat it (tactic `same_search`): an exhausted search directly; a search that
-    /// reached its ceiling because every promotion set of the model is a game, which scores at most the ceiling; a
-    /// repeat by induction (DESIGN.md, "Same search"); a search that reached an upper bound of the bounds store (`known`:
-    /// its sum is the problem's best, since the bound allows no more and the search found a set of that sum).  A trivial
-    /// or prime game settles no search, and a game that is only taken from a known source (method `known`) set none up.
+    /// Whether the proof settles the best promotion sum of the game's search problem, so that a later game that poses
+    /// the same problem can repeat it (tactic `same_search`): an exhausted search directly; a search that reached its
+    /// ceiling because every promotion set of the model is a game, which scores at most the ceiling; a repeat by
+    /// induction (solver/docs/design/same-search.md); a search that reached an upper bound of the bounds store
+    /// (`known`: its sum is the problem's best, since the bound allows no more and the search found a set of that sum).
+    /// A trivial or prime game settles no search, and a game that is only taken from a known source (method `known`)
+    /// set none up.
     pub fn settles_search(self) -> bool {
         matches!(self, Proof::Exhausted | Proof::Cap | Proof::SameSearch | Proof::Known)
     }

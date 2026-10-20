@@ -1,6 +1,6 @@
 # The certificates of U: the work list of 2176-3440, and the data it is made from
 
-What a certificate is and what it proves: DESIGN.md, ["Certificates of U"](../../docs/DESIGN.md#certificates-of-u), and
+What a certificate is and what it proves: DESIGN.md, ["Certificates of U"](../../docs/design/certificates.md), and
 docs/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates past
 2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).  Everything
 ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository, against the

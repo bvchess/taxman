@@ -609,7 +609,7 @@ in the evidence table below.
 
 Theorem 10's lemma, applied frame by frame, bounds the frame model's promotions in the same way: two matroids, one of
 the even frames and one of the odd frames, in both of which every promotable set is independent.  This is the solver's
-GF(2) bound (tactic `gf2`; solver/docs/DESIGN.md, section 4, "The GF(2) bound").
+GF(2) bound (tactic `gf2`; solver/docs/design/gf2-bound.md, "The GF(2) bound").
 
 **Theorem 11 (the frame matroids).**  Give each frame h of a state the coordinates of its factors, each mover u paying
 in h (a move of h, or a number of home h + 1 promoted into it) the vector v_h(u) of its maximal factors among them, and
@@ -623,7 +623,7 @@ completion F makes P ∪ F promotable from the root, so F is independent in A an
 is the heaviest common independent set of the contractions.
 
 *Proof.*  Promoting Q succeeds exactly when every frame is winnable with all of Q applied at once, its moves plus Q's
-members promoted into it and its factors less Q's members promoted out of it (solver/docs/DESIGN.md, section 4;
+members promoted into it and its factors less Q's members promoted out of it (solver/docs/design/search.md;
 `model::promote`).  A winnable frame peels completely (`model::peel`): each move dropped has a live factor that no move
 still there has, so, as in the proof of Theorem 10's lemma (the peel's order read backwards is the play order there),
 the movers' vectors restricted to the live factors are independent, which is independence together with the unit vectors
@@ -647,7 +647,7 @@ weight split, as Theorem 10's certificate does (`gf2::meet`).
 
 Exchanging two primes in every number is an automorphism of divisibility.  Where it maps the frame model's root onto
 itself, it maps promotion sets to promotion sets, and no optimal set is improved by it, which orders the two primes'
-shares in every optimal set at once.  This is the solver's tactic `symmetry` (solver/docs/DESIGN.md, section 4, "Prime
+shares in every optimal set at once.  This is the solver's tactic `symmetry` (solver/docs/design/gf2-bound.md, "Prime
 exchanges"; solver/notebook/dominance-and-symmetry-2026-10/README.md found the exchanges and measured them).
 
 For primes p < q let π = π_{p,q} send p^a q^b m (m prime to pq) to p^b q^a m.  For a set S of numbers and a prime r let
@@ -1060,8 +1060,8 @@ without its lemma M5: the claims of `unzip` are needed for speed, not for exactn
 the frame model's problem (frames of Taxman Mini numbered so that a candidate of frame h is promoted into frame h − 1, a
 reduced root, candidates), so the search, its bounds and its tactics apply to it unchanged: Theorems 11 and 13, the
 reduction lemma, the conflicts and the nogoods use nothing else.  The search takes the one-sided candidates too, each as
-a possible move of its frame (solver/docs/DESIGN.md, "Extended mode: one-sided candidates"), and a reference predicate
-(plain peels of the unreduced frames) decides the promotion sets of Π⁺(O) for the tests.
+a possible move of its frame (solver/docs/design/search.md, "Extended mode: one-sided candidates"), and a reference
+predicate (plain peels of the unreduced frames) decides the promotion sets of Π⁺(O) for the tests.
 
 *The claims of `unzip` in Π⁺(O).*  They cannot be reused as they are: a back claim (s, f) of Π_n is safe because no
 candidate of Π_n lists f (M5), and Π⁺(O) has more candidates.  A frame of f's layer that holds an open source has more
@@ -1191,9 +1191,9 @@ move, and [2] is the game of 2.)  ∎
 The design of the ledger stated the formula as opt(p − 1) + p − 1; it is + p − q, and the construction needs no optimal
 game, only a finished one.
 
-**Lemma L4 (repeats).**  If boards n and m pose the same search problem, Π_n = Π_m (solver/docs/DESIGN.md, "Same
-search"), then every promotion set S of it, played on the board of n (`solution_for_promotions`), is a legal game of n
-scoring in_the_bag(n) + ΣS; and, given U at n, opt(n) − in_the_bag(n) ≤ opt(m) − in_the_bag(m).
+**Lemma L4 (repeats).**  If boards n and m pose the same search problem, Π_n = Π_m (solver/docs/design/same-search.md),
+then every promotion set S of it, played on the board of n (`solution_for_promotions`), is a legal game of n scoring
+in_the_bag(n) + ΣS; and, given U at n, opt(n) − in_the_bag(n) ≤ opt(m) − in_the_bag(m).
 
 *Proof.*  The first is the soundness half of Theorem M, which every search relies on when it offers an incumbent.  For
 the second, equal problems have the same promotion sets, so P\*(Π_n) = P\*(Π_m); by the soundness at m, in_the_bag(m) +
@@ -1209,7 +1209,7 @@ besides what U(m) rests on.
 candidates its loop has still to try.  Then P\*(Π_n) ≤ max(I, max_u (ΣP_u + B_u)), where B_u is the heaviest common
 independent set over C_u of Theorem 11's matroids contracted by P_u, of at most `max_additional` members.
 
-*Proof.*  The search is exact (solver/docs/DESIGN.md, section 4): each pruning drops only sets no heavier than the
+*Proof.*  The search is exact (solver/docs/design/search.md): each pruning drops only sets no heavier than the
 incumbent of its time (at most I), sets that cannot be promoted, and, with the tactic `symmetry`, sets that break an
 inequality every heaviest set keeps (Theorem 13).  The checkpoint's units are the roots of every subtree not yet
 explored, which is what makes a resume from it exact.  So a heaviest promotion set H that keeps the inequalities is

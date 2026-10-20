@@ -24,12 +24,12 @@
 //!   factors are optional and only the claims of `unzip` that Lemma M5⁺ allows are kept ([`build_extended`]); research
 //!   code, which the solver does not use either.
 //!
-//! The Java has several names for the one idea (DESIGN.md, "The Java solver and the frame solver", maps them); this
-//! module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`], the search's copy of it (a
-//! `Copy` set of moves and factors that every promotion changes), and the two do not meet: no signature has both, and
-//! this module writes the search's as `model::Frame`.  A second word (`FrameDraft`) would only be one more name for
-//! what the wiki calls a frame.  The names of `unzip` and `removeImpossible`, and of the fields `mandatory` and
-//! `claimed`, are the Java's.
+//! The Java has several names for the one idea (solver/docs/design/frame-model.md, "The Java solver and the frame
+//! solver", maps them); this module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`],
+//! the search's copy of it (a `Copy` set of moves and factors that every promotion changes), and the two do not meet:
+//! no signature has both, and this module writes the search's as `model::Frame`.  A second word (`FrameDraft`) would
+//! only be one more name for what the wiki calls a frame.  The names of `unzip` and `removeImpossible`, and of the
+//! fields `mandatory` and `claimed`, are the Java's.
 //!
 //! # Sources, factors and frames
 //!
@@ -59,7 +59,7 @@
 //! After the frames are formed, [`BoardFrames::new`] simplifies each one until nothing changes (`finish_setup`).
 //! Three things are decided frame by frame.  All three were assumptions of the frame model, validated but not proven;
 //! they are theorems: docs/THEORY.md, "The frame model: what is proven and what remains" (Theorem M and its
-//! lemmas M1 to M6, which follow this code step by step), summed up in DESIGN.md, “What "optimal" means”.  What remains is a statement about the game, not about this code:
+//! lemmas M1 to M6, which follow this code step by step), summed up in solver/docs/design/frame-model.md, “What "optimal" means”.  What remains is a statement about the game, not about this code:
 //! that some optimal game plays every source with three or more prime factors that setup keeps.
 //!
 //! * **unzip** finds the frame's *mandatory* moves, in two ways: a source with a single usable factor must take

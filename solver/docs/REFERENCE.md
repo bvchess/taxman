@@ -93,10 +93,10 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes `--threads`, the checkpoint
   flags and the limits of `solve`, and resumes like it.  The extended problem keeps the claims of `unzip` that Lemma M5⁺
   allows, unless `--no-claims`, the formulation of the certificates made before it; a line records which.
-* **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the
-  files that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores
-  reach: the prover's, the certificates' and the ceilings'.  [DESIGN.md, "Certificates of
-  U"](DESIGN.md#certificates-of-u) has what they check and what a line holds.
+* **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
+  that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
+  the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they
+  check and what a line holds.
 
 ## 3. Reading the output
 
@@ -186,7 +186,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `method` | how the game was found: `trivial`, `prime`, `repeat`, `search` or `known` (taken from a known source with no search, `--use-prev`) |
 | `completed` | false only if a limit or a signal stopped the search; such a line records an unfinished search, and its checkpoint is kept (a `--keep-going` run writes none for a signal) |
 | `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` or `known` (section 4); null if incomplete |
-| `reached_cap` | the promotions reach `cap`, where the search stops (a search started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; DESIGN.md, "What a window changes in the results") |
+| `reached_cap` | the promotions reach `cap`, where the search stops (a search started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; solver/docs/design/trust.md, "What a window changes in the results") |
 | `assumes` | what the proof assumes beyond the frame model, here or in the games it rests on (n − 1, the game a repeat repeats, or the known source a `known` proof cites): for a game of n − 1 or of n taken from `optimal.json`, "the game of n in optimal.json is optimal"; for a bound of the bounds store, "statement U holds at n=4501" for each game its upper bound rests on; `[]`: nothing |
 | `in_the_bag` | what the game with no promotions scores (null for the prime formula and known games, which set no board up) |
 | `prev` | the game of n − 1 this one was built from: its score, where it came from (`run`, `results`, `optimal`, `strict`, `bounds`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 4, "What a game had from n − 1") |
@@ -194,7 +194,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `known` | a key that only a line citing a known source has (section 4, "Citing a known source"): `{"source":"optimal"}` or `{"source":"strict"}` for a game taken from `optimal.json` or the committed chain, or `{"source":"bounds","lower":{"rule":..,"source":..},"upper":{"rule":..,"source":..}}` for the lines of the bounds store whose bound of n is the score (`lower` null when a search found the game and the upper bound stopped it) |
 | `nodes`, `stats` | the search's steps over all invocations, and the searcher's counters (`match_bounds` counts the node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled and largest in-memory queue |
-| `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (the ceiling as a promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (DESIGN.md, "Same search"), by which a later game finds this one to repeat |
+| `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (the ceiling as a promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (solver/docs/design/same-search.md), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `keep_going`, `retry`, `retry_improved` (true) and `pass` (the number `--pass` was given) |
@@ -218,7 +218,7 @@ check every results file.
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached the [ceiling](../../docs/GLOSSARY.md#the-game) | yes |
 | `prime_formula` | the [prime formula](../../docs/GLOSSARY.md#the-game), optimal if the game of n − 1 is | yes |
-| `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [DESIGN.md](DESIGN.md#same-search) has the argument) | no: on the game m it repeats |
+| `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [DESIGN.md](design/same-search.md) has the argument) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search; the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
 
 ### Citing a known source

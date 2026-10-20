@@ -2,7 +2,7 @@
 
 Part of the [lab notebook](../README.md).
 
-What the measuring tools were first used to find ([DESIGN.md, "Performance"](../../docs/DESIGN.md#10-performance) says how to
+What the measuring tools were first used to find ([DESIGN.md, "Performance"](../../docs/design/performance.md) says how to
 use them).
 
 * **The bench set.**  Until 2026-10 `taxman bench` ran n = 480–760 (W = 8 and 16, milliseconds per game), which no

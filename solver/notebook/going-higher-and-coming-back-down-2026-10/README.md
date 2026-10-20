@@ -24,7 +24,7 @@ the root's frames after reduction, the candidates with their home frames, `max_t
 games read from the chain (a game's P\* is its score less `in_the_bag`).  Recorded for each pair:
 
 * whether the two search problems are *equal* (the test of `same_search`, DESIGN.md
-  "[Same search](../../docs/DESIGN.md#same-search)") and whether each *relaxes* the other (below);
+  "[Same search](../../docs/design/same-search.md)") and whether each *relaxes* the other (below);
 * how m's root differs from n's, frame by frame: the moves and factors m has and n has not and the other way, the
   change of the frame's freedoms, the candidates gained and lost, the change of `max_total`;
 * what each optimal promotion set is worth on the other board: the set's members that are candidates there, whether

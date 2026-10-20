@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The quick check of the frame solver's crate: the check that every change passes before it is merged (DESIGN.md,
-section 9). Standard library only.
+"""The quick check of the frame solver's crate: the check that every change passes before it is merged
+(solver/docs/design/testing.md). Standard library only.
 
 usage: solver/tools/quick_check.py   (from anywhere; it works in solver/frame and runs at a low priority)
 
@@ -21,7 +21,8 @@ exits with status 1 if
 
 A test is held to its CPU seconds, not to the seconds it takes: with every CPU busy a test takes several times as long
 as it does alone, and its CPU seconds do not change.  The limits are here and nowhere else; raising either needs
-Brian's approval.  A test that takes more than about a second is long: DESIGN.md, section 9, says what to do with it.
+Brian's approval.  A test that takes more than about a second is long: solver/docs/design/testing.md says what to do
+with it.
 """
 import ctypes
 import fcntl
@@ -55,7 +56,7 @@ TIMES = CRATE / "target" / "quick-check-times.json"  # how long the tests took l
 REPORT = CRATE / "target" / "quick-check-report.txt"
 SUMMARY = CRATE / "target" / "quick-check-summary.json"
 
-POINTER = "A test that takes more than about a second is long: see solver/docs/DESIGN.md, section 9, 'Testing'."
+POINTER = "A test that takes more than about a second is long: see solver/docs/design/testing.md."
 
 
 # --- how busy the machine is ------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Whether this is a quick run, a non-release `cargo test` (debug assertions are on in the test profile and off in the
 /// release profile): a test that draws or walks a count that can be changed (random configurations, an instance that
-/// must last) uses a smaller one, and `cargo test --release` uses the full one (DESIGN.md, "Testing").
+/// must last) uses a smaller one, and `cargo test --release` uses the full one (solver/docs/design/testing.md).
 pub const QUICK: bool = cfg!(debug_assertions);
 
 /// A fresh, empty directory under the system temp dir, removed when dropped.  It derefs to its [`Path`], so

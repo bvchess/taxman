@@ -47,8 +47,8 @@
 //!
 //! # Module map
 //!
-//! In the order to read them (DESIGN.md, section 3, is the same list with advice for a first read): each layer
-//! uses the ones above it.  Each module starts with a comment that says what it is for.
+//! In the order to read them (solver/docs/design/architecture.md, is the same list with advice for a first read): each
+//! layer uses the ones above it.  Each module starts with a comment that says what it is for.
 //!
 //! | layer | module | what it is |
 //! |---|---|---|

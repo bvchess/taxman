@@ -8,8 +8,8 @@
 //!
 //! # One game
 //!
-//! The steps, in order (DESIGN.md, "Per-game pipeline (`solver`)", has the same steps with the Java classes they
-//! replace):
+//! The steps, in order (solver/docs/design/engine.md, "Per-game pipeline (`solver`)", has the same steps with the Java
+//! classes they replace):
 //!
 //! 1. The tables of the board `1..=n`, and the set width `W` for it (`with_width!`; a checkpoint made at another
 //!    width is refused).
@@ -43,9 +43,9 @@
 //! the [`SAME_SEARCH_WINDOW`] games before it, and whose proof settles that problem's best promotion sum
 //! ([`Proof::settles_search`]), is `m`'s promotions played on its own board, with no search: method `repeat`, proof
 //! `same_search`, resting on `m`'s proof and its assumptions.  The game is found by the problem's digest and confirmed
-//! by comparing the two problems, taking `m`'s from this run's own setup of its board when there was one and setting
-//! it up again otherwise; the game then goes through `conclude` like any game.  DESIGN.md, "Same search", has why it
-//! is optimal.
+//! by comparing the two problems, taking `m`'s from this run's own setup of its board when there was one and setting it
+//! up again otherwise; the game then goes through `conclude` like any game.  solver/docs/design/same-search.md, has why
+//! it is optimal.
 //!
 //! The previous game is checked before anything uses it: it must replay legally to its recorded score, be over
 //! (no legal move left) and open with the largest prime, as every optimal game does.  A game this run made is

@@ -1,6 +1,7 @@
 //! Documentation that states what the code can check:
 //!
-//! * DESIGN.md's table of tactics lists the tactics of `taxman::tactics::Tactics`, in order, with their defaults;
+//! * the table of tactics in the design (`solver/docs/design/tactics.md`) lists the tactics of
+//!   `taxman::tactics::Tactics`, in order, with their defaults;
 //! * every relative link and `#anchor` of the repository's markdown files (the README, `docs/`, `results/`, `solver/`
 //!   with the lab notebook, and the READMEs of `heuristics/` and `moniot/`) resolves;
 //! * the lab notebook keeps its rules on its front page, `solver/notebook/README.md`, its register in the files of
@@ -9,8 +10,8 @@
 //!   page holds no entry and no table row; `solver/docs/STATUS.md` is short and dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
 //!   and its example line shows them;
-//! * DESIGN.md's reading order (section 3) is the module map of `src/lib.rs`, and `rust-version` is what the README
-//!   and the cloud setup say;
+//! * the design's reading order (`solver/docs/design/architecture.md`) is the module map of `src/lib.rs`, and
+//!   `rust-version` is what the README and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
 //!   for the ceiling, ...) or the old names of the prover's directory and script, but for the note that lists them,
@@ -18,8 +19,9 @@
 //! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
 //!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
 //!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...);
-//! * every heading that a guide, a comment or a script cites by name (`DESIGN.md, "Testing"`) or by number
-//!   (`DESIGN.md, section 9`) exists in the document it names, and so does every `PATH.md#anchor` cited in the code;
+//! * every heading that a guide, a comment or a script cites by name (`WRITING.md, "Give each task one file"`) or by
+//!   number (`WRITING.md, section 8`) exists in the document it names, and so does every `PATH.md#anchor` cited in the
+//!   code;
 //! * every guide but the notebook's entries keeps the limit of words of docs/WRITING.md, rule 8, but those still to be
 //!   split (`STILL_TO_SPLIT`), and the old files of the split documents (`INDEXES`) stay under the limit of an index.
 //!
@@ -48,9 +50,18 @@ fn notebook_dir() -> PathBuf {
     repo_dir().join("solver/notebook")
 }
 
-/// DESIGN.md, in the docs of the solver.
+/// The folder of the design's files, by its path from the repository, ending in `/` as the folders of `REWRITTEN` do:
+/// a file for each part of the design (tactics.md, architecture.md, testing.md, ...), each opening with its title.
+const DESIGN_DIR: &str = "solver/docs/design/";
+
+/// DESIGN.md, in the docs of the solver: the index of the design (its goals and the table of its files).
 fn design_md() -> PathBuf {
     repo_dir().join("solver/docs/DESIGN.md")
+}
+
+/// The folder of the design's files (`DESIGN_DIR`).
+fn design_dir() -> PathBuf {
+    repo_dir().join(DESIGN_DIR)
 }
 
 /// REFERENCE.md, the frame solver's reference, in the docs of the solver.
@@ -61,6 +72,19 @@ fn reference_md() -> PathBuf {
 fn read(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
     std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+/// The text of the design's file `name` (`tactics.md`, ...) after its title.  A file of the design is one whole part
+/// of it, from its `# Title` on, so what follows the title is the part, whatever headings it has inside.
+fn design_file(name: &str) -> String {
+    let text = read(design_dir().join(name));
+    let (title, body) = text.split_once('\n').unwrap_or((&text, ""));
+    assert!(
+        title.starts_with("# "),
+        "{DESIGN_DIR}{name} must open with its title, a line `# Title`, as the files of the design do; \
+         it opens with {title:?}"
+    );
+    body.to_owned()
 }
 
 /// The text of the part of `text` that starts after `heading` (a line start, `#`s and all) and ends before the next
@@ -80,12 +104,9 @@ struct Row {
     default: String,
 }
 
-/// The rows of the table in DESIGN.md's section "5. Tactics".
+/// The rows of the table in the design's `tactics.md`.
 fn tactic_rows() -> Vec<Row> {
-    let text = read(design_md());
-    let section = text.split("\n## 5. Tactics").nth(1).expect("the section 5. Tactics");
-    let section = section.split("\n## ").next().expect("the section's end");
-    section
+    design_file("tactics.md")
         .lines()
         .filter(|line| line.starts_with("| `"))
         .map(|line| {
@@ -103,7 +124,7 @@ fn design_lists_the_tactics_of_the_code_in_order() {
     assert_eq!(
         listed,
         Tactics::names(),
-        "DESIGN.md section 5 and tactics::Tactics must list the same tactics in order"
+        "the table of {DESIGN_DIR}tactics.md and tactics::Tactics must list the same tactics in order"
     );
 }
 
@@ -562,8 +583,7 @@ fn lib_module_map() -> Vec<String> {
 
 #[test]
 fn the_reading_order_of_design_is_the_module_map_of_lib_rs() {
-    let design = read(design_md());
-    let architecture = section(&design, "## 3. Architecture");
+    let architecture = design_file("architecture.md");
     let declared = lib_module_map();
     let mut in_design: Vec<String> = Vec::new();
     for word in architecture.split('`').skip(1).step_by(2) {
@@ -573,7 +593,10 @@ fn the_reading_order_of_design_is_the_module_map_of_lib_rs() {
             in_design.push(name.to_owned());
         }
     }
-    assert_eq!(in_design, declared, "DESIGN.md's reading order (section 3) and the module map in src/lib.rs");
+    assert_eq!(
+        in_design, declared,
+        "the reading order of {DESIGN_DIR}architecture.md and the module map in src/lib.rs"
+    );
 }
 
 #[test]
@@ -591,8 +614,8 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 // ---------------------------------------------------------------------------------------------------------
 // Vocabulary
 
-/// The text files that explain the code: the guides, the lab notebook (its front page, register, index and note on the
-/// terms changed, and its entries), and the comments.
+/// The text files that explain the code: the guides (DESIGN.md with the files of the design), the lab notebook (its
+/// front page, register, index and note on the terms changed, and its entries), and the comments.
 fn prose_files() -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = vec![
         crate_dir().join("README.md"),
@@ -603,6 +626,7 @@ fn prose_files() -> Vec<PathBuf> {
         repo_dir().join(TERMS_CHANGED),
         repo_dir().join("solver/docs/STATUS.md"),
     ];
+    files.extend(files_with_extensions(&design_dir(), &["md"]));
     files.extend(register_files());
     files.extend(entry_files());
     files.extend(files_with_extensions(&crate_dir().join("src"), &["rs"]));
@@ -705,9 +729,9 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("one-level", "one frame forward"),
 ];
 
-/// Retired in the README, DESIGN.md and the code's comments, which name the numbers by their part in the frame model,
-/// and in the docs rewritten to docs/WRITING.md (`REWRITTEN`) but those that speak of the whole game
-/// (`SPEAK_OF_THE_WHOLE_GAME`).
+/// Retired in the README, DESIGN.md with the files of the design, and the code's comments, which name the numbers by
+/// their part in the frame model, and in the docs rewritten to docs/WRITING.md (`REWRITTEN`) but those that speak of
+/// the whole game (`SPEAK_OF_THE_WHOLE_GAME`).
 const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sources"), retired("lower half", "factors")];
 
 /// The docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of docs/GLOSSARY.md
@@ -723,6 +747,7 @@ const REWRITTEN: &[&str] = &[
     "solver/frame/testdata/fits/README.md",
     "solver/docs/REFERENCE.md",
     "solver/docs/DESIGN.md",
+    DESIGN_DIR,
     "solver/docs/AGENDA.md",
     "solver/docs/RUNBOOK.md",
     "solver/docs/runbook/",
@@ -820,6 +845,7 @@ fn names_numbers_by_frame(shown: &str) -> bool {
     shown.starts_with("solver/frame/src/")
         || shown == "solver/frame/README.md"
         || shown == "solver/docs/DESIGN.md"
+        || shown.starts_with(DESIGN_DIR)
         || (is_rewritten(shown) && !SPEAK_OF_THE_WHOLE_GAME.contains(&shown))
 }
 
@@ -1261,16 +1287,16 @@ fn quick_check_limit(name: &str) -> f64 {
     line.split_whitespace().next().and_then(|value| value.parse().ok()).expect("a number")
 }
 
-/// The quick check (`solver/tools/quick_check.py`) passes its own tests, and DESIGN.md states its limits and the
-/// thresholds of its wait for a quiet machine as the script has them, so that the number in the one is the number in
-/// the other.
+/// The quick check (`solver/tools/quick_check.py`) passes its own tests, and the design's `testing.md` states its
+/// limits and the thresholds of its wait for a quiet machine as the script has them, so that the number in the one is
+/// the number in the other.
 #[test]
 fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
     let tests = repo_dir().join("solver/tools/test_quick_check.py");
     let run = std::process::Command::new("python3").arg("-I").arg(tests).output().expect("python3 runs the tests");
     assert!(run.status.success(), "{}{}", String::from_utf8_lossy(&run.stdout), String::from_utf8_lossy(&run.stderr));
 
-    let design = read(design_md()).replace('\n', " ");
+    let testing = design_file("testing.md").replace('\n', " ");
     let (target, limit, cpu) =
         (quick_check_limit("TOTAL_TARGET"), quick_check_limit("TOTAL_LIMIT"), quick_check_limit("TEST_LIMIT"));
     let (busy, wait) = ((quick_check_limit("BUSY_LIMIT") * 100.0).round(), quick_check_limit("BUSY_WAIT") / 60.0);
@@ -1280,7 +1306,10 @@ fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
         format!("more than {busy}% of the CPUs"),
         format!("After {wait} minutes it fails with \"machine busy\""),
     ] {
-        assert!(design.contains(&stated), "DESIGN.md, section 9, does not say {stated:?}: the script's limits changed");
+        assert!(
+            testing.contains(&stated),
+            "{DESIGN_DIR}testing.md does not say {stated:?}: the script's limits changed"
+        );
     }
 }
 
@@ -1302,9 +1331,6 @@ const LONGEST_QUOTED_HEADING: usize = 100;
 /// The fewest citations by name that the check must find in the repository (it found 107 on 2026-10-20): fewer means
 /// that a pattern broke, not that the citations went away.
 const FEWEST_BY_NAME: usize = 90;
-
-/// The fewest citations by number that the check must find (it found 76 on 2026-10-20).
-const FEWEST_BY_NUMBER: usize = 40;
 
 /// How a text writes the name of a document.
 #[derive(Debug, PartialEq)]
@@ -1677,11 +1703,11 @@ fn citing_files() -> Vec<PathBuf> {
     files
 }
 
-/// What the check found in the files: how many citations by name and by number, and what is wrong.
+/// What the check found in the files: how many citations by name, and what is wrong.  Citations by number have no
+/// floor: rule 8's splits remove them on purpose, and the unit tests below check that the pattern still finds them.
 #[derive(Default)]
 struct Found {
     by_name: usize,
-    by_number: usize,
     problems: Vec<String>,
 }
 
@@ -1692,9 +1718,8 @@ fn check_citations(docs: &mut DocSet, file: &Path, found: &mut Found) {
     let extension = file.extension().and_then(|ext| ext.to_str());
     let at = |line: usize, problem: String| format!("{}:{line}: {problem}", from_repo(file));
     for citation in citations(extension, &text) {
-        match citation.cited {
-            Cited::Heading(_) => found.by_name += 1,
-            Cited::Sections(_) => found.by_number += 1,
+        if matches!(citation.cited, Cited::Heading(_)) {
+            found.by_name += 1;
         }
         found.problems.extend(docs.citation_problem(file, &citation).map(|problem| at(citation.line, problem)));
     }
@@ -1718,9 +1743,8 @@ fn every_heading_cited_by_name_or_number_exists_and_so_does_every_anchor_cited_i
         check_citations(&mut docs, &file, &mut found);
     }
     assert!(found.problems.is_empty(), "broken citations of headings:\n{}", found.problems.join("\n"));
-    let Found { by_name, by_number, .. } = found;
+    let by_name = found.by_name;
     assert!(by_name >= FEWEST_BY_NAME, "the check found only {by_name} citations by name: has their syntax changed?");
-    assert!(by_number >= FEWEST_BY_NUMBER, "the check found only {by_number} citations by number: has it changed?");
 }
 
 /// The citations of `text` as short lines: the line, the document, and the heading in quotes or the sections after `§`.
@@ -1866,17 +1890,12 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 
 /// The documents that rule 8 of docs/WRITING.md would have split and that are still whole, by their paths from the
 /// repository.  A document leaves the list when it is split, and its old file, now an index, joins `INDEXES`.
-const STILL_TO_SPLIT: &[&str] = &[
-    "solver/docs/DESIGN.md",
-    "docs/THEORY.md",
-    "solver/noframe/README.md",
-    "solver/docs/AGENDA.md",
-    "results/README.md",
-];
+const STILL_TO_SPLIT: &[&str] =
+    &["docs/THEORY.md", "solver/noframe/README.md", "solver/docs/AGENDA.md", "results/README.md"];
 
 /// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
 /// file, and stays under the index limit.
-const INDEXES: &[&str] = &["solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
+const INDEXES: &[&str] = &["solver/docs/DESIGN.md", "solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
 fn word_count(text: &str) -> usize {

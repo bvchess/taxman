@@ -1,0 +1,54 @@
+# Tactics
+
+Part of the [design](../DESIGN.md).
+
+A *tactic* is a switchable piece of the search: each row below is one, in `tactics::Tactics`, set from the command line
+with `--tactic name=value`.  Every tactic is *proven* (a theorem, given a premise) or *sound* (it never prunes a
+promotable optimal set), so switching one off changes how fast an answer comes, never the answer.  The values are `on`
+or `off`, but for `match_refine` (`0` to `7`), `nogood_period` and `nogood_limit` (whole numbers), `nogood_keep` (a
+policy), and the tactics that tune the GF(2) search, `force_window` to `more_forced`, which their rows give.  The
+tactics that act inside the search are the fields of `search::SearchTactics`, and `examples/ladder.rs` takes the same
+names for them.  A checkpoint records the search tactics in its header ([Engine](engine.md#engine)), but for the three
+that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the tactics of
+`tactics::Tactics`, in order, with their defaults.
+
+| tactic | default | status | effect |
+|---|---|---|---|
+| `prime_shortcut` | on | proven (given an optimal game of n − 1: the proof is at `accelerate::prime_shortcut`) | a prime n plays the game of n − 1 with its first move replaced by n |
+| `same_search` | on | proven (given the proof of the earlier game: [same-search.md](same-search.md)) | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`) |
+| `match_refine` | 1 | sound (see `search::refine::Refiner`) | where the matching bound does not prune, refine it by branching on conflicts this many levels deep (0 = off, at most 7); no effect with `gf2`, which does not use the matching bound |
+| `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced members, and the node's loop ends after that child |
+| `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root, and use the table at every node: for the conflict to branch on and refine with, and to rule candidates out of children |
+| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each `nogood_period` of its steps, or keeps some (`nogood_keep`); off: never |
+| `nogood_period` | 50000 | sound (the table is a cache) | with `nogoods` and `forget_nogoods`, the steps of a searcher between its forgettings (a whole number from 1); a research knob, with the next two ([search.md](search.md#forced-members-and-nogoods), the item "Forgetting nogoods") |
+| `nogood_keep` | none | sound (the table is a cache) | what a forgetting keeps: `none` (nothing), `hit` (the nogoods used since the last forgetting), `sizeN` (those of at most N members), `topN` (the N most used since the last forgetting, of those used at all) |
+| `nogood_limit` | 0 | sound (the table is a cache) | with `nogoods`, a searcher's table holds at most this many nogoods, the least recently used dropped to make room for a new one (0: no limit) |
+| `lagrange` | off | proven (weak duality, for any multipliers over valid nogoods; `matchbound::lagrange`) | with `nogoods`, where the node bound leaves a node open, bound it also by a Lagrangian relaxation of the searcher's nogoods kept along its path, over the matching bound, and (with `fix_forced`) force the members without which that bound would cut; the multipliers are refitted at the root as the searcher learns ([search.md](search.md)); with `gf2` it changes no tree and costs 2 to 4% |
+| `gf2` | on | proven (docs/THEORY.md, Theorem 11; weak duality for the forced members) | bound every node by the GF(2) bound ([search.md](search.md)) instead of the matching bound and its refinement, branch on the conflicts of its heaviest set by exact strong branching, and (with `fix_forced`) force the members without which it would cut; the Lagrangian bound over the nogoods, if on, applies after it |
+| `symmetry` | on | proven (docs/THEORY.md, Theorem 13) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds ([Prime exchanges](gf2-bound.md#prime-exchanges)) |
+| `force_window` | all | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `gf2` and `fix_forced`, which members of a node's heaviest set that the weight split leaves free the exchange graph searches for being forced: those whose split bound is less than this far above the need (`80`; `0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members, for a smaller tree, at the cost of more searches ([search.md, "Forced members and nogoods"](search.md#forced-members-and-nogoods), has the measurements of `all` against `80`) |
+| `branching` | exact | sound (every completion leaves out some member of the conflict) | with `gf2`, how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
+| `strong_limit` | all | sound (as `branching`) | with `gf2`'s strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
+| `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
+| `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
+| `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
+| `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum (the Java's `FrameSolver.getMaxPromotionSum`) |
+| `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of the game of n − 1 that are still promotable |
+
+**The frame model's own rules are not tactics.**  They define the search space, and cannot be switched off inside the
+model: the greedy removal of impossible sources inside frames (the Java's `Hive.removeImpossible`); the mandatory moves
+(its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set by `Hive.finishSetup`); closed frames
+taking no part in the search; and a promoted number paying tax only from the frame one forward.  [frame-model.md, “What
+"optimal" means”](frame-model.md#what-optimal-means) says what is proven of them, and what remains: statement U.
+
+**Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from
+the defaults (such as `lagrange=on,gf2=off`), and `tactic_switches`, every tactic's value.  A line of a build before
+`gf2` has no such key, and ran the matching path.  A checkpoint records the search tactics, and is refused when they
+differ: the error names each tactic that differs, and the `--tactic` flags that resume it.
+
+*The tactics removed.*  The [notebook](../../notebook/README.md) has what each tactic was worth and the order they were
+found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's
+promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that
+the heaviest promotion set also has the most members, which is false at n = 833); and the tactics that lost, the
+Java's `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
+([which tactics earn their keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).

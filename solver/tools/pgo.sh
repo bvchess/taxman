@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Profile-guided build of the solver: an instrumented build runs a training workload, and the profile it records
-# steers the optimized build: the same answers and trees, and 0-2% fewer cycles than the plain release build on
-# the searches at the end of the chain since the hot loop is inlined by hand (12% before; DESIGN.md, "Performance").
+# Profile-guided build of the solver: an instrumented build runs a training workload, and the profile it records steers
+# the optimized build: the same answers and trees, and 0-2% fewer cycles than the plain release build on the searches at
+# the end of the chain since the hot loop is inlined by hand (12% before; solver/docs/design/performance.md).
 #
 #   solver/tools/pgo.sh [--no-train]
 #

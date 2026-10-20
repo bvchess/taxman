@@ -14,7 +14,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
 
 * **Writing.**  Docs follow docs/WRITING.md.
 * **Keep the quick check quick.**  Every change passes `solver/tools/quick_check.py`, which fails on a slow test or a
-  slow suite; how to keep a test inside its limits is in solver/docs/DESIGN.md, section 9.
+  slow suite; how to keep a test inside its limits is in solver/docs/design/testing.md.
 
 ## Where things are
 

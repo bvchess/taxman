@@ -85,9 +85,10 @@ TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored stress
 TXENGINE_CONSERVATION=500 cargo test --release --test robustness conservation
 ```
 
-* **The suite** takes about 30 s after compiling, with two or four test threads ([DESIGN.md, section
-  9](../DESIGN.md#9-testing)).  It includes the node-count tripwires (`tests/tripwires.rs`), which assert exact trees on
-  one thread, and so check the arithmetic and the search against a different CPU and compiler.
+* **The suite** takes about 30 s after compiling, with two or four test threads
+  ([solver/docs/design/testing.md](../design/testing.md)).  It includes the node-count tripwires (`tests/tripwires.rs`),
+  which assert exact trees on one thread, and so check the arithmetic and the search against a different CPU and
+  compiler.
 * **`many_threads`** runs the engine on a toy problem at 64 and at 192 workers: answers, splitting, checkpoints every 2
   ms, spilling, a panicking worker.  `--nocapture` prints each run's counters (`eff`, `splits`, `full`), the first look
   at 192 threads.

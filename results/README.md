@@ -256,8 +256,8 @@ the first.
 ## What supports the scores
 
 "Optimal" here means optimal within the frame model, given that the solver is right.  That is opt(n) wherever statement
-U holds ([DESIGN.md](../solver/docs/DESIGN.md#what-optimal-means)), and ["The files"](#the-files), above, says how far
-each kind of proof reaches.
+U holds ([DESIGN.md](../solver/docs/design/frame-model.md#what-optimal-means)), and ["The files"](#the-files), above,
+says how far each kind of proof reaches.
 
 Two verifiers check the files.  From the top of the repository:
 
@@ -274,8 +274,8 @@ Both do the same checks:
 * they check the arithmetic of each line and the predecessor it names, and that the files agree;
 * they derive each line's proof kind, and what it assumes, by the rules in `src/results.rs`.
 
-Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 s on the laptop.  [DESIGN.md, section
-8](../solver/docs/DESIGN.md#8-results-and-the-trust-model) defines the proof kinds and the assumptions.
+Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 s on the laptop.
+[solver/docs/design/trust.md](../solver/docs/design/trust.md) defines the proof kinds and the assumptions.
 
 What that evidence amounts to:
 
@@ -487,10 +487,11 @@ boards"](../docs/THEORY.md#the-ledger-bounds-between-boards)).
   itself;
 * a repeat adds its own game.
 
-U is certified for every n up to 2175 ([DESIGN.md, “What "optimal"
-means”](../solver/docs/DESIGN.md#what-optimal-means)), so a bound whose list holds only games up to 2175 rests on no
-open statement.  A proven game is opt(n) wherever U holds at the games of the `rests_on` of its upper bound.  A results
-line that rests on a proven game assumes that, one statement a game (`"statement U holds at n=4501"`), in its `assumes`.
+U is certified for every n up to 2175 ([solver/docs/design/frame-model.md, “What "optimal"
+means”](../solver/docs/design/frame-model.md#what-optimal-means)), so a bound whose list holds only games up to 2175
+rests on no open statement.  A proven game is opt(n) wherever U holds at the games of the `rests_on` of its upper bound.
+A results line that rests on a proven game assumes that, one statement a game (`"statement U holds at n=4501"`), in its
+`assumes`.
 
 **Two verifiers**, as the results files have:
 
@@ -529,8 +530,9 @@ bound about 150 and 220 bytes.  That is of the order of 3 kilobytes a game in a 
 
 ## certificates
 
-`certificates/` holds the committed certificates of U that `taxman certify` made ([DESIGN.md, "Certificates of
-U"](../solver/docs/DESIGN.md#certificates-of-u) says what a certificate is and what it proves).
+`certificates/` holds the committed certificates of U that `taxman certify` made
+([solver/docs/design/certificates.md](../solver/docs/design/certificates.md) says what a certificate is and what it
+proves).
 
 `certificates_600_1300.jsonl` has a certificate for each of the 377 games of 600..1300 that need one: 296 certified by
 a search, and 81 by posing the same problem as an earlier game.  `taxman verify-certificates` passes it, in 4.6 s.  It

@@ -29,7 +29,8 @@ optimal game 3, 4: the taxman takes 1, then 2, and the player scores 7.  The val
 The solver's results are optimal games, each a sequence of moves with its score.  The file `results/strict.jsonl` holds
 a chain of them for every n from 1 to its end, each built from the one before (section 3, "A chain from n = 1"); this
 page calls it the *committed chain*.  The code can attempt any n up to 8191, the largest board that its bitsets of game
-numbers can hold ([DESIGN.md, section 3](../docs/DESIGN.md#3-architecture), "Width dispatch").
+numbers can hold ([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width
+dispatch").
 
 [results/README.md](../../results/README.md) gives how far the chain reaches and how each game is proven: within the
 frame model, given statement U (below, "What optimal means"), and up to a smaller n also on the whole board, by the
@@ -82,7 +83,8 @@ to its glossary entry.
    its [promotion set](../../docs/GLOSSARY.md#the-frame-model).  So the solver searches for the promotion set with the
    largest sum, [P\*](../../docs/GLOSSARY.md#the-frame-model), by a branch and bound over which
    [candidates](../../docs/GLOSSARY.md#the-frame-model) to promote.  The moves of the game then include the promotions
-   (`frames::BoardFrames`; [DESIGN.md, section 7](../docs/DESIGN.md#7-per-game-pipeline-solver)).
+   (`frames::BoardFrames`; [solver/docs/design/engine.md, "Per-game pipeline
+   (`solver`)"](../docs/design/engine.md#per-game-pipeline-solver)).
 
 **An example: game 21.**  The board 1 to 21 has four frames.  `testdata/golden/n0021.json` has them, and the wiki's
 [walkthrough of game 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows them in pictures:
@@ -133,12 +135,13 @@ n − 1 is optimal.
   n, and `taxman certify` ([the reference, section 2](../docs/REFERENCE.md#2-the-other-commands)) checks it game by
   game; a proof by the ceiling or by the prime formula uses no model ([the reference, section
   4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).  The results lines do not record U.
-  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and [DESIGN.md, “What
-  "optimal" means”](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the model.
+  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and
+  [solver/docs/design/frame-model.md, “What "optimal" means”](../docs/design/frame-model.md#what-optimal-means) says
+  what each kind needs of the model.
 * **The pruning is exact.**  No [tactic](../../docs/GLOSSARY.md#the-search) prunes a promotion set that could win: each
-  is proven or sound, and [DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) grades them.  So a result rests on nothing
-  but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so, the game it
-  was built from.
+  is proven or sound, and [solver/docs/design/tactics.md](../docs/design/tactics.md) grades them.  So a result rests on
+  nothing but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so, the
+  game it was built from.
 * **The game of n − 1 is optimal, where a proof rests on it.**  The game of n is built from the game of n − 1: its
   search starts from that game's promotions and stops at the [ceiling](../../docs/GLOSSARY.md#the-game).  So a
   [chain](../../docs/GLOSSARY.md#results-and-trust) of games from n = 1 is proven game by game.  [The reference, section
@@ -172,10 +175,11 @@ rebuild, which cargo does by itself when the file has changed.
 
 *Details.*  The study tools, the examples `tune`, `extended`, `structure` and `wall`, are behind the feature `studies`,
 which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
-that names one (`cargo build --release --example wall`) needs `--features studies` too.  The build is long for a
-program of this size because the search is compiled once for every set width ([DESIGN.md, section
-3](../docs/DESIGN.md#3-architecture), "Width dispatch").  `taxman bench` finds its two files in the repository: above
-the working directory and, if they are not there, above the binary.
+that names one (`cargo build --release --example wall`) needs `--features studies` too.  The build is long for a program
+of this size because the search is compiled once for every set width
+([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width dispatch").  `taxman
+bench` finds its two
+files in the repository: above the working directory and, if they are not there, above the binary.
 
 *Build options.*  The release profile uses fat LTO and `panic = "abort"`.  The `test` profile is optimised
 (`opt-level = 2`) because the tests replay real games.  A build is generic for its target architecture, so its binary
@@ -183,8 +187,8 @@ runs on any machine of that architecture.  Tuning for the build machine's CPU is
 only that binary: `RUSTFLAGS="-C target-cpu=native" cargo build --release`, as the cloud scripts do
 ([RUNBOOK](../docs/RUNBOOK.md)).  It gains nothing on the Apple M1, where it was measured, and is unmeasured elsewhere;
 the generic x86-64 target has no hardware popcount, so measure there.  `solver/tools/pgo.sh` makes a profile-guided
-build in `target/pgo/release`, with 0 to 2% fewer cycles on the M1 and the same answers and trees.  Its header says
-how, and [DESIGN.md, section 10](../docs/DESIGN.md#10-performance) what it gains.  The probe, `examples/perf.rs`,
+build in `target/pgo/release`, with 0 to 2% fewer cycles on the M1 and the same answers and trees.  Its header says how,
+and [solver/docs/design/performance.md](../docs/design/performance.md) what it gains.  The probe, `examples/perf.rs`,
 measures the hot paths.
 
 ### A first run: the games 1 to 22
@@ -261,9 +265,9 @@ cargo test --release                 # the full suite
 ```
 
 The tests run as many threads as the machine has CPUs.  None of these builds the study tools; `--features studies` adds
-them and their tests.  [DESIGN.md, section 9](../docs/DESIGN.md#9-testing) says what the suite checks, what each test
-takes and when each runs.  `tests/tripwires.rs` asserts exact node counts, so a change that alters the search tree on
-purpose fails it; DESIGN.md says how to update the counts.
+them and their tests.  [solver/docs/design/testing.md](../docs/design/testing.md) says what the suite checks, what each
+test takes and when each runs.  `tests/tripwires.rs` asserts exact node counts, so a change that alters the search tree
+on purpose fails it; DESIGN.md says how to update the counts.
 
 The ignored tests are for large machines and long runs:
 
@@ -277,8 +281,8 @@ The ignored tests are for large machines and long runs:
 
 `taxman help` lists every command and flag.  This section shows each command with sample output.  A
 [tactic](../../docs/GLOSSARY.md#the-search) is set with `--tactic NAME=VALUE`, which is repeatable; `taxman help` and
-[DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) give the names, values and defaults, and switching one never changes
-the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
+[solver/docs/design/tactics.md](../docs/design/tactics.md) give the names, values and defaults, and switching one never
+changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
 
 ### Solve one game
 
@@ -418,8 +422,8 @@ While the searches run, the threads move between them, to the oldest game that k
 
 Games are still concluded, checked and recorded in order.  Every line has the score, proof, repeat and assumptions that
 a range solved one game after another gives it.  The moves may be another optimal set, and the nodes and times differ
-([DESIGN.md, "The window: games in flight"](../docs/DESIGN.md#the-window-games-in-flight) and "What a window changes in
-the results").
+([solver/docs/design/engine.md, "The window: games in flight"](../docs/design/engine.md#the-window-games-in-flight) and
+"What a window changes in the results").
 
 The default window is 4, the best measured on 64 threads, and what `solver/tools/cloud/chain.sh` runs with.  With one
 thread the window is always 1, one game after another.
@@ -469,7 +473,7 @@ them.
   not while it waits behind another.  Every search in flight stops with a final checkpoint, and nothing is recorded for
   that game, not even an incomplete line.  `solve` prints `wall at N after H hours` and exits with the status 4.  The
   game's clock is kept beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
-  ([DESIGN.md](../docs/DESIGN.md#the-window-games-in-flight)).
+  ([DESIGN.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  A searcher's state is bounded.  The shared queue of work units spills to `DIR/spill` beyond `--mem-cap`
@@ -531,7 +535,7 @@ $ cargo run --release --example ledger -- report DIR --known FILE
 
 The module comment of `examples/ledger/main.rs` has the flags and the files.  What the ledger finds is kept in the
 bounds store, `results/bounds.jsonl` (`ledger export`; `run --bounds` starts from it), which has two verifiers of its
-own ([results/README.md](../../results/README.md#boundsjsonl)) and which `taxman solve --use-prev` draws on too
-("Known games", above).  The ledger's files are its own, not results lines ([DESIGN.md, "The
-ledger"](../docs/DESIGN.md#the-ledger); the experiment: [the
+own ([results/README.md](../../results/README.md#boundsjsonl)) and which `taxman solve --use-prev` draws on too ("Known
+games", above).  The ledger's files are its own, not results lines ([solver/docs/design/trust.md, "The
+ledger"](../docs/design/trust.md#the-ledger); the experiment: [the
 ledger](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)).

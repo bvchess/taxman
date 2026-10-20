@@ -1,8 +1,8 @@
 //! The tactics that act inside the search ([`SearchTactics`]), and how a checkpoint records them.
 //!
 //! [`crate::tactics::Tactics`] holds every tactic of the solver by name; these are the ones a search and its
-//! checkpoints depend on.  Each is graded in `DESIGN.md`, section 5 (Tactics); the field docs say what each does
-//! and why it is sound.
+//! checkpoints depend on.  Each is graded in `solver/docs/design/tactics.md` (Tactics); the field docs say what each
+//! does and why it is sound.
 
 use super::NOGOOD_PERIOD;
 use crate::model::Keep;
@@ -10,7 +10,7 @@ use crate::model::Keep;
 pub use crate::gf2::ForceWindow;
 use crate::gf2::LEGACY_FORCE_WINDOW;
 
-/// The tactics of DESIGN.md, section 5, that act inside the search.
+/// The tactics of solver/docs/design/tactics.md, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
     /// Refine the matching bound by the branches of its conflict, this many levels deep, where it does not

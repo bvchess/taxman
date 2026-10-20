@@ -4,7 +4,8 @@
 as the setup forms them, the numbered and merged frames, the candidates, the reduced frame set, the greedy incumbent,
 the prime shortcut and the result of the solve.  There are 318 files, for the games 1 to 760, and
 [`../golden_wide`](../golden_wide) holds the structure alone of eleven wider games, 511 to 2048.  The tests
-`tests/golden_frames.rs` and `tests/solver.rs` read them; DESIGN.md, section 9 ("Golden tests"), says what they check.
+`tests/golden_frames.rs` and `tests/solver.rs` read them; the item "Golden tests" of [the design's catalogue of
+tests](../../../docs/design/testing.md#the-tests) says what they check.
 
 The files are the Java's answers, and nothing makes them again.  The exporter `tools/golden` made them (`export.sh`,
 and the Java classes `GoldenExport`, `GameProbe` and the others beside it).  Neither the exporter nor the Java program

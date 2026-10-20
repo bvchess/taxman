@@ -11,8 +11,8 @@ Why that matters: the frame solver ([its README](../frame/README.md)) searches t
 answer is opt(n) exactly when [statement U](../../docs/GLOSSARY.md#the-frame-model) holds at n: some optimal game plays
 every source with three or more prime factors that setup keeps ([THEORY.md, "The frame model: what is proven and what
 remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's other rules are
-proven; [DESIGN.md, section 2](../docs/DESIGN.md#what-optimal-means)).  Where the prover proves opt(n), U holds.  The
-sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
+proven; [solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Where the prover proves opt(n), U holds.
+The sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
 wherever THEORY.md's conjecture (★) holds (Theorem 8; [THEORY.md](../../docs/THEORY.md#the-open-problem)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
@@ -80,7 +80,7 @@ Before the prover, this was the state of the evidence.
   The scripts and data of the (★) campaign and of the census were never committed, only their numbers, in THEORY.md
   and the commit messages of e04f7c4, 20822ea and 43936d3.  So that evidence could not be reproduced; this crate's
   checks can.
-* **The frame model** ([DESIGN.md, section 2](../docs/DESIGN.md#what-optimal-means)).  Its assumptions (the greedy
+* **The frame model** ([solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Its assumptions (the greedy
   removal of impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
   promotions one frame forward) were validated end to end:
   * the solver reproduces the Java's optimal.json to 1000, which the same model made, so not independently;
@@ -370,10 +370,10 @@ of those members every set beating the recorded score V must play.
 * The members it does not certify are *open*, with the bound's margin over V.
 
 Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula, whose
-lines say `"needs":1`.  Certified members can be fixed in a search that leaves the open ones optional, the
-integrated search of the theory track, which the certificates of U carry out ([DESIGN.md, "Certificates of
-U"](../docs/DESIGN.md#certificates-of-u)).  That is why the files
-are kept: U\* less a game's open members is that search's fixed set.
+lines say `"needs":1`.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
+search of the theory track, which the certificates of U carry out
+([solver/docs/design/certificates.md](../docs/design/certificates.md)).  That is why the files are kept: U\* less a
+game's open members is that search's fixed set.
 
 The tests check the certificates against every playable set that obeys Theorem B, on boards to 60 (1,403 checks):
 
@@ -806,7 +806,7 @@ entry](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-
   U, by an exhausted search or a repeat, have it uncertified.  The barred parity bounds certify about 85% of those
   sources per game on 2176–3314 and 80% on 3315–3440, but close no game alone ([section
   3](#the-upper-part-game-by-game)).  The rest needs a search that leaves the open sources optional: the certificates of
-  U ([DESIGN.md, "Certificates of U"](../docs/DESIGN.md#certificates-of-u)), which superseded the measurement E6 of
+  U ([solver/docs/design/certificates.md](../docs/design/certificates.md)), which superseded the measurement E6 of
   section 7.
 * **Whether every optimal game's upper part is U\*.**  Theorem 8 settles the sources' instance alone.  For the whole
   game, a frontier argument would start from an optimal set S whose upper part S_U is not U\*.  Termwise domination

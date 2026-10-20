@@ -1,5 +1,5 @@
-//! The tactic `same_search`: a game whose search problem an earlier game of the chain already settled is concluded
-//! with that game's promotions, with no search (method `repeat`, proof `same_search`; DESIGN.md, "Same search").
+//! The tactic `same_search`: a game whose search problem an earlier game of the chain already settled is concluded with
+//! that game's promotions, with no search (method `repeat`, proof `same_search`; solver/docs/design/same-search.md).
 //!
 //! The games that repeat an earlier search are found here from the setups alone ([`repeats_by_problem`]), and a
 //! chain must conclude exactly those without a search, with the scores of a chain that searches them: from n = 1, and

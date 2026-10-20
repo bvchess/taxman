@@ -49,7 +49,7 @@ Each job's file names the instance that suits it; this page says why.
   `BIOS Model name: AWS Graviton4`.  Nobody has measured the gain of `native` on Graviton; expect 0 to 3 % (on the M1 it
   measured 0 %).
 * **Profile-guided optimization** (PGO) is optional.  `solver/tools/pgo.sh` makes the build (its header says how); on
-  the M1 it adds 0 to 2 % ([DESIGN.md](../DESIGN.md#10-performance)).  PGO changes code generation only, so the search
+  the M1 it adds 0 to 2 % ([DESIGN.md](../design/performance.md)).  PGO changes code generation only, so the search
   and its answers stay the same, and either binary can resume a checkpoint.  `TAXMAN_BIN` and `LADDER_BIN` point the
   scripts at another binary.  Keep a non-PGO build too if you want to profile.
 

@@ -1,6 +1,6 @@
 //! The branch-and-bound search for the promotion set with the largest sum, run on the parallel [`engine`].
 //!
-//! `DESIGN.md`, section 4 ("The search"), explains the algorithm: nodes, steps and units, the GF(2) bound (the
+//! `solver/docs/design/search.md`, explains the algorithm: nodes, steps and units, the GF(2) bound (the
 //! default) and the matching bound, conflicts, forced members and nogoods, the pseudocode of "The default step", and
 //! why the search is exact.  The
 //! docs here say where each piece of it is, and carry the arguments next to the code they justify.
@@ -15,7 +15,7 @@
 //! # The default step in the code
 //!
 //! [`TaxSearcher`] runs each unit as a loop of steps on its own stack of nodes.  A step (`searcher::Stepper::step`)
-//! has four phases, which take the steps of DESIGN.md's "The default step" in order:
+//! has four phases, which take the steps of solver/docs/design/search.md's "The default step" in order:
 //!
 //! * `check_node` (steps 1 and 2): does the node's loop go on?  The sum of its `max_add` largest candidates, then
 //!   the node's bound check, or the verdict the node's check left when it was made as a child, if `need` is the

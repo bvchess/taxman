@@ -365,8 +365,8 @@ fn the_tactics_of_extended_mode_are_the_default_without_the_symmetry_rule() {
     assert!(tactics("default").refusal_with_one_sided().is_some_and(|why| why.contains("symmetry=on")));
 }
 
-/// DESIGN.md, section 4: deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for the
-/// search.
+/// solver/docs/design/search.md: deterministic on one thread (nogoods, forgetting and all); nothing else asserts it for
+/// the search.
 #[test]
 #[cfg_attr(
     debug_assertions,
