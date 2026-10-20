@@ -148,39 +148,26 @@ complete list of the optimal sets of n − 1, not by one of them
 ## The Java solver and the frame solver
 
 The frame solver uses the Java solver's strategy, which the [wiki](https://github.com/bvchess/taxman/wiki) describes:
-split the game into frames of Taxman Mini, and search for the best promotion set.  The Java is research code, three
-generations of the same frame idea layered on each other.  So the frame solver reimplements the *algorithm*, designed
-for clarity and speed, instead of translating the classes.
+split the game into frames of Taxman Mini, and search for the best promotion set.
 
 What must match the Java is the *results*.  The setup (frames, candidates, the greedy incumbent) defines the search
 space, and it reproduces the Java's values exactly; the Java's golden data in `testdata/golden/` is the check.  Every
 final score equals optimal.json's.
 
-The search is the frame solver's own.  It started as the Java's loop: its `blameGame` bound, its depth-2 preclusion
-table, the promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was
-replaced by something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
+The search is the frame solver's own.  It started as the Java's loop: its bound, its depth-2 preclusion table, the
+promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was replaced by
+something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
 keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md) has the last measurements of what was removed.
-Not ported: `oldsearch/` (the 2021 disk-queue search), `frame.GreedySolver`, `util.Memo`, `WorkingFrame.fancyFit/fits`,
-the picklers and the compressor.
 
-The Java's and the wiki's words map onto this document's:
+The wiki's words map onto this document's:
 
-| the Java or the wiki | here |
+| the wiki | here |
 |---|---|
-| `Hive` | a frame during setup, before or after the frames of one number are merged (`frames::Frame`) |
-| `Apiary` | all the frames of a board in playing order (`frames::BoardFrames`) |
-| `FrameBuilder`'s levels | the frame numbers |
-| `WorkingFrame`, `search.Frame` | a frame as the search takes it (`model::Frame`) |
-| `freeFactorCount` | the freedoms |
-| `downstream`, `upstream` | in front of, behind |
-| `fits` | promotable |
-| `getMaxPromotionSum` | the ceiling as a promotion sum |
-| `isWinnable`, `inTheBag`, `maxTotalPromotions`, `promotionCandidates`, `mandatoryMoves` | used as they are |
-| the wiki's *selection* | a move |
-| the wiki's *front* and *back* | the same |
-| the wiki's upper bound N + opt(N − 1) | the ceiling |
+| *selection* | a move |
+| *front* and *back* | the same |
+| the upper bound N + opt(N − 1) | the ceiling |
 
-The port found one defect in the Java's bound: it can be too low.  Its `UpperBoundEstimator.getRunnerUp` replaces the
+The port found one defect in the Java's bound: it can be too low.  Its runner-up replaces the
 failing number with the next candidate below the smallest bid member, but a skipped candidate from the failing number's
 frame can be larger.  At the root of n = 114, the Java's bound is 358 against the best completion's 360 ([the
 story](../../notebook/the-port-and-its-first-improvements/README.md)).

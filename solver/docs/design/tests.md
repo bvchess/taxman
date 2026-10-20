@@ -6,7 +6,7 @@ What the full suite checks, by subject.  A few tests sample what an exhaustive r
 for the peeling agreement, every sixth game above 511 for the root promotability of the frame builder's candidates,
 every second line of the Java fixtures), and the comment on each says what the whole run costs.
 
-* **Unit tests**, per module, include the Java tests' cases (`FactorTableTest`, `FrameTest`, `FrameSetTest` for
+* **Unit tests**, per module, include the Java's unit tests' cases (of the factor table, frames, and frame sets, for
   n = 85).  The helpers that the unit and integration tests share (temporary directories, a random generator) are one
   file, `tests/common/support.rs`.
 * **Golden tests** (`tests/golden_frames.rs`, and unit tests in `src/search/tests.rs` and `src/bounds.rs`) check every

@@ -63,17 +63,17 @@ the design in outline.
 Each game goes through six steps, from its board's tables to its line in the results file.  The shortcuts of steps
 1a and 2, and the repeat in step 4, conclude a game without a search when another game already gives its answer.
 `solver::solve_game` runs the steps for one game and `solve_range` for a range; the module comment of `src/solver.rs`
-has the exact steps and checks.  Each step, with the Java class it reimplements:
+has the exact steps and checks.  The steps:
 
-| step | what | Java |
-|---|---|---|
-| 1 | the board's tables, and the set width | `FactorTable` |
-| 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known games](trust.md#known-games)) | |
-| 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) | `FrameSolver.solutionForPrime` |
-| 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) | `bombus.Apiary`, `Hive`, `frame.FrameBuilder`, `WorkingFrame` |
-| 4 | the search (method `search`): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
-| 5 | `conclude`: replay and check the game, confirm its score against `optimal.json`, assign its proof and what it assumes | `game.Solution.verify` |
-| 6 | record the result (a range) | |
+| step | what |
+|---|---|
+| 1 | the board's tables, and the set width |
+| 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known games](trust.md#known-games)) |
+| 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) |
+| 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
+| 4 | the search (method `search`): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
+| 5 | `conclude`: replay and check the game, confirm its score against `optimal.json`, assign its proof and what it assumes |
+| 6 | record the result (a range) |
 
 The steps again, with the functions that take them:
 

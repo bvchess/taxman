@@ -6,7 +6,7 @@ No: at n = 833, 834 and 835 every optimal game is one move short of the longest 
 it as its third question, left open, with the belief that the answer is yes: does an optimal game take as many moves as
 any game of the board can, or does some longer game score less?  If optimal games were always longest, a solver could
 stop searching every branch that cannot reach the most moves.  Neither the Java solver nor the frame solver does that
-(below), but the Java's `reviseFreedoms` rests on a local form of the claim.
+(below), but the Java's revision of the freedoms rested on a local form of the claim.
 
 ## What is proven
 
@@ -90,24 +90,19 @@ What the data shows:
 ## The solvers and the wiki
 
 * **Neither the Java solver nor the frame solver prunes a branch for having fewer moves than possible.**  Counts enter
-  the Java's search only as upper bounds.
-  * A frame's *freedoms* are its factors minus its moves (`search/Frame.java:43`).
-  * `FrameSet.computeMaxNumberOfPromotions` (`search/FrameSet.java:136-151`) turns them into `maxTotalPromotions`, the
-    most promotions the freedoms allow (`search/SearchManager.java:121-122`, `maxAdditionalPromotions` at :192-197).
-  * The upper bound then sums at most that many of the largest candidates, and a branch is cut on that *sum*
-    (`search/BranchExplorer.java:77`).
-  * *In the bag* is a score, what the game with no promotions makes (`frame/FrameSolver.java:155-160`), not a count.
-
-  The frame solver's `max_total` (`search/setup.rs`), `max_additional` (`bounds.rs`) and `in_the_bag` (`board.rs`)
-  are the same.
-* **The belief appears once, in `reviseFreedoms`** (`search/UpperBoundEstimator.java:41-90`).  Its comment states as
-  a theorem, without proof, that the promotion set with the largest sum also has the most promotions.  It solves the
+  the search only as upper bounds.
+  * A frame's *freedoms* are its factors minus its moves.
+  * `max_total` (`search/setup.rs`) is the most promotions the freedoms allow, and `max_additional` (`bounds.rs`) the
+    most a node can still add.
+  * The upper bound then sums at most that many of the largest candidates, and a branch is cut on that *sum*.
+  * *In the bag* (`in_the_bag`, `board.rs`) is a score, what the game with no promotions makes, not a count.
+* **The belief appears once, in the Java's revision of the freedoms.**  It stated as a theorem, without proof, that the
+  promotion set with the largest sum also has the most promotions.  It solves the
   two-frame game of frames 0 and 1 for its heaviest promotion set, and lowers frame 0's freedoms to that set's size,
   which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the tactic
   `revise_freedoms`, measured it and removed it ([which tactics earn their
-  keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).  `SearchManager.finalReport` (:185-188)
-  reports an optimal game with fewer promotions than `maxTotalPromotions` as "max promotions was over-estimated".
-* **833 refutes the comment's "theorem" for the whole frame game.**  The exchange above is a promotable set: the
+  keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+* **833 refutes that "theorem" for the whole frame game.**  The exchange above is a promotable set: the
   optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
   (`solver/frame/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`).  So at 833 `max_total`
   was not an over-estimate.  It does not decide the two-frame form that the tactic used: at 833 the tactic searched the

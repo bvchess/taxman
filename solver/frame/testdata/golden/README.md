@@ -7,8 +7,5 @@ the prime shortcut and the result of the solve.  There are 318 files, for the ga
 `tests/golden_frames.rs` and `tests/solver.rs` read them; the item "Golden tests" of [the design's catalogue of
 tests](../../../docs/design/tests.md) says what they check.
 
-The files are the Java's answers, and nothing makes them again.  The exporter `tools/golden` made them (`export.sh`,
-and the Java classes `GoldenExport`, `GameProbe` and the others beside it).  Neither the exporter nor the Java program
-is in the tree: the git tag `java-final` keeps both, the script as `rust/tools/golden/export.sh` (the crate was `rust/`
-then), so `git show java-final:rust/tools/golden/export.sh` prints it.  `../games_java.txt` is the same kind of record,
-from `GameProbe`, for the games of the board's frames beyond 760.
+The files are the Java's answers, and nothing makes them again.  `../games_java.txt` is the same kind of record, for
+the games of the board's frames beyond 760.

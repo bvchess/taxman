@@ -32,7 +32,7 @@ node it replaces, with the same answer: the rebuild recomputes `max_add` from th
 tighten it, and the conflicts and nogoods that a searcher learns along its path are a cache that units do not record.
 
 A node's *need* is what its completions must reach to beat the incumbent: `need = best + 1 − sum(promoted)`, where
-`best` is the incumbent's promotion sum.  A node's loop is the Java's (`BranchExplorer.explore`), made lazy, so that the
+`best` is the incumbent's promotion sum.  A node's loop is lazy, so that the
 search explores each child as soon as it makes it, instead of generating them all first.  The loop ends when a bound on
 the node's completions is below its need.  Otherwise it takes a candidate out of the loop, promotes it in a child,
 narrows the child's candidates, and explores the child if the child's own bound reaches the child's need.  A bound that
@@ -53,7 +53,7 @@ completions.
 
 The bound is an upper bound on `sum(promoted)` plus a completion's sum, so the search cuts a node whose matching value
 is below its need.  At the roots of the 94 golden games that need a search, its mean gap above P\* is 31, against 76 for
-the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.  The Java's `blameGame`
+the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.  The Java's
 bound, which the matching bound replaced, never pruned where the matching bound did not: the diagnostics counted none at
 every check.
 

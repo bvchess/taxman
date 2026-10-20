@@ -32,12 +32,12 @@ tactics of `tactics::Tactics`, in order, with their defaults.
 | `strong_depth` | all | sound (as `branching`) | with `gf2`, a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
 | `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
 | `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
-| `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum (the Java's `FrameSolver.getMaxPromotionSum`) |
+| `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of the game of n − 1 that are still promotable |
 
 **The frame model's own rules are not tactics.**  They define the search space, and cannot be switched off inside the
-model: the greedy removal of impossible sources inside frames (the Java's `Hive.removeImpossible`); the mandatory moves
-(its `Hive.unzip`); freedoms = factors − sources (its `freeFactorCount`, set by `Hive.finishSetup`); closed frames
+model: the greedy removal of impossible sources inside frames; the mandatory moves;
+freedoms = factors − sources; closed frames
 taking no part in the search; and a promoted number paying tax only from the frame one forward.  [frame-model.md, “What
 "optimal" means”](frame-model.md#what-optimal-means) says what is proven of them, and what remains: statement U.
 
@@ -50,7 +50,7 @@ differ: the error names each tactic that differs, and the `--tactic` flags that 
 found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's
 promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that
 the heaviest promotion set also has the most members, which is false at n = 833); and the tactics that lost, the
-Java's `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
+Java's bound with its runner-up, its preclusion table, and the branchings other than strong branching
 ([which tactics earn their keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
 
 ## Adding a tactic

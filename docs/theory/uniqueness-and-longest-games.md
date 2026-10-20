@@ -89,8 +89,8 @@ can: a step to the ceiling needs all the optimal sets of n−1, not one.
 ## Longest games
 
 An optimal game need not play as many moves as a game of the board can: at n = 833 it plays one fewer.  The wiki's
-"Questions" page asks whether it must (its third question), and the Java's `reviseFreedoms` rests on a form of it (a
-comment in `UpperBoundEstimator.java` states, as a theorem it has no proof of, that the promotion set with the largest
+"Questions" page asks whether it must (its third question), and the Java solver's revision of the freedoms rested on a
+form of it (it stated, as a theorem it had no proof of, that the promotion set with the largest
 sum also has the most promotions).  The most moves of a game of n, M(n), is the size of the largest playable subset of
 {2, …, n}.  (A game that ends with no legal move left can still be shorter than M(n): maximal playable sets can have
 different sizes, as n = 2873 shows above.)
@@ -132,8 +132,8 @@ up to n/2; the longest game's 49 and 363 use 412.  The optimal game leaves two m
 a move for heavier moves up to n/2: 1,196 against 1,167.
 
 The same exchange is a promotion set of the frame model: the optimal game promotes 48 numbers and the longer one 49,
-which is `max_total`, so the "theorem" of the Java's comment is false for the whole frame game of 833
-(`solver/frame/tests/soundness.rs`).  The Java's `reviseFreedoms` applied it only to the two-frame game of frames 0 and
+which is `max_total`, so that "theorem" is false for the whole frame game of 833
+(`solver/frame/tests/soundness.rs`).  The Java applied it only to the two-frame game of frames 0 and
 1, where it stayed unproven; the frame solver had it as the tactic `revise_freedoms`, measured that it no longer paid,
 and removed it.
 

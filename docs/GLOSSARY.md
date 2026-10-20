@@ -16,7 +16,7 @@ Some words are used inside one part of the code only, and are defined there:
 * the fields of the progress line: [the frame solver's reference, section
   3](../solver/docs/REFERENCE.md#3-reading-the-output).
 
-The Java solver's and the wiki's words map onto these in [solver/docs/design/frame-model.md, "The Java solver and the
+The wiki's words map onto these in [solver/docs/design/frame-model.md, "The Java solver and the
 frame solver"](../solver/docs/design/frame-model.md#the-java-solver-and-the-frame-solver).  The old words of the
 notebook's dated entries map onto these in the notebook's ["Terms changed"](../solver/notebook/terms-changed.md).
 
@@ -280,7 +280,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the frame solver**: the crate `solver/frame/` and its binary `taxman`, a branch and bound over promotion sets
   within the frame model, which finds the games.  "The solver" for short.
 * **the Java solver**: the original solver, whose algorithm the [wiki](https://github.com/bvchess/taxman/wiki) describes
-  and the frame solver reimplements.  It is not in the tree; the git tag `java-final` has it.
+  and the frame solver reimplements.  It is not in the tree.
 * **the prover**: the crate `solver/noframe/`, a branch and bound over sets of moves on the whole board.  It decides
   playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
   moves beats a recorded score ([its README](../solver/noframe/README.md)).
