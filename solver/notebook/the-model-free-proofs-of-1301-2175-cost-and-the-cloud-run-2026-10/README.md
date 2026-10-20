@@ -60,7 +60,7 @@ threads, 1.73 at 1200-1300; this sample 2.2 to 2.5 user time; no clean measure a
 By list scheduling the wall time on 4, 8, 16, 32 and more threads is 36, 18, 11 and 11 hours at 2.5 ms a node; from 16
 threads up the dearest games (2170-2173, the model's 8 million nodes each) set it.  The range of the estimate is wider
 than the draws': the trend in n rests on 7 games above 1800 and a sample, not a random one, and the speed of a Graviton
-core is unmeasured.  The RUNBOOK ([section 9](../../docs/RUNBOOK.md#8-the-provers-proofs-of-optn-1301-to-2175))
+core is unmeasured.  The RUNBOOK ([section 9](#later-2026-10-the-runbooks-estimate-of-the-run))
 gives the wall time and the price by size (about $3 to $4 on spot for 16 vCPUs) and says that the calibration on
 Graviton3, 4 and 5 (`rust/bench/cloud/`) refines the per-core figures.
 
@@ -153,3 +153,52 @@ takes 14.1 hours, 1.8 fewer (about $0.42): the most that a better order could ha
 *Not measured.*  Where a proof's tree branches (members above n/2 against below, the premise of [agenda
 A2](../../docs/AGENDA.md#a2-certify-the-frame-model-then-prove-with-its-facts-a-change-of-slope-for-the-proven-wall)): the lines
 hold totals only.  Graviton5.  A spot interruption, which never came in 15.9 hours.
+
+## Later (2026-10): the RUNBOOK's estimate of the run
+
+RUNBOOK.md's section 8.2, "What it costs", held this estimate of the run until 2026-10-19, when it moved here
+unchanged; the RUNBOOK keeps how to price a run.  Its "section 8.4" and "section 8.2" are the RUNBOOK's sections of
+that date, and its link named this entry.
+
+The cost of a game follows the nodes of its search.  The solver's own search of the same game, which the committed chain
+records, predicts it (the root's parity gap, which predicted the cost over 900-1300, does not here: a game of gap 364
+took 18 thousand nodes and one of gap 315 300 thousand).  Over 34 games of 1302-2124 that `exact` finished, it took 0.13
+to 13 times the nodes of the solver's search (of the source game's, for a game whose search the solver repeated), the
+ratio growing about tenfold per 1000 in n: geometric mean 0.97 at 1300-1500, 1.6 at 1500-1800, 3.8 at 1800-2124, with a
+scatter of 0.28 decades; `exact` has the weaker bound, the parity one.  Five dear games were stopped unfinished at 1.1
+to 2.2 million nodes (1430, 1472, 1475, 2052, 2170).  The committed proofs of 1..1300 cost 1.2 to 1.7 ms a node on two
+quiet laptop threads (1.73 at 1200-1300); the sample at 1300-1500 on a busy machine, 2.2 to 2.5 (user time; 8 threads in
+parallel add 12 %).  Past 1500 the node is not flat in n: the run on Graviton4 (16 threads of a `c8g.4xlarge`) costs
+about 2.2 ms a node at 1430-1863, 3.1 to 3.3 at 2060-2160 and 3.9 to 4.2 at 2170-2173, against 2.44 for the searches of
+1301-1310 in the rehearsal (section 8.4).  The model below takes 2.5 ms throughout, so it is low for the late games, the
+dear ones above all.  490 of the 875 games need a search (the rest are decided by the ceiling or the prime formula).
+With the fitted ratio and 2.5 ms a node:
+
+| | |
+|---|---|
+| nodes, all 490 searches | about 200 million (150 to 300) |
+| thread-hours at the laptop's speed | **about 140** (100 to 250; 115 at 2.0 ms a node, 170 at 3.0) |
+| the dearest games | 2170-2173 (gap 767; the model says 8 million nodes each: 6 hours at 2.5 ms a node, about 9 at Graviton4's 3.9 to 4.2; 2170 had done 1.25 million nodes after 90 minutes on the laptop), then 1475, 1430, 1472, 1521 (1.7 to 2.5 million, 1.2 to 1.7 hours at 2.5 ms), 1849-1863, 2160 |
+
+Wall time and price by size, by list scheduling over costs drawn from that model (the order is `summarize.py order`),
+at the laptop's speed and at 1.6 times as long (the factor of a Graviton CPU against an M1 Max CPU, which the
+calibration has measured since: a Graviton4 core takes 1.08 times as long, so the lower end of each range is the nearer,
+before the rise of the node's cost with n above).  Add 10 % for restarts.  Spot prices are the cheapest zone of
+us-east-1 in the owner's account's spot price history on 2026-10-14 (4 and 8 vCPUs: Vantage, the same day); on demand is
+Vantage's Linux price in US East (`c8g`: $0.0399 per vCPU-hour at every size):
+
+| vCPUs | shape | wall | spot $/hour | spot total | on-demand total |
+|---|---|---|---|---|---|
+| 4 | `c8g.xlarge` | 36 to 57 h | 0.078 | $2.8 to 4.4 | $5.8 to 9.1 |
+| 8 | `c8g.2xlarge` | 18 to 28 h | 0.158 | $2.8 to 4.4 | $5.7 to 8.9 |
+| **16** | `c8g.4xlarge` | **11 to 17 h** | 0.2391 | **$2.6 to 4.1** | **$7.0 to 10.8** |
+| 32 | `c8g.8xlarge` | 11 to 17 h | 0.4134 | $4.5 to 7.0 | $14 to 22 |
+| 64 | `c8g.16xlarge` | 11 to 17 h | 0.6794 | $7.5 to 11.6 | $28 to 43 |
+| 192 | `c8g.48xlarge` | 11 to 17 h | 1.9939 | $22 to 34 | $84 to 130 |
+
+From 16 vCPUs up the dearest games set the wall time, not the CPUs: 2170-2173 start at once and the longest of them
+decides (6 to 24 hours over the draws, at the laptop's speed; about 9 hours at Graviton4's cost per node for the
+model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals replace this table: 15.9 hours and $3.84
+on 16 vCPUs, inside the row's ranges; 2170-2173 took 7.7 to 7.9 hours each, and what set the wall time was the packing
+of the late starts, not those games
+([EXPERIMENTS](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).

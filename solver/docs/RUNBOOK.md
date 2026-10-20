@@ -19,7 +19,7 @@ goes wrong, section 11 describes the build cache, and section 12 lists the scrip
 * [5. The unattended run to the wall](#5-the-unattended-run-to-the-wall)
 * [6. The ledger's experiment](#6-the-ledgers-experiment)
 * [7. The sweep](#7-the-sweep)
-* [8. The prover's proofs of opt(n), 1301 to 2175](#8-the-provers-proofs-of-optn-1301-to-2175)
+* [8. The prover's proofs of opt(n)](#8-the-provers-proofs-of-optn)
 * [9. Certifying U (stage 4)](#9-certifying-u-stage-4)
 * [10. When something goes wrong](#10-when-something-goes-wrong)
 * [11. The build cache and the release suite](#11-the-build-cache-and-the-release-suite)
@@ -318,9 +318,9 @@ git clone https://github.com/bvchess/taxman.git && cd taxman
 solver/tools/cloud/setup.sh                          # 5 to 10 minutes
 ```
 
-The scripts must be on the branch that gets cloned (`BRANCH=...` chooses another).  Without a pushed branch, copy the
-tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and run
-`setup.sh` from inside it; it then works on that tree and does not pull, and the results record no commit.
+The scripts must be on the branch that gets cloned (`git clone --branch NAME` clones another).  Without a pushed branch,
+copy the tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_work/taxman/ HOST:taxman/`) and
+run `setup.sh` from inside it; it then works on that tree and does not pull, and the results record no commit.
 
 `setup.sh`:
 
@@ -332,7 +332,8 @@ tree from your machine (`rsync -a --exclude target --exclude .git ~/dev/taxman_w
 * replays `optimal.json`, runs both result verifiers on the committed files, and runs `taxman regress --to 400`;
 * runs `cargo test -- --test-threads=4`.
 
-Its output is also in `~/taxman-work/logs/setup.log`.  Run it again after any reboot, or to pick up later commits.
+Its output is also in `~/taxman-work/logs/setup.log`.  Run it again to pick up later commits; a reboot loses nothing
+it made.
 `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries into the cache (section 11).
 
 ### 2.5 Cost guardrails
@@ -1352,163 +1353,150 @@ The tests of the script are `test/run.sh sweep` (with `TAXMAN_BIN` set to a non-
 release; it runs `verify.sh`, so it replays the committed games three times) and, for the planner, `python3 -I
 solver/tools/test_sweep_plan.py`.
 
-## 8. The prover's proofs of opt(n), 1301 to 2175
+## 8. The prover's proofs of opt(n)
 
-The committed chain (`results/strict.jsonl`) reached 2175 when the prover's run began (it reaches further now, within
-the frame model), and the prover in `solver/noframe` has proven opt(n) = V(n) without the frame model for every n to
-2175: 1301..2175 in the run of 2026-10-14 and 15 that this section describes ([the prover's
-README](../noframe/README.md#to-2175-on-a-cloud-machine) has the results and their cost).  `prover.sh` runs the same
-program, `exact`, over a range of games on a cloud machine.  It is a small job next to the chain: the run took 226
-thread-hours, 15.9 hours on 16 vCPUs, for $3.84.  Section 8.2 keeps the estimate it was planned by, about 140
-thread-hours at the laptop's speed (100 to 250), which rests on measurements on a laptop and on the committed data of
-the 1..1300 proofs.  The [Graviton calibration](../notebook/graviton-calibration-2026-10/README.md) measured the CPU (a
-Graviton4 core runs the prover at 0.93 of an M1 Max core, a Graviton3 core at 0.75; Graviton5 was not measured), and the
-run itself found that the cost of a node on Graviton4 grows with n (section 8.2).  The run was on a `c8g.4xlarge` on
-spot, launched on 2026-10-14 as sections 2.2 and 8.4 describe; section 8.6 is what to do with the results of a run.
+`prover.sh A B` proves opt(n) = V(n), the score that `results/strict.jsonl` records, for every n from A to B, on the
+whole board.  It runs the prover's `exact` over the range in passes, one game a thread, and it is a small job next to
+the chain.  The run of 1301..2175 is the example throughout this section: it took 15.9 hours on one `c8g.4xlarge` at
+spot, for $3.84, on 2026-10-14 and 15.  [The prover's README](../noframe/README.md#to-2175-on-a-cloud-machine) has its
+results, and [its entry](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) the
+account of the run and the estimate it was planned by.
 
-That run, and everything this section says of its cost, is of searches from the plain root.  `exact` now starts from
-the roles of Theorem B by default (`--fix-low 1`: still a proof, since every optimal set obeys them; it records
-`"fix_low":1` on every line and the check counts the proofs that rest on it), which took the same nodes within 5% and
-half the time a node over 2..999 ([the prover's README](../noframe/README.md#3-the-proofs-of-optn)), so a new run
-costs about half what is estimated here.  `EXTRA_ARGS='--fix-low 0' solver/tools/cloud/prover.sh 1301 2175` reproduces
-the run as it was; its checkpoints are `ckpt/exact_N.ckpt`, those of the default `ckpt/exact_N_low.ckpt`.
+**A run searches from the roles of Theorem B.**  `exact` starts there by default (`--fix-low 1`), and the search is
+still a proof, because every optimal set obeys the roles ([THEORY.md, Theorem
+B](../../docs/THEORY.md#the-bottom-layers)).  Each line records `"fix_low":1`, and the check counts the proofs that rest
+on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the time a node ([the prover's
+README](../noframe/README.md#3-the-proofs-of-optn)).  The run of 1301..2175 searched from the plain root, so by that
+measurement a run from the roles costs about half as much.
+`EXTRA_ARGS='--fix-low 0' solver/tools/cloud/prover.sh 1301 2175` reproduces that run.  The two kinds of search keep
+separate checkpoints: `ckpt/exact_N_low.ckpt` from the roles, `ckpt/exact_N.ckpt` from the plain root.
 
-### 8.1 How `exact` uses the CPUs, and what the script does about it
+### 8.1 How `exact` uses the CPUs
 
-* **One game per thread.**  `exact` hands the games of a range to its worker threads one at a time; each game's search
-  is a single thread (the prover has no parallel search).  So the CPUs are used perfectly as long as there are
-  games left, and the wall time cannot be shorter than the dearest game.  Measured on 12 games of 1302-1364 at 1, 2, 4
-  and 8 threads (M1 Max, other jobs running): the same 275,105 nodes at every thread count (they do not depend on it),
-  606, 312, 171 and 151 s of wall time; the user time per node 2.19, 2.23, 2.31 and 2.46 ms (+12 % at 8 threads, a busy
-  laptop); the 8-thread run was bounded by its longest game (141 to 151 s), not by the threads
-  ([EXPERIMENTS.md](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
-* **Passes, not a signal.**  A search that is still going when `--seconds` run out pauses: its open subtrees and learned
-  conflicts go to `ckpt/exact_N_low.ckpt`, and a rerun resumes it (the tree is the same: node counts are identical to an
-  uninterrupted run).  Checkpoints are written only then, and `exact` has no signal handler, so a kill or a SIGTERM
-  loses the searches of the pass in progress back to their last checkpoint.  `prover.sh` therefore runs `exact` in
-  passes of `PASS_SECONDS` (default 300) and starts it again until every game has a line: an interruption costs at
-  most one pass of the games in flight (the restart of a pass costs about a second).
-* **Order.**  The games are given dearest first, by the nodes the solver's search of each took in the committed chain
-  (`summarize.py order`; the proofs of `exact` take 1 to 3 times as many, section 8.2), so that the long games start
-  at once instead of last.  The order is made once and kept in `$TAXMAN_WORK/prover-order_A_B.txt`.
-* **The tail.**  The last games run alone, so at the end most of a big machine idles; the log says so
-  ("N games are left for T threads").  This is why more than 16 to 32 vCPUs buys nothing (section 8.2).  If the tail
-  matters to you, stop (Ctrl-C), start a smaller instance, restore (`save.sh --restore`) and run `prover.sh A B` again
-  there: `THREADS` may differ between runs.
-* **What would make `exact` use many CPUs on one game** is not needed here: its open units are independent subtrees
-  (`Prover::run_units` takes a list), so a `--shard i/K` that gives a process every K-th unit of a game's checkpoint
-  would split a long game over processes.  Not done; no proving code was changed for this run.
+A game's search runs on one thread, so the wall time of a run is at least that of its dearest game, and a big machine
+idles at the end.
+
+* **One game a thread.**  `exact` hands the games of the range to its threads one at a time.  The CPUs stay busy while
+  games are left, and the node counts do not depend on the number of threads ([the
+  entry](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) measured 12 games at 1
+  to 8 threads).
+* **Passes.**  A search still running when a pass ends (`--seconds`) pauses: it saves its open subtrees and learned
+  conflicts to its checkpoint, and the next pass resumes it on the same tree, so its node count is that of a run with no
+  pause.  `exact` writes checkpoints only then, and it has no signal handler, so a kill or a SIGTERM sends the searches
+  of the pass in progress back to their last checkpoints.  `prover.sh` therefore runs `exact` in passes of
+  `PASS_SECONDS` (default 300) until every game has a line.  An interruption costs at most one pass of the games in
+  flight, and a restart about a second.
+* **The dearest games first.**  The games go in the order of the nodes that the solver's search of each took in the
+  committed chain (`summarize.py order`), so that the long games start at once.  The order is made once and kept in
+  `$TAXMAN_WORK/prover-order_A_B.txt`.  A game that repeats the search of a game settled at its ceiling records no
+  nodes, so it goes late: two of the 33 such games, 1837 and 1839, were the last of the run of 1301..2175.
+* **The tail.**  The last games run alone, and most of the machine idles; the log says so ("N games are left for T
+  threads").  With 16 vCPUs the idle CPUs cost cents an hour, so let them finish.  To finish the tail of a bigger
+  machine for less, stop the run, start a smaller instance, restore the state there (`save.sh --restore`, section 2.6)
+  and run `prover.sh A B` again: `THREADS` may differ between runs.
 
 ### 8.2 What it costs
 
-The cost of a game follows the nodes of its search.  The solver's own search of the same game, which the committed chain
-records, predicts it (the root's parity gap, which predicted the cost over 900-1300, does not here: a game of gap 364
-took 18 thousand nodes and one of gap 315 300 thousand).  Over 34 games of 1302-2124 that `exact` finished, it took 0.13
-to 13 times the nodes of the solver's search (of the source game's, for a game whose search the solver repeated), the
-ratio growing about tenfold per 1000 in n: geometric mean 0.97 at 1300-1500, 1.6 at 1500-1800, 3.8 at 1800-2124, with a
-scatter of 0.28 decades; `exact` has the weaker bound, the parity one.  Five dear games were stopped unfinished at 1.1
-to 2.2 million nodes (1430, 1472, 1475, 2052, 2170).  The committed proofs of 1..1300 cost 1.2 to 1.7 ms a node on two
-quiet laptop threads (1.73 at 1200-1300); the sample at 1300-1500 on a busy machine, 2.2 to 2.5 (user time; 8 threads in
-parallel add 12 %).  Past 1500 the node is not flat in n: the run on Graviton4 (16 threads of a `c8g.4xlarge`) costs
-about 2.2 ms a node at 1430-1863, 3.1 to 3.3 at 2060-2160 and 3.9 to 4.2 at 2170-2173, against 2.44 for the searches of
-1301-1310 in the rehearsal (section 8.4).  The model below takes 2.5 ms throughout, so it is low for the late games, the
-dear ones above all.  490 of the 875 games need a search (the rest are decided by the ceiling or the prime formula).
-With the fitted ratio and 2.5 ms a node:
+A run costs the thread-hours of its searches, spread over the vCPUs, unless its dearest game takes longer.  The run of
+1301..2175, from the plain root, took 226 thread-hours: 490 of its 875 games needed a search, and the others were at
+their ceiling or met the prime formula.  Its dearest games, 2170 to 2173, took 7.7 to 7.9 hours each, and the idle tail
+was 11 % of the machine's thread-hours.  From the roles, expect about half the thread-hours (above).
 
-| | |
-|---|---|
-| nodes, all 490 searches | about 200 million (150 to 300) |
-| thread-hours at the laptop's speed | **about 140** (100 to 250; 115 at 2.0 ms a node, 170 at 3.0) |
-| the dearest games | 2170-2173 (gap 767; the model says 8 million nodes each: 6 hours at 2.5 ms a node, about 9 at Graviton4's 3.9 to 4.2; 2170 had done 1.25 million nodes after 90 minutes on the laptop), then 1475, 1430, 1472, 1521 (1.7 to 2.5 million, 1.2 to 1.7 hours at 2.5 ms), 1849-1863, 2160 |
+For the estimate that Brian approves, price the range from the cost by bands of 100 in n in [the prover's
+README](../noframe/README.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles, over the vCPUs, with
+the idle tail, at the spot price of the hour (section 1).  The bands stop at 2175, the end of the prover's proofs; past
+it, [AGENDA, section 2](AGENDA.md#2-the-diagnosis-of-the-wall) carries the trend of the prover's nodes against the
+solver's to about 15 times them near 3000, an extrapolation.  The cost of a game follows the root's parity gap, not n,
+so the bands are a guide, not a rule, and the first passes of the run check the estimate (8.4, step 4, reads the cost of
+a node from the log).
 
-Wall time and price by size, by list scheduling over costs drawn from that model (the order is `summarize.py order`),
-at the laptop's speed and at 1.6 times as long (the factor of a Graviton CPU against an M1 Max CPU, which the
-calibration has measured since: a Graviton4 core takes 1.08 times as long, so the lower end of each range is the nearer,
-before the rise of the node's cost with n above).  Add 10 % for restarts.  Spot prices are the cheapest zone of
-us-east-1 in the owner's account's spot price history on 2026-10-14 (4 and 8 vCPUs: Vantage, the same day); on demand is
-Vantage's Linux price in US East (`c8g`: $0.0399 per vCPU-hour at every size):
-
-| vCPUs | shape | wall | spot $/hour | spot total | on-demand total |
-|---|---|---|---|---|---|
-| 4 | `c8g.xlarge` | 36 to 57 h | 0.078 | $2.8 to 4.4 | $5.8 to 9.1 |
-| 8 | `c8g.2xlarge` | 18 to 28 h | 0.158 | $2.8 to 4.4 | $5.7 to 8.9 |
-| **16** | `c8g.4xlarge` | **11 to 17 h** | 0.2391 | **$2.6 to 4.1** | **$7.0 to 10.8** |
-| 32 | `c8g.8xlarge` | 11 to 17 h | 0.4134 | $4.5 to 7.0 | $14 to 22 |
-| 64 | `c8g.16xlarge` | 11 to 17 h | 0.6794 | $7.5 to 11.6 | $28 to 43 |
-| 192 | `c8g.48xlarge` | 11 to 17 h | 1.9939 | $22 to 34 | $84 to 130 |
-
-From 16 vCPUs up the dearest games set the wall time, not the CPUs: 2170-2173 start at once and the longest of them
-decides (6 to 24 hours over the draws, at the laptop's speed; about 9 hours at Graviton4's cost per node for the
-model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals replace this table: 15.9 hours and $3.84
-on 16 vCPUs, inside the row's ranges; 2170-2173 took 7.7 to 7.9 hours each, and what set the wall time was the packing
-of the late starts, not those games
-([EXPERIMENTS](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
+*Details.*  [The entry](../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) holds
+the estimate the run was planned by (about 140 thread-hours at 2.5 ms a node, and a table of wall time and price by
+size), the run against it, and what its model got wrong: the run took 1.5 times the projected nodes and 1.6 times the
+thread-hours.  The cost of a node on Graviton4 was 2.0 to 2.6 ms through 1899, then rose to 4.1 ms at 2170 to 2173.  The
+[Graviton calibration](../notebook/graviton-calibration-2026-10/README.md) measured the prover's speed: a Graviton4 core
+runs it at 0.93 of an M1 Max core, and a Graviton3 core at 0.75.
 
 ### 8.3 Which instance
 
-**The recommendation: `c8g.4xlarge` (16 vCPUs), spot (on demand if spot has no capacity), about half a day.**
-`c8g.2xlarge` (8) takes a day and costs the same.  Nothing larger buys time, since the dearest games set it.  The
-calibration settled the family: a Graviton4 core does a unit of work for 12 to 15 % less than a Graviton3 core, and
-the `c8g.4xlarge` was $0.24 to $0.31 an hour in us-east-1b, a, c and d on 2026-10-14; `c9g` is unmeasured, and
-`c7g` at 64 vCPUs (the cheapest spot per vCPU) is no use to a job that 16 vCPUs finish.  Storage: one gp3 root volume
-of 20 GB (the build of the prover alone is under 2 GB; the output is 200 KB and the checkpoints a few MB).  The launch
-checklist of section 1 applies, with the instance role of section 2.1 (S3 for `S3_DEST`, SSM for the commands).
+**Use a `c8g.4xlarge` (16 vCPUs) at spot, for about 16 hours**, or on demand if spot has no capacity.  A `c8g.2xlarge`
+(8 vCPUs) takes a day for the same price, and nothing larger buys time, since the dearest games set it.  The calibration
+settled the family: a Graviton4 core does a unit of work for 12 to 15 % less than a Graviton3 core.  Nobody has measured
+`c9g`.  The `c8g.4xlarge` cost $0.24 to $0.31 an hour at spot in four zones of us-east-1 on 2026-10-14.  A gp3 root
+volume of 20 GB is enough: the prover's build is under 2 GB, the output about 200 KB and the checkpoints a few MB.  The
+[rules for every launch](#rules-for-every-launch) apply, with the instance profile of section 2.1 (S3 for `S3_DEST`, SSM
+for the steps).
 
 ### 8.4 Run
 
-Launch as section 2.2 says: its command is this run's.  Then:
+Launch as section 2.2 says; its values are this job's.  Then send the steps through SSM (section 2.3), the first as root
+and the others as `ec2-user`.  With no SSH there is no `rsync`, so the copy of the repository is a pushed branch,
+cloned, or a `git archive` tarball in the bucket.
 
-On the instance, the steps in order (the first as root, the others as `ec2-user`; a copy of the repository with these
-scripts is a pushed branch, cloned, or a `git archive` tarball in the bucket, since `rsync` has no ssh to ride on):
+1. **Setup.**  `PROVER_ONLY=1` builds and checks the prover alone; with the commit in the build cache it builds nothing
+   (section 11), and `BUILD_PROVER="--bin exact"` builds `exact` alone.
 
-```
-dnf install -y git tmux                                              # as root; setup.sh would do it with sudo
-git clone https://github.com/bvchess/taxman.git && cd taxman           # BRANCH=... for another branch
-PROVER_ONLY=1 solver/tools/cloud/setup.sh                              # 46 s on a c8g.4xlarge, 10 s of it the build
-                                                                     # (BUILD_PROVER="--bin exact" builds `exact` alone; with
-                                                                     # the commit in the build cache, nothing: section 11)
-# ... the rehearsal below ...
-cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
-    S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 solver/tools/cloud/prover.sh 1301 2175"
-tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh              # on spot: stops the run, saves
-```
+   ```
+   dnf install -y git tmux                                       # as root; setup.sh would do it with sudo
+   git clone https://github.com/bvchess/taxman.git && cd taxman    # --branch NAME for another branch
+   PROVER_ONLY=1 solver/tools/cloud/setup.sh                       # 46 s on a c8g.4xlarge, 10 s of it the build
+   ```
 
-The prefix `prover-1301-2175` is this run's own (one prefix a run); the laptop-side commands of 8.5 and 8.6 reach it as `$D`: `export D=s3://taxman-013764204840-us-east-1/prover-1301-2175`.  `S3_DEST` needs the instance profile above.  It is not optional with `POWEROFF`: the
-instance is terminated when it shuts down, and its root volume with it (the rules above), so `prover.sh` copies the
-results to S3 first.  Without `S3_DEST`, leave `POWEROFF` out and pull the files yourself (below) before the timer ends.
-`POWEROFF=always` shuts the machine down whenever the script ends (all 875 games and the check, the deadline, an error:
-an idle machine costs as much as a busy one; `POWEROFF=done` only when the range is complete), and `DEADLINE_HOURS`
-stops the run cleanly after that many hours.  `THREADS` defaults to every vCPU.  The saves are `SAVE_EVERY` apart (here
-300 s) plus the time a save takes, about 80 s at the lowest priority (section 2.6).
+2. **A rehearsal on the instance itself** (minutes, cents): a small range, a SIGTERM and a resume, and the check, in a
+   work directory of its own, as a step of its own.  It replaces a dry run on a laptop.
 
-**Before the full run, a rehearsal on the instance itself** (minutes, cents): a small range, a SIGTERM and a resume, and
-the check, in a work directory of its own, as a step of its own.  It replaces a dry run on a laptop.
+   ```
+   export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
+   solver/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
+   sleep 40; kill -TERM $(cat ~/rehearsal/prover.pid)      # a stop in the middle: "ended: stopped", status 143
+   wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N_low.ckpt, paused
+   solver/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
+   OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl solver/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
+   unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
+   ```
 
-```
-export TAXMAN_WORK=~/rehearsal THREADS=2 PASS_SECONDS=20
-solver/tools/cloud/prover.sh 1301 1310 &              # makes the order, then passes of 20 s
-sleep 40; kill -TERM $(cat ~/rehearsal/prover.pid)      # a stop in the middle: "ended: stopped", status 143
-wait $!; echo $?; ls ~/rehearsal/ckpt                   # 143 (a bare `wait` returns 0); exact_N_low.ckpt, paused
-solver/tools/cloud/prover.sh 1301 1310                  # resumes ("N searches paused"), finishes, runs the check
-OUT=~/rehearsal/results/exact_parity_1301_1310.jsonl solver/tools/cloud/prover.sh --verify 1301 1311   # must FAIL
-unset TAXMAN_WORK THREADS PASS_SECONDS; rm -rf ~/rehearsal
-```
+   The second `prover.sh` must end with `OK: opt(n) is proven equal to the recorded score for every n in 2..1310` and
+   exit status 0, and the last command must print `without a line: 1311` and `FAILED`.  The node counts are the same
+   whatever the stops.  The lines of `~/rehearsal/results/exact_parity_1301_1310.jsonl` give the cost of a node on this
+   CPU, `secs` over `nodes`: 2.44 ms for the searches of these ten games on the `c8g.4xlarge`, from the plain root.  On
+   a laptop those searches took about 3 minutes of one thread.
 
-The second command must end with `OK: opt(n) is proven equal to the recorded score for every n in 2..1310` and exit
-status 0, and the last command must print `without a line: 1311` and `FAILED` (on a laptop the five searches among those
-ten games take about 3 minutes of one thread; their node counts are the same whatever the stops).  The `ms/node` of the
-real CPUs is also here: `secs` over `nodes` of the lines of `~/rehearsal/results/exact_parity_1301_1310.jsonl` (2.44 ms
-for the searches of these ten games on the `c8g.4xlarge`).
+3. **The run,** in tmux, with `spot-watch.sh` beside it:
 
-First minutes of the full run: `prover.sh` prints the machine, makes the order, and logs `pass 1: 0 of 875 games done`.
-In `~/taxman-work/logs/prover.err` the lines `exact: n=... paused after N nodes, U open units` give the nodes a long
-game has done; divide the seconds of a pass by the nodes of one pass for milliseconds per node (about 2.2 to 3.3 for the
-games of the first passes on a `c8g.4xlarge`, more for the latest games: section 8.2).
+   ```
+   cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=36 POWEROFF=always \
+       S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175 solver/tools/cloud/prover.sh 1301 2175"
+   tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh              # on spot: stops the run, saves
+   ```
 
-### 8.5 Watch, stop, resume, the tail
+   The prefix `prover-1301-2175` is this run's own, one prefix a run.  The commands of 8.5 and 8.6 on your machine reach
+   it as `$D`: `export D=s3://taxman-013764204840-us-east-1/prover-1301-2175`.
 
-From the laptop, with no access to the instance, the saves in S3 (`$D` of 8.4; as old as the last save, about 6 minutes
-at most):
+4. **The first minutes.**  `prover.sh` prints the machine, makes the order, and logs `pass 1: 0 of 875 games done`.  In
+   `~/taxman-work/logs/prover.err`, the lines `exact: n=N not finished: paused after N nodes, U open units` give the
+nodes of a long game.  The seconds of a pass over the nodes of one pass give the milliseconds a node: about 2.2 to 3.3
+for the games of the first passes on a `c8g.4xlarge` from the plain root, more for the late games (section 8.2).
+
+The guardrails are section 2.5's, with these differences:
+
+* **`S3_DEST` is required with `POWEROFF`.**  A shutdown terminates the instance and deletes its root volume, so
+  `prover.sh` copies the results to S3 before it powers off.  Without `S3_DEST`, leave out `POWEROFF` and pull the files
+  yourself (8.6) before the timer ends.
+* **`POWEROFF=always`** powers the machine off whenever the script ends: the range complete and checked, the deadline,
+  or an error.  `POWEROFF=done` powers it off only when the range is complete.
+* **`DEADLINE_HOURS`** stops the run after that many hours, and `prover.sh` exits with status 3.  The stop is a
+  SIGTERM, so the searches of the pass in progress go back to their last checkpoints (8.1).
+* **`SAVE_EVERY`** defaults to `PASS_SECONDS` (300 s).  A save takes about 80 s at the lowest priority (section 2.6).
+* **`THREADS`** defaults to every vCPU.
+
+**A range that starts above 1301** needs `BASELINE`, one file of the proofs of 2..A − 1 for the check to build on (a
+`cat` of the committed files of `solver/noframe/data/`); its default is the proofs of 2..1300.  `prover.sh --list`, a
+measurement on chosen games, is in the script's header.
+
+### 8.5 Watch, stop, resume
+
+From your machine, with no access to the instance, read the saves in S3 (`$D` of 8.4).  They are as old as the last
+save, about 6 minutes at most:
 
 ```
 aws s3 cp $D/logs/prover.log - | tail            # a line a pass: games done, searches paused, the exit status
@@ -1517,7 +1505,7 @@ aws s3 cp $D/results/exact_parity_1301_2175.jsonl - | grep -c .      # games don
 aws s3 ls $D/ckpt/                               # a checkpoint per unfinished search, rewritten every pass
 ```
 
-On the instance, in a shell, or as steps through SSM (where root's `~` is not ec2-user's: write `/home/ec2-user/` out):
+On the instance, in a shell or as steps through SSM (where root's `~` is not ec2-user's: write `/home/ec2-user/` out):
 
 ```
 tail -f ~/taxman-work/logs/prover.log            # a line a pass: games done, searches paused, the exit status
@@ -1526,19 +1514,20 @@ grep -c . ~/taxman-work/results/exact_parity_1301_2175.jsonl      # games done, 
 ls -l ~/taxman-work/ckpt                         # a checkpoint per unfinished search, rewritten every pass
 ```
 
-* **Stop**: Ctrl-C in tmux or `kill -TERM $(cat ~/taxman-work/prover.pid)` (through SSM, which is root, the pid file is
-  `/home/ec2-user/taxman-work/prover.pid`); the searches of the pass in progress go back to their last checkpoint.
-  **Resume**: the same command (`THREADS`, `S3_DEST` may differ).
-* **Spot interruption**: `spot-watch.sh` stops it and saves; on a replacement machine run `PROVER_ONLY=1 setup.sh`, then
-  `S3_DEST=... solver/tools/cloud/save.sh --restore`, then the same `prover.sh` command.  Without a saved copy, the
-  results file and checkpoints are on the root volume, which a spot termination deletes: use `S3_DEST`, or `rsync`
-  the work directory home from time to time.
-* **An error stop** (exit status 1): `exact` panicked.  Read the end of `prover.err`.  A message
-  "a playable set worth X beats the recorded Y" is a counterexample: a better game than the committed chain's
-  for that n.  Keep `~/taxman-work` as it is, the set is in the message, and tell the author; it is the finding
-  this run exists to look for.  "does not replay to its score" means the file or the build is wrong.
-* **The tail**: toward the end only the dearest games are left (the log says how many, against the threads).  Let them
-  finish; with 16 vCPUs the idle CPUs cost cents an hour.
+* **Stop** with Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/prover.pid)`; through SSM, which runs as root, the
+  pid file is `/home/ec2-user/taxman-work/prover.pid`.  The searches of the pass in progress go back to their last
+  checkpoints.  **Resume** with the same command; `THREADS` and `S3_DEST` may differ.
+* **A spot interruption:** `spot-watch.sh` stops the run and saves.  On a replacement machine run
+  `PROVER_ONLY=1 solver/tools/cloud/setup.sh`, then `S3_DEST=... solver/tools/cloud/save.sh --restore`, then the same
+  `prover.sh` command, minding section 2.6's two cautions (the logs and the deadline).  Without a saved copy, the
+results and the checkpoints are on the root volume, which a spot termination deletes: use `S3_DEST`, or `rsync` the work
+directory home from time to time.
+* **An error stop** (`prover.sh` exits with status 1): `exact` stopped with an error, the final check failed, or
+`MAX_FAILS` passes in a row crashed without a new line.  Nothing is retried; read the end of `prover.log` and
+`prover.err`.  The message "a playable set worth X beats the recorded Y" is a counterexample: a better game
+  than the committed chain's for that n, the finding a run exists to look for.  The set is in the message; keep
+  `~/taxman-work` as it is, and tell Brian.  The message "the recorded game does not replay to its score" means that the
+  results file or the build is wrong.
 
 ### 8.6 Bring the data home, verify, commit
 
@@ -1552,27 +1541,33 @@ rsync -av ec2-user@HOST:taxman-work/logs/ ./prover-logs/
 OUT=solver/noframe/data/exact_parity_1301_2175.jsonl solver/tools/cloud/prover.sh --verify 1301 2175
 ```
 
-The check (`summarize.py check 1301 2175`, which `prover.sh` already ran at the end) passes only if every n in
-2..2175 is proven (a line for each n of 1301..2175, and with `data/exact_parity_2_1300.jsonl` each proven by a bound,
-a search to completion, or the ceiling or the prime formula from a proven predecessor) and every line's score is the
-recorded optimum of `results/strict.jsonl`.  It exits 0 and prints `OK: opt(n) is proven equal to the recorded score
-for every n in 2..2175`; anything else prints which n.  Then, on your machine:
+The check (`summarize.py check 1301 2175`, which `prover.sh` also ran at the end) passes only if two things hold:
+
+* every n in 2..2175 is proven: each n of 1301..2175 has a line, and with `data/exact_parity_2_1300.jsonl` each is
+  proven by a bound, a search run to the end, or the ceiling or the prime formula from a proven predecessor;
+* every line's score is the score that `results/strict.jsonl` records.
+
+It then exits with status 0 and prints `OK: opt(n) is proven equal to the recorded score for every n in 2..2175`;
+anything else prints which n failed.  Then, on your machine, count the proofs and their cost by bands of 100 in n:
 
 ```
-python3 solver/noframe/tools/summarize.py exact solver/noframe/data/exact_parity_2_1300.jsonl solver/noframe/data/exact_parity_1301_2175.jsonl
-python3 solver/noframe/tools/summarize.py cost --band 100 solver/noframe/data/exact_parity_1301_2175.jsonl   # cost by band
+python3 solver/noframe/tools/summarize.py exact solver/noframe/data/exact_parity_2_1300.jsonl \
+    solver/noframe/data/exact_parity_1301_2175.jsonl
+python3 solver/noframe/tools/summarize.py cost --band 100 solver/noframe/data/exact_parity_1301_2175.jsonl
 ```
 
-Commit `solver/noframe/data/exact_parity_1301_2175.jsonl` (152 KB, never overwritten by a later run: `OUT` names another
-file).  Do not commit the work directory, the checkpoints or the logs.  Then update the places that say how far the
-prover's proofs reach, found by searching the guides for the old range (after the run of 2026-10-14 and 15: the table
-and sections 3, 7 and 8 of [solver/noframe/README.md](../noframe/README.md); the entry on the proofs of 1301-2175 and
-the "pending" sentence of "The committed chain to 2175" (in [solver/notebook/](../notebook/)), its
-register rows in [solver/notebook/README.md](../notebook/README.md); the READMEs, `DESIGN.md`, `results/README.md`,
-`AGENDA.md` and `THEORY.md`), with the totals from the two commands above and the real milliseconds per node of a
-Graviton CPU by n (the table of 8.2 is a prediction).  Then the end of the
-[rules for every launch](#rules-for-every-launch): terminate the instance (`POWEROFF=always` has shut it down, which
-terminates it) and confirm that nothing is left, the launch's security group included.
+Commit `solver/noframe/data/exact_parity_1301_2175.jsonl` (152 KB), and never let a later run overwrite it: `OUT` names
+another file.  Do not commit the work directory, the checkpoints or the logs.  Record the run:
+
+* the totals of the two commands, and the real milliseconds a node by n, in [the prover's
+  README](../noframe/README.md#3-the-proofs-of-optn), which holds the proofs and their cost;
+* the new end of the prover's proofs in [results/README.md](../../results/README.md), which holds how far each kind of
+  proof reaches; then search the docs for the old end and update what still names it;
+* the run itself in a notebook entry, with its rows in the register ([the notebook's
+  rules](../notebook/README.md#how-this-notebook-is-kept)), and its cost as section 2.8 says.
+
+Then do the end of the [rules for every launch](#rules-for-every-launch): `POWEROFF=always` has shut the instance down,
+which terminates it; confirm that nothing is left, the launch's security group included.
 
 ## 9. Certifying U (stage 4)
 
@@ -1863,22 +1858,26 @@ EXPERIMENTS entry with the times against the estimate and the overhead by |O| an
 
 ## 10. When something goes wrong
 
-| symptom | cause and remedy |
-|---|---|
-| `error: ... is in use by another process (process N)` | a solver already uses that checkpoint directory (`pgrep -a taxman`); a lock is released when its process ends, however it ends |
-| `error: FILE is in use by another process (another run appending to it?): it is locked` | a solver already appends to that results file (`--out`); the same remedy |
-| `chain.sh: another chain.sh is running` | the same, one level up; `~/taxman-work/chain.pid` names it |
-| `cannot resume from ...: made with different search tactics: ...` | resume with the `--tactic` flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |
-| `cannot resume from ...` for another game or build | delete the named `.ckpt` file; the game restarts from its beginning |
-| the solver exits with status 137 | the OOM killer or a spot reclaim; `chain.sh` retries; look at `dmesg` if it repeats (it should not: memory use is tiny) |
-| `rustc ... older than 1.89` / an error about `try_lock` | `rustup update stable`; `setup.sh` does this when rustup is present |
-| `eff` low and `idle` high on a short game at 192 threads | expected (section 3.5); judge long games |
-| `lock` of several percent on long games | the shared deque is contended: report it; fewer threads is the immediate remedy (`THREADS=96`) |
-| `/tmp` or `$TAXMAN_WORK` is a memory filesystem | `chain.sh` refuses: set `TAXMAN_WORK` to a directory on EBS |
-| `Permission denied` installing packages | run as a user with sudo, or install git, a C compiler, python3 and curl and use `SKIP_PACKAGES=1` |
-| the SSH connection dropped | the run is in tmux: reconnect, `tmux attach -t tx`; if tmux is gone the machine rebooted: `setup.sh` is not needed again, run `chain.sh N` |
-| a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root: put the step in a script file and run `sudo -u ec2-user -i bash FILE` (section 2.3); a multi-line `bash -lc '...'` through `sudo -i` mangles its quoting |
-| the machine rebooted | tmux and `chain.sh` are gone; the state is in `~/taxman-work`: run `chain.sh N` again |
+Most failures leave a message in the logs of `~/taxman-work/logs/`; the table gives the cause and the remedy of each.  A
+job's own failures are in its section: the prover's error stop in section 8.5, the run to the wall's in section 5.6, and
+a counterexample to U in section 9.8.
+
+| what you see | cause | remedy |
+|---|---|---|
+| `DIR is in use by another process (process N): DIR/... is locked` | another solver uses that checkpoint directory | find it with `pgrep -a taxman`; a lock is released when its process ends, however it ends |
+| `FILE is in use by another process (another run appending to it?): it is locked` | another solver appends to that results file (`--out`) | the same |
+| `another chain run is going (it holds ~/taxman-work/chain.lock)` | a second `chain.sh`; `prover.sh` says `another prover run` | `~/taxman-work/chain.pid` (or `prover.pid`) names the first |
+| `FILE was made with different search tactics: ...; resume it with FLAGS, or delete it to start the game over` | the run's `--tactic` flags differ from the checkpoint's | resume with the flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |
+| `cannot resume from FILE: ...` for another game or build | the checkpoint is not this game's or this build's | delete the named `.ckpt` file; the game starts from its beginning |
+| the solver exits with status 137 | a SIGKILL: the OOM killer, or a shutdown | `chain.sh` retries a crash; if it repeats, read `dmesg` (memory use is small: section 1) |
+| `rustc ... is older than 1.89 and there is no rustup to update it`, or an error about `try_lock` | the engine needs `File::try_lock`, stable from Rust 1.89 | install rustup, with which `setup.sh` updates stable itself, or a Rust of 1.89 or later; by hand, `rustup update stable` |
+| `DIR is on a memory filesystem: it would vanish with the instance (set TAXMAN_WORK)` | `/tmp` or `$TAXMAN_WORK` is tmpfs | set `TAXMAN_WORK` to a directory on EBS (section 1, "Storage") |
+| `installing packages needs root or sudo (or SKIP_PACKAGES=1 if git, cc, python3 and curl are there)` | `setup.sh` runs as a user without sudo | run it as a user with sudo, or install those four and set `SKIP_PACKAGES=1` |
+| a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root, and `sudo -i` mangles a multi-line `bash -lc '...'` | put the step in a script file and run `sudo -u ec2-user -i bash FILE` (section 2.3) |
+| the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain and the sweep, `pv` for the prover, `cert` for the certificates); if tmux is gone, the machine rebooted (next row) |
+| the machine rebooted | tmux and the job are gone; the state is in `~/taxman-work`, and the build survives | run the job's command again (`chain.sh N`) |
+| `eff` low and `idle` high on a short game at 192 threads | expected (section 3.5) | judge the long games |
+| `lock` of several percent on long games | the shared deque is contended | report it; fewer threads is the remedy at hand (`THREADS=96`) |
 
 ## 11. The build cache and the release suite
 
