@@ -9,7 +9,7 @@ fn bits<const W: usize>(xs: &[u32]) -> Bits<W> {
 
 // ---- the Java's algorithms, transliterated, as the reference ----
 
-/// `Frame.isWinnable`, step for step.
+/// The Java solver's test of whether a frame is winnable, step for step.
 fn ref_is_winnable<const W: usize>(moves: Bits<W>, factors: Bits<W>, math: &FactorProvider) -> bool {
     let (mut rm, mut rf) = (moves, factors);
     if rm.len() > rf.len() {
@@ -55,7 +55,7 @@ fn ref_is_winnable<const W: usize>(moves: Bits<W>, factors: Bits<W>, math: &Fact
     false
 }
 
-/// `Frame.reduce(movesToKeep, factorsToKeep, math)`, step for step (with Java assertions off).
+/// The Java solver's reduction of a frame, step for step (with its assertions off).
 fn ref_reduce<const W: usize>(moves: Bits<W>, factors: Bits<W>, math: &FactorProvider) -> (Bits<W>, Bits<W>) {
     let (mut rm, mut rf) = (moves, factors);
     let mut progress = true;

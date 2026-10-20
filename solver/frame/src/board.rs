@@ -6,7 +6,7 @@
 //! it, so that the facts that join the pieces are written once:
 //!
 //! * the score of a game of the frame model is `in_the_bag` plus the sum of its promotions, where `in_the_bag`
-//!   (the Java's `inTheBag`) is what the game with no promotions scores ([`Board::in_the_bag`]);
+//!   is what the game with no promotions scores ([`Board::in_the_bag`]);
 //! * no game of `n` scores more than `n + opt(n − 1)` (deleting the move `n` from an optimal game leaves a game of
 //!   `n − 1`), so no promotion set sums to more than `n + opt(n − 1) − in_the_bag`: the search's *ceiling*, at which
 //!   it can stop ([`Board::promotion_cap`]);
@@ -36,8 +36,7 @@ pub struct Board<const W: usize> {
     pub frames: SearchFrames<W>,
     /// The game with no promotions, in play order.
     pub plain: Vec<u32>,
-    /// What [`plain`](Self::plain) scores (the Java's `inTheBag`): the part of every score that no promotion
-    /// changes.
+    /// What [`plain`](Self::plain) scores: the part of every score that no promotion changes.
     pub in_the_bag: u64,
     /// How long forming, numbering and merging the frames took.
     pub frames_time: Duration,

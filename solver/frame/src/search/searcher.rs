@@ -104,7 +104,7 @@ pub struct SearchSpace<'a, const W: usize> {
     /// The largest number in the root's frames and candidates (the one-sided candidates of the extended problem are
     /// in no frame): what the nogoods hold.
     pub root_max: u32,
-    /// The most promotions a promotion set can have (`maxTotalPromotions`; see [`Prepared::max_total`]).
+    /// The most promotions a promotion set can have (see [`Prepared::max_total`]).
     pub max_total: u32,
     /// Where to collect [`Diagnostics`], if anywhere.
     pub diagnostics: Option<&'a Mutex<Diagnostics>>,

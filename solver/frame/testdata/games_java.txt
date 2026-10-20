@@ -1,7 +1,7 @@
-# n | promotions | sum(moves) | fnv1a64(moves)  -- the Java's Apiary(board, promotions).getSolution() (tools/golden
-# GameProbe, run without -ea) for the promotion sets of result rows (n = 762..1227: the whole optimal set, a random
-# subset and a random half of it), and for further feasible sets at the edges of the set widths (511, 512, 1023..1025,
-# 1500, 2047..2049).  fnv1a64 is taken over the decimal text of each move followed by a comma.
+# n | promotions | sum(moves) | fnv1a64(moves)  -- the Java's game of the board's frames for the promotion sets of
+# result rows (n = 762..1227: the whole optimal set, a random subset and a random half of it), and for further feasible
+# sets at the edges of the set widths (511, 512, 1023..1025, 1500, 2047..2049).  fnv1a64 is taken over the decimal text
+# of each move followed by a comma.
 762 | 164 228 245 252 258 260 261 273 279 280 285 290 294 300 308 312 320 322 325 330 333 336 338 340 342 343 345 350 351 352 356 357 360 363 364 366 368 369 370 372 375 376 378 380 | 182931 | e9c3e8315f4e5c19
 762 | 164 245 258 260 261 273 285 290 294 300 320 322 325 330 340 343 345 350 351 357 360 366 368 369 372 376 378 | 177363 | b830ba96d57dcc5c
 762 | 228 245 252 258 279 294 300 308 325 340 343 351 360 363 368 369 372 375 376 380 | 175247 | 5972e3572d634d4c

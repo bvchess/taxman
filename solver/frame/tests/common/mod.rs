@@ -45,8 +45,7 @@ pub fn testdata(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata").join(path)
 }
 
-/// The Java's golden data for game `n`: `testdata/golden/n<NNNN>.json` (made by `tools/golden/export.sh` at the git tag
-/// `java-final`).
+/// The Java's golden data for game `n`: `testdata/golden/n<NNNN>.json`.
 pub fn golden(n: u32) -> Json {
     Json::from_file(testdata(&format!("golden/n{n:04}.json"))).unwrap_or_else(|e| panic!("n={n}: {e}"))
 }

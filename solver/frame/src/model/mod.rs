@@ -39,12 +39,11 @@
 //! once promoted), so each is promoted at most once along a path, as the search's candidates ensure.  A model with
 //! none ([`FrameGraph::build`]) is the frame model as it was, and every method below reduces to what it did.
 //!
-//! This is the Java solver's `Frame`, `FrameSet`, `FrameMapper` (home frames only) and `FactorProvider`
-//! (package `org.taxman.h6.search`), reimplemented for speed rather than translated: frames are inline bitsets,
-//! a [`FrameSet`] is `Copy` and never allocates, and promotions can be done in place.  The results are the
-//! Java's (the golden tests check them); how they are computed differs: the peel's rule, the reduction started
-//! only where a promotion can have left a move with a single live factor (frames in a [`FrameSet`] are always
-//! reduced), and the factor lists restricted to the frames each number can take part in.
+//! This is the Java solver's frame model (home frames only), reimplemented for speed rather than translated: frames are
+//! inline bitsets, a [`FrameSet`] is `Copy` and never allocates, and promotions can be done in place.  The results are
+//! the Java's (the golden tests check them); how they are computed differs: the peel's rule, the reduction started only
+//! where a promotion can have left a move with a single live factor (frames in a [`FrameSet`] are always reduced), and
+//! the factor lists restricted to the frames each number can take part in.
 //!
 //! Numbers are `u32` game numbers throughout; the lists store them as `u16`, which bounds boards at 65535.
 
@@ -78,7 +77,7 @@ pub const MAX_FRAMES: usize = 9;
 pub struct FrameGraph {
     graph: FactorProvider,
     /// Home frame of each number: the frame whose factors held it when the frame set was built; 0 for numbers
-    /// that were not a factor anywhere (as the Java's `FrameMapper`).
+    /// that were not a factor anywhere.
     home: Vec<u8>,
     /// The own frame plus one of each one-sided candidate, 0 for every other number; empty when there are none.
     own: Vec<u8>,
@@ -91,8 +90,8 @@ pub struct FrameGraph {
 }
 
 impl FrameGraph {
-    /// The Java's `FrameSet.create`: `columns` alternate factors and moves per frame, front first; each frame
-    /// is reduced.  Returns the model and the starting frame set.
+    /// `columns` alternate factors and moves per frame, front first; each frame is reduced.  Returns the model and the
+    /// starting frame set.
     pub fn build<const W: usize>(tables: &Tables, columns: &[Vec<u32>]) -> Result<(FrameGraph, FrameSet<W>), String> {
         Self::build_extended(tables, columns, &[])
     }
@@ -187,7 +186,7 @@ impl FrameGraph {
         self.home.get(n as usize).map_or(0, |&h| usize::from(h))
     }
 
-    /// The Java's `containsFactor`: whether `n` is still a factor of its home frame.
+    /// Whether `n` is still a factor of its home frame.
     #[inline]
     pub fn contains_factor<const W: usize>(&self, state: &FrameSet<W>, n: u32) -> bool {
         let h = self.home(n);

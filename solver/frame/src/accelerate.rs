@@ -1,8 +1,7 @@
 //! The prime shortcut, and the last step that turns a promotion set into a game.
 //!
 //! Where this fits ([`crate::solver`] has the whole pipeline): before it searches for the game of `n`, the solver
-//! tries a shortcut that needs the (optimal) game of `n − 1`, the Java's `FrameSolver.solveBasedOnPrev` for a prime
-//! `n`, which `--force-search` turns off.
+//! tries a shortcut for a prime `n` that needs the (optimal) game of `n − 1`; `--force-search` turns it off.
 //!
 //! * [`prime_shortcut`], for a prime `n`.  **Proven**: given an optimal game of `n − 1`, the game it returns is
 //!   optimal, with no assumption from the frame model.  The proof is the documentation of the function.

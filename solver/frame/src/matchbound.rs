@@ -24,9 +24,9 @@
 //! be matched and an edge whose mover is a candidate weighs that candidate.
 //!
 //! The bound ignores the frames' freedoms and the limit on the number of promotions (`max_total`, a node's
-//! `max_add`).  Both only remove completions, so it remains an upper bound.  The Java's `blameGame` bound does
-//! respect them, and the smaller of the two would be a bound too; but it never pruned where the matching bound did
-//! not, so the search does not compute it.
+//! `max_add`).  Both only remove completions, so it remains an upper bound.  The Java solver's own bound does respect
+//! them, and the smaller of the two would be a bound too; but it never pruned where the matching bound did not, so the
+//! search does not compute it.
 //!
 //! # Two solvers
 //!

@@ -20,8 +20,8 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 
 /// One frame: its moves, its factors, and its freedoms.  Freedoms start at `|factors| − |moves|` and drop by one
-/// on every promotion into or out of the frame.  Equality includes the freedoms (the Java's `Frame.equals` ignores
-/// them).
+/// on every promotion into or out of the frame.  Equality includes the freedoms (the Java solver's equality of frames
+/// ignores them).
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Frame<const W: usize> {
     pub moves: Bits<W>,
@@ -40,8 +40,8 @@ impl<const W: usize> Frame<W> {
         winnable(&self.moves, &self.factors, g)
     }
 
-    /// The Java's `Frame.reduce`: the frame with every move that is left with one live factor dropped together with
-    /// that factor, freedoms recomputed from the sizes.
+    /// The frame with every move that is left with one live factor dropped together with that factor, freedoms
+    /// recomputed from the sizes.
     pub fn reduce(&self, g: &FactorProvider) -> Self {
         let (mut moves, mut factors) = (self.moves, self.factors);
         let pending = Worklist::of(&moves);
@@ -49,8 +49,8 @@ impl<const W: usize> Frame<W> {
         Frame::new(moves, factors)
     }
 
-    /// The Java's `Frame.promoteInto`: the frame with `n` added as a move, if it stays winnable; reduced, and
-    /// with one freedom less.  Works on any frame, reduced or not.
+    /// The frame with `n` added as a move, if it stays winnable; reduced, and with one freedom less.  Works on any
+    /// frame, reduced or not.
     pub fn promote_into(&self, n: u32, g: &FactorProvider) -> Option<Self> {
         let mut moves = self.moves.with(n);
         let mut factors = self.factors;
@@ -62,8 +62,8 @@ impl<const W: usize> Frame<W> {
         Some(Frame { moves, factors, freedoms: self.freedoms - 1 })
     }
 
-    /// The Java's `Frame.promoteOutOf`: the frame without the factor `n`, if it stays winnable; reduced, and
-    /// with one freedom less.  `None` also when `n` is not a factor (the Java asserts).
+    /// The frame without the factor `n`, if it stays winnable; reduced, and with one freedom less.  `None` also when
+    /// `n` is not a factor (the Java solver asserts).
     pub fn promote_out_of(&self, n: u32, g: &FactorProvider) -> Option<Self> {
         if !self.factors.contains(n) {
             return None;
@@ -131,8 +131,8 @@ impl<const W: usize> FrameSet<W> {
         self.frames[..other.len].copy_from_slice(&other.frames[..other.len]);
     }
 
-    /// The Java's `narrowCandidateSet`: the members of `candidates` that are factors of a frame `i ≥ 1` such
-    /// that both frame `i` and frame `i − 1` have freedoms left (see the module docs).
+    /// The members of `candidates` that are factors of a frame `i ≥ 1` such that both frame `i` and frame `i − 1` have
+    /// freedoms left (see the module docs).
     #[inline]
     pub fn narrow_candidates(&self, candidates: &Bits<W>) -> Bits<W> {
         let mut open = Bits::EMPTY;
@@ -144,15 +144,14 @@ impl<const W: usize> FrameSet<W> {
         open & *candidates
     }
 
-    /// The Java's `computeMaxNumberOfPromotions()`: an upper bound on the number of further promotions, from
-    /// the freedoms alone (see the module docs).
+    /// An upper bound on the number of further promotions, from the freedoms alone (see the module docs).
     #[inline]
     pub fn max_promotions(&self) -> i32 {
         self.max_promotions_with(|f| f.freedoms)
     }
 
-    /// The Java's `computeMaxNumberOfPromotions(candidates)`: as [`max_promotions`](Self::max_promotions), but
-    /// no frame promotes out more numbers than it has among `candidates`.
+    /// As [`max_promotions`](Self::max_promotions), but no frame promotes out more numbers than it has among
+    /// `candidates`.
     #[inline]
     pub fn max_promotions_among(&self, candidates: &Bits<W>) -> i32 {
         self.max_promotions_with(|f| f.freedoms.min(f.factors.intersect(candidates).len() as i32))
