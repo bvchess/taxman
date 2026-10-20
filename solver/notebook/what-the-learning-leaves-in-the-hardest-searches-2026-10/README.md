@@ -25,6 +25,10 @@ node's conflict (its images under twin swaps and paired exchanges that are confl
 at every gap, so it closes only nodes that were closing anyway: cutting by it would save under 4% of the steps.  So
 ladder branching is moot too.  ([Stage 2](#stage-2-todays-hardest-units-and-the-knot).)
 
+**Closed (2026-10-20).**  None of this reopens the learning, which is closed, not adopted: [the
+verdict](../conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted) has the
+evidence.
+
 The study follows [conflicts closed under cheap exchanges](../conflicts-closed-under-cheap-exchanges-2026-10/README.md),
 whose learning took 20.6% off the steps of the tuning suite and only 4.5% off the CPU of its whole games.  It has three
 stages: the instruments, built and tried on two units of the old [tuning

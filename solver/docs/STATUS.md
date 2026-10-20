@@ -25,12 +25,16 @@ wall"](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only 
 that slope.  On 64 threads the search loses nothing to threads (3.4 thousand nodes a second a thread at 3441, the same
 on 16, 32 and 64), so what remains is cheaper nodes and smaller trees.  Every avenue tried for the bound is closed but
 the certificates (A2, paused): [AGENDA.md, "Ranked avenues"](AGENDA.md#3-ranked-avenues).  For smaller trees, learning
-each conflict's closure under cheap twin exchanges takes 21% off the steps and 16% off the CPU of the 46 problems of the
-tuning suite (37-49% off three hard units' steps, 4.5% of the CPU off its six whole games), in the studies build only so
-far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md)).
+each conflict's closure under cheap twin exchanges is closed, not adopted: units gain and whole games do not ([the
+verdict](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)).
 
 ## Recently closed
 
+* **Learning conflicts' closures under cheap twin exchanges** (2026-10-19 to 20): 37-49% off three hard units' steps and
+  15.9% off the CPU of the tuning suite's 46 problems, but 4.5% off its six whole games.  On the hardest games of the run
+  to 5000 it took 13.4% off the CPU of 4176, put 30.9% on that of 4050 and ran past 2.2 times the default's at 4005.  It
+  stays in the studies build, and the whole-game test and the searcher's tactic that it planned are withdrawn ([the
+  verdict](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)).
 * **The run to 5000** (2026-10-18 to 20): games 3915-4547 appended to the committed chain, 167 of them from the bounds
   store with no search, for 40.4 instance-hours and $27.32, both referees passing; the budget ended it in game 4548,
   whose checkpoint is in S3 ([the entry](../notebook/the-run-to-5000-2026-10/README.md)).
