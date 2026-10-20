@@ -8,8 +8,7 @@ The design explains what the solver does, and why, a file a part (the map below)
 
 The other documents:
 
-* [STATUS.md](STATUS.md) is the current state of the work: what is in flight, paused, decided and waiting.  Read it
-  first.
+* [STATUS.md](STATUS.md) is the current state of the work: the priority, and the projects in flight.  Read it first.
 * The [README](../frame/README.md) is the user guide: how to build and run the solver.  The [reference](REFERENCE.md)
   has every flag and command, the output, and what a result records.  The [glossary](../../docs/GLOSSARY.md) defines the
   project's words.

@@ -174,7 +174,9 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   and statistics to `nNNNN.ckpt`.  Its **header** identifies the search: n, the set width, digests of the candidates
   and frames, `max_total` and the tactics.
 * **the wall**: the first game whose own search takes longer than a set number of hours.  `taxman solve --game-hours
-  H` ends a range there.  [STATUS.md](../solver/docs/STATUS.md) gives the limit the project uses.
+  H` ends a range there.  The project's limit (2026-10-16) is 24 hours of the game's own search, not time spent waiting
+  behind another game, on one `c8g.16xlarge` with the run's build and settings: `--game-hours 24`, the hours the game
+  has been the oldest of the window with its search running.
 
 ## Bounds
 

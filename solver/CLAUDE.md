@@ -24,7 +24,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
 * **docs/GLOSSARY.md**: every term, defined once.
 * **solver/docs/DESIGN.md**: the design, the index of solver/docs/design/, a file a part (testing.md says how
   changes are tested).
-* **solver/docs/STATUS.md**: the current state: what is in flight, paused, decided, and waiting on a decision.
+* **solver/docs/STATUS.md**: the current state: the priority, and the projects in flight.
 * **solver/notebook/README.md**: the lab notebook's rules, and the map of its register (register/, a file a
   subject) and its index (index.md); its entries are the folders beside it.
 * **solver/docs/AGENDA.md**: the research avenues.

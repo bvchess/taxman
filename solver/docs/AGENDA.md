@@ -2,12 +2,12 @@
 
 What to pursue to push the wall much further: what limits the search, the avenues ranked, the conjectures worth proving,
 the ideas worth borrowing, and what the cloud runs should measure.  It is for anyone choosing the next experiment.  The
-wall is the first game whose own search takes longer than the limit that [STATUS](STATUS.md) gives ([the
-glossary](../../docs/GLOSSARY.md)).  Each avenue says where it stands.  The
-[register](../notebook/README.md#register-of-everything-tried) is the record of what was tried, and an avenue started
-from here gets its row there when it ends.  The measurements made for this agenda are the entry [Measurements made for
-the research agenda](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as
-"measurements 7.1" to "7.4".
+[wall](../../docs/GLOSSARY.md#the-search) is the first game whose own search takes longer than the project's limit.
+Each avenue says where it stands.  The [register](../notebook/README.md#register-of-everything-tried) is the record of
+what was tried, and an avenue started from here gets its row there when it ends.  The measurements made for this agenda
+are the entry [Measurements made for the research
+agenda](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as "measurements 7.1" to
+"7.4".
 
 * [1. Where we are](#1-where-we-are)
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
@@ -186,7 +186,8 @@ nodes](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026
 
 *Paused.*  Its first steps are done, and the campaign of certificates of 2176..3440 is ready and paused; the games past
 3440 have none yet.  The proven wall of the heading is the end of the games proven on the whole board, 2175 (the
-prover's proofs, and certificates of 600..1300) ([STATUS](STATUS.md); [runbook/certify.md](runbook/certify.md)).
+prover's proofs, and certificates of 600..1300) ([runbook/certify.md](runbook/certify.md)); certifying U is not the
+priority ([STATUS](STATUS.md)).
 
 *Idea.*  Turn the model's assumptions into proven facts, in general or game by game, so that the solver's chain is a
 proof on the whole board and the prover need not repeat the model's work by search.  The first assumption is the upper
@@ -217,9 +218,10 @@ should lose the part spent refuting sacrifices of U\*, which grows with n: A2's 
 
 
 *What remains.*  The campaign of certificates of 2176..3440, and the claim-by-claim rule (Lemma M5⁺), which would settle
-its last phase without a search; both are paused (STATUS).  The prover's search with the certified members forced, on
-five games of 1302-2100 (killed if the dear games take fewer than half the nodes), has not run; E6, the measurement of
-the sources left free against the upper part fixed to U\*, was prepared and then superseded by the certificates.
+its last phase without a search; both are paused, since certifying U is not the priority ([STATUS](STATUS.md)).  The
+prover's search with the certified members forced, on five games of 1302-2100 (killed if the dear games take fewer than
+half the nodes), has not run; E6, the measurement of the sources left free against the upper part fixed to U\*, was
+prepared and then superseded by the certificates.
 
 *Payoff.*  The proofs on the whole board move with the solver's chain instead of falling behind tenfold per 1000 n.
 With a general proof of the model, the prover becomes a cross-check that can lag.

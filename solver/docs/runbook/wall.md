@@ -5,10 +5,10 @@ Part of the [runbook](../RUNBOOK.md).
 `wall.sh` runs the chain on one `c8g.16xlarge` (64 threads, window 4) at spot, with no one to watch it.  The machine
 builds a pinned commit of master and solves the chain from n = 1, or, with `--use-prev`, takes the games that the
 committed chain and the bounds store already hold and goes on past them ([Drawing on the known
-games](#launch-watch-stop-clean-up), below).  It stops by itself at the wall, when it has used its budget, or on a
-date.  When AWS takes the machine away, a group starts another that goes on from the saved state.
-[STATUS.md](../STATUS.md) gives the wall's limit.  A launch needs the approval of whoever owns the AWS account, with the
-estimate of [What needs approval, and what it costs](#what-needs-approval-and-what-it-costs).
+games](#launch-watch-stop-clean-up), below).  It stops by itself at the wall, when it has used its budget, or on a date.
+When AWS takes the machine away, a group starts another that goes on from the saved state.  [The
+glossary](../../../docs/GLOSSARY.md#the-search) gives the wall's limit.  A launch needs the approval of whoever owns the
+AWS account, with the estimate of [What needs approval, and what it costs](#what-needs-approval-and-what-it-costs).
 
 ## How it ends
 

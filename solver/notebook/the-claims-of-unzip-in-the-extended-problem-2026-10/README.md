@@ -93,6 +93,17 @@ was measured on this code, then taken out:
 but for the times and the build, to the base commit's binary (ed09ac0; 290,503 nodes), both suites, clippy and fmt.
 The laptop ran one process at a time, on one thread, `nice`; nothing ran on AWS.
 
+
+## Later (2026-10-20): the claim-by-claim rule's branch, paused
+
+STATUS held this until it was cut to the state of the work.  The claim-by-claim rule (Lemma M5⁺ claim by claim, for the
+certificates) is paused, decided 2026-10-16, until after the weekly reset.  Its branch
+`worktree-agent-a2db9341d6d4e8cd9` held three commits: e62dd1f (the rule, `Claims::Each`, the default of `certify`),
+30c8504 (the certificates of 600..1300 and the problems of 600..3440 claim by claim) and 54dce27 (the edit of THEORY.md,
+uncommitted until then).  It is on the old layout (`rust/`, `heuristics/THEORY.md`): its paths need the new ones before
+it merges.  By the project's rule the branch is deleted once recorded here.  Certifying U is not the priority
+([STATUS](../../docs/STATUS.md)).
+
 ## Files
 
 What the census checks and why: the module comment of `examples/structure.rs` (it defines every field of a line) and
