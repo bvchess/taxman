@@ -4,9 +4,10 @@ Part of the [design](../DESIGN.md).
 
 The search is a branch and bound over promotion sets.  It keeps the best promotion set found so far, the *incumbent*,
 and explores the sets that could beat it, pruning every part of the tree that a bound shows cannot.  This section builds
-it up: the state and the order of the search, three bounds on a node (the matching bound, the Lagrangian bound over the
-nogoods, and the GF(2) bound, the default), the conflicts and nogoods that the branching rests on, and the rule of
-symmetric pairs.  "The default step" then puts them together, and the last two parts are the search's start and its
+it up: the state and the order of the search, two bounds on a node (the matching bound and the Lagrangian bound over the
+nogoods), and the conflicts and nogoods that the branching rests on; the GF(2) bound, the default, and the rule of
+symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, and the last two parts
+are the search's start and its
 extended mode.  The [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
 
 ## Search state and order
@@ -86,8 +87,8 @@ kept only help a frame.  So **every promotable completion leaves out some member
   (`search::refine::Refiner`).
 * **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest candidate:
   the child promotes the member, and the node goes on without it, so that neither can reproduce the heaviest matching.
-  The member is the one whose removal lowers the matching bound most.  That takes one bound without each member, and
-  `bound_excluding` settles most of them from the potentials alone.  A node with no conflict among its candidates
+  The member is the one whose removal lowers the matching bound most.  That takes one bound without each member, each
+  solved exactly (`MatchBound::value_excluding`).  A node with no conflict among its candidates
   branches on its largest.  The smallest member, the largest, and the Java's largest candidate were once tactics; at the
   hardest games they took 6 to more than 17 times as long, and were removed.
 * **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: the search offers it as
@@ -134,7 +135,8 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   on them and a resumed search starts with empty tables; the run that resumes says which it uses.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
   cannot be promoted from the root at all and could be filtered out once.  It cannot: on every game from 2 to 1230 the
-  frame builder's candidates all pass that test at the root, which a test checks.  A single-member conflict is a
+  frame builder's candidates all pass that test at the root (a test checks every game to 511 and every sixth
+  past it).  A single-member conflict is a
   candidate that cannot be promoted *once the node's promotions are made*: its frame may have used it to pay for a move
   left with one live factor, say.  In another branch it is part of a nogood of two or more members.  The promotions that
   fail are under 4% of the steps, so little would be saved ([single-member
@@ -174,7 +176,7 @@ The search computes it in integers (weights in 64ths), with nothing rounded; the
   times less game time.  Each step costs about half as much again, so a search whose time goes into finding its best set
   late, as 992's does, is slower ([a Lagrangian bound over the
   nogoods](../../notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it changes no
-  tree measured (below).
+  tree measured ([tactics.md](tactics.md), the row of `lagrange`).
 
 ## The default step
 
@@ -189,8 +191,9 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
    or its max_add largest sum below need
 2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
-     F = the forced members of I* (by the weight split: those without which the bound is below need; and those
-         near it whose exchange graph has no cycle through them within value − need)
+     F = the forced members of I* (by the weight split: those without which the bound is below need; and those it
+         leaves free within force_window of need, all by default, whose exchange graph has no cycle through them
+         within value − need)
      the nogood table knows a conflict of I* all of whose members are in F or promoted
                                                    -> end the loop (cut)
      I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop

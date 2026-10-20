@@ -18,7 +18,8 @@ runs.  It has four parts:
 * the candidates;
 * `max_total`, the most promotions the frames' freedoms allow.
 
-The searcher also gets the tactics, the ceiling and the seed (`search::prepare`).  They change how the search runs, not
+The searcher also gets the tactics (`search::prepare`), the ceiling and the seed (`search::search`).  They change how
+the search runs, not
 what it finds ([search.md](search.md)).  The greedy set and the matching graph are functions of Π.  The best promotion
 sum P\*(Π) is the largest sum of a *promotable* set of Π: a set of at most `max_total` candidates that can be promoted
 from the root, keeping every frame winnable and its freedoms at least 0.
@@ -35,7 +36,7 @@ side of telling problems apart.  Equal forms are equal problems, with the same p
 results line records the form's 64-bit digest (`setup.digest`), but nothing rests on the digest alone ("Finding m",
 below).
 
-*Which proofs settle P\*.*  A repeat is only as good as the earlier game's proof.  Three kinds of proof of a game m
+*Which proofs settle P\*.*  A repeat is only as good as the earlier game's proof.  Four kinds of proof of a game m
 establish P\*(Π_m):
 
 * `exhausted`: the search explored the whole tree of Π_m.  So the sum of m's promotions is P\*(Π_m), given that the
@@ -49,6 +50,9 @@ establish P\*(Π_m):
   m's promotions, whatever tactics shaped the search.
 * `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
   k's.
+* `known`, where an upper bound of the bounds store ended m's search: the search found a promotable set of the largest
+  sum the bound allows, so no set sums to more, given the bound, whose assumptions m's line records
+  (`Proof::settles_search`).  A game only taken from a known source, with no search, sets none up.
 
 No other proof settles P\*.  A trivial game has no candidates and sets no search up.  A prime game is the prime
 formula's and sets none up either.  Neither is ever repeated, and the verifiers refuse a repeat that names one.  An

@@ -9,14 +9,15 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Unit tests**, per module, include the Java tests' cases (`FactorTableTest`, `FrameTest`, `FrameSetTest` for
   n = 85).  The helpers that the unit and integration tests share (temporary directories, a random generator) are one
   file, `tests/common/support.rs`.
-* **Golden tests** (`tests/golden_frames.rs`, `tests/solver.rs`) check every stage of the port against the Java's
+* **Golden tests** (`tests/golden_frames.rs`, and unit tests in `src/search/tests.rs` and `src/bounds.rs`) check every
+  stage of the port against the Java's
   answers in `testdata/golden/n*.json` ([its README](../../frame/testdata/golden/README.md) says where they came from):
   the setup's frames, the numbered and merged frames, the candidates, the reduced frame set, the greedy incumbent, the
   prime shortcut and the result of the solve.  The searched golden games (94, up to 760) give the Java's promotion sums
   with the default tactics, and the tactic variants give the same answers on those up to 400.  Past 760 the Java's
   structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048,
   checked at the width `with_width!` picks) and `games_java.txt` (the Java's game of the board's frames, move for move,
-  for 171 sets of promotions at 762–2049).
+  for 171 sets of promotions at 511–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
   `results/strict.jsonl`, and the last, the moves that the game's promotions make and the digest of the board's search
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
@@ -31,8 +32,9 @@ every second line of the Java fixtures), and the comment on each says what the w
     optional) both ways, in both formulations (with and without the claims of `unzip`, Lemma M5⁺): on every set of
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
     with none open the promotion sets are the frame model's, and catches a mutant that skips the check of Lemma M5⁺.
-  * `tests/bottom_layers.rs` checks Theorem B on every game of `optimal.json`, the committed chain and the chain past
-    it, every optimal set the prover enumerated, and every optimal set of the games to 48.
+  * `tests/bottom_layers.rs` checks Theorem B on every game of `optimal.json`, the committed chain and another run of
+    its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
+    set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
     `build_frames` uses, that the frames lie in layers (Lemma Ω, also on punctured boards), and that the numbering by
     layer is the Java's breadth-first numbering on every game to 400 and a sample to 8191.
@@ -70,11 +72,12 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Soundness harness** (`tests/soundness.rs`): the search starts from an incumbent worth 1 or 5 less than P\* with an
   empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place (which tests
   the `<` and `<=` boundaries too).  It runs:
-  * every game 2..=300 under each of 34 configurations: 19 of the matching path (every tactic; forgetting every step,
+  * every game 2..=300 under each of 41 configurations: 19 of the matching path (every tactic; forgetting every step,
     every third, never; the Lagrangian bound refitted every few steps; one thread and two), 11 of the default, the
     GF(2) bound with the rule of symmetric pairs (every way of choosing the branch; the matching bound as a first check;
     without forced members or nogoods; forgetting every step; two threads; the Lagrangian bound after it), the GF(2)
-    bound without the rule on one thread, two, and forgetting every step, and the matching path with the rule;
+    bound without the rule on one thread, two, and forgetting every step, the matching path with the rule, and 7
+    policies of keeping nogoods;
   * every game 2..=600 with symmetric pairs, with the rule over either bound (and the oracle without the frame model to
     40); units on the way to an optimal set (an optimal set less 30 to 70% of its members, games 600..1000) with the
     rule; and games 301..=600 (every tenth: searches of hundreds to thousands of steps) with the Lagrangian bound
@@ -83,10 +86,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     exhaustively; promoting a set at once against one by one in random orders; conflicts and nogoods on perturbed
     models;
   * searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling: game 600 on the matching
-    path, one of them with the Lagrangian bound refitted every four steps, and game 1000 with the GF(2) bound, whose
+    path, one of them with the Lagrangian bound refitted every four steps, and game 992 with the GF(2) bound, whose
     search of 600 is too short to stop;
   * units of real games at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent,
-    and games 1133 (matching) and 1000 (GF(2)) resumed every 1,024 steps at W = 20, 24 and 64, which carry the harness
+    and games 1133 (matching) and 992 (GF(2)) resumed every 1,024 steps at W = 20, 24 and 64, which carry the harness
     past the widths of the Java's table (n ≤ 1000).
 
   A search below the root with the rule of symmetric pairs is held to the best completion that keeps their
@@ -111,7 +114,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   and reproduce every row of the default table, node for node.
 
   **A change that alters the tree on purpose fails them.**  Run `cargo test --release --test tripwires -- --nocapture`
-  (the quick tests check only the rows of trees of 400 nodes or fewer): it prints the rows as observed, in the layout of
+  (the quick tests check only the rows of trees of 250 nodes or fewer): it prints the rows as observed, in the layout of
   the table at the top of the file.  Check that the promotion sums (the answers) have not moved, paste the rows in, and
   update any node counts quoted in the docs.
 * **Extended mode** ([Extended mode: one-sided candidates](search.md#extended-mode-one-sided-candidates)):
@@ -225,10 +228,11 @@ every second line of the Java fixtures), and the comment on each says what the w
     assumptions dropped or added, no citation, a changed proof or score, a citation on a game that is not a known one.
     `tests/docs.rs` has `known` among the keys a line has.
 * **Large games** (`tests/wide.rs`): the Java stopped at 1000, and the sets that hold a game are 8 to 128 words wide,
-  so nothing above 1023 meets anything but the committed results and these tests.
+  so these tests check the widths past 1023 against each other and against the committed results.
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
     `max_total`, answer and tree.
-  * Game 1133 (W = 20, about 2,400 nodes) under every tactic against `strict.jsonl`, and a slice of that chain; the
+  * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against `strict.jsonl`, and a
+    slice of that chain; the
     sacrifice bound proves game 1133 by an independent route.
   * A game of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at 128 go through the frames, the matching
     bound, conflicts, the greedy set and a node-limited search; games of 2050, 2400, 2800 and 3100 at the widths they
