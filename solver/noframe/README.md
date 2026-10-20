@@ -13,7 +13,8 @@ every source with three or more prime factors that setup keeps
 ([docs/theory/frame-model.md](../../docs/theory/frame-model.md), where the model's other rules are proven;
 [solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Where the prover proves opt(n), U holds.  The
 sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
-wherever THEORY.md's conjecture (★) holds (Theorem 8; [THEORY.md](../../docs/theory/open-problem.md)).
+wherever THEORY.md's conjecture (★) holds (Theorem 8;
+[docs/theory/uniqueness-and-longest-games.md](../../docs/theory/uniqueness-and-longest-games.md)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
 searches for adversarial instances.  It rests only on THEORY.md's theorems and on elementary bounds, and every exact

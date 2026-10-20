@@ -12,7 +12,8 @@ Before the prover, this was the state of the evidence.
     (Theorems 4–6);
   * greedy is weight-optimal wherever the frontier jam is hyperedge-free;
   * the bounds opt(n) ≤ n + opt(n − 1), the prime formula, and the Franklín–Moniot bound.
-* **(★), the upper-half conjecture.**  docs/theory/evidence.md had 3,231 of 3,236 rejection-bearing components (all n
+* **(★), the upper-half conjecture.**  docs/THEORY.md had, to commit ddbaf30, 3,231 of 3,236 rejection-bearing
+  components (all n
   = 6..1500, forty samples to 4000, n = 2873 and 9170) verified by exact search over the residual or certified by the
   matching-number bound.  Five were undecided (n = 3103, 3872, 3936, 4000, 9170, with search budgets of 2.7×10⁹ to
   1.1×10⁴⁷), the last "to be settled only by a theorem"; the uncertified 0.2% were exactly those five.  Besides:
@@ -62,6 +63,6 @@ Before the prover, this was the state of the evidence.
   less than d.  The picks below n/2 are all below d, and every exchange observed between optimal sets turns on numbers
   below n/2 that are maximal factors of members of U\*, which is where to look.  Also observed but unexplained: a
   game's optimal sets all have the same size.  The cheapest next evidence is the other half for the 34 games enumerated
-  only with the sources fixed.  Their enumeration costs about what their proofs did (5 to 60 minutes each, some 6
-  CPU-hours in all), so it wants `exact`'s pausing and Lagrangian bound with the target lowered by one and the
-  enumeration mode on, which would let `exact` return every optimal set with each proof.
+  only with the sources fixed.  Their enumeration costs about what their proofs did (some 6 CPU-hours in all, 5 to 100
+  minutes for each of the 18 that took a search), so it wants `exact`'s pausing and Lagrangian bound with the target
+  lowered by one and the enumeration mode on, which would let `exact` return every optimal set with each proof.

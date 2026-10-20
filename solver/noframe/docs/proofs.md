@@ -19,8 +19,10 @@ from proven facts only:
 
 A search from the roles proves that no playable set that obeys them beats V(n).  That proves opt(n) ≤ V(n), because an
 optimal set beating V(n) would obey them.  Its lines say `"fix_low":1`, and the plain root's `"fix_low":0`; the
-committed `data/exact_*.jsonl` are all from the plain root, and rest on no Theorem B.  `tools/summarize.py exact` and
-`check` count the proofs that rest on it.  The prover knows nothing of frames, greedy, `unzip` or promotions.
+committed `data/exact_*.jsonl` are all from the plain root, from before the field, and rest on no Theorem B.
+`tools/summarize.py exact` and `check` count the proofs that rest on it.  Its game (`src/game.rs`) knows nothing of
+frames, greedy, `unzip` or promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of Theorem B
+and the checks of the conjectures.
 
 The search:
 
@@ -56,9 +58,9 @@ The target is the recorded score V(n).  The search proves that no playable set b
 B, none that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
 
 Every rule above is tested against brute force or against the recorded score.  The search must still reach
-optimal.json's score from one below it, with each rule on, and from the roles of Theorem B too, on every third game of
-187-700 that needs a search.  The parity bound's intersection is checked against enumeration on random pairs of
-matroids.
+optimal.json's score from one below it, with each rule on, on every seventh game to 420, and from the roles of Theorem
+B on every third game of 187-700 that needs a search.  The parity bound's intersection is checked against enumeration on
+random pairs of matroids.
 
 **From the roles of Theorem B** (the default since 2026-10; the committed proofs below are from the plain root).  Over
 the games of 2..999, the 391 searches took 588,026 nodes and 357 s from the roles, against 614,900 nodes and 712 s from
@@ -83,7 +85,7 @@ all of them at most 186 (`upper::tests`).
 | **every n in 2 .. 989**, and 999 .. 1019 | **1009** |
 
 The searches took 10.0 hours of CPU in all.  The cost is far from monotone in n, and follows the Franklín–Moniot
-bound's gap: 140–430 points around n = 500–700, and 650–1200 from 800 on.  The hardest games are those whose score it
+bound's gap: 140–510 points at n = 500–699, and 540–1180 from 800 on.  The hardest games are those whose score it
 overrates most: 798–804 at 7–12 million nodes, and 987–989 at 19–53 million.  Games 990, 992, 993, 995 and 996 took
 50–70 million nodes each, and 1020 and 1023–1027 several million, without finishing; their searches are saved in
 `data/checkpoints/exact_open_searches.tar.gz`.
@@ -102,7 +104,7 @@ data/exact_parity_990_1300.jsonl`):
 | proven by a search (to 989 with the Franklín–Moniot bound alone, from 990 with the parity bound) | 649 |
 | `chain`, at its ceiling V(n) = n + V(n−1), predecessor proven | 407 |
 | `prime`, by the prime formula, predecessor proven | 198 |
-| **every n in 2 .. 1300**, the whole committed chain | **1299** |
+| **every n in 2 .. 1300**, the committed chain to 1300 | **1299** |
 
 The parity searches of this file took 2.7 hours of thread time on three threads; the warm starts came in for its last
 96 games.  The hardest was 1287, at 146,855 nodes and 279 seconds.  So the frame model's answer is opt(n) for every
@@ -264,15 +266,17 @@ By band, the open members and the margins of each game (the share is of all memb
 | 3200-3314 | 66 | 1030 | 959-993 | 113, 150, 246 | 16.1% | 372, 1355 |
 | 3315-3440 | 73 | 1259 | 994-1035 | 172, 197, 271 | 19.9% | 531, 1467 |
 
-* **No game is certified whole.**  Every one leaves members open: from 1 (1305) to 102 (2172) up to 2175, and from 15
+* **No game past 1300 is certified whole.**  Every one leaves members open: from 1 (1305) to 102 (2172) up to 2175, and
+  from 15
   (2610) to 317 (2346) past it.  In all, 7.5% of the members are open to 2175 (18,596 of 247,482), 14.9% on 2176-3314
   (77,195 of 518,992), and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
 * **The open share follows the root's gap, not n.**  It grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
-  0.73 in each file), and it falls back with the gap (2600-2699).  The root's gap is the one the frame solver's search
+  0.73, 0.73 and 0.91 in the three files), and it falls back with the gap (2600-2699).  The root's gap is the one the
+  frame solver's search
   costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400 games past 2175 that
   both measured (`../notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl`).  The margins grow with it, and the largest
   is close to the gap.
-* **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,125 games that need it**, as at every root
+* **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,198 games that need it**, as at every root
   measured before; no game is flagged.
 * **The open members are mostly of layer 3** (52% to 2175 and 58% past it), then of layer 5 (21%, 27%) and 4 (19%, 9%),
   and the rest in layers 6 to 11.

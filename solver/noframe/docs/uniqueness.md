@@ -54,9 +54,9 @@ The checks:
 * both optimal sets of 425 replay by the rules (`heuristics/core.py`'s ordering and `check_sequence`);
 * every optimal set found holds the largest prime and no other.
 
-Enumerating at V(n) − 1 costs about what the proof at V(n) costs.  Over 68 games whose proof took at least 10,000
-nodes, the ratio runs from 0.94 to 1.20, 4% more in total.  So a proof of opt(n) by the prover can return the complete
-list of optimal sets almost for free.
+Enumerating at V(n) − 1 costs about what the proof at V(n) costs.  Over the 154 games to 989 whose proof took at least
+10,000 nodes, the ratio runs from 0.91 to 1.49, 4% more in total.  So a proof of opt(n) by the prover can return the
+complete list of optimal sets almost for free.
 
 ## Results
 
@@ -92,7 +92,7 @@ which games at their ceiling or primes carry from game to game, and some games m
 |---|---|---|---|---|
 | 425–428 | 2 | {110, 132, 168} ↔ {98, 150, 162} | 410 | 3 ↔ 3 |
 | 432–439 | 2 | {132, 147, 180, 208} ↔ {156, 160, 162, 189} | 667 | 4 ↔ 4 |
-| 539 | 3 | {128, 168, 240} ↔ {120, 192, 224}; {120, 154, 189, 220, 234} ↔ {147, 180, 182, 198, 210}; the two non-canonical sets are 7 ↔ 7 apart | 536, 917, 1333 | 3, 5, 7 |
+| 539 | 3 | {128, 168, 240} ↔ {120, 192, 224}; {120, 154, 189, 220, 234} ↔ {147, 180, 182, 198, 210}, between the two non-canonical sets; the canonical set and the third are 7 ↔ 7 apart | 536, 917, 1333 | 3, 5, 7 |
 | 684–687 | 3, 3, 2, 2 | {44, 198, 238, 325} ↔ {68, 196, 266, 275}; {44, 238, 252, 260, 294} ↔ {68, 234, 250, 266, 270}; {198, 234, 250, 270, 325} ↔ {196, 252, 260, 275, 294} | 805, 1088, 1277 | 4, 5, 5 |
 | 696–699 | 2 | {198, 234, 250, 270, 325} ↔ {196, 252, 260, 275, 294} (one of 684's) | 1277 | 5 ↔ 5 |
 | 770–773, 775–779 | 2 | {228, 231, 252, 260, 280, 320, 325} ↔ {189, 250, 270, 273, 275, 315, 324} | 1896 | 7 ↔ 7 |
