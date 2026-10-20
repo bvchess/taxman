@@ -53,15 +53,15 @@ $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json     # the t
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
 8: maximal factors [4]; maximal composites [16, 24, 40, 56]
 45: maximal factors [9, 15]; maximal composites []
-$ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184 (standalone, no derivation)
+$ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184, each on its own, no derivation
 ```
 
 * **`bench`** appends one JSON line per run to its history file: `solver/frame/bench/history.jsonl` of the repository,
   unless `--history FILE` names another (pass it to keep the checkout clean).  It takes the games past `optimal.json`'s
   from `results/strict.jsonl`, unless `--known FILE` names another results file.
 * **The ladder** is the harness for hard games and for scaling over thread counts: `cargo run --release --example
-  ladder -- --scaling --seed-opt --known results/strict.jsonl --seconds 600 1215`.  Its flags are documented at the
-  top of `examples/ladder.rs`.
+  ladder -- --scaling --seed-opt --known ../../results/strict.jsonl --seconds 600 1215`, in `solver/frame`.  Its
+  flags are documented at the top of `examples/ladder.rs`.
 * **`verify-results [--threads K] FILE...`** checks each file as `solve` checks its `--out FILE` when it opens it.  The
   checks run in order, but the search problems they set up again for the repeats, most of the time on a long file,
   are set up first, on K threads (default: all CPUs).  With `--threads 1` it sets them up one at a time, as the checks
@@ -219,7 +219,7 @@ check every results file.
 | `exhausted` | the search explored its whole tree | no |
 | `cap` | the search reached the [ceiling](../../docs/GLOSSARY.md#the-game) | yes |
 | `prime_formula` | the [prime formula](../../docs/GLOSSARY.md#the-game), optimal if the game of n − 1 is | yes |
-| `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [DESIGN.md](design/same-search.md) has the argument) | no: on the game m it repeats |
+| `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap`, `same_search`, or `known` where an upper bound ended its search) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [design/same-search.md](design/same-search.md) has the argument) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search; the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
 
 ### Citing a known source
@@ -290,7 +290,7 @@ made it: a sweep goes over them more than once, and a run with no `--pass` has n
 
 | `prev` | what the game had from the game of n − 1 | what its proof can be |
 |---|---|---|
-| `null` | nothing: it was solved standalone (a block's first game, or the game before it is missing), with no seed and no ceiling (`setup.cap` null) | `trivial`, `exhausted`, or `same_search` on a completed game of the file |
+| `null` | nothing: it was solved standalone (a block's first game, or the game before it is missing), with no seed and no ceiling (`setup.cap` null) | `trivial`, `exhausted`, `same_search` on a completed game of the file, or `known` |
 | `source` `run` or `results`, `proof` null | the best game of an unfinished search of n − 1, as a seed, and no more: no ceiling (`setup.cap` null), no prime formula, nothing that rests on it | the same: never `cap` or `prime_formula` |
 | `proof` given (or `source` `optimal`, `strict`, `bounds`) | n − 1 proven (or assumed, from `optimal.json`; or the committed chain's or the bounds store's game, `--use-prev`): the seed, the ceiling n + score(n − 1), the prime formula for a prime n, and repeats | any |
 
