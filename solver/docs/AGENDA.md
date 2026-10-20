@@ -42,7 +42,11 @@ whose size grows with n ([the anatomy of the gap](../notebook/the-anatomy-of-the
   go](../notebook/how-far-can-nogoods-go-2026-10/README.md)).  Flat-cycle cuts, measured at roots only, add little to
   the matching LP.
 * *Branching and learning*: strong branching, forced members, nogoods, the rule of symmetric pairs, dominance by
-  exchange and transpositions.  Constant factors, all taken.
+  exchange and transpositions.  Constant factors, all taken.  Closed, not adopted ([the
+  verdict](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)):
+  learning each conflict's closure under the cheap exchanges, a bound that imposes its knot, and ladder branching.  The
+  learning gains on units and not on whole games; the knot's bound would save under 4% of the steps, and ladder
+  branching has nothing to impose.
 * *Reuse along the chain*: the ceiling, the prime formula and same search are in.  Carrying nogoods or a search's tree
   to the next game, a chain that comes back down, ceilings from neighbouring problems and equivalent problems gave
   nothing more ([going higher](../notebook/going-higher-and-coming-back-down-2026-10/README.md),

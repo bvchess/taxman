@@ -13,6 +13,9 @@ three hard units.  Learning their closure, the images of the images and so on, t
 CPU time with the checks paid.  The best and the conclusion are unchanged: the search learns only what a peel shows to
 be a conflict, so the learning is sound by construction.
 
+**Later (2026-10-20): closed, not adopted.**  Whole games do not gain what units do, and the next steps this entry
+plans are withdrawn: see [the verdict](#later-2026-10-20-closed-not-adopted).
+
 The idea is the first of
 [near completions](../completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md#ideas), tested on the units
 of [the anatomy](../the-anatomy-of-a-hard-subtree-2026-10/README.md).  The learning lives in the studies build only; the
@@ -511,3 +514,49 @@ The first command makes the 92 runs of the comparison and the seven `bare` runs.
 nogood_period=30000` makes the other half of `suite-perturbed.jsonl`.
 
 Commits: the commit of this section (`wall images --root` and `--count` with their test, and `suite.py`).
+
+## Later (2026-10-20): closed, not adopted
+
+**Verdict.**  The learning is closed, not adopted.  It stays in the studies build as a record, and the searcher does not
+get it.  The two steps that the decisions above plan, a test on whole games on many threads on EC2 and then a tactic in
+the searcher, are withdrawn.  Units gain from the learning, and whole games, where the chain's cost lies, do not gain
+reliably.
+
+**The evidence** is this entry and two later ones:
+
+* **The tuning suite** ([the whole tuning suite](#later-2026-10-20-the-whole-tuning-suite), above).  The learning takes
+  20.6% off the steps and 15.9% off the CPU of the 46 problems, but only 4.5% off the CPU of the six whole games, and
+  three of those cost more.
+* **The hardest searches of the run to 5000** ([the hardest searches of the run to
+  5000](../the-hardest-searches-of-the-run-to-5000-2026-10/README.md)).  On 30 units of 3940, 4225, 4416 and 4548 the
+  learning takes 20.0% off the steps, and 7.2% at 4548.  On whole games it goes both ways: at 4176 it takes 13.4% off
+  the CPU, at 4050 it puts 30.9% on, and at 4005 we stopped it at 2.2 times the default search's CPU, without a
+  result.
+* **Every attempt to push it further failed** ([what the learning leaves in the hardest
+  searches](../what-the-learning-leaves-in-the-hardest-searches-2026-10/README.md)):
+  * A wider closure, with the exchanges the closure lacks, could catch at most 8% of the conflicts the search still
+    computes at 3300-14.
+  * Learning each computed conflict's nogood under other witnesses made the trees 14% larger on 22 units and cost 32%
+    more CPU.
+  * Keeping the used nogoods at a clearing moved the trees by a factor from a third to one and a half, the same with
+    the learning as without it.
+  * A bound that imposes the whole knot of a conflict would save 0.6-3.6% of the steps by the entry's estimate, so we
+    did not build it, and ladder branching has nothing to impose.
+  * At the scale of the run to 5000 the learning has less to work on: at 4416 an exclusion costs a median of 156-176
+    points against 123 at 3300-14, and 5-12% of the exclusions are cheap, against 20%.
+
+**Why the early results misled.**  A unit solved alone overstates the gain, and a tree's size swings chaotically under
+any change to the nogoods the search holds, so a unit's gain does not predict a whole game's cost.
+
+* The first trial's units were among the suite's best: they rank 4th, 7th and 8th of 46 by the share of CPU gained.
+  The suite's units gained 17.7% of the CPU and its whole games 4.5%.
+* A unit's gain does not predict its game's.  The three units of 4005 took 4.2% less CPU, and the game, stopped at
+  2.2 times the default search's CPU, had not finished.
+* The learning changes which nogoods the search holds, and a small tree moves by tens of percent when anything does.
+  13 of the suite's 46 problems cost more CPU, and the default search on twelve units under 100,000 steps moved from 55%
+  fewer steps to 226% more under a change of the nogood period alone ([where it costs
+  more](#where-it-costs-more)).
+
+**What would reopen it** is a consistent gain in CPU on whole games of the scale of the chain's end, not a gain on
+units.  Those games take 3.1 to 6.2 million steps on one thread, as 4005, 4050 and 4176 do.  A new form of the learning
+is tested on them first.
