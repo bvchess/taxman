@@ -1,0 +1,188 @@
+Instruments Time Profiler, 1 ms samples, one thread, `tune solve` of one unit.  First the parts of a step (the
+samples under each function, so the indented ones are within the one above; the queue is under the cycle
+searches of both the forced members and strong branching), then every function of the crate by the samples
+under it (tp.py incl).
+
+## 3441-2994 before the round (fd3aa9e, 539k cycles a step)
+
+total 6365 ms
+  96.9%  step
+  75.7%  evaluate
+  24.5%  force_by_cycles
+  21.5%    has_cycle_within
+   0.5%    cycle_length
+  11.3%  the cycle searches' queue
+  40.8%  split (incl. resolve)
+  23.1%    split_bounds_from
+  10.4%      split_potentials
+   3.9%        warm_start
+   4.0%      build_columns
+  17.6%    resolve
+  16.0%      derive
+   6.4%        rebuild
+   4.8%        renumber
+   0.0%        move_slots
+   0.0%        reduce_unknown
+  10.1%  solve
+   8.9%  strong branching
+   5.6%  make_child
+   4.1%    peels
+   3.8%  push_all
+   1.6%  gap
+   0.3%  nogood lookups
+   0.8%  conflict seek
+   0.3%  save_split
+
+total 6365 ms
+ 96.89%  taxman:search::searcher::TaxSearcher::engine::Searcher::TaxUnit
+ 96.89%  taxman:search::searcher::Stepper::step::w_4tu
+ 96.89%  taxman:engine::Searcher::search::searcher::TaxUnit::run
+ 96.89%  taxman:search::searcher::TaxSearcher::step::w_4tu
+ 96.89%  taxman:engine::Shared::search::searcher::TaxUnit::worker
+ 96.89%  taxman:engine::run::search::searcher::TaxUnit::w_4tu
+ 76.62%  taxman:search::searcher::Stepper::check_gf2::w_4tu
+ 76.62%  taxman:search::searcher::Stepper::check::w_4tu
+ 75.74%  taxman:gf2::Gf2Bound::evaluate::w_4tu
+ 75.74%  taxman:gf2::Levels::evaluate::w_4tu
+ 43.22%  taxman:search::searcher::Stepper::check_child::w_4tu
+ 40.77%  taxman:gf2::split::w_4tu
+ 37.72%  taxman:search::searcher::Stepper::check_node::w_4tu
+ 29.63%  taxman:gf2::meet::Meet::shortest_cycle::w_4tu
+ 24.46%  taxman:gf2::Levels::force_by_cycles::w_4tu
+ 23.06%  taxman:gf2::meet::Meet::split_bounds_from::split::w_4tu
+ 21.54%  taxman:gf2::meet::Meet::has_cycle_within::w_4tu
+ 17.61%  taxman:gf2::resolve::w_4tu
+ 16.01%  taxman:gf2::meet::Meet::derive::w_4tu
+ 10.43%  taxman:gf2::meet::Meet::split_potentials::w_4tu
+ 10.24%  taxman:search::searcher::Stepper::choose_branch_gf2::w_4tu
+ 10.24%  taxman:search::searcher::Stepper::choose_branch::w_4tu
+ 10.20%  taxman:gf2::meet::Meet::shortest_path::w_4tu
+ 10.07%  taxman:gf2::solve::w_4tu
+ 10.05%  taxman:gf2::meet::Meet::solve::solve::w_4tu
+  9.87%  taxman:gf2::meet::Meet::augment::solve::w_4tu
+  9.87%  taxman:gf2::meet::Meet::without::w_4tu
+  9.79%  taxman:gf2::meet::Queue::pop
+  8.91%  taxman:gf2::Levels::certified_excluding::w_4tu
+  8.91%  taxman:gf2::Gf2Bound::certified_excluding::w_4tu
+  8.69%  taxman:gf2::meet::RadixHeap::pop
+  7.16%  taxman:gf2::meet::Meet::add::w_4tu
+  6.44%  taxman:gf2::meet::Meet::rebuild::w_4tu
+  5.99%  taxman:gf2::meet::each_bit::Meet::shortest_cycle::w_4tu
+  5.70%  taxman:gf2::meet::is_zero::w_4tu
+  5.61%  taxman:search::searcher::Stepper::make_child::w_4tu
+  4.79%  taxman:gf2::meet::Meet::renumber::w_4tu
+  4.13%  taxman:model::peel::Scratch::winnable::w_4tu
+  4.13%  taxman:model::peel::peel::w_4tu
+  3.97%  taxman:gf2::meet::Meet::build_columns::w_4tu
+  3.94%  taxman:gf2::meet::Meet::warm_start::w_4tu
+  3.80%  taxman:gf2::Gf2Bound::push_all::w_4tu
+  3.79%  taxman:gf2::Levels::push_all::w_4tu
+  3.36%  taxman:gf2::meet::each_bit::Meet::build_columns::w_4tu
+  3.32%  taxman:gf2::meet::each_bit::Meet::renumber::w_4tu
+  3.21%  taxman:model::promote::FrameGraph::promote_all_using::w_4tu
+  3.11%  taxman:gf2::meet::each_bit::Meet::split_bounds_from::split
+  2.69%  taxman:model::promote::FrameGraph::frames_winnable::w_4tu
+  2.33%  taxman:gf2::meet::each_bit::Meet::shortest_path::w_4tu
+  2.33%  taxman:gf2::meet::each_bit::Meet::split_potentials::w_4tu
+  2.22%  taxman:game::Optimal::with_results_files
+  2.22%  taxman:game::Optimal::with_results
+  2.11%  taxman:json::Json::parse
+  2.11%  taxman:json::Parser::object
+  2.11%  taxman:json::Parser::value
+  1.78%  taxman:json::Parser::array
+  1.62%  taxman:gf2::Losses::of::w_4tu
+  1.60%  taxman:gf2::meet::Meet::find_gap::w_4tu
+  1.60%  taxman:gf2::meet::Meet::gap::w_4tu
+  1.59%  taxman:gf2::contract::w_4tu
+
+## 3441-2994 after it (451k cycles a step)
+
+total 5268 ms
+  96.3%  step
+  74.6%  evaluate
+  24.1%  force_by_cycles
+  19.6%    has_cycle_within
+   0.6%    cycle_length
+   9.3%  the cycle searches' queue
+  37.5%  split (incl. resolve)
+  26.7%    split_bounds_from
+  11.2%      split_potentials
+   4.3%        warm_start
+   4.9%      build_columns
+  10.7%    resolve
+   8.8%      derive
+   0.2%        rebuild
+   0.0%        renumber
+   1.0%        move_slots
+   1.6%        reduce_unknown
+  12.3%  solve
+   7.0%  strong branching
+   6.8%  make_child
+   5.1%    peels
+   3.8%  push_all
+   2.7%  gap
+   0.8%  nogood lookups
+   1.4%  conflict seek
+   0.6%  save_split
+
+total 5268 ms
+ 96.32%  taxman:engine::Shared::search::searcher::TaxUnit::worker
+ 96.32%  taxman:engine::run::search::searcher::TaxUnit::w_4tu
+ 96.30%  taxman:search::searcher::TaxSearcher::engine::Searcher::TaxUnit
+ 96.30%  taxman:engine::Searcher::search::searcher::TaxUnit::run
+ 96.28%  taxman:search::searcher::Stepper::step::w_4tu
+ 96.28%  taxman:search::searcher::TaxSearcher::step::w_4tu
+ 76.08%  taxman:search::searcher::Stepper::check_gf2::w_4tu
+ 76.08%  taxman:search::searcher::Stepper::check::w_4tu
+ 74.60%  taxman:gf2::Gf2Bound::evaluate::w_4tu
+ 74.58%  taxman:gf2::Levels::evaluate::w_4tu
+ 43.72%  taxman:search::searcher::Stepper::check_child::w_4tu
+ 37.51%  taxman:gf2::split::w_4tu
+ 36.92%  taxman:search::searcher::Stepper::check_node::w_4tu
+ 26.69%  taxman:gf2::meet::Meet::split_bounds_from::split::w_4tu
+ 25.17%  taxman:gf2::meet::Meet::shortest_cycle::w_4tu
+ 24.13%  taxman:gf2::Levels::force_by_cycles::w_4tu
+ 19.57%  taxman:gf2::meet::Meet::has_cycle_within::w_4tu
+ 13.06%  taxman:gf2::meet::Meet::shortest_path::w_4tu
+ 12.26%  taxman:gf2::solve::w_4tu
+ 12.24%  taxman:gf2::meet::Meet::solve::solve::w_4tu
+ 11.94%  taxman:gf2::meet::Meet::augment::solve::w_4tu
+ 11.16%  taxman:gf2::meet::Meet::split_potentials::w_4tu
+ 10.71%  taxman:gf2::resolve::w_4tu
+  8.79%  taxman:gf2::meet::Meet::derive::w_4tu
+  8.71%  taxman:search::searcher::Stepper::choose_branch::w_4tu
+  8.71%  taxman:search::searcher::Stepper::choose_branch_gf2::w_4tu
+  8.11%  taxman:gf2::meet::Meet::without::w_4tu
+  7.57%  taxman:gf2::meet::Queue::pop
+  7.00%  taxman:gf2::Gf2Bound::certified_excluding::w_4tu
+  7.00%  taxman:gf2::Levels::certified_excluding::w_4tu
+  6.76%  taxman:search::searcher::Stepper::make_child::w_4tu
+  5.98%  taxman:gf2::meet::RadixHeap::pop
+  5.96%  taxman:gf2::meet::is_zero::w_4tu
+  5.26%  taxman:gf2::meet::each_bit::Meet::shortest_cycle::w_4tu
+  5.14%  taxman:model::peel::Scratch::winnable::w_4tu
+  5.13%  taxman:model::peel::peel::w_4tu
+  4.92%  taxman:gf2::meet::Meet::build_columns::w_4tu
+  4.35%  taxman:gf2::meet::Meet::warm_start::w_4tu
+  4.02%  taxman:gf2::meet::each_bit::Meet::build_columns::w_4tu
+  4.01%  taxman:gf2::meet::each_bit::Meet::split_bounds_from::split
+  3.82%  taxman:gf2::Levels::push_all::w_4tu
+  3.82%  taxman:gf2::Gf2Bound::push_all::w_4tu
+  3.63%  taxman:model::promote::FrameGraph::promote_all_using::w_4tu
+  3.11%  taxman:model::promote::FrameGraph::frames_winnable::w_4tu
+  2.77%  taxman:gf2::meet::each_bit::Meet::shortest_path::w_4tu
+  2.73%  taxman:gf2::Losses::of::w_4tu
+  2.70%  taxman:gf2::meet::Meet::gap::w_4tu
+  2.70%  taxman:gf2::meet::Meet::find_gap::w_4tu
+  2.60%  taxman:game::Optimal::with_results_files
+  2.60%  taxman:game::Optimal::with_results
+  2.58%  taxman:gf2::meet::each_bit::Meet::split_potentials::w_4tu
+  2.41%  taxman:json::Json::parse
+  2.41%  taxman:json::Parser::value
+  2.41%  taxman:json::Parser::object
+  2.35%  taxman:gf2::meet::BlockSpan::reduce::w_4tu
+  2.22%  taxman:model::promote::FrameGraph::promote_in_place_using::w_4tu
+  2.11%  taxman:model::promote::FrameGraph::promotable::w_4tu
+  2.03%  taxman:json::Parser::array
+  1.71%  taxman:gf2::meet::Queue::push
+  1.65%  taxman:gf2::contract::w_4tu

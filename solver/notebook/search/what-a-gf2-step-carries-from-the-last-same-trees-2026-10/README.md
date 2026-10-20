@@ -2,6 +2,8 @@
 
 Part of the [lab notebook](../../README.md).
 
+Started 2026-10-20.
+
 *Question.*  Where do the cycles of a GF(2) step go at the end of the chain, now that the default searches every member
 for being forced (`force_window=all`), and what does a step compute again that it could carry from the step before,
 with every search tree the same?
@@ -147,6 +149,161 @@ The split and its tableaux are the largest part now, and at 4548 the larger (sha
   cycle, and a search bounded there finds the same cycle (every vertex settled below the bound is settled the same).
   Perhaps 1-2% of a step.
 
+## 2026-10-20: the derived tableaux and the cycle searches' queue
+
+*Question.*  After the round above, where do a step's cycles go, what is each of its four candidates (left for later,
+with estimates) worth, and what else takes cycles off a step with every search tree the same?
+
+*Answer.*  The tableaux a step derives and the queue of its cycle searches held more than the candidates.  Kept: a block
+whose span changes is reduced where its circuits change instead of built; a derived tableau keeps its slot numbers
+instead of renumbering every circuit; the searches' radix heap buckets its keys by distance; a search offers nothing
+past the best cycle it has found; and the split's first round is narrowed where the arcs are the start's.  A step falls
+by 13.5 to 17.4% in cycles and 19.5 to 23.7% in instructions on the five units above, every count the same (3441-2994:
+539k to 451k cycles a step).  Of the four candidates, the blocks are reduced rather than pivoted, the narrowed first
+round gave 1.5 to 2.2%, a component test would settle three quarters of the searches that prove a member forced but a
+pass costs about what they do, and strong branching's bound gave way to the cut at the best cycle found, in every
+search.
+
+*How it was measured.*  As above: the units solved to completion on one thread (`tune solve`, `--known
+results/strict.jsonl`, the default tactics, built with `--features studies`), cycles and instructions of the process
+(`/usr/bin/time -l`), Instruments' Time Profiler at 1 ms for the parts of a step (`tp.py`), and counters of the timer
+`cntvct_el0` in scratch builds for what a profile cannot split (`round2-counters.diff`, `round2-components.diff`).  The
+laptop (M1 Max) had other load throughout; every run waited for the load to fall to 8.  Two runs of one build on one
+unit agree to about 1% in cycles and to 0.1% in instructions, so each change was measured against the build before it in
+alternation.
+
+### Where a step went
+
+The base (fd3aa9e; share of the samples, `round2-profile_3441.txt` and `round2-profile_4548.txt` have the rest):
+
+| work | 3441-2994 | 4548-124 |
+|---|---|---|
+| searches for forced members (`has_cycle_within`) | 21.5% | 14.1% |
+| the cycle searches' queue (`Queue`, in these and strong branching's) | 11.3% | 6.7% |
+| the split without its tableaux (`split_bounds_from`) | 23.1% | 25.9% |
+| of which Bellman–Ford with its walks | 10.4% | 9.9% |
+| tableaux derived again (`derive`) | 16.0% | 17.9% |
+| of which blocks built (`rebuild`) | 6.4% | 7.7% |
+| of which slots renumbered (`renumber`) | 4.8% | 5.2% |
+| solves | 10.1% | 12.7% |
+| strong branching | 8.9% | 3.9% |
+| the child: promotion and peels | 5.6% | 8.5% |
+| levels pushed | 3.8% | 5.4% |
+
+Counters at 3441-2994 (4548-124 in parentheses):
+
+* *The searches for forced members.*  303,320 searches proved a member forced (1,027,442), 8.3 a step (12.4), each
+  settling 42 vertices (23) for about 7k cycles; 100,992 found a cycle (206,674), each settling 123 vertices (101) for
+  about 22k.  They take 11% and 11.5% of a step (7.5% and 7.1%), two thirds of it (three quarters) at the levels a
+  node keeps without the member it branched on.
+* *The blocks built in derivations.*  11,918 blocks in 29,559 derivations (36,540 in 66,157), 86% of their time in
+  blocks where an element that enters stays free after the exchanges, the rest where the numbers that enter and leave
+  differ.  Such a block had 538 live elements (417) and 35 members, of which 1.1 left and 1.1 entered; 57% of its
+  elements (63%) were free or had a circuit through a member that leaves.
+* *The renumbering.*  80,220 blocks renumbered (161,789), 172 elements each with 4.9 slots a circuit; 58% of them only
+  dropped slots.  It was 5.0% of a step (5.8%).
+* *The split's first round.*  In the children that inherit their parent's heaviest set it took, with its walks, 3.9% of
+  a step (4.5%); 98% of their vertices' paths held, and half of those splits had vertices their start had not (9.6 a
+  split: the parent's loops, live again in the child).
+
+### The candidates
+
+* *Forced members without a search.*  A member alone in its strongly connected component of the arcs within the slack
+  is forced.  Of the members that a search proved forced, 224,179 of 303,320 (74%) are alone (803,336 of 1,027,442,
+  78%), and their searches are 48% (61%) of the time of those searches, about 5% (4%) of a step after this round.  But
+  a level has 3,170 arcs within the slack (5,570), and a pass that lists them and runs Tarjan's algorithm costs about
+  what the searches it replaces cost: the measuring pass took 5.9 (9.3) times their time.  Not built.  A cut with the
+  shortest arc into the member (a constant A* bound) was measured too: the searches that prove a member forced settle
+  24% (22%) fewer vertices, but finding that arc costs a scan of the member's block of `B`, about what it saves.  Not
+  built.
+* *Blocks built because an element entering is free* (`Meet::derive`).  Kept, in a better form than pivots: where a
+  block's span changes, an element whose circuit holds no member that leaves keeps it (the circuit lies in the new set),
+  and only the others are reduced by the new members, as the elements the source tableau did not have already were.  A
+  derived tableau's residues are read only for being zero, so a reduction's residue will do.
+* *The split's first round* (`Meet::split_bounds_from`).  Kept.  Where the level's set is its start's less the members
+  promoted since (checked by the roles the start recorded and its number of members), the arcs among the vertices the
+  start had are the start's.  The walks then check only that the vertices are live, and a potential whose path holds is
+  the distance among those vertices, so no arc between two of them is relaxed: the first round pulls each other vertex's
+  potential in along its arcs, and relaxes the arcs out of those vertices.  It narrows 11,715 of the 11,729 inherited
+  children's splits at 3441-2994, whose time falls from 5.6 M to 3.2 M ticks of the timer.  The vertices the start did
+  not have make the round need the arcs out of the broken vertices, not only into them.
+* *Strong branching bounded by a kept cycle.*  Not built; in its place every cycle search (strong branching's too) no
+  longer offers a distance at or past the best cycle it has found, which it would end before taking.
+
+Two parts larger than the candidates were found in the profile:
+
+* *The renumbering* (5% of a step).  Slots only name members: the searches order their vertices by distance, arcs and
+  element, and what else is read off a derived tableau (the split, the gap) is unique, so its numbering does not
+  matter outside a solve, which builds its tableau anew (only the split's predecessors, which choose where a later
+  split starts, can differ).  A derived tableau now keeps its slots: a member gone frees its slot, whose bit leaves the
+  circuits, and a member that enters takes a free one.  The tests compare circuits as sets of members.
+* *The queue* (11.3% of a step at 3441-2994).  Its keys are a distance above a vertex, and the radix heap spread the
+  keys of one distance over the buckets of their vertices' bits, redistributing at nearly every pop.  It now buckets by
+  distance alone and sorts the keys of one distance once; they come out in the same order, which a test checks
+  against a binary heap.
+
+### What was kept
+
+Each change against the build before it, 3441-2994, cycles a step (alternating runs):
+
+| change | from | to |
+|---|---|---|
+| the split's first round narrowed (measured last, on the final code) | 460.6k | 450.8k |
+| blocks reduced where the span changes, not built | 532.4k | 514.2k |
+| slots kept | 510.5k | 494.0k |
+| the queue by distance (both with the closing below, not kept) | 493.6k | 467.3k |
+| no offer past the best cycle | 462.6k | 455.1k |
+
+The five units, base (fd3aa9e) against the round, two runs each:
+
+| unit | steps | cycles a step | instructions a step | CPU seconds |
+|---|---|---|---|---|
+| 3441-2994 | 36,500 | 539.0k to 450.8k | 1,868k to 1,495k | 6.17 to 5.06 |
+| 3441-5231 | 82,172 | 512.8k to 423.8k | 1,750k to 1,370k | 13.43 to 10.96 |
+| 4225-24 | 32,030 | 650.5k to 542.5k | 2,346k to 1,790k | 6.51 to 5.33 |
+| 4548-236 | 22,613 | 615.7k to 527.0k | 2,223k to 1,747k | 4.28 to 3.55 |
+| 4548-124 | 83,169 | 604.7k to 523.0k | 2,135k to 1,719k | 15.98 to 13.63 |
+
+At 4548 a CPU-second takes 5,205 steps before and 6,102 after.  Every unit's steps, best and counters are the same.
+
+*Not kept: a cycle closed as soon as it is reached.*  A search for a cycle within the slack could stop when it offers
+a distance to an element with an arc to the member, before settling it: exact, since the distance offered is a path's.
+It made a step dearer, 466.7k cycles against 452.9k, because the cycles it keeps for later levels are longer, and
+free fewer members there.
+
+*Checks.*  The chain 1..1300 on one thread (`taxman solve 1-1300 --threads 1` to a scratch file) is line for line that
+of master (be4c92b) but for the times and the build: 276,918 steps, 80.7 to 76.3 G cycles, its searches 22.1 to 20.7 s.
+`taxman regress --to 1000 --threads 1` matches every game.  The probe's fingerprints are unchanged (7e8e724717d26545;
+5b83bbebf0bb2899 with `--tactic lagrange=off`; a58ade4629ab6186 with `--tactic gf2=on`, f3deaac0dbdc030a with
+`force_window=80` besides).  A release build with debug assertions, under which every split started is checked against
+the split from zero and every member freed by a kept cycle against a search, solved 3441-2994, 4225-24 and 4548-124
+with the same counts.  The tests check every derived tableau against a solve's, circuits as sets of members (the long
+random paths of the levels too), and the radix heap against a binary heap.  The full suite (`cargo test --release
+--features studies`) and the quick check pass.
+
+### Where a step goes now
+
+The split and the cycle searches are the largest parts, and none of the rest is above 15% (share of the samples):
+
+| work | 3441-2994, 451k cycles a step | 4548-124, 523k |
+|---|---|---|
+| searches for forced members | 19.6% | 12.7% |
+| the cycle searches' queue | 9.3% | 5.3% |
+| the split without its tableaux | 26.7% | 28.7% |
+| of which Bellman–Ford with its walks | 11.2% | 9.9% |
+| of which the columns of `A` (`build_columns`) | 4.9% | 6.7% |
+| tableaux derived again | 8.8% | 9.5% |
+| solves | 12.3% | 14.6% |
+| strong branching | 7.0% | 3.4% |
+| the child: promotion and peels | 6.8% | 10.4% |
+| levels pushed | 3.8% | 6.4% |
+| the gap of a derived tableau | 2.7% | 2.6% |
+
+The searches that prove a member forced, three quarters of which a component test would settle, are the clearest
+prize left if a cheaper test than a pass over the arcs within the slack is found; the split's pass over the circuits
+for the bounds without each member (`split_bounds_from` less Bellman–Ford and the columns, about 10%) is the next
+largest part not yet studied.
+
 ## Files
 
 * `prof.diff`: the counters by kind of level and by the outcome of each search, with the parent's cycles checked in
@@ -157,5 +314,16 @@ The split and its tableaux are the largest part now, and at 4548 the larger (sha
   and after it (both), from the traces with `tp.py`.
 * `tp.py`: reads an `xctrace export` of a Time Profiler trace and sums the samples by function, self or inclusive,
   or under a function by the next frame (`tp.py EXPORT.xml self|incl|children FUNCTION`).
+* `round2-counters.diff`: the second round's counters of the searches for forced members (with the cut by the
+  shortest arc into the member), of the blocks built and renumbered in derivations, and of the split's first round (on
+  fd3aa9e, a scratch build, not kept).
+* `round2-components.diff`: the component test of the members that a search proves forced (on the second round's
+  code, not kept).
+* `round2-runs.jsonl`: every run of the second round, one line a run: the build, the unit, steps, CPU seconds, best,
+  cycles and instructions a step (from `tune solve` under `/usr/bin/time -l`).
+* `round2-profile_3441.txt`, `round2-profile_4548.txt`: the parts of a step and the samples by function, before the
+  second round and after it, from the traces with `tp.py`.
 
-*Commits*: 1735e60 (the cycles kept), 28c5669 (the split started), and this entry.
+*Commits*: 1735e60 (the cycles kept), 28c5669 (the split started), and this entry; in the second round b0082ae (blocks
+reduced where the span changes), 854d65d (slots kept), 2e07cd2 (the queue by distance), 994ae69 (no offer past the best
+cycle), f22561c (the first round narrowed), and this section.

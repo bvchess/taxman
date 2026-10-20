@@ -1,0 +1,489 @@
+diff --git a/solver/frame/src/gf2.rs b/solver/frame/src/gf2.rs
+index bbbc37b..533cccf 100644
+--- a/solver/frame/src/gf2.rs
++++ b/solver/frame/src/gf2.rs
+@@ -74,7 +74,7 @@ pub mod meet;
+ 
+ use crate::bits::Bits;
+ use crate::model::{FrameGraph, FrameSet};
+-use meet::{bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, SplitStart, Vector};
++use meet::{ticks, bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, SplitStart, Vector};
+ 
+ const NONE: u32 = u32::MAX;
+ 
+@@ -639,6 +639,7 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
+ /// known of its heaviest set.
+ #[derive(Clone)]
+ struct Level<const W: usize, const R: usize> {
++    origin: u8,
+     vec: [Vec<Vector<R>>; 2],
+     /// The live candidates (elements only, loops left out).
+     live: Bits<W>,
+@@ -690,6 +691,7 @@ impl<const W: usize, const R: usize> Source<W, R> {
+ impl<const W: usize, const R: usize> Level<W, R> {
+     fn new(n: usize) -> Self {
+         Level {
++            origin: 0,
+             vec: [vec![[0; R]; n], vec![[0; R]; n]],
+             live: Bits::EMPTY,
+             history: Vec::new(),
+@@ -726,6 +728,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
+     }
+ 
+     fn copy_from(&mut self, other: &Self) {
++        self.origin = 0;
+         for m in 0..2 {
+             self.vec[m].copy_from_slice(&other.vec[m]);
+         }
+@@ -766,6 +769,7 @@ struct Levels<'g, const W: usize, const R: usize> {
+     stats: Gf2Stats,
+     /// Which free members are searched for being forced ([`ForceWindow`]).
+     force_window: ForceWindow,
++    fprof: FProf,
+     /// The cycles within the slack that the last search for forced members at each depth found or kept
+     /// ([`force_by_cycles`](Self::force_by_cycles)), and scratch for the next search's.
+     cycles: Vec<Cycles>,
+@@ -806,6 +810,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+             start_idx: Vec::with_capacity(n),
+             stats: Gf2Stats::default(),
+             force_window: ForceWindow::default(),
++            fprof: FProf::default(),
+             cycles: Vec::new(),
+             next_cycles: Cycles::default(),
+             nodes: vec![0],
+@@ -892,9 +897,11 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+             // The child's smaller sets, with the promoted, are smaller sets of the parent's.
+             child.loss_floor = parent.loss_floor;
+             (child.source.held, child.source.contracted) = (held, *added);
++            child.origin = 2;
+             self.stats.inherited += 1;
+         } else if certify_child(self.graph, &lower[d], parent, child, added, &mut self.meet, &mut self.live_idx) {
+             (child.source.held, child.source.contracted) = (held, *added);
++            child.origin = 3;
+             self.stats.certified_children += 1;
+         }
+         self.depth = d + 1;
+@@ -915,6 +922,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+     fn remove_candidate(&mut self, x: u32) {
+         self.prior_for = Some((self.depth, x));
+         if self.kept_for.take() == Some((self.depth, x)) {
++            self.kept.origin = 4;
+             std::mem::swap(&mut self.levels[self.depth], &mut self.kept);
+             std::mem::swap(&mut self.kept, &mut self.prior);
+             return;
+@@ -964,6 +972,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+                 let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
+                 let start = from.map(|i| &self.starts[i].0);
+                 let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
++                meet.prof.kind = usize::from(level.origin);
+                 split(self.graph, level, meet, live_idx, start_idx, &mut self.stats, start);
+                 if level.has_pot {
+                     self.meet.save_split(&mut self.starts[d].0);
+@@ -1046,7 +1055,32 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+                 continue;
+             }
+             let e = graph.index[x as usize];
+-            if self.meet.has_cycle_within(&problem, &level.pot, e, slack) {
++            let (t0, s0) = (ticks(), self.meet.prof.settled);
++            let found = self.meet.has_cycle_within(&problem, &level.pot, e, slack);
++            let (dt, ds) = (ticks() - t0, self.meet.prof.settled - s0);
++            let end = self.meet.found_end();
++            let min_in = self.meet.min_in(&problem, &level.pot, e);
++            let k = usize::from(found);
++            self.fprof.by_kind[usize::from(level.origin)][k] += 1;
++            self.fprof.by_kind_t[usize::from(level.origin)][k] += dt;
++            self.fprof.n[k] += 1;
++            self.fprof.t[k] += dt;
++            self.fprof.settled[k] += ds;
++            self.fprof.slack[k] += slack as u64;
++            self.fprof.min_in[k] += min_in.min(slack + 1) as u64;
++            if min_in > slack {
++                self.fprof.cut_all[k] += 1;
++            } else {
++                self.meet.prof.cut = min_in;
++                let (t1, s1) = (ticks(), self.meet.prof.settled);
++                let again = self.meet.has_cycle_within(&problem, &level.pot, e, slack);
++                self.fprof.cut_t[k] += ticks() - t1;
++                self.fprof.cut_settled[k] += self.meet.prof.settled - s1;
++                self.meet.prof.cut = 0;
++                assert_eq!(again, found, "the cut search differs");
++                assert_eq!(self.meet.found_end(), end, "the cut search closes another cycle");
++            }
++            if found {
+                 free_members(graph, &self.meet, self.meet.keep_cycle(e, &mut within), &mut free);
+             } else {
+                 forced.insert(x);
+@@ -1171,6 +1205,32 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+     }
+ }
+ 
++/// PROF of the searches for forced members: [forced, found].
++#[derive(Default, Debug)]
++struct FProf {
++    n: [u64; 2],
++    t: [u64; 2],
++    settled: [u64; 2],
++    slack: [u64; 2],
++    min_in: [u64; 2],
++    cut_all: [u64; 2],
++    cut_t: [u64; 2],
++    cut_settled: [u64; 2],
++    by_kind: [[u64; 2]; 6],
++    by_kind_t: [[u64; 2]; 6],
++}
++
++impl<'g, const W: usize, const R: usize> Drop for Levels<'g, W, R> {
++    fn drop(&mut self) {
++        if self.fprof.n.iter().sum::<u64>() > 0 || self.meet.prof.derives > 0 {
++            let mut p = self.meet.prof.clone();
++            p.reason = [Vec::new(), Vec::new()];
++            eprintln!("FPROF {:?}", self.fprof);
++            eprintln!("MPROF {:?}", p);
++        }
++    }
++}
++
+ /// Adds the members of the workspace's set on `cycle` (elements) to `free` (candidates).
+ fn free_members<const W: usize, const R: usize>(graph: &Gf2Graph, meet: &Meet<R>, cycle: &[u32], free: &mut Bits<W>) {
+     for &e in cycle.iter().filter(|&&e| meet.contains(e)) {
+@@ -1256,6 +1316,7 @@ fn solve<const W: usize, const R: usize>(
+     level.loss_floor = Losses::from_history(level).unwrap_or(0);
+     level.has_split = false;
+     level.has_pot = false;
++    level.origin = 1;
+ }
+ 
+ /// A child that keeps every member of its parent's heaviest set but one, `x`, besides those it promotes: its heaviest
+diff --git a/solver/frame/src/gf2/meet.rs b/solver/frame/src/gf2/meet.rs
+index 60fd76b..451c7ff 100644
+--- a/solver/frame/src/gf2/meet.rs
++++ b/solver/frame/src/gf2/meet.rs
+@@ -198,6 +198,54 @@ const NO_SLOT: u16 = u16::MAX;
+ /// The heap entry of [`Meet::without`] that stands for the next element free in A.
+ const FREE_A: u32 = u32::MAX - 1;
+ 
++#[inline(always)]
++pub fn ticks() -> u64 {
++    let t: u64;
++    unsafe { std::arch::asm!("mrs {}, cntvct_el0", out(reg) t) };
++    t
++}
++
++/// PROF counters.  kind: 0 other, 1 solved, 2 inherited child, 3 certified child, 4 kept.
++#[derive(Default, Debug, Clone)]
++pub struct MProf {
++    pub settled: u64,
++    pub cut: i64,
++    pub kind: usize,
++    pub reason: [Vec<u8>; 2],
++    pub dcount: [u64; 6],
++    pub dt: [u64; 6],
++    pub renum_t: u64,
++    pub derive_t: u64,
++    pub derives: u64,
++    pub split_n: [u64; 6],
++    pub split_t: [u64; 6],
++    pub r1_t: [u64; 6],
++    pub valid: [u64; 6],
++    pub vertices: [u64; 6],
++    pub cond: [u64; 6],
++    pub started: [u64; 6],
++    /// dirty blocks (reason 1-4): count, old live elements, members of the new set, uncertain, leaving, entering
++    pub dirty_n: u64,
++    pub dirty_live: u64,
++    pub dirty_k: u64,
++    pub dirty_unc: u64,
++    pub dirty_l: u64,
++    pub dirty_e: u64,
++    /// renumber slow path: calls, elements remapped, set bits remapped, runs, calls in order (removals only)
++    pub ren_n: u64,
++    pub ren_elems: u64,
++    pub ren_bits: u64,
++    pub ren_runs: u64,
++    pub ren_inorder: u64,
++    pub ren_inorder_t: u64,
++    pub ren_t: u64,
++    /// inherited splits whose roles differ: role 0 (fresh), member then outside now, outside then member now
++    pub role0: u64,
++    pub role_mo: u64,
++    pub role_om: u64,
++    pub cond_fail: u64,
++}
++
+ /// The workspace of the intersection: everything a solve needs, kept between solves so that a solve allocates
+ /// nothing once the vectors have grown.
+ ///
+@@ -337,6 +385,7 @@ pub struct Meet<const R: usize> {
+     pub reduced: u64,
+     /// In tests: a workspace that solves every derived tableau's problem again, to check the derived one against it,
+     /// and the tableaux it checked.
++    pub prof: MProf,
+     #[cfg(test)]
+     pub check: Option<Box<Meet<R>>>,
+     #[cfg(test)]
+@@ -572,6 +621,7 @@ impl<const R: usize> Meet<R> {
+             restored: 0,
+             built: 0,
+             reduced: 0,
++            prof: MProf::default(),
+             #[cfg(test)]
+             check: None,
+             #[cfg(test)]
+@@ -857,8 +907,13 @@ impl<const R: usize> Meet<R> {
+         const LIVE: u8 = 2;
+         const WANTED: u8 = 4;
+         let held = self.tableau == self.solves;
++        let t_derive = ticks();
+         self.solves += 1;
+         self.tableau = self.solves;
++        for m in 0..2 {
++            self.prof.reason[m].clear();
++            self.prof.reason[m].resize(self.block_live[m].len(), 0);
++        }
+         // The elements of the tableau held are the live elements of its blocks of A.
+         for list in &self.block_live[0] {
+             for &e in list {
+@@ -888,6 +943,7 @@ impl<const R: usize> Meet<R> {
+             for b in 0..self.block_live[m].len() {
+                 self.dirty[m][b] = !ok;
+                 if !ok {
++                    self.prof.reason[m][b] = 0;
+                     continue;
+                 }
+                 self.entering.clear();
+@@ -904,6 +960,13 @@ impl<const R: usize> Meet<R> {
+                 }
+                 if self.entering.len() != self.leaving.len() {
+                     self.dirty[m][b] = true;
++                    self.prof.reason[m][b] = if self.leaving.is_empty() {
++                        1
++                    } else if self.entering.is_empty() {
++                        2
++                    } else {
++                        3
++                    };
+                     continue;
+                 }
+                 while let Some(&y) = self.entering.last() {
+@@ -920,6 +983,31 @@ impl<const R: usize> Meet<R> {
+                     self.exchange(m, b, x, y);
+                 }
+                 self.dirty[m][b] = !self.entering.is_empty();
++                self.prof.reason[m][b] = 4;
++                if self.dirty[m][b] {
++                    let mut lmask = [0u64; R];
++                    for &x in &self.leaving {
++                        let s = usize::from(self.slot[m][x as usize]);
++                        lmask[s / 64] |= 1 << (s % 64);
++                    }
++                    let mut unc = 0;
++                    for &z in &self.block_live[m][b] {
++                        let zi = z as usize;
++                        if self.mark[zi] & LIVE == 0 || self.inside[zi] {
++                            continue;
++                        }
++                        let hits = self.mask[m][zi].iter().zip(&lmask).any(|(a, c)| a & c != 0);
++                        if !is_zero(&self.res[m][zi]) || hits {
++                            unc += 1;
++                        }
++                    }
++                    self.prof.dirty_n += 1;
++                    self.prof.dirty_live += self.block_live[m][b].len() as u64;
++                    self.prof.dirty_k += self.next_slot[m][b] as u64;
++                    self.prof.dirty_unc += unc + self.leaving.len() as u64;
++                    self.prof.dirty_l += self.leaving.len() as u64;
++                    self.prof.dirty_e += self.entering.len() as u64;
++                }
+             }
+         }
+         // The new set and its elements; then each block's slots numbered by increasing member, or the block built.
+@@ -949,16 +1037,24 @@ impl<const R: usize> Meet<R> {
+             for b in 0..self.block_live[m].len() {
+                 if self.dirty[m][b] {
+                     self.dirty[m][b] = false;
++                    let t0 = ticks();
+                     self.rebuild(p, m, b);
++                    let r = usize::from(self.prof.reason[m][b]);
++                    self.prof.dcount[r] += 1;
++                    self.prof.dt[r] += ticks() - t0;
+                     self.built += 1;
+                 } else {
++                    let t0 = ticks();
+                     self.renumber(m, b);
+                     self.reduce_fresh(p, m, b);
++                    self.prof.renum_t += ticks() - t0;
+                 }
+             }
+         }
+         self.derived += 1;
+         self.lists(p, live);
++        self.prof.derive_t += ticks() - t_derive;
++        self.prof.derives += 1;
+         // `start` is the heaviest set of all sizes: the solve would end with the shortest path that gains nothing, whose
+         // length is the gap, found when first asked for.
+         (self.settled, self.stopped) = (true, false);
+@@ -1113,6 +1209,7 @@ impl<const R: usize> Meet<R> {
+         if slots.iter().all(|&z| self.inside[z as usize]) && slots.windows(2).all(|pair| pair[0] < pair[1]) {
+             return;
+         }
++        let t_ren = ticks();
+         self.slot_map.fill(NO_SLOT);
+         let mut k = 0u16;
+         for &z in &self.block_live[m][b] {
+@@ -1149,6 +1246,44 @@ impl<const R: usize> Meet<R> {
+             }
+         }
+         self.next_slot[m][b] = k;
++        let old = self.prof.ren_n;
++        let _ = old;
++        let mut runs = 0;
++        let mut prev: Option<(usize, u16)> = None;
++        let mut inorder = true;
++        let mut last_t = None;
++        for s in 0..64 * R {
++            let t = self.slot_map[s];
++            if t == NO_SLOT {
++                continue;
++            }
++            if let Some(lt) = last_t {
++                if t < lt {
++                    inorder = false;
++                }
++            }
++            last_t = Some(t);
++            match prev {
++                Some((ps, pt)) if ps + 1 == s && pt + 1 == t => {}
++                _ => runs += 1,
++            }
++            prev = Some((s, t));
++        }
++        let dt = ticks() - t_ren;
++        self.prof.ren_n += 1;
++        self.prof.ren_runs += runs;
++        self.prof.ren_t += dt;
++        if inorder {
++            self.prof.ren_inorder += 1;
++            self.prof.ren_inorder_t += dt;
++        }
++        for &z in &self.block_live[m][b] {
++            let z = z as usize;
++            if !self.inside[z] && is_zero(&self.res[m][z]) {
++                self.prof.ren_elems += 1;
++                self.prof.ren_bits += self.mask[m][z].iter().map(|w| u64::from(w.count_ones())).sum::<u64>();
++            }
++        }
+     }
+ 
+     /// Makes `y` (independent of the tableau's set in block `b` of matroid `m`) a member: a new slot, and the
+@@ -1523,6 +1658,9 @@ impl<const R: usize> Meet<R> {
+                 u = q as usize;
+             };
+             let status = if ok { valid } else { invalid };
++            if ok {
++                self.prof.valid[self.prof.kind] += walk.len() as u64;
++            }
+             for &w in &walk {
+                 let w = w as usize;
+                 if w == zero {
+@@ -1561,9 +1699,32 @@ impl<const R: usize> Meet<R> {
+         }
+         self.pot[zero] = 0;
+         self.split_pred[zero] = NONE;
++        let t_split = ticks();
++        let kind = self.prof.kind;
++        let mut started = false;
+         if let Some(start) = start.filter(|start| start.saved) {
++            started = true;
+             self.warm_start(p, live, start);
++            let cond = live.iter().all(|&e| start.role[e as usize] == 1 + u8::from(self.inside[e as usize]));
++            self.prof.cond[kind] += u64::from(cond);
++            if kind == 2 && !cond {
++                self.prof.cond_fail += 1;
++                for &e in live {
++                    let (r, i) = (start.role[e as usize], self.inside[e as usize]);
++                    if r == 0 {
++                        self.prof.role0 += 1;
++                    } else if r == 2 && !i {
++                        self.prof.role_mo += 1;
++                    } else if r == 1 && i {
++                        self.prof.role_om += 1;
++                    }
++                }
++            }
+         }
++        self.prof.started[kind] += u64::from(started);
++        self.prof.split_n[kind] += 1;
++        self.prof.vertices[kind] += live.len() as u64 + 1;
++        let mut t_r1 = 0;
+         self.changed_in.clear();
+         self.changed_in.extend_from_slice(live);
+         self.changed_in.push(zero as u32);
+@@ -1626,7 +1787,12 @@ impl<const R: usize> Meet<R> {
+                 next.push(zero as u32);
+             }
+             std::mem::swap(&mut self.changed_in, &mut self.changed_out);
++            if rounds == 1 {
++                t_r1 = ticks() - t_split;
++            }
+         }
++        self.prof.r1_t[kind] += t_r1;
++        self.prof.split_t[kind] += ticks() - t_split;
+         true
+     }
+ 
+@@ -1803,6 +1969,29 @@ impl<const R: usize> Meet<R> {
+         true
+     }
+ 
++    pub fn min_in(&self, p: &Problem<'_, R>, pot: &[i64], x: u32) -> i64 {
++        let w = p.weight;
++        let xi = x as usize;
++        let w2 = |e: usize| w[e] - pot[e];
++        let b = usize::from(p.block[1][xi]);
++        let s = usize::from(self.slot[1][xi]);
++        let mut best = i64::MAX;
++        for list in &self.out_a {
++            for &y in list {
++                let i = y as usize;
++                let arc = !is_zero(&self.res[1][i]) || (usize::from(p.block[1][i]) == b && bit(&self.mask[1][i], s));
++                if arc {
++                    best = best.min(w2(xi) - w2(i));
++                }
++            }
++        }
++        best
++    }
++
++    pub fn found_end(&self) -> u32 {
++        self.found
++    }
++
+     /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: that cycle, added to
+     /// `cycles` from `x` on, and returned (empty if there is none).  Each of its members has it through it too, as
+     /// long.
+@@ -1879,14 +2068,15 @@ impl<const R: usize> Meet<R> {
+         let reached = settled - 1;
+         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
+         // Distances from `limit + 1` on cannot lead to a cycle that certifies.
+-        let bound = (limit + 1) * HOPS;
++        let cbound = (limit + 1) * HOPS;
++        let bound = (limit + 1 - self.prof.cut) * HOPS;
+         let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
+         heap.start(bound, self.pos.len());
+         // A banned element counts as settled: never offered, nor reached as an element free in A.
+         for &e in banned {
+             stamp[e as usize] = settled;
+         }
+-        let mut cycle = (bound, NONE);
++        let mut cycle = (cbound, NONE);
+         // The elements free in A, by decreasing w1: the next one unsettled, and the member through which they are
+         // reached (the least distance plus w1, packed).
+         let mut next_free = 0;
+@@ -2031,6 +2221,7 @@ impl<const R: usize> Meet<R> {
+                 });
+             }
+         }
++        self.prof.settled += u64::from(tick);
+         (cycle.1 != NONE).then(|| (cycle.0.div_euclid(HOPS), cycle.1))
+     }
+ 
