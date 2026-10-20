@@ -26,17 +26,17 @@ file your task needs.
 |---|---|---|
 | [frame/README.md](frame/README.md) | guide | the frame solver: what it computes, how to build it, a first run and the common tasks |
 | [docs/REFERENCE.md](docs/REFERENCE.md) | reference | the frame solver's flags and commands, its output, and what a result records and why it can be trusted |
-| [docs/GLOSSARY.md](../docs/GLOSSARY.md) | reference | the project's words, each with the one name the docs use |
-| [results/README.md](../results/README.md) | reference | the committed results files and what supports their scores; [runs.md](../results/runs.md) records how the committed chain was made, run by run |
+| [../docs/GLOSSARY.md](../docs/GLOSSARY.md) | reference | the project's words, each with the one name the docs use |
+| [../results/README.md](../results/README.md) | reference | the committed results files and what supports their scores; [runs.md](../results/runs.md) records how the committed chain was made, run by run |
 | [noframe/README.md](noframe/README.md) | explanation and reference | the prover: its proofs and checks of the frame solver's results on the whole board, and its checks of the conjectures; the index of [noframe/docs/](noframe/docs/), a file a subject |
 | [docs/DESIGN.md](docs/DESIGN.md) | explanation | how the frame solver works and why, from the frame model and the search to the trust model, the tests and performance; the index of [docs/design/](docs/design/), a file a part |
-| [docs/THEORY.md](../docs/THEORY.md) | explanation | the theorems both programs rest on: maximal factors, playable sets, the bounds and the frame model's exactness; the index of [docs/theory/](../docs/theory/), a file a subject, with the file of each theorem |
+| [../docs/THEORY.md](../docs/THEORY.md) | explanation | the theorems both programs rest on: maximal factors, playable sets, the bounds and the frame model's exactness; the index of [docs/theory/](../docs/theory/), a file a subject, with the file of each theorem |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | guide | running the frame solver, and the prover's proofs, on a cloud machine of many CPUs; the index of [docs/runbook/](docs/runbook/), a file a job, and [launch.md](docs/runbook/launch.md) has the rules for every launch |
 | [docs/STATUS.md](docs/STATUS.md) | time-bound | what is in flight, paused, decided and waiting on a decision; read it first |
 | [docs/AGENDA.md](docs/AGENDA.md) | time-bound | the research agenda: what limits the end of the chain, the avenues ranked, the conjectures, and what the cloud runs should measure; [agenda-ideas.md](docs/agenda-ideas.md) has the ideas from other domains |
 | [notebook/README.md](notebook/README.md) | record | the lab notebook: its rules, and the register of everything tried, kept or not, a file a subject in [notebook/register/](notebook/register/) (read your subject's before proposing an experiment); the [index of rounds](notebook/index.md); each entry is a folder beside it |
-| [the cost curve](notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n past the end of the chain, with projections for a larger machine |
-| [docs/WRITING.md](../docs/WRITING.md) | guide | how the docs are written |
+| [the cost curve](notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n around 1231, in the search before the GF(2) bound, with projections for a larger machine |
+| [../docs/WRITING.md](../docs/WRITING.md) | guide | how the docs are written |
 | the [wiki](https://github.com/bvchess/taxman/wiki) | explanation | the game and the algorithm, with a walkthrough of game 21 |
 
 ## The tools

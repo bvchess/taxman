@@ -9,7 +9,8 @@ Some words are used inside one part of the code only, and are defined there:
 * setup's (`unzip`, claimed factors, sinks): the module comment of `solver/frame/src/frames/mod.rs`;
 * the peel inside a frame, `reduce` and the home frame: `solver/frame/src/model/`;
 * the bounds' internals (potentials, weight splits, contraction, refinement, refits):
-  [solver/docs/design/search.md](../solver/docs/design/search.md);
+  [solver/docs/design/search.md](../solver/docs/design/search.md) and
+  [solver/docs/design/gf2-bound.md](../solver/docs/design/gf2-bound.md);
 * the engine's (units, splits, steals, spills, pauses): [solver/docs/design/engine.md,
   "Engine"](../solver/docs/design/engine.md#engine) and the module comment of `solver/frame/src/engine.rs`;
 * the fields of the progress line: [the frame solver's reference, section
@@ -201,7 +202,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
   inner bound when it matters.  It comes in three forms:
   * the tactic `lagrange`: the matching bound inside, with multipliers that each searcher fits at the root to the
-    nogoods it has learned ([DESIGN.md](../solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods));
+    nogoods it has learned ([design/search.md](../solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (`wall choice`).  The
     notebook's entries call this form the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
@@ -220,8 +221,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **floor**: a search from a floor F starts from an incumbent worth F that has no set.  If it ends having found
   nothing, no promotion set weighs more than F ([THEORY.md](THEORY.md), Lemma F).
 * **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n), from
-  [Franklín and Moniot (2023)](https://arxiv.org/abs/2211.00461).  `solver/tools/check_results.py` compares every score
-  with it.
+  [Franklín and Moniot (2023)](https://arxiv.org/abs/2211.00461).  `solver/tools/check_results.py` compares each score
+  with it where `heuristics/results` has the bound.
 * **parity bound**: the prover's bound.  Every playable set is independent in two matroids over GF(2), split by the
   parity of the number of prime factors, and the bound is their heaviest common independent set ([THEORY.md](THEORY.md),
   Theorem 10).

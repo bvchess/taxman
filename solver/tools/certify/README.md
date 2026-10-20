@@ -1,10 +1,11 @@
 # The certificates of U: the work list of 2176-3440, and the data it is made from
 
-What a certificate is and what it proves: DESIGN.md, ["Certificates of U"](../../docs/design/certificates.md), and
+What a certificate is and what it proves: solver/docs/design/certificates.md, ["Certificates of
+U"](../../docs/design/certificates.md), and
 docs/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates past
 2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).  Everything
 ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository, against the
-committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred bounds
+committed chain (`results/strict.jsonl`, then games 1..3440) and the prover's barred bounds
 (`solver/noframe/data/upper_*.jsonl`).  `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314,
 3315..3440).
 
@@ -42,12 +43,14 @@ the 3,054 s that the unfinished 3441's 625.8 million nodes took at its measured 
 The recorded seconds over-count the first era 3.27 times and the second 1.55 times; `plan.md` gives the total from
 the recorded seconds as well, as an upper end.
 
-**The lists.**  `pilot.txt` holds the five dearest games, `dear.txt` the next fifteen, and `rest_1.txt` to `rest_4.txt`
+**The lists.**  `pilot.txt` holds the five dearest games, `dear.txt` the next fifteen with the games that rest on them,
+and `rest_1.txt` to `rest_4.txt`
 the others, balanced by expected time and each in increasing n, so that the proven part of the chain grows as a run
 goes.  A game that the rule of the same problem settles is in the list of the game it rests on, after it: the rule
 looks only at the certificates of its own `--out` file.
 
 To make the list again on other data (more of the chain, other prices or another overhead), run the command of
-`plan.md`'s first line with `--out-dir` a scratch directory.  `solver/tools/test_certify_plan.py` tests the script on
+the table above with `--out-dir` a scratch directory (`plan.md` and the lists record it with the paths of an older
+layout).  `solver/tools/test_certify_plan.py` tests the script on
 synthetic data, and `tests/certify.rs` checks its prediction against `certificates_600_1300.jsonl`: the games that need
 a certificate, their open and rejected sources, and the games the rule settles.
