@@ -41,20 +41,19 @@ The other documents:
 
 ## The files
 
-Each file explains one part of the solver and the reasons for it, and defines each term where it first matters.  The
-old section numbers are given for the citations that still use them.
+Each file explains one part of the solver and the reasons for it, and defines each term where it first matters.
 
-| old section | file | read it to |
+| topic | file | read it to |
 |---|---|---|
-| 2. The game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each kind of proof |
-| 3. Architecture | [architecture.md](design/architecture.md) | find your way in the code: the modules in their reading order |
-| 4. The search, but the GF(2) bound and prime exchanges | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, the start, extended mode |
-| 4: The GF(2) bound; Prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
-| 5. Tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |
-| 6. Engine; 7. Per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
-| 8. Results and the trust model, but Same search and Certificates of U | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, past limits, known games, the ledger |
-| 8: Same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
-| 8: Certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of statement U |
-| 9. Testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
-| 9: The tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
-| 10. Performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |
+| the game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each kind of proof |
+| the architecture | [architecture.md](design/architecture.md) | find your way in the code: the modules in their reading order |
+| the search | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, the start, extended mode |
+| the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
+| the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |
+| the engine, the per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
+| results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, past limits, known games, the ledger |
+| same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
+| certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of statement U |
+| testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
+| the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
+| performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |

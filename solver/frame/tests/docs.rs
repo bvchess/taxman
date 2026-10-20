@@ -23,8 +23,8 @@
 //!   number (`WRITING.md, section 8` or `section 8 of WRITING.md`), and every paragraph or list item that it cites by
 //!   the bold or italic words it opens with (`DESIGN.md, the paragraph "Width dispatch"`), exists in the document it
 //!   names, and so does every `PATH.md#anchor` cited in the code;
-//! * every guide but the notebook's entries keeps the limit of words of docs/WRITING.md, rule 8, but those still to be
-//!   split (`STILL_TO_SPLIT`), and the old files of the split documents (`INDEXES`) stay under the limit of an index.
+//! * every guide but the notebook's entries keeps the limit of words of docs/WRITING.md, rule 8, and the indexes of the
+//!   documents that are folders of files (`INDEXES`) stay under the limit of an index.
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
@@ -790,7 +790,13 @@ const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
 
 /// Retired in the rewritten docs and matched in their own case: the notebook's old name, which in lower case is a plain
 /// English word.
-const RETIRED_CASED: &[Retired] = &[retired("EXPERIMENTS", "the notebook (solver/notebook/README.md)")];
+const RETIRED_CASED: &[Retired] = &[
+    retired("EXPERIMENTS", "the notebook (solver/notebook/README.md)"),
+    retired("Brian", "the role: whoever owns the AWS account, or the project's owner (docs/WRITING.md, \"Voice\")"),
+];
+
+/// Phrases that hold a word of `RETIRED_CASED` and stay: a copyright notice names its holder.
+const CASED_STAYS: &[&str] = &["Copyright (c) Brian Chess"];
 
 /// Paths and names that must not appear at all, not even in code: they were renamed.
 const RETIRED_NAMES: &[Retired] = &[
@@ -891,7 +897,7 @@ fn retired_in(lines: &[String], lists: &[&[Retired]]) -> Vec<(usize, &'static st
 fn retired_cased_in(lines: &[String], list: &[Retired]) -> Vec<(usize, &'static str, &'static str)> {
     let mut found = Vec::new();
     for (i, line) in lines.iter().enumerate() {
-        let line = without_link_targets(line);
+        let line = CASED_STAYS.iter().fold(without_link_targets(line), |line, stays| line.replace(stays, ""));
         for entry in list.iter().filter(|entry| has_word(&line, entry.word)) {
             found.push((i + 1, entry.word, entry.instead));
         }
@@ -2221,11 +2227,7 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 // ---------------------------------------------------------------------------------------------------------
 // Sizes
 
-/// The documents that rule 8 of docs/WRITING.md would have split and that are still whole, by their paths from the
-/// repository.  A document leaves the list when it is split, and its old file, now an index, joins `INDEXES`.
-const STILL_TO_SPLIT: &[&str] = &[];
-
-/// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
+/// The indexes of the documents that are folders of files, by their paths from the repository: each holds a line a
 /// file, and stays under the index limit.
 const INDEXES: &[&str] = &[
     "docs/THEORY.md",
@@ -2288,20 +2290,10 @@ fn words_in(shown: &str) -> Option<usize> {
 fn size_problems(file_limit: usize, index_limit: usize) -> Vec<String> {
     let mut problems = Vec::new();
     for (shown, words) in guide_sizes() {
-        if words >= file_limit && !STILL_TO_SPLIT.contains(&shown.as_str()) {
+        if words >= file_limit {
             problems.push(format!(
                 "{shown} has {words} words, over the limit of {file_limit} of docs/WRITING.md, rule 8: split it by task"
             ));
-        }
-    }
-    for shown in STILL_TO_SPLIT {
-        match words_in(shown) {
-            None => problems
-                .push(format!("{shown} is in STILL_TO_SPLIT but there is no such file: remove it from STILL_TO_SPLIT")),
-            Some(words) if words < file_limit => problems.push(format!(
-                "{shown} has {words} words, under the limit of {file_limit}: remove it from STILL_TO_SPLIT"
-            )),
-            Some(_) => {}
         }
     }
     for shown in INDEXES {

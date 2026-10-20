@@ -2,7 +2,7 @@
 
 Part of the [lab notebook](../README.md).
 
-*Question.*  The [research agenda](../../docs/AGENDA.md#6-what-the-cloud-runs-should-measure) left one measurement to the chain
+*Question.*  The [research agenda](../../docs/AGENDA.md#5-what-the-cloud-runs-should-measure) left one measurement to the chain
 past 2175: the true root GF(2) gap of every searched game, against the chain's own optima.  It says which of two
 regimes of the gap's growth the wall follows (C5: +7 per 100 n, the committed games', or +57, the unseeded starts'
 upper bound to 4095, which would put the wall between 3000 and 4000), whether the cost model of 1301-2175 (`log10

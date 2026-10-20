@@ -28,7 +28,8 @@ ends, however it ends) before it builds anything, says so, and counts that wait 
 **It fails**, naming the tests that are over, if the tests take more than 15 s (the target is 10 s; the build and the
 wait are not counted) or if one test uses more than 2 s of CPU (CPU, not seconds on the clock, which grow several times
 over when every CPU is busy).  The limits and the thresholds of the wait are the constants at the top of the script, and
-raising a limit needs Brian's approval: a test that goes over is made smaller or long, as below, never allowed more.
+raising a limit needs the project owner's approval: a test that goes over is made smaller or long, as below, never
+allowed more.
 
 **A long test** is one that takes more than about a second in the test profile.
 `#[cfg_attr(debug_assertions, ignore = "long: the quick check is quick_one")]` skips it in a non-release run, where
@@ -52,8 +53,8 @@ binary, the tests, and the examples `ledger`, `perf` and `ladder`.  The study to
 `--features studies`, and run `cargo test --features studies` and `cargo clippy --all-targets --features studies` after
 a change to the library that they read.
 
-**Before a change is merged** (what a reviewer of a subagent's work runs, besides reading it; the tests are described
-below, the probe in [performance.md](performance.md)):
+**Before a change is merged** (what a reviewer of a change runs, besides reading it; the tests are described below, the
+probe in [performance.md](performance.md)):
 
 * every change: `solver/tools/quick_check.py`, and `cargo test --release`, `cargo clippy --all-targets` and `cargo fmt
   --check` in `solver/noframe/`;

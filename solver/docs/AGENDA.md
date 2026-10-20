@@ -1,9 +1,9 @@
 # Research agenda (2026-10)
 
 What to pursue to push the wall much further: what limits the search, the avenues ranked, the conjectures worth proving,
-the ideas worth borrowing, and what the cloud runs should measure.  It is for Brian, and for an agent choosing the next
-experiment.  The wall is the first game whose own search takes longer than the limit that [STATUS](STATUS.md) gives
-([the glossary](../../docs/GLOSSARY.md)).  Each avenue says where it stands.  The
+the ideas worth borrowing, and what the cloud runs should measure.  It is for anyone choosing the next experiment.  The
+wall is the first game whose own search takes longer than the limit that [STATUS](STATUS.md) gives ([the
+glossary](../../docs/GLOSSARY.md)).  Each avenue says where it stands.  The
 [register](../notebook/README.md#register-of-everything-tried) is the record of what was tried, and an avenue started
 from here gets its row there when it ends.  The measurements made for this agenda are the entry [Measurements made for
 the research agenda](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as
@@ -13,8 +13,8 @@ the research agenda](../notebook/measurements-made-for-the-research-agenda-2026-
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
 * [3. Ranked avenues](#3-ranked-avenues)
 * [4. Conjectures](#4-conjectures)
-* [5. Ideas from other domains](agenda-ideas.md)
-* [6. What the cloud runs should measure](#6-what-the-cloud-runs-should-measure)
+* [5. What the cloud runs should measure](#5-what-the-cloud-runs-should-measure)
+* [Ideas from other domains](agenda-ideas.md), in a file of its own
 
 ## 1. Where we are
 
@@ -361,12 +361,7 @@ more.  What stays unexplained is a factor of 3 (sd 0.48 decades) in a game's tre
 greedy rejects on the sources' instance is a GF(2) combination of the sources it kept above it; it would prove the
 upper-half conjecture in general.  It is not on the critical path of the wall; C3 is.
 
-## 5. Ideas from other domains
-
-The ideas from other fields that might serve the search, and the pilots that tried them, are in
-[agenda-ideas.md](agenda-ideas.md).
-
-## 6. What the cloud runs should measure
+## 5. What the cloud runs should measure
 
 The chain past 2175 and the prover's proofs of 1301-2175 were to decide C5 and A2's premise: C5 is decided, and A2's
 premise needs a rerun (below).  Most of what follows needs only the runs' output files, analysed afterwards on one
