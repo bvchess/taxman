@@ -81,7 +81,6 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 
 ## Waiting on Brian
 
-* Nothing for the run itself: Brian approved it (2026-10-16); periodic updates need his AWS session (12 hours each).
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
 

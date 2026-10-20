@@ -208,10 +208,11 @@ or `--node-limit`, the `default` tactics and the option `use_prev`.  The first l
 assumptions are the line's ([RUNBOOK, section
 4.4](../solver/docs/RUNBOOK.md#44-verifying-and-bringing-the-results-home)).
 
-*Details.*  The run was launched on 2026-10-18 at 12:40 PDT, continued once with `wall.sh launch --continue`, and ended
-on 2026-10-20 at 05:31 PDT on its budget of 40.5 instance-hours (36 at the launch), in the middle of game 4548, which
-has a checkpoint and no completed line.  It cost about $27.32, on four instances: spot interruptions replaced the first
-two, and the budget ended the third, which `--continue` took up with a fourth.  [The notebook
+*Details.*  The run was launched on 2026-10-18 at 12:27 PDT, continued with `wall.sh launch --continue` when its first
+budget of 36 instance-hours ran out, and ended on 2026-10-20 at 05:31 PDT on its budget of 40.5, in the middle of game
+4548, which has a checkpoint and no completed line.  Four instances ran the solver, for $27.32: spot interruptions
+replaced the first two, and the budget ended the third, which `--continue` took up with a fourth.  A fifth, the first
+try of `--continue`, idled for about 25 minutes (about $0.30) on the old layout of the scripts.  [The notebook
 entry](../solver/notebook/the-run-to-5000-2026-10/README.md) records the run.
 
 * `invocations` is 1 in every kept line but 3940, 3942, 4340, 4431, 4432 and 4433.  Those games were in flight when an
