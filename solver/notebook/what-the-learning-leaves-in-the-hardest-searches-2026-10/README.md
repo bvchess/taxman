@@ -10,9 +10,9 @@ not make, or something else?
 exclusions on a path, at the same prices, closing at the same gap.  It removes breadth, not depth: fewer alternatives
 for each exclusion.  The conflicts it still computes are mostly ones it met before.  At 3300-14, 57% are a nogood the
 search learned and then forgot at a clearing of its table, and 26% are a conflict met before whose nogood no longer
-fits the node.  Exchanges outside the learning's class explain at most 8%.  So the first lead is the forgetting, not a
-wider closure: keeping the nogoods used since the last clearing (the tactic `nogood_keep=hit`), which makes the
-default search larger, takes a further 43% off the steps of 3300-14 with the learning.
+fits the node.  Exchanges outside the learning's class explain at most 8%.  So a wider closure has little to catch.
+Keeping the nogoods used since the last clearing (the tactic `nogood_keep=hit`) is no answer either: it moves the trees
+by the same factor with the learning as without it, 0.36-0.37 at 3300-14 and 1.46 at 3441-1262.
 
 The study follows [conflicts closed under cheap exchanges](../conflicts-closed-under-cheap-exchanges-2026-10/README.md),
 whose learning took 20.6% off the steps of the tuning suite and only 4.5% off the CPU of its whole games.  It has three
@@ -123,17 +123,32 @@ Each conflict the search still computes, in the first group that holds it (`resi
 
 The largest group is the forgotten nogoods, so the cheapest test keeps them.  The tactic `nogood_keep=hit` keeps, at a
 clearing, the nogoods used since the last one.  [Keeping and
-forgetting](../keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md) found that it makes the
-default search 28-31% larger.  With the learning it is the other way round at 3300-14:
+forgetting](../keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md) found that it makes ten whole
+games 28-31% larger on one thread.  The question here was whether the learning, whose classes a clearing throws away,
+changes that.  It does not: keeping moves each unit by the same factor with the learning or without it, and the factor
+swings from a third to one and a half.
 
-| search | steps | CPU s |
-|---|---|---|
-| default | 1,248,609 | 308 |
-| default, `nogood_keep=hit` | | |
-| learning | 790,609 | 204 |
-| learning, `nogood_keep=hit` | 453,073 | 117 |
+| unit | default | `nogood_keep=hit` | change | learning | learning, `nogood_keep=hit` | change |
+|---|---|---|---|---|---|---|
+| 3300-14 | 1,248,609 | 464,165 | −62.8% | 790,609 | 453,073 | −42.7% |
+| 3441-1262 | 1,099,410 | 1,602,571 | +45.8% | 648,846 | 950,397 | +46.5% |
 
-The best and the conclusion are the same in all four.  One unit is not a result; the stages that follow measure it.
+The cells are steps; the CPU seconds follow them (308, 118, 204 and 117 at 3300-14; 342, 506, 220 and 326 at
+3441-1262).  The best and the conclusion are the optimum's in all eight.  A unit's tree is a chaotic function of the
+nogoods it holds, as [the tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md) found, so
+two units cannot say whether keeping pays on average; the earlier entry says it does not.  The run of 3440-12 was
+stopped before it ended, to save the budget.
+
+## Next
+
+* **Stage 2** applies `profile` and `misses` to the suite of the chain's hardest searches, and to its whole games,
+  to ask why whole games gain less than units.
+* **The witness.**  A quarter of what the learning computes is a conflict it knew under another witness.  Each nogood
+  lies in one frame, and its witness is promotions of the two homes that touch that frame.  A test: with each
+  computed conflict, also learn its nogood with one witness member exchanged for a twin or kin among the root's
+  candidates, each checked by a peel from the root.  That costs a few hundred peels for each computed conflict, and
+  computed conflicts are under 1% of the checks.
+* **Not a wider closure.**  The exchanges the closure lacks explain at most 8% of the computed conflicts at 3300-14.
 
 ## Files
 
