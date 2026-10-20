@@ -78,14 +78,15 @@ chain reach.  The prover ([its README](../../noframe/README.md)) is a separate p
 [the section on its proofs](../../noframe/docs/proofs.md) lists the facts that they use.
 
 Past the prover's proofs, the committed games are proven within the frame model, so each is opt(n) wherever U holds at
-n.  Proving U at such an n takes two steps, which the command `taxman certify` combines game by game ("Certificates of
-U", [trust.md](trust.md)); [results/README.md](../../../results/README.md#certificates) says which games have
+n.  Proving U at such an n takes two steps, which the command `taxman certify` combines game by game
+([certificates.md](certificates.md)); [results/README.md](../../../results/README.md#certificates) says which games have
 certificates.
 
 First, the prover's [barred bounds](../../../docs/GLOSSARY.md#bounds) settle most members of U\*: each member that a
 barred bound certifies is played by every set of moves that beats the recorded score and obeys Theorem B, and the
 members it does not certify are *open*.  It certifies most members in each game, within the prover's proofs and past
-them, but closes no game alone ([the prover's README](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the
+them, but closes no game alone
+([solver/noframe/docs/proofs.md](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the
 method, and [the entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the
 shares).
 
@@ -111,6 +112,7 @@ What each kind of proof needs of the frame model, beyond the code's correctness 
 | `exhausted`, `trivial` | completeness at n, so U at n |
 | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
 | `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
+| `known` | nothing of the model at n: what the cited game or bound assumes (for the bounds store, U at the games its bounds rest on) |
 
 The tests tie the theorems to the code:
 

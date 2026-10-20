@@ -84,7 +84,8 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
   It does not retry an error status (1 or 2: a refused checkpoint, a game that failed a check), because it would repeat:
   read `~/taxman-work/logs/chain.err`.
 * **Use the same build between a stop and its resume.**  A checkpoint records the game, the frames the build made, the
-  candidates and the search tactics, and the solver refuses one from a different build with the reason: delete it, or
+  candidates and the search tactics, and the solver refuses one from a build that sets these up differently, with the
+  reason: delete it, or
   run the old build.  The width of the sets is part of that: a build that gives a game another width refuses its old
   checkpoint.  Do not `git pull` in the middle of a long game without a reason.  Changing only code generation (PGO,
   `target-cpu`) is harmless.

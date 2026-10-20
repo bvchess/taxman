@@ -88,8 +88,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 `tests/` holds the integration tests ([testing.md](testing.md)), and `solver/tools/` the scripts around the programs:
 the second verifiers in Python, the quick check, the profile-guided build and the cloud scripts ([solver/README.md, "The
 tools"](../../README.md#the-tools)).  The programs of finished studies (`fields`, `matroid`, `dominance`, `slope`,
-`repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) are gone from master; [the
-notebook](../../notebook/README.md#how-this-notebook-is-kept) says where they build.
+`repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) are gone from master; [the notebook's list of retired
+terms](../../notebook/terms-changed.md#removed-programs) says where they build.
 
 **Width dispatch.**  A set of game numbers is a bitset of W words of 64 bits, and everything that holds one is generic
 over `const W: usize`.  The macro `with_width!` (in `bits`; the solver, the examples and the tests use it) picks the

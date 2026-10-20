@@ -93,8 +93,9 @@ microseconds of a thread up to 3310, 326.73 after; the table of eras in `plan.md
 * **Phase C on another build.**  If a build with the claim-by-claim rule is merged by phase C, check it out on the
   machine of phase C
   (`git fetch && git checkout M5COMMIT`) and build again.  Delete the checkpoint directory of `deferred` if an earlier
-  attempt left one, since a checkpoint of another build is refused.  Phases A and B never change build: a checkpoint is
-  resumed only by the build that made it, and the lines of one list should come from one build.
+  attempt left one, since a checkpoint of a build that sets up another search is refused.  Phases A and B never change
+  build: a checkpoint is resumed only by a build that sets up the same search, and the lines of one list should come
+  from one build.
 * **Inputs,** all committed: `results/strict.jsonl` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
   prover's barred bounds: 2..1300, 1301..2175, 2176..3314, 3315..3440), `solver/tools/certify/plan.jsonl` and `plan.md`,
   and the lists in `solver/tools/certify/lists/stage4/`.  `certify.sh` takes them from the checkout.

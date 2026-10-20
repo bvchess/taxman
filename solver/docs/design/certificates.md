@@ -68,7 +68,8 @@ against a higher score applies to a game the rule settles too.
 beside them, the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the
 formulation (`claims`), the verdict, the digest of Π⁺(O), the game it rests on if the rule settled it
 (`same_problem`), and the build.  A search stopped by a limit or a signal writes an `incomplete` line and keeps its
-checkpoint (the flags are `solve`'s); a rerun skips the games with a verdict and resumes the others.  A problem whose
+checkpoint (the flags are `solve`'s); a rerun skips the certified games, stops again at a beaten one, and resumes the
+others.  A problem whose
 GF(2) bound needs more block words than the engines of the game's set width have is searched at the widest set width
 (128 words, five words of engine); `certify::certificate_width` is the one place that decides the width, and the line
 records it.
@@ -77,8 +78,9 @@ records it.
 the two.  The file has one n a line, in the order to certify them; it skips blank lines and those whose first non-blank
 character is `#`, and has no game twice.  Any other line is a usage error that names the file and the line.  The loop
 of the range takes the games in the file's order, with the same rules: the game's line of the barred bounds must exist,
-a game that needs no certificate is counted (`not needing one`) and passed over, a final verdict in `--out` skips the
-game, and the rule of the same problem looks at the certified games of the file and of the run, whatever order they
+a game that needs no certificate is counted (`not needing one`) and passed over, a `certified` verdict in `--out` skips
+the game (a `beaten` one stops the run again), and the rule of the same problem looks at the certified games of the file
+and of the run, whatever order they
 were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.
 
 *The campaign's lists.*  `solver/tools/certify_plan.py` (standard library only) makes the lists of the campaign on
@@ -94,7 +96,7 @@ and `solver/tools/cloud/certify.sh` runs them ([runbook/certify.md](../runbook/c
 [--threads K]` (`src/certify/verify.rs`) reads the files that `certify --out` wrote, without changing them, and checks
 every line.  It notes and ignores a last line without its newline, as the file cuts it when it is opened.  A complete
 line that is no certificate, or whose `build` lacks the commit (40 hexadecimal digits) or the `dirty` flag, is an
-error.  It counts and skips an `incomplete` line, and checks a line with a final verdict in this order:
+error.  It counts and skips an `incomplete` line, and checks a line with a final verdict on these points:
 
 1. the barred bounds have a line for the game, which says it needs a certificate, and whose open members and score
    are the line's;

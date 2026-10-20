@@ -5,7 +5,7 @@ Part of the [design](../DESIGN.md).
 ## The GF(2) bound
 
 The *GF(2) bound*, the default node bound (tactic `gf2`), relaxes winnability less than matchability does, and so prunes
-more: at the roots of 880 to 1300 its gap is a tenth of the matching bound's ([matroid intersection
+more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound's ([matroid intersection
 bounds](../../notebook/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors coordinates
 over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal factors in the
 frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and the peel's order
@@ -39,9 +39,9 @@ misses are the *odd* cores of movers with three or more factors.
   contraction, and for a certified child the set is first flipped along its cycle by exchanges, each a pivot that keeps
   the span.  It derives a node's from a copy of its own tableau, saved when it kept the certified level (`Snapshot`).  A
   block where an exchange would change the span is built instead, and the elements the parent did not have (its own
-  loops, candidates again in the child) are reduced by the block's members.  The module comment of `src/gf2/meet.rs`
-  ("Deriving a tableau") has the argument, and the random paths of the tests check every derived tableau against the one
-  a solve builds.  The trees are the same.
+  loops, candidates again in the child) are reduced by the block's members.  The docs of `Meet` in `src/gf2/meet.rs`
+  ("Deriving a tableau") have the argument, and the random paths of the tests check every derived tableau against the
+  one a solve builds.  The trees are the same.
 * **The heaviest set without a member, with no solve.**  In practice the heaviest set without a member `x` of `I*` is
   `I*` flipped along one cycle through `x` of its exchange graph.  `Meet::without` finds the shortest such cycle by
   Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent,
@@ -93,11 +93,11 @@ misses are the *odd* cores of movers with three or more factors.
   the sets of 128 words have the copies of four and five words, so the narrower widths build as before.  Tests run those
   copies on small games with the vectors padded with zero words (`Gf2Graph::padded`), where they must search the same
   tree.
-* **Open for other weights.**  `meet::Problem` takes any positive weights, but two of its starts assume that weights do
-  not decrease with an element's index, as the root's candidates, in increasing order, have them: the start from the
-  heaviest uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian
-  over the nogoods, or a cover LP with this intersection as its inner problem, as the nogoods study suggests) needs its
-  own element order, or those two starts switched off.  The levels, the contraction and the split do not depend on the
+* **Other weights.**  `meet::Problem` takes weights that are positive and do not decrease with an element's index, as
+  the root's candidates, in increasing order, have them; two of its starts rely on that: the start from the heaviest
+  uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian over the
+  nogoods, or a cover LP with this intersection as its inner problem, as the nogoods study suggests) relabels them by
+  increasing weight first, with `Gf2Graph::reweighted`.  The levels, the contraction and the split do not depend on the
   order.
 
 ## Prime exchanges

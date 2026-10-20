@@ -22,8 +22,8 @@ The other documents:
 
 * **Go past n = 1000**, where the Java solver's table of optimal games stopped, as far as the machines at hand reach: a
   laptop (an Apple M1 Max: 10 CPUs, 32 GB of RAM, a fast SSD) and a cloud machine of many CPUs ([RUNBOOK](RUNBOOK.md)).
-  [results/README.md](../../results/README.md#strictjsonl) says how far the committed chain of games reaches, and which
-  machine made each part of it.
+  [results/README.md](../../results/README.md#strictjsonl) says how far the committed chain of games reaches, and
+  [results/runs.md](../../results/runs.md) which machine made each part of it.
 * **Be right before being fast.**  A game counts only once an independent
   [referee](../../docs/GLOSSARY.md#results-and-trust) has replayed it.  Every result records how its optimality is
   proven and what that proof takes as given.  Every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound

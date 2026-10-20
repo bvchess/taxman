@@ -208,7 +208,8 @@ the games past its end.  The checkpoint of the walled game stays in `ckpt/`, bec
 **To go on** after the wall or the budget (a longer wall, more money), run
 `wall.sh cleanup`, then
 `wall.sh launch --continue --commit THE-SAME-COMMIT --until DATE --budget-hours H --game-hours G`.  Use the commit the
-run began with, because a checkpoint resumes only on the build that made it ([Run](chain.md#run)), and give the budget
+run began with, because a checkpoint resumes only on a build that sets up the same search ([Run](chain.md#run)), and
+give the budget
 as the new total.  `--continue` removes the end, the stop and the count of machines (`run/boots/`), writes the config
 again, and keeps the ledger, the results
 and the checkpoints.

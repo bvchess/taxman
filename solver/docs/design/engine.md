@@ -29,11 +29,13 @@ the design in outline.
 * **Incumbent.**  An `AtomicU64` value with a payload behind a mutex (the promotion set, encoded).  Offers only ever
   raise it.  A searcher can declare it optimal, which ends the run, as an incumbent that reaches the ceiling given
   through the control (below) does.
-* **Checkpoint.**  Every `checkpoint_interval` all workers yield and park.  The engine writes the caller's header, the
+* **Checkpoint.**  At every checkpoint interval (`EngineConfig::checkpoint`) all workers yield and park.  The engine
+  writes the caller's header, the
   incumbent, statistics and every unit, in memory and spilled, to `<checkpoint>.tmp`, fsyncs it, renames it over the
   checkpoint, syncs the directory, and releases the workers.  Resuming loads the file and goes on, losing and
   duplicating nothing beyond partly explored nodes.  Any interval works, zero included.  The caller's header identifies
-  the search, so that a checkpoint of another game, width, build or tactics refuses to resume ([trust.md](trust.md)).  A
+  the search, so that a checkpoint of another game, width, frames, candidates or tactics refuses to resume
+  ([trust.md](trust.md)); a build that sets up the same search resumes it.  A
   run that completes deletes its checkpoint, unless the caller asks to keep it until it has recorded the result.
 * **Stopping and sharing.**  Time and node limits, and SIGINT and SIGTERM (after `stop_on_signals`), stop a run with a
   final checkpoint; a second signal kills the process.  A stop that already holds when a run starts (a time limit of
@@ -69,7 +71,7 @@ has the exact steps and checks.  Each step, with the Java class it reimplements:
 | 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known games](trust.md#known-games)) | |
 | 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) | `FrameSolver.solutionForPrime` |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) | `bombus.Apiary`, `Hive`, `frame.FrameBuilder`, `WorkingFrame` |
-| 4 | the search (method `search`): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [trust.md](trust.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
+| 4 | the search (method `search`): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves | `search.SearchManager.create`, `Frame`, `FrameSet`, `LowerBoundEstimator.greedy`, `BranchExplorer`; `Apiary(board, promotions).getSolution()` |
 | 5 | `conclude`: replay and check the game, confirm its score against `optimal.json`, assign its proof and what it assumes | `game.Solution.verify` |
 | 6 | record the result (a range) | |
 
@@ -206,5 +208,6 @@ tried on the way.
 **The table of optimal games is built into the binary** (`optimal.json`, through `include_str!` and
 `game::Optimal::built_in`): the table as it was when the crate was compiled, which a rebuild picks up when the file
 changes.  The solver confirms every completed game's score against it, and a score that differs is a hard error that
-names the game.  No option names another table, so a run cannot be checked against anything else; the library takes
+names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
+against anything else (`verify-optimal FILE` and `extend-optimal --table FILE` take one); the library takes
 another table where a test needs one (`solver::solve_range_each_with`, `results::read_results`).
