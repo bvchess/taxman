@@ -471,6 +471,54 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     verifiers_agree(&dir, &[(hole, Verdict::Accepted)]);
 }
 
+/// A record of the proof `known` stands on the file's own line of the game before, whatever proof that line has.  A run
+/// with `--use-prev` records the committed chain's games as `known`, so when its lines are appended to the committed
+/// file, its first line names a game of n − 1 as `known` while the file's line of that game has the proof it was made
+/// with.  Both verifiers accept such a record when the score, the moves and the assumptions are the line's, and refuse
+/// it when any of them differs, when the game is not in the file, when it names another source, and a record of any
+/// other proof that is not the line's.  Games 1..90.
+#[test]
+fn a_known_record_of_the_game_before_stands_on_the_files_own_line() {
+    let games = solver::solve_range(1, 90, &common::options(1), None).unwrap();
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    // The index of the first game built on a game of each proof (the game of n is `games[n - 1]`).
+    let after = |proof: Proof| {
+        (1..games.len())
+            .find(|&i| games[i - 1].proof == Some(proof))
+            .unwrap_or_else(|| panic!("no game after a game of proof {} in 1..=90", proof.as_str()))
+    };
+    let s = |text: &str| Json::from(text);
+    let known = || ("prev.proof", s("known"));
+    let proofs = [Proof::Exhausted, Proof::Cap, Proof::SameSearch, Proof::PrimeFormula];
+    let accepted: Vec<(usize, Vec<Edit>)> = proofs.iter().map(|&proof| (after(proof), vec![known()])).collect();
+
+    let i = after(Proof::Exhausted);
+    let before = &games[i - 1];
+    let optimal = Optimal::built_in();
+    let digest = moves_digest(optimal.moves(before.n).unwrap());
+    let from_optimal: Vec<Edit> = vec![
+        ("prev.source", s("optimal")),
+        ("prev.moves_digest", s(&digest)),
+        known(),
+        ("prev.assumes", Json::array([assumed_optimal(before.n)])),
+    ];
+    let refused: Vec<(usize, Vec<Edit>, &str)> = vec![
+        (i, vec![known(), ("prev.score", Json::from(before.score + 1))], "does not match line"),
+        (i, vec![known(), ("prev.moves_digest", s("0000000000000000"))], "does not match line"),
+        (i, vec![known(), ("prev.assumes", Json::array(["a statement"]))], "does not match line"),
+        // Another proof than the line's, and than `known`.
+        (i, vec![("prev.proof", s("cap"))], "does not match line"),
+        // `known` is the record of the file's own game: the game of optimal.json has no proof to leave out.
+        (i, from_optimal, "does not match optimal.json"),
+    ];
+    both_verifiers(&TempDir::new("known-record"), &lines, &accepted, &refused);
+
+    // The game named is not in the file.
+    let hole: Vec<Json> = lines[..i - 1].iter().cloned().chain([with(&lines[i], "prev.proof", &s("known"))]).collect();
+    let cases = vec![(hole, Verdict::Refused { line: i, n: games[i].n, expected: "which the file does not hold" })];
+    verifiers_agree(&TempDir::new("known-record-hole"), &cases);
+}
+
 /// How many games of the report in `range` have the proof, the ceiling proof, or no assumption.
 fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize {
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()

@@ -291,7 +291,9 @@ made it: a sweep goes over them more than once, and a run with no `--pass` has n
 | `proof` given (or `source` `optimal`, `strict`, `bounds`) | n − 1 proven (or assumed, from `optimal.json`; or the committed chain's or the bounds store's game, `--use-prev`): the seed, the ceiling n + score(n − 1), the prime formula for a prime n, and repeats | any |
 
 The game of n − 1 that a `results` line names is in the same file.  It is a completed game or, with no proof, an
-earlier incomplete line with the score and moves it records.  A game that a retry searched again has several lines:
+earlier incomplete line with the score and moves it records.  A record of the proof `known` (where the run took its
+copy from a known source) stands on the file's completed game with that score, those moves and those assumptions,
+whatever its own proof ([the runbook, section 4.4](RUNBOOK.md#44-verifying-and-bringing-the-results-home)).  A game that a retry searched again has several lines:
 an incomplete one made when the game of n − 1 had less to give, or was missing, and a later one made when it had more.
 Each says what it had.
 

@@ -753,6 +753,13 @@ For a chain from 1, the report says `assumptions: none in N of N games`.  Any as
 is not what it should be: stop and read the line.  (A count of incomplete lines is not a problem: every search that
 stopped and resumed left one.)
 
+A run with `--use-prev` (section 5.4) holds the committed chain's games as `known` lines at the start of its own file,
+so its file does not continue the committed file as it stands.  Append its completed lines past the committed file's
+last game, byte for byte, and leave out its `known` copies of the committed games and its incomplete lines (the
+committed file has none); then run the referees on the committed file.  The first appended line records its game of
+n − 1 with the proof `known`, as the run's own line, while the committed file's line has the proof it was made with.
+Both referees accept that record, because the score, the moves and the assumptions are the line's.
+
 Then decide what to keep.  The file takes about 2 KB a game.  Scripts must not overwrite the committed `results/`: put a
 file next to them (say `results/strict-1-1400.jsonl`) and update `results/README.md`.  The scaling logs under
 `solver/notebook/` (in a folder of their own, or in `solver/notebook/graviton-calibration-2026-10/`) are your call.
@@ -954,7 +961,8 @@ aws iam list-role-policies --role-name taxman-ec2 --query PolicyNames          #
 **After the end,** pull the results
 (`aws s3 sync s3://taxman-013764204840-us-east-1/wall-RUN/results results-from-cloud/`) and verify them at home as
 section 4.4 says.  `verify.sh` must report that the games of the committed file agree with it with equal scores,
-"assumptions: none", and both referees agreeing; the referees alone check the games past its end.  The checkpoint of the
+"assumptions: none" (a run with `--use-prev` reports the statements of the store's games instead), and both referees
+agreeing; the referees alone check the games past its end.  The checkpoint of the
 walled game stays in `ckpt/`, because a run that goes on needs it.
 
 **To go on** after the wall or the budget (a longer wall, more money), run
@@ -990,6 +998,7 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "
   store is append-only, so a checkout at a later commit has every line that the pinned one had.  Run
   `ledger verify-bounds results/bounds.jsonl` on the store first (section 6), because the chain takes its bounds on its
   word.
+* **Bringing it home.**  Section 4.4 says how to append the run's lines to the committed chain.
 * **A resumed machine** passes the flag again (it is in `run/config`, which every machine reads), and the results file
   it restores from S3 gets the same checks.  The checkpoint of a searched game resumes as ever.
 * **The trade-off.**  Without the flag, the chain from n = 1 re-proves the committed chain (in the run of 2026-10-17,
