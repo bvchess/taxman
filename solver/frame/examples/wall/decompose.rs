@@ -1,6 +1,6 @@
-//! `wall decompose`: A5's cheapest experiment (solver/docs/AGENDA.md, "A5. Decompose across the frames"): do the
-//! conflicts of a node that heads a big subtree split, across some home, into two sides that do not interact, so that
-//! an AND/OR search could solve the sides apart?  The question, the numbers and the verdict are in
+//! `wall decompose`: A5's cheapest experiment (solver/docs/AGENDA.md, "A5. Decompose across the frames (AND/OR
+//! search)"): do the conflicts of a node that heads a big subtree split, across some home, into two sides that do not
+//! interact, so that an AND/OR search could solve the sides apart?  The question, the numbers and the verdict are in
 //! solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md, whose `analyze.py` reads
 //! the lines.
 //!

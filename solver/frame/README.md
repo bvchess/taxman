@@ -133,8 +133,8 @@ n − 1 is optimal.
   n, and `taxman certify` ([the reference, section 2](../docs/REFERENCE.md#2-the-other-commands)) checks it game by
   game; a proof by the ceiling or by the prime formula uses no model ([the reference, section
   4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).  The results lines do not record U.
-  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and [DESIGN.md, "What
-  optimal means"](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the model.
+  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and [DESIGN.md, “What
+  "optimal" means”](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the model.
 * **The pruning is exact.**  No [tactic](../../docs/GLOSSARY.md#the-search) prunes a promotion set that could win: each
   is proven or sound, and [DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) grades them.  So a result rests on nothing
   but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so, the game it

@@ -271,13 +271,14 @@ on 1300 and 2100.  *Payoff:* about ten times, a constant, which is what A2's rem
   ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * **Strong branching's solves**, untried: 70% of the intersection's work, they restart far below their answer, and
   cancelling the negative cycles of the optimal set less the member would start them next to it ([the GF(2) bound in the
-  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), "Next on the inner loop").
+  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), the item "Next on the inner loop").
 * **What only the matching path uses**, open: the GF(2) bound has made it idle, and it can be removed once a production
   run has been made with the GF(2) search: the Lagrangian bound in the search and refinement ([the same
-  entry](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), "To remove").
+  entry](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
 * **A unit that carries its GF(2) level**, not built: a rebuilt unit's first node would check the level instead of
   solving it, which wins at most the units' first nodes, 1 to 4% of a thread's time at 64 threads, nothing on long
-  searches ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), "What to build next").
+  searches ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), the paragraph "What to build
+  next").
 
 **Closed beside these avenues** (2026-10-18):
 
@@ -314,8 +315,8 @@ then regions with holes.
 **C3 (the upper part).**  *Open.*  Every optimal game plays U\*, and game by game barred parity bounds and small
 searches could certify it.  This strong form holds in every game whose optimal sets were enumerated (954 games of
 2..989).  The weak form, U, that some optimal set contains U\*_{≥3}, holds wherever the prover has proven opt(n), every
-n up to 2175, and certificates prove it game by game for 600..1300 ([THEORY.md, "What is known of
-U"](../../docs/THEORY.md#the-upper-part); [results/README.md](../../results/README.md#what-supports-the-scores)).
+n up to 2175, and certificates prove it game by game for 600..1300 ([THEORY.md, "The upper
+part"](../../docs/THEORY.md#the-upper-part); [results/README.md](../../results/README.md#what-supports-the-scores)).
 *Evidence:* every game enumerated ([the prover's README, section 5](../noframe/README.md#5-is-the-optimal-set-unique));
 92-96% of U\* certified at the root by one bound each (measurements 7.3).  *Attack:* the frontier argument of [the
 prover's README, section 8](../noframe/README.md#8-what-remains-open) for a proof; A2 for certificates.
@@ -349,9 +350,9 @@ of the chain's nodes, and all of the 18 dearest have a gap of 1,094 or more.  Wh
 (sd 0.48 decades) in a game's tree at its gap.
 
 **C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([THEORY.md, "The span
-certificate"](../../docs/THEORY.md#the-span-certificate-)).  Every source that descending greedy rejects on the sources'
-instance is a GF(2) combination of the sources it kept above it; it would prove the upper-half conjecture in general.
-It is not on the critical path of the wall; C3 is.
+certificate (♦)"](../../docs/THEORY.md#the-span-certificate-)).  Every source that descending greedy rejects on the
+sources' instance is a GF(2) combination of the sources it kept above it; it would prove the upper-half conjecture in
+general.  It is not on the critical path of the wall; C3 is.
 
 ## 5. Ideas from other domains
 

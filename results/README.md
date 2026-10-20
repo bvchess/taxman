@@ -478,7 +478,8 @@ A line of 4501 might read:
 **What an upper bound rests on.**  Every upper bound is a bound of the frame model at some game: a root bound, a dual
 bound, a completed search or a given game.  That is opt(n) where statement U holds at that game.  The lemmas carry it
 between games without more, except the second part of Lemma L4, the bound on opt(n) − in_the_bag(n), which rests on U
-at the game it is carried to ([THEORY.md, "In the ledger"](../docs/THEORY.md#the-ledger-bounds-between-boards)).
+at the game it is carried to ([THEORY.md, "The ledger: bounds between
+boards"](../docs/THEORY.md#the-ledger-bounds-between-boards)).
 `rests_on` lists the games:
 
 * a bound of the frame model has its own game alone;
@@ -486,10 +487,10 @@ at the game it is carried to ([THEORY.md, "In the ledger"](../docs/THEORY.md#the
   itself;
 * a repeat adds its own game.
 
-U is certified for every n up to 2175 ([DESIGN.md, "What optimal means"](../solver/docs/DESIGN.md#what-optimal-means)),
-so a bound whose list holds only games up to 2175 rests on no open statement.  A proven game is opt(n) wherever U holds
-at the games of the `rests_on` of its upper bound.  A results line that rests on a proven game assumes that, one
-statement a game (`"statement U holds at n=4501"`), in its `assumes`.
+U is certified for every n up to 2175 ([DESIGN.md, “What "optimal"
+means”](../solver/docs/DESIGN.md#what-optimal-means)), so a bound whose list holds only games up to 2175 rests on no
+open statement.  A proven game is opt(n) wherever U holds at the games of the `rests_on` of its upper bound.  A results
+line that rests on a proven game assumes that, one statement a game (`"statement U holds at n=4501"`), in its `assumes`.
 
 **Two verifiers**, as the results files have:
 

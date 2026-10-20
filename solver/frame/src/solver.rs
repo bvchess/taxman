@@ -8,7 +8,8 @@
 //!
 //! # One game
 //!
-//! The steps, in order (DESIGN.md, "Per-game pipeline", has the same steps with the Java classes they replace):
+//! The steps, in order (DESIGN.md, "Per-game pipeline (`solver`)", has the same steps with the Java classes they
+//! replace):
 //!
 //! 1. The tables of the board `1..=n`, and the set width `W` for it (`with_width!`; a checkpoint made at another
 //!    width is refused).

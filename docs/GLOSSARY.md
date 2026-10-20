@@ -125,9 +125,9 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   frames, not "the model".
 * **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their
   proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
-  or by the prime formula does not ([DESIGN.md, "What optimal means"](../solver/docs/DESIGN.md#what-optimal-means)).  U
-  is open in general, and proven at every n the prover has proven.  Past those games `taxman certify` checks it game by
-  game ([certificate of U](#results-and-trust)).
+  or by the prime formula does not ([DESIGN.md, “What "optimal" means”](../solver/docs/DESIGN.md#what-optimal-means)).
+  U is open in general, and proven at every n the prover has proven.  Past those games `taxman certify` checks it game
+  by game ([certificate of U](#results-and-trust)).
 * **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional
   ([THEORY.md](THEORY.md), Theorem M⁺; `frames::build_extended`).  The certificates of U search it.
 

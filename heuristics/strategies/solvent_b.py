@@ -3,7 +3,7 @@
 
 """solvent-b: solvent, self-audited for the "self-blocking" mistake.
 
-Background (see README.md's "Solvent" section and
+Background (see heuristics/README.md's "Solvent: a near-quadratic strategy" section and
 `results/mistake_catalog_1000.json`): base solvent's entire measured loss
 against optimal decomposes into persistent "self-blocking" episodes.
 Solvent's descending greedy commits each candidate m as its OWN selection

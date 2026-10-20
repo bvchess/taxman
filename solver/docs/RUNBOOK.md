@@ -786,7 +786,7 @@ capacity 0 and powers off, and nothing starts a machine in place of the one that
 
 | end | what it is | the log says | status of `chain.sh` |
 |---|---|---|---|
-| **the wall** | a game's own search has passed `GAME_HOURS` (24): the hours it has been the oldest game of the window with its search running, over every run of it ([DESIGN.md, "The wall"](DESIGN.md#the-window-games-in-flight)); waiting behind another game does not count | `wall at N after H hours` | 4 |
+| **the wall** | a game's own search has passed `GAME_HOURS` (24): the hours it has been the oldest game of the window with its search running, over every run of it ([DESIGN.md, "The window: games in flight"](DESIGN.md#the-window-games-in-flight)); waiting behind another game does not count | `wall at N after H hours` | 4 |
 | **the budget** | `BUDGET_HOURS` (74) instance-hours over every machine of the run, counted in the ledger; the solver stops five minutes (`LEDGER_MARGIN`) before they are used up | `stopped by the budget of 74 instance-hours` | 3 |
 | **the date** | `RUN_UNTIL`, the hard date; the solver stops five minutes before it too | `stopped by the date ...` | 3 |
 | the range | the chain reached `CHAIN_TO` (8191, the largest board) | `the range 1-N is complete` | 0 |
@@ -1318,7 +1318,7 @@ end.  The merge drops repeated lines (`awk '!seen[$0]++'`), so it can run any nu
 file, which only grows) and `passes` (the last pass made).  `save.sh` copies the directory, so both reach S3.  A pass
 works in `$TAXMAN_WORK/sweep-pass/`, which is not saved; a pass that was stopped leaves its lines there, and the next
 start merges them first.  Each line says what its game had from n − 1 in `prev`, and which pass made it in
-`options.pass` ([REFERENCE.md, "What a game had from n − 1"](REFERENCE.md#what-a-game-had-from-n---1)).  Pass 1 is the
+`options.pass` ([REFERENCE.md, "What a game had from n - 1"](REFERENCE.md#what-a-game-had-from-n---1)).  Pass 1 is the
 blocks, and a rerun after an interruption counts as another pass.
 
 **`explore.jsonl` is not a chain.**  It has holes, and games built on unfinished ones, so it never goes into

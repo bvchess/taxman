@@ -204,9 +204,10 @@ fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusi
 
 /// A unit below the root of a game, searched from a handicapped incumbent, with what an exhaustive search found in it.
 ///
-/// Theorem 13 (docs/THEORY.md, "Prime exchanges") says that every heaviest promotion set of the *root* keeps
-/// the inequality of each symmetric pair, and the search with the tactic `symmetry` looks at the completions that
-/// keep them, at every node.  A unit below the root is no root: its best completion can break an inequality (some
+/// Theorem 13 (docs/THEORY.md, "Prime exchanges: symmetries of the promotions") says that every heaviest promotion
+/// set of the *root* keeps the inequality of each symmetric pair, and the search with the tactic `symmetry` looks at
+/// the completions that keep them, at every node.  A unit below the root is no root: its best completion can break an
+/// inequality (some
 /// promotion of its `promoted` may even break one already, which no completion mends), and its search finds the best
 /// completion that keeps them ("Pruning with the inequalities", last paragraph).  So a search with the rule is
 /// compared with the oracle for that, [`Game::exhaustive_keeping`], and the others with [`Game::exhaustive`].

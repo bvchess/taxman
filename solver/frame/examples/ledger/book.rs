@@ -429,7 +429,7 @@ impl Book {
     /// the boards (each one's ceiling from the one before) is passed on in one sweep and a chain down them in the
     /// next, and a board is not improved again by every source that happens to reach it first.
     /// Returns the changes, in order.  An error is a violation (L > U), or a game a relation made that the referee
-    /// refuses: either is a bug, or a counterexample to statement U (THEORY.md, "The ledger").
+    /// refuses: either is a bug, or a counterexample to statement U (THEORY.md, "The ledger: bounds between boards").
     pub fn propagate(&mut self, changed: impl IntoIterator<Item = u32>) -> Result<Vec<Change>, String> {
         let mut pending: BTreeSet<u32> = changed.into_iter().collect();
         let mut cursor = 0;

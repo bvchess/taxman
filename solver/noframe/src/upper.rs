@@ -381,7 +381,7 @@ mod tests {
         assert!(open_boards.iter().all(|&n| n < 187), "a board from 187 on is not closed: {open_boards:?}");
     }
 
-    /// The figures of the barred bounds at 600 (they appear in THEORY.md's "What is known of U": 4 of the 161
+    /// The figures of the barred bounds at 600 (they appear in THEORY.md's "The upper part": 4 of the 161
     /// members are open).
     #[test]
     fn the_barred_bounds_at_600() {

@@ -54,6 +54,16 @@ files.  The [notebook's front page](../solver/notebook/README.md#how-this-notebo
 A new entry opens with its question in a sentence and its answer in a sentence or two, then gives the method, the
 results and the decision.
 
+## 8. Give each task one file
+
+Most readers are agents, and an agent pays for every word it loads, so a reader should be able to load what one task
+needs and little else.  A file stays under 6,000 words, and should stay under 5,000.  A longer document becomes a
+folder of files, split by task rather than by size: a file holds what one kind of task needs, whole, and two files a
+task always needs together are one.  The document's old file stays as its index, under 1,000 words, with a line a file
+saying which task it serves.  Files have plain names (`runbook/prover.md`), and a citation names the file and, where
+it needs one, the heading, never a section number.  A split copies nothing: a passage that two tasks need lives in one
+file, and the other links it (rule 5).  The notebook's entries are records and keep their length.
+
 ## Voice
 
 Write plainly, modestly and briefly:
@@ -75,8 +85,9 @@ for every n" but "The file `results/strict.jsonl` holds a chain of optimal games
 ## The check
 
 The docs test, `solver/frame/tests/docs.rs`, runs in `solver/tools/quick_check.py`.  It checks that every relative link
-resolves, and that neither the guides nor the comments of the code and the scripts use the words the project has
-retired.
+resolves, that every heading cited by name or by number exists, and that every document but the notebook's entries
+keeps rule 8's limits, but for a list of documents still to be split.  It also checks that neither the guides nor the
+comments of the code and the scripts use the words the project has retired.
 
 ## Sources
 

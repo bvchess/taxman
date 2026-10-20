@@ -5,7 +5,7 @@
 # so that they can be tried too.  On an Apple-silicon Mac the container is linux/arm64, the instruction set of Graviton.
 # The build context is the repository root, and only the files the build needs are sent (Dockerfile.dockerignore).
 #
-# How to build and run it: solver/docs/RUNBOOK.md, "Dry run in Docker".
+# How to build and run it: solver/docs/RUNBOOK.md, "Dry run in Docker (optional)".
 
 ARG RUST_IMAGE=rust:1-bookworm
 FROM ${RUST_IMAGE}

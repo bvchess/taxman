@@ -15,7 +15,11 @@
 //!   for the ceiling, ...) or the old names of the prover's directory and script;
 //! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
 //!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
-//!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...).
+//!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...);
+//! * every heading that a guide, a comment or a script cites by name (`DESIGN.md, "Testing"`) or by number
+//!   (`DESIGN.md, section 9`) exists in the document it names, and so does every `PATH.md#anchor` cited in the code;
+//! * every guide but the notebook's entries keeps the limit of words of docs/WRITING.md, rule 8, but those still to be
+//!   split (`STILL_TO_SPLIT`), and the old files of the split documents (`INDEXES`) stay under the limit of an index.
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
@@ -137,19 +141,29 @@ fn markdown_files() -> Vec<PathBuf> {
     found
 }
 
-/// `text` with its fenced code blocks and inline code spans blanked out, line by line (lines are kept, so that
-/// line numbers still mean something).
-fn without_code(text: &str) -> Vec<String> {
+/// The lines of `text` with those of fenced code blocks (and the fences) emptied (lines are kept, so that line numbers
+/// still mean something).
+fn outside_fences(text: &str) -> Vec<&str> {
     let mut fenced = false;
     text.lines()
         .map(|line| {
-            if line.trim_start().starts_with("```") {
-                fenced = !fenced;
-                return String::new();
+            let fence = line.trim_start().starts_with("```");
+            fenced ^= fence;
+            if fence || fenced {
+                ""
+            } else {
+                line
             }
-            if fenced {
-                return String::new();
-            }
+        })
+        .collect()
+}
+
+/// `text` with its fenced code blocks and inline code spans blanked out, line by line (lines are kept, so that
+/// line numbers still mean something).
+fn without_code(text: &str) -> Vec<String> {
+    outside_fences(text)
+        .into_iter()
+        .map(|line| {
             let mut in_span = false;
             line.chars()
                 .filter(|&c| {
@@ -163,22 +177,25 @@ fn without_code(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// The headings of a markdown file, at any level and outside fenced code: their text, trimmed, without the `#`s.
+fn headings(text: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    for line in outside_fences(text) {
+        let Some(rest) = line.strip_prefix('#') else { continue };
+        if let Some(heading) = rest.trim_start_matches('#').strip_prefix(' ') {
+            found.push(heading.trim());
+        }
+    }
+    found
+}
+
 /// The anchors GitHub gives the headings of a markdown file: the heading in lower case, punctuation but `-` and `_`
 /// dropped, spaces turned into `-`, and `-1`, `-2` ... added to a heading that repeats.
 fn anchors(text: &str) -> BTreeSet<String> {
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut anchors = BTreeSet::new();
-    let fenced_out = text.lines().scan(false, |fenced, line| {
-        if line.trim_start().starts_with("```") {
-            *fenced = !*fenced;
-        }
-        Some(if *fenced { "" } else { line })
-    });
-    for line in fenced_out {
-        let Some(heading) = line.strip_prefix('#').map(|rest| rest.trim_start_matches('#')) else { continue };
-        let Some(heading) = heading.strip_prefix(' ') else { continue };
+    for heading in headings(text) {
         let slug: String = heading
-            .trim()
             .to_lowercase()
             .chars()
             .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | ' '))
@@ -191,17 +208,22 @@ fn anchors(text: &str) -> BTreeSet<String> {
     anchors
 }
 
+/// The byte ranges of the targets of the inline links `[text](target)` of `text` (with code already blanked out).
+fn link_ranges(text: &str) -> Vec<std::ops::Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut from = 0;
+    while let Some(open) = text[from..].find("](") {
+        let start = from + open + 2;
+        let Some(length) = text[start..].find(')') else { break };
+        ranges.push(start..start + length);
+        from = start + length;
+    }
+    ranges
+}
+
 /// The targets of the inline links `[text](target)` of a line (with code already blanked out).
 fn link_targets(line: &str) -> Vec<&str> {
-    let mut targets = Vec::new();
-    let mut rest = line;
-    while let Some(start) = rest.find("](") {
-        let after = &rest[start + 2..];
-        let Some(end) = after.find(')') else { break };
-        targets.push(&after[..end]);
-        rest = &after[end..];
-    }
-    targets
+    link_ranges(line).into_iter().map(|range| &line[range]).collect()
 }
 
 #[test]
@@ -505,9 +527,8 @@ fn prose_files() -> Vec<PathBuf> {
     files
 }
 
-/// The files below `dir` (not in a `target` or a hidden directory) whose extension is one of `extensions`, in the
-/// order of their paths.
-fn files_with_extensions(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
+/// The files below `dir` (not in a `target` or a hidden directory) that `keep` accepts, in the order of their paths.
+fn files_where(dir: &Path, keep: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
     paths.sort();
     let mut found = Vec::new();
@@ -515,13 +536,19 @@ fn files_with_extensions(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
         if path.is_dir() {
             if name != "target" && !name.starts_with('.') {
-                found.extend(files_with_extensions(&path, extensions));
+                found.extend(files_where(&path, keep));
             }
-        } else if path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| extensions.contains(&ext)) {
+        } else if keep(&path) {
             found.push(path);
         }
     }
     found
+}
+
+/// The files below `dir` (not in a `target` or a hidden directory) whose extension is one of `extensions`, in the
+/// order of their paths.
+fn files_with_extensions(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
+    files_where(dir, &|path| path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| extensions.contains(&ext)))
 }
 
 #[test]
@@ -1172,4 +1199,711 @@ fn the_quick_check_passes_its_own_tests_and_design_states_its_limits() {
     ] {
         assert!(design.contains(&stated), "DESIGN.md, section 9, does not say {stated:?}: the script's limits changed");
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Citations of headings
+
+/// The documents that a text may name without a path or `.md`: `RUNBOOK, "Certifying U (stage 4)"` cites RUNBOOK.md.
+const BARE_DOCS: &[&str] = &["RUNBOOK", "DESIGN", "THEORY", "REFERENCE", "AGENDA", "GLOSSARY", "STATUS", "WRITING"];
+
+/// What may stand between a document and the quoted heading it cites by name, longest first.
+const NAME_SEPARATORS: &[&str] = &[", section ", " section ", ", ", ": ", "'s ", " ("];
+
+/// What may stand between a document and the section numbers it cites, longest first.
+const NUMBER_SEPARATORS: &[&str] = &[", sections ", " sections ", ", section ", " section ", " §"];
+
+/// The longest heading, in characters, that a citation by name quotes: a longer quotation is a sentence.
+const LONGEST_QUOTED_HEADING: usize = 100;
+
+/// The fewest citations by name that the check must find in the repository (it found 107 on 2026-10-20): fewer means
+/// that a pattern broke, not that the citations went away.
+const FEWEST_BY_NAME: usize = 90;
+
+/// The fewest citations by number that the check must find (it found 76 on 2026-10-20).
+const FEWEST_BY_NUMBER: usize = 40;
+
+/// How a text writes the name of a document.
+#[derive(Debug, PartialEq)]
+struct DocName {
+    /// The path or file name as written, or the target of a link (`RUNBOOK` is written `RUNBOOK.md`).
+    written: String,
+    /// Whether it is the target of a markdown link, which is relative to the citing file.
+    link: bool,
+}
+
+/// What a citation takes from the document.
+#[derive(Debug, PartialEq)]
+enum Cited {
+    /// A heading, by its text: the text between the quotes.
+    Heading(String),
+    /// Sections, by their numbers (`9`, `5.4`).
+    Sections(Vec<String>),
+}
+
+/// A heading or a section cited after the name of a document, with the line where the document is named.
+#[derive(Debug, PartialEq)]
+struct Citation {
+    line: usize,
+    doc: DocName,
+    cited: Cited,
+}
+
+/// A document named in a text, from byte `start` to byte `end` of it.
+struct Mention {
+    start: usize,
+    end: usize,
+    doc: DocName,
+}
+
+/// A file's text with its wrapped lines joined into one, so that a citation that a line break splits is found.
+struct Joined {
+    text: String,
+    /// Where each line of the file starts in `text`, with the line's number (from 1).
+    starts: Vec<(usize, usize)>,
+}
+
+impl Joined {
+    /// The number of the line of the file that byte `offset` of `text` comes from.
+    fn line_at(&self, offset: usize) -> usize {
+        self.starts[self.starts.partition_point(|&(start, _)| start <= offset).saturating_sub(1)].1
+    }
+}
+
+/// What a line of a file says, without what only makes it a line of a comment: its indentation, its comment marker
+/// (`//`, `///`, `//!` in Rust, `#` in the scripts) with the spaces after it, a trailing `\` (a string that goes on),
+/// and the backslash of an escaped quote.  A markdown line keeps its words.
+fn line_content(extension: Option<&str>, line: &str) -> String {
+    let line = line.trim();
+    let unmarked = match extension {
+        Some("md") => return line.to_owned(),
+        Some("rs") => line.strip_prefix("//").map_or(line, |rest| {
+            let rest = rest.trim_start_matches('/');
+            rest.strip_prefix('!').unwrap_or(rest)
+        }),
+        _ => line.strip_prefix('#').map_or(line, |rest| rest.trim_start_matches('#')),
+    };
+    unmarked.trim().trim_end_matches('\\').trim_end().replace("\\\"", "\"")
+}
+
+/// The text of a file of the given extension as one line per paragraph: a line break, with the comment marker that
+/// follows it and its spaces, is one space; a blank line is a break that nothing crosses.  The fenced code blocks of
+/// markdown are left out.
+fn join_wrapped_lines(extension: Option<&str>, text: &str) -> Joined {
+    let lines = if extension == Some("md") { outside_fences(text) } else { text.lines().collect() };
+    let mut joined = Joined { text: String::new(), starts: Vec::new() };
+    let mut previous_empty = true;
+    for (i, line) in lines.into_iter().enumerate() {
+        let content = line_content(extension, line);
+        if i > 0 {
+            joined.text.push(if content.is_empty() || previous_empty { '\n' } else { ' ' });
+        }
+        joined.starts.push((joined.text.len(), i + 1));
+        previous_empty = content.is_empty();
+        joined.text.push_str(&content);
+    }
+    joined
+}
+
+/// Whether `c` can be part of the path of a file in a text.
+fn is_path_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '/' | '-')
+}
+
+/// The file named by the path that ends with the `.md` at byte `at` of `text`, if a file is named (`*.md` and `.mdx`
+/// are not).
+fn file_mention_at(text: &str, at: usize) -> Option<Mention> {
+    let end = at + ".md".len();
+    let before = &text[..at];
+    let named = before.ends_with(|c: char| c.is_ascii_alphanumeric() || c == '_');
+    if !named || text[end..].starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+        return None;
+    }
+    let start = before.char_indices().rev().take_while(|&(_, c)| is_path_char(c)).last().map_or(at, |(i, _)| i);
+    Some(Mention { start, end, doc: DocName { written: text[start..end].to_owned(), link: false } })
+}
+
+/// The paths and file names of `text` that end in `.md`.
+fn file_mentions(text: &str) -> Vec<Mention> {
+    text.match_indices(".md").filter_map(|(at, _)| file_mention_at(text, at)).collect()
+}
+
+/// The markdown links of `text` whose target is a `.md` file with no anchor, whatever their text says; the mention ends
+/// after the link.
+fn link_mentions(text: &str) -> Vec<Mention> {
+    let is_file =
+        |target: &str| target.ends_with(".md") && !target.contains("://") && !target.contains(char::is_whitespace);
+    link_ranges(text)
+        .into_iter()
+        .filter(|range| is_file(&text[range.clone()]))
+        .map(|range| Mention {
+            start: range.start,
+            end: range.end + 1,
+            doc: DocName { written: text[range].to_owned(), link: true },
+        })
+        .collect()
+}
+
+/// The bare names of `BARE_DOCS` in `text`: whole words, not part of a path (`RUNBOOK.md` is a file's name).
+fn bare_mentions(text: &str) -> Vec<Mention> {
+    let mut found = Vec::new();
+    for name in BARE_DOCS {
+        for (start, _) in text.match_indices(name) {
+            let end = start + name.len();
+            let in_a_word_or_path =
+                text[..start].ends_with(|c: char| c.is_alphanumeric() || matches!(c, '_' | '/' | '.'));
+            let more =
+                text[end..].starts_with(|c: char| c.is_alphanumeric() || c == '_') || text[end..].starts_with(".md");
+            if !in_a_word_or_path && !more {
+                found.push(Mention { start, end, doc: DocName { written: format!("{name}.md"), link: false } });
+            }
+        }
+    }
+    found
+}
+
+/// Every document named in `text`, in order: by a path or file name, by a link, or by a bare name.
+fn mentions(text: &str) -> Vec<Mention> {
+    let mut found = file_mentions(text);
+    found.extend(link_mentions(text));
+    found.extend(bare_mentions(text));
+    found.sort_by_key(|mention| mention.start);
+    found
+}
+
+/// The heading quoted at the start of `text`, in straight or curly double quotes (a heading that has straight quotes in
+/// it is quoted in curly ones): at most `LONGEST_QUOTED_HEADING` characters, starting with a capital letter, a digit or
+/// a backtick (a quotation that starts with a lower-case word is a key or a phrase).
+fn quoted_heading(text: &str) -> Option<String> {
+    let (close, inside) =
+        text.strip_prefix('"').map(|rest| ('"', rest)).or_else(|| text.strip_prefix('“').map(|rest| ('”', rest)))?;
+    let (heading, _) = inside.split_once(close)?;
+    let starts_like_a_heading =
+        heading.starts_with(|c: char| c.is_uppercase() || c.is_ascii_digit() || c == '`') || is_file_name(heading);
+    let short = heading.chars().count() <= LONGEST_QUOTED_HEADING && !heading.contains('\n');
+    (starts_like_a_heading && short).then(|| heading.to_owned())
+}
+
+/// Whether `text` is one word with a dot in it, a file's name (`bounds.jsonl`), which a heading may be.
+fn is_file_name(text: &str) -> bool {
+    !text.is_empty() && text.contains('.') && !text.contains(char::is_whitespace)
+}
+
+/// The heading cited by name at the start of `rest`, the text that follows a document's name.
+fn heading_cited(rest: &str) -> Option<Cited> {
+    NAME_SEPARATORS.iter().find_map(|separator| quoted_heading(rest.strip_prefix(separator)?)).map(Cited::Heading)
+}
+
+/// The number at the start of `text` (`9`, `5.4`) and what follows it.
+fn number_at(text: &str) -> Option<(&str, &str)> {
+    let digits = |text: &str| text.find(|c: char| !c.is_ascii_digit()).unwrap_or(text.len());
+    let mut end = digits(text);
+    if end == 0 {
+        return None;
+    }
+    while text[end..].starts_with('.') && text[end + 1..].starts_with(|c: char| c.is_ascii_digit()) {
+        end += 1 + digits(&text[end + 1..]);
+    }
+    Some(text.split_at(end))
+}
+
+/// The section numbers at the start of `text`: `9`, `5.4`, and those that follow `and` (`3 and 4`, `§2 and §5`).
+fn section_numbers(text: &str) -> Vec<String> {
+    let mut numbers = Vec::new();
+    let mut rest = text;
+    while let Some((number, after)) = number_at(rest) {
+        numbers.push(number.to_owned());
+        rest = after.strip_prefix(" and ").map_or("", |next| next.trim_start_matches('§'));
+    }
+    numbers
+}
+
+/// The sections cited by number at the start of `rest`, the text that follows a document's name.
+fn sections_cited(rest: &str) -> Option<Cited> {
+    let numbers = section_numbers(NUMBER_SEPARATORS.iter().find_map(|separator| rest.strip_prefix(separator))?);
+    (!numbers.is_empty()).then_some(Cited::Sections(numbers))
+}
+
+/// The headings and sections that the text of a file (of the given extension) cites, after the names of documents
+/// (written in code font or not), in order.
+fn citations(extension: Option<&str>, text: &str) -> Vec<Citation> {
+    let joined = join_wrapped_lines(extension, text);
+    mentions(&joined.text)
+        .into_iter()
+        .filter_map(|mention| {
+            let rest = &joined.text[mention.end..];
+            let rest = rest.strip_prefix('`').unwrap_or(rest);
+            let cited = heading_cited(rest).or_else(|| sections_cited(rest))?;
+            Some(Citation { line: joined.line_at(mention.start), doc: mention.doc, cited })
+        })
+        .collect()
+}
+
+/// The `PATH.md#anchor` mentions of the text of a source file: the line, the document and the anchor.
+fn code_anchors(extension: Option<&str>, text: &str) -> Vec<(usize, DocName, String)> {
+    let joined = join_wrapped_lines(extension, text);
+    let is_anchor_char = |c: &char| c.is_alphanumeric() || matches!(c, '-' | '_');
+    let mut found = Vec::new();
+    for (at, _) in joined.text.match_indices(".md#") {
+        let Some(mention) = file_mention_at(&joined.text, at) else { continue };
+        let anchor: String = joined.text[at + ".md#".len()..].chars().take_while(is_anchor_char).collect();
+        if !anchor.is_empty() {
+            found.push((joined.line_at(mention.start), mention.doc, anchor));
+        }
+    }
+    found
+}
+
+/// `heading` without its number: "8. Give each task one file" and "5.4 Foo" lose "8. " and "5.4 ".
+fn without_number(heading: &str) -> &str {
+    let number_end = heading.find(|c: char| !(c.is_ascii_digit() || c == '.')).unwrap_or(heading.len());
+    if heading.starts_with(|c: char| c.is_ascii_digit()) && heading[number_end..].starts_with(' ') {
+        heading[number_end..].trim_start()
+    } else {
+        heading
+    }
+}
+
+/// `text` as headings are compared with their quotations: without backticks and `*`, and without a final `.` or `,`.
+fn plain(text: &str) -> String {
+    let text: String = text.chars().filter(|&c| c != '`' && c != '*').collect();
+    text.trim().trim_end_matches(['.', ',']).to_owned()
+}
+
+/// Whether the quotation `quoted` names `heading`: it is the heading's text, with its number or without.
+fn names_heading(quoted: &str, heading: &str) -> bool {
+    let quoted = plain(quoted);
+    quoted == plain(heading) || quoted == plain(without_number(heading))
+}
+
+/// Whether `heading` is numbered `number`: its text starts with it, then `.` or a space.
+fn has_number(heading: &str, number: &str) -> bool {
+    heading.strip_prefix(number).is_some_and(|rest| rest.starts_with(['.', ' ']))
+}
+
+/// What the citations are checked against: the repository's markdown files, and the headings and anchors of the
+/// documents cited so far.
+struct DocSet {
+    markdown: Vec<PathBuf>,
+    headings: BTreeMap<PathBuf, Vec<String>>,
+    anchors: BTreeMap<PathBuf, BTreeSet<String>>,
+}
+
+impl DocSet {
+    fn new() -> DocSet {
+        DocSet { markdown: markdown_files(), headings: BTreeMap::new(), anchors: BTreeMap::new() }
+    }
+
+    /// The markdown file called `name` that is the only one of that name, or why there is not one.
+    fn only_file_named(&self, name: &str) -> Result<PathBuf, String> {
+        let same: Vec<&PathBuf> =
+            self.markdown.iter().filter(|path| path.file_name().is_some_and(|n| n == name)).collect();
+        match same.as_slice() {
+            [only] => Ok((*only).clone()),
+            [] => Err(format!("there is no file {name}: write its path from the repository's top")),
+            several => Err(format!("{name} names {} files: write its path from the repository's top", several.len())),
+        }
+    }
+
+    /// The file that `doc`, written in the file `citing`, names, or why it names none.  A link is relative to the
+    /// citing file; a path with a `/` is from the repository's top, else relative to the citing file; a bare name is
+    /// the file of that name beside the citing file, else the only one of the markdown files.
+    fn resolve(&self, citing: &Path, doc: &DocName) -> Result<PathBuf, String> {
+        let written = doc.written.as_str();
+        let beside = citing.parent().expect("a file has a directory").join(written);
+        let from_top = repo_dir().join(written);
+        let found = if doc.link || written.starts_with('.') {
+            beside
+        } else if written.contains('/') {
+            if from_top.exists() {
+                from_top
+            } else {
+                beside
+            }
+        } else if beside.exists() {
+            beside
+        } else {
+            return self.only_file_named(written);
+        };
+        found
+            .canonicalize()
+            .map_err(|_| format!("there is no file {written}: write its path from the repository's top"))
+    }
+
+    /// The headings of the markdown file `doc`.
+    fn headings_of(&mut self, doc: &Path) -> &[String] {
+        self.headings
+            .entry(doc.to_path_buf())
+            .or_insert_with(|| headings(&read(doc)).into_iter().map(str::to_owned).collect())
+    }
+
+    /// What is wrong with `citation`, written in the file `citing`, if anything.
+    fn citation_problem(&mut self, citing: &Path, citation: &Citation) -> Option<String> {
+        let doc = match self.resolve(citing, &citation.doc) {
+            Ok(doc) => doc,
+            Err(problem) => return Some(problem),
+        };
+        let shown = from_repo(&doc);
+        let headings = self.headings_of(&doc);
+        let is_named = |quoted: &str| headings.iter().any(|heading| names_heading(quoted, heading));
+        let is_numbered = |number: &str| headings.iter().any(|heading| has_number(heading, number));
+        match &citation.cited {
+            Cited::Heading(quoted) if !is_named(quoted) => Some(format!(
+                "{shown} has no heading \"{quoted}\": cite a heading by its text, with its number or without"
+            )),
+            Cited::Sections(numbers) => numbers.iter().find(|number| !is_numbered(number)).map(|number| {
+                format!(
+                    "{shown} has no heading numbered {number}: cite the heading by its name, as docs/WRITING.md, \
+                     rule 8, says"
+                )
+            }),
+            Cited::Heading(_) => None,
+        }
+    }
+
+    /// What is wrong with the `anchor` of `doc`, written in the file `citing`, if anything.
+    fn anchor_problem(&mut self, citing: &Path, doc: &DocName, anchor: &str) -> Option<String> {
+        let path = match self.resolve(citing, doc) {
+            Ok(path) => path,
+            Err(problem) => return Some(problem),
+        };
+        let known = self.anchors.entry(path.clone()).or_insert_with(|| anchors(&read(&path)));
+        (!known.contains(anchor)).then(|| format!("no heading of {} has the anchor #{anchor}", from_repo(&path)))
+    }
+}
+
+/// The markdown files that cite docs and keep rule 8's limits: those of `markdown_files` but the notebook's entries
+/// (which are records), and the top-level CLAUDE.md.
+fn guide_files() -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = markdown_files().into_iter().filter(|path| !is_entry(&from_repo(path))).collect();
+    files.push(repo_dir().join("CLAUDE.md"));
+    files
+}
+
+/// The files that cite docs: the guides, the code and the scripts (`code_files`, and the build script, the Dockerfiles
+/// of the tools and the heuristics' Python).
+fn citing_files() -> Vec<PathBuf> {
+    let root = repo_dir();
+    let mut files = guide_files();
+    files.extend(code_files());
+    files.push(root.join("solver/frame/build.rs"));
+    files.extend(files_where(&root.join("solver/tools"), &|path| {
+        path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("Dockerfile"))
+    }));
+    files.extend(files_with_extensions(&root.join("heuristics"), &["py"]));
+    files
+}
+
+/// What the check found in the files: how many citations by name and by number, and what is wrong.
+#[derive(Default)]
+struct Found {
+    by_name: usize,
+    by_number: usize,
+    problems: Vec<String>,
+}
+
+/// Checks the citations of headings in the file `file`, and its anchors if it is a source file (the link test checks
+/// those of the markdown).
+fn check_citations(docs: &mut DocSet, file: &Path, found: &mut Found) {
+    let text = read(file);
+    let extension = file.extension().and_then(|ext| ext.to_str());
+    let at = |line: usize, problem: String| format!("{}:{line}: {problem}", from_repo(file));
+    for citation in citations(extension, &text) {
+        match citation.cited {
+            Cited::Heading(_) => found.by_name += 1,
+            Cited::Sections(_) => found.by_number += 1,
+        }
+        found.problems.extend(docs.citation_problem(file, &citation).map(|problem| at(citation.line, problem)));
+    }
+    if extension != Some("md") {
+        for (line, doc, anchor) in code_anchors(extension, &text) {
+            found.problems.extend(docs.anchor_problem(file, &doc, &anchor).map(|problem| at(line, problem)));
+        }
+    }
+}
+
+/// Every heading that a guide, a comment or a script cites by name (`DESIGN.md, "Testing"`) or by number
+/// (`DESIGN.md, section 9`) exists, and so does every `#anchor` that the code cites.
+#[test]
+fn every_heading_cited_by_name_or_number_exists_and_so_does_every_anchor_cited_in_the_code() {
+    if !repo_dir().join("README.md").exists() {
+        eprintln!("citations not checked: this is not a full checkout of the repository (no README.md at its top)");
+        return;
+    }
+    let (mut docs, mut found) = (DocSet::new(), Found::default());
+    for file in citing_files() {
+        check_citations(&mut docs, &file, &mut found);
+    }
+    assert!(found.problems.is_empty(), "broken citations of headings:\n{}", found.problems.join("\n"));
+    let Found { by_name, by_number, .. } = found;
+    assert!(by_name >= FEWEST_BY_NAME, "the check found only {by_name} citations by name: has their syntax changed?");
+    assert!(by_number >= FEWEST_BY_NUMBER, "the check found only {by_number} citations by number: has it changed?");
+}
+
+/// The citations of `text` as short lines: the line, the document, and the heading in quotes or the sections after `§`.
+fn citations_shown(extension: Option<&str>, text: &str) -> Vec<String> {
+    let shown = |c: &Citation| {
+        let cited = match &c.cited {
+            Cited::Heading(heading) => format!("\"{heading}\""),
+            Cited::Sections(numbers) => format!("§{}", numbers.join("+")),
+        };
+        format!("{} {}{} {cited}", c.line, c.doc.written, if c.doc.link { " (link)" } else { "" })
+    };
+    citations(extension, text).iter().map(shown).collect()
+}
+
+/// A document is named by a path, a file name, a link or a bare name, and cited by name (after each separator, in
+/// either quotes) or by number; what is no citation (a key, a fence, a blank line between) is left out.
+#[test]
+fn citations_are_found_in_every_form_of_markdown() {
+    let text = [
+        "See DESIGN.md, \"Testing\" and [the runbook](RUNBOOK.md), section 4.",
+        "The docs/THEORY.md's “Longest games”, REFERENCE.md (\"A results line\"), AGENDA.md: \"A5. Decompose\",",
+        "STATUS.md section \"Unwrapped\" and RUNBOOK, \"Dry run in Docker\".  DESIGN.md §2 and §5, but",
+        "THEORY.md, sections 3 and 4.2; WRITING.md, section 8.  Not [x](DESIGN.md#testing), \"Testing\",",
+        "nor README.md, \"a key\", nor *.md, \"Star\", nor `DESIGN.md`, \"Testing\" [the design](DESIGN.md);",
+        "results/README.md, \"bounds.jsonl\", but not REFERENCE.md, \"a two-word key\".",
+        "```",
+        "THEORY.md, \"In a fence\"",
+        "```",
+        "* A list item that cites DESIGN.md,",
+        "  \"Same search\", and RUNBOOK",
+        "",
+        "\"Not joined\", nor DESIGN.md,",
+        "",
+        "\"Over a blank line\".",
+    ]
+    .join("\n");
+    assert_eq!(
+        citations_shown(Some("md"), &text),
+        [
+            "1 DESIGN.md \"Testing\"",
+            "1 RUNBOOK.md (link) §4",
+            "2 docs/THEORY.md \"Longest games\"",
+            "2 REFERENCE.md \"A results line\"",
+            "2 AGENDA.md \"A5. Decompose\"",
+            "3 STATUS.md \"Unwrapped\"",
+            "3 RUNBOOK.md \"Dry run in Docker\"",
+            "3 DESIGN.md §2+5",
+            "4 THEORY.md §3+4.2",
+            "4 WRITING.md §8",
+            "5 DESIGN.md \"Testing\"",
+            "6 results/README.md \"bounds.jsonl\"",
+            "10 DESIGN.md \"Same search\"",
+        ]
+    );
+}
+
+/// A citation that a line break splits is found, over `//!`, `///` and `//` lines, over `#` lines and over a string
+/// that goes on, at the line where its document is named; a blank line is a break that nothing crosses.
+#[test]
+fn a_citation_wrapped_over_two_comment_lines_is_found_at_the_line_where_it_starts() {
+    let rust = [
+        "//! The theory is in docs/THEORY.md, \"The frame",
+        "//! model is exact\", and DESIGN.md, section",
+        "/// 9 has the limits; see also solver/docs/RUNBOOK.md,",
+        "    // \"Certifying U (stage 4)\" (a comment inside a function).",
+        "let m = \"see DESIGN.md, \\\"Same search\\\"\";",
+        "let n = \"see DESIGN.md, \\",
+        "         section 4\";",
+    ]
+    .join("\n");
+    assert_eq!(
+        citations_shown(Some("rs"), &rust),
+        [
+            "1 docs/THEORY.md \"The frame model is exact\"",
+            "2 DESIGN.md §9",
+            "3 solver/docs/RUNBOOK.md \"Certifying U (stage 4)\"",
+            "5 DESIGN.md \"Same search\"",
+            "6 DESIGN.md §4",
+        ]
+    );
+    let script = [
+        "#!/usr/bin/env python3",
+        "# See solver/docs/DESIGN.md, \"Same",
+        "# search\" and RUNBOOK.md, sections 2.5",
+        "# and 2.7.",
+        "",
+        "# DESIGN.md,",
+        "",
+        "# \"Not joined over a blank line\"",
+    ]
+    .join("\n");
+    assert_eq!(
+        citations_shown(Some("py"), &script),
+        ["2 solver/docs/DESIGN.md \"Same search\"", "3 RUNBOOK.md §2.5+2.7"]
+    );
+}
+
+/// A `PATH.md#anchor` is found in a comment, wrapped or not, but for an empty anchor and a longer extension.
+#[test]
+fn anchors_cited_in_the_code_are_found_wrapped_or_not() {
+    let text = "/// See [the ledger](../docs/THEORY.md#the-ledger-bounds-between-boards) and\n\
+                /// DESIGN.md#testing-1.  Not README.md# or notes.mdx#x.";
+    let found: Vec<(usize, String, String)> =
+        code_anchors(Some("rs"), text).into_iter().map(|(line, doc, anchor)| (line, doc.written, anchor)).collect();
+    let expected = [(1, "../docs/THEORY.md", "the-ledger-bounds-between-boards"), (2, "DESIGN.md", "testing-1")];
+    assert_eq!(found, expected.map(|(line, doc, anchor)| (line, doc.to_owned(), anchor.to_owned())));
+}
+
+/// A quotation names a heading by its text, with its number or without, ignoring backticks, `*` and a final `.` or `,`
+/// (and counting case); a section is named by the number its heading starts with; a quotation is a heading only if it
+/// starts like one (or is a file's name) and is not too long; the headings of a file are those outside fenced code.
+#[test]
+fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_number() {
+    assert!(names_heading("Tactics", "5. Tactics") && names_heading("5. Tactics", "5. Tactics"));
+    assert!(names_heading("Same search", "5.4. Same search") && names_heading("Same search", "5.4 Same search"));
+    assert!(names_heading("Per-game pipeline (solver)", "7. Per-game pipeline (`solver`)"));
+    assert!(names_heading("`taxman` runs.", "**`taxman`** runs") && names_heading("A, B,", "A, B"));
+    assert!(names_heading("The span certificate (♦)", "The span certificate (♦)"));
+    assert!(!names_heading("same search", "Same search"), "case counts");
+    assert!(!names_heading("Extended mode", "Extended mode: one-sided candidates"), "the whole heading");
+    assert!(!names_heading("2. Tactics", "Tactics"), "a number the heading does not have");
+
+    assert!(has_number("9. Testing", "9") && has_number("5.4 Foo", "5.4") && has_number("5.4. Foo", "5.4"));
+    assert!(!has_number("10. Foo", "1") && !has_number("Testing", "9") && !has_number("5.4 Foo", "5.5"));
+
+    let curly = "“What \"optimal\" means”, and more";
+    assert_eq!(quoted_heading(curly).as_deref(), Some("What \"optimal\" means"));
+    assert_eq!(quoted_heading("\"9. Testing\" x").as_deref(), Some("9. Testing"));
+    assert_eq!(quoted_heading("\"`bounds.jsonl`\"").as_deref(), Some("`bounds.jsonl`"));
+    assert_eq!(quoted_heading("\"bounds.jsonl\"").as_deref(), Some("bounds.jsonl"), "a file's name may be a heading");
+    assert_eq!(quoted_heading("\"proof\""), None, "a lower-case word is a key, not a heading");
+    assert_eq!(quoted_heading("\"Open"), None);
+    let long = |length: usize| format!("\"{}\"", "A".repeat(length));
+    assert_eq!(quoted_heading(&long(LONGEST_QUOTED_HEADING)).map(|heading| heading.len()), Some(100));
+    assert_eq!(quoted_heading(&long(LONGEST_QUOTED_HEADING + 1)), None, "a quotation of a sentence");
+
+    let text = "# Title\n```\n## Not\n```\n## 2. Yes ##\n#Not\n### Also";
+    assert_eq!(headings(text), ["Title", "2. Yes ##", "Also"]);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Sizes
+
+/// The documents that rule 8 of docs/WRITING.md would have split and that are still whole, by their paths from the
+/// repository.  A document leaves the list when it is split, and its old file, now an index, joins `INDEXES`.
+const STILL_TO_SPLIT: &[&str] = &[
+    "solver/docs/DESIGN.md",
+    "docs/THEORY.md",
+    "solver/docs/RUNBOOK.md",
+    "solver/notebook/README.md",
+    "solver/noframe/README.md",
+    "solver/docs/AGENDA.md",
+    "results/README.md",
+];
+
+/// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
+/// file, and stays under the index limit.
+const INDEXES: &[&str] = &[];
+
+/// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
+fn word_count(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
+/// The number that follows `before` in `text` (a sentence on one line), written with or without commas:
+/// `limit_after("stays under 6,000 words", "under ")` is 6000.
+fn limit_after(text: &str, before: &str) -> Option<usize> {
+    let after = text.split_once(before)?.1;
+    let number: String = after.chars().take_while(|c| c.is_ascii_digit() || *c == ',').collect();
+    number.trim_end_matches(',').replace(',', "").parse().ok()
+}
+
+/// The limits of rule 8 of docs/WRITING.md, in words: of a file, and of the index that a split document leaves.
+fn word_limits() -> (usize, usize) {
+    let writing = read(repo_dir().join("docs/WRITING.md"));
+    let heading = "## 8. Give each task one file";
+    assert!(writing.contains(&format!("\n{heading}\n")), "docs/WRITING.md has lost its section {heading:?}");
+    let rule = section(&writing, heading).replace('\n', " ");
+    let limit = |before: &str| {
+        let message =
+            format!("docs/WRITING.md, rule 8, no longer says {before:?} and a number: the size test reads it");
+        limit_after(&rule, before).unwrap_or_else(|| panic!("{message}"))
+    };
+    (limit("A file stays under "), limit("stays as its index, under "))
+}
+
+/// Whether the file at `shown` (a path from the repository) lies in the folder of an entry of the lab notebook: the
+/// entry's README.md and the files beside it, which its scripts wrote and which are committed as they were.
+fn is_in_an_entry(shown: &str) -> bool {
+    shown.starts_with("solver/notebook/") && shown != "solver/notebook/README.md"
+}
+
+/// The word counts of the guides that rule 8 holds to the file limit, with their paths from the repository: those of
+/// `guide_files`, but the files in the folders of the notebook's entries (which are records).
+fn guide_sizes() -> Vec<(String, usize)> {
+    let shown_files = guide_files().into_iter().map(|path| (from_repo(&path), path));
+    shown_files
+        .filter(|(shown, _)| !is_in_an_entry(shown))
+        .map(|(shown, path)| (shown, word_count(&read(&path))))
+        .collect()
+}
+
+/// The size of the file `shown` (a path from the repository) in words, if it exists.
+fn words_in(shown: &str) -> Option<usize> {
+    std::fs::read_to_string(repo_dir().join(shown)).ok().map(|text| word_count(&text))
+}
+
+/// What is wrong with the sizes of the documents, as messages, given the limits of a file and of an index.
+fn size_problems(file_limit: usize, index_limit: usize) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (shown, words) in guide_sizes() {
+        if words >= file_limit && !STILL_TO_SPLIT.contains(&shown.as_str()) {
+            problems.push(format!(
+                "{shown} has {words} words, over the limit of {file_limit} of docs/WRITING.md, rule 8: split it by task"
+            ));
+        }
+    }
+    for shown in STILL_TO_SPLIT {
+        match words_in(shown) {
+            None => problems
+                .push(format!("{shown} is in STILL_TO_SPLIT but there is no such file: remove it from STILL_TO_SPLIT")),
+            Some(words) if words < file_limit => problems.push(format!(
+                "{shown} has {words} words, under the limit of {file_limit}: remove it from STILL_TO_SPLIT"
+            )),
+            Some(_) => {}
+        }
+    }
+    for shown in INDEXES {
+        match words_in(shown) {
+            None => problems.push(format!("{shown} is in INDEXES but there is no such file: remove it from INDEXES")),
+            Some(words) if words >= index_limit => problems.push(format!(
+                "{shown} is an index (INDEXES) of {words} words, over the limit of {index_limit} of \
+                 docs/WRITING.md, rule 8: an index holds a line a file; move the rest into the files of its folder"
+            )),
+            Some(_) => {}
+        }
+    }
+    problems
+}
+
+/// Every guide but the notebook's entries keeps rule 8's limit of words, but those still to be split, and the indexes
+/// of the split documents keep the limit of an index.
+#[test]
+fn documents_keep_the_size_limits_of_rule_8() {
+    if !repo_dir().join("README.md").exists() {
+        eprintln!("sizes not checked: this is not a full checkout of the repository (no README.md at its top)");
+        return;
+    }
+    let (file_limit, index_limit) = word_limits();
+    assert!(file_limit > index_limit, "rule 8 lets a file be {file_limit} words and an index {index_limit}");
+    let problems = size_problems(file_limit, index_limit);
+    assert!(problems.is_empty(), "documents that break rule 8 of docs/WRITING.md:\n{}", problems.join("\n"));
+}
+
+/// The limits are read from the rule's sentences, words are counted as `wc -w` does, and a file of an entry is told.
+#[test]
+fn the_limits_are_read_from_the_rule_and_words_are_counted_as_wc_does() {
+    let rule = "A file stays under 6,000 words, and should stay under 5,000.  \
+                The old file stays as its index, under 1,000 words.";
+    assert_eq!(limit_after(rule, "A file stays under "), Some(6000));
+    assert_eq!(limit_after(rule, "stays as its index, under "), Some(1000));
+    assert_eq!(limit_after(rule, "stays as its table, under "), None, "a sentence that is gone");
+    assert_eq!(limit_after("under 750, with a line", "under "), Some(750));
+    assert_eq!(word_count("a  b\n\tc—d \n"), 3);
+    assert!(
+        is_in_an_entry("solver/notebook/x-2026-10/fields_output.md") && is_in_an_entry("solver/notebook/x/README.md")
+    );
+    assert!(!is_in_an_entry("solver/notebook/README.md") && !is_in_an_entry("solver/docs/DESIGN.md"));
 }

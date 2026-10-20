@@ -305,10 +305,10 @@ fn candidates_can_be_promoted_from_the_root<const W: usize>(ns: impl Iterator<It
     }
 }
 
-/// So a test of each candidate at the root would find nothing to drop (see DESIGN.md, "Single-member conflicts
-/// belong to the node"), and the single-member conflicts of the search are relative to its nodes.  The cost is
-/// all in building the frames (10 to 20 ms a board above 500), so every board to 511 is checked (0.2 s) and
-/// every sixth above (1.2 s); all of 2..=1230 takes 7 s.
+/// So a test of each candidate at the root would find nothing to drop (see DESIGN.md, "Forced members and nogoods",
+/// the item "Single-member conflicts belong to the node"), and the single-member conflicts of the search are relative
+/// to its nodes.  The cost is all in building the frames (10 to 20 ms a board above 500), so every board to 511 is
+/// checked (0.2 s) and every sixth above (1.2 s); all of 2..=1230 takes 7 s.
 #[test]
 fn the_frame_builders_candidates_can_all_be_promoted_from_the_root() {
     candidates_can_be_promoted_from_the_root::<8>(2..=511);

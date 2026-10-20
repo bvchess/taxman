@@ -12,9 +12,9 @@
 //! unit ([`TaxSearcher`](super::TaxSearcher)`::start`, then its first check): the GF(2) bound of the node's
 //! candidates given its promotions, with at most [`max_additional`] more promotions (THEORY.md, Theorem 11), which
 //! holds for every completion whatever the tactics.  This is the *dual bound* of the stopped branch and bound
-//! (THEORY.md, "The ledger", Lemma D), and a stopped search usually throws it away; [`dual_bound`] reads it from the
-//! checkpoint, without the engine.  Like every bound of the frame model it bounds the frame model's optimum, which
-//! is opt(n) given statement U at n (README, "What optimal means").
+//! (THEORY.md, "The ledger: bounds between boards", Lemma D), and a stopped search usually throws it away;
+//! [`dual_bound`] reads it from the checkpoint, without the engine.  Like every bound of the frame model it bounds the
+//! frame model's optimum, which is opt(n) given statement U at n (solver/frame/README.md, “What "optimal" means”).
 
 use super::header::Header;
 use super::setup::Prepared;

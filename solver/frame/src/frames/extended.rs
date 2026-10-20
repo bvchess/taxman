@@ -51,9 +51,9 @@
 //! else left).  docs/THEORY.md, Lemma M5⁺: the claims kept are front and back moves of every instance of Π⁺(O),
 //! so Theorem M⁺ holds with them taken out, and with O = ∅ every claim is kept and Π⁺(∅) is Π_n
 //! (`examples/structure.rs` checks the problems equal on every board).  Without the check a back claim could hide a
-//! use of f by a promoted number, as at n = 98 in Π_n (THEORY.md, "Why the candidate filter matters"): a component of
-//! f's layer that holds an open source has more freedoms and can take on composites of f that were no candidates in
-//! Π_n.
+//! use of f by a promoted number, as at n = 98 in Π_n (THEORY.md, "The frame model is exact, given its upper part", the
+//! paragraph "Why the candidate filter matters"): a component of f's layer that holds an open source has more freedoms
+//! and can take on composites of f that were no candidates in Π_n.
 
 use super::{columns_of, layer_of, BoardFrames, ClaimKind};
 use crate::bits::Bits;

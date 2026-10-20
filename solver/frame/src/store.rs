@@ -297,7 +297,8 @@ pub struct Line {
     pub from_value: Option<u64>,
     /// A repeat's upper bound: `in_the_bag` of `n` and of `from`.
     pub bags: Option<(u64, u64)>,
-    /// An upper bound: the boards at which statement U is assumed, ascending (THEORY.md, "In the ledger").
+    /// An upper bound: the boards at which statement U is assumed, ascending (THEORY.md, "The ledger: bounds between
+    /// boards").
     pub rests_on: Vec<u32>,
     /// A dual bound: where the checkpoint of the search that gave it is, if the export was given the place.
     pub checkpoint: Option<String>,

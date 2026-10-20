@@ -1099,9 +1099,9 @@ legal, finished and within the ceilings but not optimal, when the game of n − 
 proof kinds and the assumptions track, and why a chain from n = 1 matters.  [results/README.md](../../results/README.md)
 says what supports each committed score.
 
-**Result lines** are one JSON object per line ([REFERENCE.md, "A results
-line"](REFERENCE.md#a-results-line---out-schema-5)).  A line is never rewritten, and a run locks the results file it
-appends to.
+**Result lines** are one JSON object per line ([REFERENCE.md, "A results line
+(`--out`, schema 5)"](REFERENCE.md#a-results-line---out-schema-5)).  A line is never rewritten, and a run locks the
+results file it appends to.
 
 **What identifies a checkpoint.**  The header that a search stores identifies the search, so that a build never resumes
 a checkpoint of another search.  It holds:
@@ -1173,7 +1173,7 @@ n − 1 is a game of n, optimal or not.
 
 The lines say what a game had: a game built on an unfinished one has `prev` with no proof, `setup.cap` null and no `cap`
 or `prime_formula` proof, and both referees refuse a line that claims one of these on it ([REFERENCE.md, "What a game
-had from n − 1"](REFERENCE.md#what-a-game-had-from-n---1)).  The format of a line is the same, except that `options`
+had from n - 1"](REFERENCE.md#what-a-game-had-from-n---1)).  The format of a line is the same, except that `options`
 also names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of such a range are
 solved one at a time, because a game that went on from a game in flight would not know whether to take its ceiling.
 
@@ -1857,15 +1857,9 @@ every second line of the Java fixtures), and the comment on each says what the w
     builds check that every root frame is winnable, which the shortcut needs.
 * **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors, through the real binary;
   `bench --history FILE` keeps the tracked `solver/frame/bench/history.jsonl` out of the tests.
-* **Documentation** (`tests/docs.rs`): the table of tactics in section 5 matches the code; every relative link and
-  `#anchor` in the markdown files resolves; each entry of the lab notebook (`solver/notebook/`) opens with its title and
-  a link back, and is linked from the register or the index of `solver/notebook/README.md`, whose only sections are the
-  introduction's; `solver/docs/STATUS.md` is dated and has at most 150 lines; REFERENCE.md's table of the fields of a
-  result line, and its example line, have the keys the code writes; the reading order of section 3 is the module map of
-  `src/lib.rs`; `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never
-  *forced*; and neither the guides nor the comments and docstrings of the code and the scripts use the words the project
-  has retired.  The list, with what to say instead, is in the test; the entries of the notebook, and its note "Terms
-  changed" that maps their words, are exempt.
+* **Documentation** (`tests/docs.rs`): what the docs state that the code can check, from the table of tactics to
+  the links, the citations of headings, the sizes of [WRITING.md](../../docs/WRITING.md)'s rule 8 and the words the
+  project has retired.  The comment at the top of the file lists every check.
 
 ## 10. Performance
 

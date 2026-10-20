@@ -1,9 +1,9 @@
 //! The census of the structure of the frames: for each game of a range, how the board's frames sit by the number
 //! of prime factors of their numbers (their *layer*), how they are numbered from the front, what `unzip` claimed, and
-//! whether the hypotheses of the exactness theorem of the frame model (docs/THEORY.md, "Theorem M") hold on the
-//! board.  It looks at the frames as setup forms them and at the frames the search takes, built by the very function
-//! the solver uses (`taxman::frames::numbering`), and at the model the search builds from them
-//! ([`taxman::model::FrameGraph`]).  It searches nothing.
+//! whether the hypotheses of the exactness theorem of the frame model (docs/THEORY.md, "The frame model is exact, given
+//! its upper part") hold on the board.  It looks at the frames as setup forms them and at the frames the search takes,
+//! built by the very function the solver uses (`taxman::frames::numbering`), and at the model the search builds from
+//! them ([`taxman::model::FrameGraph`]).  It searches nothing.
 //!
 //! ```text
 //! cargo run --release --example structure -- FROM TO [--threads K] [--out FILE]
@@ -46,8 +46,9 @@
 //!   "greedy_only": [..]}`, the numbers in one set and not the other.
 //! * **H** (the claims in Π⁺(∅)): the extended problem with nothing open and the claims of `unzip` given
 //!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; docs/THEORY.md, "The
-//!   claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no claim, keeps every claim of the search's
-//!   frames in the order made, has the search's frames and candidates, and poses the same search problem
+//!   extended problem", the paragraph "The claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no
+//!   claim, keeps every claim of the search's frames in the order made, has the search's frames and candidates, and
+//!   poses the same search problem
 //!   ([`taxman::search::problem_of_extended`] of its frames and candidates equals [`taxman::search::problem_of`] of
 //!   the search's).  Item, one for each thing that differs: `{"what": "refused", "count": k, "claims": [[s, f], ..]}`
 //!   (the first 20), `{"what": "claims", "at": i, "kept": k, "given": g}` (the first place where the claims kept
@@ -79,8 +80,9 @@
 //!
 //! **Lemma M5⁺'s check.**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if `f` passes the check
 //! ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided candidate has it among its
-//! maximal factors (docs/THEORY.md, "The claims of `unzip` in Π⁺(O)"); a component that fails it for one back
-//! claim keeps none of its claims, front claims included; so does one that holds a source in O.  The candidates of
+//! maximal factors (docs/THEORY.md, "The extended problem", the paragraph "The claims of `unzip` in Π⁺(O)"); a
+//! component that fails it for one back claim keeps none of its claims, front claims included; so does one that holds
+//! a source in O.  The candidates of
 //! Π⁺(O) only grow with O, so a back claim fails the check for some O exactly when it fails for the largest O that
 //! holds none of its component's sources: U\*_{≥3} (the kept sources of three or more prime factors) less the
 //! component's own sources, or all of U\*_{≥3} for a component of layer 1 or 2, which no O touches.

@@ -116,8 +116,8 @@
 //! already stand for, so it is appended like any other.  Its scores must agree with the table's wherever the two
 //! overlap, so a results file of another game cannot be mistaken for the table's continuation.
 //!
-//! The fields of a line are described in solver/docs/REFERENCE.md ("A results line"); [`SCHEMA`] is the version of
-//! the format.
+//! The fields of a line are described in solver/docs/REFERENCE.md ("A results line (`--out`, schema 5)"); [`SCHEMA`] is
+//! the version of the format.
 
 use crate::board::search_problem;
 use crate::game::{largest_prime_at_most, replay, replay_finished, Optimal};
@@ -146,7 +146,7 @@ pub fn assumed_optimal(n: u32) -> String {
 }
 
 /// What a bound of the bounds store that rests on statement U at the board `n` assumes: "statement U holds at n=4501".
-/// (U is the statement of README.md, "What optimal means"; a bound of the store lists the boards it rests on.)
+/// (U is the statement of DESIGN.md, “What "optimal" means”; a bound of the store lists the boards it rests on.)
 pub fn assumed_u(n: u32) -> String {
     format!("{U_STATEMENT}{n}")
 }

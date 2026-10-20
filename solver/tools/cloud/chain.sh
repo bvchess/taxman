@@ -48,7 +48,8 @@
 #                        draws on the known games of the checkout's results/ (the committed chain, the
 #                        proven boards of the bounds store) instead of searching for them (RUNBOOK.md, section 5.4)
 #   MAX_FAILS            default 5
-#   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; RUNBOOK.md, "Past 4095")
+#   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; RUNBOOK.md, "The production
+#                        chain", the item "Past 4095")
 #   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,
 #                        over every run (`taxman solve --game-hours`; its clock is kept in the checkpoint directory,
 #                        so a run that resumes the game goes on from it).  Default: none
