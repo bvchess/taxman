@@ -1885,9 +1885,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   introduction's; `solver/docs/STATUS.md` is dated and has at most 150 lines; REFERENCE.md's table of the fields of a
   result line, and its example line, have the keys the code writes; the reading order of section 3 is the module map of
   `src/lib.rs`; `rust-version` is what the README and `setup.sh` say; the docs call `unzip`'s moves *mandatory*, never
-  *forced*; and the guides and comments of the repository do not use the words the project has retired.  The list, with
-  what to say instead, is in the test; the entries of the notebook, and its note "Terms changed" that maps their words,
-  are exempt.
+  *forced*; and neither the guides nor the comments and docstrings of the code and the scripts use the words the project
+  has retired.  The list, with what to say instead, is in the test; the entries of the notebook, and its note "Terms
+  changed" that maps their words, are exempt.
 
 ## 10. Performance
 

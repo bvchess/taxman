@@ -75,7 +75,8 @@ for every n" but "The file `results/strict.jsonl` holds a chain of optimal games
 ## The check
 
 The docs test, `solver/frame/tests/docs.rs`, runs in `solver/tools/quick_check.py`.  It checks that every relative link
-resolves and that the guides do not use the words the project has retired.
+resolves, and that neither the guides nor the comments of the code and the scripts use the words the project has
+retired.
 
 ## Sources
 
