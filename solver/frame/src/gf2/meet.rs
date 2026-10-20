@@ -1962,12 +1962,13 @@ impl<const R: usize> Meet<R> {
         let mut next_member = 0;
         // The vertices settled so far, which orders the offers.
         let mut tick = 0u32;
-        // Offers the distance `d` to `v` from `from`.
+        // Offers the distance `d` to `v` from `from`, unless it is no shorter than the best cycle so far (the search
+        // ends before it would take the entry).
         macro_rules! offer {
             ($v:expr, $d:expr, $from:expr) => {{
                 let (v, d): (u32, Dist) = ($v, $d);
                 let i = v as usize;
-                if d < bound && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
+                if d < cycle.0 && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
                     seen[i] = reached;
                     reach[i] = d;
                     back[i] = $from;
