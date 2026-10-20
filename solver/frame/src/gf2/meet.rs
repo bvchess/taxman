@@ -492,8 +492,9 @@ impl RadixHeap {
 pub struct SplitStart {
     pot: Vec<i64>,
     pred: Vec<u32>,
-    /// By element: 0 if it was not live, 1 if outside the set, 2 if a member.
+    /// By element: 0 if it was not live, 1 if outside the set, 2 if a member; and the number of members.
     role: Vec<u8>,
+    members: usize,
     saved: bool,
 }
 
@@ -1499,7 +1500,7 @@ impl<const R: usize> Meet<R> {
     /// docs), passed to `f(x, bound)`.  False (and `f` never called) if the split's constraints have no solution,
     /// which Frank's theorem rules out for a settled solve (a test checks it).
     pub fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], f: impl FnMut(u32, i64)) -> bool {
-        self.split_bounds_from(p, live, None, f)
+        self.split_bounds_from(p, live, None, None, f)
     }
 
     /// The split's arc `q → u` in the current tableau (`zero` the zero node), as [`split_bounds`](Self::split_bounds)
@@ -1530,8 +1531,11 @@ impl<const R: usize> Meet<R> {
     /// predecessors there is still a path of the constraint graph, as long: every vertex on it live then and now, a
     /// member then exactly when a member now (which fixes the lengths of its arcs), and every arc still an arc.  Each
     /// such potential is the length of a path from the virtual source, so no lower than the shortest distance.  A
-    /// walk up the predecessors from each vertex, stopped at the first whose status is known.
-    fn warm_start(&mut self, p: &Problem<'_, R>, live: &[u32], start: &SplitStart) {
+    /// walk up the predecessors from each vertex, stopped at the first whose status is known.  Where the constraint
+    /// graph on the vertices `start` had is known to be `start`'s on them (`kept`, see
+    /// [`keeps_arcs`](Self::keeps_arcs)), only the vertices are checked.  Returns the stamp in `seen` of the live
+    /// vertices whose path holds, and whether the zero node's does.
+    fn warm_start(&mut self, p: &Problem<'_, R>, live: &[u32], start: &SplitStart, kept: bool) -> (u32, bool) {
         let zero = self.pot.len() - 1;
         let g = self.next_generation(4);
         let (live_mark, on_path, valid, invalid) = (g - 3, g - 2, g - 1, g);
@@ -1579,7 +1583,7 @@ impl<const R: usize> Meet<R> {
                 if q == NONE {
                     break true;
                 }
-                if !self.split_arc(p, q as usize, u, zero) {
+                if !kept && !self.split_arc(p, q as usize, u, zero) {
                     break false;
                 }
                 u = q as usize;
@@ -1602,12 +1606,88 @@ impl<const R: usize> Meet<R> {
             }
         }
         self.walk = walk;
+        (valid, zero_status == valid)
+    }
+
+    /// Whether, for a problem that is `start`'s contracted by `contracted`, the current set is `start`'s less
+    /// `contracted`, every element live in both outside the set in both, and every element live only now outside it.
+    /// Then the constraint graph on the vertices `start` had is `start`'s on them, with the same lengths: contracting
+    /// members keeps the other elements' circuits less them and which elements are free, and deleting elements outside
+    /// the set changes no circuit.
+    fn keeps_arcs(&self, live: &[u32], start: &SplitStart, contracted: &[u32]) -> bool {
+        let role = |e: u32| start.role[e as usize];
+        contracted.iter().all(|&c| role(c) == 2)
+            && self.members.len() + contracted.len() == start.members
+            && live.iter().all(|&e| match role(e) {
+                0 => !self.inside[e as usize],
+                r => r == 1 + u8::from(self.inside[e as usize]),
+            })
+    }
+
+    /// The first round of a split started from `start` where [`keeps_arcs`](Self::keeps_arcs) holds and the zero
+    /// node's path holds: the potential of a vertex whose path holds (stamp `valid`) is its distance in `start`'s
+    /// graph, so no arc between two such vertices can lower one.  So the round pulls each other vertex's potential
+    /// along its arcs in, and lists those vertices to relax their own arcs, which reaches what a round over every
+    /// vertex would leave to the next.
+    fn pull_into_broken(&mut self, p: &Problem<'_, R>, live: &[u32], valid: u32) {
+        let w = p.weight;
+        let zero = self.pot.len() - 1;
+        let pz = self.pot[zero];
+        for &v in live {
+            let vi = v as usize;
+            if self.seen[vi] == valid {
+                continue;
+            }
+            self.changed_in.push(v);
+            let (mut best, mut from) = (self.pot[vi], NONE);
+            if self.inside[vi] {
+                // From the zero node, and from the elements whose circuit in B holds it.
+                if pz + w[vi] < best {
+                    (best, from) = (pz + w[vi], zero as u32);
+                }
+                let s = usize::from(self.slot[1][vi]);
+                for &y in &self.block_live[1][usize::from(p.block[1][vi])] {
+                    let yi = y as usize;
+                    if !self.inside[yi] && is_zero(&self.res[1][yi]) && bit(&self.mask[1][yi], s) {
+                        let d = self.pot[yi] + w[vi] - w[yi];
+                        if d < best {
+                            (best, from) = (d, y);
+                        }
+                    }
+                }
+            } else if !is_zero(&self.res[0][vi]) {
+                // Free in A: from the zero node.
+                if pz < best {
+                    (best, from) = (pz, zero as u32);
+                }
+            } else {
+                // From the members of its circuit in A.
+                let (pot, elems) = (&self.pot, &self.slot_elem[0][usize::from(p.block[0][vi])]);
+                each_bit(&self.mask[0][vi], |s| {
+                    let x = elems[s];
+                    if pot[x as usize] < best {
+                        (best, from) = (pot[x as usize], x);
+                    }
+                });
+            }
+            if from != NONE {
+                self.pot[vi] = best;
+                self.split_pred[vi] = from;
+            }
+        }
     }
 
     /// The split's potentials (before they are shifted to make `w1`): Bellman–Ford from all zero, lowered first to
-    /// those of `start` where they still hold (see [`warm_start`](Self::warm_start)).  False if the constraints have
-    /// no solution.
-    fn split_potentials(&mut self, p: &Problem<'_, R>, live: &[u32], start: Option<&SplitStart>) -> bool {
+    /// those of `start` where they still hold (see [`warm_start`](Self::warm_start)), its first round narrowed where
+    /// the problem is `start`'s contracted by `contracted` (see [`pull_into_broken`](Self::pull_into_broken)).  False
+    /// if the constraints have no solution.
+    fn split_potentials(
+        &mut self,
+        p: &Problem<'_, R>,
+        live: &[u32],
+        start: Option<&SplitStart>,
+        contracted: Option<&[u32]>,
+    ) -> bool {
         let w = p.weight;
         // Potentials for the constraints w1(v) − w1(u) ≤ c, as arcs u → v of length c, from potentials all zero:
         // Bellman–Ford from a virtual source with an arc of length 0 to every vertex, whose distances are the same
@@ -1623,12 +1703,20 @@ impl<const R: usize> Meet<R> {
         }
         self.pot[zero] = 0;
         self.split_pred[zero] = NONE;
-        if let Some(start) = start.filter(|start| start.saved) {
-            self.warm_start(p, live, start);
-        }
         self.changed_in.clear();
-        self.changed_in.extend_from_slice(live);
-        self.changed_in.push(zero as u32);
+        let mut narrowed = false;
+        if let Some(start) = start.filter(|start| start.saved) {
+            let kept = contracted.is_some_and(|c| self.keeps_arcs(live, start, c));
+            let (valid, zero_valid) = self.warm_start(p, live, start, kept);
+            if kept && zero_valid {
+                self.pull_into_broken(p, live, valid);
+                narrowed = true;
+            }
+        }
+        if !narrowed {
+            self.changed_in.extend_from_slice(live);
+            self.changed_in.push(zero as u32);
+        }
         let limit = live.len() + 3;
         let mut rounds = 0;
         while !self.changed_in.is_empty() {
@@ -1695,12 +1783,14 @@ impl<const R: usize> Meet<R> {
     /// [`split_bounds`](Self::split_bounds), its Bellman–Ford started from the potentials of an earlier split `start`
     /// where they still hold ([`warm_start`](Self::warm_start)): the same split, since the shortest distances are
     /// the same from any potentials that are lengths of paths and no lower (debug builds check it against the split
-    /// from all zero).
+    /// from all zero).  If `p` is `start`'s problem contracted by the members `contracted`, the first round relaxes
+    /// fewer arcs ([`pull_into_broken`](Self::pull_into_broken)).
     pub fn split_bounds_from(
         &mut self,
         p: &Problem<'_, R>,
         live: &[u32],
         start: Option<&SplitStart>,
+        contracted: Option<&[u32]>,
         mut f: impl FnMut(u32, i64),
     ) -> bool {
         debug_assert!(self.settled);
@@ -1711,11 +1801,11 @@ impl<const R: usize> Meet<R> {
         let zero = self.pot.len() - 1;
         #[cfg(debug_assertions)]
         let cold = start.is_some() && {
-            let solved = self.split_potentials(p, live, None);
+            let solved = self.split_potentials(p, live, None, None);
             self.cold.copy_from_slice(&self.pot);
             solved
         };
-        let solved = self.split_potentials(p, live, start);
+        let solved = self.split_potentials(p, live, start, contracted);
         #[cfg(debug_assertions)]
         if start.is_some() {
             assert_eq!(solved, cold, "a split from a start and the split from all zero disagree on a solution");
@@ -2256,6 +2346,7 @@ impl<const R: usize> Meet<R> {
         for &y in self.out_a.iter().flatten() {
             start.role[y as usize] = 1;
         }
+        start.members = self.members.len();
         start.saved = true;
     }
 

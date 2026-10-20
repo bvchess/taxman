@@ -665,6 +665,8 @@ struct Level<const W: usize, const R: usize> {
     meet_solve: u64,
     /// What the level's tableau can be derived from when it is made again ([`resolve`]).
     source: Source<W, R>,
+    /// What the level's node promoted from its parent's (nothing at a unit's root).
+    added: Bits<W>,
 }
 
 /// Where a solved level's tableau can be derived from instead of built ([`meet::Meet::derive`]): the workspace's solve
@@ -704,6 +706,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             loss_floor: 0,
             meet_solve: 0,
             source: Source::default(),
+            added: Bits::EMPTY,
         }
     }
 
@@ -737,6 +740,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.has_pot = false;
         self.meet_solve = 0;
         self.source.clear();
+        self.added = other.added;
     }
 }
 
@@ -763,6 +767,7 @@ struct Levels<'g, const W: usize, const R: usize> {
     meet: Meet<R>,
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
+    contracted_idx: Vec<u32>,
     stats: Gf2Stats,
     /// Which free members are searched for being forced ([`ForceWindow`]).
     force_window: ForceWindow,
@@ -804,6 +809,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             meet: Meet::new(n, graph.blocks),
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
+            contracted_idx: Vec::with_capacity(n),
             stats: Gf2Stats::default(),
             force_window: ForceWindow::default(),
             cycles: Vec::new(),
@@ -848,6 +854,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.has_pot = false;
         level.meet_solve = 0;
         level.source.clear();
+        level.added = Bits::EMPTY;
         for x in promoted.iter() {
             contract(self.graph, level, x);
         }
@@ -866,6 +873,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let child = &mut upper[0];
         child.copy_from(&lower[d]);
         child.live = child_live;
+        child.added = *added;
         // The child's problem is the top level's before it went on without the candidate the child promotes (the
         // same vectors), so it starts from that level's dominant sets.
         let parent = if from_prior { &self.prior } else { &lower[d] };
@@ -963,8 +971,21 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
                 let node = self.nodes[d];
                 let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
                 let start = from.map(|i| &self.starts[i].0);
+                // The level's problem is its node's last split's, or its parent node's contracted by what it promoted.
+                let graph = self.graph;
+                let contracted = &mut self.contracted_idx;
+                contracted.clear();
+                let same_problem = match from {
+                    Some(i) if i == d => true,
+                    Some(i) if self.starts[i].1 == self.nodes[i] => {
+                        contracted.extend(level.added.iter().map(|x| graph.index[x as usize]));
+                        true
+                    }
+                    _ => false,
+                };
+                let contracted = same_problem.then_some(&contracted[..]);
                 let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
-                split(self.graph, level, meet, live_idx, start_idx, &mut self.stats, start);
+                split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted);
                 if level.has_pot {
                     self.meet.save_split(&mut self.starts[d].0);
                     self.starts[d].1 = node;
@@ -1412,8 +1433,10 @@ fn resolve<const W: usize, const R: usize>(
 }
 
 /// The bounds without each member of `level`'s heaviest set (settled), from a weight split, its Bellman–Ford started
-/// from `start`, an earlier split ([`Meet::split_bounds_from`]).  Unless the workspace still holds the level's last
-/// solve, the level's heaviest set is solved again from itself first ([`resolve`]).
+/// from `start`, an earlier split, whose problem the level's is contracted by `contracted` if that is known
+/// ([`Meet::split_bounds_from`]).  Unless the workspace still holds the level's last solve, the level's heaviest set
+/// is solved again from itself first ([`resolve`]).
+#[allow(clippy::too_many_arguments)]
 fn split<const W: usize, const R: usize>(
     graph: &Gf2Graph,
     level: &mut Level<W, R>,
@@ -1422,6 +1445,7 @@ fn split<const W: usize, const R: usize>(
     start_idx: &mut Vec<u32>,
     stats: &mut Gf2Stats,
     start: Option<&SplitStart>,
+    contracted: Option<&[u32]>,
 ) {
     if level.meet_solve != meet.solves {
         resolve(graph, level, meet, live_idx, start_idx);
@@ -1438,7 +1462,9 @@ fn split<const W: usize, const R: usize>(
     let out = &mut level.split;
     out.clear();
     level.has_pot = meet.settled
-        && meet.split_bounds_from(&problem, live_idx, start, |e, bound| out.push((graph.elems[e as usize], bound)));
+        && meet.split_bounds_from(&problem, live_idx, start, contracted, |e, bound| {
+            out.push((graph.elems[e as usize], bound))
+        });
     if level.has_pot {
         level.pot.copy_from_slice(meet.potentials());
     }

@@ -58,16 +58,20 @@ misses are the *odd* cores of movers with three or more factors.
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by
   Bellman–Ford, each round from the vertices that changed.  It starts from the last split of the same node, or else of
   its parent, wherever the path of predecessors that gave a potential is still a path (`Meet::split_bounds_from`), and
-  reaches the same split, the shortest distances.  Its bound is loose, so for the members it leaves free within the
-  tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too when
-  no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
-  (`Meet::has_cycle_within`).  A member on a cycle that the search for another found within the slack is not searched,
-  since that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the
-  node's own or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`,
-  a bit test an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that
-  inherits its parent's heaviest set finds nearly all its members free on its parent's cycles ([what a GF(2) step
-  carries from the last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).
-  The forced members are the same.  The window `all` costs each node more, since every member is checked exactly, and
+  reaches the same split, the shortest distances.  Where the level's set is the start's less the members promoted
+  since, as in a child that inherits its parent's heaviest set, the arcs among the vertices the start had are the
+  start's: the walks then check only vertices, and a potential whose path holds is the distance among those vertices,
+  so the first round relaxes only the arcs into and out of the others.  Its bound is loose, so for the members it
+  leaves free within the tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A
+  member is forced too when no cycle through it is shorter than the slack `value − need` and the sets of other sizes
+  lose more than that (`Meet::has_cycle_within`).  A member on a cycle that the search for another found within the
+  slack is not searched, since that cycle passes through it.  Nor is a member on a cycle that the last searches at the
+  parent's depth, the node's own or its child's found, if it is still a cycle of this exchange graph within the slack
+  (`Meet::cycle_length`, a bit test an arc).  A child's exchange graph is its parent's less what it promoted or
+  dropped, so a child that inherits its parent's heaviest set finds nearly all its members free on its parent's cycles
+  ([what a GF(2) step carries from the
+  last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  The forced members
+  are the same.  The window `all` costs each node more, since every member is checked exactly, and
   the trees fall by more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the
   former window, 80 (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
   campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
