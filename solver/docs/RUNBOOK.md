@@ -806,7 +806,7 @@ Four backstops depend on none of these scripts:
 |---|---|---|
 | `wall.sh` | your machine | `launch`, `status`, `stop` and `cleanup`; it prints every aws command that changes something (`+ aws ...`; `--verbose` prints the reads too), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
 | the launch template `taxman-wall`, the security group `taxman-wall` (no inbound rule), the group `taxman-wall` | the account | one `c8g.16xlarge` (or `INSTANCE_TYPE`) at spot, lowest price first among the zones (`SpotAllocationStrategy=lowest-price`, one pool), capacity rebalancing off, `min 0, max 1`, EC2 health checks, tags `Project=taxman`, `Purpose=wall` |
-| the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts `wall-node.sh` in a tmux session `tx` as `ec2-user`; if any of that fails after five tries, it records the end and takes the group to 0 |
+| the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts the `wall-node.sh` that commit has (in `solver/tools/cloud`, or `rust/tools/cloud` before the restructure of 2026-10-18) in a tmux session `tx` as `ec2-user`, checking a few seconds later that the session lives; if any of that fails after five tries, it records the end and takes the group to 0 |
 | `wall-node.sh` | each machine | restores the logs, runs `setup.sh` (the solver alone, `BUILD=--bin taxman`: from the build cache if it has the commit, tested; no tests of its own; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means (5.1) |
 | `run.sh`'s ledger | each machine | counts the budget and the date (below) |
 | `wall-policy.json` | the role `taxman-ec2` | lets the machines set the capacity of this one group and read groups (5.3) |
@@ -1138,7 +1138,7 @@ used there.  The instances of the earlier runs exercised all of these but the gr
 |---|---|
 | `launch` stops with an error after some commands | the script prints each command's error; `wall.sh cleanup --force` deletes what exists, then launch again |
 | the group has no instance and the capacity is 1 | no spot capacity at the ceiling in those zones: `aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall` says why; add zones or raise `--spot-max` (`cleanup`, then `launch --continue`) |
-| `status` shows `ENDED` with `boot failed` | the user data failed (install, clone, checkout, tmux); the reason names the step; fix and `launch --continue` |
+| `status` shows `ENDED` with `boot failed` | the user data failed (install, clone, checkout, finding or starting `wall-node.sh`); the reason names the step; fix and `launch --continue` |
 | machines keep starting | `run/boots/` counts them; the `MAX_INSTANCES`th ends the run as a boot loop; read `logs/wall-node.log` in S3 |
 | the machine is up and `status` shows nothing new for over 20 minutes | `aws ssm start-session`, `tmux attach -t tx`; `tail ~/taxman-work/logs/chain.err` |
 | `wall.sh stop` and nothing happens | the machine looks for the stop object every 30 s while the chain runs, and not during the setup; `stop --now` ends it at once |

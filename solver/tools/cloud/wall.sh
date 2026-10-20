@@ -259,9 +259,9 @@ zones_by_price() {
     done | awk '{if (NF == 1) print "99", $1; else print}' | sort -n
 }
 
-# The user data of the launch template: a script that sets the timer, installs, checks out the commit and starts
-# wall-node.sh in tmux.  If any of that fails it ends the run with the reason, so that the group does not launch the
-# same failure again and again.
+# The user data of the launch template: a script that sets the timer, installs, checks out the commit, finds
+# wall-node.sh in the checkout and starts it in tmux.  If any of that fails, or the tmux session is gone a few seconds
+# later, it ends the run with the reason, so that the group does not launch the same failure again and again.
 write_user_data() {
     local file="$1" timer_minutes="$2" commit="$3"
     {
@@ -287,10 +287,18 @@ write_user_data() {
         printf 'retry clone || fail "git clone"\n'
         printf 'sudo -u ec2-user git -C /home/ec2-user/taxman checkout %s ||\n' "$commit"
         printf '    fail "git checkout %s"\n' "$commit"
+        # A commit from before the restructure of 2026-10-18 has the script in rust/ and takes the same environment.
+        printf 'node=solver/tools/cloud/wall-node.sh\n'
+        printf '[ -f /home/ec2-user/taxman/$node ] || node=rust/tools/cloud/wall-node.sh\n'
+        printf '[ -f /home/ec2-user/taxman/$node ] ||\n'
+        printf '    fail "wall-node.sh is in neither solver/tools/cloud nor rust/tools/cloud at %s"\n' "$commit"
         printf 'sudo -u ec2-user -i env AWS_DEFAULT_REGION=%s S3_DEST=%s ASG=%s \\\n' "$AWS_DEFAULT_REGION" "$S3_DEST" \
             "$NAME"
-        printf '    tmux new-session -d -s tx -c /home/ec2-user/taxman solver/tools/cloud/wall-node.sh ||\n'
+        printf '    tmux new-session -d -s tx -c /home/ec2-user/taxman "$node" ||\n'
         printf '    fail "tmux"\n'
+        # tmux says success for a command that does not run: the session has to be alive a few seconds later.
+        printf 'sleep 5\n'
+        printf 'sudo -u ec2-user -i tmux has-session -t tx || fail "wall-node did not start"\n'
     } >"$file"
 }
 

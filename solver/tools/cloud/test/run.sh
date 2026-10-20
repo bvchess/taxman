@@ -409,7 +409,14 @@ print(base64.b64decode(json.load(open(sys.argv[1]))["UserData"]).decode(), end="
         sed '1d;$d' >"$tmp/user-data.sh"
     check "the user data is valid bash" bash -n "$tmp/user-data.sh"
     check "it checks out the commit" matches "$tmp/user-data.sh" "git -C /home/ec2-user/taxman checkout $commit"
-    check "it starts wall-node.sh in tmux" matches "$tmp/user-data.sh" 'tmux new-session -d -s tx .*wall-node.sh'
+    check "it takes wall-node.sh from solver/ if the checkout has it" matches "$tmp/user-data.sh" \
+        '^node=solver/tools/cloud/wall-node.sh$'
+    check "else from rust/, where commits before the restructure have it" matches "$tmp/user-data.sh" \
+        '|| node=rust/tools/cloud/wall-node.sh$'
+    check "else it ends the run" matches "$tmp/user-data.sh" 'fail "wall-node.sh is in neither'
+    check "it starts the script it found in tmux" matches "$tmp/user-data.sh" 'tmux new-session -d -s tx .* "\$node"'
+    check "it checks that the session lives a few seconds later" matches "$tmp/user-data.sh" \
+        'tmux has-session -t tx || fail "wall-node did not start"'
     check "it sets the timer from the budget" matches "$tmp/user-data.sh" '^shutdown -h +4560$'
     check "the config has no build cache setting by default" lacks "$tmp/dry.out" '^RELEASE_TESTS='
     RELEASE_TESTS=1 REQUIRE_CACHED=1 DRY_RUN=1 "$wall" launch --commit "$commit" --until 2099-01-01 \
