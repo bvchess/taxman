@@ -234,7 +234,7 @@ fn cheap_images<const W: usize>(spf: &[u32], k: &Bits<W>, cands: &Bits<W>, chose
 
 /// What every searcher's hook of a game shares: the model, the root, the smallest prime factor of each number, and the
 /// period after which a searcher forgets its nogoods.
-struct Game<const W: usize> {
+pub(super) struct Game<const W: usize> {
     model: Arc<FrameGraph>,
     root: FrameSet<W>,
     spf: Vec<u32>,
@@ -244,13 +244,13 @@ struct Game<const W: usize> {
     /// Gather the classes of the learning (`--trace`).
     classes: bool,
     /// Propose the images of the images too (`--closure`).
-    closure: bool,
+    pub(super) closure: bool,
     /// The learning's hook proposes images; if not, it only counts the tree (`--count`).
     propose: bool,
 }
 
 impl<const W: usize> Game<W> {
-    fn new(p: &Prepared<W>, verify: bool, classes: bool) -> Game<W> {
+    pub(super) fn new(p: &Prepared<W>, verify: bool, classes: bool) -> Game<W> {
         let top = p.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(1);
         let (spf, _) = numtheory::sieve(top);
         let forget_period = p.tactics.forgetting().period;
@@ -542,13 +542,13 @@ struct Class {
 
 /// What the learning's hooks of a unit's search gathered.
 #[derive(Default)]
-struct Learned {
+pub(super) struct Learned {
     steps: u64,
     nodes: u64,
     leaves: u64,
-    conflicts: u64,
-    proposed: u64,
-    learned: u64,
+    pub(super) conflicts: u64,
+    pub(super) proposed: u64,
+    pub(super) learned: u64,
     classes: Vec<Class>,
 }
 
@@ -577,7 +577,7 @@ impl<const W: usize> Track<W> {
 }
 
 /// The learning's hook of one searcher.  What it gathers goes to `shared` when the searcher is dropped.
-struct Learner<const W: usize> {
+pub(super) struct Learner<const W: usize> {
     game: Arc<Game<W>>,
     shared: Arc<Mutex<Learned>>,
     tally: Learned,
@@ -587,7 +587,7 @@ struct Learner<const W: usize> {
 }
 
 impl<const W: usize> Learner<W> {
-    fn new(game: Arc<Game<W>>, shared: Arc<Mutex<Learned>>) -> Self {
+    pub(super) fn new(game: Arc<Game<W>>, shared: Arc<Mutex<Learned>>) -> Self {
         let track = game.classes.then(Track::default);
         Learner { game, shared, tally: Learned::default(), shape: Shape::default(), scratch: Scratch::new(), track }
     }
@@ -809,7 +809,11 @@ fn line(n: u32, id: &str, mode: &str, o: &Options, opt: u64, s: &Solved) -> Line
 
 /// The units of game `n` to solve: the whole game with `--root`, as the suite names it (`GAME-root`); else the suite's
 /// units `--ids` names.
-fn units_of<const W: usize>(n: u32, o: &Options, p: &Prepared<W>) -> Result<Vec<(String, TaxUnit<W>)>, String> {
+pub(super) fn units_of<const W: usize>(
+    n: u32,
+    o: &Options,
+    p: &Prepared<W>,
+) -> Result<Vec<(String, TaxUnit<W>)>, String> {
     if o.exchanges.root {
         return Ok(vec![(format!("{n}-root"), TaxUnit { promoted: Bits::EMPTY, cands: p.candidates })]);
     }
