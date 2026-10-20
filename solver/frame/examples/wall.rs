@@ -27,8 +27,8 @@
 //!     | --root) [--prune] [--below D] [--sample K] [--nodes K] [--tactic NAME=VALUE]... N|A-B...
 //! cargo run --profile test --example wall --features studies -- near --known FILE (--suite FILE --ids ID[,ID...]
 //!     | --root) --within D [--nodes K] [--probes K [--probe-gap G] [--seed S]] [--sets DIR] [--tactic NAME=VALUE]... N
-//! cargo run --profile test --example wall --features studies -- images --known FILE --suite FILE --ids ID[,ID...]
-//!     [--learn [--closure] | --bare] [--trace DIR] [--nodes K] [--tactic NAME=VALUE]... N
+//! cargo run --profile test --example wall --features studies -- images --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) [--learn [--closure] | --bare | --count] [--trace DIR] [--nodes K] [--tactic NAME=VALUE]... N
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -145,10 +145,11 @@
 //!   P*, by value, counted exactly by the search made to count (`search::StepHook::counting`) or estimated from
 //!   random descents; defined in `wall/near.rs`, whose module comment has the count, the estimate and the files.
 //!   `solver/notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/` reads them.
-//! * **images**: units of the tuning suite solved with a hook that, wherever a node goes on without a member and its
-//!   bound swaps in the member's twin (a twin swap or a paired exchange), asks whether the node's conflict with the
-//!   same swap made is a conflict too, and with `--learn` makes the search learn those images; defined in
-//!   `wall/images.rs`, whose module comment has the test, the learning, the lines and the files.
+//! * **images**: units of the tuning suite, or whole games, solved with a hook that, wherever a node goes on without a
+//!   member and its bound swaps in the member's twin (a twin swap or a paired exchange), asks whether the node's
+//!   conflict with the same swap made is a conflict too, and with `--learn` makes the search learn those images;
+//!   `--count` only counts the tree's steps and leaves; defined in `wall/images.rs`, whose module comment has the test,
+//!   the learning, the lines and the files.
 //!   `solver/notebook/conflicts-closed-under-cheap-exchanges-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
@@ -275,7 +276,7 @@ const COMMANDS: [&str; 14] = [
 ];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 59] = [
+const OPTIONS: [(&str, &[&str]); 60] = [
     (
         "--known",
         &[
@@ -306,10 +307,11 @@ const OPTIONS: [(&str, &[&str]); 59] = [
     ("--ids", &["anatomy", "exchanges", "near", "images"]),
     ("--prune", &["exchanges"]),
     ("--below", &["exchanges"]),
-    ("--root", &["exchanges", "near"]),
+    ("--root", &["exchanges", "near", "images"]),
     ("--sample", &["exchanges"]),
     ("--learn", &["images"]),
     ("--bare", &["images"]),
+    ("--count", &["images"]),
     ("--closure", &["images"]),
     ("--within", &["near"]),
     ("--probes", &["near"]),
@@ -403,7 +405,7 @@ struct Options {
     exchanges: exchanges::Params,
     /// The options of `near` (its `--ids` are `anatomy`'s, its `--root` `exchanges'`, its `--seed` the finder's).
     near: near::Params,
-    /// The options of `images` (its `--ids` and `--trace` are `anatomy`'s).
+    /// The options of `images` (its `--ids` and `--trace` are `anatomy`'s, its `--root` `exchanges'`).
     images: images::Params,
     games: Vec<u32>,
 }
@@ -568,6 +570,7 @@ fn parse() -> Result<Options, String> {
             "--sample" => o.exchanges.sample = number("--sample", value("--sample")?)?,
             "--learn" => o.images.learn = true,
             "--bare" => o.images.bare = true,
+            "--count" => o.images.count = true,
             "--closure" => o.images.closure = true,
             "--within" => o.near.within = number("--within", value("--within")?)?,
             "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
