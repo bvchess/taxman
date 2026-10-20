@@ -6,9 +6,10 @@
 //!   with the lab notebook, and the READMEs of `heuristics/` and `moniot/`) resolves;
 //! * the lab notebook keeps its rules on its front page, `solver/notebook/README.md`, and its register in the files of
 //!   `register/` (a file a subject); its entries are folders with one README.md each, beside the front page and in
-//!   `search/` (the search's), and the register lists them all: every entry opens with its title and a link back, and
-//!   a file of the register links to it, and the front page holds no entry and no table row; `solver/docs/STATUS.md`
-//!   is short and dated;
+//!   `search/` (the search's), and the register lists them all: every entry opens with its title, a link back and the
+//!   dates it was started and concluded (the month of its name, if it has one, is the month it started), and a file of
+//!   the register links to it, and the front page holds no entry and no table row; `solver/docs/STATUS.md` is short and
+//!   dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
 //!   and its example line shows them;
 //! * the design's reading order (`solver/docs/design/architecture.md`) is the module map of `src/lib.rs`, and
@@ -408,7 +409,9 @@ fn back_link_of(file: &Path) -> &'static str {
     }
 }
 
-/// Every entry opens with its title, named for its anchor, and a back link, and a file of the register links to it.
+/// Every entry opens with its title, named for its anchor, a back link and its dates (`Started D.` or
+/// `Started D.  Concluded E.`, after a blank line; E is not before D, and D lies in the month that the entry's name
+/// holds, if it holds one), and a file of the register links to it.
 #[test]
 fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
     let listed = files_linked_by_the_register();
@@ -418,7 +421,7 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
     for file in files {
         let name = entry_name(&file);
         let text = read(&file);
-        let top: Vec<&str> = text.lines().take(3).collect();
+        let top: Vec<&str> = text.lines().take(5).collect();
         match top.first() {
             Some(title) if title.starts_with("# ") => {
                 let named = anchors(title).into_iter().next().unwrap_or_default();
@@ -431,6 +434,24 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
         let back_link = back_link_of(&file);
         if top.get(1) != Some(&"") || top.get(2) != Some(&back_link) {
             problems.push(format!("{name}: the third line is not {back_link:?}, after a blank line"));
+        }
+        let dates = match (top.get(3), top.get(4)) {
+            (Some(&""), Some(line)) => entry_dates(line),
+            _ => None,
+        };
+        match dates {
+            None => problems.push(format!(
+                "{name}: the fifth line is not `Started YYYY-MM-DD.` or `Started YYYY-MM-DD.  Concluded YYYY-MM-DD.` \
+                 (two spaces before Concluded, plausible dates), after a blank line"
+            )),
+            Some((started, concluded)) => {
+                if let Some(concluded) = concluded.filter(|concluded| concluded < &started) {
+                    problems.push(format!("{name}: it concluded on {concluded}, before it started on {started}"));
+                }
+                if let Some(month) = month_of_name(&name).filter(|month| !started.starts_with(month)) {
+                    problems.push(format!("{name}: its name holds the month {month}, but it started on {started}"));
+                }
+            }
         }
         if !listed.contains(&file) {
             problems.push(format!("{name}: no file of solver/notebook/{REGISTER_FOLDER}/ links to it"));
@@ -501,17 +522,79 @@ fn the_back_link_of_an_entry_goes_up_to_the_front_page() {
     assert_eq!(back_link_of(&below), SEARCH_BACK_LINK);
 }
 
+/// The number that `text` writes with exactly `count` digits, if it does.
+fn digits(text: &str, count: usize) -> Option<u32> {
+    let all_digits = text.len() == count && text.bytes().all(|b| b.is_ascii_digit());
+    text.parse().ok().filter(|_| all_digits)
+}
+
+/// Whether `text` is a plausible month, `YYYY-MM`.
+fn is_month(text: &str) -> bool {
+    let Some((year, month)) = text.split_once('-') else { return false };
+    digits(year, 4).is_some() && matches!(digits(month, 2), Some(1..=12))
+}
+
+/// Whether `text` is a plausible date, `YYYY-MM-DD`.
+fn is_date(text: &str) -> bool {
+    let Some((month, day)) = text.rsplit_once('-') else { return false };
+    is_month(month) && matches!(digits(day, 2), Some(1..=31))
+}
+
 /// Whether `line` is `Updated YYYY-MM-DD.`, a plausible date.
 fn is_update_line(line: &str) -> bool {
-    let Some(date) = line.strip_prefix("Updated ").and_then(|rest| rest.strip_suffix('.')) else { return false };
-    let parts: Vec<&str> = date.split('-').collect();
-    let [year, month, day] = parts.as_slice() else { return false };
-    let number = |part: &str, digits: usize| part.len() == digits && part.bytes().all(|b| b.is_ascii_digit());
-    number(year, 4)
-        && number(month, 2)
-        && number(day, 2)
-        && matches!(month.parse::<u32>(), Ok(1..=12))
-        && matches!(day.parse::<u32>(), Ok(1..=31))
+    line.strip_prefix("Updated ").and_then(|rest| rest.strip_suffix('.')).is_some_and(is_date)
+}
+
+/// The dates of an entry from `line`, its fifth: the day it started and, if it has concluded, the day it did, from
+/// `Started D.` or `Started D.  Concluded E.` (two spaces before `Concluded`, plausible dates).  Any other line has
+/// none.
+fn entry_dates(line: &str) -> Option<(&str, Option<&str>)> {
+    let dates = line.strip_prefix("Started ")?.strip_suffix('.')?;
+    match dates.split_once(".  Concluded ") {
+        Some((started, concluded)) => (is_date(started) && is_date(concluded)).then_some((started, Some(concluded))),
+        None => is_date(dates).then_some((dates, None)),
+    }
+}
+
+/// The month that the name of an entry holds, `YYYY-MM` after a `-` and before a `-` or the end of the name (the start
+/// of the work: `the-gap-past-2175-2026-10`), if it holds one.  A number such as `2175` is no year, since no month of
+/// 01-12 follows it.
+fn month_of_name(name: &str) -> Option<&str> {
+    name.match_indices('-').find_map(|(at, _)| {
+        let month = name.get(at + 1..at + 8)?;
+        (is_month(month) && matches!(name.as_bytes().get(at + 8), None | Some(b'-'))).then_some(month)
+    })
+}
+
+/// The dates of an entry and the month of its name are read from the lines and names that hold them, and from no other.
+#[test]
+fn the_dates_of_an_entry_and_the_month_of_its_name_are_read() {
+    assert!(is_date("2026-10-16") && !is_date("2026-13-16") && !is_date("2026-10-32") && !is_date("2026-10-00"));
+    assert!(!is_date("2026-10") && !is_date("2026-10-1") && !is_date("26-10-16") && !is_date("2026-10-16-17"));
+    assert_eq!(entry_dates("Started 2026-10-12."), Some(("2026-10-12", None)));
+    assert_eq!(entry_dates("Started 2026-10-12.  Concluded 2026-10-15."), Some(("2026-10-12", Some("2026-10-15"))));
+    let others = [
+        "",
+        "Updated 2026-10-12.",
+        "Started 2026-13-12.",
+        "Started 2026-10-12",
+        "Started 2026-10-12.  Concluded 2026-10-15",
+        "Started 2026-10-12. Concluded 2026-10-15.",
+        "Started 2026-10-12.   Concluded 2026-10-15.",
+        "Started 2026-10-12.  Concluded 2026-10-32.",
+        "Started 2026-10-12.  Concluded .",
+        "Started 2026-10-12.  Concluded 2026-10-15. ",
+        "Started 2026-10-12.  Concluded 2026-10-15.  Concluded 2026-10-16.",
+    ];
+    for line in others {
+        assert_eq!(entry_dates(line), None, "{line:?} has no dates");
+    }
+    assert_eq!(month_of_name("the-gap-past-2175-2026-10"), Some("2026-10"));
+    assert_eq!(month_of_name("carrying-nogoods-over-2026-10-measured-not-kept"), Some("2026-10"));
+    assert_eq!(month_of_name("the-engine"), None);
+    for name in ["boards-past-4095", "the-gap-past-2175", "x-2026-13", "x-2026-10y", "x-2026-100", "2026-10"] {
+        assert_eq!(month_of_name(name), None, "{name} holds no month");
+    }
 }
 
 #[test]

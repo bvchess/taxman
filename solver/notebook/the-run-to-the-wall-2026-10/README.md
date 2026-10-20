@@ -2,40 +2,54 @@
 
 Part of the [lab notebook](../README.md).
 
-*Question.*  How far does the unattended run of [RUNBOOK section
-12](../../docs/runbook/wall.md) take the chain from n = 1 on one `c8g.16xlarge` at
-spot, with the settings of [the tuning campaign](../search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
-(`force_window=all`) and the counter that could no longer wrap ([the
-wrap](../search/cheaper-gf2-nodes-same-trees-2026-10/README.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)); does it solve
-1..3440 again with the committed chain's scores; and where is the wall, the first game whose own search takes more than
-24 hours?
+Started 2026-10-16.  Concluded 2026-10-18.
 
-*What was run* (2026-10-17 07:20:47Z to 2026-10-18 18:58:04Z, commit eb84a6f, a clean tree): `wall.sh launch`, an Auto
-Scaling group of one spot `c8g.16xlarge` (Graviton4, 64 vCPUs, 124 GiB) that replaces an interrupted machine, running
-`chain.sh 8191`, that is `taxman solve 1-8191` from n = 1 with a window of 4 games in flight on all 64 threads, the
-default tactics of that commit, and `--game-hours 24` (the wall).  The run's limits were the wall, 72 instance-hours
-and 2026-10-22; its settings and ending are `run/config` and `run/ended` in
-[solver/notebook/the-run-to-the-wall-2026-10](README.md).  One machine ran all of it (no interruption notice came).  It was
-stopped on request (`wall.sh stop`, a final checkpoint written) in the middle of game 3915, 49 minutes and 138 million
-nodes into its search, after 128,236 s of the solver: 35.72 instance-hours, about $24.14 at the $0.676 the run
-recorded.  The reason was to restart with the chain drawing on the known games (`solve --use-prev`, [RUNBOOK
-12.4](../../docs/runbook/wall.md#launch-watch-stop-clean-up)): the committed chain now holds 1..3914, so a run
-that draws on it records those games with no search and starts at 3915, where this one stopped.
+**Question.**  How far does the unattended run of [the runbook's wall page](../../docs/runbook/wall.md) take the chain
+from n = 1 on one `c8g.16xlarge` at spot, and where is the wall, the first game whose own search takes more than 24
+hours?  The run used the settings of [the tuning
+campaign](../search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md) (`force_window=all`) and the counter
+that [could no longer
+wrap](../search/cheaper-gf2-nodes-same-trees-2026-10/README.md#later-2026-10-the-stamps-wrap-and-the-committed-chain).
+**Answer.**  It reached 3914 in 35.72 instance-hours for $24.14, and was stopped on request in game 3915.  Games 1..3440
+came out with the committed chain's scores, proofs and methods, game for game; 3441..3914 are new.  The dearest game,
+3441, took 2.77 hours, so the wall is far off.
 
-*What it made.*  The 3,914 games 1..3914, each built from the one before, nothing assumed.
+## Method
 
-* **1..3440 again: the same scores, proofs and methods, game for game** (3,440 of 3,440;
-  `solver/notebook/the-run-to-the-wall-2026-10/reproof_check.py` compares the run's lines, kept whole in `reproof.jsonl.gz`, with the committed
-  file's; the independent referee `solver/tools/check_results.py` accepts them, nothing assumed).  The lines differ in nodes
-  and seconds, as the build does.  Over 2176..3440 the summed search seconds were 14.1 hours
-  against the second run's 47.3 (0.30) and the nodes 7.80 billion against 17.73 (0.44); the games overlap in the
-  window, so these add up to more than the time.  Game 3440 took 6,323 s (1.76 hours, 1.36 billion nodes) against
-  18,184 s (5.05 hours, 3.72 billion).  Of the 165 games that the second run searched for more than a minute, the
-  median took 0.31 of its time.
-* **3441..3914 are new** and are appended to `results/strict.jsonl` byte for byte (the [results
-  README](../../../results/README.md) has the run's third part): 221 searches (178 exhausted, 43 at the ceiling), 193
-  repeats and 60 primes; 21.28 billion nodes and 49.0 hours of game time; 107 games of 30 million nodes or more took
-  20.65 billion of them.
+The run was `wall.sh launch` at commit eb84a6f, a clean tree, from 2026-10-17 07:20:47Z to 2026-10-18 18:58:04Z.  It
+set up an Auto Scaling group of one spot `c8g.16xlarge` (Graviton4, 64 vCPUs, 124 GiB) that replaces an interrupted
+machine, running `chain.sh 8191`, that is `taxman solve 1-8191` from n = 1 with a window of 4 games in flight on all 64
+threads, the default tactics of that commit, and `--game-hours 24` (the wall).  The limits were the wall, 72
+instance-hours and 2026-10-22.  One machine ran all of it, and no interruption notice came.
+
+The run was stopped on request (`wall.sh stop`, a final checkpoint written) in the middle of game 3915, 49 minutes and
+138 million nodes into its search, after 128,236 s of the solver: 35.72 instance-hours, about $24.14 at the $0.676 the
+run recorded.  The reason was to restart with the chain drawing on the known games (`solve --use-prev`, [the wall
+page](../../docs/runbook/wall.md#launch-watch-stop-clean-up)): the committed chain then holds 1..3914, so a run that
+draws on it records those games with no search and starts at 3915.
+
+## Results
+
+The run made the 3,914 games 1..3914, each built from the one before, assuming nothing.
+
+**1..3440 again: the same scores, proofs and methods, game for game** (3,440 of 3,440).
+[reproof_check.py](reproof_check.py) compares the run's lines, kept whole in `reproof.jsonl.gz`, with the committed
+file's, and the independent referee `solver/tools/check_results.py` accepts them.  The lines differ in nodes and
+seconds, as the build does.  The comparison with the second run's lines over 2176..3440 (the games overlap in the
+window, so the sums add up to more than the time):
+
+| over 2176..3440 | this run | the second run | ratio |
+|---|---|---|---|
+| summed search seconds | 14.1 hours | 47.3 hours | 0.30 |
+| nodes | 7.80 billion | 17.73 billion | 0.44 |
+| game 3440 | 6,323 s (1.76 hours, 1.36 billion nodes) | 18,184 s (5.05 hours, 3.72 billion) | |
+
+Of the 165 games that the second run searched for more than a minute, the median took 0.31 of its time.
+
+**3441..3914 are new** and are appended to `results/strict.jsonl` byte for byte (the [results
+README](../../../results/README.md) has the run's third part): 221 searches (178 exhausted, 43 at the ceiling), 193
+repeats and 60 primes; 21.28 billion nodes and 49.0 hours of game time; 107 games of 30 million nodes or more took
+20.65 billion of them.
 
 | n | games | searches | nodes | search hours, summed | median of the exhausted searches |
 |---|---|---|---|---|---|
@@ -44,42 +58,42 @@ that draws on it records those games with no search and starts at 3915, where th
 | 3701-3800 | 100 | 49 | 6.72 G | 14.7 | 1,224 s |
 | 3801-3914 | 114 | 50 | 10.18 G | 21.3 | 1,502 s |
 
-*The longest games* (search seconds on 64 threads): 3441 at 9,973 s (2.77 hours, 0.79 billion nodes), 3440 at 6,323 s
+**The longest games** (search seconds on 64 threads): 3441 at 9,973 s (2.77 hours, 0.79 billion nodes), 3440 at 6,323 s
 (1.76 hours), 3888 at 5,271 s (1.46 hours, 0.48 billion), 3444 at 4,687 s (1.30 hours), then 3807 (1.21), 3896 (1.11),
 3864 (1.08) and 3906 (1.06 hours): eight games over an hour, 35 over half an hour.
 
-*What it says.*  The wall was far off: the dearest game took a ninth of the 24 hours.  But the median exhausted search
-rose tenfold from the games of 3551-3700 to those of 3701-3800 (115 s to 1,224 s) and has stayed there, so that each
-block of 100 games since has cost 15 to 19 hours of game time; the patches of dear games that the second run met here
-and there, and from 3399 on, are the rule past 3700.  The table of STATUS of 2026-10-16 (the second run's trend) put
-a day at 3,740 and three days at 4,050; 35.7 hours reached 3,914.
+**What the table says.**  The dearest game took a ninth of the 24 hours.  But the median exhausted search rose tenfold
+from the games of 3551-3700 to those of 3701-3800 (115 s to 1,224 s) and stayed there, so each block of 100 games since
+has cost 15 to 19 hours of game time.  The patches of dear games that the second run met here and there, and from 3399
+on, are the rule past 3700.  STATUS of 2026-10-16 (the second run's trend) put a day at 3,740 and three days at 4,050;
+35.7 hours reached 3,914.
 
-*Commits.*  eb84a6f (the build and `wall.sh`), 687d467 (3440 re-proven, in STATUS), c7d81c2 (games 3441..3914
-appended); the logs, the chart of the search times and `reproof_check.py` are in
-[solver/notebook/the-run-to-the-wall-2026-10](README.md).
+## Decision
 
-*Not kept.*  The checkpoint of game 3915 (2.9 MB; a build other than eb84a6f cannot resume it), the lines of the
-results file past 3440 (the committed ones) and the other checkpoints.
-
+Kept: games 3441..3914, appended to `results/strict.jsonl` (the third run there), and the re-proof of 1..3440, which
+agrees with the committed chain and took 0.30 of the second run's search time on 2176..3440.  Not kept: the
+checkpoint of game 3915 (2.9 MB; a build other than eb84a6f cannot resume it), the lines of the results file past 3440
+(the committed ones) and the other checkpoints.  The next run draws on the known games and starts at 3915.  The wall is
+unreached: it would reopen as the dearest game approaches 24 hours.
 
 ## Later (2026-10-20): the rehearsal, as the runbook gave it
 
-The runbook's page on the run to the wall held this until the page was made general.
+The runbook's page on the run to the wall held this procedure until the page was made general.  It is the rehearsal that
+tested `wall.sh` and `wall-node.sh` before the run, made on 2026-10-17 at commit eb84a6f for about $0.15.
 
 The rehearsal tests the whole mechanism on a small machine, with the chain to 1300 instead of the whole committed chain
 and the limits tiny.  It takes two runs, because the wall is the end of a run: the first shows the wall and the end that
-takes the group to 0, and the second the replacement and the budget.  It costs about $0.15 in all.
-
-Use a `c8g.2xlarge` (8 vCPUs, 16 GiB, about $0.13 an hour at spot), whose machines build in about 7 minutes.  A
-`c8g.large` (2 vCPUs, 4 GiB) cannot build the solver: its first machine stopped answering Systems Manager three minutes
-after boot and sat at half its CPU for 35 minutes with the chain not started.
+takes the group to 0, and the second the replacement and the budget.  It uses a `c8g.2xlarge` (8 vCPUs, 16 GiB, about
+$0.13 an hour at spot), whose machines build in about 7 minutes.  A `c8g.large` (2 vCPUs, 4 GiB) cannot build the
+solver: its first machine stopped answering Systems Manager three minutes after boot and sat at half its CPU for 35
+minutes with the chain not started.
 
 **Slow the chain on purpose.**  No game up to 1300 takes a second under the default search (on 2 threads of an M1 Max,
 1232 takes 1.0 s, 1287 0.7 s, and none up to 400 takes 10 ms), so neither a wall of seconds nor a chain that outlasts
 the budget would come.  Both runs pass `--extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"`, the
 matching path (the search before the GF(2) bound), whose games are slower and give the same answers.  On 2 threads of
-the M1 Max it takes 2.1 s for game 950, 4.1 s for 988 and 989, 9.1 s for 990, 2.0 s for 1200, and hours for 1232
-to 1300.
+the M1 Max it takes 2.1 s for game 950, 4.1 s for 988 and 989, 9.1 s for 990, 2.0 s for 1200, and hours for 1232 to
+1300.
 
 ```
 cd ~/dev/taxman_work/taxman
@@ -95,10 +109,7 @@ export UNTIL=$(date -u -v+2d +%F)                                     # GNU date
 slower), so the wall falls at 988, or at 989 or 990 if the head had less than 3.6 s of the search to do:
 
 ```
-export RUN=rehearsal-1
-DRY_RUN=1 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
-    --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
-    --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+export RUN=rehearsal-1                     # first with DRY_RUN=1 before the command
 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
     --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
     --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
@@ -106,11 +117,12 @@ solver/tools/cloud/wall.sh status          # every few minutes
 ```
 
 It passes if `status` ends in `ENDED ...: wall at N after H hours` within about 15 minutes of the launch, with N between
-988 and 992 (the run of 2026-10-17 ended at 992) and H at least 0.001, and:
+988 and 992 and H at least 0.001, and:
 
-* `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query 'AutoScalingGroups[0].DesiredCapacity'`
-  says 0 and no instance remains (`describe-instances` of the end checks): the end took the group to 0 and nothing
-  replaced the machine.  Check again 5 minutes later.
+* The group's `DesiredCapacity` is 0 and no instance remains (`describe-instances` of the end checks): the end took the
+  group to 0 and nothing replaced the machine.  Check again 5 minutes later.  The capacity is
+  `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query
+  'AutoScalingGroups[0].DesiredCapacity'`.
 * `aws s3 ls s3://taxman-013764204840-us-east-1/wall-rehearsal-1/ckpt/` has `nN.ckpt` and `nN.clock`, and the last line
   of `results/strict.jsonl` there is game N − 1 (no line for N).
 * The results pulled home agree with the committed chain:
@@ -150,28 +162,28 @@ solver/tools/cloud/wall.sh status          # machines started: 2; the hours go o
 It passes if:
 
 * the group launches a second machine without anyone (within about 3 minutes);
-* the log in S3
-  (`aws s3 cp s3://taxman-013764204840-us-east-1/wall-rehearsal-2/logs/chain.log - | grep -E 'starting|stopped|deadline'`)
-  shows a second `starting the solver` whose `games done so far` is at least the first's last save, and `chain.err`
-  shows the game in progress continuing from its checkpoint (a node count above zero at its first progress line);
+* the log in S3 (`wall-rehearsal-2/logs/chain.log` in the bucket, read with
+  `aws s3 cp ... - | grep -E 'starting|stopped|deadline'`) shows a second `starting the solver` whose
+  `games done so far` is at least the first's last save, and `chain.err` shows the game in progress continuing from its
+  checkpoint (a node count above zero at its first progress line);
 * `run/ledger` shows `base` equal to the first machine's `hours`;
 * the run ends within a few minutes of 0.6 instance-hours with `deadline: the budget of 0.6 instance-hours`, the group
   at 0, no instance, and `hours` in the ledger between 0.55 and 0.65.
 
 Then run `solver/tools/cloud/wall.sh cleanup`.  Once you have read the logs, the two prefixes can go (a deletion in the
-bucket: Brian's yes first, like everything else here):
+bucket: the account owner's yes first, like everything else here):
 
 ```
 aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-1/
 aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-2/
 ```
 
-**The run of 2026-10-17** (commit eb84a6f; about $0.15 in all).  Run 1 ended `wall at 992 after 0.00100 hours`, with the
-group at 0, the checkpoint and clock of 992 in S3, and the results 1..991 equal to the committed scores.  In run 2 the
-machine terminated without notice at game 1289; the group replaced it 2 seconds later, the replacement resumed from S3
-(`games done so far: 1289`, the ledger's `base` the first machine's hours), and the chain ended
-`complete: the range 1-1300` before the budget, with the group at 0.  A third run, with a budget of 0.2 hours, ended
-`deadline: the budget of 0.2 instance-hours` at 0.18, with the group at 0.
+**The run of 2026-10-17** (commit eb84a6f).  Run 1 ended `wall at 992 after 0.00100 hours`, with the group at 0, the
+checkpoint and clock of 992 in S3, and the results 1..991 equal to the committed scores.  In run 2 the machine
+terminated without notice at game 1289; the group replaced it 2 seconds later, the replacement resumed from S3 (`games
+done so far: 1289`, the ledger's `base` the first machine's hours), and the chain ended `complete: the range 1-1300`
+before the budget, with the group at 0.  A third run, with a budget of 0.2 hours, ended `deadline: the budget of 0.2
+instance-hours` at 0.18, with the group at 0.
 
 **Cost.**  Run 1 takes about 0.25 instance-hours and run 2 0.6, so 0.85 instance-hours of a `c8g.2xlarge`, with a 20 GB
 gp3 volume for as long (under a cent) and a few thousand requests to S3: **about $0.15 in all**, and under $0.40 at the
@@ -188,39 +200,52 @@ does not make.
 
 ## Files
 
-The run
-(2026-10-17 07:20:47Z to 2026-10-18 18:58:04Z, commit eb84a6f, one spot `c8g.16xlarge`, 35.72 instance-hours, about
-$24.14) launched with `solver/tools/cloud/wall.sh` ([RUNBOOK section
-12](../../docs/runbook/wall.md)); this directory holds what is worth keeping of its
-prefix in S3.  Its games 1..3914 are in [results/strict.jsonl](../../../results/README.md) (the third run there), 3441..3914
-byte for byte; its checkpoints, results file and the stop marker are not kept (below).
+The run's games 1..3914 are in [results/strict.jsonl](../../../results/README.md) (the third run there), 3441..3914
+byte for byte.  This folder holds what is worth keeping of the run's prefix in S3.
 
-### Files and the commands that made them
+* `run/config`: written by `wall.sh launch`; the run's settings: the commit, the instance type, the chain's end
+  (`CHAIN_TO` 8191), `WINDOW` 4, the wall (`GAME_HOURS` 24), the budget (`BUDGET_HOURS` 72 instance-hours,
+  `LEDGER_MARGIN` 300 s), `MAX_INSTANCES`, the price the cost is counted at and the date (`RUN_UNTIL`,
+  2026-10-22T00:00Z).
+* `run/ledger`: kept by the machine in S3; the run's clock: `start` (seconds since the epoch, 2026-10-17T07:20:47Z), the
+  `boot` that holds it, `base` (instance-hours before it), `hours` so far (35.7161 at the end) and `updated`.
+* `run/ended`: written by the machine; the time (2026-10-18T18:58:07Z) and `reason=stopped on request (wall.sh stop)`.
+* `logs/chain.log`: `chain.sh`'s own log: its settings, and the signal that stopped the solver at 18:58:04Z (status
+  143, after 128,236 s, a final checkpoint written).
+* `logs/chain.out.gz`: the solver's standard output, a line a game concluded (`n=3441 score=... search nodes=... 9972.8
+  s optimal unknown proof=exhausted`), and the stopped game 3915's last line.
+* `logs/chain.err.gz`: its progress lines, every 60 s for the games in flight: nodes and rate, the queue, the engine's
+  counters (`eff`, `idle`, `lock`, splits, steals, pauses) and the nogood table's.
+* `logs/setup.log`: `setup.sh` on the machine: the build and the smoke checks (`optimal.json` replayed, both referees on
+  the committed files, the first 400 games, the prover on 2..400), all passing; the machine, the rustc and the commit.
+* `logs/wall-node.log`, `logs/spot-watch.log`, `logs/save.log.gz`: the node script's events (setup, `chain.sh`, the stop
+  request, the end), the spot-interruption watch (it watched and saw none) and the saves to S3 every 10 minutes.
+* `reproof.jsonl.gz`: the first 3440 lines of the run's own `results/strict.jsonl` (18 MB, 0.62 MB gzipped), the
+  re-proof of 1..3440, which the committed file does not hold (it has the second run's lines there); 3441..3914 are the
+  committed ones, so they are not repeated.  `gunzip -c reproof.jsonl.gz > FILE`, then `python3 -I
+  solver/tools/check_results.py FILE`: all checks pass (3,440 completed games, nothing assumed; `taxman verify-results
+  FILE` is the solver's referee).
+* `reproof_check.py`: `./reproof_check.py` (from anywhere; standard library); compares `reproof.jsonl.gz` with the
+  committed file (score, proof and method: 3,440 of 3,440 equal), and prints the search seconds and nodes by range
+  against the committed lines (2176..3440: 14.13 hours and 7.80 G nodes against 47.33 and 17.73) and the run's longest
+  games.
+* `plot_search_times.py`, `search_times_wall_run.svg`: `./plot_search_times.py search_times_wall_run.svg`; the search
+  seconds of each searched game of the run (blue), against the second run's on 2176..3440 (gray), log scale, from
+  `reproof.jsonl.gz` and the committed file.  A first picture, drawn when the run stood at game 3399, was this plot of
+  that day's data (the script reproduces it byte for byte when cut at 3399); this one is the finished run.
 
-| file | command | what it is |
-|---|---|---|
-| `run/config` | written by `wall.sh launch` | the run's settings: the commit, the instance type, the chain's end (`CHAIN_TO` 8191), `WINDOW` 4, the wall (`GAME_HOURS` 24), the budget (`BUDGET_HOURS` 72 instance-hours, `LEDGER_MARGIN` 300 s), `MAX_INSTANCES`, the price the cost is counted at and the date (`RUN_UNTIL`, 2026-10-22T00:00Z) |
-| `run/ledger` | kept by the machine in S3 | the run's clock: `start` (seconds since the epoch, 2026-10-17T07:20:47Z), the `boot` that holds it, `base` (instance-hours before it), `hours` so far (35.7161 at the end) and `updated` |
-| `run/ended` | written by the machine | how it ended: the time (2026-10-18T18:58:07Z) and `reason=stopped on request (wall.sh stop)` |
-| `logs/chain.log` | | `chain.sh`'s own log: its settings, the signal that stopped the solver at 18:58:04Z (status 143, after 128,236 s, a final checkpoint written) |
-| `logs/chain.out.gz` | gzipped | the solver's standard output, a line a game concluded: `n=3441 score=... search nodes=... 9972.8 s optimal unknown proof=exhausted`, and the stopped game 3915's last line |
-| `logs/chain.err.gz` | gzipped | its progress lines, every 60 s for the games in flight: nodes and rate, the queue, the engine's counters (`eff`, `idle`, `lock`, splits, steals, pauses) and the nogood table's |
-| `logs/setup.log` | | `setup.sh` on the machine: the build and the smoke checks (`optimal.json` replayed, both referees on the committed files, the first 400 games, the prover on 2..400), all passing; the machine, the rustc and the commit |
-| `logs/wall-node.log`, `logs/spot-watch.log`, `logs/save.log.gz` | | the node script's events (setup, `chain.sh`, the stop request, the end), the spot-interruption watch (it watched and saw none: one machine ran all the run) and the saves to S3 every 10 minutes |
-| `reproof.jsonl.gz` | the first 3440 lines of the run's own `results/strict.jsonl`, gzipped (18 MB, 0.62 MB gzipped); `gunzip -c reproof.jsonl.gz > FILE`, then `python3 -I ../../tools/check_results.py FILE`: all checks pass (3,440 completed games, nothing assumed; `taxman verify-results FILE` is the solver's referee) | the re-proof of 1..3440, which the committed file does not hold (it has the second run's lines there); 3441..3914 are the committed ones, so they are not repeated |
-| `reproof_check.py` | `./reproof_check.py` (from anywhere; standard library) | compares `reproof.jsonl.gz` with the committed file (score, proof and method: 3,440 of 3,440 equal), and prints the search seconds and nodes by range against the committed lines (2176..3440: 14.13 hours and 7.80 G nodes against 47.33 and 17.73) and the run's longest games |
-| `plot_search_times.py`, `search_times_wall_run.svg` | `./plot_search_times.py search_times_wall_run.svg` | the search seconds of each searched game of the run (blue), against the second run's on 2176..3440 (gray), log scale; from `reproof.jsonl.gz` and the committed file.  A first picture, drawn when the run stood at game 3399 and left untracked at the repository's root, was this plot of that day's data (this script reproduces it byte for byte when cut at 3399); this one is the finished run |
+Not kept: `results/strict.jsonl` as the machine held it (22 MB, games 1..3914 and the stopped game's line 3915 with
+`score` null), because 3441..3914 are the committed file's lines and 1..3440 are in `reproof.jsonl.gz`; the `ckpt/` of
+game 3915; and `run/stop` (the marker `wall.sh stop` writes) and `run/boots/` (one file, the machine's boot).
 
-### What is not kept
+Other charts of the run's data:
+[report_page.py](../search/the-ledger-bounds-from-both-sides-2026-10/cloud-20261017/report_page.py) reads
+`reproof.jsonl.gz` for the chain's cost per game on 2176..3440, and
+[where_chart.py](../search/the-ledger-bounds-from-both-sides-2026-10/past4300/where_chart.py) the committed file for how
+far the chain reaches.
 
-* `results/strict.jsonl` (22 MB, games 1..3914 and the stopped game's line 3915 with `score` null): 3441..3914 are the
-  committed file's lines, byte for byte (compared when this was written), and 1..3440 are in `reproof.jsonl.gz`.
-* `ckpt/`: the checkpoint and clock of game 3915 (2.9 MB, at 49 minutes and 138 million nodes of its search).  Only the
-  build that made it, eb84a6f, can resume it (a checkpoint belongs to its build, RUNBOOK section 5), and the next run
-  draws on the known games instead.
-* `run/stop` (the marker `wall.sh stop` writes) and `run/boots/` (one file, the machine's boot).
+## Commits
 
-### Where the other charts of the run's data are
-
-`../ledger/cloud-20261017/report_page.py` reads `reproof.jsonl.gz` for the chain's cost per game on 2176..3440, and
-`../ledger/past4300/where_chart.py` the committed file for how far the chain reaches.
+* eb84a6f (2026-10-16): the build and `wall.sh`; the run's commit.
+* 687d467 (2026-10-17): 3440 re-proven, in STATUS.
+* c7d81c2 (2026-10-18): games 3441..3914 appended to `results/strict.jsonl`.

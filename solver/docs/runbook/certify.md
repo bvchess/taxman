@@ -175,6 +175,6 @@ rerun overwrite them: a rerun writes another file.  Then record the campaign:
 
 [Certificates past
 2175](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md) prepared a
-campaign for 2176..3440 ("stage 4"), not run; [its later
-section](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md#later-2026-10-20-the-stage-4-campaign-as-the-runbook-planned-it)
+campaign for 2176..3440 ("stage 4"), not run; [its section on the
+campaign](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md#the-stage-4-campaign-as-the-runbook-planned-it)
 has its plan: the prices of its seven lists, the stop rule of its pilot, and the commands of its three phases.

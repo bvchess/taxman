@@ -2,53 +2,49 @@
 
 Part of the [lab notebook](../../README.md).
 
-*Question.*  Each searcher keeps its own table of nogoods, looks a node's conflict up by scanning it, and clears it after
-every 50,000 of its own steps ([forgetting](../forgetting-nogoods-2026-10/README.md), measured at 1024-1225 on the matching path).
-Nogood work is under 1% of a node's time at the end of the chain (the profile in
-[solver/notebook/the-calibration-for-the-run-to-4000-2026-10/README.md](../../the-calibration-for-the-run-to-4000-2026-10/README.md)), so the question is not what the table costs but whether keeping more,
-or keeping better, makes the trees smaller.  Every policy is sound (the table is a cache of nogoods that hold at every
-node), so a policy changes the trees and never the optimum.
+Started 2026-10-16.  Concluded 2026-10-16.
 
-*Status.*  **Partial.**  The knobs and the counters are done and kept (defaults unchanged); the sweep below is six games
-under twenty policies and four more under eight, all on one thread.  The runs on games of 4-10 million nodes that the
-plan asked for if a policy gained 5% were stopped before one ended, because Brian moved the sweep to the cloud machine,
-where the tuning campaign (its entry's folder) runs these policies on the suite of subtrees of the dearest games and six
-whole games.  That campaign is where the sweep continues.
+**Question.**  Does keeping more nogoods, or keeping better ones, make the trees smaller at the end of the chain?
+**Answer.**  No: every policy that keeps more or longer made the trees larger, by 6% to 86%, and no shorter period
+gained more than the noise shows (0.2-2.7% fewer nodes on ten games, standard error 3.4-4.4%).  The knobs and counters
+are kept, with the defaults unchanged.
 
-*What was built* (commit ea0eda6; DESIGN.md section 4, "Forgetting nogoods", and section 5).  Three tactics, set by
-`--tactic` like the others and by `examples/ladder.rs`, none of them recorded in a checkpoint (the run that resumes says
-which):
+## Method
+
+Each searcher keeps its own table of nogoods, looks a node's conflict up by scanning it, and clears it after every
+50,000 of its own steps ([forgetting](../forgetting-nogoods-2026-10/README.md), measured at games 1024-1225 on the
+matching path).  Nogood work is under 1% of a node's time at the end of the chain ([the calibration for the run to
+4000](../../the-calibration-for-the-run-to-4000-2026-10/README.md)), so the question is not what the table costs but
+whether keeping more, or keeping better, makes the trees smaller.  Every policy is sound (the table is a cache of
+nogoods that hold at every node), so a policy changes the trees and never the optimum.
+
+**The knobs** (commit ea0eda6; [the tactics guide](../../../docs/design/tactics.md)).  Three tactics, set by `--tactic`
+and by `examples/ladder.rs`, none recorded in a checkpoint:
 
 | tactic | default | values | what it does |
 |---|---|---|---|
 | `nogood_period` | 50000 | a whole number from 1 | steps of a searcher between its forgettings; `forget_nogoods=off` is never |
-| `nogood_keep` | none | `none`, `hit`, `size2` (`sizeN`), `top64` (`topN`) | what a forgetting keeps: nothing; the nogoods used since the last forgetting; those of at most N members; the N most used since then (only those used at all, the most recently used first among equals) |
-| `nogood_limit` | 0 | a whole number, 0 for none | the table holds at most this many nogoods, the least recently used dropped to make room for a new one (a rebuild of the table, so cheap only for small limits) |
+| `nogood_keep` | none | `none`, `hit`, `size2` (`sizeN`), `top64` (`topN`) | what a forgetting keeps: nothing; the nogoods used since the last forgetting; those of at most N members; the N most used since then |
+| `nogood_limit` | 0 | a whole number, 0 for none | the table holds at most this many nogoods, the least recently used dropped to make room |
 
 A nogood is *used* when a lookup answers with it or it rules a candidate out of a child.  `nogood_limit` is independent
-of the period: with a period (`forget_nogoods=on`) the table is limited between forgettings and forgotten at each
-period, and with `forget_nogoods=off` the limit is the only way anything goes (`forget_nogoods=off,nogood_limit=256` in
-the tables).  The counters are in `model::NogoodStats`, summed over the searchers and printed by the ladder's line and by
-the engine's progress lines (published at the end of every unit and every 32,768 steps of a searcher, so a line lags):
-`nogoods learned L lookups K hit P% ruled out R forgot F (table T kept C) evicted E largest M`, that is nogoods added,
-lookups of a table that held one and the share answered, candidates ruled out of children, forgettings with the mean
-table before and the mean kept, nogoods evicted by the limit, and the largest table.  With the defaults every tree is
-what it was: the probe's fingerprints (7e8e724717d26545, 5b83bbebf0bb2899 with `lagrange=off`, f3deaac0dbdc030a with
-`gf2=on`), the tripwires and `taxman regress --to 1000 --threads 1` unchanged, and every default run below has the node
-count of the build before the knobs.  Tests: the table's answers against their definition under every policy, each
-policy's uses and evictions, every policy giving the golden games' optimum (also in the soundness harness), the
-parsing, and the header ignoring the policy.
+of the period: with `forget_nogoods=off` the limit is the only way anything goes.  Counters (`model::NogoodStats`) give
+the nogoods learned, the lookups and the share answered, the candidates ruled out, the forgettings with the mean table
+before and the mean kept, the nogoods evicted, and the largest table; the ladder's line and the engine's progress lines
+print them.  With the defaults every tree is what it was (the probe's fingerprints 7e8e724717d26545, 5b83bbebf0bb2899
+with `lagrange=off` and f3deaac0dbdc030a with `gf2=on`, the tripwires, `taxman regress --to 1000 --threads 1`), and the
+tests check that every policy gives the golden games' optimum.
 
-*How it was measured.*  The ladder (`--seed-opt --known results/strict.jsonl --threads 1`), so that a search only
-proves its optimum and the nodes are exact.  Six games of 2211-3260 whose recorded proofs (64 threads) took 1.0-1.6
-million nodes and are `exhausted` (a proof at the ceiling would be no search): 2211, 2250, 2862, 2910, 3050, 3260; one
-thread needs 0.4-0.8 million for them.  Four more, 2316, 2625, 3135, 3228 (1.3-3.1 million recorded, 1.0-2.0 million on one thread), for eight
-policies.  The
-data, the scripts and the tables are in [solver/notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10](README.md).  CPU seconds are the process's,
-on a laptop others shared (load 6 to 200), and the later runs went eight at a time (about 8% fewer instructions per CPU
-second), so nodes are the measure and the CPU figures are good to a few percent.
+**The measurement.**  The ladder (`--seed-opt --known results/strict.jsonl --threads 1`), so that a search only proves
+its optimum and the nodes are exact.  Six games of 2211-3260 whose recorded proofs (64 threads) took 1.0-1.6 million
+nodes and are `exhausted` (a proof at the ceiling would be no search): 2211, 2250, 2862, 2910, 3050 and 3260, which need
+0.4-0.8 million on one thread.  Twenty policies ran on them.  Four more games, 2316, 2625, 3135 and 3228 (1.0-2.0
+million nodes on one thread), ran under eight policies.  CPU seconds are the process's, on a laptop that others shared
+(load 6 to 200), so nodes are the measure and the CPU figures are good to a few percent.
 
-*Results, six games* (nodes summed; the policy's tactics in the first column):
+## Results
+
+Six games (nodes summed; the policy's tactics in the first column):
 
 | policy | nodes | against the default | geometric mean of the games, ± s.e. |
 |---|---|---|---|
@@ -70,7 +66,7 @@ second), so nodes are the measure and the CPU figures are good to a few percent.
 | `forget_nogoods=off,nogood_limit=256` | 5,173,971 | +32.9% | +28.3% ± 12.2 |
 | `forget_nogoods=off,nogood_limit=1024` | 4,925,984 | +26.5% | +28.6% ± 6.6 |
 
-Ten games, the eight policies that were run on all of them (2625, 3135, 3228, 2316 added; nodes 9.6 million at the
+Ten games, the eight policies that ran on all of them (2625, 3135, 3228 and 2316 added; 9.6 million nodes at the
 default):
 
 | policy | nodes | against the default | geometric mean, ± s.e. |
@@ -84,67 +80,59 @@ default):
 | `nogood_keep=hit` | 12,316,958 | +28.4% | +30.3% ± 6.2 |
 | `nogood_keep=top64` | 10,725,178 | +11.8% | +9.9% ± 4.5 |
 
-*What the numbers say.*
-
-* **No policy keeps the trees smaller than clearing everything every 50,000 steps would.**  Everything that keeps more
-  or longer makes them larger: a longer period (+19% at 200,000, +23% at a million or never on six games), keeping the
-  nogoods used (+31%), the 256 most used (+31%) or the nogoods of at most 16 members (+17%), and every limit (+12% at
-  64, +27% at 1024, +33% at 256).  Of the ten games, keeping the nogoods used makes 9 larger (by up to 68%) and never
-  forgetting 8 (by up to 87%), one of them hugely: 3228 with no forgetting took 7.10 million nodes, 6.9 times the
+* **Keeping more, or longer, makes the trees larger.**  A longer period costs +19% at 200,000 and +23% at a million or
+  never on six games; keeping the nogoods used +31%, the 256 most used +31% and those of at most 16 members +17%; and
+  every limit +12% at 64, +27% at 1024 and +33% at 256.  Of the ten games, keeping the nogoods used makes 9 larger (by
+  up to 68%) and never forgetting 8 (by up to 87%): game 3228 with no forgetting took 7.10 million nodes, 6.9 times the
   default's 1.03 million, from a table that never held more than 1,180 nogoods.
 * **Shorter periods are the same within noise.**  On the first six games every period from 10,000 to 40,000 was 2.5-8.7%
-  below the default in nodes (three of the four by more than 5%); on ten games the three that were run on all of them
-  are 0.2-2.7% below in nodes and 2.5-5.0% in the geometric mean, with standard errors of 3.4-4.4%.  The tree is a
-  chaotic function of the policy: a period of 62,500 instead of 50,000 changes a game's tree by −17% to +25%, and the
-  games' ratios have a standard deviation of about 12-14%, so six games cannot see a gain under about 12% and ten
-  cannot see one under about 8%.  The default is itself one such draw, so every period compared with it on the same
-  games inherits its luck: the four added games took the geometric means of 10,000, 20,000 and 40,000 from −9.4%,
-  −4.8% and −8.5% to −5.0%, −4.2% and −2.5%.  If a shorter period gains anything, it is a few percent.
-* **Nogoods of at most 4 members do not occur.**  `size2`, `size3` and `size4` give the default's trees to the node: at
-  no forgetting did the table hold one.  The nogoods of this search are large: 5% of the table has at most 8 members
-  (20 of 424) and 28% at most 16 (117 of 421), and keeping the short ones (+7%, +17%) makes the trees larger, as it
-  did on the matching path ([IDEAS 3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)).  (Means over the forgettings
-  of the six games; the table averages 424 nogoods.)
-* **The counters say why the table does not pay, and what it does not cost.**  With no forgetting 5,379 nogoods were
-  learned on the six games against 34,463 at the default: each is learned 6.4 times over, which by the notebook's
-  50-90 thousand cycles for a conflict is about 0.1% of the cycles, and a table of 436 nogoods on average (largest
-  1,137) costs a node nothing visible: CPU 171-192 µs a node at every policy on the first six games, no trend with the
-  table, and 2625, whose table reaches 4,786 nogoods without forgetting (1,606 at the default), took 212 µs a node
-  against 219.  The bigger table answers more lookups (98.7% at the default, 99.9% never forgetting) and rules out
-  more candidates (629 thousand against 856 thousand), yet the trees grow by a fifth: a stale nogood may be the
+  below the default in nodes; on ten games the three that ran on all of them are 0.2-2.7% below in nodes and 2.5-5.0% in
+  the geometric mean, with standard errors of 3.4-4.4%.  The tree is a chaotic function of the policy: a period of
+  62,500 instead of 50,000 changes a game's tree by −17% to +25%, and the games' ratios have a standard deviation of
+  about 12-14%, so six games cannot see a gain under about 12% and ten cannot see one under about 8%.  The default is
+  one such draw too, so every period compared with it inherits its luck.  If a shorter period gains anything, it is a
+  few percent.
+* **Nogoods of at most 4 members do not occur.**  `size2`, `size3` and `size4` give the default's trees to the node,
+  since the table held none.  The nogoods of this search are large: 5% of the table has at most 8 members (20 of 424)
+  and 28% at most 16 (117 of 421), and keeping the short ones (+7%, +17%) makes the trees larger, as it did on the
+  matching path ([IDEAS 3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)).
+* **The table costs nothing visible, and the trees grow.**  With no forgetting 5,379 nogoods were learned on the six
+  games against 34,463 at the default: each is learned 6.4 times over, about 0.1% of the cycles.  A table of 436
+  nogoods on average (largest 1,137) costs 171-192 µs a node at every policy, with no trend; game 2625, whose table
+  reaches 4,786 nogoods without forgetting (1,606 at the default), took 212 µs a node against 219.  The bigger table
+  answers more lookups (99.9% never forgetting, 98.7% at the default) and rules out more candidates (856 thousand
+  against 629 thousand), yet the trees grow by a fifth.  A reading, not a measurement: a stale nogood may be the
   smallest conflict the table knows without being the conflict of the node's own heaviest set, and the branching it
-  gives is then worse.  That is a reading, not a measurement; what the data show is the association of a bigger table
-  with a bigger tree.
-* **Time follows nodes.**  CPU seconds and cycles move with the nodes, within about six points of them in every total (the
-  load of the machine and the eight-at-a-time runs account for the rest).
+  gives is then worse.  Time follows nodes, within about six points in every total.
 
-*Which policies deserve a test at 64 threads.*  None of the keeping policies.  If the campaign tries one, it is a
-period near 20,000-40,000, for which the data show no loss and a gain too small for ten games to see (the idea of
-[IDEAS 3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads) that a period of about 30,000 might suit 192 threads is not
-refuted); `nogood_period` is the only knob that has a chance, and at 64 threads each searcher's table is smaller than
-here, which can only shrink the differences between policies.
+The tuning campaign ran the sweep on, on the suite of subtrees of games 3300, 3425, 3440 and 3441 and six whole games,
+one thread each ([the tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)), and agrees.
+Against the default (9 problems, stage A), the periods 5,000, 10,000, 20,000, 30,000 and 200,000 took 0.998, 1.007,
+0.970, 0.996 and 1.036 of the CPU and 0.919, 0.959, 0.950, 0.984 and 1.055 of the nodes; `nogood_keep=top64` took 1.131
+and 1.168 and `nogood_limit=256` 1.096 and 1.098; and on top of `force_window=all` (16 problems) the periods 5,000,
+10,000 and 20,000 took 1.036, 1.044 and 1.018 of `all`'s CPU.
 
-*Commits.*  ea0eda6 (the knobs, the counters, the tests), the merges of master that followed, and the commit of this
-entry with `solver/notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/`.
+## Decision
 
-## Later (2026-10): the tuning campaign's runs
-
-The sweep went on in the [tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md), on the suite of
-subtrees of 3300, 3425, 3440 and 3441 and six whole games, one thread each.  It agrees with this entry: against the
-default (9 problems, stage A) the periods 5,000, 10,000, 20,000, 30,000 and 200,000 took 0.998, 1.007, 0.970, 0.996 and
-1.036 of the CPU and 0.919, 0.959, 0.950, 0.984 and 1.055 of the nodes, `nogood_keep=top64` 1.131 and 1.168 and
-`nogood_limit=256` 1.096 and 1.098; and on top of `force_window=all` (16 problems) the periods 5,000, 10,000 and 20,000
-took 1.036, 1.044 and 1.018 of `all`'s CPU.  No policy was adopted.
+No policy was adopted, and the knobs stay as research knobs with the defaults unchanged.  None of the keeping policies
+deserves a test at 64 threads.  The one with a chance is `nogood_period` near 20,000-40,000, for which the data show no
+loss and a gain too small for ten games to see; the idea of [IDEAS
+3](../ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads) that a period of about
+30,000 might suit 192 threads is not refuted.  At 64 threads each searcher's table is smaller than here, which can only
+shrink the differences between policies.  The plan went on to three games whose recorded proofs took 4-10 million nodes
+(2260, 3243, 3340) under the default and four periods; the sweep moved to the cloud machine's tuning campaign before one
+of those runs ended, so there are none.
 
 ## Files
 
-The sweep of this entry:
-games of 2211-3260 proved on one thread by the ladder, seeded with their own optimum, under the default policy and the
-other policies of the tactics `nogood_period`, `forget_nogoods`, `nogood_keep` and `nogood_limit` (DESIGN.md, section
-5).  A search on one thread is deterministic, so node counts compare exactly, and they are the measure; CPU seconds and
-cycles are the process's over the search (`getrusage`, `proc_pid_rusage`) on a laptop that other jobs shared (load 6
-to 200), and the later runs went eight at a time, with about 8% fewer instructions per CPU-second than one at a time,
-so CPU figures compare only between runs made under the same load.
+The sweep: games of 2211-3260 proved on one thread by the ladder, seeded with their own optimum, under the default
+policy and the others.  A search on one thread is deterministic, so node counts compare exactly; CPU seconds and cycles
+are the process's over the search (`getrusage`, `proc_pid_rusage`), so they compare only between runs made under the
+same load.  The ladder was `target/release/examples/ladder` of commit ea0eda6; the policies are the `--tactic` specs of
+the first column of the tables.  Every `default` run has the node count of the build before the knobs (506,416 at game
+2211, 415,764 at 2910, 683,587 at 2250, 761,406 at 3050, 814,937 at 2862), and the merge with the node-speed round
+(6460c86) changes none (2910 again: 415,764).  The summary's column of CPU microseconds a node weighs the games by their
+nodes, so it moves with which game a policy made large; compare a game with itself.
 
 | file | what it is |
 |---|---|
@@ -154,13 +142,8 @@ so CPU figures compare only between runs made under the same load.
 | `sweep.txt` | 152 runs: six games (2211, 2910, 2250, 3050, 2862, 3260) under 20 policies, four more (2625, 3135, 3228, 2316) under 8; each line is `GAME<TAB>POLICY<TAB>the ladder's line` |
 | `sweep.md` | `summarize.py sweep.txt`, for the six games and for the ten games of the eight policies run on all of them |
 
-The ladder was `target/release/examples/ladder` of commit ea0eda6 (`--seed-opt --known results/strict.jsonl --threads
-1`); the policies are the `--tactic` specs of the first column of the tables (`forget_nogoods=off,nogood_limit=256` is
-two of them).  Every `default` run has the node count of the build before the knobs (506,416 at 2211, 415,764 at 2910,
-683,587 at 2250, 761,406 at 3050, 814,937 at 2862), and the merge with master's node-speed round (6460c86) changes none
-(2910 again: 415,764).  The summary's column of CPU microseconds a node weighs the games by their nodes, so it moves with
-which game a policy made large; compare a game with itself.
+## Commits
 
-The plan went on to three games whose recorded proofs took 4-10 million nodes (2260, 3243, 3340) under the default and
-four periods; the sweep moved to the cloud machine's tuning campaign (its entry's folder) before one of those runs ended,
-so there are none.
+* ea0eda6 (2026-10-16): the knobs, the counters and the tests.
+* ac706cc (2026-10-16): this entry and the data of the sweep.
+* The merges of master that followed, among them 6460c86, the node-speed round.

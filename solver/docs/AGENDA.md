@@ -289,8 +289,8 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
   entry](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
 * **A unit that carries its GF(2) level**, not built: a rebuilt unit's first node would check the level instead of
   solving it, which wins at most the units' first nodes, 1 to 4% of a thread's time at 64 threads, nothing on long
-  searches ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), the paragraph "What to build
-  next").
+  searches ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), the item "A unit
+  that carries its GF(2) level").
 
 **Closed beside these avenues** (2026-10-18):
 
