@@ -23,24 +23,26 @@
 //!   so the nodes are those of a proof, as the probe's are.  Build it with `--profile test` (opt-level 2, no LTO):
 //!   the proof of 2170 takes a minute.
 //! * The nodes: `--fixtures DIR` (the probe's `nNNNN.nodes`, thinned to `--keep K`) and the *pauses* of the game's
-//!   proof: the proof from the optimum on one thread, stopped after every `--span` steps (the engine counts in blocks
-//!   of 1,024), `--pauses P` times, each pause's open units read from its checkpoint (the stack the proof was working
-//!   through: the root's remaining siblings, then the next level's, down to the deepest), and the root itself.  Units
-//!   that are the same are measured once; one that today's bound cuts has a line of `"cut":true` and nothing else.
+//!   proof: the proof from an optimal set on one thread, stopped after every `--span` steps (the engine counts in
+//!   blocks of 1,024), `--pauses P` times, each pause's open units read from its checkpoint (the stack the proof was
+//!   working through: the root's remaining siblings, then the next level's, down to the deepest), and the root itself.
+//!   Units that are the same are measured once; one that today's bound cuts has a line of `"cut":true` and nothing
+//!   else.
 //! * A line of an open node: `id`, `source`, `depth` (its promotions) and `cands`, `need` and `today` (the GF(2)
 //!   bound on its completions) and `gap` (`today - need`, at least 0), `open` (its candidates by home, index `h` for
-//!   home `h`; index 0 counts the rest), `subtree` (the engine's steps of the node's subtree solved from the
-//!   optimum on one thread, fresh tables, the default tactics; at most `--unit-cap` steps, then `"completed":false`)
-//!   and `solve_cpu_s`; `s` (the heaviest set of today's bound: its size, and `s_homes`, `s_weights` by home) and
-//!   `leaf` (it can be promoted: the node is settled); and two spreads, `cores` (the cores that [`cores_of`] finds for
-//!   the heaviest set, up to six a frame) and `learned` (the nogoods that the subtree's searcher held when it ended, a
-//!   sample of the conflicts the subtree met: with the default forgetting, those of its last 50,000 steps).  A
-//!   [`Spread`] has `n` (its conflicts), `frames` (by the frame they fail in; one failing in several counts in each),
-//!   `places` (for each separator home `h = 1, 2, ...` the counts of left, right, touch-left, touch-right, touch-only
-//!   and cross), `width` (for each home the number of distinct open members in any conflict: a separator `h` has to
-//!   decide `width[h]` candidates) and `span` (the widest spread of homes of a conflict: 1 or less).
+//!   home `h`; index 0 counts the rest), `subtree` (the engine's steps of the node's subtree solved from an
+//!   optimal set on one thread, fresh tables, the default tactics; at most `--unit-cap` steps, then
+//!   `"completed":false`) and `solve_cpu_s`; `s` (the heaviest set of today's bound: its size, and `s_homes`,
+//!   `s_weights` by home) and `leaf` (it can be promoted: the node is settled); and two spreads, `cores` (the cores
+//!   that [`cores_of`] finds for the heaviest set, up to six a frame) and `learned` (the nogoods that the subtree's
+//!   searcher held when it ended, a sample of the conflicts the subtree met: with the default forgetting, those of its
+//!   last 50,000 steps).  A [`Spread`] has `n` (its conflicts), `frames` (by the frame they fail in; one failing in
+//!   several counts in each), `places` (for each separator home `h = 1, 2, ...` the counts of left, right, touch-left,
+//!   touch-right, touch-only and cross), `width` (for each home the number of distinct open members in any conflict: a
+//!   separator `h` has to decide `width[h]` candidates) and `span` (the widest spread of homes of a conflict: 1 or
+//!   less).
 //! * With `--best-cap STEPS` also the node's best completion `F*` (its own optimum, `best` its sum), if it is known:
-//!   the optimum's own, for a node that holds it, else found by an optimizing solve from the greedy completion that
+//!   the optimal set's own, for a node that holds it, else found by an optimizing solve from the greedy completion that
 //!   ends within that many steps.  From it come the bound's error by home, `excess_homes` (the weight of the heaviest
 //!   set at home `h` less that of `F*`; they sum to `today - best`, the gap the bound leaves to the node's own optimum:
 //!   the split of the gap that the anatomy of the gap, solver/notebook/the-anatomy-of-the-gap-2026-10/README.md, made at
@@ -253,7 +255,7 @@ fn by_home<const W: usize>(model: &FrameGraph, frames: usize, set: &Bits<W>) -> 
 // ---------------------------------------------------------------------------------------------------------
 // A node
 
-/// What a node is measured against: the optimum, the incumbent that a proof is seeded with.
+/// What a node is measured against: an optimal set, the incumbent that a proof is seeded with.
 struct Incumbent<const W: usize> {
     set: Bits<W>,
     sum: u64,
@@ -490,7 +492,7 @@ fn best_completion<const W: usize>(
     solved.completed.then(|| solved.best.difference(&unit.promoted))
 }
 
-/// The best completion of a node that holds the optimum: the optimum's other promotions.
+/// The best completion of a node that holds an optimal set: that set's other promotions.
 fn known_completion<const W: usize>(incumbent: &Incumbent<W>, unit: &TaxUnit<W>) -> Option<Bits<W>> {
     let rest = incumbent.set.difference(&unit.promoted);
     (unit.promoted.is_subset(&incumbent.set) && rest.is_subset(&unit.cands)).then_some(rest)
@@ -662,7 +664,7 @@ fn measure_unit<const W: usize>(
 // ---------------------------------------------------------------------------------------------------------
 // The nodes
 
-/// The open units of the proof of the game from the optimum on one thread, stopped after every `span` steps `pauses`
+/// The open units of the proof of the game from an optimal set on one thread, stopped after every `span` steps `pauses`
 /// times: the units of each pause's checkpoint.
 fn paused_units<const W: usize>(
     case: &Case<'_, W>,
@@ -781,9 +783,9 @@ mod tests {
     }
 
     /// The root of game 936 and some of the probe's nodes, measured: no conflict crosses a separator (the program
-    /// refuses a line if one does), the bound's error by home sums to the root's gap to the optimum, the root's
+    /// refuses a line if one does), the bound's error by home sums to the root's gap to P*, the root's
     /// subtree is its ideal proof, the oracle separators' sides have gaps of the bound over their parts of the
-    /// optimum, and the AND/OR search stops at its limit.
+    /// optimal set, and the AND/OR search stops at its limit.
     #[test]
     fn the_root_of_936_and_some_probe_nodes_are_measured() {
         let board = Board::<16>::for_n(936);

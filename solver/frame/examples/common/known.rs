@@ -1,4 +1,4 @@
-//! The known game of a board as a search incumbent, for the examples that start a search from the optimum
+//! The known game of a board as a search incumbent, for the examples that start a search from the known game
 //! (`#[path = "common/known.rs"] mod known;`; `tune` proves subtrees from it and `wall choice-prepare` takes the
 //! incumbent a node must beat from it), and what survives of a seed in a board, from which the ledger starts its
 //! finder.
@@ -9,7 +9,7 @@ use taxman::engine::Control;
 use taxman::game::Optimal;
 use taxman::search::{self, Prepared};
 
-/// The incumbent promotion set of the game's known optimum, and the optimum's promotion sum: the known game's
+/// The incumbent promotion set of the game's known optimum, and its promotion sum P*: the known game's
 /// promotions (those that are candidates here) that can all be promoted, as a search seeded with them starts.
 pub fn known_incumbent<const W: usize>(
     board: &Board<W>,

@@ -14,7 +14,7 @@
 //! and the hardest games):
 //!
 //! * `nNNNN.nodes` (F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded with
-//!   the optimum), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a node's
+//!   an optimal set), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a node's
 //!   state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
 //!   `can_promote_using`, the minimal conflict and the one from the residual (the `core` line) of the heaviest
 //!   matching, the matching from scratch
@@ -177,7 +177,7 @@ fn setup<const W: usize>(n: u32) -> Prepared<W> {
     Board::<W>::for_n(n).prepare(SearchTactics::default()).expect("prepare")
 }
 
-/// The optimum's promotions that can be promoted from the root, one by one from the largest down.
+/// The promotions of the optimal game that can be promoted from the root, one by one from the largest down.
 fn seed<const W: usize>(p: &Prepared<W>, optimal: &Optimal) -> Bits<W> {
     let moves = optimal.moves(p.n).unwrap_or_else(|| panic!("no known game for n={} (--known FILE?)", p.n));
     let mut state = p.root;
@@ -615,7 +615,7 @@ fn make_nodes<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, every: u64,
     let mut text = format!(
         "# Search nodes of game {n} for examples/perf.rs (F1), made by\n\
          # `perf make-nodes {n} --every {every} --keep {keep}`: its proof (one thread, default tactics, seeded with\n\
-         # the optimum) in {runs} runs of {every} nodes, each resuming the last one's checkpoint ({total} nodes in\n\
+         # an optimal set) in {runs} runs of {every} nodes, each resuming the last one's checkpoint ({total} nodes in\n\
          # all), handed the searcher {} distinct units; these {} are evenly spaced among them.  Sets in hex, digit k\n\
          # holding the numbers 4k..4k+3, lowest bit first.\n",
         units.len(),

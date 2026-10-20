@@ -231,7 +231,7 @@ pub fn parse_board_list(name: &str, text: &str) -> Result<Vec<u32>, CliError> {
         let at = |why: String| CliError::Usage(format!("{name}: line {}: {why}", i + 1));
         let digits = line.bytes().all(|b| b.is_ascii_digit());
         let n: u32 =
-            line.parse().ok().filter(|_| digits).ok_or_else(|| at(format!("expected a board size, got {line:?}")))?;
+            line.parse().ok().filter(|_| digits).ok_or_else(|| at(format!("expected a game n, got {line:?}")))?;
         if !(1..=MAX_N).contains(&n) {
             return Err(at(format!("{n} is not a game from 1 to {MAX_N}")));
         }
@@ -389,12 +389,12 @@ mod tests {
     fn a_list_of_boards_refuses_what_is_none_naming_the_file_and_the_line() {
         let list = |text: &str| parse_board_list("boards.txt", text).map(|_| ()).map_err(usage);
         for (text, why) in [
-            ("12\nx\n", "boards.txt: line 2: expected a board size, got \"x\""),
-            ("12\n13 14\n", "boards.txt: line 2: expected a board size, got \"13 14\""),
-            ("12\n1302 # a note\n", "boards.txt: line 2: expected a board size, got \"1302 # a note\""),
-            ("12\n-5\n", "boards.txt: line 2: expected a board size, got \"-5\""),
-            ("+5\n", "boards.txt: line 1: expected a board size, got \"+5\""),
-            ("12\n4294967296\n", "boards.txt: line 2: expected a board size, got \"4294967296\""),
+            ("12\nx\n", "boards.txt: line 2: expected a game n, got \"x\""),
+            ("12\n13 14\n", "boards.txt: line 2: expected a game n, got \"13 14\""),
+            ("12\n1302 # a note\n", "boards.txt: line 2: expected a game n, got \"1302 # a note\""),
+            ("12\n-5\n", "boards.txt: line 2: expected a game n, got \"-5\""),
+            ("+5\n", "boards.txt: line 1: expected a game n, got \"+5\""),
+            ("12\n4294967296\n", "boards.txt: line 2: expected a game n, got \"4294967296\""),
             ("0\n", "boards.txt: line 1: 0 is not a game from 1 to 8191"),
             ("# c\n12\n8192\n", "boards.txt: line 3: 8192 is not a game from 1 to 8191"),
             ("12\n\n30\n12\n", "boards.txt: line 4: the board 12 is listed again (first on line 1)"),

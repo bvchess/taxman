@@ -8,9 +8,9 @@
 //! ```
 //!
 //! `N` is the game of the units, `--ids` the suite's ids of them (`N-INDEX`).  Each unit has a line on stdout: `id`,
-//! `depth` (its promotions), `cands`, `need` (what a completion must add to beat the optimum), `nodes` (the engine's
+//! `depth` (its promotions), `cands`, `need` (what a completion must add to beat P*), `nodes` (the engine's
 //! steps), `steps` (those the hook was told of: the same), `cpu_s` (the thread's), `completed`, `best` (the best
-//! promotion sum; the optimum's unless the subtree beat it), `root_value` and `root_chosen` (the GF(2) bound of the
+//! promotion sum; P* unless the subtree beat it), `root_value` and `root_chosen` (the GF(2) bound of the
 //! unit's first step and the size of its heaviest set), `conflicts` (the distinct conflicts the steps' checks found),
 //! `residues` (the distinct residues of each frame and of the whole node, then the distinct states of each frame and
 //! of all of them, below), `asked` and `overridden` (how often

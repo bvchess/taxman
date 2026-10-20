@@ -53,7 +53,7 @@ Per game, for every board of the range (plan.jsonl has one line each, null where
   expected_thread_hours_recorded   the same from the recorded seconds x threads (the upper end, which ignores the
               window; a gap-model game as above)
 
-The lists (lists/*.txt in --out-dir; one board size a line after the header lines that start with `# `).  A group is a
+The lists (lists/*.txt in --out-dir; one n a line after the header lines that start with `# `).  A group is a
 game that has no share (its head) with the games that share with it, directly or through a chain of shares: it goes
 into one list, in increasing n, since a share is settled only from a certificate in the same output file.  pilot.txt
 holds the groups of the five dearest heads, dear.txt those of the next fifteen, and rest_1.txt .. rest_K.txt the other

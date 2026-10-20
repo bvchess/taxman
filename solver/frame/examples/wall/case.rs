@@ -35,7 +35,7 @@ pub struct Params {
     /// The subgradient steps of the fit at the root (`--steps`).
     pub steps: usize,
     /// Where `choice-prepare` takes its nodes: a directory of `.nodes` fixtures, the tuning suite, and how many nodes
-    /// on the way to the optimum it makes.
+    /// on the way to an optimal set it makes.
     pub fixtures: Option<PathBuf>,
     pub suite: Option<PathBuf>,
     pub paths: usize,
@@ -50,10 +50,10 @@ pub struct Params {
     pub claims: Option<PathBuf>,
     pub node_steps: usize,
     pub sub: bool,
-    /// The A1 bound (`fields.rs`): the seconds of the root fit `choice-prepare` makes for a game (`--fit-seconds`; 0:
-    /// none, so no A1 bounds), the directory of fits it takes before fitting (`--fits`), whether `choice` measures the
-    /// A1 bounds (`--a1`), the pricings of the warm refit (`--a1-pricings`) and the seconds of the node's own master
-    /// (`--a1-seconds`).
+    /// The multi-field bound (`fields.rs`): the seconds of the root fit `choice-prepare` makes for a game
+    /// (`--fit-seconds`; 0: none, so no multi-field bounds), the directory of fits it takes before fitting (`--fits`),
+    /// whether `choice` measures the multi-field bounds (`--a1`), the pricings of the warm refit (`--a1-pricings`) and
+    /// the seconds of the node's own master (`--a1-seconds`).
     pub fit_seconds: f64,
     pub fits: Option<PathBuf>,
     pub a1: bool,
@@ -211,7 +211,8 @@ impl<const W: usize> Case<'_, W> {
 pub enum Command {
     /// `wall choice-prepare` (`choice.rs`): a game's nogood pool, its root multipliers and its sampled nodes, in a file.
     ChoicePrepare,
-    /// `wall choice` (`choice.rs`): the strong bound against the subtree at each node of a prepared file.
+    /// `wall choice` (`choice.rs`): the Lagrangian bound refitted at each node of a prepared file, against the node's
+    /// subtree.
     Choice,
     /// `wall decompose` (`decompose.rs`): how the conflicts of a node lie against each separator home.
     Decompose,
@@ -309,8 +310,8 @@ mod tests {
         line.get(name).and_then(Json::as_bool).unwrap_or_else(|| panic!("{name} in {line}"))
     }
 
-    /// Game 936 prepared for `choice` (a few of the probe's nodes and some on the way to the optimum) and measured: every
-    /// unit has its line in the worker's file, and a run again goes on where it was.
+    /// Game 936 prepared for `choice` (a few of the probe's nodes and some on the way to an optimal set) and measured:
+    /// every unit has its line in the worker's file, and a run again goes on where it was.
     #[test]
     fn a_game_prepared_for_choice_is_measured_and_a_run_again_goes_on_where_it_was() {
         let dir = crate::support::TempDir::new("wall-choice");
@@ -354,7 +355,8 @@ mod tests {
                 let found = a1.get(variant).unwrap_or_else(|| panic!("{variant} in {unit}"));
                 let (bound, cut) =
                     (found.get("bound").and_then(Json::as_i64), found.get("cut").and_then(Json::as_bool));
-                // A node on the way to the optimum is cut by nothing: its target is what its best completion reaches.
+                // A node on the way to an optimal set is cut by nothing: its target is what its best completion
+                // reaches.
                 let cuts = (source != "path").then(|| bound < unit.get("need").and_then(Json::as_i64));
                 assert!(bound.is_some() && cut == Some(cuts.unwrap_or(false)), "{unit}");
             }

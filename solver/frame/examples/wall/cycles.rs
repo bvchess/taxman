@@ -1020,7 +1020,7 @@ fn triangle(movers: &[u32]) -> bool {
 }
 
 /// The LP bounds of the instance `inst` of game `n` (board `p`), each stage within `seconds`.  `target` is what the
-/// gap is measured to: the optimum at a root, `need` (the optimum plus 1 less the promotions' sum) at a unit, as the
+/// gap is measured to: P* at a root, `need` (P* plus 1 less the promotions' sum) at a unit, as the
 /// A1 measurements measured it.
 fn measure<const W: usize>(p: &Prepared<W>, inst: &Instance<W>, target: Option<i64>, seconds: f64) -> Measured {
     let mut scratch = Scratch::new();
@@ -1154,7 +1154,7 @@ fn game<const W: usize>(
         }
         if let (true, Some(opt)) = (root, opt) {
             if let Some(&low) = measured.bounds.iter().chain([&(measured.gf2 as i64)]).filter(|&&b| b < opt).min() {
-                faults.push(format!("a bound of {low} below the optimum {opt}"));
+                faults.push(format!("a bound of {low} below P* {opt}"));
             }
         }
         if measured.doubled > 0 {
@@ -1189,7 +1189,7 @@ mod tests {
     use taxman::search::SearchTactics;
 
     /// At the root of a game: the LP without cuts is the matching bound, every stage's bound is at most the one before
-    /// and at least the optimum, no two movers share two factors, and every hexagon is `X·pq, X·pr, X·qr`.
+    /// and at least P*, no two movers share two factors, and every hexagon is `X·pq, X·pr, X·qr`.
     fn the_bounds_hold_at_the_root<const W: usize>(n: u32) {
         let board = Board::<W>::for_n(n);
         let p = board.prepare(SearchTactics::default()).expect("prepare");

@@ -1,6 +1,6 @@
-//! The A1 bound at a search node: the GF(2) frame matroids and a family of GF(3) signed frame matroids, coupled by
-//! Lagrangian multipliers that a column generation fits, for the node-choice measurement (`choice.rs`).  The bound,
-//! its proof (Theorems 14 and 15 of docs/THEORY.md) and the study that measured it at the roots and in a branch
+//! The multi-field bound (A1) at a search node: the GF(2) frame matroids and a family of GF(3) signed frame matroids,
+//! coupled by Lagrangian multipliers that a column generation fits, for the node-choice measurement (`choice.rs`).  The
+//! bound, its proof (Theorems 14 and 15 of docs/THEORY.md) and the study that measured it at the roots and in a branch
 //! and bound are in solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md and
 //! solver/notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md; its code is that study's, from
 //! commit 8753189 (`dw` the bound and its fit, `gf3` the signed matroids, `cores` the signings the fit derives from the
@@ -222,7 +222,7 @@ mod tests {
     use taxman::gf2::{Gf2Bound, Gf2Graph};
     use taxman::search::SearchTactics;
 
-    /// A root fit makes a bound between the optimum and the root's GF(2) bound, reads back from its file's object as
+    /// A root fit makes a bound between P* and the root's GF(2) bound, reads back from its file's object as
     /// the same fit, and is refused for another game or when its bound is not the one it was saved with.
     fn a_root_fit_is_checked_against_its_game<const W: usize>(n: u32) {
         let board = Board::<W>::for_n(n);

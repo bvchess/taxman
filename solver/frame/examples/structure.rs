@@ -1,4 +1,4 @@
-//! The census of the structure of the frames: for each board size of a range, how the board's frames sit by the number
+//! The census of the structure of the frames: for each game of a range, how the board's frames sit by the number
 //! of prime factors of their numbers (their *layer*), how they are numbered from the front, what `unzip` claimed, and
 //! whether the hypotheses of the exactness theorem of the frame model (docs/THEORY.md, "Theorem M") hold on the
 //! board.  It looks at the frames as setup forms them and at the frames the search takes, built by the very function
@@ -891,7 +891,7 @@ impl Sink {
     }
 }
 
-/// The lines of the file `path` that hold a board of `from..=to`, by board size (a missing file has none).  A last
+/// The lines of the file `path` that hold a board of `from..=to`, by n (a missing file has none).  A last
 /// line that lacks its newline was cut short by an interruption; with `repair` it is cut off the file, and it is
 /// ignored in any case.
 fn read_lines(path: &Path, from: u32, to: u32, repair: bool) -> Result<BTreeMap<u32, Json>, String> {

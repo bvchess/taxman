@@ -71,7 +71,7 @@ fn in_ustar(n: u32, ustar: &[u32]) -> Vec<bool> {
 /// Whether the frames of layer 2 are closed on game n (THEORY.md, Theorem B): `ustar`, U\* in any order, has as many
 /// members of layer 2 as there are primes up to n/2.  U\*_2 is a forest in the graph on those primes and a ground
 /// vertex (pq is the edge p–q and p² the edge p–ground), so with that many edges it is a spanning tree and every other
-/// number of layer 2 closes a cycle with it.  It decides each board by its own U\*; it does not assume a board size
+/// number of layer 2 closes a cycle with it.  It decides each board by its own U\*; it does not assume a value of n
 /// (every board from 187 to 8191 is closed, and so are some below it).
 pub fn layer_two_closed(n: u32, spf: &[u32], ustar: &[u32]) -> bool {
     let member = in_ustar(n, ustar);
@@ -396,7 +396,7 @@ mod tests {
         assert!(barred.open.iter().all(|o| o.margin.is_some_and(|m| m > 0)));
     }
 
-    /// A game that needs a search: its board size, recorded score, moves and U\*.
+    /// A game that needs a search: its n, recorded score, moves and U\*.
     struct Searched {
         n: u64,
         v: u64,
@@ -475,7 +475,7 @@ mod tests {
         assert!(checked > 0, "the test checked nothing");
     }
 
-    /// Fixing the two bottom layers by Theorem B keeps the proofs and the optima: from `low_roles`, with the target
+    /// Fixing the two bottom layers by Theorem B keeps the proofs and opt(n): from `low_roles`, with the target
     /// the score nothing beats it, and with the target one below a playable set obeying the roles is found, worth
     /// the score.  Every 3rd game that needs a search in 187..=700 (all of them take three times the time).
     #[test]

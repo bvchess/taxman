@@ -1,5 +1,5 @@
 //! GF(3) linear algebra and the signed frame matroids of a state: the GF(3) twin of `FrameMatroids` in
-//! `frames.rs`, for the A1 bound of `wall/fields.rs`.
+//! `frames.rs`, for the multi-field bound of `wall/fields.rs`.
 //!
 //! # The signed frame matroids
 //!

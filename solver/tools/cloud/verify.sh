@@ -4,7 +4,7 @@
 #   solver/tools/cloud/verify.sh [FILE...]        default: the production file ($RESULTS)
 #
 # 1. `taxman verify-results`: every game replayed, the chain from n-1, each line's proof and provenance, and that
-#    the files agree wherever they share a board size (results/README.md gives the range the committed strict.jsonl
+#    the files agree wherever they share a game (results/README.md gives the range the committed strict.jsonl
 #    covers).
 # 2. solver/tools/check_results.py: the same, written independently in Python, plus the Franklin-Moniot bound and the best
 #    heuristic chain (heuristics/results, to n = 2000).

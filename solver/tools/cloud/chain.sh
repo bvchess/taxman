@@ -66,7 +66,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 to="${1:-${CHAIN_TO:-}}"
 case "$to" in
-    '' | *[!0-9]*) die "usage: chain.sh N   (the last board size; the chain starts at 1)" ;;
+    '' | *[!0-9]*) die "usage: chain.sh N   (the last game; the chain starts at 1)" ;;
 esac
 [ "$to" -ge 1 ] || die "N must be at least 1"
 [ -x "$TAXMAN_BIN" ] || die "$TAXMAN_BIN is missing: run setup.sh"

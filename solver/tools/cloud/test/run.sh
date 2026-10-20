@@ -712,7 +712,7 @@ default_run() {
 
 # --- sweep.sh ----------------------------------------------------------------------------------------------------
 
-# The lines of the file $1 for board size $2 (completed or not), one a line.
+# The lines of the file $1 for game $2 (completed or not), one a line.
 game_lines() {
     grep -F -- "{\"schema\":5,\"n\":$2," "$1"
 }
@@ -815,7 +815,7 @@ scenario_sweep() {
         echo $? >"$tmp/stop2.status"
     )
     check "the same command completes it, both referees agreeing" has_line "$tmp/stop2.status" 0
-    check "with every board size 1301..1340 either completed or unfinished, none missing" equals \
+    check "with every game 1301..1340 either completed or unfinished, none missing" equals \
         "$(for n in $(seq 1301 1340); do game_lines "$w3/results/explore.jsonl" "$n" | head -n 1; done | wc -l | tr -d ' ')" 40
     check "and nothing left that has more to give" converged "$w3/results/explore.jsonl" 1301 1340
     cp "$tmp/verify.sh.stub" "$cloud/verify.sh"

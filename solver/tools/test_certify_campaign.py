@@ -187,8 +187,8 @@ class Check(unittest.TestCase):
             (directory / "one.txt").write_text("# header\n\n  12  \n# a comment\n13\n")
             (directory / "ignored.md").write_text("not a list")
             self.assertEqual(certify_campaign.directory_lists(directory), {"one": [12, 13]})
-            for text, message in [("12\n12\n", "listed again (first on line 1)"), ("12\nx\n", "expected a board size"),
-                                  ("12 13\n", "expected a board size"), ("-1\n", "expected a board size")]:
+            for text, message in [("12\n12\n", "listed again (first on line 1)"), ("12\nx\n", "expected a game n"),
+                                  ("12 13\n", "expected a game n"), ("-1\n", "expected a game n")]:
                 (directory / "one.txt").write_text(text)
                 with self.assertRaises(certify_campaign.CampaignError) as raised:
                     certify_campaign.directory_lists(directory)

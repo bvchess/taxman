@@ -39,16 +39,16 @@ pub fn check(entries: &[Entry], known: &Optimal) -> Checked {
         let Some(opt) = known.score(n) else { continue };
         c.known += 1;
         if let Some(l) = e.lower.as_ref().filter(|l| l.value > opt) {
-            c.violations.push(format!("n={n}: L = {} ({}) is above the optimum {opt}", l.value, l.rule.name()));
+            c.violations.push(format!("n={n}: L = {} ({}) is above opt(n) = {opt}", l.value, l.rule.name()));
         }
         if let Some(u) = e.upper.filter(|u| u.value < opt) {
-            c.violations.push(format!("n={n}: U = {} ({}) is below the optimum {opt}", u.value, u.rule.name()));
+            c.violations.push(format!("n={n}: U = {} ({}) is below opt(n) = {opt}", u.value, u.rule.name()));
         }
         if e.proven() {
             if e.upper.map(|u| u.value) == Some(opt) {
                 c.proven_right += 1;
             } else {
-                c.violations.push(format!("n={n}: proven at {:?}, but the optimum is {opt}", e.upper.map(|u| u.value)));
+                c.violations.push(format!("n={n}: proven at {:?}, but opt(n) is {opt}", e.upper.map(|u| u.value)));
             }
         }
     }

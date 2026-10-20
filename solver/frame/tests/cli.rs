@@ -164,8 +164,8 @@ fn certify_takes_a_range_or_a_list_of_boards_and_not_both() {
         let file = list(name, text);
         refused(&["certify", "--list", path(&file)], &format!("{name}: line {why}"));
     };
-    bad("word.txt", "1302\nboard\n", "2: expected a board size, got \"board\"");
-    bad("note.txt", "1302 # a note\n", "1: expected a board size, got \"1302 # a note\"");
+    bad("word.txt", "1302\nboard\n", "2: expected a game n, got \"board\"");
+    bad("note.txt", "1302 # a note\n", "1: expected a game n, got \"1302 # a note\"");
     bad("zero.txt", "0\n", "1: 0 is not a game from 1 to 8191");
     bad("large.txt", "# c\n\n8192\n", "3: 8192 is not a game from 1 to 8191");
     bad("twice.txt", "1302\n1304\n\n1302\n", "4: the board 1302 is listed again (first on line 1)");

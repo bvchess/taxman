@@ -1,9 +1,9 @@
 //! The search nodes that `choice-prepare` samples for a game, from three sources: the fixture `--fixtures DIR` has for
-//! the game (`nNNNN.nodes`, as the probe's, made by `perf make-nodes`: units that the proof seeded with the optimum
+//! the game (`nNNNN.nodes`, as the probe's, made by `perf make-nodes`: units that the proof seeded with an optimal set
 //! handed its searcher), the units of the game in the tuning suite `--suite FILE`
 //! (`solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl`), and `--paths K` nodes on the
-//! way to the optimum (default 50): the optimum's promotions less a random 30 to 70% of them, its other candidates
-//! narrowed, whose best completion is at least the optimum less what they promote, which is a check of the bound's
+//! way to an optimal set (default 50): its promotions less a random 30 to 70% of them, its other candidates
+//! narrowed, whose best completion is at least P* less what they promote, which is a check of the bound's
 //! validity.
 
 use super::case::Case;
@@ -80,8 +80,9 @@ pub(super) fn suite_nodes<const W: usize>(suite: &Option<PathBuf>, n: u32) -> Re
     Ok(out)
 }
 
-/// `count` nodes on the way to the optimum `known` of `case`: `known` less a random 30 to 70% of its members promoted,
-/// the root's other candidates narrowed in the state they reach (which keeps the rest of `known`, promotable there).
+/// `count` nodes on the way to the optimal set `known` of `case`: `known` less a random 30 to 70% of its members
+/// promoted, the root's other candidates narrowed in the state they reach (which keeps the rest of `known`, promotable
+/// there).
 pub(super) fn path_nodes<const W: usize>(case: &Case<'_, W>, known: &Bits<W>, count: usize) -> Vec<Sampled<W>> {
     let p = case.p;
     let mut rng = Rng(0x9A7E_0000 + u64::from(case.n()));

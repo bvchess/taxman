@@ -28,7 +28,7 @@
 #   --until DATE          UNTIL           the hard date (UTC): YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ
 #   --budget-hours H      BUDGET_HOURS    instance-hours in all, over every machine                   default 74
 #   --game-hours H        GAME_HOURS      the wall: one game's own search, in hours                   default 24
-#   --chain-to N          CHAIN_TO        the last board size                                         default 8191
+#   --chain-to N          CHAIN_TO        the last game                                              default 8191
 #   --window K            WINDOW          games in flight                                             default 4
 #   --threads K           THREADS         worker threads                                              default all
 #   --instance-type T     INSTANCE_TYPE   the type of the one instance                              default c8g.16xlarge
@@ -527,7 +527,7 @@ launch() {
 # queue ...` (the time since the search began, waits included; the nodes so far; the nodes a second in the last
 # interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of promotions so
 # far), and nothing else says where a game is: a game with no recent line has no state to tell (a setup, a prime or
-# repeated game, a search not started).  Arguments: the first and the last board size in flight, and the games' wall
+# repeated game, a search not started).  Arguments: the first and the last game in flight, and the games' wall
 # clocks (ckpt/nNNNN.clock) as "n seconds n seconds ...".  A line is recent unless three lines of another game in
 # flight follow it (a game that still searches prints once an interval).  The state of a game is told from its last
 # line:

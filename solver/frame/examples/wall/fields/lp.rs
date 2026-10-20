@@ -1,5 +1,5 @@
 //! A dense revised simplex method with a partitioned basis inverse, for the master LP of a Dantzig–Wolfe
-//! decomposition.  Part of the A1 bound of `wall/fields.rs`; it knows nothing of matroids.
+//! decomposition.  Part of the multi-field bound of `wall/fields.rs`; it knows nothing of matroids.
 //!
 //! # The LP
 //!
@@ -1022,9 +1022,9 @@ mod tests {
         (m, empties)
     }
 
-    /// The optimum by enumeration.  The live columns and the `Le` rows' slacks have full row rank (the empty
-    /// columns and the slacks make an identity), and the LP is bounded and feasible, so its optimum is attained at
-    /// a basic feasible solution: a set of as many columns as rows whose matrix is nonsingular, with a nonnegative
+    /// The LP's optimal value by enumeration.  The live columns and the `Le` rows' slacks have full row rank (the empty
+    /// columns and the slacks make an identity), and the LP is bounded and feasible, so its optimal value is attained
+    /// at a basic feasible solution: a set of as many columns as rows whose matrix is nonsingular, with a nonnegative
     /// solution.  The best objective over all such sets.
     fn reference(m: &Model) -> f64 {
         let rows = m.kind.len();
@@ -1279,7 +1279,7 @@ mod tests {
         }
     }
 
-    /// Test 3: after a reset to the empty columns and the death of a random subset of the others, the optimum is
+    /// Test 3: after a reset to the empty columns and the death of a random subset of the others, the optimal value is
     /// that of the LP without the dead columns.
     #[test]
     fn dead_columns_never_enter() {
@@ -1386,7 +1386,7 @@ mod tests {
         }
     }
 
-    /// Test 4: degenerate LPs (`Le` rows of rhs 0) reach the optimum, the same value in a permuted column order and
+    /// Test 4: degenerate LPs (`Le` rows of rhs 0) reach the optimal value, the same in a permuted column order and
     /// by Bland's rule alone.
     #[test]
     fn degenerate_lps_reach_the_optimum() {

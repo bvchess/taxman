@@ -347,7 +347,7 @@ results/strict.jsonl: 3914 completed games, n = 1..=3914 (0 missing), 0 incomple
   proof: trivial 13, prime_formula 541, cap 354, exhausted 1356, same_search 1650
   assumptions: none in 3914 of 3914 games
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 1244, prime formula 540
-0 board sizes are in more than one file, with equal scores in all
+0 games are in more than one file, with equal scores in all
 checked in 12724.7 ms
 ```
 

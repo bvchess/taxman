@@ -31,8 +31,8 @@
 //! workers' busy time per step, shares of the workers' time (`Counters::share`: of their lifetimes summed, which
 //! is wall time × threads when their number does not change), splits and the units they gave, steals, runs and
 //! tiny runs (units with nothing left), and the time until all workers first ran at once.  With `--seed-opt` the
-//! search only proves the optimum, so its node count barely depends on the threads and the speedup measures the
-//! parallel search alone; seeded from n − 1 it also depends on when each run happens to find the optimum.
+//! search only proves P*, so its node count barely depends on the threads and the speedup measures the
+//! parallel search alone; seeded from n − 1 it also depends on when each run happens to find an optimal set.
 //!
 //! Where the time of a step goes on many threads: for a search long against its own setup, `k/s/thr` is `eff %` over
 //! `µs/step` (times 10), so it falls when the workers do not step all the time (they wait for work or for the lock)

@@ -95,7 +95,7 @@ class Excerpt(unittest.TestCase):
 
     def test_it_takes_the_block_the_window_before_it_and_what_they_rest_on(self):
         rows = [
-            done(1),  # within 8 board sizes before 6, and what game 2 rests on
+            done(1),  # within the 8 games before 6, and what game 2 rests on
             done(2, prev=(10, True, [1])),
             done(3, prev=(20, True, [2])),
             done(4, prev=(30, True, [3])),

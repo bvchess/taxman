@@ -1,8 +1,8 @@
-//! The A1 bound and its multipliers: one GF(2) matroid intersection plus a greedy per signed GF(3) frame matroid,
-//! coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of the fields study
-//! (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at commit 8753189,
-//! with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer checked against a
-//! reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
+//! The multi-field bound and its multipliers: one GF(2) matroid intersection plus a greedy per signed GF(3) frame
+//! matroid, coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of the fields
+//! study (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at commit
+//! 8753189, with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer checked
+//! against a reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
 //! # The bound
 //!
 //! Let `A`, `B` be the two GF(2) frame matroids of a state (`frames::FrameMatroids`) and `N_1, …, N_K` signed GF(3)
@@ -1822,7 +1822,7 @@ mod tests {
         assert_eq!(master.solve(deadline, &mut stats), Solved::Optimal, "a breakdown recovered from");
         assert_eq!(stats.breakdowns, 1, "the breakdown counted");
         assert!(master.lp.violation() <= BROKEN_VIOLATION && master.lp.largest_dual() <= BROKEN_DUAL);
-        assert!((master.lp.value() - value).abs() <= 1e-6 * value.abs().max(1.0), "the optimum again");
+        assert!((master.lp.value() - value).abs() <= 1e-6 * value.abs().max(1.0), "the optimal value again");
         master.inject = 2;
         assert_eq!(master.solve(deadline, &mut stats), Solved::Broken, "two breakdowns running");
         assert_eq!(stats.breakdowns, 3);

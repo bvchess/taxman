@@ -13,8 +13,9 @@
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
 //!   for the ceiling, ...) or the old names of the prover's directory and script;
-//! * the docs rewritten to docs/WRITING.md (`REWRITTEN`) do not use the names that docs/GLOSSARY.md
-//!   replaced (board size, the optimum, strong bound, checker, EXPERIMENTS, ...).
+//! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
+//!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
+//!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...).
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
@@ -492,16 +493,6 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 
 /// The text files that explain the code: the guides, the lab notebook with its entries, and the comments.
 fn prose_files() -> Vec<PathBuf> {
-    fn rust_files(dir: &Path, found: &mut Vec<PathBuf>) {
-        for entry in std::fs::read_dir(dir).expect("a directory") {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                rust_files(&path, found);
-            } else if path.extension().is_some_and(|ext| ext == "rs") {
-                found.push(path);
-            }
-        }
-    }
     let mut files: Vec<PathBuf> = vec![
         crate_dir().join("README.md"),
         reference_md(),
@@ -510,8 +501,27 @@ fn prose_files() -> Vec<PathBuf> {
         repo_dir().join("solver/docs/STATUS.md"),
     ];
     files.extend(entry_files());
-    rust_files(&crate_dir().join("src"), &mut files);
+    files.extend(files_with_extensions(&crate_dir().join("src"), &["rs"]));
     files
+}
+
+/// The files below `dir` (not in a `target` or a hidden directory) whose extension is one of `extensions`, in the
+/// order of their paths.
+fn files_with_extensions(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
+    paths.sort();
+    let mut found = Vec::new();
+    for path in paths {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if path.is_dir() {
+            if name != "target" && !name.starts_with('.') {
+                found.extend(files_with_extensions(&path, extensions));
+            }
+        } else if path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| extensions.contains(&ext)) {
+            found.push(path);
+        }
+    }
+    found
 }
 
 #[test]
@@ -740,6 +750,14 @@ fn retired_cased_in(lines: &[String], list: &[Retired]) -> Vec<(usize, &'static 
     found
 }
 
+/// The words that docs/GLOSSARY.md replaced (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) in `lines` (prose: code
+/// blanked): `(line number, word, instead)`.
+fn glossary_words_in(lines: &[String]) -> Vec<(usize, &'static str, &'static str)> {
+    let mut found = retired_in(lines, &[RETIRED_IN_THE_REWRITTEN_DOCS]);
+    found.extend(retired_cased_in(lines, RETIRED_CASED));
+    found
+}
+
 /// The front page of the lab notebook, `solver/notebook/README.md`, describes the present: all of it, but for the note
 /// that maps the old words, which keeps them, and the titles of the entries in the first column of the index, which
 /// keep the words of their time.  Those are blanked or cut, so that line numbers stay.  The entries themselves
@@ -756,27 +774,181 @@ fn experiments_now(text: &str) -> String {
     format!("{before}{}\n## Register of everything tried\n{}", blank(note), register.join("\n"))
 }
 
-/// The prose of a file as lines: a markdown file's text, a Rust file's comments, a shell script's comments, with code
-/// spans and fenced blocks blanked.  Lines are kept, so that line numbers still mean something.
+/// The comments of the Rust source `text`, line by line: the text after `//`, `///` or `//!` outside string and
+/// character literals (a `//` in a string, a raw string or a string over several lines is text), and the text of
+/// `/* */` comments.  Lines are kept, so that line numbers still mean something; a line with no comment is empty.
+fn rust_comments(text: &str) -> Vec<String> {
+    #[derive(Clone, Copy)]
+    enum Lex {
+        Code,
+        LineComment,
+        BlockComment(usize),
+        Str,
+        RawStr(usize),
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let at = |i: usize, expected: &str| expected.chars().enumerate().all(|(k, c)| chars.get(i + k) == Some(&c));
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let mut lines = vec![String::new()];
+    let (mut lex, mut i) = (Lex::Code, 0);
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\n' {
+            lines.push(String::new());
+            if matches!(lex, Lex::LineComment) {
+                lex = Lex::Code;
+            }
+            i += 1;
+            continue;
+        }
+        match lex {
+            Lex::LineComment => {
+                lines.last_mut().expect("a line").push(c);
+                i += 1;
+            }
+            Lex::BlockComment(depth) if at(i, "*/") => {
+                lex = if depth == 1 { Lex::Code } else { Lex::BlockComment(depth - 1) };
+                i += 2;
+            }
+            Lex::BlockComment(depth) if at(i, "/*") => {
+                lex = Lex::BlockComment(depth + 1);
+                i += 2;
+            }
+            Lex::BlockComment(_) => {
+                lines.last_mut().expect("a line").push(c);
+                i += 1;
+            }
+            Lex::Str => {
+                match c {
+                    '"' => lex = Lex::Code,
+                    // An escape takes the next character with it, but not the newline of a line continuation.
+                    '\\' if chars.get(i + 1) != Some(&'\n') => i += 1,
+                    _ => {}
+                }
+                i += 1;
+            }
+            Lex::RawStr(hashes) => {
+                if c == '"' && (1..=hashes).all(|k| chars.get(i + k) == Some(&'#')) {
+                    lex = Lex::Code;
+                    i += hashes;
+                }
+                i += 1;
+            }
+            Lex::Code if at(i, "//") => {
+                lex = Lex::LineComment;
+                i += 2;
+                while chars.get(i) == Some(&'/') {
+                    i += 1;
+                }
+                if chars.get(i) == Some(&'!') {
+                    i += 1;
+                }
+            }
+            Lex::Code if at(i, "/*") => {
+                lex = Lex::BlockComment(1);
+                i += 2;
+            }
+            Lex::Code if c == '"' => {
+                lex = Lex::Str;
+                i += 1;
+            }
+            Lex::Code if (c == 'r' || at(i, "br")) && !(i > 0 && is_word(chars[i - 1])) => {
+                // A raw string, r"..." or r#"..."# (with a b before it for bytes), or a word that starts with r or br.
+                let r = if c == 'b' { i + 1 } else { i };
+                let hashes = chars[r + 1..].iter().take_while(|&&h| h == '#').count();
+                if chars.get(r + 1 + hashes) == Some(&'"') {
+                    lex = Lex::RawStr(hashes);
+                    i = r + 2 + hashes;
+                } else {
+                    i += 1;
+                }
+            }
+            Lex::Code if c == '\'' => {
+                // A character literal ('a', '"', '\n', '\'') or the start of a lifetime ('a).
+                i += match (chars.get(i + 1), chars.get(i + 2)) {
+                    (Some('\\'), _) => {
+                        4 + chars[(i + 3).min(chars.len())..].iter().position(|&q| q == '\'').unwrap_or(0)
+                    }
+                    (_, Some('\'')) => 3,
+                    _ => 1,
+                };
+            }
+            Lex::Code => i += 1,
+        }
+    }
+    lines
+}
+
+/// The comments and docstrings of the Python source `text`, line by line: the lines whose first non-blank character is
+/// `#` (but for a shebang), and the text of the docstrings.  A docstring is a string in `"""` that opens a line and is
+/// the first statement of the file, or comes after a line that ends in `:` and does not open an `if`, `for`, `else` ...
+/// block (that is, after a `def` or a `class`, whose signature may run over several lines).  The other strings in `"""`
+/// (a script or a fixture in a test) are code, and so are their lines.  Lines are kept; a line with no comment is
+/// empty.
+fn python_comments(text: &str) -> Vec<String> {
+    const BLOCKS: &[&str] =
+        &["if ", "elif ", "else", "for ", "while ", "try", "except", "finally", "with ", "match ", "case "];
+    const QUOTES: &str = "\"\"\"";
+    let mut lines = Vec::new();
+    // While in a string in `"""`: whether it is a docstring.  And the last line of code before this line, if any.
+    let (mut inside, mut before): (Option<bool>, Option<&str>) = (None, None);
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(docstring) = inside {
+            let (body, closed) = line.split_once(QUOTES).map_or((line, false), |(body, _)| (body, true));
+            lines.push(if docstring { body.to_owned() } else { String::new() });
+            if closed {
+                inside = None;
+            }
+        } else if let Some(comment) = trimmed.strip_prefix('#') {
+            lines.push(if trimmed.starts_with("#!") { String::new() } else { comment.to_owned() });
+        } else if trimmed.is_empty() {
+            lines.push(String::new());
+        } else {
+            let after_quotes = trimmed.trim_start_matches(|c| "rRbBuU".contains(c)).strip_prefix(QUOTES);
+            let docstring = after_quotes.filter(|_| {
+                before.is_none_or(|code| code.ends_with(':') && !BLOCKS.iter().any(|b| code.starts_with(b)))
+            });
+            if let Some(body) = docstring {
+                // A docstring that closes on its first line has the closing quotes after its text.
+                lines.push(body.split(QUOTES).next().unwrap_or("").to_owned());
+                inside = (!body.contains(QUOTES)).then_some(true);
+                before = Some(QUOTES);
+            } else {
+                // A string in `"""` that is not a docstring runs on to the next `"""` if this line has an odd number.
+                inside = (trimmed.matches(QUOTES).count() % 2 == 1).then_some(false);
+                lines.push(String::new());
+                before = Some(trimmed);
+            }
+        }
+    }
+    lines
+}
+
+/// The comments of a source file, line by line: a Rust file's ([`rust_comments`]), a Python script's
+/// ([`python_comments`]), or the lines of a shell script whose first non-blank character is `#`.
+fn comment_lines(extension: Option<&str>, text: &str) -> Vec<String> {
+    match extension {
+        Some("rs") => rust_comments(text),
+        Some("py") => python_comments(text),
+        _ => text
+            .lines()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                trimmed.strip_prefix('#').filter(|_| !trimmed.starts_with("#!")).unwrap_or("").to_owned()
+            })
+            .collect(),
+    }
+}
+
+/// The prose of a file as lines: a markdown file's text, a source file's comments ([`comment_lines`]), with code spans
+/// and fenced blocks blanked.  Lines are kept, so that line numbers still mean something.
 fn prose_lines(path: &Path, text: &str) -> Vec<String> {
     let extension = path.extension().and_then(|ext| ext.to_str());
     if extension == Some("md") {
         return without_code(text);
     }
-    let comment = |line: &str| -> String {
-        let trimmed = line.trim_start();
-        let after = if extension == Some("rs") {
-            match trimmed.starts_with("//") {
-                true => Some(trimmed.trim_start_matches('/').trim_start_matches('!')),
-                false => line.split_once(" // ").map(|(_, comment)| comment),
-            }
-        } else {
-            trimmed.strip_prefix('#').filter(|_| !trimmed.starts_with("#!"))
-        };
-        after.unwrap_or("").to_owned()
-    };
-    let comments: Vec<String> = text.lines().map(comment).collect();
-    without_code(&comments.join("\n"))
+    without_code(&comment_lines(extension, text).join("\n"))
 }
 
 /// `path` as shown in a message and compared with the names above: relative to the repository, with `/`.
@@ -845,8 +1017,7 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
         let prose = prose_lines(&path, &text);
         let mut retired = retired_in(&prose, &lists);
         if REWRITTEN.contains(&shown.as_str()) {
-            retired.extend(retired_in(&prose, &[RETIRED_IN_THE_REWRITTEN_DOCS]));
-            retired.extend(retired_cased_in(&prose, RETIRED_CASED));
+            retired.extend(glossary_words_in(&prose));
         }
         for (at, word, instead) in retired {
             found.push(format!("{shown}:{at}: {word:?}, say {instead}"));
@@ -879,11 +1050,98 @@ fn the_vocabulary_check_finds_what_it_should() {
 
     let text = "every Board Size, the optimum's score, the `board size` and the \"strong bound\" (quoted)\n\
                 the experiments of EXPERIMENTS and [the notebook](EXPERIMENTS.md), and a type checker";
-    let prose = without_code(text);
-    let mut found = retired_in(&prose, &[RETIRED_IN_THE_REWRITTEN_DOCS]);
-    found.extend(retired_cased_in(&prose, RETIRED_CASED));
+    let found = glossary_words_in(&without_code(text));
     let found: Vec<(usize, &str)> = found.iter().map(|&(at, word, _)| (at, word)).collect();
     assert_eq!(found, [(1, "board size"), (1, "the optimum"), (2, "checker"), (2, "EXPERIMENTS")]);
+}
+
+/// The directories, from the repository, whose Rust files' comments use the words of docs/GLOSSARY.md: the source, the
+/// examples and the tests of the frame solver and of the prover.
+const CODE_DIRS: &[&str] = &[
+    "solver/frame/src",
+    "solver/frame/examples",
+    "solver/frame/tests",
+    "solver/noframe/src",
+    "solver/noframe/examples",
+    "solver/noframe/tests",
+];
+
+/// The directories whose scripts' comments (`*.sh`, `*.py`, and the docstrings of the Python) use them too: the tools of
+/// the repository and the prover's.
+const SCRIPT_DIRS: &[&str] = &["solver/tools", "solver/noframe/tools"];
+
+/// The files whose comments use the glossary's words: those of `CODE_DIRS` and `SCRIPT_DIRS`, but for this one.
+fn code_files() -> Vec<PathBuf> {
+    let root = repo_dir();
+    let below = |dirs: &[&str], extensions: &[&str]| -> Vec<PathBuf> {
+        dirs.iter().flat_map(|dir| files_with_extensions(&root.join(dir), extensions)).collect()
+    };
+    let mut files = below(CODE_DIRS, &["rs"]);
+    files.extend(below(SCRIPT_DIRS, &["sh", "py"]));
+    files.into_iter().filter(|path| from_repo(path) != SKIPPED).collect()
+}
+
+#[test]
+fn the_glossarys_words_stay_out_of_the_comments_of_the_code() {
+    let files = code_files();
+    assert!(files.len() > 150, "the check found only {} files: has the layout changed?", files.len());
+    let mut found = Vec::new();
+    for path in files {
+        for (at, word, instead) in glossary_words_in(&prose_lines(&path, &read(&path))) {
+            found.push(format!("{}:{at}: {word:?}, say {instead}", from_repo(&path)));
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "words docs/GLOSSARY.md replaced (solver/notebook/README.md, \"Terms changed\"), in comments:\n{}",
+        found.join("\n")
+    );
+}
+
+#[test]
+fn comments_are_found_outside_strings_and_docstrings_are_told_from_other_strings() {
+    let rust = [
+        r#"let a = "http://x"; // a comment"#,
+        r##"let b = "// in a string"; let c = '"'; let d = r#"raw // "quoted""#; // after raw"##,
+        "/// doc",
+        "//! inner",
+        r#"let e = "over"#,
+        r#"// two lines"; // after both"#,
+        "fn f<'a>(x: &'a str) {} /* block",
+        "over lines */ let g = '\\''; // end",
+    ]
+    .join("\n");
+    let expected = [" a comment", " after raw", " doc", " inner", "", " after both", " block", "over lines  end"];
+    assert_eq!(rust_comments(&rust)[..8], expected);
+
+    let python = [
+        "#!/usr/bin/env python3",
+        r#""""Module docstring"#,
+        r#"over two lines.""""#,
+        "# a comment",
+        "def f(",
+        "    a,",
+        "):",
+        r#"    """Doc of f.""""#,
+        r#"    text = """not a docstring"#,
+        "# not a comment",
+        r#"""""#,
+        "    if a:",
+        r#"        """not a docstring either""""#,
+        "    return text  # not taken",
+    ]
+    .join("\n");
+    let expected =
+        ["", "Module docstring", "over two lines.", " a comment", "", "", "", "Doc of f.", "", "", "", "", "", ""];
+    assert_eq!(python_comments(&python), expected);
+
+    let script = "#!/bin/sh\n# a comment\necho hi # not taken\n  # indented\n";
+    assert_eq!(comment_lines(Some("sh"), script), ["", " a comment", "", " indented"]);
+
+    let text = "// a board size, `the optimum` and \"the optimum\"\nlet n = 1; // the checker";
+    let found = glossary_words_in(&prose_lines(Path::new("x.rs"), text));
+    let found: Vec<(usize, &str)> = found.iter().map(|&(at, word, _)| (at, word)).collect();
+    assert_eq!(found, [(1, "board size"), (2, "checker")]);
 }
 
 /// The value of the constant `name` at the top of `solver/tools/quick_check.py`.

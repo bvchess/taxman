@@ -1,6 +1,6 @@
 //! The longest games against the optimal ones: for every game of a range, M(n), the most moves a game of n can
 //! have, decided by the prover ([`taxman_prover::moves`]), against the moves of the recorded optimal game
-//! (optimal.json, which reaches 1300, and for a board size it lacks the game of `--results`).  One line per
+//! (optimal.json, which reaches 1300, and, for a game it lacks, the game of `--results`).  One line per
 //! game, resumable:
 //!
 //!     moves --from A --to B [--list ...] [--budget NODES] [--heaviest 0] [--seconds S] [--optimal FILE]
@@ -21,7 +21,7 @@
 //! its sum and how it differs from the recorded game (`heaviest_out`, the recorded game's moves it does not
 //! play, and `heaviest_in`, its moves the recorded game does not play), from a search for the heaviest set of
 //! M(n) picks that starts with those whose upper part is the recorded game's.  The comparison with the optimal
-//! game rests on the recorded score being the optimum (proven on the whole board to 989 and 999-1019, by `exact`).
+//! game rests on the recorded score being opt(n) (proven on the whole board to 989 and 999-1019, by `exact`).
 //! Starts no new game after `--seconds`.
 
 use std::collections::BTreeMap;

@@ -8,7 +8,7 @@ Each line of an optsets file lists, for one n, the optimal value ("score") and t
 found using the playability theorems: a canonical set (the line's "canonical" if present, else the moves of
 optimal.json's game) and "others", each given as (canonical - out) | in.  For every game that ended "complete" with
 at most 200 sets and n <= --max, heuristics/evaluation/certify.py's `Exact` (a raw-pot-state brute force that
-assumes no theory) recomputes the optimum and every optimal whole pick set, and both are compared with the line.  The
+assumes no theory) recomputes opt(n) and every optimal whole pick set, and both are compared with the line.  The
 run stops at the first n whose brute force exceeds --budget seconds, or at the first disagreement (reported in full).
 
     crosscheck_optsets.py OPTSETS_FILE [--max N] [--budget SECONDS]

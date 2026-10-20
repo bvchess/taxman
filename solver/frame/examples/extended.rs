@@ -65,7 +65,7 @@
 //! ```
 //!
 //! `claims` is the formulation the problem, the words and the width are of.  `same_as` is the latest game m of the 8
-//! board sizes before n (`SAME_SEARCH_WINDOW`) among the games of the run whose problem equals n's whole (the digest,
+//! games before n (`SAME_SEARCH_WINDOW`) among the games of the run whose problem equals n's whole (the digest,
 //! then the problems), whatever the two games are worth: where the worths are equal as well, `taxman certify` settles n
 //! from m with no search.  At the end, on stderr: the games, those with a `same_as`, those of them with equal worth,
 //! the games by width, and the seconds.

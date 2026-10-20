@@ -1,7 +1,7 @@
 //! The parity bound at the root of each game (`parityroot A B [STEP]`): the heaviest common independent set of the
 //! two parity matroids, against the recorded optimum (optimal.json, then `../../results/strict.jsonl`), with the
-//! Franklín–Moniot bound beside it, its cost, and checks: the bound is at least the optimum and the recorded game's
-//! moves are independent in both matroids (the bound with every recorded move forced is still at least the optimum).
+//! Franklín–Moniot bound beside it, its cost, and checks: the bound is at least opt(n) and the recorded game's
+//! moves are independent in both matroids (the bound with every recorded move forced is still at least opt(n)).
 
 use std::path::PathBuf;
 use std::time::Instant;

@@ -321,7 +321,7 @@ impl Citing for Uppers<'_> {
     }
 }
 
-/// The lines that an export of `entries` (a ledger's boards) to `store` appends, checked as the checker will check
+/// The lines that an export of `entries` (a ledger's boards) to `store` appends, checked as the verifier will check
 /// them, and what they are.  The lower bounds come first, in order of n, then the upper bounds, each after the ones it
 /// cites.  A board of the committed chain (`chain`) gets none.
 pub fn plan(

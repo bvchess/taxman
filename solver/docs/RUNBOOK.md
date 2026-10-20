@@ -594,7 +594,7 @@ TAXMAN_WORK=~/rehearsal EXTRA_ARGS="--time-limit 5" solver/tools/cloud/chain.sh 
 
 It takes minutes.  The log (`~/rehearsal/logs/chain.log`) shows each pass, and at the end `verify.sh` runs both referees
 on the rehearsal's file and the committed one.  **It passes if the chain completes, the log says "both referees agree",
-and `verify.sh` prints `1231 board sizes are in more than one file, with equal scores in all`** (the scores of 1..1231
+and `verify.sh` prints `1231 games are in more than one file, with equal scores in all`** (the scores of 1..1231
 equal the committed chain's; the moves may differ).  A game that stopped and resumed is no different from one that ran
 in one piece (`"assumes":[]`), so the chain goes on from it.  Then rehearse the two harder interruptions by hand, with
 `TAXMAN_WORK` exported as `~/rehearsal2` in both tmux windows:
@@ -1049,7 +1049,7 @@ It passes if `status` ends in `ENDED ...: wall at N after H hours` within about 
 * The results pulled home agree with the committed chain:
   `aws s3 sync s3://taxman-013764204840-us-east-1/wall-rehearsal-1/results results-rehearsal-1/`, then
   `solver/tools/cloud/verify.sh results-rehearsal-1/strict.jsonl` prints
-  `N − 1 board sizes are in more than one file, with equal scores in all`.
+  `N − 1 games are in more than one file, with equal scores in all`.
 * If the build was slow enough that the budget of 0.3 hours came first, the end says
   `deadline: the budget of 0.3 instance-hours`.  That tests the budget, and you run the wall again with
   `--budget-hours 0.6`.

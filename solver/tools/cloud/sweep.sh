@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The sweep: as many proven games as the time allows over a stretch of board sizes, holes allowed, for little time and
-# money.  Not a chain: the games are made in blocks of consecutive board sizes, each block on one thread, and each game
+# The sweep: as many proven games as the time allows from a stretch of games, holes allowed, for little time and
+# money.  Not a chain: the games are made in blocks of consecutive games, each block on one thread, and each game
 # gets a limited search.
 #
 #   solver/tools/cloud/sweep.sh FIRST LAST
@@ -82,7 +82,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 first="${1:-}"
 last="${2:-}"
 case "$first$last" in
-    '' | *[!0-9]*) die "usage: sweep.sh FIRST LAST   (the board sizes to go over, FIRST..LAST, up to 8191)" ;;
+    '' | *[!0-9]*) die "usage: sweep.sh FIRST LAST   (the games to go over, FIRST..LAST, up to 8191)" ;;
 esac
 [ -n "$first" ] && [ -n "$last" ] || die "usage: sweep.sh FIRST LAST"
 [ "$first" -ge 1 ] && [ "$first" -le "$last" ] && [ "$last" -le 8191 ] || die "FIRST..LAST must be within 1..8191"
@@ -156,7 +156,7 @@ seed_first_block() {
         log "KNOWN ($KNOWN) has no proven game of $before: the first block starts standalone"
         return 0
     fi
-    # (The board size starts at the 17th character, after {"schema":5,"n": , and ends before the comma that RLENGTH counts.)
+    # (The n starts at the 17th character, after {"schema":5,"n": , and ends before the comma that RLENGTH counts.)
     awk -v last="$before" 'match($0, /^\{"schema":5,"n":[0-9]+,/) {
         if (substr($0, 17, RLENGTH - 17) + 0 <= last) print
     }' "$KNOWN" >"$file.tmp" && mv "$file.tmp" "$file"

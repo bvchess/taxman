@@ -43,7 +43,7 @@
 //! the pair's dominance *held*: an estimate of where the node might go on without `y` as well.
 //!
 //! **The lines.**  One a unit, or a game with `--root`: `id`, `mode` (`check` or `prune`), `below` (the incumbent is
-//! the optimum less it, as a floor with no set, when it is positive), `tactics`, `nodes` (the engine's steps), `steps`
+//! P* less it, as a floor with no set, when it is positive), `tactics`, `nodes` (the engine's steps), `steps`
 //! (the hook's: the same), `tree_nodes` and `leaves` (nodes with no child), `completed`, `best` (the sum of the set the
 //! search ended with: the incumbent's or one it found, 0 from a floor if it found none), `opt`, `cpu_s`; `exclusions`
 //! (steps that went on without a member), `with_exchange` (of those, the ones where an exchange of two primes maps the
@@ -92,7 +92,7 @@ use taxman::tactics::Tactics;
 pub struct Params {
     /// Prune by the exchanges that pass (`--prune`); otherwise only check them, and the tree is the search's own.
     pub prune: bool,
-    /// The incumbent is the optimum less this, as a floor with no set (`--below`); 0: the known optimum's set.
+    /// The incumbent is P* less this, as a floor with no set (`--below`); 0: the known optimum's set.
     pub below: u64,
     /// Search each game from its root (`--root`) instead of units of the suite.
     pub root: bool,
@@ -183,7 +183,7 @@ impl Failure {
 
 /// What every searcher's hook of a game shares: the model, the primes, and the options.
 struct Game {
-    /// The board size, and its model.
+    /// The game's n, and its model.
     n: u32,
     model: Arc<FrameGraph>,
     /// The smallest prime factor of each number up to `top`, and the primes up to it.
@@ -1097,7 +1097,7 @@ mod tests {
         assert!(verified > 0, "no exchange passed at 1215");
     }
 
-    /// The root search of game `n` from a floor `below` under its optimum, with the rule, finds the optimum; returns
+    /// The root search of game `n` from a floor `below` under P*, with the rule, finds P*; returns
     /// the candidates the rule dropped.
     fn prune<const W: usize>(n: u32, below: u64, symmetry: bool) -> u64 {
         let (p, opt, _) = game::<W>(n, SearchTactics { symmetry, ..SearchTactics::default() });

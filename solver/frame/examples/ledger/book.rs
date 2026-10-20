@@ -1,9 +1,9 @@
-//! The book of the ledger: for every board size n, a lower bound L(n), the score of a game it holds, and an upper
+//! The book of the ledger: for every game n, a lower bound L(n), the score of a game it holds, and an upper
 //! bound U(n) on opt(n), each with its derivation (the rule and the board it came from), and the relations between
-//! board sizes, applied to a fixpoint.  The relations are proven in docs/THEORY.md, "The ledger: bounds between
+//! boards, applied to a fixpoint.  The relations are proven in docs/THEORY.md, "The ledger: bounds between
 //! boards"; each lemma there gives an L direction (a game of one board made from a game of another, which the
 //! referee replays here before it counts, and which is made and replayed only if it can beat the board's own) and a
-//! U direction (an inequality between the optima):
+//! U direction (an inequality on opt(n)):
 //!
 //! * `monotone` (Lemma L1): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still legal
 //!   (n composite); U(n − 1) ≤ U(n).
@@ -108,7 +108,7 @@ impl Stalled {
     }
 }
 
-/// What the ledger keeps of a board size.
+/// What the ledger keeps of a board.
 #[derive(Clone, Debug, Default)]
 pub struct Entry {
     pub n: u32,

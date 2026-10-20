@@ -1,4 +1,4 @@
-//! `wall near`: how many completions of a unit come near the optimum, counted exactly or estimated.  A unit of the
+//! `wall near`: how many completions of a unit come near P*, counted exactly or estimated.  A unit of the
 //! tuning suite is a node with candidates (`wall anatomy`'s units); its *completions* are the sets of its candidates
 //! that the node can promote, with at most `max_total` promotions in all, and a completion's *value* is the promotion
 //! sum of the unit's promotions and its own.  The command counts the completions whose value is at least the *floor*,
@@ -43,11 +43,11 @@
 //! **The line**, one a unit: `id`, `depth` (the unit's promotions), `cands`, `opt`, `within` (D), `floor`, `bound` (the
 //! value of the unit's GF(2) bound: its promotions' sum and the bound), `steps` (the count's search steps, or the
 //! descents'), `cpu_s` and `best` (the largest value counted, or null).  The count adds `children` (the children made),
-//! `completed`, `count` and `by_distance` (`[d, count]` for each distance `d` below the optimum that has completions).
+//! `completed`, `count` and `by_distance` (`[d, count]` for each distance `d` below P* that has completions).
 //! The estimate adds `probes`, `probe_gap`, `probe_gap_steps` (the steps of the counts at the probe gap), `incomplete`
 //! (counts at the probe gap stopped: the estimate is then low), `hits` (descents whose node at the probe gap had a
 //! completion at the floor) and
-//! `estimates` (`[d, estimate, standard error]` of the completions within `d` of the optimum, for `d` = 0, 10, 20, ...
+//! `estimates` (`[d, estimate, standard error]` of the completions within `d` of P*, for `d` = 0, 10, 20, ...
 //! up to D, and D).
 //!
 //! **The sets** (`--sets DIR`, with the count): `DIR/ID.sets.tsv` has a header line `ref` and the members of the unit's
@@ -81,7 +81,7 @@ use taxman::search::{
 /// The options of `near`.
 #[derive(Clone)]
 pub struct Params {
-    /// Count the completions within this much of the optimum (`--within`).
+    /// Count the completions within this much of P* (`--within`).
     pub within: u64,
     /// Estimate the counts from this many random descents instead of counting (`--probes`; 0: count), each to a node
     /// whose gap is at most `probe_gap` (`--probe-gap`).
@@ -576,10 +576,10 @@ mod tests {
         let p = board.prepare(counting_tactics(SearchTactics::default()).expect("gf2")).expect("prepare");
         let (_, opt) = known_incumbent(&board, &p, Optimal::built_in()).expect("known").expect("a known game");
         let all = every_set(&p);
-        assert_eq!(all.keys().next_back(), Some(&opt), "the best set is the optimum");
+        assert_eq!(all.keys().next_back(), Some(&opt), "the best set is worth P*");
         let graph = MatchGraph::new(&p.model, &p.root);
         let root = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
-        // The count is every set at the floor, by value: near the optimum, and every set but the empty one.
+        // The count is every set at the floor, by value: near P*, and every set but the empty one.
         for floor in [opt, opt - 10, opt - 50, 1] {
             let done = count(&p, &graph, root, floor, None, Sink::new(Bits::EMPTY, Bits::EMPTY, None)).expect("count");
             assert!(done.completed);

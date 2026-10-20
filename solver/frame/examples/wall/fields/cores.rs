@@ -1,5 +1,5 @@
 //! The cores that a set of candidates runs into in the frames of a state, and the GF(3) signings that make them
-//! dependent.  Part of the A1 bound of `wall/fields.rs`, beside `gf3` (the signed frame matroids).
+//! dependent.  Part of the multi-field bound of `wall/fields.rs`, beside `gf3` (the signed frame matroids).
 //!
 //! # Cores
 //!

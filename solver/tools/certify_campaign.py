@@ -107,7 +107,7 @@ def campaign_lists(games, rest=REST_LISTS):
 
 
 def list_text(entry, command):
-    """The text of a list file: four header lines that start with `# `, then one board size a line."""
+    """The text of a list file: four header lines that start with `# `, then one n a line."""
     head = [
         f"# {entry['name']}: phase {entry['phase']}, {entry['what']}",
         f"# games: {len(entry['games'])} in {entry['groups']} groups",
@@ -118,8 +118,8 @@ def list_text(entry, command):
 
 
 def read_list(path):
-    """The boards of a list file in its order, as `taxman certify --list` reads them: one board size a line, blank lines
-    and lines that start with `#` skipped.  A line that is not a board size, or a board listed twice, is an error."""
+    """The boards of a list file in its order, as `taxman certify --list` reads them: one n a line, blank lines and
+    lines that start with `#` skipped.  A line that is not a game n, or a board listed twice, is an error."""
     boards = []
     first = {}
     for number, line in enumerate(read_text(path).splitlines(), 1):
@@ -127,7 +127,7 @@ def read_list(path):
         if not line or line.startswith("#"):
             continue
         if not re.fullmatch(r"[0-9]+", line):
-            raise CampaignError(f"{path} line {number}: expected a board size, got {line!r}")
+            raise CampaignError(f"{path} line {number}: expected a game n, got {line!r}")
         n = int(line)
         if n in first:
             raise CampaignError(f"{path} line {number}: the board {n} is listed again (first on line {first[n]})")

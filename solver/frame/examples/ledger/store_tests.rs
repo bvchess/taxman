@@ -40,7 +40,7 @@ const FOUND: [u32; 3] = [925, 950, 976];
 const GIVEN: [u32; 2] = [920, 940];
 
 /// A book of the boards `ns` as a run might leave them partway: every board has its start game (no promotions) and a
-/// bound above the optimum (the root's bound for every tenth board, else a stopped search's), the boards `found` have
+/// bound above opt(n) (the root's bound for every tenth board, else a stopped search's), the boards `found` have
 /// their optimal game (a search's) and an exhausted search, `given` boards are the chain's games, and the relations
 /// have carried the bounds between the boards.
 fn partial_book(ns: &[u32], given: &[u32], found: &[u32]) -> Book {
@@ -696,8 +696,8 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
 }
 
 /// A run started from the file does not map the boards the file has both bounds of, and ends where a run without it
-/// ends: every board proven at the optimum.  The file is by hand, with loose bounds (a start game and a stopped
-/// search's bound above the optimum) for every board, so that none is proven at the start.
+/// ends: every board proven at opt(n).  The file is by hand, with loose bounds (a start game and a stopped
+/// search's bound above opt(n)) for every board, so that none is proven at the start.
 #[test]
 fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let dir = TempDir::new("store-start");

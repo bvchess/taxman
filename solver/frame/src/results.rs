@@ -1492,7 +1492,7 @@ impl fmt::Display for FileReport {
         if let (Some(first), Some(last)) = (unfinished.first(), unfinished.last()) {
             writeln!(
                 f,
-                "  unfinished: {} board sizes have only an unfinished search (n = {first} to {last}); they are not \
+                "  unfinished: {} games have only an unfinished search (n = {first} to {last}); they are not \
                  proven",
                 unfinished.len()
             )?;
@@ -1528,7 +1528,7 @@ impl fmt::Display for Report {
         for file in &self.files {
             writeln!(f, "{file}")?;
         }
-        write!(f, "{} board sizes are in more than one file, with equal scores in all", self.shared)
+        write!(f, "{} games are in more than one file, with equal scores in all", self.shared)
     }
 }
 

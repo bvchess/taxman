@@ -17,7 +17,7 @@ use taxman::engine::Control;
 use taxman::game::replay_finished;
 use taxman::json::Json;
 
-/// A scheduler of the board `n` alone, mapped by hand: its lower bound worth `lower`, at most the optimum (the game is
+/// A scheduler of the board `n` alone, mapped by hand: its lower bound worth `lower`, at most opt(n) (the game is
 /// the optimal one, which these tests' jobs do not replay), its upper bound and its root's `upper`.
 fn alone(dir: &Path, n: u32, settings: &Settings, lower: u64, upper: u64) -> Scheduler {
     let (mut scheduler, _) = Scheduler::open(n, n, dir, settings, None).unwrap();
@@ -54,7 +54,7 @@ fn text(event: &Json, field: &str) -> Option<String> {
     event.get(field).and_then(Json::as_str).map(str::to_owned)
 }
 
-/// A search under a floor above the optimum completes having found nothing and its floor is the board's new upper
+/// A search under a floor above opt(n) completes having found nothing and its floor is the board's new upper
 /// bound, by the rule `floor`; it is a point of the board's line, the ledger keeps it, the event says what it was, and
 /// a gap within two steps is then the proof's.
 #[test]
@@ -96,7 +96,7 @@ fn a_floor_step_that_completes_lowers_the_upper_bound_with_the_floor_rule() {
     assert!(entry.proven() && entry.upper.unwrap().value == opt(n));
 }
 
-/// A floor below the optimum finds sets, the last of them the optimum, and the search that completes has proven it
+/// A floor below opt(n) finds sets, the last of them optimal, and the search that completes has proven it
 /// (Lemma F): the lower bound is the game it found, which the referee replays, and the upper bound is exhausted.  One
 /// that its limit stops with a set found leaves the lower bound at that game; its floor, now below it, is dropped, and
 /// its checkpoint, a search from that set, becomes the board's own for the proof if the board has none.
@@ -120,7 +120,7 @@ fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_
     assert_eq!(text(&events[0], "outcome").as_deref(), Some("proved"));
     assert!(!dir.join("ckpt").read_dir().unwrap().any(|_| true), "no checkpoint is left of a proven board");
 
-    // A step stopped with a set found, 30 under the optimum: the lower bound is that game; the floor, below it, is
+    // A step stopped with a set found, 30 under opt(n): the lower bound is that game; the floor, below it, is
     // dropped with the stalled step that was there; its checkpoint becomes the board's own, unless the board has one,
     // which stays and the step's is deleted.
     for ordinary in [false, true] {
@@ -160,7 +160,7 @@ fn a_floor_step_that_its_limit_stops_is_kept_and_resumed_under_its_floor() {
     let (dir, n) = (TempDir::new("ledger-floor-stalled"), 1218);
     let mut scheduler =
         alone(&dir, n, &Settings { floor_step: 20, lns_seconds: 0.0, ..quiet() }, opt(n) - 30, opt(n) + 100);
-    // The floor at the optimum is the proof's tree, thousands of steps, and the limit of a millisecond stops it at an
+    // The floor at opt(n) is the proof's tree, thousands of steps, and the limit of a millisecond stops it at an
     // early check of the engine.
     let floor = Floor { score: opt(n), resume: false };
     let job = step_job(n, floor, opt(n) + 100, Duration::from_millis(1));
@@ -219,7 +219,7 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
     let dir = TempDir::new("ledger-floor-order");
     let mut scheduler = climbing(&dir, &[906], &stepping());
     // Two boards with steps: 950 on a line well under the median, 954 on one well over it.  The root of each is 1,400
-    // above the optimum, and the lower bound 10 under: the proof is a floor 1,410 below the root.
+    // above opt(n), and the lower bound 10 under: the proof is a floor 1,410 below the root.
     let steps_of = |intercept: f64, slope: f64, n: u32| -> Vec<Step> {
         let root = opt(n) + 1400;
         [700u64, 900, 1100]

@@ -1,5 +1,5 @@
-//! The ledger: a lower bound L(n), the score of a game it holds, and an upper bound U(n) on opt(n) for every board
-//! size of a stretch at once, tightened from both sides by limited searches and by the relations between boards,
+//! The ledger: a lower bound L(n), the score of a game it holds, and an upper bound U(n) on opt(n) for every game
+//! of a stretch at once, tightened from both sides by limited searches and by the relations between boards,
 //! with the effort spent where a proof looks cheapest.  A board is proven when L(n) = U(n).  The design and the
 //! experiment are in solver/notebook/the-ledger-bounds-from-both-sides-2026-10/README.md.
 //!
@@ -51,7 +51,7 @@
 //!   having found nothing the floor is U (rule `floor`) and the step is a point of the board's line (its steps of 100
 //!   nodes or more; fewer than two points keep the median slope, none the median line).  If it finds a set above the
 //!   floor the set is a game like any other, offered as L after the referee has replayed it, and if the search
-//!   completes the set is the optimum (the board is proven); if the limit stops it with a set, the floor is below L and
+//!   completes the set is optimal (the board is proven); if the limit stops it with a set, the floor is below L and
 //!   the step is dropped, its checkpoint (a search from that set) becoming the board's own for its proof if the board
 //!   has none.  A step that its limit stops with nothing is *stalled*: kept with its
 //!   checkpoint (DIR/ckpt/nN.floor.ckpt, apart from the ordinary searches'), tried again under the same floor with the
@@ -73,14 +73,14 @@
 //!   deleted; a search whose U falls is given the lower ceiling.
 //! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
 //!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
-//!   games, and the proven game is the optimum's start about 88% of the time), so the ledger *climbs* from a wedge.  A
+//!   games, and the proven game starts an optimal game about 88% of the time), so the ledger *climbs* from a wedge.  A
 //!   board that is searched, not proven, not parked, and has its board below proven (however that was proven, and
 //!   however many boards between were settled by the relations) gets a climb *up* ahead of every other job: its search,
 //!   as above (so seeded with the proven game), for `--climb-limit` seconds (default 60; 0: no climbs), resumed from its
 //!   checkpoint if it has one, and not counted among its ordinary searches (its `level` and so its next limit stay).
 //!   If the climb proves the board, the board above it is climbed to next, and so on.  A board with its board *above*
 //!   proven gets a climb *down*, after the climbs up: seeded with that game (the game below it that Lemma L2 makes from
-//!   it is the optimum for n − 1 in about 35% of the composite pairs), but with the ledger's ceiling, which is loose
+//!   it is optimal for n − 1 in about 35% of the composite pairs), but with the ledger's ceiling, which is loose
 //!   (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.  `--climb` picks the ways (`up`, `down`,
 //!   `both`, the default, or `off`).  If a climb stops at its limit the board is *parked* (`parked` in the ledger): it
 //!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
@@ -127,16 +127,16 @@
 //! `down`, `up` if the board is next to a proven one both ways) and its `outcome`: `proved` (its search proved the
 //! board), `parked`, or `moot` (a relation had proven the board while it went on); a floor step has its `floor`,
 //! `distance` (points below the root's bound), `held` (it completed having found nothing) and `outcome`: `held` (the
-//! floor is U), `proved` (it found the optimum and completed), `found` (it stopped with a set, so the floor is below L:
-//! dropped), `stalled` (the limit stopped it: kept), or `moot` (a relation proved the board, or lowered U to the floor,
-//! while it went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board
-//! `n` from `before` to `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle`
-//! (the relations carried the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and
-//! the rules and sources of its two bounds), and the run's `end` (`reason`, `proven`, `games`, and the main thread's
-//! `main_s` busy, `main_longest_s` for the longest piece, and `waited_s`: the seconds that results waited in all).
-//! The events are written out after each result.  `ckpt/`: the checkpoints of the searches that have not finished,
-//! `nN.ckpt` of a board's ordinary searches and climbs and `nN.floor.ckpt` of its stalled floor step.  One run at a
-//! time uses DIR (`taxman.lock`).
+//! floor is U), `proved` (it found the best set and completed), `found` (it stopped with a set, so the floor is below
+//! L: dropped), `stalled` (the limit stopped it: kept), or `moot` (a relation proved the board, or lowered U to the
+//! floor, while it went on)), a `derive` (a relation changed `side`, `lower` or `upper`, of board `n` from `before` to
+//! `after`, by `rule` from the board `from`; those of a result all carry its time), a `settle` (the relations carried
+//! the `boards` of the maps to the others: `changes`, `seconds`), a `proven` board (`value`, and the rules and sources
+//! of its two bounds), and the run's `end` (`reason`, `proven`, `games`, and the main thread's `main_s` busy,
+//! `main_longest_s` for the longest piece, and `waited_s`: the seconds that results waited in all).  The events are
+//! written out after each result.  `ckpt/`: the checkpoints of the searches that have not finished, `nN.ckpt` of a
+//! board's ordinary searches and climbs and `nN.floor.ckpt` of its stalled floor step.  One run at a time uses DIR
+//! (`taxman.lock`).
 //!
 //! A bound that the relations make is checked as it is made: a game must pass the referee (`replay_finished`), and
 //! L > U anywhere ends the run with an error (a bug, or a counterexample to statement U, on which every U of the frame
@@ -144,8 +144,8 @@
 //!
 //! **report** prints what a run did: the boards proven and how (the rules of their two bounds), the curve of boards
 //! proven against CPU, the gaps left, and the check of every board against the known optima (optimal.json and the
-//! completed games of each `--known FILE`): every game replays to its L, L <= opt <= U, and a proven value is the
-//! optimum.  It exits with status 1 if the check finds anything wrong.
+//! completed games of each `--known FILE`): every game replays to its L, L <= opt <= U, and a proven value is
+//! opt(n).  It exits with status 1 if the check finds anything wrong.
 //!
 //! **The bounds store** (`store.rs` the line and its checks, `export.rs`, `verify.rs`; results/README.md, "bounds.jsonl",
 //! has the format).  The bounds a run finds are kept in a file of their own, `results/bounds.jsonl`, one JSON line a

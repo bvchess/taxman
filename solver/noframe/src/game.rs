@@ -1410,7 +1410,7 @@ mod tests {
 
     /// With the target one below optimal.json's score, the search (all its pruning rules: forced picks, nogoods,
     /// the conflict-packing cut, and optionally the segment cuts, the Lagrangian bound or the parity bound) must
-    /// still reach a playable set worth the optimum; at the score itself it must prove that nothing beats it.
+    /// still reach a playable set worth opt(n); at the score itself it must prove that nothing beats it.
     /// Every 7th game to 420.
     #[test]
     fn the_search_finds_the_optimum_just_above_the_target() {
@@ -1467,7 +1467,7 @@ mod tests {
                         assert!(board.playable(&pick), "n={n}");
                         assert_eq!(picks.iter().map(|&c| u64::from(c)).sum::<u64>(), v, "n={n}");
                     }
-                    other => panic!("n={n} variant={variant}: {other:?} below the optimum"),
+                    other => panic!("n={n} variant={variant}: {other:?} below opt(n)"),
                 }
                 assert_eq!(prover(v).run(), Verdict::Proven, "n={n} variant={variant}");
             }
@@ -1475,7 +1475,7 @@ mod tests {
     }
 
     /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of
-    /// an uninterrupted one, on both sides of the optimum (opt(300) = 28691, opt(432) = 59259 and, with the parity
+    /// an uninterrupted one, on both sides of opt(n) (opt(300) = 28691, opt(432) = 59259 and, with the parity
     /// bound, opt(600) = 112623; optimal.json).
     #[test]
     fn paused_searches_resume_to_the_same_verdict() {
@@ -1522,7 +1522,7 @@ mod tests {
         for n in 2..=20u32 {
             let board = Board::new(n, &spf);
             assert_eq!(brute(&board), known[n as usize], "n={n}");
-            // Optimizing from nothing reaches the optimum, with and without the segment cuts and the parity bound.
+            // Optimizing from nothing reaches opt(n), with and without the segment cuts and the parity bound.
             for (segments, parity) in [(false, false), (true, false), (false, true), (true, true)] {
                 let mut p = Prover::new(&board, 0, u64::MAX).optimize();
                 if parity {
@@ -1553,7 +1553,7 @@ mod tests {
                         let sum: u64 = picks.iter().map(|&c| u64::from(c)).sum();
                         assert!(sum >= known[n as usize], "n={n}");
                     }
-                    other => panic!("n={n}: the optimum beats opt − 1, got {other:?}"),
+                    other => panic!("n={n}: opt(n) beats opt(n) − 1, got {other:?}"),
                 }
             }
         }

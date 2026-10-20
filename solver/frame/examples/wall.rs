@@ -1,4 +1,4 @@
-//! The wall regime: how the solver's costs grow with the board size `n` and with the size of a search tree.  What a
+//! The wall regime: how the solver's costs grow with `n` and with the size of a search tree.  What a
 //! game of the chain costs is its search, which grows with the tree, plus everything around the search, which grows
 //! with `n` alone (the tables, the frames, the model, the GF(2) matroids of the root, the replays); the commands
 //! measure the two apart.  The study, its data and its conclusions are in
@@ -44,7 +44,7 @@
 //!   number-theory tables (`tables_s`), the frames (`frames_s`), the game with no promotions that `Board::new` adds
 //!   to them (`plain_s`) and the board as a whole (`board_s`); `prepare_s`, the search's model and greedy incumbent
 //!   (`model_s` and `greedy_s` are its two phases); `problem_s`, the canonical search problem and its digest;
-//!   `search_problem_s`, the same problem built from the board size alone, which is what the tactic `same_search`
+//!   `search_problem_s`, the same problem built from `n` alone, which is what the tactic `same_search`
 //!   does for the earlier game and what the results check does for each repeat line and the game it repeats;
 //!   `match_graph_s`, the matching graph; `improve_s`, the local search from the greedy set; `zero_search_s`, the
 //!   search stopped before its first node (the search's own setup: matching graph, seed, dive, local search, the
@@ -113,13 +113,13 @@
 //!   once, one a thread (default 1), in the order given.  Each line is printed, and with `--out FILE` appended to it,
 //!   as its game finishes, so in the order of finishing; the games that FILE has are skipped, so a run that was
 //!   interrupted goes on where it was (a line cut short at the end of FILE is cut off).
-//! * **choice-prepare** and **choice**: at which nodes is a slow, strong bound (the Lagrangian bound over nogoods,
-//!   refitted at the node, and the A1 bound of `wall/fields.rs` in two forms) worth computing besides today's?
-//!   `choice-prepare` makes a game's file (its nogood pool, its root multipliers, its A1 root fit, its sampled nodes)
-//!   and `choice` measures each node of the file: its gap, the strong bounds and whether they cut, the subtree today's
-//!   search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the options and the
-//!   lines; `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in the cloud and reads the
-//!   lines.
+//! * **choice-prepare** and **choice**: at which nodes is a slower, tighter bound (the Lagrangian bound over the
+//!   nogoods, refitted at the node, and the multi-field bound of `wall/fields.rs` in two forms) worth computing besides
+//!   today's?  `choice-prepare` makes a game's file (its nogood pool, its root multipliers, its A1 root fit, its
+//!   sampled nodes) and `choice` measures each node of the file: its gap, the slower bounds and whether they cut, the
+//!   subtree today's search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the
+//!   options and the lines; `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in the
+//!   cloud and reads the lines.
 //! * **decompose**: do the conflicts of a node that heads a big subtree split, across some home, into two sides that do
 //!   not interact (A5, the decomposition across the frames)?  For the nodes of a game's proof (the probe's fixtures,
 //!   the open units of pauses of the proof, the root): how the conflicts of the node's heaviest set and the nogoods
@@ -139,8 +139,8 @@
 //!   whether an exchange of two primes that maps the member onto another candidate is a symmetry of the node, and with
 //!   `--prune` prunes by the ones that are; defined in `wall/exchanges.rs`, whose module comment has the check, the
 //!   rule and the lines.  `solver/notebook/local-prime-exchanges-at-the-nodes-2026-10/` reads them.
-//! * **near**: how many completions of a unit of the tuning suite, or of a whole game, come within `--within D` of the
-//!   optimum, by value, counted exactly by the search made to count (`search::StepHook::counting`) or estimated from
+//! * **near**: how many completions of a unit of the tuning suite, or of a whole game, come within `--within D` of
+//!   P*, by value, counted exactly by the search made to count (`search::StepHook::counting`) or estimated from
 //!   random descents; defined in `wall/near.rs`, whose module comment has the count, the estimate and the files.
 //!   `solver/notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/` reads them.
 //!
@@ -174,7 +174,8 @@ mod anatomy;
 /// The game that `choice-prepare` and `choice` play: their options, budgets and the play of a command.
 #[path = "wall/case.rs"]
 mod case;
-/// `choice-prepare` and `choice`: the strong bound refitted at a node against the subtree today's search makes of it.
+/// `choice-prepare` and `choice`: the Lagrangian bound, refitted at a node, against the node's subtree in today's
+/// search.
 #[path = "wall/choice.rs"]
 mod choice;
 #[path = "common/counters.rs"]
@@ -188,7 +189,7 @@ mod decompose;
 /// `exchanges`: local prime exchanges at the nodes of a search, checked and pruned by.
 #[path = "wall/exchanges.rs"]
 mod exchanges;
-/// The A1 bound (GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
+/// The multi-field bound (A1: GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
 #[path = "wall/fields.rs"]
 mod fields;
 /// `sample` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
@@ -200,7 +201,7 @@ mod known;
 #[allow(dead_code)] // `wall` reads the part that harvests nogoods; the ledger reads the rest
 #[path = "common/lns.rs"]
 mod lns;
-/// `near`: the completions of a unit near the optimum, counted or estimated.
+/// `near`: the completions of a unit near P*, counted or estimated.
 #[path = "wall/near.rs"]
 mod near;
 /// The nogoods that the finder and the sound search learn, and the Lagrangian bound fitted over them.
@@ -209,7 +210,7 @@ mod nogoods;
 #[path = "common/rng.rs"]
 mod rng;
 /// The nodes of a game that `choice-prepare` samples: the probe's fixtures, the tuning suite's units and nodes on the
-/// way to the optimum.
+/// way to an optimal set.
 #[path = "wall/sample.rs"]
 mod sample;
 /// The helpers of the tests (temporary directories), shared with the other tests.
@@ -434,7 +435,7 @@ fn duration(name: &str, text: String) -> Result<Duration, String> {
     Duration::try_from_secs_f64(seconds).map_err(|e| format!("{name} {seconds}: {e}"))
 }
 
-/// The board sizes of the arguments: numbers, and for every command but `nodes` and `grow` also ranges `A-B`.
+/// The games of the arguments: numbers, and for every command but `nodes` and `grow` also ranges `A-B`.
 fn games(command: &str, texts: &[String]) -> Result<Vec<u32>, String> {
     let ranges = !matches!(command, "nodes" | "grow");
     let mut games = Vec::new();
@@ -655,7 +656,7 @@ impl Line {
         Line(Vec::new())
     }
 
-    /// A line that starts with the board size.
+    /// A line that starts with `n`.
     fn of(n: u32) -> Line {
         let mut line = Line::new();
         line.field("n", n);
@@ -1393,7 +1394,7 @@ fn known_proofs(path: &Path) -> Result<HashMap<u32, String>, String> {
     Ok(proofs)
 }
 
-/// The board sizes of the lines of an output file's text, and the length in bytes of its whole lines.  A text that does
+/// The games of the lines of an output file's text, and the length in bytes of its whole lines.  A text that does
 /// not end in a newline ends in a line cut short (a run was killed in the middle of writing it), which counts for
 /// nothing and is cut off before a run goes on.
 fn finished_games(text: &str) -> Result<(HashSet<u32>, usize), String> {
@@ -1474,7 +1475,7 @@ mod tests {
     use taxman::search::symmetry::Symmetries;
     use taxman::solver::{self, GameResult, SolveOptions};
 
-    /// The board sizes from 2 to `to`, every `step`-th.
+    /// The games from 2 to `to`, every `step`-th.
     fn sample(step: usize, to: u32) -> impl Iterator<Item = u32> {
         (2..=to).step_by(step)
     }
@@ -1488,7 +1489,7 @@ mod tests {
     }
 
     /// The ends of game `n` are what `solve` reports of it: its setup line's sizes and greedy sum, the start incumbent
-    /// that a search stopped at once is left with (`best_so_far`), and with `full` the optimum of a search to the end,
+    /// that a search stopped at once is left with (`best_so_far`), and with `full` the score of a search to the end,
     /// which lies between the ends, and which takes no more than the first node if they meet.
     fn agree_with_solve(n: u32, full: bool) {
         let land = landscape_at(n).expect("a board the solver supports");
@@ -1574,7 +1575,7 @@ mod tests {
         first_nodes(&[700, 936, 1215, 1300, 1400, 2112]);
     }
 
-    /// Every sampled game's ends hold the known optimum: lower at most the optimum, upper at least.
+    /// Every sampled game's ends hold opt(n): lower at most it, upper at least.
     fn bracket_the_optimum(games: impl Iterator<Item = u32>) {
         for n in games {
             let land = landscape_at(n).expect("a board the solver supports");

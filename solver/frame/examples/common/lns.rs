@@ -1,9 +1,9 @@
 //! Large neighbourhood search (LNS) for a good game: keep a random share of the incumbent's promotions fixed, search
 //! the rest exactly as a unit of the engine, take any better game, and repeat (`#[path = "common/lns.rs"] mod lns;`
 //! beside `rng`; `wall choice-prepare` harvests nogoods with it and the ledger uses it, so that they share one copy).
-//! It is not sound: it may miss the optimum, and nothing it finds proves anything.  A lower bound needs only a legal
-//! game, so a caller may offer what it finds as one, after the referee (`taxman::game::replay_finished`) has replayed
-//! it at its score.  The measurements are in
+//! It is not sound: it may miss an optimal game, and nothing it finds proves anything.  A lower bound needs only a
+//! legal game, so a caller may offer what it finds as one, after the referee (`taxman::game::replay_finished`) has
+//! replayed it at its score.  The measurements are in
 //! solver/notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md.
 
 use crate::rng::Rng;
@@ -55,7 +55,7 @@ pub struct Options {
     pub fix: (f64, f64),
     /// The step limit of one unit (the engine counts in blocks of 1,024).
     pub unit_nodes: u64,
-    /// The seed of the random choices (mixed with the board size, so that each game has its own: [`rng`](Self::rng)).
+    /// The seed of the random choices (mixed with n, so that each game has its own: [`rng`](Self::rng)).
     pub seed: u64,
 }
 

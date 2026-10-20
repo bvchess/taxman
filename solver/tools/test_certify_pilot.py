@@ -279,7 +279,7 @@ class Inputs(Case):
                 "--plan", self.write("plan.jsonl", [plan_line(1100)]), "--plan-md", self.write_md()]
         code, _out, err = self.call(argv)
         self.assertEqual(code, 1)
-        self.assertIn("bad.txt line 2: expected a board size", err)
+        self.assertIn("bad.txt line 2: expected a game n", err)
 
 
 class Committed(unittest.TestCase):

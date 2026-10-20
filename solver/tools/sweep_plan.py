@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Planning for solver/tools/cloud/sweep.sh, which solves a stretch of board sizes in blocks of consecutive games, each
+"""Planning for solver/tools/cloud/sweep.sh, which solves a stretch of games in consecutive blocks, each
 block on one thread, and then goes over the games again so that each sees the game before it whichever block made it.
 Standard library only; it shares no code with the Rust crate.
 
@@ -16,7 +16,7 @@ usage:
       OUT` needs, and prints "LINES TODO": the number of lines written (the solver appends after them) and the number
       of games of A..B that it will search again first (none: nothing to go over, and the job is not worth starting;
       see `excerpt` for which).  `solve` opens its --out file with the checks of `taxman verify-results`, so the excerpt must hold
-      whatever each of its lines rests on: all the lines of A..B, the completed games of the 8 board sizes before A
+      whatever each of its lines rests on: all the lines of A..B, the completed games of the 8 games before A
       (the games a repeat can repeat) and the best unfinished search of A - 1 (its seed), and, for every completed line
       taken, the game of n - 1 it names (the completed game, or the unfinished search whose score and moves it
       records) and the game it repeats, and so on.  The lines are copied as they are, in their order in RESULTS.

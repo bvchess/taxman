@@ -1,6 +1,6 @@
 //! The prover's proofs of optimal scores: for every game in a range, an upper bound on opt(n) proven without the
-//! frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and for a board size it
-//! lacks the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
+//! frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and, for a game it
+//! lacks, the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1] [--parity 0]
 //!           [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]
@@ -18,7 +18,7 @@
 //! files `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below,
 //! the largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the other numbers of
 //! layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides it from the
-//! board's own U\*, not from a board size), every number of layer 2 up to n/2 barred.  THEORY.md's Theorem B says every
+//! board's own U\*, not from n), every number of layer 2 up to n/2 barred.  THEORY.md's Theorem B says every
 //! optimal set obeys them, so a search from them that proves "no playable set obeying them beats V" still proves
 //! opt(n) <= V (an optimal set beating V would obey them), and its line is written `"proven"` like any other.  The
 //! recorded game must obey them (checked).  The sources of layer 3 and up stay free.  Against the plain root it takes

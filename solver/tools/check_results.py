@@ -43,13 +43,13 @@ For every completed game:
               not be over.  A line whose prev has source run or results and no proof was built on such a game
               (`solve --keep-going`): an earlier incomplete line of n-1 has that score and those moves.  That game seeded
               the line and proves nothing, so the line has no ceiling (setup.cap), no cap or prime_formula proof, and
-              scores no less than it.  A file may have holes (board sizes with no line, or only incomplete lines)
+              scores no less than it.  A file may have holes (games with no line, or only incomplete lines)
   repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
               on an earlier line, whose proof is exhausted, cap or same_search; the record's proof and assumptions are
               m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do the two
               setups' frames, candidates and max_total; the promotions are m's, and promotion_sum is their sum;
               score(n) - in_the_bag(n) = score(m) - in_the_bag(m)
-and across files: every board size that two files share has the same score in both.
+and across files: every game that two files share has the same score in both.
 
 What this referee cannot check, because it does not rebuild the frame model: that an exhausted search explored its
 whole tree (it trusts the line's proof kind, as the Rust verifier must too), and that a repeat's search problem is
@@ -397,11 +397,11 @@ def check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
 
 def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
     """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
-    report's counters, and the board sizes that only an unfinished search is recorded for."""
+    report's counters, and the games that only an unfinished search is recorded for."""
     rows = read_lines(path, problems)
     games = {}
     unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their game
-    stopped = set()  # the board sizes with an incomplete line
+    stopped = set()  # the games with an incomplete line
     for number, row in rows:
         if row.get("schema") != SCHEMA:
             problems.append(
@@ -623,7 +623,7 @@ def main():
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)
             print(f"  {len(done)} completed games, n = {min(done)}..{max(done)} ({missing} missing)")
         if unfinished:
-            print(f"  unfinished: {len(unfinished)} board sizes have only an unfinished search "
+            print(f"  unfinished: {len(unfinished)} games have only an unfinished search "
                   f"(n = {unfinished[0]} to {unfinished[-1]}); they are not proven")
         print("  proof: " + listing(counts))
         print("  assumed: " + listing(assumed))
@@ -636,7 +636,7 @@ def main():
                     problems.append(f"n={n}: {other} scores {other_score}, {path} scores {score}")
             else:
                 seen[n] = (path, score)
-    print(f"{len(shared)} board sizes are in more than one file")
+    print(f"{len(shared)} games are in more than one file")
     if problems:
         print(f"{len(problems)} PROBLEMS:")
         for problem in problems:

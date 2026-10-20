@@ -1,7 +1,7 @@
 //! The upper part of the optimal sets, game by game: for every game in a range, which members of U\*_{≥3} (the
 //! sources of three or more prime factors that descending greedy keeps) the parity bound certifies to be in every
-//! set beating the recorded score, and which it leaves open.  The recorded games are optimal.json's (to 1300) and, for a board
-//! size it lacks, those of the `--results` files (default the solver's `results/strict.jsonl`), read in the order
+//! set beating the recorded score, and which it leaves open.  The recorded games are optimal.json's (to 1300) and, for
+//! a game it lacks, those of the `--results` files (default the solver's `results/strict.jsonl`), read in the order
 //! given after optimal.json, an earlier file winning.  One line per game, resumable:
 //!
 //!     upper --from A --to B [--list ...] [--threads K] [--seconds S] [--optimal FILE] [--results FILE]...

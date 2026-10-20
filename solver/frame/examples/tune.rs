@@ -31,7 +31,7 @@
 //! `solve` solves units of GAME to completion: each by an engine run of its own (one thread, fresh nogood tables),
 //! so that a unit's result does not depend on the others solved with it.  The incumbent a subtree starts from is the
 //! known optimum of the game if `--known` has it (then the subtree is *proved*: the search only has to show that
-//! nothing in it beats the optimum), else the checkpoint's incumbent, recorded in the units file.  The unit ids are
+//! nothing in it beats P*), else the checkpoint's incumbent, recorded in the units file.  The unit ids are
 //! those of the file (all the game's units if there is no `--ids`); `root` (or `GAME-root`) is the whole game, the
 //! root unit with all candidates, for which no units file is needed (but the known optimum is: a whole game is a
 //! proof).  `--tactic` takes the names and values of `taxman solve --tactic` (the search tactics only), so a new
@@ -44,10 +44,10 @@
 //! nothing beat it), `incumbent` (the starting one), `proved`, `opt` (the known optimum or null), `tactics` (the
 //! changes from the defaults) and `stats` (the searchers' counters, `search::stat`).
 //!
-//! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not the
-//! optimum: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree below
-//! the root can hold a heavier completion that breaks one (docs/THEORY.md, "Pruning with the inequalities").
-//! With the optimum as the incumbent nothing beats it whatever the settings, so a different `best` there is a bug.
+//! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an
+//! optimal set: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree
+//! below the root can hold a heavier completion that breaks one (docs/THEORY.md, "Pruning with the inequalities").
+//! With an optimal set as the incumbent nothing beats it whatever the settings, so a different `best` there is a bug.
 
 #[allow(dead_code)] // this reads and writes hex sets only; the probe reads the nodes fixtures too
 #[path = "common/fixtures.rs"]
@@ -537,11 +537,11 @@ mod tests {
     use std::time::Duration;
     use taxman::search::Prepared;
 
-    /// A game whose proof takes several thousand steps with the default tactics (3,647 from the optimum): more than
+    /// A game whose proof takes several thousand steps with the default tactics (3,647 from an optimal set): more than
     /// the 1,024 the engine counts by, so that a node limit can stop it and a checkpoint of it holds units.
     const GAME: u32 = 1215;
 
-    /// The game set up as `solve` sets it up, with the optimum known (the built-in table has it).
+    /// The game set up as `solve` sets it up, with its optimal game known (the built-in table has it).
     struct World<const W: usize> {
         prepared: Prepared<W>,
         board: Board<W>,
@@ -579,16 +579,16 @@ mod tests {
             let b = solve_unit(&space, root(&w), &w.start, None).unwrap();
             assert!(a.completed && a.nodes > 1_024, "{} nodes", a.nodes);
             assert_eq!((a.nodes, a.best, a.stats), (b.nodes, b.best, b.stats));
-            assert_eq!(a.best, w.opt, "a proof from the optimum finds nothing better");
+            assert_eq!(a.best, w.opt, "a proof from an optimal set finds nothing better");
             assert!(a.cpu_ns > 0 && b.cpu_ns > 0);
         }
         taxman::with_width!(GAME, W => check::<W>());
     }
 
-    /// The root unit is the whole search: the nodes of the one-thread proof that `search` makes, seeded with the
-    /// optimum, are the root unit's.  (The checkable case: the subtree of a node below the root is not a part of the
-    /// search that one can check in this way, because the searcher's nogoods, learned in the units before it, are not
-    /// the fresh searcher's.)
+    /// The root unit is the whole search: the nodes of the one-thread proof that `search` makes, seeded with an
+    /// optimal set, are the root unit's.  (The checkable case: the subtree of a node below the root is not a part of
+    /// the search that one can check in this way, because the searcher's nogoods, learned in the units before it, are
+    /// not the fresh searcher's.)
     #[test]
     fn the_root_unit_is_the_whole_search() {
         fn check<const W: usize>() {
@@ -651,8 +651,8 @@ mod tests {
         assert!(counts.iter().all(|&c| (500..700).contains(&c)), "{counts:?}");
     }
 
-    /// Units of a checkpoint: sampled, written, read back, and solved from the checkpoint's incumbent and from the
-    /// optimum.
+    /// Units of a checkpoint: sampled, written, read back, and solved from the checkpoint's incumbent and from an
+    /// optimal set.
     #[test]
     fn units_of_a_checkpoint_are_sampled_written_read_and_solved() {
         fn check<const W: usize>() {
@@ -700,12 +700,12 @@ mod tests {
                 let index: usize = row.id.rsplit('-').next().unwrap().parse().unwrap();
                 assert_eq!(row.unit, all[index], "{} is that unit of the checkpoint", row.id);
                 assert_eq!(row.depth, row.unit.promoted.len());
-                // From the optimum the subtree is proved, and solved the same every time.
+                // From an optimal set the subtree is proved, and solved the same every time.
                 let proof = solve_unit(&space, row.unit, &w.start, None).unwrap();
                 let again = solve_unit(&space, row.unit, &w.start, None).unwrap();
                 assert!(proof.completed && proof.best == w.opt);
                 assert_eq!((proof.nodes, proof.stats), (again.nodes, again.stats));
-                // From the checkpoint's incumbent, which is no better than the optimum, it finds at most the optimum.
+                // From the checkpoint's incumbent, which is no better than P*, it finds at most P*.
                 let search = solve_unit(&space, row.unit, &checkpoint_start, None).unwrap();
                 assert!(search.completed && (checkpoint_start.sum()..=w.opt).contains(&search.best));
             }

@@ -246,7 +246,7 @@ first.jsonl: 22 completed games, n = 1..=22 (0 missing), 0 incomplete lines
   proof: trivial 10, prime_formula 8, cap 1, exhausted 2, same_search 1
   assumptions: none in 22 of 22 games
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 9, prime formula 7
-0 board sizes are in more than one file, with equal scores in all
+0 games are in more than one file, with equal scores in all
 checked in 185.3 ms
 $ python3 solver/tools/check_results.py first.jsonl
 ...

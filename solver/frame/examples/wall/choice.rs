@@ -1,26 +1,26 @@
-//! `wall choice-prepare` and `wall choice`: at which search nodes is a slow, strong bound worth computing instead of
+//! `wall choice-prepare` and `wall choice`: at which search nodes is a slower, tighter bound worth computing instead of
 //! today's fast GF(2) bound alone?  The question and the data it asks for are in
 //! solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md; the analysis is
 //! `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/analyze.py`.
 //!
-//! The *strong bound* of a node (promotions `P`, candidates `C`) is the Lagrangian bound over nogoods that
-//! [`nogoods`](super::nogoods) fits at the root, with the GF(2) bound as its inner problem, but with the multipliers
-//! fitted at the node: for the nogoods `N` live there (those whose members outside `P` are all in `C`; the others are
-//! vacuous and only loosen the bound), every completion `F` has `|F ∩ N| ≤ |N - P| - 1`, so for any multipliers
-//! `λ_N ≥ 0` the heaviest common independent set of the node's GF(2) matroids, each candidate `x` weighing
+//! The Lagrangian bound over the nogoods, refitted at a node (promotions `P`, candidates `C`), or *the refitted bound*,
+//! is the bound that [`nogoods`](super::nogoods) fits at the root, with the GF(2) bound as its inner problem, but with
+//! the multipliers fitted at the node: for the nogoods `N` live there (those whose members outside `P` are all in `C`;
+//! the others are vacuous and only loosen the bound), every completion `F` has `|F ∩ N| ≤ |N - P| - 1`, so for any
+//! multipliers `λ_N ≥ 0` the heaviest common independent set of the node's GF(2) matroids, each candidate `x` weighing
 //! `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N - P| - 1)` bounds every completion (weak duality).  The fit is `--node-steps`
 //! subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the root, and it stops
 //! at the first step whose bound is below what the node needs (the node is then *cut*).
 //!
-//! Two more strong bounds can be measured at the same nodes, the *A1 bounds* ([`fields`](super::fields): GF(2) and
-//! signed GF(3) frame matroids coupled by multipliers that a column generation fits, with a certified bracket;
+//! Two more bounds can be measured at the same nodes, the *multi-field bounds* (A1; [`fields`](super::fields): GF(2)
+//! and signed GF(3) frame matroids coupled by multipliers that a column generation fits, with a certified bracket;
 //! solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md): **r2**, the study's warm refit
 //! (the multipliers of the game's root fit, then a column generation of at most `--a1-pricings` evaluations from the
 //! root's master columns and rank inequalities that still hold at the node, with no exact check), and **full**, the
 //! node's own master with the exact checks and the separation of the node's own cores, from the root fit's multipliers
 //! and signings, stopping at the first bound that cuts and within `--a1-seconds` (then *capped*).  Each is the lowest
-//! `⌊L⌋` it evaluated, a bound on the node's completions at any multipliers and signings, and cuts the node when it
-//! is below `need`.
+//! `⌊L⌋` it evaluated, a bound on the node's completions at any multipliers and signings, and cuts the node when it is
+//! below `need`.
 //!
 //! The work is in two commands, so that the cloud can share the nodes among processes:
 //!
@@ -34,7 +34,7 @@
 //!   suite that the chain has not reached).  The nodes ([`sample`](super::sample) has the sources) are those of the
 //!   fixture `--fixtures DIR` has for the game and the game's units in the suite, each source thinned to `--keep`
 //!   nodes spread evenly over their gaps among those today's bound leaves open (a node it cuts has no subtree to speak
-//!   of), and `--paths` nodes on the way to the optimum, whose best completion is known (a check of the bound's
+//!   of), and `--paths` nodes on the way to an optimal set, whose best completion is known (a check of the bound's
 //!   validity, not measured further).
 //!   The line printed has the game's `n`, `incumbent`, `known`, `root` and `gap` (the root's GF(2) bound over the
 //!   incumbent), `finder_pool`, `search_pool` and `pool`, `harvest_cpu_s`, `fit_steps`, `fit_cpu_s`, `active` (nogoods
@@ -46,7 +46,7 @@
 //!   incumbent that it closes), and for a fitted one `a1_stop` (how it ended: `Converged`, or the budget that ran
 //!   out) and `a1_lb` (the certified lower bound on its LP, 0 if none).
 //! * **choice** (`--prep DIR N...`), for each unit of the games' files, the heaviest first: its subtree, today's
-//!   bound, the strong bound and the times, as a line of JSON on stdout.  With `--results DIR --worker K` the lines
+//!   bound, the refitted bound and the times, as a line of JSON on stdout.  With `--results DIR --worker K` the lines
 //!   are also appended to `DIR/worker-K.jsonl`, and a unit that any file of `DIR` already has is skipped, so a run
 //!   that stops goes on where it was; with `--claims DIR` a unit is taken by creating a file of its name there, so
 //!   that workers share the units (clear the directory when a run begins again).  `--cap S` stops a unit's solve
@@ -68,12 +68,12 @@
 //!   wall seconds into the fit at the end of each step) and `s` (the fit's CPU seconds, the live filter included, the
 //!   matroids not); and `sub`: the same with the nogoods of the solve besides (`extra`: those not in the pool), or
 //!   null without `--sub-nogoods`.  That is a bound of hindsight, for what a searcher's own table could give;
-//! * `a1`, with `--a1` (else null): the A1 bounds.  `build_s` is the CPU seconds of the node's GF(2) frame matroids
-//!   as vectors, and `r2` and `full` are the two bounds, each with `bound` (the lowest `⌊L⌋` it evaluated), `cut` (it is
-//!   below `need`), `stop` (how it ended: `Target` when it cut, `Converged` or `Fitted` when it settled, `Seconds`,
-//!   `Pricings`, `Rounds` or `Breakdown` when a budget or the master ended it), `capped` (it ended before settling
-//!   and did not cut: more time might have cut), `pricings` (evaluations of `L`; `r2`'s are those after the first),
-//!   and `s`, the CPU seconds it took besides `build_s` (`r2`'s include its first evaluation, at the root fit's
+//! * `a1`, with `--a1` (else null): the multi-field bounds.  `build_s` is the CPU seconds of the node's GF(2) frame
+//!   matroids as vectors, and `r2` and `full` are the two bounds, each with `bound` (the lowest `⌊L⌋` it evaluated),
+//!   `cut` (it is below `need`), `stop` (how it ended: `Target` when it cut, `Converged` or `Fitted` when it settled,
+//!   `Seconds`, `Pricings`, `Rounds` or `Breakdown` when a budget or the master ended it), `capped` (it ended before
+//!   settling and did not cut: more time might have cut), `pricings` (evaluations of `L`; `r2`'s are those after the
+//!   first), and `s`, the CPU seconds it took besides `build_s` (`r2`'s include its first evaluation, at the root fit's
 //!   multipliers, which is `tier1`, a field of `r2` alone; `full` has `rounds`, its separation rounds).  A path node's
 //!   `full` gets at most 2 CPU seconds: it cannot cut, and only its bound is checked;
 //! * the unit's solve by the engine on one thread, fresh nogood tables and the forgetting of the default (as the
@@ -172,7 +172,7 @@ struct PrepUnit<const W: usize> {
     unit: TaxUnit<W>,
     /// The nodes of the suite's solve, if it has the unit.
     hint: Option<u64>,
-    /// For a node on the way to the optimum, what its best completion reaches.
+    /// For a node on the way to an optimal set, what its best completion reaches.
     lower: Option<u64>,
     /// The gap when it was prepared.
     gap: i64,
@@ -468,7 +468,8 @@ fn a1_fit<const W: usize>(
 
 /// The seconds of the A1 warm refit, which settles in a fraction of one.
 const R2_SECONDS: f64 = 10.0;
-/// The seconds of the A1 bound of a node on the way to the optimum, which cannot cut it: only its validity is checked.
+/// The seconds of the multi-field bound of a node on the way to an optimal set, which cannot cut it: only its validity
+/// is checked.
 const PATH_SECONDS: f64 = 2.0;
 
 /// The nogood pool of a game and the multipliers fitted for it at the root.
@@ -484,7 +485,7 @@ struct Tools<'a, const W: usize> {
     a1: Option<A1>,
 }
 
-/// The A1 bounds of a game (`--a1`): its root fit and the budgets.
+/// The multi-field bounds of a game (`--a1`): its root fit and the budgets.
 struct A1 {
     root: Root,
     limits: Limits,
@@ -492,7 +493,7 @@ struct A1 {
     full_seconds: f64,
 }
 
-/// An A1 bound at a node with the CPU seconds it took (besides the node's frame matroids) and whether it cut.
+/// A multi-field bound at a node with the CPU seconds it took (besides the node's frame matroids) and whether it cut.
 struct Timed {
     refit: Found,
     seconds: f64,
@@ -518,8 +519,9 @@ impl Timed {
     }
 }
 
-/// The A1 bounds at a node whose bound must fall to `target` to cut it: the cost of its frame matroids, and the warm
-/// refit and the node's own master (the latter for at most `PATH_SECONDS` at a node on the way to the optimum).
+/// The multi-field bounds at a node whose bound must fall to `target` to cut it: the cost of its frame matroids, and
+/// the warm refit and the node's own master (the latter for at most `PATH_SECONDS` at a node on the way to an optimal
+/// set).
 struct A1Bounds {
     build_s: f64,
     r2: Timed,
@@ -556,7 +558,7 @@ struct Refit {
     seconds: f64,
 }
 
-/// The strong bound of the node with promotions `promoted` and candidates `cands`, whose matroids are `graph`: a fit
+/// The refitted bound of the node with promotions `promoted` and candidates `cands`, whose matroids are `graph`: a fit
 /// of `steps` steps towards a bound below `need`, over the `nogoods` live at the node (each with the multiplier to
 /// begin from).
 fn refit<'a, const W: usize>(
@@ -665,7 +667,8 @@ fn measure_unit<const W: usize>(
         faults.push(format!("{at}: the bound of its matroids built afresh is {plain_value}, not {today}"));
     }
 
-    // A node on the way to the optimum is fitted towards what its best completion reaches, which no bound goes below.
+    // A node on the way to an optimal set is fitted towards what its best completion reaches, which no bound goes
+    // below.
     let aim = pu.lower.unwrap_or(need);
     let pooled = pool.sets.iter().zip(pool.lambda).map(|(set, &lambda)| (set, lambda));
     let strong =
@@ -985,8 +988,8 @@ mod tests {
             let best = if ran.set.sum() > unit.promoted.sum() { ran.set } else { unit.promoted };
             let lower = best.sum() - unit.promoted.sum();
             // Incumbents that no completion beats (the best set itself, and the game's optimum, which is what the
-            // fixtures' proofs are seeded with and where the strong bound cuts), and one it beats (the best set without
-            // its largest member outside the promotions).
+            // fixtures' proofs are seeded with and where the refitted bound cuts), and one it beats (the best set
+            // without its largest member outside the promotions).
             let beaten = best.difference(&unit.promoted).max().map(|x| {
                 let mut set = best;
                 set.remove(x);
@@ -1030,8 +1033,8 @@ mod tests {
                     }
                     cut_at_the_end += i32::from(cut);
                 }
-                // The A1 bounds: neither is below the best completion, each cuts exactly when it is below `need`, and
-                // neither cuts a node whose completion beats the incumbent.
+                // The multi-field bounds: neither is below the best completion, each cuts exactly when it is below
+                // `need`, and neither cuts a node whose completion beats the incumbent.
                 let a1 = line.get("a1").filter(|a1| !a1.is_null()).unwrap_or_else(|| panic!("a1 in {line}"));
                 for variant in ["r2", "full"] {
                     let found = a1.get(variant).unwrap_or_else(|| panic!("a1 {variant} in {line}"));
@@ -1055,7 +1058,7 @@ mod tests {
             }
         }
         assert!(measured >= 12, "{measured} measurements");
-        assert!(cut_by_a1 > 0, "no node cut by an A1 bound");
+        assert!(cut_by_a1 > 0, "no node cut by a multi-field bound");
         eprintln!("choice: {measured} measurements, {open} open, {cut_at_the_end} cut by a fit, {cut_by_a1} by A1");
     }
 

@@ -5,7 +5,7 @@
 #   solver/tools/cloud/certify.sh LIST[:THREADS]...
 #
 # LIST is a name (pilot7, dear_rest, rest_1 to rest_4, deferred: the file $LISTS/NAME.txt) or the path of a list file
-# (one board size a line, as `taxman certify --list` reads it; the files of stage4 hold only games that need a
+# (one n a line, as `taxman certify --list` reads it; the files of stage4 hold only games that need a
 # certificate).  Each list runs as a process of its own, all at once:
 #
 #   taxman certify --list FILE --results $CERT_RESULTS --upper U... --out $OUT_DIR/certificates_NAME.jsonl \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The prover's proofs of opt(n) for a range of board sizes, on all the CPUs of a machine, resumable.
+# The prover's proofs of opt(n) for a range of games, on all the CPUs of a machine, resumable.
 #
 #   solver/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: results/strict.jsonl)
 #   solver/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
@@ -60,8 +60,8 @@ BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
 SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
 usage() {
-    die "usage: prover.sh [--verify] A B   (the first and last board size, 2 <= A <= B)" \
-        "or OUT=FILE prover.sh --list N1,N2,...   (board sizes, each at least 2)"
+    die "usage: prover.sh [--verify] A B   (the first and last game, 2 <= A <= B)" \
+        "or OUT=FILE prover.sh --list N1,N2,...   (games, each at least 2)"
 }
 verify_only=0
 list_mode=0

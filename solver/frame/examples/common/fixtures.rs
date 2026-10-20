@@ -33,7 +33,7 @@ pub fn from_hex<const W: usize>(text: &str) -> Result<Bits<W>, String> {
     Ok(set)
 }
 
-/// The nodes of a `.nodes` fixture: (board size, incumbent, units).
+/// The nodes of a `.nodes` fixture: (n, incumbent, units).
 pub type Nodes<const W: usize> = (u32, Bits<W>, Vec<TaxUnit<W>>);
 
 pub fn read_nodes<const W: usize>(path: &Path) -> Result<Nodes<W>, String> {
@@ -51,5 +51,5 @@ pub fn read_nodes<const W: usize>(path: &Path) -> Result<Nodes<W>, String> {
             _ => return Err(at(format!("unexpected line {line:?}"))),
         }
     }
-    Ok((n.ok_or_else(|| format!("{}: no board size", path.display()))?, incumbent, units))
+    Ok((n.ok_or_else(|| format!("{}: no n line", path.display()))?, incumbent, units))
 }
