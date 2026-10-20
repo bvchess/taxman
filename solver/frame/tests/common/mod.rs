@@ -108,8 +108,8 @@ fn read_stored_games(name: &str) -> StoredGames {
     games
 }
 
-/// The game `n − 1` of a committed results file as the previous game of `n`.  The games of `results/strict.jsonl`
-/// assume nothing (`results/README.md`); the proof only matters to the results lines.
+/// The game `n − 1` of a committed results file as the previous game of `n`.  The tests take games of
+/// `results/strict.jsonl` below 1300, which assume nothing; the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
     Prev {

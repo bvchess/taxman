@@ -226,9 +226,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
 * **chain**: games each built from the one before (n = 1, 2, 3, ...).  A game's search starts from the previous game's
   promotions and stops at its ceiling.  A game solved with no game of n − 1 is **standalone**.
-* **the committed chain**: the chain in the file `results/strict.jsonl`, from n = 1.  Every game in it is proven and
-  assumes nothing beyond the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its
-  range.  The **end of the chain** is its last game.
+* **the committed chain**: the chain in the file `results/strict.jsonl`, from n = 1.  Every game in it is proven within
+  the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its range.  The **end of the chain** is
+  its last game.
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
   concludes it with the earlier game's promotions instead of searching.  `same_search` is the name of the tactic and of
   the proof; the method of the line is `repeat`.
