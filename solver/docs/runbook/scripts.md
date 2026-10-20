@@ -6,7 +6,7 @@ Part of the [runbook](../RUNBOOK.md).
 
 The scripts of `solver/tools/cloud/`; the ledger's are in `solver/tools/ledger/` ([ledger.md](ledger.md)).  The top of
 each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `sweep.sh`, `prover.sh`, `certify.sh`,
-`wall.sh`, `wall-node.sh`) also give their variables and exit statuses.
+`wall.sh`, `wall-node.sh`) also give their variables, and `chain.sh`, `sweep.sh` and `certify.sh` their exit statuses.
 
 | file | what it does |
 |---|---|
@@ -28,9 +28,11 @@ each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `swee
 | `test/test_build_cache.py`, `test/test_run_tests.py`, `test/test_setup.py` | tests of the build cache (a directory for the bucket, and the stand-in for aws), of the release suite's runner (a toy crate) and of `setup.sh`'s build logic (a stand-in for cargo); no cloud, no release build |
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image ([Dry run in Docker (optional)](before-a-big-run.md#dry-run-in-docker-optional)) |
 
-All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
+The scripts that source `run.sh` keep their state in one directory, `$TAXMAN_WORK` (default `~/taxman-work`), among
+it `results/strict.jsonl` (and
 `exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid` (`prover.pid`)
-and `deadline`.  Nothing is written inside the checkout but `solver/frame/target` and `solver/noframe/target`, and
+and `deadline`; `wall.sh` keeps its files in `WALL_DIR`, and the ledger's `cloud.sh` in `OUT`.  Nothing is written
+inside the checkout but `solver/frame/target` and `solver/noframe/target`, and
 `solver/frame/bench/history.jsonl` if you run `taxman bench` without `--history`.
 
 ## What has run where
@@ -46,11 +48,11 @@ on macOS cannot.
 | `setup.sh` | its build and checks | the prover's run (`PROVER_ONLY=1`), the chain's run, the scaling run on a `c8g.48xlarge` (in full, without the tests), and the releases of [build-cache.md](build-cache.md) |
 | `verify.sh` | yes | the chain's rehearsal; the scaling run |
 | `save.sh` | | the prover's run (with an instance role); the chain's run (with its restore on the second instance) |
-| `spot-watch.sh` | the path after a notice (a SIGTERM, the final checkpoint), with a signal, in `test/run.sh node` ([The rehearsal](wall.md#the-rehearsal)) | the prover's run and the chain's run; no spot interruption has tested it, since none came in either run (the chain's first instance was stopped on purpose) |
+| `spot-watch.sh` | the path after a notice (a SIGTERM, the final checkpoint), with a signal, in `test/run.sh node` ([The rehearsal](wall.md#the-rehearsal)) | the prover's run, the chain's run, and [the run to 5000](../../notebook/the-run-to-5000-2026-10/README.md), whose two spot interruptions it handled |
 | `prover.sh` | over a range, with a SIGTERM stop and a resume, on macOS and in the image | the run of [prover.md](prover.md) (2026-10-14 and 15, to the end) |
 | `certify.sh` | `taxman certify` on two lists at once (bash 3.2) through a complete run and its `verify-certificates`, a SIGTERM stop and its resume; with a stand-in for the binary, a counterexample, an error, a crash and a deadline | not run |
 | `scaling.sh` | all three modes: a sweep, `--engine`, `--pauses` | not run: the calibration and the scaling run did by hand what it does |
-| `wall.sh`, `wall-node.sh`, the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the rehearsal](wall.md#the-rehearsal) and [the run to the wall](../../notebook/the-run-to-the-wall-2026-10/README.md) |
+| `wall.sh`, `wall-node.sh`, the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the rehearsal](wall.md#the-rehearsal) and [the run to the wall](../../notebook/the-run-to-the-wall-2026-10/README.md) and [the run to 5000](../../notebook/the-run-to-5000-2026-10/README.md) |
 | `sweep.sh` | against the stand-in (`test/run.sh sweep`) and on ranges a laptop can do ([its local test](../../notebook/the-sweep-a-local-test-2026-10/README.md)) | not run |
 | `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)) |
 | the build cache and the release suite | against a directory for the bucket, the stand-in for aws and a stand-in for cargo; the runner, the whole suites of the solver and the prover in the test profile | the releases and the cache of 2026-10-18 ([What was tested](build-cache.md#what-was-tested)) |

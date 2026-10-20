@@ -7,7 +7,7 @@ machine builds a pinned commit of master, re-solves the games of the committed `
 it at home, [Verifying, and bringing the results home](chain.md#verifying-and-bringing-the-results-home)), and goes on
 past them.  It stops by itself at the wall, when it has used its budget, or on a date.  When AWS takes the machine away,
 a group starts another that goes on from the saved state.  [The run to the
-wall](../../notebook/the-run-to-the-wall-2026-10/README.md) records the first run and the rehearsal;
+wall](../../notebook/the-run-to-the-wall-2026-10/README.md) records the first run;
 [STATUS.md](../STATUS.md) holds the decision for the wall (Brian, 2026-10-16) and its reasons.  A launch needs Brian's
 approval, with the estimate of [What needs Brian's approval, and what it
 costs](#what-needs-brians-approval-and-what-it-costs).
@@ -32,12 +32,12 @@ the games before it, each appended by the `chain.sh` that concluded it.  The obj
 end (the reason and the time).  A machine that starts later finds it, sets the capacity to 0 again and powers off, which
 stops a failing end from repeating.  `wall.sh launch --continue` removes it on purpose.
 
-Four backstops depend on none of these scripts:
+Three backstops depend on none of these scripts, and a fourth on `wall-node.sh` alone:
 
 * the timer in the user data (`shutdown -h +MINUTES`, the budget and two hours), so that no machine outlives the whole
   run;
 * a scheduled action of the group that takes it to capacity 0 at the date plus two hours;
-* `MAX_INSTANCES`;
+* `MAX_INSTANCES`, which `wall-node.sh` checks as each machine starts;
 * the ceiling on the spot price (`--spot-max`, dollars an hour, $1.0): above it no machine launches, and the run waits.
 
 ## The parts
@@ -46,7 +46,7 @@ Four backstops depend on none of these scripts:
 |---|---|---|
 | `wall.sh` | your machine | `launch`, `status`, `stop` and `cleanup`; it prints every aws command that changes something (`+ aws ...`; `--verbose` prints the reads too), `DRY_RUN=1` prints the changes without making them, and the files the commands take stay in `~/taxman-wall/RUN` |
 | the launch template `taxman-wall`, the security group `taxman-wall` (no inbound rule), the group `taxman-wall` | the account | one `c8g.16xlarge` (or `INSTANCE_TYPE`) at spot, lowest price first among the zones (`SpotAllocationStrategy=lowest-price`, one pool), capacity rebalancing off, `min 0, max 1`, EC2 health checks, tags `Project=taxman`, `Purpose=wall` |
-| the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts the `wall-node.sh` that commit has (in `solver/tools/cloud`, or `rust/tools/cloud` before the restructure of 2026-10-18) in a tmux session `tx` as `ec2-user`, checking a few seconds later that the session lives; if any of that fails after five tries, it records the end and takes the group to 0 |
+| the user data | the template | sets the timer, installs git and tmux, clones the repository, checks out the pinned commit and starts the `wall-node.sh` that commit has (in `solver/tools/cloud`, or `rust/tools/cloud` before the restructure of 2026-10-18) in a tmux session `tx` as `ec2-user`, checking a few seconds later that the session lives; if any of that fails (the install and the clone after five tries), it records the end and takes the group to 0 |
 | `wall-node.sh` | each machine | restores the logs, runs `setup.sh` (the solver alone, `BUILD=--bin taxman`: from the build cache if it has the commit, tested; no tests of its own; its smoke checks run), then `save.sh --restore`; starts `spot-watch.sh` and a loop that looks for `run/stop`; runs `chain.sh` with the config; decides what its status means ([How it ends](#how-it-ends)) |
 | `run.sh`'s ledger | each machine | counts the budget and the date (below) |
 | `wall-policy.json` | the role `taxman-ec2` | lets the machines set the capacity of this one group and read groups ([What needs Brian's approval](#what-needs-brians-approval-and-what-it-costs)) |
@@ -77,7 +77,8 @@ A machine stops if it cannot read the ledger or the ledger has no numbers, becau
 
 The [rules for every launch](launch.md#rules-for-every-launch) cover these account changes: the inline policy
 `taxman-wall` on the role `taxman-ec2`; a security group, a launch template, an Auto Scaling group and a scheduled
-action (all named `taxman-wall`); the spot instances the group launches, and their volumes; and objects in the bucket.
+action (all named `taxman-wall`, the action `taxman-wall-date`); the spot instances the group launches, and their
+volumes; and objects in the bucket.
 The first Auto Scaling group of the account also creates the service-linked role `AWSServiceRoleForAutoScaling`, which
 stays.  `cleanup` deletes the group, the template, the security group and the policy; the service-linked role, the
 bucket and `taxman-ec2` stay on purpose.
@@ -116,7 +117,8 @@ solving them again: add `--extra-args "--use-prev"` to both commands (the paragr
 below).
 
 The defaults are the run: `c8g.16xlarge`, window 4, wall 24 hours, budget 74 instance-hours, the chain to 8191, the spot
-ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` prints the header of the script, and every option has
+ceiling $1.0, a volume of 40 GB, zones by price.  `launch --help` prints the header of the script, and every option but
+`--continue` has
 an environment variable.  `launch` prints the files (the user data, the config, the mixed instances policy) and each
 command that changes something before it runs the command (`--verbose` adds the reads).  It puts the config in S3, then
 makes the policy, the security group, the launch template, the group at capacity 0 and the scheduled action, and last
@@ -204,9 +206,11 @@ report that the games of the committed file agree with it with equal scores, "as
 the games past its end.  The checkpoint of the walled game stays in `ckpt/`, because a run that goes on needs it.
 
 **To go on** after the wall or the budget (a longer wall, more money), run
+`wall.sh cleanup`, then
 `wall.sh launch --continue --commit THE-SAME-COMMIT --until DATE --budget-hours H --game-hours G`.  Use the commit the
 run began with, because a checkpoint resumes only on the build that made it ([Run](chain.md#run)), and give the budget
-as the new total.  `--continue` removes the end and the stop, writes the config again, and keeps the ledger, the results
+as the new total.  `--continue` removes the end, the stop and the count of machines (`run/boots/`), writes the config
+again, and keeps the ledger, the results
 and the checkpoints.
 
 **Drawing on the known games.**  The chain above searches every game from n = 1, which re-proves the committed chain
@@ -386,8 +390,8 @@ used there.  The instances of the earlier runs exercised all of these but the gr
 | symptom | cause and remedy |
 |---|---|
 | `launch` stops with an error after some commands | the script prints each command's error; `wall.sh cleanup --force` deletes what exists, then launch again |
-| the group has no instance and the capacity is 1 | no spot capacity at the ceiling in those zones: `aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall` says why; add zones or raise `--spot-max` (`cleanup`, then `launch --continue`) |
-| `status` shows `ENDED` with `boot failed` | the user data failed (install, clone, checkout, finding or starting `wall-node.sh`); the reason names the step; fix and `launch --continue` |
-| machines keep starting | `run/boots/` counts them; the `MAX_INSTANCES`th ends the run as a boot loop; read `logs/wall-node.log` in S3 |
+| the group has no instance and the capacity is 1 | no spot capacity at the ceiling in those zones: `aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall` says why; add zones or raise `--spot-max` (`cleanup --force`, then `launch --continue`) |
+| `status` shows `ENDED` with `boot failed` | the user data failed (install, clone, checkout, finding or starting `wall-node.sh`); the reason names the step; fix, `cleanup`, then `launch --continue` |
+| machines keep starting | `run/boots/` counts them; the one after the `MAX_INSTANCES`th ends the run as a boot loop; read `logs/wall-node.log` in S3 |
 | the machine is up and `status` shows nothing new for over 20 minutes | `aws ssm start-session`, `tmux attach -t tx`; `tail ~/taxman-work/logs/chain.err` |
 | `wall.sh stop` and nothing happens | the machine looks for the stop object every 30 s while the chain runs, and not during the setup; `stop --now` ends it at once |

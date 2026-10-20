@@ -27,7 +27,7 @@ depends on:
   the CPU that builds it; with no flag it is `generic`.
 * **The cache is not used**, with a message that says why, and the build goes on as before, never reading or writing the
   cache, for a dirty checkout, no commit (a copy without `.git`), `RUSTFLAGS` other than empty or one
-  `-C target-cpu=...`, no `aws` command or no credentials, or `BUILD_CACHE=off`.
+  `-C target-cpu=...`, no `aws` command, or `BUILD_CACHE=off`.  With no credentials a lookup is a miss and a put fails.
 * **SET** names what an entry's tarball holds, by its parts: `solver-bin-taxman+solver-example-ledger`, say, or
   `prover-bins+prover-examples+solver-bins+solver-examples` for everything.
 * **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
@@ -107,7 +107,8 @@ lists each one's tests (`--list`, leaving out the `#[ignore]`d ones that `cargo 
 binaries together: the tests with no time on record first, then the longest first (`test-times.json`, rewritten after
 each run, kept in the cache), so that the longest does not start last.  The doc tests run as `cargo test --doc`.
 
-* **A failing test** does not stop the others (as `--no-fail-fast`); each is run once more alone afterwards, so that the
+* **A failing test** does not stop the others (as `--no-fail-fast`); the first 20 are run once more alone afterwards, so
+  that the
   report says whether it fails only in company.  A test that outlasts `TEST_TIMEOUT` is killed and fails.
 * **The summary** (`--summary`) names the ten tests that used the most CPU, with their seconds of CPU: a test's own,
   which do not grow when the machine is busy.  `solver/tools/quick_check.py` runs the suite without `--release` and

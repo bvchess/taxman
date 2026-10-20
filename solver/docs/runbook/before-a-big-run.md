@@ -68,7 +68,7 @@ nothing about speed: the scaling numbers of a container on a laptop mean nothing
 
    Every search that takes more than 2 seconds stops, and the next pass resumes it from its checkpoint.  The log shows
    the passes ("going on"), and it must end with "the range 1-1000 is complete", both referees agreeing.
-5. Copy the logs home (`scp -r HOST:taxman-work/logs .`), then do what the rules say for the end: terminate the instance
+5. Copy the logs home (`scp -r HOST:small/logs .`), then do what the rules say for the end: terminate the instance
    and confirm that nothing remains.
 
 ## The big instance: correctness
@@ -85,9 +85,9 @@ TXENGINE_STRESS=2000 cargo test --release --test engine -- --ignored stress
 TXENGINE_CONSERVATION=500 cargo test --release --test robustness conservation
 ```
 
-* **The suite** takes about 30 s after compiling, with two or four test threads
-  ([solver/docs/design/testing.md](../design/testing.md)).  It includes the node-count tripwires (`tests/tripwires.rs`),
-  which assert exact trees on one thread, and so check the arithmetic and the search against a different CPU and
+* **The suite** takes about 30 s after compiling, with four test threads.  It includes the small trees of the node-count
+  tripwires (`tests/tripwires.rs`; the large ones need `--release`), which assert exact trees on one thread, and so
+  check the arithmetic and the search against a different CPU and
   compiler.
 * **`many_threads`** runs the engine on a toy problem at 64 and at 192 workers: answers, splitting, checkpoints every 2
   ms, spilling, a panicking worker.  `--nocapture` prints each run's counters (`eff`, `splits`, `full`), the first look

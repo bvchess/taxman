@@ -174,10 +174,11 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
 * installs packages, and installs Rust with rustup if there is none (stable, at least 1.89);
 * looks first, in a clean checkout at a commit, for that commit's tested binaries in the build cache, and builds nothing
   when it finds them ([build-cache.md](build-cache.md)); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the
-  solver and the examples `ledger`, `perf` and `ladder` (`STUDIES=1` adds the study tools `tune`, `extended`,
+  solver, its examples `ledger`, `perf` and `ladder`, and the prover (`solver/noframe`) (`STUDIES=1` adds the study
+  tools `tune`, `extended`,
   `structure` and `wall`, which a default build skips);
 * replays `optimal.json`, runs both result verifiers on the committed files, and runs `taxman regress --to 400`;
-* runs `cargo test -- --test-threads=4`.
+* runs `cargo test -- --test-threads=4`, and the prover's `cargo test --release`.
 
 Its output is also in `~/taxman-work/logs/setup.log`.  Run it again to pick up later commits; a reboot loses nothing it
 made.  `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries into the cache
@@ -185,8 +186,9 @@ made.  `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries in
 
 ### Cost guardrails
 
-These variables bound a run.  `DEADLINE_HOURS`, `POWEROFF`, `BUDGET_HOURS` and `RUN_UNTIL` belong to `run.sh`, so every
-long-run script reads them; `GAME_HOURS` is `chain.sh`'s.  The table says what `chain.sh` does.
+These variables bound a run.  `DEADLINE_HOURS`, `POWEROFF`, `BUDGET_HOURS` and `RUN_UNTIL` belong to `run.sh`, so
+`chain.sh`,
+`sweep.sh`, `prover.sh` and `certify.sh` read them; `GAME_HOURS` is `chain.sh`'s.  The table says what `chain.sh` does.
 
 | variable | effect |
 |---|---|
@@ -194,7 +196,7 @@ long-run script reads them; `GAME_HOURS` is `chain.sh`'s.  The table says what `
 | `POWEROFF` | `done` powers the machine off when the range is complete; `always` powers it off whenever `chain.sh` ends for any reason, which needs passwordless `sudo`, as on both AMIs |
 | `GAME_HOURS` | the wall: the chain stops at the first game whose own search has passed that many hours, over every run of it, keeping every checkpoint and recording nothing for the game; the log says `wall at N after H hours`, and the status is 4 |
 | `BUDGET_HOURS` | instance-hours over every machine of the run, counted in the ledger in S3; the solver stops cleanly five minutes before they are used up, with status 3 like `DEADLINE_HOURS` |
-| `RUN_UNTIL` | a date, treated like `BUDGET_HOURS` |
+| `RUN_UNTIL` | a date in seconds since the epoch, treated like `BUDGET_HOURS` |
 
 Use `POWEROFF=always` for an unattended run, since an idle machine after an error or a deadline costs as much as a busy
 one.  `chain.sh` saves to `S3_DEST` before it powers off, which matters because a shutdown terminates the instance.

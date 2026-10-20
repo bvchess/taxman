@@ -4,7 +4,8 @@ Part of the [runbook](../RUNBOOK.md).
 
 `sweep.sh FIRST LAST` proves as many games of a long stretch as a cheap machine allows, with holes, on one
 `c8g.16xlarge` at spot.  Brian chose 3441 to 8191 for it (2026-10-17).  The chain of [chain.md](chain.md) proves every
-game in turn and stops at the first it cannot (3441 took 5.9 hours on 64 threads).  The sweep instead gives each game at
+game in turn and stops at the first it cannot (the search of 3441 took 2.8 hours on 64 threads).  The sweep instead
+gives each game at
 most `GAME_SECONDS` (180) of one thread, goes on past the games that do not finish, and keeps what does.
 [STATUS](../STATUS.md) says whether it has run, and [a local
 test](../../notebook/the-sweep-a-local-test-2026-10/README.md) tried it on the laptop.  A launch needs Brian's approval

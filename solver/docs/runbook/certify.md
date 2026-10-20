@@ -18,7 +18,8 @@ commands and the checks differ.
 ## What it costs, and what to approve
 
 **Approve up to $50 at spot (or $160 on demand), in two steps:** phase A first ($3 at spot, $11 on demand), then phases
-B and C once the stop rule of 9.2 says GO.  The table below prices the campaign at $31 to $35 at spot.
+B and C once [the stop rule](#the-stop-rule-of-the-pilot) says GO.  The table below prices the campaign at $31 to $35 at
+spot.
 
 708 games need a certificate.  The rule of the same problem settles 145 of them with no search: each sits in the list of
 the game it rests on, after it.  115 more repeat a search that the rule cannot settle; they are searched too, and go
@@ -35,11 +36,11 @@ one `c8g.16xlarge` (64 threads), and in dollars at the spot price paid on 2026-1
 | C: the repeats the rule cannot settle | `deferred` | 117 (115 searched) | 0-361 | 0-5.6 | $0-3.81 | $0-14.40 |
 | **all** | | **708** | **2,940-3,301** | **46-52** | **$31-35** | **$117-132** |
 
-Phase C costs nothing if a build with Lemma M5⁺ is merged by then: that lemma, unzip's claims in the extended problem,
-is the open item of [the
-entry](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md), and its
-rule settles 3427 and its like from the certificates of phases A and B (3427 alone is 223 thread-hours).  Without it,
-the 117 games are searched, for 361 thread-hours.
+Phase C costs less if a build with the claim-by-claim rule is merged by then.  That rule, Lemma M5⁺ claim by claim, was
+measured but not kept ([the entry on the claims of
+unzip](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)), and it settles 3427 and 59 more
+of the deferred repeats from the certificates of phases A and B (3427 alone is 223 thread-hours); the build of Lemma M5⁺
+that is merged settles none of them.  Without the rule, the 117 games are searched, for 361 thread-hours.
 
 * **If the overhead is not 2.**  The plan prices a certificate at 2 times the plain search; the certificates of eight
   games of 1400..2156 took a median of 1.55 times it ([one-sided candidates in the
@@ -47,10 +48,13 @@ the 117 games are searched, for 361 thread-hours.
   costs 2,350-2,640 thread-hours ($25-28 at spot, $94-105 on demand), at 2.4 3,530-3,960 ($37-42, $141-158).  The pilot
   measures it where the money goes (|O| near 200-300, root gaps 1,100-1,550).
 * **Spending past 1.5 times the estimate pauses the campaign.**  Each phase runs under a `DEADLINE_HOURS` of 1.5 times
-  its expected hours (the table of 9.4), after which the script stops cleanly and the campaign waits for a report.
+  its expected hours (the table of [The lists, and the commands of the
+  phases](#the-lists-and-the-commands-of-the-phases)), after which the script stops cleanly and the campaign waits for a
+  report.
   Resume only with Brian's yes.
 * **Wall time.**  About two days on one machine; the dearest game, 3440, takes 10.6 hours by itself.  Two machines (the
-  dear list on one, the four rest lists on the other, each with its own S3 prefix, 9.6) bring the rest down to about 29
+  dear list on one, the four rest lists on the other, each with its own S3 prefix, [Phase B](#phase-b)) bring the rest
+  down to about 29
   hours at the same cost.
 * **Risks.**  The overhead at the dear end could be worse than the plan's; the pilot finds that out for $3.  A spot
   interruption costs at most a checkpoint interval (5 minutes), and nothing with `spot-watch.sh`.  A counterexample (a
@@ -61,7 +65,7 @@ the 117 games are searched, for 361 thread-hours.
 
 **Go on if the median R is at most 3 and no R is above 5,** where R is a certificate's cost over the plan's price of its
 plain search; the campaign then costs at most 1.5 times the plan.  **Stop** otherwise: report, and build the speedups
-(Lemma M5⁺ and a faster node) before spending more.  **Stop at once** on any `beaten` verdict.
+(the claim-by-claim rule and a faster node) before spending more.  **Stop at once** on any `beaten` verdict.
 `solver/tools/certify_pilot.py` (its header defines the quantities) computes all of it from the certificates and the
 plan ([Phase A](#phase-a-the-pilot)).
 
@@ -86,7 +90,8 @@ microseconds of a thread up to 3310, 326.73 after; the table of eras in `plan.md
   `COMMIT`: the whole campaign runs on it, and the lines of every certificate record it (`build`).  The build is
   `setup.sh` with the tests skipped (they run on the laptop), which builds the solver and the prover for the CPU of the
   machine and runs its smoke checks.
-* **Phase C on another build.**  If a build with Lemma M5⁺ is merged by phase C, check it out on the machine of phase C
+* **Phase C on another build.**  If a build with the claim-by-claim rule is merged by phase C, check it out on the
+  machine of phase C
   (`git fetch && git checkout M5COMMIT`) and build again.  Delete the checkpoint directory of `deferred` if an earlier
   attempt left one, since a checkpoint of another build is refused.  Phases A and B never change build: a checkpoint is
   resumed only by the build that made it, and the lines of one list should come from one build.
@@ -208,12 +213,13 @@ tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
 if it stops for any reason, the second command does not run.  Then the four rest lists run together.  On two machines
 instead, run the same two commands, one on each: `dear_rest` with `D/B1` and `POWEROFF=done`, and the four rest lists
 with `D/B2` and `POWEROFF=done`, each machine with a timer of its own deadline plus an hour.  The second launch reuses
-the first's security group (`sg`), since 2.2 names a group by the purpose and the day.  Phase C then fetches both
+the first's security group (`sg`), since [Launch](launch.md#launch) names a group by the purpose and the day.  Phase C
+then fetches both
 prefixes.
 
 ## Phase C
 
-Phase C searches the repeats that the rule cannot settle, or settles them by the rule of a build with Lemma M5⁺ ([The
+Phase C searches the repeats that the rule cannot settle, or settles them by a build with the claim-by-claim rule ([The
 machine and the build](#the-machine-and-the-build)).  Its output file starts as a copy of everything the earlier phases
 wrote (with two machines in phase B, sync `$D/B1/results` and `$D/B2/results` in place of `$D/B/results` below), so that
 the rule finds the certificates of the games it rests on, and so that the file at the end is the whole campaign's.  On a

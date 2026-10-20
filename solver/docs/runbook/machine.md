@@ -49,7 +49,8 @@ Each job's file names the instance that suits it; this page says why.
   `BIOS Model name: AWS Graviton4`.  Nobody has measured the gain of `native` on Graviton; expect 0 to 3 % (on the M1 it
   measured 0 %).
 * **Profile-guided optimization** (PGO) is optional.  `solver/tools/pgo.sh` makes the build (its header says how); on
-  the M1 it adds 0 to 2 % ([DESIGN.md](../design/performance.md)).  PGO changes code generation only, so the search
+  the M1 it adds 0 to 2 % ([design/performance.md](../design/performance.md)).  PGO changes code generation only, so the
+  search
   and its answers stay the same, and either binary can resume a checkpoint.  `TAXMAN_BIN` and `LADDER_BIN` point the
   scripts at another binary.  Keep a non-PGO build too if you want to profile.
 
@@ -77,8 +78,9 @@ Each job's file names the instance that suits it; this page says why.
 ## Storage
 
 Put checkpoints and results on a disk that survives a stop or a reboot and has local semantics (`flock`, `fsync`).  Use
-the root EBS volume (gp3; 40 GB is plenty, since the toolchain and `target/` take 3 to 4 GB and the results about 2 KB
-per game), or a separate EBS volume that you mount and name with `TAXMAN_WORK`.  Turn "delete on termination" off for a
+the root EBS volume (gp3; 40 GB is plenty, since the toolchain and `target/` take 3 to 4 GB and the results 30 MB for
+the 4,547 games of the committed chain on 2026-10-20), or a separate EBS volume that you mount and name with
+`TAXMAN_WORK`.  Turn "delete on termination" off for a
 separate volume if the state should outlive the instance; the end of the run deletes it with the rest.  Avoid three
 things:
 

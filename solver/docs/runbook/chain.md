@@ -64,11 +64,12 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
 
   ```
   mkdir -p ~/taxman-work/results && cp results/strict.jsonl ~/taxman-work/results/strict.jsonl
-  solver/tools/cloud/chain.sh 4095                    # skips the games it holds and solves the next on
+  solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
   ```
 
-  `chain.sh` checks the file when it opens it.  The file assumes nothing (it is a chain from n = 1), holds no incomplete
-  line, and its lines keep the builds that made them ([results/README.md](../../../results/README.md) names them), as
+  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` games
+  assume statement U, and its lines keep the builds that made them ([results/README.md](../../../results/README.md)
+  names them), as
   the lines added will keep the cloud's.  The comparison of `verify.sh` with the committed file is then trivial for the
   games it holds, so the referees alone check the games above them (each game replayed, the chain bounds,
   Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On a
@@ -79,7 +80,7 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
   completed game and resumes the game with a checkpoint.  The thread count, the window, `S3_DEST`, `DEADLINE_HOURS` and
   N may differ between runs.  The first deadline stays in `~/taxman-work/deadline`: delete the file to set another (a
   replacement machine: [Surviving a spot interruption](launch.md#surviving-a-spot-interruption)).
-* **What it does by itself.**  `chain.sh` retries a crash (a status other than 0, 1, 2, 124, 130 and 143) after 10 s.
+* **What it does by itself.**  `chain.sh` retries a crash (a status other than 0, 1, 2, 4, 124, 130 and 143) after 10 s.
   It does not retry an error status (1 or 2: a refused checkpoint, a game that failed a check), because it would repeat:
   read `~/taxman-work/logs/chain.err`.
 * **Use the same build between a stop and its resume.**  A checkpoint records the game, the frames the build made, the
@@ -103,14 +104,14 @@ tail -f ~/taxman-work/logs/chain.err          # the progress lines of the game i
 tail -n 3 ~/taxman-work/logs/chain.out        # the last finished games
 tail ~/taxman-work/logs/chain.log             # this script's own messages
 tail -n 1 ~/taxman-work/results/strict.jsonl | cut -c1-40        # the last completed game
-ls -l ~/taxman-work/ckpt                      # a checkpoint no older than ~2 minutes while a long game runs
+ls -l ~/taxman-work/ckpt                      # a checkpoint no older than ~5 minutes while a long game runs
 htop                                          # all CPUs near 100 %
 ```
 
 A healthy progress line at 192 threads shows `eff` of 95 % or more, `lock` under 1 %, small `idle`, `queue` of a few
 hundred at most, `spilled 0`, `pauses N (x%)` with x under 1, and `best` rising early and then holding still (the
 incumbent is often, not always, found long before the proof ends).  The node rate grows with the thread count: one M1
-Max thread does 12 thousand nodes a second at n = 1215 and 8 thousand at 2172 (the table of [round
+Max thread does 9 thousand nodes a second at n = 1472 and 8 thousand at 2172 (the table of [round
 B](../../notebook/round-b-the-chain-on-many-threads-2026-10/README.md)).  On a Graviton4 core the proof of 2172 does 6.5
 thousand a second on one thread, and the chain's searches of 2277..2336 did 3.3 to 6.2 thousand a thread on 192 threads
 (0.6 to 1.2 million a second) and 3.9 to 5.3 thousand on 64 (0.25 to 0.34 million) ([the scaling
@@ -146,8 +147,10 @@ file.  The first appended line records its game of n − 1 with the proof `known
 committed file's line has the proof it was made with.  Both referees accept that record, because the score, the moves
 and the assumptions are the line's.
 
-Then decide what to keep.  The file takes about 2 KB a game.  Scripts must not overwrite the committed `results/`: put a
-file next to them (say `results/strict-1-1400.jsonl`) and update `results/README.md`.  The scaling logs under
+Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
+committed `results/`: put a
+file next to them (say `results/strict-1-1400.jsonl`) and update `results/README.md` and the list of results files in
+`tests/results.rs`.  The scaling logs under
 `solver/notebook/` (in a folder of their own, or in `solver/notebook/graviton-calibration-2026-10/`) are your call.
 
 To extend the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
