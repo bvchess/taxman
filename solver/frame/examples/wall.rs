@@ -25,6 +25,8 @@
 //!     [--seconds S] [--out FILE] N...
 //! cargo run --profile test --example wall --features studies -- exchanges --known FILE (--suite FILE --ids ID[,ID...]
 //!     | --root) [--prune] [--below D] [--sample K] [--nodes K] [--tactic NAME=VALUE]... N|A-B...
+//! cargo run --profile test --example wall --features studies -- near --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) --within D [--nodes K] [--probes K [--frontier G] [--seed S]] [--sets DIR] [--tactic NAME=VALUE]... N
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -137,6 +139,10 @@
 //!   whether an exchange of two primes that maps the member onto another candidate is a symmetry of the node, and with
 //!   `--prune` prunes by the ones that are; defined in `wall/exchanges.rs`, whose module comment has the check, the
 //!   rule and the lines.  `solver/notebook/local-prime-exchanges-at-the-nodes-2026-10/` reads them.
+//! * **near**: how many completions of a unit of the tuning suite, or of a whole game, come within `--within D` of the
+//!   optimum, by value, counted exactly by the search made to count (`search::StepHook::counting`) or estimated from
+//!   random descents; defined in `wall/near.rs`, whose module comment has the count, the estimate and the files.
+//!   `solver/notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -194,6 +200,9 @@ mod known;
 #[allow(dead_code)] // `wall` reads the part that harvests nogoods; the ledger reads the rest
 #[path = "common/lns.rs"]
 mod lns;
+/// `near`: the completions of a unit near the optimum, counted or estimated.
+#[path = "wall/near.rs"]
+mod near;
 /// The nogoods that the finder and the sound search learn, and the Lagrangian bound fitted over them.
 #[path = "wall/nogoods.rs"]
 mod nogoods;
@@ -237,7 +246,7 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 12] = [
+const COMMANDS: [&str; 13] = [
     "setup",
     "nodes",
     "grow",
@@ -250,10 +259,11 @@ const COMMANDS: [&str; 12] = [
     "anatomy",
     "cycles",
     "exchanges",
+    "near",
 ];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 52] = [
+const OPTIONS: [(&str, &[&str]); 56] = [
     (
         "--known",
         &[
@@ -267,6 +277,7 @@ const OPTIONS: [(&str, &[&str]); 52] = [
             "anatomy",
             "cycles",
             "exchanges",
+            "near",
         ],
     ),
     ("--cap", &["choice"]),
@@ -277,13 +288,17 @@ const OPTIONS: [(&str, &[&str]); 52] = [
     ("--best-cap", &["decompose"]),
     ("--and-or-cap", &["decompose"]),
     ("--and-or-min", &["decompose"]),
-    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges"]),
+    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges", "near"]),
     ("--units", &["cycles"]),
-    ("--ids", &["anatomy", "exchanges"]),
+    ("--ids", &["anatomy", "exchanges", "near"]),
     ("--prune", &["exchanges"]),
     ("--below", &["exchanges"]),
-    ("--root", &["exchanges"]),
+    ("--root", &["exchanges", "near"]),
     ("--sample", &["exchanges"]),
+    ("--within", &["near"]),
+    ("--probes", &["near"]),
+    ("--frontier", &["near"]),
+    ("--sets", &["near"]),
     ("--trace", &["anatomy"]),
     ("--prefer", &["anatomy"]),
     ("--best-cpu", &["anatomy"]),
@@ -302,17 +317,17 @@ const OPTIONS: [(&str, &[&str]); 52] = [
     ("--fits", &["choice-prepare"]),
     ("--cpu", &["choice-prepare"]),
     ("--steps", &["choice-prepare"]),
-    ("--seed", &["choice-prepare"]),
+    ("--seed", &["choice-prepare", "near"]),
     ("--fix", &["choice-prepare"]),
     ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
-    ("--nodes", &["nodes", "grow", "anatomy", "exchanges"]),
+    ("--nodes", &["nodes", "grow", "anatomy", "exchanges", "near"]),
     ("--seconds", &["nodes", "grow", "cycles"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
     ("--width", &["setup", "nodes"]),
     ("--no-seed", &["nodes"]),
-    ("--tactic", &["nodes", "grow", "anatomy", "exchanges"]),
+    ("--tactic", &["nodes", "grow", "anatomy", "exchanges", "near"]),
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
@@ -370,6 +385,8 @@ struct Options {
     anatomy: anatomy::Params,
     /// The options of `exchanges`.
     exchanges: exchanges::Params,
+    /// The options of `near` (its `--ids` are `anatomy`'s, its `--root` `exchanges'`, its `--seed` the finder's).
+    near: near::Params,
     games: Vec<u32>,
 }
 
@@ -398,6 +415,7 @@ impl Options {
             params: case::Params::default(),
             anatomy: anatomy::Params::default(),
             exchanges: exchanges::Params::default(),
+            near: near::Params::default(),
             games: Vec::new(),
         }
     }
@@ -529,6 +547,10 @@ fn parse() -> Result<Options, String> {
             "--below" => o.exchanges.below = number("--below", value("--below")?)?,
             "--root" => o.exchanges.root = true,
             "--sample" => o.exchanges.sample = number("--sample", value("--sample")?)?,
+            "--within" => o.near.within = number("--within", value("--within")?)?,
+            "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
+            "--frontier" => o.near.frontier = number("--frontier", value("--frontier")?)?,
+            "--sets" => o.near.sets = Some(value("--sets")?.into()),
             _ => texts.push(arg.clone()),
         }
     }
@@ -600,6 +622,10 @@ fn main() {
     }
     if o.command == "exchanges" {
         exchanges::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if o.command == "near" {
+        near::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     if let Some(command) = case::Command::named(&o.command) {

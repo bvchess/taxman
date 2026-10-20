@@ -11,7 +11,8 @@
 //! branching on any member, and going on without it, explores every completion (DESIGN.md, section 4, "The default
 //! step", the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may
 //! also narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric
-//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.
+//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.  And it may
+//! make the search count the completions that reach the need instead of beating it ([`StepHook::counting`]).
 //!
 //! The hook is the GF(2) path's (the tactic `gf2`, the default): on the matching path it is told of the steps, without
 //! their bound checks, and asked nothing.
@@ -51,6 +52,19 @@ pub trait StepHook<const W: usize> {
     /// do.  This is the one site where a hook can change the answer: the rule's soundness is the study's to prove.
     fn narrow(&mut self, promoted: &Bits<W>, cands: &mut Bits<W>) -> bool {
         let _ = (promoted, cands);
+        false
+    }
+
+    /// Whether the search *counts* (asked at each offer and at each heaviest set that can be promoted; the answer must
+    /// not change).  A counting search makes every completion of its unit that reaches the need as a child, once,
+    /// instead of looking for one better than the incumbent.  It offers nothing, so the incumbent and the need stay
+    /// where they began; and a node whose heaviest set can be promoted, which a search ends there, branches on that
+    /// set's members as on a conflict's (every other completion leaves one of them out), to make that set and every
+    /// other.  The promotion sets of the children made are distinct, so the hook counts a completion at the step that
+    /// made it, explored or not (the end [`StepEnd::Child`], [`StepEnd::Leaf`] or [`StepEnd::ChildCut`]: a child with
+    /// nothing more to promote is cut as exact).  Only with the GF(2) bound, and without the rule of symmetric pairs,
+    /// which keeps one side of each pair.
+    fn counting(&self) -> bool {
         false
     }
 }

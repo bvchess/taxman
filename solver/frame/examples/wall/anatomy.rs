@@ -473,6 +473,11 @@ fn write_candidates<const W: usize>(path: &Path, p: &Prepared<W>, known: &Known<
     out.write_all(text.as_bytes()).and_then(|()| out.flush()).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// Writes the game's candidates as the trace has them, for another study (`near`).
+pub(super) fn write_game_candidates<const W: usize>(path: &Path, p: &Prepared<W>) -> Result<(), String> {
+    write_candidates(path, p, &Known::new(p, &[]))
+}
+
 fn write_conflicts<const W: usize>(path: &Path, listed: &[Bits<W>]) -> Result<(), String> {
     let mut out = create(path)?;
     let mut text = String::from("id\tsize\tmembers\n");

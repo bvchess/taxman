@@ -354,6 +354,10 @@ struct Stepper<'a, const W: usize> {
     /// A study's hook, and the record of the step in progress that it is told of ([`SearchSpace::hooks`]).
     #[cfg(feature = "studies")]
     hook: Option<(Box<dyn StepHook<W>>, StepRecord<W>)>,
+    /// Whether the conflict of the last GF(2) check is its heaviest set, which can be promoted: a counting search
+    /// ([`StepHook::counting`]) branches on it.
+    #[cfg(feature = "studies")]
+    promotable: bool,
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -389,6 +393,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 gf2_flushed: Gf2Stats::default(),
                 #[cfg(feature = "studies")]
                 hook: space.hooks.map(|make| (make(), StepRecord::default())),
+                #[cfg(feature = "studies")]
+                promotable: false,
             },
         }
     }
@@ -933,6 +939,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
     ) -> Result<Open<W>, usize> {
         let space = self.space;
         self.counts.match_bounds += 1;
+        #[cfg(feature = "studies")]
+        {
+            self.promotable = false;
+        }
         if self.matching_on && self.matching.value() < need {
             return Err(cut::MATCH);
         }
@@ -967,6 +977,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let conflict = match found {
             Lookup::Conflict(k) => k,
             Lookup::None => {
+                // A counting search goes on, branching on the members of the heaviest set (`StepHook::counting`),
+                // without the Lagrangian bound's check (leaving out a check that only cuts keeps the count).
+                #[cfg(feature = "studies")]
+                if self.counting() && !eval.chosen.is_empty() {
+                    self.promotable = true;
+                    return Ok(Open { conflict: Some(eval.chosen), forced });
+                }
                 // The heaviest set can be promoted: the best completion.
                 self.offer(ctx, &(promoted | eval.chosen));
                 return Err(cut::EXACT);
@@ -1083,7 +1100,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
         .expect("not empty");
         if conflict.is_some_and(|k| k.is_subset(&forced)) {
             // Every completion that reaches `need` promotes the whole conflict, so there is none.
+            #[cfg(not(feature = "studies"))]
             return None;
+            // Unless a counting search's "conflict" is its heaviest set, which can be promoted: then that set is the
+            // one such completion, and the child that promotes the forced members makes it.
+            #[cfg(feature = "studies")]
+            if !self.promotable {
+                return None;
+            }
         }
         #[cfg(feature = "studies")]
         if let Some((hook, _)) = &mut self.hook {
@@ -1133,6 +1157,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
         Next::Parent
     }
 
+    /// Whether a study's hook makes the search count ([`StepHook::counting`]).
+    #[cfg(feature = "studies")]
+    fn counting(&self) -> bool {
+        self.hook.as_ref().is_some_and(|(hook, _)| hook.counting())
+    }
+
     /// Records how the step ended, for the hook, if there is one.
     #[cfg(feature = "studies")]
     #[inline]
@@ -1166,6 +1196,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// Offers `set` as the incumbent if it beats it, recording when.  A proven ceiling on the sum is the run's, not
     /// the space's: the engine ends the run when the incumbent reaches it ([`crate::engine::EngineConfig::control`]).
     fn offer(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>, set: &Bits<W>) {
+        #[cfg(feature = "studies")]
+        if self.counting() {
+            return;
+        }
         let value = set.sum();
         if value <= ctx.best() {
             return;

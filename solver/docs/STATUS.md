@@ -60,7 +60,7 @@ What has been tried for the bound, and where it stands:
 * **Flat-cycle cuts: closed** (2026-10-18).  On the matching LP they add 0.12 of the gap; it does not beat A1, and the
   rest is not cycle-shaped ([the entry](../notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md)).
 * **Why the trees are big** (2026-10-18): the gap is paid in exclusions priced at a tenth of the member left out (the
-  bound substitutes a near-equal number), 5-8 a path ([the entry](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)); the prime swaps behind them are no symmetries of their nodes but the root's pairs, so no pruning ([local exchanges](../notebook/local-prime-exchanges-at-the-nodes-2026-10/README.md)).
+  bound substitutes a near-equal number), 5-8 a path ([the entry](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)); the prime swaps behind them are no symmetries of their nodes but the root's pairs, so no pruning ([local exchanges](../notebook/local-prime-exchanges-at-the-nodes-2026-10/README.md)); and the trees are the bound's error, not near-optimal completions: four of five units, hard and easy, hold none within 100 of the optimum ([near completions](../notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md)).
 
 **The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
 ([solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
