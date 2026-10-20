@@ -74,7 +74,7 @@ pub mod meet;
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet};
-use meet::{bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, Vector};
+use meet::{bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, SplitStart, Vector};
 
 const NONE: u32 = u32::MAX;
 
@@ -770,6 +770,11 @@ struct Levels<'g, const W: usize, const R: usize> {
     /// ([`force_by_cycles`](Self::force_by_cycles)), and scratch for the next search's.
     cycles: Vec<Cycles>,
     next_cycles: Cycles,
+    /// The node at each depth (a number given to each unit's root and each child), and the last weight split at each
+    /// depth with the node it was for: a node's split starts from its own last one, or else from its parent's.
+    nodes: Vec<u64>,
+    next_node: u64,
+    starts: Vec<(SplitStart, u64)>,
 }
 
 impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
@@ -803,6 +808,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             force_window: ForceWindow::default(),
             cycles: Vec::new(),
             next_cycles: Cycles::default(),
+            nodes: vec![0],
+            next_node: 0,
+            starts: Vec::new(),
         }
     }
 
@@ -823,6 +831,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn reset(&mut self, promoted: &Bits<W>, cands: &Bits<W>) {
         self.depth = 0;
+        self.next_node += 1;
+        self.nodes[0] = self.next_node;
         self.kept_for = None;
         self.prior_for = None;
         let live = self.live_of(cands);
@@ -888,6 +898,11 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             self.stats.certified_children += 1;
         }
         self.depth = d + 1;
+        self.next_node += 1;
+        if self.nodes.len() == d + 1 {
+            self.nodes.push(0);
+        }
+        self.nodes[d + 1] = self.next_node;
     }
 
     fn pop(&mut self) {
@@ -942,7 +957,18 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let mut forced = Bits::EMPTY;
         if let Some(need) = need {
             if !level.has_split && level.settled {
-                split(self.graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx, &mut self.stats);
+                if self.starts.len() <= d {
+                    self.starts.resize_with(d + 1, Default::default);
+                }
+                let node = self.nodes[d];
+                let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
+                let start = from.map(|i| &self.starts[i].0);
+                let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
+                split(self.graph, level, meet, live_idx, start_idx, &mut self.stats, start);
+                if level.has_pot {
+                    self.meet.save_split(&mut self.starts[d].0);
+                    self.starts[d].1 = node;
+                }
             }
             if level.has_split {
                 for &(x, bound) in &level.split {
@@ -1385,8 +1411,9 @@ fn resolve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
 }
 
-/// The bounds without each member of `level`'s heaviest set (settled), from a weight split.  Unless the workspace
-/// still holds the level's last solve, the level's heaviest set is solved again from itself first ([`resolve`]).
+/// The bounds without each member of `level`'s heaviest set (settled), from a weight split, its Bellman–Ford started
+/// from `start`, an earlier split ([`Meet::split_bounds_from`]).  Unless the workspace still holds the level's last
+/// solve, the level's heaviest set is solved again from itself first ([`resolve`]).
 fn split<const W: usize, const R: usize>(
     graph: &Gf2Graph,
     level: &mut Level<W, R>,
@@ -1394,6 +1421,7 @@ fn split<const W: usize, const R: usize>(
     live_idx: &mut Vec<u32>,
     start_idx: &mut Vec<u32>,
     stats: &mut Gf2Stats,
+    start: Option<&SplitStart>,
 ) {
     if level.meet_solve != meet.solves {
         resolve(graph, level, meet, live_idx, start_idx);
@@ -1409,8 +1437,8 @@ fn split<const W: usize, const R: usize>(
     stats.splits += 1;
     let out = &mut level.split;
     out.clear();
-    level.has_pot =
-        meet.settled && meet.split_bounds(&problem, live_idx, |e, bound| out.push((graph.elems[e as usize], bound)));
+    level.has_pot = meet.settled
+        && meet.split_bounds_from(&problem, live_idx, start, |e, bound| out.push((graph.elems[e as usize], bound)));
     if level.has_pot {
         level.pot.copy_from_slice(meet.potentials());
     }

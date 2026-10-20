@@ -40,7 +40,11 @@
 //! member of `I*` takes one pass over the circuits.  The split comes from the conditions under which `I*` is a
 //! heaviest independent set of a matroid for a weighting (members of non-negative weight; elements whose addition
 //! keeps it independent of non-positive weight; no exchange that gains), which for `w1` on `A` and `w2 = w − w1` on
-//! `B` are difference constraints on `w1`, solved by Bellman–Ford.
+//! `B` are difference constraints on `w1`, solved by Bellman–Ford.  The split is the shortest distances from a
+//! virtual source, which Bellman–Ford reaches from any potentials that are lengths of paths, so a split may start from
+//! an earlier one's potentials wherever the path of predecessors that gave each is still a path
+//! ([`Meet::split_bounds_from`]): a child's problem is its parent's with a few vertices gone, a node's after it goes
+//! on without a member its own with a few circuits changed.
 //!
 //! # The heaviest set without a member
 //!
@@ -287,9 +291,15 @@ pub struct Meet<const R: usize> {
     pub rebuilds: u64,
     /// The weight splits' Bellman–Ford rounds.
     pub split_rounds: u64,
-    /// The split's scratch: its potentials (one per element and one more), and the replacements' weights.
+    /// The split's scratch: its potentials (one per element and one more), the predecessor that gave each its
+    /// potential (`NONE` for 0, the virtual source's), the replacements' weights, a walk's vertices, and in debug
+    /// builds the potentials found from all zero to check those found from a start.
     pot: Vec<i64>,
+    split_pred: Vec<u32>,
     repl: [Vec<i64>; 2],
+    walk: Vec<u32>,
+    #[cfg(debug_assertions)]
+    cold: Vec<i64>,
     /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
     /// from), settled stamps, when each was offered its distance, and heap; the elements outside the set in the span
     /// of A by the slots of their circuits (`columns`, per block of A 64·R slots) and those free in A, both built for
@@ -443,6 +453,19 @@ impl RadixHeap {
     }
 }
 
+/// A weight split's potentials as its Bellman–Ford found them, the predecessor that gave each its potential, and the
+/// live elements and members of the problem it was for ([`Meet::save_split`]): a later split of a related problem
+/// starts from the potentials whose paths of predecessors are still paths of its constraint graph
+/// ([`Meet::split_bounds_from`]).
+#[derive(Clone, Default)]
+pub struct SplitStart {
+    pot: Vec<i64>,
+    pred: Vec<u32>,
+    /// By element: 0 if it was not live, 1 if outside the set, 2 if a member.
+    role: Vec<u8>,
+    saved: bool,
+}
+
 /// Cycles of exchange graphs, each its elements in the order of its arcs (from each to the next, and from the last to
 /// the first), kept from the searches for forced members ([`Meet::keep_cycle`]) to check against a later exchange
 /// graph ([`Meet::cycle_length`]).
@@ -521,7 +544,11 @@ impl<const R: usize> Meet<R> {
             rebuilds: 0,
             split_rounds: 0,
             pot: vec![0; n + 1],
+            split_pred: vec![NONE; n + 1],
             repl: [vec![0; n], vec![0; n]],
+            walk: Vec::with_capacity(n + 1),
+            #[cfg(debug_assertions)]
+            cold: vec![0; n + 1],
             reach: vec![INF; n],
             back: vec![NONE; n],
             settled_at: vec![0; n],
@@ -1409,8 +1436,116 @@ impl<const R: usize> Meet<R> {
     /// common independent set without each member `x` of the heaviest set, from a weight split (see the module
     /// docs), passed to `f(x, bound)`.  False (and `f` never called) if the split's constraints have no solution,
     /// which Frank's theorem rules out for a settled solve (a test checks it).
-    pub fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], mut f: impl FnMut(u32, i64)) -> bool {
-        debug_assert!(self.settled);
+    pub fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], f: impl FnMut(u32, i64)) -> bool {
+        self.split_bounds_from(p, live, None, f)
+    }
+
+    /// The split's arc `q → u` in the current tableau (`zero` the zero node), as [`split_bounds`](Self::split_bounds)
+    /// lists them.
+    fn split_arc(&self, p: &Problem<'_, R>, q: usize, u: usize, zero: usize) -> bool {
+        if q == zero {
+            return self.inside[u] || !is_zero(&self.res[0][u]);
+        }
+        if u == zero {
+            return self.inside[q] || !is_zero(&self.res[1][q]);
+        }
+        match (self.inside[q], self.inside[u]) {
+            (true, false) => {
+                is_zero(&self.res[0][u])
+                    && p.block[0][q] == p.block[0][u]
+                    && bit(&self.mask[0][u], usize::from(self.slot[0][q]))
+            }
+            (false, true) => {
+                is_zero(&self.res[1][q])
+                    && p.block[1][q] == p.block[1][u]
+                    && bit(&self.mask[1][q], usize::from(self.slot[1][u]))
+            }
+            _ => false,
+        }
+    }
+
+    /// Lowers the split's starting potentials to those of `start` (an earlier split) at the vertices whose path of
+    /// predecessors there is still a path of the constraint graph, as long: every vertex on it live then and now, a
+    /// member then exactly when a member now (which fixes the lengths of its arcs), and every arc still an arc.  Each
+    /// such potential is the length of a path from the virtual source, so no lower than the shortest distance.  A
+    /// walk up the predecessors from each vertex, stopped at the first whose status is known.
+    fn warm_start(&mut self, p: &Problem<'_, R>, live: &[u32], start: &SplitStart) {
+        let zero = self.pot.len() - 1;
+        let g = self.next_generation(4);
+        let (live_mark, on_path, valid, invalid) = (g - 3, g - 2, g - 1, g);
+        for &e in live {
+            self.settled_at[e as usize] = live_mark;
+        }
+        let base = start.pot[zero];
+        let mut walk = std::mem::take(&mut self.walk);
+        // The zero node's status (0 unknown, then valid or invalid), and whether it is on the walk.
+        let mut zero_status = 0;
+        for v in live.iter().map(|&e| e as usize).chain(std::iter::once(zero)) {
+            walk.clear();
+            let mut zero_on_walk = false;
+            let mut u = v;
+            let ok = loop {
+                let status = if u == zero {
+                    if zero_on_walk {
+                        invalid
+                    } else {
+                        zero_status
+                    }
+                } else {
+                    let stamp = self.seen[u];
+                    if stamp == on_path {
+                        invalid
+                    } else if stamp == valid || stamp == invalid {
+                        stamp
+                    } else {
+                        0
+                    }
+                };
+                if status != 0 {
+                    break status == valid;
+                }
+                walk.push(u as u32);
+                if u == zero {
+                    zero_on_walk = true;
+                } else {
+                    if self.settled_at[u] != live_mark || start.role[u] != 1 + u8::from(self.inside[u]) {
+                        break false;
+                    }
+                    self.seen[u] = on_path;
+                }
+                let q = start.pred[u];
+                if q == NONE {
+                    break true;
+                }
+                if !self.split_arc(p, q as usize, u, zero) {
+                    break false;
+                }
+                u = q as usize;
+            };
+            let status = if ok { valid } else { invalid };
+            for &w in &walk {
+                let w = w as usize;
+                if w == zero {
+                    zero_status = status;
+                } else {
+                    self.seen[w] = status;
+                }
+                if ok {
+                    let potential = if w == zero { base } else { start.pot[w] + base };
+                    if potential < self.pot[w] {
+                        self.pot[w] = potential;
+                        self.split_pred[w] = start.pred[w];
+                    }
+                }
+            }
+        }
+        self.walk = walk;
+    }
+
+    /// The split's potentials (before they are shifted to make `w1`): Bellman–Ford from all zero, lowered first to
+    /// those of `start` where they still hold (see [`warm_start`](Self::warm_start)).  False if the constraints have
+    /// no solution.
+    fn split_potentials(&mut self, p: &Problem<'_, R>, live: &[u32], start: Option<&SplitStart>) -> bool {
         let w = p.weight;
         // Potentials for the constraints w1(v) − w1(u) ≤ c, as arcs u → v of length c, from potentials all zero:
         // Bellman–Ford from a virtual source with an arc of length 0 to every vertex, whose distances are the same
@@ -1419,14 +1554,16 @@ impl<const R: usize> Meet<R> {
         // (w1(y) ≥ w(y)).  A member's other arcs go to the elements whose A-circuit holds it (w1(y) ≤ w1(x)), an
         // element's in the span of B to the members of its B-circuit (w2(y) ≤ w2(x)).  Each round relaxes the arcs
         // out of the vertices whose potential fell in the round before (every vertex in the first).
-        if self.columns_for != self.tableau {
-            self.build_columns();
-        }
         let zero = self.pot.len() - 1;
         for &e in live {
             self.pot[e as usize] = 0;
+            self.split_pred[e as usize] = NONE;
         }
         self.pot[zero] = 0;
+        self.split_pred[zero] = NONE;
+        if let Some(start) = start.filter(|start| start.saved) {
+            self.warm_start(p, live, start);
+        }
         self.changed_in.clear();
         self.changed_in.extend_from_slice(live);
         self.changed_in.push(zero as u32);
@@ -1441,13 +1578,15 @@ impl<const R: usize> Meet<R> {
             let generation = self.next_generation(1);
             self.changed_out.clear();
             let (pot, seen, next) = (&mut self.pot, &mut self.seen, &mut self.changed_out);
+            let pred = &mut self.split_pred;
             let mut zero_fell = false;
-            // Offers the potential `d` to `v`.
+            // Offers the potential `d` to `v` from `u`.
             macro_rules! relax {
-                ($v:expr, $d:expr) => {{
+                ($v:expr, $d:expr, $u:expr) => {{
                     let (v, d): (usize, i64) = ($v, $d);
                     if d < pot[v] {
                         pot[v] = d;
+                        pred[v] = $u as u32;
                         if v == zero {
                             zero_fell = true;
                         } else if seen[v] != generation {
@@ -1462,24 +1601,24 @@ impl<const R: usize> Meet<R> {
                 let pu = pot[u];
                 if u == zero {
                     for &x in &self.members {
-                        relax!(x as usize, pu + w[x as usize]);
+                        relax!(x as usize, pu + w[x as usize], u);
                     }
                     for &y in &self.free_a {
-                        relax!(y as usize, pu);
+                        relax!(y as usize, pu, u);
                     }
                 } else if self.inside[u] {
-                    relax!(zero, pu);
+                    relax!(zero, pu, u);
                     let column = usize::from(p.block[0][u]) * 64 * R + usize::from(self.slot[0][u]);
                     for &y in &self.columns[column] {
-                        relax!(y as usize, pu);
+                        relax!(y as usize, pu, u);
                     }
                 } else if !is_zero(&self.res[1][u]) {
-                    relax!(zero, pu - w[u]);
+                    relax!(zero, pu - w[u], u);
                 } else {
                     let elems = &self.slot_elem[1][usize::from(p.block[1][u])];
                     each_bit(&self.mask[1][u], |s| {
                         let x = elems[s] as usize;
-                        relax!(x, pu + w[x] - w[u]);
+                        relax!(x, pu + w[x] - w[u], u);
                     });
                 }
             }
@@ -1487,6 +1626,43 @@ impl<const R: usize> Meet<R> {
                 next.push(zero as u32);
             }
             std::mem::swap(&mut self.changed_in, &mut self.changed_out);
+        }
+        true
+    }
+
+    /// [`split_bounds`](Self::split_bounds), its Bellman–Ford started from the potentials of an earlier split `start`
+    /// where they still hold ([`warm_start`](Self::warm_start)): the same split, since the shortest distances are
+    /// the same from any potentials that are lengths of paths and no lower (debug builds check it against the split
+    /// from all zero).
+    pub fn split_bounds_from(
+        &mut self,
+        p: &Problem<'_, R>,
+        live: &[u32],
+        start: Option<&SplitStart>,
+        mut f: impl FnMut(u32, i64),
+    ) -> bool {
+        debug_assert!(self.settled);
+        let w = p.weight;
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
+        let zero = self.pot.len() - 1;
+        #[cfg(debug_assertions)]
+        let cold = start.is_some() && {
+            let solved = self.split_potentials(p, live, None);
+            self.cold.copy_from_slice(&self.pot);
+            solved
+        };
+        let solved = self.split_potentials(p, live, start);
+        #[cfg(debug_assertions)]
+        if start.is_some() {
+            assert_eq!(solved, cold, "a split from a start and the split from all zero disagree on a solution");
+            for e in live.iter().map(|&e| e as usize).chain(std::iter::once(zero)) {
+                assert!(!solved || self.pot[e] == self.cold[e], "the split from a start differs at {e}");
+            }
+        }
+        if !solved {
+            return false;
         }
         // The split: w1 = pot − pot[zero], w2 = w − w1.  Members have 0 ≤ w1, w2 ≤ w.
         let base = self.pot[zero];
@@ -2002,6 +2178,22 @@ impl<const R: usize> Meet<R> {
     /// the live elements).
     pub fn potentials(&self) -> &[i64] {
         &self.pot[..self.pot.len() - 1]
+    }
+
+    /// Keeps the last split's potentials and predecessors in `start`, for a later split to start from
+    /// ([`split_bounds_from`](Self::split_bounds_from)).
+    pub fn save_split(&self, start: &mut SplitStart) {
+        start.pot.clone_from(&self.pot);
+        start.pred.clone_from(&self.split_pred);
+        start.role.clear();
+        start.role.resize(self.inside.len(), 0);
+        for &x in &self.members {
+            start.role[x as usize] = 2;
+        }
+        for &y in self.out_a.iter().flatten() {
+            start.role[y as usize] = 1;
+        }
+        start.saved = true;
     }
 
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
