@@ -99,10 +99,11 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
   On 2176..3440 with the truth hidden every proven board is at its committed score: 916 of 1,265 in 48 core-hours without the
   climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
 * **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
-  proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
-  (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or `optimal.json` has proven is recorded
-  with no search, citing it; the run to 5000 took 167 games from it; 
-  [runbook/wall.md](runbook/wall.md#launch-watch-stop-clean-up)).
+  proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343, and the survey to 382, the
+  last 4783.  **The chain draws on it** (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or
+  `optimal.json` has proven is recorded with no search, citing it;
+  [runbook/wall.md](runbook/wall.md#launch-watch-stop-clean-up)).  The run to 5000 took 167 games from it; 215 of its
+  boards lie past the chain's end, in 4548..4783, so 238 of the 453 games from 4548 to 5000 need a search.
 * **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
   section](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)): the ledger
   steps an open board down by searches under floors (150 points, a tenfold of cost a step; each lowers U), fits a line
