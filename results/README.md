@@ -198,15 +198,15 @@ never held more than 5,815, and none spilled to disk.
 
 **The fourth run, games 3915–4547.**  The command was `taxman solve 1-8191 --use-prev`, with a window of 4 games in
 flight on 64 threads of one `c8g.16xlarge` at spot, with the build of commit ca357bf; `solver/tools/cloud/wall.sh`
-launched it ([RUNBOOK, section 5](../solver/docs/RUNBOOK.md#5-the-unattended-run-to-the-wall)).  With `--use-prev` it
-took games 1–3914 from this file and each game the bounds store had proven from the store, with no search, and
-searched the others, from 3915 on.  Its own file started with `known` copies of games 1–3914.  The lines of games
-3915–4547 were appended to this file, byte for byte; those copies and the run's three incomplete lines (of games 3940,
-4340 and 4548) were left out.  Every kept line records that build (`dirty` false), 64 threads, no `--time-limit`
-or `--node-limit`, the `default` tactics and the option `use_prev`.  The first line, 3915, records its game of 3914 as
-`known`, the run's copy of this file's line; both verifiers accept that record, because the score, the moves and the
-assumptions are the line's ([RUNBOOK, section
-4.4](../solver/docs/RUNBOOK.md#44-verifying-and-bringing-the-results-home)).
+launched it ([solver/docs/runbook/wall.md](../solver/docs/runbook/wall.md)).  With `--use-prev` it took games 1–3914
+from this file and each game the bounds store had proven from the store, with no search, and searched the others, from
+3915 on.  Its own file started with `known` copies of games 1–3914.  The lines of games 3915–4547 were appended to this
+file, byte for byte; those copies and the run's three incomplete lines (of games 3940, 4340 and 4548) were left out.
+Every kept line records that build (`dirty` false), 64 threads, no `--time-limit` or `--node-limit`, the `default`
+tactics and the option `use_prev`.  The first line, 3915, records its game of 3914 as `known`, the run's copy of this
+file's line; both verifiers accept that record, because the score, the moves and the assumptions are the line's
+([solver/docs/runbook/chain.md, "Verifying, and bringing the results
+home"](../solver/docs/runbook/chain.md#verifying-and-bringing-the-results-home)).
 
 *Details.*  The run was launched on 2026-10-18 at 12:27 PDT, continued with `wall.sh launch --continue` when its first
 budget of 36 instance-hours ran out, and ended on 2026-10-20 at 05:31 PDT on its budget of 40.5, in the middle of game

@@ -12,7 +12,7 @@ store gave 167 of the games with no search.
 
 *What was run* (2026-10-18 at 19:27:41Z to 2026-10-20 at 12:31:00Z, commit ca357bf, a clean tree).  `wall.sh launch` set
 up an Auto Scaling group of one spot `c8g.16xlarge` (64 threads) that replaces an interrupted machine ([RUNBOOK.md, "The
-unattended run to the wall"](../../docs/RUNBOOK.md#5-the-unattended-run-to-the-wall)).  The machine ran `taxman solve
+unattended run to the wall"](../../docs/runbook/wall.md)).  The machine ran `taxman solve
 1-8191 --use-prev` with a [window](../../../docs/GLOSSARY.md#the-search) of 4 games in flight, the default tactics of
 that commit and the [wall](../../../docs/GLOSSARY.md#the-search) at 24 hours (`--game-hours 24`).  With `--use-prev` it
 took games 1..3914 from the committed chain and each game the store had proven from the store, and searched the others
@@ -59,7 +59,7 @@ lines average 206 thousand nodes per solver second, so a billion nodes cost 1.35
 * Appending needed a narrower rule in both referees (eff2aab): the run's first line, 3915, records its game of 3914 as
   `known`, and a record of the proof `known` for the file's own game n − 1 needs only the same score, moves digest and
   assumptions.  [RUNBOOK.md, "Verifying, and bringing the results
-  home"](../../docs/RUNBOOK.md#44-verifying-and-bringing-the-results-home) has the splice.
+  home"](../../docs/runbook/chain.md#verifying-and-bringing-the-results-home) has the splice.
 
 | stretch | games | from the store | searches | nodes | search hours, summed | median of the exhausted searches |
 |---|---|---|---|---|---|---|

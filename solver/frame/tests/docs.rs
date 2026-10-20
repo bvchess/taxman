@@ -643,6 +643,7 @@ const REWRITTEN: &[&str] = &[
     "solver/docs/DESIGN.md",
     "solver/docs/AGENDA.md",
     "solver/docs/RUNBOOK.md",
+    "solver/docs/runbook/",
     "solver/docs/STATUS.md",
     "solver/tools/certify/README.md",
     "solver/tools/ledger/README.md",
@@ -735,7 +736,13 @@ fn names_numbers_by_frame(shown: &str) -> bool {
     shown.starts_with("solver/frame/src/")
         || shown == "solver/frame/README.md"
         || shown == "solver/docs/DESIGN.md"
-        || (REWRITTEN.contains(&shown) && !SPEAK_OF_THE_WHOLE_GAME.contains(&shown))
+        || (is_rewritten(shown) && !SPEAK_OF_THE_WHOLE_GAME.contains(&shown))
+}
+
+/// Whether the doc at `shown` (a path from the repository) is in `REWRITTEN`, by name or by its folder (an entry
+/// ending in `/`).
+fn is_rewritten(shown: &str) -> bool {
+    REWRITTEN.iter().any(|&listed| shown == listed || (listed.ends_with('/') && shown.starts_with(listed)))
 }
 
 /// Whether `word` occurs in `line` (lower case) as a whole word that is not quoted (`"forced moves" in its docs`).
@@ -1043,7 +1050,7 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
         }
         let prose = prose_lines(&path, &text);
         let mut retired = retired_in(&prose, &lists);
-        if REWRITTEN.contains(&shown.as_str()) {
+        if is_rewritten(&shown) {
             retired.extend(glossary_words_in(&prose));
         }
         for (at, word, instead) in retired {
@@ -1786,7 +1793,6 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 const STILL_TO_SPLIT: &[&str] = &[
     "solver/docs/DESIGN.md",
     "docs/THEORY.md",
-    "solver/docs/RUNBOOK.md",
     "solver/notebook/README.md",
     "solver/noframe/README.md",
     "solver/docs/AGENDA.md",
@@ -1795,7 +1801,7 @@ const STILL_TO_SPLIT: &[&str] = &[
 
 /// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
 /// file, and stays under the index limit.
-const INDEXES: &[&str] = &[];
+const INDEXES: &[&str] = &["solver/docs/RUNBOOK.md"];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
 fn word_count(text: &str) -> usize {

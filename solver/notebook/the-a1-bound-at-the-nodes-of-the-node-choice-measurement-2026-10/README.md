@@ -161,7 +161,7 @@ the root fits 300 s):
 
 That is **about 30 to 40 minutes** of the machine with the build cache (10 minutes more with a build), **about 40 cents
 at spot** ($0.68 an hour for a `c8g.16xlarge`, [STATUS](../../docs/STATUS.md)), $1.50 on demand ($2.55 an hour, $0.0399 a vCPU-hour;
-[RUNBOOK section 9.2](../../docs/RUNBOOK.md#quota-prices-and-spot-interruptions)); the timer of 60 minutes bounds it at **$0.68 at spot** ($2.55 on
+[RUNBOOK section 9.2](../../docs/runbook/machine.md#quota-prices-and-spot-interruptions)); the timer of 60 minutes bounds it at **$0.68 at spot** ($2.55 on
 demand) plus the volume.  The figures are estimates: the A1 bounds' times at 3300 to 3441 are not known (a pricing is 1.2
 to 2.9 ms at 2200 to 3400, a node's master 100 to 1,000 of them), and a `full` that overruns its 30 s by a few seconds
 in the exact checks makes the run longer, not dearer.

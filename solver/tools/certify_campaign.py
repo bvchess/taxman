@@ -7,7 +7,7 @@ The work list (`solver/tools/certify/plan.jsonl`, made by certify_plan.py) says 
 of them the rule of the same problem settles from another game's certificate (`share`).  A game with no share is a head;
 the games that share with it, directly or through a chain of shares, are its group.  The rule reads only the
 certificates of the `--out` file it appends to, so a group goes whole into one list, its head first.  The campaign runs
-in phases (RUNBOOK, "Certifying U (stage 4)"):
+in phases (solver/docs/runbook/certify.md):
 
   pilot7     phase A.  The seven games of PILOT_HEADS with their groups, the dearest head first.  Run alone, one game
              after the other on all the threads, so that each game's time per node is measured cleanly.

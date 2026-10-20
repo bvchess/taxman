@@ -13,7 +13,7 @@
 #
 # so each list has its own output file, its own checkpoint directory and its own logs (certify_NAME.out and .err).  T is
 # the number after the colon; without one, the threads of the machine (THREADS, default every CPU) are shared equally
-# among the lists.  The runbook has the commands of the phases (RUNBOOK.md, section 9): the pilot pilot7 on all
+# among the lists.  The runbook has the commands of the phases (solver/docs/runbook/certify.md): the pilot pilot7 on all
 # threads, then dear_rest on all threads, then rest_1 rest_2 rest_3 rest_4 together on a quarter each, then deferred.
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: `taxman certify` skips the

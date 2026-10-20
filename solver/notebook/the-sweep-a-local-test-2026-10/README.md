@@ -5,7 +5,7 @@ Part of the [lab notebook](../README.md).
 **Question.**  Brian's plan of 2026-10-17 is as many proven games of 3441..8191 as one cheap machine gives, holes
 allowed: blocks of consecutive games, one thread each, a search of at most 180 s a game, a game that does not finish
 leaves its best game as a seed for the next, and passes over the merged file so that each game sees the game before it
-whichever block made it ([RUNBOOK section 13](../../docs/RUNBOOK.md#7-the-sweep);
+whichever block made it ([RUNBOOK section 13](../../docs/runbook/sweep.md);
 `taxman solve --keep-going`).  Does it do that on a range small enough for a laptop, and does a block's first game end
 as it would in one unbroken chain when the game before it is proven?
 

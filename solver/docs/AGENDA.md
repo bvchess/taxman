@@ -181,8 +181,7 @@ nodes](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026
 
 *Paused.*  Its first steps are done, and the campaign of certificates of 2176..3440 is ready and paused; the games past
 3440 have none yet.  The proven wall of the heading is the end of the games proven on the whole board, 2175 (the
-prover's proofs, and certificates of 600..1300) ([STATUS](STATUS.md); [RUNBOOK section
-9](RUNBOOK.md#9-certifying-u-stage-4)).
+prover's proofs, and certificates of 600..1300) ([STATUS](STATUS.md); [runbook/certify.md](runbook/certify.md)).
 
 *Idea.*  Turn the model's assumptions into proven facts, in general or game by game, so that the solver's chain is a
 proof on the whole board and the prover need not repeat the model's work by search.  The first assumption is the upper
@@ -502,5 +501,5 @@ and the memory at 192, the fixed costs of a game on a Graviton4 core, and the ch
 * **A spot interruption, and the scripts on Ubuntu.**  `spot-watch.sh` has not seen an interruption, so neither has the
   restore after one (the cloud run's restore followed a stop on purpose): no notice came in the cloud runs, and the
   scaling run's instance had its notice two minutes before the end, with no `spot-watch.sh` running.  `scaling.sh` has
-  not run on EC2, and its first run, on a small instance, is its test; nothing has run on Ubuntu ([the RUNBOOK, "What
-  has run where"](RUNBOOK.md#what-has-run-where)).
+  not run on EC2, and its first run, on a small instance, is its test; nothing has run on Ubuntu ([runbook/scripts.md,
+  "What has run where"](runbook/scripts.md#what-has-run-where)).

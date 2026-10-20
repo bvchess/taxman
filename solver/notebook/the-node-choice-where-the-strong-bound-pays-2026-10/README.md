@@ -156,7 +156,7 @@ taken from the build cache (`STUDIES=1` for the study tools, `wall` among them, 
 A run again with the same `OUT` goes on where it was (a fixture or a prepared file that is there is kept, and the nodes
 in `measure/*.jsonl` are not measured again).  The script exits with status 1 if `faults` is not empty (a bound below a
 node's best completion, a harvested nogood that can be promoted, a cut of a node that holds a better set: bugs).  The
-lead launches it ([the rules for every launch](../../docs/RUNBOOK.md#rules-for-every-launch) apply), with user
+lead launches it ([the rules for every launch](../../docs/runbook/launch.md#rules-for-every-launch) apply), with user
 data like [the ledger's](../../tools/ledger/cloud.sh):
 
 ```text
@@ -175,7 +175,7 @@ sudo -u ec2-user tmux new-session -d -s choice -c /home/ec2-user/taxman \
 
 The binaries come from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, and with `STUDIES=1`,
 because `wall` is a study tool that a default build does not hold; [RUNBOOK section
-15](../../docs/RUNBOOK.md#11-the-build-cache-and-the-release-suite)); a setup that fails ends the machine and the
+15](../../docs/runbook/build-cache.md)); a setup that fails ends the machine and the
 measurement does not start.
 
 ### Cost and time

@@ -14,7 +14,7 @@ in the docs listed at the end.
   resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
   only when the question needs it.
 * **Money.**  Anything that costs money or changes the AWS account needs Brian's explicit approval, with a cost
-  estimate first, and nothing is left running (solver/docs/RUNBOOK.md has the rules for a launch).
+  estimate first, and nothing is left running (solver/docs/runbook/launch.md has the rules for a launch).
 * **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
   moniot/Makefile, not edited.
 * **Branch.**  Work on master; commit and push there.

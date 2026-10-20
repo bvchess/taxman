@@ -3,7 +3,7 @@
 Part of the [lab notebook](../README.md).
 
 *Question.*  How far does the unattended run of [RUNBOOK section
-12](../../docs/RUNBOOK.md#5-the-unattended-run-to-the-wall) take the chain from n = 1 on one `c8g.16xlarge` at
+12](../../docs/runbook/wall.md) take the chain from n = 1 on one `c8g.16xlarge` at
 spot, with the settings of [the tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
 (`force_window=all`) and the counter that could no longer wrap ([the
 wrap](../cheaper-gf2-nodes-same-trees-2026-10/README.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)); does it solve
@@ -19,7 +19,7 @@ and 2026-10-22; its settings and ending are `run/config` and `run/ended` in
 stopped on request (`wall.sh stop`, a final checkpoint written) in the middle of game 3915, 49 minutes and 138 million
 nodes into its search, after 128,236 s of the solver: 35.72 instance-hours, about $24.14 at the $0.676 the run
 recorded.  The reason was to restart with the chain drawing on the known games (`solve --use-prev`, [RUNBOOK
-12.4](../../docs/RUNBOOK.md#54-launch-watch-stop-clean-up)): the committed chain now holds 1..3914, so a run
+12.4](../../docs/runbook/wall.md#launch-watch-stop-clean-up)): the committed chain now holds 1..3914, so a run
 that draws on it records those games with no search and starts at 3915, where this one stopped.
 
 *What it made.*  The 3,914 games 1..3914, each built from the one before, nothing assumed.
@@ -66,7 +66,7 @@ results file past 3440 (the committed ones) and the other checkpoints.
 The run
 (2026-10-17 07:20:47Z to 2026-10-18 18:58:04Z, commit eb84a6f, one spot `c8g.16xlarge`, 35.72 instance-hours, about
 $24.14) launched with `solver/tools/cloud/wall.sh` ([RUNBOOK section
-12](../../docs/RUNBOOK.md#5-the-unattended-run-to-the-wall)); this directory holds what is worth keeping of its
+12](../../docs/runbook/wall.md)); this directory holds what is worth keeping of its
 prefix in S3.  Its games 1..3914 are in [results/strict.jsonl](../../../results/README.md) (the third run there), 3441..3914
 byte for byte; its checkpoints, results file and the stop marker are not kept (below).
 

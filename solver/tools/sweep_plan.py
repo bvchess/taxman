@@ -32,7 +32,8 @@ import math
 import os
 import sys
 
-# Seconds of setup of one game on one thread, measured on a Graviton4 core (solver/docs/RUNBOOK.md, section 7.1).
+# Seconds of setup of one game on one thread, measured on a Graviton4 core (solver/docs/runbook/sweep.md, "What it
+# does").
 SETUP_SECONDS = [(2200, 1.0), (3000, 3.0), (4000, 9.0), (6000, 48.0)]
 SAME_SEARCH_WINDOW = 8  # solver::SAME_SEARCH_WINDOW: how far back a game looks for a search to repeat
 

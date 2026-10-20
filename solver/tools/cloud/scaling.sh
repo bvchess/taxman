@@ -6,8 +6,8 @@
 #   solver/tools/cloud/scaling.sh --pauses      also one real game with a checkpoint every 0.5 s (cost of a pause)
 #   solver/tools/cloud/scaling.sh --quick       one small game only (seconds: a check that everything runs)
 #
-# Everything is logged to $LOGS/scaling-<time>.txt with a description of the machine at the top.  RUNBOOK.md,
-# "Reading the sweep", says how to read the tables.  Run it on an idle machine.
+# Everything is logged to $LOGS/scaling-<time>.txt with a description of the machine at the top.
+# solver/docs/runbook/before-a-big-run.md, "Reading the sweep", says how to read the tables.  Run it on an idle machine.
 #
 # Environment (all optional):
 #   GAMES          games to sweep, default "1215 1225" (proofs that take about 1 and 2.5 minutes on one M1 CPU)

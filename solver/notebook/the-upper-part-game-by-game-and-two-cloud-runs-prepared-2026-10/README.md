@@ -114,7 +114,7 @@ runs the prover and is unaffected.
 Two measurements of the theory track (docs/THEORY.md, "The upper part"; the account is the entry
 ["The upper part game by game"](README.md)),
 built, tested and calibrated on the laptop and **not run**: each waits for Brian's approval with the estimate below
-([rules for every launch](../../docs/RUNBOOK.md#rules-for-every-launch)).  Both launch as section 9.4 does (an instance profile, steps
+([rules for every launch](../../docs/runbook/launch.md#rules-for-every-launch)).  Both launch as section 9.4 does (an instance profile, steps
 through SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, a tmux session), from a checkout of a commit that has
 this section (pushed first: the instance clones it); only the instance, the setup and the command differ, and the
 results come home as in 9.6.  E6 may run first; E9(a) is independent of it.

@@ -14,8 +14,8 @@
 #    defaults to `--bin taxman`, all the chain needs: from the build cache if it has this commit, tested, otherwise
 #    built; no tests of its own, the smoke checks run), then `save.sh --restore` brings the results and the
 #    checkpoints: the logs first, so that the first save does not replace the old machine's logs with this one's, which
-#    share their names (RUNBOOK.md, section 2.6).  RELEASE_TESTS=1 and REQUIRE_CACHED=1 in the config go on to setup.sh
-#    (RUNBOOK.md, section 11): the first runs the release suite before the chain starts if the cache has no tested
+#    share their names (solver/docs/runbook/launch.md, "Surviving a spot interruption").  RELEASE_TESTS=1 and REQUIRE_CACHED=1 in the config go on to setup.sh
+#    (solver/docs/runbook/build-cache.md): the first runs the release suite before the chain starts if the cache has no tested
 #    build, and a failed suite ends the run with RELEASE_TESTS_FAILED beside the run's results; the second ends the
 #    run if the cache has none.
 # 3. spot-watch.sh watches for an interruption notice, a loop watches for $S3_DEST/run/stop (wall.sh stop), and

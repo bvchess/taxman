@@ -4,7 +4,7 @@
 #
 #   solver/tools/ledger/cloud.sh FIRST-LAST   from the top of the repository, once solver/tools/cloud/setup.sh has the
 #                                             release `ledger` example
-#                                             (built there, or taken from the build cache: RUNBOOK section 11; set
+#                                             (built there, or taken from the build cache: solver/docs/runbook/build-cache.md; set
 #                                             BUILD="--bin taxman --example ledger" for setup.sh: the solver is there
 #                                             for its smoke checks)
 #
@@ -22,7 +22,7 @@
 #   FLOOR_SLACK a floor step's limit is this many times its forecast time (the program's default, 4)
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
 #   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
-#               ledger is exported to it afterwards with `ledger export` (RUNBOOK section 6)
+#               ledger is exported to it afterwards with `ledger export` (solver/docs/runbook/ledger.md)
 #   KNOWN       the results file the report checks against (default results/strict.jsonl)
 #   LEDGER_BIN  the program (default solver/frame/target/release/examples/ledger; a laptop's test is
 #               solver/frame/target/debug/examples/ledger, built by `cargo build --profile test --example ledger`

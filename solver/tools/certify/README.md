@@ -30,8 +30,8 @@ data after the plan:
 `solver/tools/certify_campaign.py check` verifies any directory of lists against `plan.jsonl` (every game that needs a
 certificate in one list, none in two, a game that shares after the game it shares with in the same list, `deferred` the
 unsettled repeats with their groups), and `solver/tools/certify_pilot.py` rates the certificates of the pilot against
-the plan and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and the cost table are in [RUNBOOK section
-9](../../docs/RUNBOOK.md#9-certifying-u-stage-4).
+the plan and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and the cost table are in
+[solver/docs/runbook/certify.md](../../docs/runbook/certify.md).
 
 **The two eras.**  `certify_plan.py` prices a search by its nodes, at the thread-seconds per node that the chain's own
 run paid in each stretch of it, since the chain ran several searches at once and a game's recorded seconds are the

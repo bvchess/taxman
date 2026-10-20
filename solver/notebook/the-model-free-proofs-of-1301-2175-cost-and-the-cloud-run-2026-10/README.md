@@ -81,7 +81,7 @@ owner's, and are below; the results are in `solver/noframe/data/exact_parity_130
 *The run (2026-10-14 and 15).*  The plan above ran, the check passed, and the cost came out higher than the projection's
 central figure, inside its ranges.
 
-*What ran.*  `solver/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../docs/RUNBOOK.md#84-run) describes, on one
+*What ran.*  `solver/tools/cloud/prover.sh 1301 2175` as [RUNBOOK 9.4](../../docs/runbook/prover.md#run) describes, on one
 `c8g.4xlarge` (Graviton4, 16 vCPUs, 31 GiB) on spot in us-east-1b at $0.2402 an hour, launched 2026-10-14 23:22:58 UTC
 (the run began at 23:28:46 and ended "complete" at 15:21:58 on the 15th: 15.9 hours), the build of commit 4db7a14 with
 `-C target-cpu=native`.  The instance shut itself down at the end (`POWEROFF=always`) and was terminated: 16.0

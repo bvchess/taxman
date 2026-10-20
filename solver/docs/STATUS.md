@@ -16,9 +16,9 @@ now.  Nothing is published: `optimal.json` stays at 1300.
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes more
 than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game has
 been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint, or
-when its budget is spent ([RUNBOOK 5.3](RUNBOOK.md#53-what-needs-brians-approval-and-what-it-costs)).  The chain's
-launch is [RUNBOOK section 4](RUNBOOK.md#4-the-production-chain), the unattended run [section
-5](RUNBOOK.md#5-the-unattended-run-to-the-wall); each needs Brian's approval.
+when its budget is spent ([runbook/wall.md](runbook/wall.md#what-needs-brians-approval-and-what-it-costs)).  The chain's
+launch is [runbook/chain.md](runbook/chain.md), the unattended run
+[runbook/wall.md](runbook/wall.md); each needs Brian's approval.
 
 The cost of a searched game grows tenfold for about every 1,040 in n, in patches; [the agenda, section
 2](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes that
@@ -68,7 +68,7 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 * **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset
   (Brian, 2026-10-16: Monday night).  Its branch `worktree-agent-a2db9341d6d4e8cd9` holds three commits (the third is the edit of
   THEORY.md) and is on the old layout (`rust/`, `heuristics/THEORY.md`): its paths need the new ones before it merges.
-* **Certifying 2176-3440** ([RUNBOOK section 9](RUNBOOK.md#9-certifying-u-stage-4)): ready, not
+* **Certifying 2176-3440** ([runbook/certify.md](runbook/certify.md)): ready, not
   approved, shelved by Brian on 2026-10-16.  About 3,023 thread-hours, 47 hours of one `c8g.16xlarge`, $32 at spot
   ($121 on demand), the pilot first ($3); phases A and B on the build of 14beb7a, phase C on the claim-by-claim build
   ([certificates past 2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md),
@@ -88,7 +88,7 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 
 * **The sweep**, built 2026-10-17 and not run: blocks of consecutive games of 3441..8191, one thread and a limited
   search a game each, passes over the merged `explore.jsonl` until nothing changes
-  ([RUNBOOK section 7](RUNBOOK.md#7-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
+  ([runbook/sweep.md](runbook/sweep.md); `taxman solve --keep-going`); about $3.3 at 180 s a
   game.  The file is not a chain and never goes into `strict.jsonl`.  The ledger (next) may supersede it.
 * **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
@@ -101,11 +101,11 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 * **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
   proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
   (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or `optimal.json` has proven is recorded
-  with no search, citing it; the run to 5000 took 167 games from it; [RUNBOOK
-  5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)).
+  with no search, citing it; the run to 5000 took 167 games from it; 
+  [runbook/wall.md](runbook/wall.md#launch-watch-stop-clean-up)).
 * **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
   section](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)): the ledger
   steps an open board down by searches under floors (150 points, a tenfold of cost a step; each lowers U), fits a line
   to each board's steps that forecasts its proof, and orders the boards by it.  On 2576..2700 at 900 CPU s 69 and 73
   boards were proven against 61; dry-run, not run in the cloud; the next stage resumes stage 2's ledger with it
-  ([RUNBOOK 6](RUNBOOK.md#6-the-ledgers-experiment)).
+  ([runbook/ledger.md](runbook/ledger.md)).

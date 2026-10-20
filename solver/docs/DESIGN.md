@@ -1483,7 +1483,7 @@ into the list of the game it rests on, after it, since the rule reads only its o
 ([solver/tools/certify/](../tools/certify/README.md)).  `solver/tools/certify_campaign.py` cuts the campaign's phases
 from that work list into `solver/tools/certify/lists/stage4/` (a pilot of seven dear games with a stop rule, the dear
 games, four balanced lists, and the repeats the rule cannot settle), `solver/tools/certify_pilot.py` rates the pilot,
-and `solver/tools/cloud/certify.sh` runs them ([RUNBOOK, section 9](RUNBOOK.md#9-certifying-u-stage-4)).
+and `solver/tools/cloud/certify.sh` runs them ([runbook/certify.md](runbook/certify.md)).
 
 *Verifying the certificates.*  `taxman verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...]
 [--threads K]` (`src/certify/verify.rs`) reads the files that `certify --out` wrote, without changing them, and checks
@@ -1791,10 +1791,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     youngest first and suspends them if need be, and a suspended search claims one thread.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run
-  ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [RUNBOOK, section
-  5.6](RUNBOOK.md#56-what-was-tested-and-what-can-go-wrong)), and the build cache and the release suite that runs on
-  EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`, `test_run_tests.py` and
-  `test_setup.py`, run with `python3 -I`; [RUNBOOK, section 11](RUNBOOK.md#11-the-build-cache-and-the-release-suite)).
+  ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [runbook/wall.md, "What
+  was tested, and what can go wrong"](runbook/wall.md#what-was-tested-and-what-can-go-wrong)), and the build cache and
+  the release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`,
+  `test_run_tests.py` and `test_setup.py`, run with `python3 -I`; [runbook/build-cache.md](runbook/build-cache.md)).
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
@@ -1919,7 +1919,8 @@ load on the machine moves wall times by up to 3×.  Five tools measure it:
   counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
 
 The cloud scripts (`solver/tools/cloud`) run the scaling sweep, the cost of a checkpoint pause and the chain on a
-machine of many CPUs ([RUNBOOK.md, sections 3 and 4](RUNBOOK.md#3-before-a-big-run)).
+machine of many CPUs ([runbook/before-a-big-run.md](runbook/before-a-big-run.md) and
+[runbook/chain.md](runbook/chain.md)).
 
 **Where it stands.**  At the end of the chain a step of the search cost 888k cycles on one thread of the M1 Max, 92% of
 it in the GF(2) bound, and [cheaper GF(2) nodes](../notebook/cheaper-gf2-nodes-same-trees-2026-10/README.md) took it to
