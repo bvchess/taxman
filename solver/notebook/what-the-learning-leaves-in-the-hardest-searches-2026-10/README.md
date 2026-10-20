@@ -14,6 +14,11 @@ fits the node.  Exchanges outside the learning's class explain at most 8%.  So a
 Keeping the nogoods used since the last clearing (the tactic `nogood_keep=hit`) is no answer either: it moves the trees
 by the same factor with the learning as without it, 0.36-0.37 at 3300-14 and 1.46 at 3441-1262.
 
+**Follow-ups, on the old suite (2026-10-20).**  None leaves an idea to keep.  Learning each computed conflict's nogood
+under other witnesses makes the trees 14% larger on 22 units.  A whole game forgets as much at the clearings as a unit
+does, step for step, and its image nogoods give fewer of its known conflicts.  Keeping the used nogoods does not make
+the search branch on smaller conflicts.  ([Three follow-ups](#three-follow-ups-on-the-old-suite).)
+
 The study follows [conflicts closed under cheap exchanges](../conflicts-closed-under-cheap-exchanges-2026-10/README.md),
 whose learning took 20.6% off the steps of the tuning suite and only 4.5% off the CPU of its whole games.  It has three
 stages: the instruments, built and tried on two units of the old [tuning
@@ -150,6 +155,107 @@ stopped before it ended, to save the budget.
   computed conflicts are under 1% of the checks.
 * **Not a wider closure.**  The exchanges the closure lacks explain at most 8% of the computed conflicts at 3300-14.
 
+## Three follow-ups on the old suite
+
+Before stage 2, three questions that stage 1 left were each given a rough number on the old suite (2026-10-20).  None
+leaves an idea to keep:
+
+* **Learning the witness's exchanges makes the trees larger.**  It cuts the conflicts the search computes, as it was
+  meant to, and the trees grow 14% on 22 units.
+* **A whole game forgets as much as a unit does, step for step.**  The share of computed conflicts that are forgotten
+  nogoods grows with the length of any search.  The image nogoods give fewer of a whole game's known conflicts.
+* **Keeping the used nogoods does not make the search branch on smaller conflicts.**  At 3300-14 it branches on
+  conflicts of the same size and fewer cheap ones; nothing points to a rule for choosing among conflicts.
+
+Every search here completed with the optimum as its best.
+
+### The witness's exchanges
+
+**The test.**  The search learns each computed conflict's nogood again with one member of its witness exchanged.  For
+each member `w` of the witness (the nogood's members outside the conflict), and each root candidate `y` outside the
+nogood that touches a frame `w` touches and is `w`'s twin (`w = m·p`, `y = m·q`, `p` and `q` prime) or kin (`w = m·u`,
+`y = m·v`, `u` and `v` at most 16), the searcher peels the nogood with `y` for `w` from the root.  A minimal conflict it
+finds there is learned as a nogood; a conflict of the root holds at every node, so the search stays exact.  That is 519
+sets peeled and 29 nogoods learned a computed conflict, on top of `--learn --closure`.  The prototype, `wall images
+--learn --closure --witness` with a hook in the searcher behind the feature `studies`, is not in the code:
+`witness.patch` adds it to commit 60976f3.
+
+**The result.**  The units are 3300-14 and the 21 units of the suite whose closure took under 50 CPU seconds.  The
+closure alone is the closure's lines of [cheap exchanges](../conflicts-closed-under-cheap-exchanges-2026-10/README.md)
+(`suite-runs.jsonl`), which a run of 3441-5459 here repeated step for step.
+
+| | the closure | the closure and the witness |
+|---|---|---|
+| steps, the 22 units | 2,812,162 | 3,217,865 (+14.4%) |
+| steps, a unit's ratio: geometric mean; range | | 1.034; 0.44 (3425-13) to 2.97 (3441-571) |
+| units larger | | 12 of 22 |
+| conflicts computed | 10,167 | 8,819 |
+| conflicts computed a thousand steps | 3.6 | 2.7 |
+| CPU seconds | 733 | 971 (+32%) |
+
+* **The exchanges do their job, and the tree does not care.**  A quarter fewer conflicts are computed for each step,
+  and at 3441-5459 the nogoods rule 115,415 candidates out of children against 8,112.  But a conflict the search no
+  longer computes is mostly the one the table now gives (stage 1's groups), and a node branches on a conflict alike
+  whether it found it or computed it.  What moves the tree is the candidates the nogoods rule out, and that moves it
+  both ways, as keeping the nogoods did in stage 1.
+* **They cost CPU.**  The tables hold 2,300-5,400 nogoods at a clearing, and a lookup scans the whole table.  The CPU
+  of the closure alone comes from the earlier entry's runs; on the two units run alone on the same day, the witness
+  took 11% more CPU at 3300-14 (204 to 227 seconds) and 35% more at 3441-5459.
+* **Decision: dropped.**  With it goes the aim of cutting the computed conflicts for their own sake: they are under 1%
+  of the checks, and finding one instead of computing it saves a peel, not tree.
+
+### Whole games and units
+
+Stage 1 guessed that a whole game, one long search, loses more to the clearings than a unit.  It does not: the share
+grows with the length of the search, and 3128-root and 3300-14 forget as much over the same steps.  The whole game was
+traced with `wall anatomy --root --learn --closure` (377,696 steps, as in the earlier entry), and `residual.py windows`
+follows each search period by period:
+
+| | 3128-root | 3300-14 |
+|---|---|---|
+| steps | 377,696 | 790,609 |
+| computed conflicts learned before, in the first period; the second | 0%; 35% | 0%; 30% |
+| the same, over the first 400,000 steps; the whole search | 42.8%; 42.8% | 41.0%; 57.0% |
+| the same, in each period after 500,000 steps | | 70-90% |
+| known conflicts given by image nogoods, first 400,000 steps; the whole search | 12.4%; 12.4% | 16.5%; 15.7% |
+
+* **The forgotten share is the length of the search.**  None of a period's computed conflicts are forgotten in the
+  first period, a third in the second, and most after ten.  3128-root forgets 42.8% against 3300-14's 57.0% because it
+  is half as long.  A searcher of a big run on many threads takes millions of steps, so most of the conflicts it
+  computes will be nogoods it forgot; by the witness's test, that costs peels, not tree.
+* **The image share is lower in the whole game.**  Its image nogoods give 12.4% of its known conflicts, against 16.5%
+  for 3300-14 over the same steps and 14.8% for 3441-5459.  `misses` puts 18.1% of 3128-root's computed conflicts in
+  none of the groups of moves, against 9.1% at 3300-14; the same conflict with another nogood is 27.2% (26.0%).
+
+### The conflicts branched on, keeping the used nogoods or not
+
+At 3300-14, keeping the used nogoods at a clearing (`nogood_keep=hit`) takes the tree from 1,248,609 steps to 464,165.
+The guess was that what the table holds changes which conflict a node branches on, and that a better conflict (fewer
+members, dearer exclusions) is the lever.  The test of `wall images`, which leaves the tree as it is, gives a row for
+each exclusion with the size of the conflict and the price; `residual.py branched` compares the two searches:
+
+| | default | `nogood_keep=hit` |
+|---|---|---|
+| exclusions | 345,237 | 131,989 |
+| conflict size, p10/median/p90; mean | 2/3/5; 3.07 | 2/3/5; 3.18 |
+| price, p10/median/p90 | 24/125/297 | 41/126/258 |
+| priced under 50 | 19.9% | 14.0% |
+| of those, conflicts of 2 members | 73.3% | 79.6% |
+| paired exchanges: share of the exclusions (cheap: 99-100% of them) | 7.9% | 4.7% |
+| twin swaps: share of the exclusions; cheap | 29.4%; 8.5% | 31.2%; 4.0% |
+
+* **Not smaller conflicts.**  The conflicts are the same size, and the table already gives a node the smallest
+  conflict it knows within the heaviest set.
+* **Fewer cheap ones.**  What differs is the tail of cheap exclusions: 14.0% against 19.9%, most of them conflicts of
+  two members, and fewer paired exchanges.  Strong branching takes a conflict's dearest member, so a cheap exclusion is
+  a conflict all of whose members are cheap to leave out.
+* **The trees part near the top.**  Both branch at the unit's node on 1485 (a conflict of 16 members) and then on 1640
+  (15 members); after that they differ.
+* **Decision: dropped.**  A rule could only choose, among the conflicts the table knows within the heaviest set, the
+  one whose dearest member is dearest, at the cost of a bound for each member of each.  Nothing here shows that the
+  cheap conflicts had dear alternatives; keeping the nogoods also rules more candidates out, which changes the prices
+  as much as a choice would.
+
 ## Files
 
 * `residual.py`: `profile` and `misses`, the tables of this entry; its module comment has the usage.
@@ -161,6 +267,11 @@ stopped before it ended, to save the budget.
   3441-5459` and `3441`; then `python3 -I residual.py profile DIR_DEFAULT DIR_LEARNING 3300-14 3441-5459` and
   `python3 -I residual.py misses DIR 3300-14 3441-5459`.  The tests of keeping are `wall images` with `--learn --closure`
   or `--count`, and `--tactic nogood_keep=hit`.
+* The follow-ups: `residual.py windows` and `branched`; `witness.patch`, the witness's prototype; in `runs.jsonl`, the
+  lines labelled `witness` and `base` (`wall images --learn --closure [--witness]`), the line of 3128-root (`wall
+  anatomy --root --learn --closure --trace DIR 3128`, then `residual.py windows DIR 3128-root` and `misses`), and the
+  lines labelled `test-default` and `test-keep` (`wall images --ids 3300-14 [--tactic nogood_keep=hit] --trace DIR
+  3300`, then `residual.py branched DIR_DEFAULT DIR_KEEP 3300-14`).
 
 Commits: the commit of this entry (`wall anatomy --learn`, `--closure`, `--root`, the mirror, the nogood log, with
 their tests).

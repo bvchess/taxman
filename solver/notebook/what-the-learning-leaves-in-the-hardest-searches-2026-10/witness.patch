@@ -1,0 +1,305 @@
+diff --git a/solver/frame/examples/wall.rs b/solver/frame/examples/wall.rs
+index 3f8d5df..2c13046 100644
+--- a/solver/frame/examples/wall.rs
++++ b/solver/frame/examples/wall.rs
+@@ -279,7 +279,7 @@ const COMMANDS: [&str; 14] = [
+ ];
+ 
+ /// The options, with the commands each applies to (an option given to another command is an error).
+-const OPTIONS: [(&str, &[&str]); 60] = [
++const OPTIONS: [(&str, &[&str]); 61] = [
+     (
+         "--known",
+         &[
+@@ -316,6 +316,7 @@ const OPTIONS: [(&str, &[&str]); 60] = [
+     ("--bare", &["images"]),
+     ("--count", &["images"]),
+     ("--closure", &["anatomy", "images"]),
++    ("--witness", &["images"]),
+     ("--within", &["near"]),
+     ("--probes", &["near"]),
+     ("--probe-gap", &["near"]),
+@@ -576,6 +577,7 @@ fn parse() -> Result<Options, String> {
+             "--bare" => o.images.bare = true,
+             "--count" => o.images.count = true,
+             "--closure" => o.images.closure = true,
++            "--witness" => o.images.witness = true,
+             "--within" => o.near.within = number("--within", value("--within")?)?,
+             "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
+             "--probe-gap" => o.near.probe_gap = number("--probe-gap", value("--probe-gap")?)?,
+diff --git a/solver/frame/examples/wall/images.rs b/solver/frame/examples/wall/images.rs
+index de0057c..6b87208 100644
+--- a/solver/frame/examples/wall/images.rs
++++ b/solver/frame/examples/wall/images.rs
+@@ -76,7 +76,7 @@ use taxman::board::Board;
+ use taxman::engine::{self, Control, EngineConfig, Start};
+ use taxman::game::Optimal;
+ use taxman::matchbound::MatchGraph;
+-use taxman::model::{FrameGraph, FrameSet, Scratch};
++use taxman::model::{FrameGraph, FrameSet, NogoodStats, Scratch};
+ use taxman::numtheory;
+ use taxman::search::{
+     payload_of, set_of_payload, MakeHook, Prepared, SearchSpace, StepEnd, StepHook, StepRecord, TaxSearcher, TaxUnit,
+@@ -93,6 +93,8 @@ pub struct Params {
+     pub count: bool,
+     /// With `--learn`, propose the images of the images too, and so on (`--closure`).
+     pub closure: bool,
++    /// With `--learn`, also learn each computed conflict's nogood with one witness member exchanged (`--witness`).
++    pub witness: bool,
+ }
+ 
+ /// An exchange priced under this many points is *cheap* (the anatomy's line).
+@@ -101,6 +103,9 @@ const CHEAP: i64 = 50;
+ /// With `--closure`, the most sets proposed for one conflict.
+ const CLOSURE: usize = 64;
+ 
++/// Kin share a divisor `m` with cofactors at most this (`m·u` and `m·v`).
++const KIN: u32 = 16;
++
+ // ---------------------------------------------------------------------------------------------------------
+ // The substitutions
+ 
+@@ -229,6 +234,53 @@ fn cheap_images<const W: usize>(spf: &[u32], k: &Bits<W>, cands: &Bits<W>, chose
+     }
+ }
+ 
++/// The sets of the witness's exchanges (`--witness`): `nogood` with one member `w` of its witness (its members
++/// outside `conflict`) exchanged for a root candidate `y` outside it that touches a frame `w` touches and is `w`'s twin
++/// (`w = m·p`, `y = m·q`, `p` and `q` prime) or kin (`w = m·u`, `y = m·v`, `u` and `v` at most `KIN`), added to `out`.
++fn witness_exchanges<const W: usize>(
++    spf: &[u32],
++    model: &FrameGraph,
++    nogood: &Bits<W>,
++    conflict: &Bits<W>,
++    cands: &Bits<W>,
++    out: &mut Vec<Bits<W>>,
++) {
++    let top = cands.max().unwrap_or(0);
++    let frames = |x: u32| {
++        let (a, b) = model.frames_touched(x);
++        [Some(a), b]
++    };
++    for w in (*nogood - *conflict).iter() {
++        let near = frames(w);
++        let mut seen = Bits::<W>::EMPTY;
++        let mut push = |y: u32| {
++            if y == w || y > top || !cands.contains(y) || nogood.contains(y) || seen.contains(y) {
++                return;
++            }
++            seen.insert(y);
++            if frames(y).iter().flatten().any(|f| near.contains(&Some(*f))) {
++                out.push(nogood.without(w).with(y));
++            }
++        };
++        let mut rest = w;
++        while rest > 1 {
++            let p = spf[rest as usize];
++            while rest.is_multiple_of(p) {
++                rest /= p;
++            }
++            let m = w / p;
++            for q in (2..=top / m).filter(|&q| q != p && is_prime(q, spf)) {
++                push(m * q);
++            }
++        }
++        for u in (1..=KIN).filter(|&u| w.is_multiple_of(u)) {
++            for v in (1..=KIN).filter(|&v| v != u) {
++                push(w / u * v);
++            }
++        }
++    }
++}
++
+ // ---------------------------------------------------------------------------------------------------------
+ // What the hooks share
+ 
+@@ -247,6 +299,10 @@ pub(super) struct Game<const W: usize> {
+     pub(super) closure: bool,
+     /// The learning's hook proposes images; if not, it only counts the tree (`--count`).
+     propose: bool,
++    /// Also propose the witness's exchanges of each computed conflict's nogood (`--witness`), among the root's
++    /// candidates `cands`.
++    witness: bool,
++    cands: Bits<W>,
+ }
+ 
+ impl<const W: usize> Game<W> {
+@@ -255,7 +311,8 @@ impl<const W: usize> Game<W> {
+         let (spf, _) = numtheory::sieve(top);
+         let forget_period = p.tactics.forgetting().period;
+         let model = Arc::clone(&p.model);
+-        Game { model, root: p.root, spf, forget_period, verify, classes, closure: false, propose: true }
++        let cands = p.candidates;
++        Game { model, root: p.root, spf, forget_period, verify, classes, closure: false, propose: true, witness: false, cands }
+     }
+ }
+ 
+@@ -550,6 +607,9 @@ pub(super) struct Learned {
+     pub(super) proposed: u64,
+     pub(super) learned: u64,
+     classes: Vec<Class>,
++    /// With `--witness`: the witness's exchanges proposed, and the nogoods learned within them.
++    witness_proposed: u64,
++    witness_learned: u64,
+ }
+ 
+ /// With `--trace`, what a learning hook tracks of the classes: the class of each key, the class of the conflict last
+@@ -646,6 +706,8 @@ impl<const W: usize> Drop for Learner<W> {
+         shared.conflicts += tally.conflicts;
+         shared.proposed += tally.proposed;
+         shared.learned += tally.learned;
++        shared.witness_proposed += tally.witness_proposed;
++        shared.witness_learned += tally.witness_learned;
+         shared.classes.extend(tally.classes);
+     }
+ }
+@@ -698,6 +760,18 @@ impl<const W: usize> StepHook<W> for Learner<W> {
+         track.current = Some(class);
+     }
+ 
++    fn propose_nogoods(&mut self, _: &Bits<W>, conflict: &Bits<W>, nogood: &Bits<W>, more: &mut Vec<Bits<W>>) {
++        let game = &self.game;
++        if game.witness {
++            witness_exchanges(&game.spf, &game.model, nogood, conflict, &game.cands, more);
++            self.tally.witness_proposed += more.len() as u64;
++        }
++    }
++
++    fn learned_nogood(&mut self, _: &Bits<W>, _: &Bits<W>) {
++        self.tally.witness_learned += 1;
++    }
++
+     fn learned(&mut self, _: &Bits<W>, _: &Bits<W>, nogood: Option<&Bits<W>>) {
+         self.tally.learned += 1;
+         let (Some(track), Some(&n)) = (&mut self.track, nogood) else { return };
+@@ -722,6 +796,8 @@ struct Solved {
+     completed: bool,
+     best: u64,
+     cpu_s: f64,
++    /// What the searcher's nogood table did.
++    nogoods: NogoodStats,
+ }
+ 
+ /// Solves `unit` on one thread from the incumbent `start` (its value, and its set or none: a floor), with fresh tables
+@@ -741,7 +817,8 @@ fn solve<const W: usize>(
+     let out = engine::run(&cfg, begin, b"images", |_| TaxSearcher::new(&space)).expect("the engine");
+     let cpu_s = before.zip(cpu_seconds()).map_or(0.0, |(a, b)| b - a);
+     let best = set_of_payload::<W>(&out.payload).sum();
+-    Solved { nodes: out.stats.nodes, completed: out.completed, best, cpu_s }
++    let nogoods = *space.nogood_totals.lock().unwrap_or_else(PoisonError::into_inner);
++    Solved { nodes: out.stats.nodes, completed: out.completed, best, cpu_s, nogoods }
+ }
+ 
+ /// The test on `unit`: its search, and what the hooks gathered.
+@@ -835,8 +912,12 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
+     let graph = MatchGraph::new(&p.model, &p.root);
+     let start = (opt, &set);
+     let trace = o.anatomy.trace.as_ref();
+-    let game =
+-        Arc::new(Game { closure: o.images.closure, propose: !o.images.count, ..Game::new(&p, false, trace.is_some()) });
++    let game = Arc::new(Game {
++        closure: o.images.closure,
++        propose: !o.images.count,
++        witness: o.images.witness,
++        ..Game::new(&p, false, trace.is_some())
++    });
+     for (id, unit) in units {
+         if o.images.bare {
+             let solved = solve(&p, &graph, None, unit, start, o.nodes);
+@@ -860,14 +941,29 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
+                 });
+                 write_lines(&dir.join(format!("{id}.classes.tsv")), header, lines)?;
+             }
+-            let mut out = line(n, &id, if o.images.closure { "closure" } else { "learn" }, o, opt, &solved);
++            let mode = match (o.images.closure, o.images.witness) {
++                (true, true) => "closure+witness",
++                (false, true) => "learn+witness",
++                (true, false) => "closure",
++                (false, false) => "learn",
++            };
++            let mut out = line(n, &id, mode, o, opt, &solved);
+             out.field("steps", t.steps)
+                 .field("tree_nodes", t.nodes)
+                 .field("leaves", t.leaves)
+                 .field("conflicts", t.conflicts)
+                 .field("proposed", t.proposed)
+-                .field("learned", t.learned)
+-                .print();
++                .field("learned", t.learned);
++            if o.images.witness {
++                out.field("witness_proposed", t.witness_proposed).field("witness_learned", t.witness_learned);
++            }
++            let g = &solved.nogoods;
++            out.field("ng_learned", g.learned)
++                .field("ng_lookups", g.lookups)
++                .field("ng_hits", g.hits)
++                .field("ng_ruled_out", g.ruled_out)
++                .field("ng_table_mean", g.size_before / g.forgettings.max(1));
++            out.print();
+         } else {
+             let (solved, t) = check(&p, &graph, &game, unit, start, o.nodes);
+             if let Some(dir) = trace {
+@@ -898,8 +994,8 @@ pub fn run(o: &Options, optimal: &Optimal) -> Result<(), String> {
+     if [o.images.learn, o.images.bare, o.images.count].into_iter().filter(|&mode| mode).count() > 1 {
+         return Err("images: --learn, --bare and --count do not go together".to_owned());
+     }
+-    if o.images.closure && !o.images.learn {
+-        return Err("images: --closure needs --learn".to_owned());
++    if (o.images.closure || o.images.witness) && !o.images.learn {
++        return Err("images: --closure and --witness need --learn".to_owned());
+     }
+     for &n in &o.games {
+         taxman::with_width!(n, W => play::<W>(n, o, optimal), else Err(beyond(n)))?;
+diff --git a/solver/frame/src/search/hooks.rs b/solver/frame/src/search/hooks.rs
+index 4e61723..d715f7d 100644
+--- a/solver/frame/src/search/hooks.rs
++++ b/solver/frame/src/search/hooks.rs
+@@ -90,6 +90,21 @@ pub trait StepHook<const W: usize> {
+         let _ = (set, conflict, nogood);
+     }
+ 
++    /// After [`propose`](Self::propose), with the tactic `nogoods`: the nogood `nogood` the searcher made of the
++    /// conflict `conflict` it computed at a node with the promotions `promoted`; more sets for it to learn nogoods
++    /// within, put in `more`.  Of each, a minimal conflict that a peel *from the root* finds within it is a nogood
++    /// (it holds at every node), and the searcher adds it to its table unless the table holds one within it, and then
++    /// tells the hook ([`learned_nogood`](Self::learned_nogood)).  A set that can be promoted from the root teaches
++    /// nothing, so this changes the tree, never the answer.  Asked only on the GF(2) path.
++    fn propose_nogoods(&mut self, promoted: &Bits<W>, conflict: &Bits<W>, nogood: &Bits<W>, more: &mut Vec<Bits<W>>) {
++        let _ = (promoted, conflict, nogood, more);
++    }
++
++    /// A nogood the searcher learned within a set that [`propose_nogoods`](Self::propose_nogoods) proposed.
++    fn learned_nogood(&mut self, set: &Bits<W>, nogood: &Bits<W>) {
++        let _ = (set, nogood);
++    }
++
+     /// Whether the search *counts* (asked at each offer and at each heaviest set that can be promoted; the answer must
+     /// not change).  A counting search makes every completion of its unit that reaches the need as a child, once,
+     /// instead of looking for one better than the incumbent.  It offers nothing, so the incumbent and the need stay
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index deaa2c5..ae1d97b 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -697,6 +697,22 @@ impl<'a, const W: usize> Stepper<'a, W> {
+             self.known.push(c);
+             hook.learned(set, &c, nogood.as_ref());
+         }
++        // The sets proposed to learn nogoods within from the root (`StepHook::propose_nogoods`): a conflict of the
++        // root is a nogood whatever the set, so the search stays exact.
++        if let Some(table) = &mut self.nogoods {
++            if let Some(n) = space.model.nogood(&mut self.scratch, space.root, promoted, k) {
++                proposals.clear();
++                hook.propose_nogoods(promoted, k, &n, &mut proposals);
++                for set in &proposals {
++                    let Some(m) = space.model.conflict_using(&mut self.scratch, space.root, set, true) else { continue };
++                    if table.conflict(&Bits::EMPTY, &m).is_some() {
++                        continue;
++                    }
++                    table.insert(m);
++                    hook.learned_nogood(set, &m);
++                }
++            }
++        }
+         self.proposals = proposals;
+     }
+ 
