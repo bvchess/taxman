@@ -583,7 +583,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// Finds the mandatory moves of frame `i` until there are no more, recording each with the factor it claims;
     /// whether it found any.  (Earlier notes call these moves "forced", which this code avoids: the search has
     /// forced members of its own that are unrelated.  The Java's field is `mandatoryMoves`.)  That no game is lost
-    /// by them is docs/THEORY.md's lemma M5 (see [`crate::frames`]).
+    /// by them is lemma M5 of docs/theory/frame-model.md (see [`crate::frames`]).
     ///
     /// Two kinds of move are mandatory, as long as the factor involved is of no use outside the frame, so that
     /// settling the pair now takes nothing from the search:

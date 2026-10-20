@@ -15,12 +15,11 @@
 //! ```
 //!
 //! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  (Release,
-//! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick
-//! tests.)  Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste
-//! the rows in, and change the node counts quoted in DESIGN.md and solver/notebook/ if they are affected.  The same
-//! goes for
-//! [`FORGETTING`] and for [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its formulation
-//! without the claims of `unzip` (the frame model with the claims put back and no source open;
+//! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick tests.)
+//! Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows
+//! in, and change the node counts quoted in solver/docs/design/ and solver/notebook/ if they are affected.  The same
+//! goes for [`FORGETTING`] and for [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its
+//! formulation without the claims of `unzip` (the frame model with the claims put back and no source open;
 //! `Board::prepare_extended_with` with `claims` unset), whose rows are checked the same way.  Besides its table, Π⁺(∅)
 //! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
 //! same frames and candidates, node for node; and with the claims Lemma M5⁺ allows, which with no source open are all

@@ -8,9 +8,9 @@ promotable optimal set), so switching one off changes how fast an answer comes, 
 or `off`, but for `match_refine` (`0` to `7`), `nogood_period` and `nogood_limit` (whole numbers), `nogood_keep` (a
 policy), and the tactics that tune the GF(2) search, `force_window` to `more_forced`, which their rows give.  The
 tactics that act inside the search are the fields of `search::SearchTactics`, and `examples/ladder.rs` takes the same
-names for them.  A checkpoint records the search tactics in its header ([Engine](engine.md#engine)), but for the three
-that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the tactics of
-`tactics::Tactics`, in order, with their defaults.
+names for them.  A checkpoint records the search tactics in its header ([trust.md](trust.md), and "Adding a tactic"
+below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
+tactics of `tactics::Tactics`, in order, with their defaults.
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -52,3 +52,22 @@ promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by so
 the heaviest promotion set also has the most members, which is false at n = 833); and the tactics that lost, the
 Java's `blameGame` bound with its runner-up, its preclusion table, and the branchings other than strong branching
 ([which tactics earn their keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+
+## Adding a tactic
+
+A new tactic changes the code, its tests and this table together:
+
+* **Its name and value**: a slot in `Tactics::slots_mut` (`src/tactics.rs`), in this table's order, with
+  `TACTIC_COUNT` and that module's tests of the names and the values.  The command line, the results line and the
+  ladder take the names from there.
+* **Inside the search**: a field of `search::SearchTactics` (`src/search/tactics.rs`) and of `SearchSpace`
+  (`search::searcher`), which the soundness harness builds too (`tests/common/mod.rs`).  A checkpoint's header records
+  a switch through `bits`, `from_bits` and `with_switches_of`, and a setting that tunes the search through `tuning`,
+  `with_tuning` and `legacy_tuning`; the paragraph "What identifies a checkpoint" of [trust.md](trust.md) says which
+  header version a search writes, and `src/search/tests.rs` pins the bits.
+* **The tests**: the tactic among the variants of `every_tactic_gives_the_same_scores_at` (`tests/solver.rs`); a
+  tactic that prunes, among the configurations of `tests/soundness.rs` and the rows of `tests/tripwires.rs`; and the
+  checklist of [testing.md](testing.md) before the merge.
+* **The docs**: its row here, with its grade and the reason for it; the mechanism in the design file of its part (the
+  [map](../DESIGN.md)); the example results line of [REFERENCE.md](../REFERENCE.md#a-results-line---out-schema-5),
+  whose `tactic_switches` lists every switch; and a notebook entry once it is measured.
