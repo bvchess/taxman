@@ -1,0 +1,4 @@
+{"kind": "suite", "note": "the whole games before their runs: nominal sizes", "nominal": 10000000}
+{"kind": "whole", "game": 4050, "id": "4050-root", "gap": 1012, "default": {"nodes": 10000000, "cpu_s": 0.0, "wall_s": 0.0, "best": 368462, "completed": true}}
+{"kind": "whole", "game": 4176, "id": "4176-root", "gap": 1010, "default": {"nodes": 10000000, "cpu_s": 0.0, "wall_s": 0.0, "best": 389035, "completed": true}}
+{"kind": "whole", "game": 4005, "id": "4005-root", "gap": 1148, "default": {"nodes": 10000000, "cpu_s": 0.0, "wall_s": 0.0, "best": 356598, "completed": true}}

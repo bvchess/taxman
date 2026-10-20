@@ -89,7 +89,7 @@ use super::images::{units_of, Game, Learned, Learner};
 use super::{beyond, Line, Options};
 use crate::counters::cpu_seconds;
 use crate::fixtures::from_hex;
-use crate::known::known_incumbent;
+use crate::known::{known_incumbent, survivors};
 use crate::lns::run_unit_with;
 use crate::rng::Rng;
 use std::collections::hash_map::DefaultHasher;
@@ -671,6 +671,32 @@ pub(super) fn suite_units<const W: usize>(
             found.get(id).map(|&unit| (id.clone(), unit)).ok_or_else(|| format!("no unit {id} of {n} in the suite"))
         })
         .collect()
+}
+
+/// The incumbent the units of game `n` in the suite at `path` start from when the game has no known optimum: the
+/// incumbent of the checkpoint they were cut from, which the `game` line of `tune units` holds (`incumbent` in hex, and
+/// its sum `incumbent_sum`), reduced to what can be promoted in `p` as `tune solve` reduces it.  `None` if the file has
+/// no such line for the game.
+pub(super) fn suite_start<const W: usize>(path: &Path, n: u32, p: &Prepared<W>) -> Result<Option<Bits<W>>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    for line in text.lines().filter(|line| !line.trim().is_empty()) {
+        let json = Json::parse(line).map_err(|e| format!("{}: {e:?}", path.display()))?;
+        let is_game = json.get("kind").and_then(Json::as_str) == Some("game");
+        if !is_game || json.get("game").and_then(Json::as_u32) != Some(n) {
+            continue;
+        }
+        let (Some(hex), Some(sum)) =
+            (json.get("incumbent").and_then(Json::as_str), json.get("incumbent_sum").and_then(Json::as_u64))
+        else {
+            return Ok(None);
+        };
+        let set = survivors(p, &from_hex(hex)?)?;
+        if set.sum() != sum {
+            return Err(format!("the checkpoint's incumbent is worth {sum}, but {} of it can be promoted", set.sum()));
+        }
+        return Ok(Some(set));
+    }
+    Ok(None)
 }
 
 /// The numbers of the file at `path`, in order.

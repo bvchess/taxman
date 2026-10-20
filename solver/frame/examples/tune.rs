@@ -13,6 +13,8 @@
 //! cargo run --release --example tune -- units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]
 //! cargo run --release --example tune -- solve GAME [--known FILE] [--units FILE] [--ids I,J,...]
 //!     [--tactic NAME=VALUE]... [--node-limit L]
+//! cargo run --release --example tune -- expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K]
+//!     [--out FILE]
 //! ```
 //!
 //! `units` reads the units a checkpoint of game GAME holds (the engine's deque from its front, the shallowest and
@@ -37,6 +39,13 @@
 //! proof).  `--tactic` takes the names and values of `taxman solve --tactic` (the search tactics only), so a new
 //! tactic needs no change here, and `--node-limit L` stops a unit after about L nodes (the engine counts every 1,024),
 //! which then reports `completed: false`.
+//!
+//! `expand` makes more units from the units of a checkpoint.  A checkpoint of a game with billions of steps holds few
+//! units of the middle sizes: its workers stood at shallow nodes, whose loops are huge, or at deep ones, whose loops
+//! are tiny.  `expand` solves each unit of `--ids` for K steps (2,048 by default; the engine counts by 1,024) from the
+//! same start as `solve`, and writes as `unit` lines the nodes of the searcher's stack when the limit stops it, from
+//! the shallowest: the loops the K steps left, which together are what they did not search.  Their ids are `ID.1`,
+//! `ID.2`, ... and their `index` the unit's own, so that the lines can be appended to the units file.
 //!
 //! One jsonl line a unit: `game`, `id`, `depth`, `cands`, `nodes` (the engine's steps), `cpu_s` (the CPU time of the
 //! worker thread, from the start of the unit's searcher to the end of its run: the setup of the game, the same for
@@ -71,7 +80,7 @@ use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::search::{self, stat, NodeBound, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
+use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
@@ -337,24 +346,94 @@ fn sample_units<const W: usize>(
     let mut bound = NodeBound::new(&prepared, &graph);
     let best = opt.unwrap_or(head.best);
     for (index, unit) in reservoir.into_sorted() {
-        let gap = bound.completions(&unit).map(|value| {
-            let need = (best + 1).saturating_sub(unit.promoted.sum());
-            (value, need)
-        });
-        lines.push(Json::object([
-            ("kind", Json::from("unit")),
-            ("game", Json::from(game)),
-            ("id", Json::from(format!("{game}-{index}"))),
-            ("index", Json::from(index)),
-            ("depth", Json::from(unit.promoted.len())),
-            ("n_cands", Json::from(unit.cands.len())),
-            ("sum", Json::from(unit.promoted.sum())),
-            ("bound", gap.map_or(Json::Null, |(value, _)| Json::from(value))),
-            ("need", gap.map_or(Json::Null, |(_, need)| Json::from(need))),
-            ("gap", gap.map_or(Json::Null, |(value, need)| Json::from(value as i64 - need as i64))),
-            ("promoted", Json::from(to_hex(&unit.promoted))),
-            ("cands", Json::from(to_hex(&unit.cands))),
-        ]));
+        lines.push(unit_line(game, format!("{game}-{index}"), index, &unit, &mut bound, best));
+    }
+    Ok(lines)
+}
+
+/// The `unit` line of a units file: the node's depth, candidates and sum, its bound against what it needs to beat
+/// `best` (`gap`), and both sets in hex.
+fn unit_line<const W: usize>(
+    game: u32,
+    id: String,
+    index: u64,
+    unit: &TaxUnit<W>,
+    bound: &mut NodeBound<'_, W>,
+    best: u64,
+) -> Json {
+    let gap = bound.completions(unit).map(|value| (value, (best + 1).saturating_sub(unit.promoted.sum())));
+    Json::object([
+        ("kind", Json::from("unit")),
+        ("game", Json::from(game)),
+        ("id", Json::from(id)),
+        ("index", Json::from(index)),
+        ("depth", Json::from(unit.promoted.len())),
+        ("n_cands", Json::from(unit.cands.len())),
+        ("sum", Json::from(unit.promoted.sum())),
+        ("bound", gap.map_or(Json::Null, |(value, _)| Json::from(value))),
+        ("need", gap.map_or(Json::Null, |(_, need)| Json::from(need))),
+        ("gap", gap.map_or(Json::Null, |(value, need)| Json::from(value as i64 - need as i64))),
+        ("promoted", Json::from(to_hex(&unit.promoted))),
+        ("cands", Json::from(to_hex(&unit.cands))),
+    ])
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Expanding a unit
+
+/// The units that solving `unit` for about `steps` steps leaves behind: the nodes of the searcher's stack when the
+/// node limit stops it (the engine writes them to its final checkpoint), shallowest first, that still have candidates.
+/// They partition what the steps did not search of the unit.  A unit that the steps finish leaves none.  The engine
+/// counts steps by 1,024.
+fn expand_unit<const W: usize>(
+    space: &SearchSpace<'_, W>,
+    unit: TaxUnit<W>,
+    start: &Bits<W>,
+    steps: u64,
+    ckpt: &Path,
+) -> Result<Vec<TaxUnit<W>>, String> {
+    let _ = std::fs::remove_file(ckpt);
+    let checkpoint = Some((ckpt.to_path_buf(), std::time::Duration::from_secs(1 << 20)));
+    let cfg =
+        EngineConfig { threads: 1, node_limit: Some(steps), progress: None, checkpoint, ..EngineConfig::default() };
+    let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: search::payload_of(start) };
+    let cpu = AtomicU64::new(0);
+    let outcome =
+        engine::run(&cfg, begin, b"tune", |_| Timed::new(space, &cpu)).map_err(|e| format!("the engine: {e}"))?;
+    if outcome.completed {
+        return Ok(Vec::new());
+    }
+    let mut units = Vec::new();
+    engine::scan_checkpoint(ckpt, |bytes| {
+        units.push(TaxUnit::<W>::decode(bytes));
+        Ok(())
+    })
+    .map_err(|e| format!("{}: {e}", ckpt.display()))?;
+    std::fs::remove_file(ckpt).map_err(|e| format!("{}: {e}", ckpt.display()))?;
+    Ok(units)
+}
+
+/// `expand`: the `unit` lines of the units that each of the units `o.ids` of the units file leaves after `steps`
+/// steps, as `expand_unit` finds them, with ids `ID.1`, `ID.2`, ... from the shallowest; `index` is the unit's own, so
+/// that the lines can be appended to the units file.  A game's checkpoint holds few units of the middle sizes, and
+/// the units of a stack of one that stopped at some depth are the pieces of that path's loops.
+fn expand<const W: usize>(game: u32, o: &SolveOptions, steps: u64, optimal: &Optimal) -> Result<Vec<Json>, String> {
+    let (header, rows) = o.units.as_ref().map(|path| read_units::<W>(path, game)).ok_or("expand needs --units")??;
+    let board = Board::<W>::for_n(game);
+    let prepared = board.prepare(o.tactics)?;
+    let start = start_set(game, &board, &prepared, header.as_ref(), optimal)?.0;
+    let graph = MatchGraph::new(&prepared.model, &prepared.root);
+    let space = SearchSpace::new(&prepared, &graph);
+    let gf2 = Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates);
+    let mut bound = NodeBound::new(&prepared, &gf2);
+    let ckpt = std::env::temp_dir().join(format!("tune-expand-{}.ckpt", std::process::id()));
+    let mut lines = Vec::new();
+    for id in o.ids.as_deref().unwrap_or_default() {
+        let row = rows.iter().find(|row| row.id == *id).ok_or_else(|| format!("no unit {id} in the file"))?;
+        let index = id.rsplit('-').next().and_then(|i| i.parse().ok()).unwrap_or(0);
+        for (k, unit) in expand_unit(&space, row.unit, &start, steps, &ckpt)?.into_iter().enumerate() {
+            lines.push(unit_line(game, format!("{id}.{}", k + 1), index, &unit, &mut bound, start.sum()));
+        }
     }
     Ok(lines)
 }
@@ -371,6 +450,31 @@ struct SolveOptions {
     node_limit: Option<u64>,
 }
 
+/// The set the units of `game` are solved from, and the known optimum if there is one (then a solve proves): the known
+/// game's, else the incumbent of the checkpoint the units were cut from, which the units file's `game` line holds.
+fn start_set<const W: usize>(
+    game: u32,
+    board: &Board<W>,
+    prepared: &Prepared<W>,
+    header: Option<&GameLine>,
+    optimal: &Optimal,
+) -> Result<(Bits<W>, Option<u64>), String> {
+    match (known_incumbent(board, prepared, optimal)?, header.and_then(|h| h.incumbent.as_ref())) {
+        (Some((set, opt)), _) => Ok((set, Some(opt))),
+        (None, Some((hex, sum))) => {
+            let set = survivors(prepared, &from_hex(hex)?)?;
+            if set.sum() != *sum {
+                return Err(format!(
+                    "the checkpoint's incumbent is worth {sum}, but {} of it can be promoted",
+                    set.sum()
+                ));
+            }
+            Ok((set, None))
+        }
+        (None, None) => Err(format!("no known game of {game}, and no checkpoint incumbent in the units")),
+    }
+}
+
 /// Solves the units of `game` that `o` asks for, printing a line each.
 fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Result<(), String> {
     let (header, rows) = match &o.units {
@@ -384,21 +488,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             return Err(format!("the units of game {game} are for other candidates than this build makes"));
         }
     }
-    let known = known_incumbent(&board, &prepared, optimal)?;
-    let (start, opt) = match (&known, header.as_ref().and_then(|h| h.incumbent.as_ref())) {
-        (Some((set, opt)), _) => (*set, Some(*opt)),
-        (None, Some((hex, sum))) => {
-            let set = survivors(&prepared, &from_hex(hex)?)?;
-            if set.sum() != *sum {
-                return Err(format!(
-                    "the checkpoint's incumbent is worth {sum}, but {} of it can be promoted",
-                    set.sum()
-                ));
-            }
-            (set, None)
-        }
-        (None, None) => return Err(format!("no known game of {game}, and no checkpoint incumbent in the units")),
-    };
+    let (start, opt) = start_set(game, &board, &prepared, header.as_ref(), optimal)?;
     let wanted: Vec<Row<W>> = match &o.ids {
         None => rows,
         Some(ids) => {
@@ -432,7 +522,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             ("completed", Json::from(solved.completed)),
             ("best", Json::from(solved.best)),
             ("incumbent", Json::from(start.sum())),
-            ("proved", Json::from(known.is_some())),
+            ("proved", Json::from(opt.is_some())),
             ("opt", opt.map_or(Json::Null, Json::from)),
             ("tactics", Json::from(description.clone())),
             ("node_limit", o.node_limit.map_or(Json::Null, Json::from)),
@@ -447,8 +537,24 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
 // The command line
 
 enum Command {
-    Units { game: u32, ckpt: PathBuf, sample: usize, seed: u64, out: Option<PathBuf>, known: Option<PathBuf> },
-    Solve { game: u32, options: SolveOptions },
+    Units {
+        game: u32,
+        ckpt: PathBuf,
+        sample: usize,
+        seed: u64,
+        out: Option<PathBuf>,
+        known: Option<PathBuf>,
+    },
+    Solve {
+        game: u32,
+        options: SolveOptions,
+    },
+    /// The units a unit leaves after `--node-limit` steps (2,048 by default), as the lines of a units file.
+    Expand {
+        game: u32,
+        options: SolveOptions,
+        out: Option<PathBuf>,
+    },
 }
 
 fn parse() -> Result<Command, String> {
@@ -493,11 +599,18 @@ fn parse() -> Result<Command, String> {
             let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit };
             Ok(Command::Solve { game: game(Some(g))?, options })
         }
+        ("expand", [g]) => {
+            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit };
+            Ok(Command::Expand { game: game(Some(g))?, options, out })
+        }
         ("units", _) => Err("usage: tune units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]".into()),
+        ("expand", _) => Err("usage: tune expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K] \
+                              [--out FILE]"
+            .into()),
         ("solve", _) => {
             Err("usage: tune solve GAME [--known FILE] [--units FILE] [--ids I,J,...] [--tactic N=V]...".into())
         }
-        (other, _) => Err(format!("unknown command {other:?}: units or solve")),
+        (other, _) => Err(format!("unknown command {other:?}: units, solve or expand")),
     }
 }
 
@@ -522,6 +635,18 @@ fn run() -> Result<(), String> {
             let optimal = known_games(&options.known)?;
             taxman::with_width!(game, W => solve::<W>(game, &options, &optimal))
         }
+        Command::Expand { game, options, out } => {
+            let optimal = known_games(&options.known)?;
+            let steps = options.node_limit.unwrap_or(2_048);
+            let lines = taxman::with_width!(game, W => expand::<W>(game, &options, steps, &optimal))?;
+            let text: String = lines.iter().map(|line| format!("{line}\n")).collect();
+            match out {
+                Some(out) => std::fs::write(&out, text).map_err(|e| format!("{}: {e}", out.display()))?,
+                None => print!("{text}"),
+            }
+            eprintln!("{} units from {} units", lines.len(), options.ids.as_ref().map_or(0, Vec::len));
+            Ok(())
+        }
     }
 }
 
@@ -536,7 +661,6 @@ fn main() {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use taxman::search::Prepared;
 
     /// A game whose proof takes several thousand steps with the default tactics (3,647 from an optimal set): more than
     /// the 1,024 the engine counts by, so that a node limit can stop it and a checkpoint of it holds units.
@@ -625,6 +749,52 @@ mod tests {
             let off = solve_unit(&other_space, root(&w), &w.start, None).unwrap();
             assert!(off.completed && off.nodes != full.nodes);
             assert_eq!(off.best, full.best);
+        }
+        taxman::with_width!(GAME, W => check::<W>());
+    }
+
+    /// A unit that the steps do not finish leaves the nodes of its stack as units: the root of game 1215 after 1,024
+    /// steps leaves several, each a proof from P* that finds nothing better; a unit that the steps finish leaves none;
+    /// and `expand` writes them as the lines of a units file, which reads back as the same units.
+    #[test]
+    fn a_stopped_unit_leaves_its_stack_as_units() {
+        fn check<const W: usize>() {
+            let w = world::<W>();
+            let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
+            let space = SearchSpace::new(&w.prepared, &graph);
+            let dir = scratch("expand");
+            let ckpt = dir.join("expand.ckpt");
+            let units = expand_unit(&space, root(&w), &w.start, 1_024, &ckpt).unwrap();
+            assert!(units.len() > 3, "{} units", units.len());
+            assert!(units.iter().all(|unit| !unit.cands.is_empty()));
+            assert!(!ckpt.exists(), "the checkpoint is removed");
+            for unit in &units {
+                let solved = solve_unit(&space, *unit, &w.start, None).unwrap();
+                assert!(solved.completed && solved.best == w.opt);
+            }
+            assert!(expand_unit(&space, root(&w), &w.start, 100_000, &ckpt).unwrap().is_empty(), "the game finishes");
+
+            let gf2 = Gf2Graph::new(&w.prepared.model, &w.prepared.root, &w.prepared.candidates);
+            let mut bound = NodeBound::new(&w.prepared, &gf2);
+            let path = dir.join("units.jsonl");
+            let line = unit_line(GAME, format!("{GAME}-0"), 0, &root(&w), &mut bound, w.opt);
+            std::fs::write(&path, format!("{line}\n")).unwrap();
+            let options = SolveOptions {
+                known: None,
+                units: Some(path.clone()),
+                ids: Some(vec![format!("{GAME}-0")]),
+                tactics: SearchTactics::default(),
+                node_limit: None,
+            };
+            let lines = expand::<W>(GAME, &options, 1_024, Optimal::built_in()).unwrap();
+            assert_eq!(lines.len(), units.len());
+            let ids: Vec<&str> = lines.iter().filter_map(|l| l.get("id").and_then(Json::as_str)).collect();
+            assert_eq!(ids[..2], [format!("{GAME}-0.1"), format!("{GAME}-0.2")]);
+            assert!(lines.iter().all(|l| l.get("gap").and_then(Json::as_i64).is_some()));
+            std::fs::write(&path, lines.iter().map(|l| format!("{l}\n")).collect::<String>()).unwrap();
+            let (_, rows) = read_units::<W>(&path, GAME).unwrap();
+            assert_eq!(rows.iter().map(|row| row.unit).collect::<Vec<_>>(), units);
+            std::fs::remove_dir_all(&dir).unwrap();
         }
         taxman::with_width!(GAME, W => check::<W>());
     }

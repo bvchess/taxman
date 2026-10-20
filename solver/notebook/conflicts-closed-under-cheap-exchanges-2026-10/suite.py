@@ -2,8 +2,9 @@
 """Runs every problem of the tuning suite with the default search and with the learning of conflicts closed under the
 cheap exchanges, and makes the tables of the entry's section "The whole tuning suite" from the lines.
 
-usage: python3 -I suite.py run RESULTS.jsonl [--bin WALL] [--workers 2] [--max-load 8] [--nice 10] [--only ID,...]
-                                             [--modes MODE,...] [--tactic NAME=VALUE] [--bare ID,...]
+usage: python3 -I suite.py run RESULTS.jsonl [--bin WALL] [--suite SUITE.jsonl] [--workers 2] [--max-load 8]
+                                             [--nice 10] [--only ID,...] [--modes MODE,...] [--together]
+                                             [--tactic NAME=VALUE] [--bare ID,...]
        python3 -I suite.py table RESULTS.jsonl
        python3 -I suite.py spread RESULTS.jsonl PERTURBED.jsonl
 
@@ -13,7 +14,9 @@ run and one thread a process, for each problem of the suite and each mode (`--mo
 closed under the cheap exchanges (`--learn --closure`), `learn` the learning of their images alone and `check` the test
 of the images, both for a look at the problems where `closure` loses.  `--bare` runs the named problems once more with
 no hook, to measure what the counting hook costs.  At most `--workers` runs go at once, and a run starts only when the
-machine's load average over one minute is at most `--max-load`.  Each run's line goes to RESULTS.jsonl as the run ends,
+machine's load average over one minute is at most `--max-load`; with `--together` a worker takes a problem and runs its
+modes at once.  `--suite` names another suite file, such as the hardest searches' (solver/notebook/the-hardest-searches-
+of-the-run-to-5000-2026-10/suite.jsonl).  Each run's line goes to RESULTS.jsonl as the run ends,
 and a run already in the file is not made again, so an interrupted `run` is started again with the same command.  It
 stops starting runs when a run fails, when the two searches of a problem differ in their best or their conclusion, or
 when the default search's steps are not the suite's.  Ctrl-C ends its own processes and no others.
@@ -61,16 +64,17 @@ MINUS = "−"
 
 
 # --- the problems --------------------------------------------------------------------------------------------------
-def problems():
-    """The suite's problems in its order: id, game, whole (a whole game), gap, the default's steps and CPU seconds."""
+def problems(suite=SUITE):
+    """The problems of the suite file in its order: id, game, whole (a whole game), gap (the line's own, else the
+    tuning suite's whole games' in WHOLE_GAPS), and the default's steps, CPU seconds and best sum."""
     out = []
-    for line in SUITE.read_text().splitlines():
+    for line in Path(suite).read_text().splitlines():
         row = json.loads(line)
         if row["kind"] in ("unit", "whole"):
-            whole = row["kind"] == "whole"
-            gap = WHOLE_GAPS[row["id"]] if whole else row["gap"]
-            out.append({"id": row["id"], "game": row["game"], "whole": whole, "gap": gap,
-                        "steps": row["default"]["nodes"], "cpu_s": row["default"]["cpu_s"]})
+            gap = row["gap"] if "gap" in row else WHOLE_GAPS[row["id"]]
+            out.append({"id": row["id"], "game": row["game"], "whole": row["kind"] == "whole", "gap": gap,
+                        "steps": row["default"]["nodes"], "cpu_s": row["default"]["cpu_s"],
+                        "best": row["default"]["best"]})
     return out
 
 
@@ -88,10 +92,10 @@ def read_results(path):
 
 
 # --- running -------------------------------------------------------------------------------------------------------
-def command(binary, problem, mode, tactics=()):
+def command(binary, problem, mode, tactics=(), suite=SUITE):
     """The `wall images` command line of one run, with the search tactics `NAME=VALUE` given (their trees are not the
     suite's, so the limit on the steps is doubled)."""
-    where = ["--root"] if problem["whole"] else ["--suite", str(SUITE), "--ids", problem["id"]]
+    where = ["--root"] if problem["whole"] else ["--suite", str(suite), "--ids", problem["id"]]
     limit = LIMITS[mode] * problem["steps"] * (2 if tactics else 1)
     tuned = [option for spec in tactics for option in ("--tactic", spec)]
     return [str(binary), "images", "--known", str(KNOWN), *where, *OPTIONS[mode], *tuned, "--nodes", str(limit),
@@ -99,14 +103,15 @@ def command(binary, problem, mode, tactics=()):
 
 
 def complaints(problem, results):
-    """What is wrong with the runs of a problem so far: every search must complete with the problem's best, and the
-    default search's steps must be the suite's."""
+    """What is wrong with the runs of a problem so far: every search must complete with the problem's best (the known
+    optimum if there is one, and the suite's in any case: the default search's, which for a game with no known optimum
+    is the best the units' incumbent leads to), and the default search's steps must be the suite's."""
     found = []
     lines = [line for line in results.values() if line["id"] == problem["id"]]
     for line in lines:
-        if not line["completed"] or line["best"] != line["opt"]:
+        if not line["completed"] or line["best"] != problem["best"] or line["opt"] not in (None, line["best"]):
             found.append(f"{problem['id']} {line['mode']} {line['tactics']}: completed {line['completed']}, "
-                         f"best {line['best']}, opt {line['opt']}")
+                         f"best {line['best']}, opt {line['opt']}, the suite's {problem['best']}")
     if len({(line["best"], line["completed"]) for line in lines}) > 1:
         found.append(f"{problem['id']}: the best or the conclusion differs between the searches")
     count = results.get((problem["id"], "count"))
@@ -143,13 +148,21 @@ class Runner:
                 self.log(f"waiting for the load to fall: {os.getloadavg()[0]:.1f} over {self.args.max_load}")
         return not self.stop.is_set()
 
-    def run_one(self, problem, mode):
+    def run_one(self, problem, modes):
+        """Runs the modes of a problem together (one process each) once the machine is quiet enough."""
         if not self.wait_for_load():
             return
         load = os.getloadavg()[0]
+        together = [threading.Thread(target=self.run_mode, args=(problem, mode, load)) for mode in modes]
+        for t in together:
+            t.start()
+        for t in together:
+            t.join()
+
+    def run_mode(self, problem, mode, load):
         began = time.time()
         tactics = self.args.tactic
-        argv = ["nice", "-n", str(self.args.nice), *command(self.args.bin, problem, mode, tactics)]
+        argv = ["nice", "-n", str(self.args.nice), *command(self.args.bin, problem, mode, tactics, self.args.suite)]
         child = subprocess.Popen(argv, cwd=FRAME, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         with self.lock:
             self.children.append(child)
@@ -195,7 +208,7 @@ class Runner:
 
 
 def run(args):
-    ps = {p["id"]: p for p in problems()}
+    ps = {p["id"]: p for p in problems(args.suite)}
     wanted = args.only.split(",") if args.only else list(ps)
     bare = args.bare.split(",") if args.bare else []
     done = read_results(args.results)
@@ -205,8 +218,10 @@ def run(args):
     tuned = tuple(args.tactic)
     if len(tuned) > 1:
         sys.exit("run: one --tactic at a time")
-    jobs = [(ps[i], mode) for i in order for mode in modes if (i, mode, *tuned) not in done]
-    jobs += [(ps[i], "bare") for i in bare if (i, "bare", *tuned) not in done]
+    todo = [(ps[i], [mode for mode in modes if (i, mode, *tuned) not in done]) for i in order]
+    # With --together a job is a problem and all its modes at once (so they meet the same load); else a job is one run.
+    jobs = [(p, ms) for p, ms in todo if ms] if args.together else [(p, [m]) for p, ms in todo for m in ms]
+    jobs += [(ps[i], ["bare"]) for i in bare if (i, "bare", *tuned) not in done]
     print(f"{len(jobs)} runs to make, {len(done)} already in {args.results}", file=sys.stderr)
     Runner(args, jobs, done).go()
 
@@ -370,6 +385,9 @@ def main():
     runs = sub.add_parser("run")
     runs.add_argument("results")
     runs.add_argument("--bin", default=WALL)
+    runs.add_argument("--suite", default=SUITE, help="the suite file (default: the tuning suite's)")
+    runs.add_argument("--together", action="store_true",
+                      help="run the modes of a problem at once, a problem a worker, so that they meet the same load")
     runs.add_argument("--workers", type=int, default=2)
     runs.add_argument("--max-load", type=float, default=8.0)
     runs.add_argument("--nice", type=int, default=10)

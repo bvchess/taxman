@@ -32,8 +32,14 @@
 //! all, for the time of the search alone.  `--count` solves them with the learning's hook that proposes nothing: the
 //! search of `--bare`, with `steps`, `tree_nodes` and `leaves` counted, which `--bare` cannot.
 //!
+//! **The start.**  A unit is solved from the known optimum of its game (`--known` has it), which makes the solve a
+//! proof.  For a game with no known optimum, the units of a `--suite` are solved from the incumbent of the checkpoint
+//! they were cut from, which the suite's `game` line holds, as `tune solve` solves the units of an unfinished game: a
+//! subtree may then hold a better set, and `opt` is null.  `--root` needs the known optimum.
+//!
 //! **The line**, one a unit: `id`, `mode` (`check`, `learn`, `closure`, `count` or `bare`), `tactics`, `nodes` (the
-//! engine's steps), `completed`, `best` (the sum of the set the search ended with) and `opt`, `cpu_s`; but for `bare`,
+//! engine's steps), `completed`, `best` (the sum of the set the search ended with), `opt` (the known optimum, or null),
+//! `incumbent` (the sum of the set the search started from; `opt` when that is known), `cpu_s`; but for `bare`,
 //! `steps` (the hook's: the same as `nodes`), `tree_nodes` and `leaves` (nodes with no child explored).  The test adds
 //! `exclusions` (steps that went on without a member), `priced` (those whose node checked its bound again at its next
 //! step), `twin`, `paired` and `other` (the priced ones by their substitution), and `twin_images` and `paired_images`
@@ -61,7 +67,7 @@
 //! out, which counts those that the node's other conflicts or narrowing rule out too).  The hook forgets the nogoods
 //! when the searcher's table does (tactic `forget_nogoods`).
 
-use super::anatomy::suite_units;
+use super::anatomy::{suite_start, suite_units};
 use super::cycles::gcd;
 use super::{beyond, Line, Options};
 use crate::counters::cpu_seconds;
@@ -793,8 +799,16 @@ fn write_lines(path: &Path, header: &str, lines: impl IntoIterator<Item = String
     out.flush().map_err(fail)
 }
 
+/// What a game's units are solved from: the sum of the incumbent, and the known optimum if there is one (then the two
+/// are equal and the search proves; else the search may find better).
+#[derive(Clone, Copy)]
+struct Origin {
+    incumbent: u64,
+    opt: Option<u64>,
+}
+
 /// The fields every line has.
-fn line(n: u32, id: &str, mode: &str, o: &Options, opt: u64, s: &Solved) -> Line {
+fn line(n: u32, id: &str, mode: &str, o: &Options, start: Origin, s: &Solved) -> Line {
     let mut out = Line::of(n);
     out.text("id", id)
         .text("mode", mode)
@@ -802,7 +816,8 @@ fn line(n: u32, id: &str, mode: &str, o: &Options, opt: u64, s: &Solved) -> Line
         .field("nodes", s.nodes)
         .field("completed", s.completed)
         .field("best", s.best)
-        .field("opt", opt)
+        .maybe("opt", start.opt)
+        .field("incumbent", start.incumbent)
         .seconds("cpu_s", s.cpu_s);
     out
 }
@@ -821,6 +836,29 @@ pub(super) fn units_of<const W: usize>(
     suite_units::<W>(suite, n, &o.anatomy.ids)
 }
 
+/// The set to solve the units of game `n` from, and what is known of it: the game's known optimum (the units are
+/// proved), or else, for the units of a suite, the incumbent of the checkpoint they were cut from, as `tune solve`
+/// solves the units of an unfinished game (a subtree may then hold a better set than the incumbent).
+fn start_of<const W: usize>(
+    n: u32,
+    o: &Options,
+    board: &Board<W>,
+    p: &Prepared<W>,
+    optimal: &Optimal,
+) -> Result<(Bits<W>, Origin), String> {
+    if let Some((set, opt)) = known_incumbent(board, p, optimal)? {
+        return Ok((set, Origin { incumbent: opt, opt: Some(opt) }));
+    }
+    let from_units = match (&o.params.suite, o.exchanges.root) {
+        (Some(suite), false) => suite_start(suite, n, p)?,
+        _ => None,
+    };
+    let set = from_units.ok_or_else(|| {
+        format!("n={n}: needs its known optimum (--known), or the units of a --suite whose game line has an incumbent")
+    })?;
+    Ok((set, Origin { incumbent: set.sum(), opt: None }))
+}
+
 /// `images` on game `n` at the set width `W`.
 fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
     let board = Board::<W>::for_n(n);
@@ -828,22 +866,20 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
         return Ok(());
     }
     let p = board.prepare(o.tactics)?;
-    let Some((set, opt)) = known_incumbent(&board, &p, optimal)? else {
-        return Err(format!("n={n}: needs its known optimum (--known)"));
-    };
+    let (set, known) = start_of(n, o, &board, &p, optimal)?;
     let units = units_of(n, o, &p)?;
     let graph = MatchGraph::new(&p.model, &p.root);
-    let start = (opt, &set);
+    let start = (known.incumbent, &set);
     let trace = o.anatomy.trace.as_ref();
     let game =
         Arc::new(Game { closure: o.images.closure, propose: !o.images.count, ..Game::new(&p, false, trace.is_some()) });
     for (id, unit) in units {
         if o.images.bare {
             let solved = solve(&p, &graph, None, unit, start, o.nodes);
-            line(n, &id, "bare", o, opt, &solved).print();
+            line(n, &id, "bare", o, known, &solved).print();
         } else if o.images.count {
             let (solved, t) = learn(&p, &graph, &game, unit, start, o.nodes);
-            line(n, &id, "count", o, opt, &solved)
+            line(n, &id, "count", o, known, &solved)
                 .field("steps", t.steps)
                 .field("tree_nodes", t.nodes)
                 .field("leaves", t.leaves)
@@ -860,7 +896,7 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
                 });
                 write_lines(&dir.join(format!("{id}.classes.tsv")), header, lines)?;
             }
-            let mut out = line(n, &id, if o.images.closure { "closure" } else { "learn" }, o, opt, &solved);
+            let mut out = line(n, &id, if o.images.closure { "closure" } else { "learn" }, o, known, &solved);
             out.field("steps", t.steps)
                 .field("tree_nodes", t.nodes)
                 .field("leaves", t.leaves)
@@ -876,7 +912,7 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
             let count = |kind: Kind, image: Option<bool>| {
                 t.rows.iter().filter(|r| r.sub.kind == kind && (image.is_none() || r.image == image)).count()
             };
-            let mut out = line(n, &id, "check", o, opt, &solved);
+            let mut out = line(n, &id, "check", o, known, &solved);
             out.field("steps", t.steps)
                 .field("tree_nodes", t.nodes)
                 .field("leaves", t.leaves)
@@ -1002,6 +1038,74 @@ mod tests {
     #[test]
     fn the_count_finds_the_tree_of_the_search_and_root_names_the_whole_game() {
         taxman::with_width!(1215, W => count_1215::<W>(), else panic!("{}", beyond(1215)));
+    }
+
+    /// A game with no known optimum is solved from the incumbent of its units' `game` line, as `tune solve` does: here
+    /// game 1215 with the table of known games emptied, and an incumbent worth less than P*.  The default search and
+    /// the learning of its root unit find P* from it, and the line says `opt` is unknown.
+    fn unfinished_1215<const W: usize>() {
+        use crate::fixtures::to_hex;
+        use taxman::json::Json;
+        let n = 1215;
+        let board = Board::<W>::for_n(n);
+        let p = board.prepare(SearchTactics::default()).expect("prepare");
+        let (best_set, opt) = known_incumbent(&board, &p, Optimal::built_in()).expect("known").expect("a known game");
+        let low = crate::known::survivors(&p, &best_set.without(best_set.max().expect("a number"))).expect("a set");
+        assert!(low.sum() < opt, "the incumbent must be worth less than P*");
+
+        let dir = std::env::temp_dir().join(format!("images-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a scratch directory");
+        let units = dir.join("units.jsonl");
+        let game_line = |game: u32, sum: u64| {
+            format!(
+                "{{\"kind\":\"game\",\"game\":{game},\"incumbent\":\"{}\",\"incumbent_sum\":{sum}}}\n",
+                to_hex(&low)
+            )
+        };
+        let unit_line = format!(
+            "{{\"kind\":\"unit\",\"game\":{n},\"id\":\"{n}-0\",\"promoted\":\"0\",\"cands\":\"{}\"}}\n",
+            to_hex(&p.candidates)
+        );
+        std::fs::write(&units, format!("{}{}", game_line(n, low.sum()), unit_line)).expect("the units file");
+        assert_eq!(suite_start(&units, n, &p).expect("a start"), Some(low));
+        assert_eq!(suite_start(&units, n + 1, &p).expect("no start"), None, "another game's");
+        let wrong = dir.join("wrong.jsonl");
+        std::fs::write(&wrong, game_line(n, low.sum() + 1)).expect("the file");
+        assert!(suite_start(&wrong, n, &p).is_err(), "an incumbent worth other than its recorded sum");
+
+        let nothing = Optimal::from_json(&Json::parse("[]").expect("JSON")).expect("an empty table");
+        let mut options = Options::new("images".to_owned());
+        options.params.suite = Some(units.clone());
+        let (set, start) = start_of(n, &options, &board, &p, &nothing).expect("the units' incumbent");
+        assert_eq!((set, start.incumbent, start.opt), (low, low.sum(), None));
+        let (set, start) = start_of(n, &options, &board, &p, Optimal::built_in()).expect("the known optimum");
+        assert_eq!((set, start.incumbent, start.opt), (best_set, opt, Some(opt)), "a known game is proved");
+        options.exchanges.root = true;
+        assert!(start_of(n, &options, &board, &p, &nothing).is_err(), "the whole game needs its optimum");
+        options.exchanges.root = false;
+        options.params.suite = None;
+        assert!(start_of(n, &options, &board, &p, &nothing).is_err(), "no units and no optimum");
+        std::fs::remove_dir_all(&dir).expect("removed");
+
+        let graph = MatchGraph::new(&p.model, &p.root);
+        let root = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
+        let plain = solve(&p, &graph, None, root, (low.sum(), &low), None);
+        let (learned, l) = learn(
+            &p,
+            &graph,
+            &Arc::new(Game { closure: true, ..Game::new(&p, false, false) }),
+            root,
+            (low.sum(), &low),
+            None,
+        );
+        assert!(plain.completed && learned.completed);
+        assert_eq!((plain.best, learned.best), (opt, opt), "from below, both find P*");
+        assert!(l.learned > 0, "nothing learned");
+    }
+
+    #[test]
+    fn a_game_with_no_known_optimum_starts_from_its_units_incumbent() {
+        taxman::with_width!(1215, W => unfinished_1215::<W>(), else panic!("{}", beyond(1215)));
     }
 
     /// The root search of game `n` from a floor 60 under P*, with no set, with the learning (of the closures, with
