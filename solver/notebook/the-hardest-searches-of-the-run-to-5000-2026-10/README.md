@@ -9,6 +9,9 @@ hardest searches of the committed chain's run to 4547, and does a whole game's l
 **Answer.**  On the units, yes, a little under the old suite's size.  On whole games it went both ways, and a game's
 learning matched its units' for two games of three.
 
+**Later (2026-10-20): closed, not adopted.**  On these whole games the learning was closed: see [the
+verdict](../conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted).
+
 * **The units.**  On 30 units of 3940, 4225, 4416 and 4548 (104,080 to 1,048,736 steps) the learning takes 20.0% off the
   steps (9.09 M to 7.27 M): 25.5% at 3940, 29.7% at 4225, 27.6% at 4416 and 7.2% at 4548.  The median unit gains 14.7%,
   and 3 units take more steps.  The old suite's units gained 22.6% of the steps.  Every unit ended with the best set of
