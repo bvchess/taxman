@@ -173,13 +173,21 @@ impl<const R: usize> BlockSpan<R> {
         (v, c)
     }
 
-    /// Adds the element `e` with the vector `v`; false (and nothing added) if `v` is in the span.
+    /// Adds the element `e` with the vector `v`, in the next slot; false (and nothing added) if `v` is in the span.
     #[inline]
     fn insert(&mut self, v: Vector<R>, e: u32) -> bool {
+        let added = self.insert_as(v, self.elem.len());
+        if added {
+            self.elem.push(e);
+        }
+        added
+    }
+
+    /// Adds the vector `v` as slot `slot` (its bit in the masks); false (and nothing added) if `v` is in the span.
+    #[inline]
+    fn insert_as(&mut self, v: Vector<R>, slot: usize) -> bool {
         let (r, mut c) = self.reduce(v);
         let Some(p) = lowest(&r) else { return false };
-        let slot = self.elem.len();
-        self.elem.push(e);
         c[slot / 64] |= 1 << (slot % 64);
         self.row[p] = (r, c);
         self.has[p / 64] |= 1 << (p % 64);
@@ -214,11 +222,13 @@ const FREE_A: u32 = u32::MAX - 1;
 /// # Deriving a tableau
 ///
 /// Outside a solve only part of the tableau is ever read: which elements are free (`res[e] ≠ 0`), the circuits of the
-/// others (`mask[e]`), the member in each slot, and the lists of members and of the elements outside the set.  Of
-/// these the free elements and the circuits depend on the set alone, not on how the tableau was made, and a rebuild
-/// numbers each block's slots by increasing member.  So a tableau equal to the one a solve would build for a set
-/// follows from the tableau of a related set, at a cost linear in the elements instead of a pivot per member
-/// ([`derive`](Self::derive)):
+/// others (`mask[e]`, through the member in each slot), and the lists of members and of the elements outside the
+/// set.  These depend on the set alone, not on how the tableau was made, but for the numbers of the slots, which
+/// only name the members: the searches order their vertices by distance, arcs and element, never by slot, and what
+/// else is read off such a tableau (the split, the gap) is unique; only the split's predecessors, which choose where
+/// a later split starts, can depend on that order (a solve, whose paths do, builds its tableau anew).  So a tableau
+/// that reads as the one a solve would build for a set follows from the tableau of a related set, at a cost linear
+/// in the elements instead of a pivot per member ([`derive`](Self::derive)):
 ///
 /// * Exchanging a member `x` for an element `y` in the span whose circuit holds `x` keeps the span, so it changes
 ///   no residue and is the pivot of [`exchange`](Self::exchange).  Two independent sets of a block with the same
@@ -233,7 +243,8 @@ const FREE_A: u32 = u32::MAX - 1;
 ///   contraction exactly when it is in the span of `S`, and its circuit there is its circuit with respect to `S`
 ///   less `C` (the vectors reduced modulo those of `C`).  So the circuits carry over without the slots of `C`.
 /// * Deleting elements that are not members changes no other element's circuit.
-/// * Numbering the slots by increasing member renames the bits of the circuits.
+/// * A member gone frees its slot, whose bit leaves the circuits, and one that enters takes a free slot; the others
+///   keep theirs.
 ///
 /// The search derives a child's tableau from its parent's (inherited, the members it promotes contracted; or
 /// certified, flipped along a cycle and contracted), and a node's without the member it branched on from its own,
@@ -243,7 +254,7 @@ pub struct Meet<const R: usize> {
     res: [Vec<Vector<R>>; 2],
     /// The slot of each member of the tableau's set, [`NO_SLOT`] for the others.
     slot: [Vec<u16>; 2],
-    /// Per block: the member in each slot, and the slots in use.
+    /// Per block: the member in each slot ([`NONE`] for a slot freed in a derived tableau), and the slots in use.
     slot_elem: [Vec<Vec<u32>>; 2],
     next_slot: [Vec<usize>; 2],
     /// Per block: the live elements of the solve.
@@ -326,11 +337,10 @@ pub struct Meet<const R: usize> {
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
     pub withouts_exact: u64,
-    /// [`derive`](Self::derive)'s scratch: marks by element, the new slot of each old one, the elements that enter
-    /// and leave a block, the live elements the tableau derived from did not have, and per matroid and block those
-    /// whose circuits it does not give where the span changes.
+    /// [`derive`](Self::derive)'s scratch: marks by element, the elements that enter and leave a block, the live
+    /// elements the tableau derived from did not have, and per matroid and block those whose circuits it does not
+    /// give where the span changes.
     mark: Vec<u8>,
-    slot_map: Vec<u16>,
     entering: Vec<u32>,
     leaving: Vec<u32>,
     fresh: Vec<u32>,
@@ -570,7 +580,6 @@ impl<const R: usize> Meet<R> {
             withouts: 0,
             withouts_exact: 0,
             mark: vec![0; n],
-            slot_map: vec![NO_SLOT; 64 * R],
             entering: Vec::new(),
             leaving: Vec::new(),
             fresh: Vec::new(),
@@ -907,7 +916,7 @@ impl<const R: usize> Meet<R> {
                     }
                 }
                 for &x in &self.slot_elem[m][b][..self.next_slot[m][b]] {
-                    if self.mark[x as usize] & WANTED == 0 {
+                    if x != NONE && self.mark[x as usize] & WANTED == 0 {
                         self.leaving.push(x);
                     }
                 }
@@ -947,8 +956,8 @@ impl<const R: usize> Meet<R> {
                 }
             }
         }
-        // The new set and its elements; then each block's slots numbered by increasing member and the circuits not
-        // known found, or the block built.
+        // The new set and its elements; then each block's slots brought to it and the circuits not known found, or the
+        // block built.
         for list in &self.block_live[0] {
             for &e in list {
                 self.inside[e as usize] = false;
@@ -974,7 +983,7 @@ impl<const R: usize> Meet<R> {
             }
             for b in 0..self.block_live[m].len() {
                 if ok {
-                    self.renumber(m, b);
+                    self.move_slots(m, b);
                     self.reduce_unknown(p, m, b);
                 } else {
                     self.rebuild(p, m, b);
@@ -1016,19 +1025,28 @@ impl<const R: usize> Meet<R> {
         same("outside", format!("{:?}", self.out_a), format!("{:?}", other.out_a))?;
         for m in 0..2 {
             for b in 0..self.block_live[m].len() {
-                let slots = |t: &Meet<R>| format!("{:?}", &t.slot_elem[m][b][..t.next_slot[m][b]]);
-                same(&format!("slots of block {b} of {m}"), slots(self), slots(other))?;
+                let slots = |t: &Meet<R>| {
+                    let mut members: Vec<u32> =
+                        t.slot_elem[m][b][..t.next_slot[m][b]].iter().copied().filter(|&z| z != NONE).collect();
+                    members.sort_unstable();
+                    format!("{members:?}")
+                };
+                same(&format!("members of block {b} of {m}"), slots(self), slots(other))?;
             }
             for &e in live {
                 let i = e as usize;
                 let row = |t: &Meet<R>| {
                     let free = !is_zero(&t.res[m][i]);
                     if t.inside[i] {
-                        format!("member, slot {}", t.slot[m][i])
+                        let s = usize::from(t.slot[m][i]);
+                        format!("member, its slot's {}", t.slot_elem[m][usize::from(p.block[m][i])][s])
                     } else if free {
                         "free".to_string()
                     } else {
-                        format!("circuit {:?}", t.mask[m][i])
+                        let mut circuit = Vec::new();
+                        each_bit(&t.mask[m][i], |s| circuit.push(t.slot_elem[m][usize::from(p.block[m][i])][s]));
+                        circuit.sort_unstable();
+                        format!("circuit {circuit:?}")
                     }
                 };
                 same(&format!("element {e} of block {} of {m}", p.block[m][i]), row(self), row(other))?;
@@ -1063,7 +1081,9 @@ impl<const R: usize> Meet<R> {
                 let slots = &s.slots[m][slot_at..s.slot_ends[m][b]];
                 for (k, &e) in slots.iter().enumerate() {
                     self.slot_elem[m][b][k] = e;
-                    self.slot[m][e as usize] = k as u16;
+                    if e != NONE {
+                        self.slot[m][e as usize] = k as u16;
+                    }
                 }
                 self.next_slot[m][b] = slots.len();
                 slot_at = s.slot_ends[m][b];
@@ -1072,7 +1092,7 @@ impl<const R: usize> Meet<R> {
         for &e in &s.elems[0] {
             self.inside[e as usize] = false;
         }
-        for &e in &s.slots[0] {
+        for &e in s.slots[0].iter().filter(|&&e| e != NONE) {
             self.inside[e as usize] = true;
         }
         // The workspace holds the snapshot's tableau.
@@ -1106,7 +1126,7 @@ impl<const R: usize> Meet<R> {
 
     /// The rows of the live elements of block `b` of matroid `m` whose circuits the tableau derived from does not give:
     /// those it did not have (`fresh`), and those `unsure` where the span changed.  Each is reduced by the span of
-    /// the block's members, inserted in slot order, so that its residue is zero exactly when it is in the span, and
+    /// the block's members, each inserted as its slot, so that its residue is zero exactly when it is in the span, and
     /// its mask is then its circuit.
     fn reduce_unknown(&mut self, p: &Problem<'_, R>, m: usize, b: usize) {
         let unsure = std::mem::take(&mut self.unsure[m][b]);
@@ -1116,9 +1136,9 @@ impl<const R: usize> Meet<R> {
         }
         let span = &mut self.spans[m][b];
         span.clear();
-        for &z in &self.block_live[m][b] {
-            if self.inside[z as usize] {
-                let inserted = span.insert(p.vector[m][z as usize], z);
+        for (k, &z) in self.slot_elem[m][b][..self.next_slot[m][b]].iter().enumerate() {
+            if z != NONE {
+                let inserted = span.insert_as(p.vector[m][z as usize], k);
                 debug_assert!(inserted, "a member of a common independent set is dependent");
             }
         }
@@ -1131,58 +1151,51 @@ impl<const R: usize> Meet<R> {
         self.reduced += 1;
     }
 
-    /// Numbers the slots of block `b` of matroid `m` by increasing member among its live elements, as a rebuild does:
-    /// each member there has a slot, and the circuit of each other live element in the span is carried over to the
-    /// new numbers, less the slots of members that are no longer live elements (contracted), or no longer members
-    /// where the span changed (`dirty`; there the members that enter have no slot yet).
-    fn renumber(&mut self, m: usize, b: usize) {
-        // Members in increasing order in their slots, none of them gone and none new: the numbering is already a
-        // rebuild's, and so are the circuits.
-        let slots = &self.slot_elem[m][b][..self.next_slot[m][b]];
-        let kept = slots.iter().all(|&z| self.inside[z as usize]) && slots.windows(2).all(|pair| pair[0] < pair[1]);
-        if kept && !self.dirty[m][b] {
-            return;
-        }
-        self.slot_map.fill(NO_SLOT);
-        let mut k = 0u16;
-        for &z in &self.block_live[m][b] {
-            if self.inside[z as usize] {
-                let s = self.slot[m][z as usize];
-                if s != NO_SLOT {
-                    self.slot_map[usize::from(s)] = k;
-                } else {
-                    debug_assert!(self.dirty[m][b], "a member without a slot");
-                }
-                k += 1;
+    /// Brings the slots of block `b` of matroid `m` to the new set (`inside`): each member gone (contracted, or no
+    /// longer a member where the span changed, `dirty`) frees its slot, whose bit leaves the circuits of the live
+    /// elements, and each member that entered where the span changed takes the first free slot.  The other members
+    /// keep theirs, so that the circuits carry over.
+    fn move_slots(&mut self, m: usize, b: usize) {
+        let mut gone = [0u64; R];
+        let mut freed = false;
+        for (k, z) in self.slot_elem[m][b][..self.next_slot[m][b]].iter_mut().enumerate() {
+            if *z != NONE && !self.inside[*z as usize] {
+                self.slot[m][*z as usize] = NO_SLOT;
+                *z = NONE;
+                gone[k / 64] |= 1 << (k % 64);
+                freed = true;
             }
+        }
+        if freed {
+            for &z in &self.block_live[m][b] {
+                if !self.inside[z as usize] {
+                    for (c, g) in self.mask[m][z as usize].iter_mut().zip(&gone) {
+                        *c &= !g;
+                    }
+                }
+            }
+        }
+        if !self.dirty[m][b] {
+            return;
         }
         let mut k = 0;
         for &z in &self.block_live[m][b] {
             let z = z as usize;
-            if self.inside[z] {
+            if self.inside[z] && self.slot[m][z] == NO_SLOT {
+                while k < self.next_slot[m][b] && self.slot_elem[m][b][k] != NONE {
+                    k += 1;
+                }
+                if k == self.next_slot[m][b] {
+                    self.next_slot[m][b] += 1;
+                }
                 self.slot_elem[m][b][k] = z as u32;
                 self.slot[m][z] = k as u16;
                 let mut own = [0; R];
                 own[k / 64] |= 1 << (k % 64);
                 self.mask[m][z] = own;
                 self.res[m][z] = [0; R];
-                k += 1;
-            } else {
-                self.slot[m][z] = NO_SLOT;
-                if is_zero(&self.res[m][z]) {
-                    let mut circuit = [0; R];
-                    let map = &self.slot_map;
-                    each_bit(&self.mask[m][z], |s| {
-                        let t = map[s];
-                        if t != NO_SLOT {
-                            circuit[usize::from(t) / 64] |= 1 << (t % 64);
-                        }
-                    });
-                    self.mask[m][z] = circuit;
-                }
             }
         }
-        self.next_slot[m][b] = k;
     }
 
     /// Makes `y` (independent of the tableau's set in block `b` of matroid `m`) a member: a new slot, and the
@@ -2248,7 +2261,7 @@ impl<const R: usize> Meet<R> {
                 span.clear();
                 let stay = self.slot_elem[m][b][..self.next_slot[m][b]]
                     .iter()
-                    .filter(|&&z| self.seen[z as usize] != self.generation);
+                    .filter(|&&z| z != NONE && self.seen[z as usize] != self.generation);
                 let enter =
                     self.flip.iter().filter(|&&y| !self.inside[y as usize] && usize::from(p.block[m][y as usize]) == b);
                 for &e in stay.chain(enter) {
