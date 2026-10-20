@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """The tables of "What the learning leaves in the hardest searches" (README.md beside this file), from the files of
-`wall anatomy --trace`.
+`wall anatomy --trace` and `wall images --trace`.
 
 usage: python3 -I residual.py profile DIR_A DIR_B ID...
        python3 -I residual.py misses DIR ID... [--every K] [--period P]
+       python3 -I residual.py windows DIR ID... [--period P]
+       python3 -I residual.py branched DIR_A DIR_B ID...
 
 DIR holds what `wall anatomy --trace DIR` writes, with `--learn --closure` or without: `ID.steps.tsv`,
 `ID.nogoods.tsv` and `N.candidates.tsv`; their fields are defined in the module comment of
@@ -15,6 +17,11 @@ solver/frame/examples/wall/anatomy.rs.
   search's own and those learned within images) for one that a few moves of members turn into a nogood that would have
   given the conflict at its node, and names the moves by the factorizations of the members.  `--every K` takes every
   K-th computed conflict only; `--period P` is the searcher's forgetting period (50,000 steps by default).
+* `windows` follows a search period by period (`--period P`): the conflicts computed and the share whose nogood was
+  learned before, so forgotten at a clearing; the conflicts known and the share that image nogoods give.
+* `branched` puts side by side the conflicts two searches of each unit branched on: their sizes, the prices of the
+  exclusions, and the cheap ones by the substitution the bound made.  Its DIRs hold `ID.images.tsv`, the rows that
+  `wall images --trace DIR` writes without `--learn` (solver/frame/examples/wall/images.rs, "The rows").
 
 Standard library only; the anatomy's script (beside its README.md) supplies the tree.
 """
@@ -513,6 +520,91 @@ def run_misses(dir_, ids, every, period):
               "; ".join(f"{k} {v / max(1, total):.1f}" for k, v in cost.items()) + ".\n")
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# windows
+
+
+def run_windows(dir_, ids, period):
+    dir_ = Path(dir_)
+    for uid in ids:
+        seen, computed, known = set(), Counter(), Counter()
+        for r in read_nogoods(dir_ / f"{uid}.nogoods.tsv"):
+            if r.src == "C" and r.nogood is not None:
+                w = (r.step - 1) // period
+                computed[(w, "all")] += 1
+                computed[(w, "met")] += r.nogood in seen
+            if r.nogood is not None:
+                seen.add(r.nogood)
+        s = Steps(dir_ / f"{uid}.steps.tsv")
+        for i in range(s.n):
+            for code in (s.ksrc[i], s.cksrc[i]):
+                if code >= 1:
+                    known[(i // period, "all")] += 1
+                    known[(i // period, "image")] += code >= 2
+        print(f"## {uid}, by period of {period:,} steps\n")
+        rows, total = [], Counter()
+        for w in range(max(k[0] for k in known) + 1):
+            for key in ("all", "met"):
+                total[("c", key)] += computed[(w, key)]
+            for key in ("all", "image"):
+                total[("k", key)] += known[(w, key)]
+            rows.append([f"{w * period:,}", f"{computed[(w, 'all')]:,}",
+                         anatomy.pct(computed[(w, "met")], computed[(w, "all")]),
+                         anatomy.pct(total[("c", "met")], total[("c", "all")]), f"{known[(w, 'all')]:,}",
+                         anatomy.pct(known[(w, "image")], known[(w, "all")]),
+                         anatomy.pct(total[("k", "image")], total[("k", "all")])])
+        anatomy.table(rows, ["from step", "computed", "learned before", "so far", "known", "from images", "so far"])
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# branched
+
+
+def read_rows(path):
+    """The test's rows that `branched` uses: depth, price (None if unpriced), substitution and conflict size."""
+    rows = []
+    with open(path) as f:
+        at = {h: i for i, h in enumerate(next(f).rstrip("\n").split("\t"))}
+        for line in f:
+            v = line.rstrip("\n").split("\t")
+            price = None if v[at["price"]] == "-" else int(v[at["price"]])
+            rows.append((int(v[at["d"]]), price, v[at["kind"]], int(v[at["nk"]])))
+    return rows
+
+
+def branched(rows):
+    """The figures of the conflicts one search branched on (see the module docs)."""
+    f = {"exclusions": f"{len(rows):,}"}
+    sizes = [r[3] for r in rows]
+    priced = [r for r in rows if r[1] is not None]
+    cheap = [r for r in priced if r[1] < CHEAP]
+    q = anatomy.quantiles(sizes)
+    f["conflict size, p10/median/p90; mean"] = f"{q[0]}/{q[1]}/{q[2]}; {sum(sizes) / len(sizes):.2f}"
+    f["conflicts of 2 members"] = anatomy.pct(sizes.count(2), len(sizes))
+    q = anatomy.quantiles([r[1] for r in priced])
+    f["price, p10/median/p90"] = f"{q[0]}/{q[1]}/{q[2]}"
+    f["priced under 50"] = anatomy.pct(len(cheap), len(priced))
+    f["of those, conflicts of 2 members"] = anatomy.pct(sum(1 for r in cheap if r[3] == 2), len(cheap))
+    for kind, name in (("T", "twin swaps"), ("P", "paired exchanges"), ("O", "other substitutions")):
+        n, c = sum(1 for r in priced if r[2] == kind), sum(1 for r in cheap if r[2] == kind)
+        f[f"{name}: share of the exclusions; cheap"] = f"{anatomy.pct(n, len(priced))}; {anatomy.pct(c, n)}"
+    for lo, hi in ((0, 2), (3, 9), (10, None)):
+        part = [r for r in priced if lo <= r[0] and (hi is None or r[0] <= hi)]
+        if part:
+            mean = sum(r[3] for r in part) / len(part)
+            name = f"depth {lo}+" if hi is None else f"depth {lo}-{hi}"
+            f[f"{name}: exclusions; mean size; median price"] = \
+                f"{len(part):,}; {mean:.2f}; {anatomy.quantiles([r[1] for r in part])[1]}"
+    return f
+
+
+def run_branched(dir_a, dir_b, ids):
+    for uid in ids:
+        a, b = (branched(read_rows(Path(d) / f"{uid}.images.tsv")) for d in (dir_a, dir_b))
+        print(f"## {uid}\n")
+        anatomy.table([[key, a[key], b.get(key, "-")] for key in a], ["", Path(dir_a).name, Path(dir_b).name])
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -530,6 +622,17 @@ def main():
             else:
                 rest.append(a)
         return run_misses(rest[0], rest[1:], every, period)
+    if args[0] == "windows":
+        period, rest = 50_000, []
+        it = iter(args[1:])
+        for a in it:
+            if a == "--period":
+                period = int(next(it))
+            else:
+                rest.append(a)
+        return run_windows(rest[0], rest[1:], period)
+    if args[0] == "branched":
+        return run_branched(args[1], args[2], args[3:])
     sys.exit(__doc__)
 
 
