@@ -1,12 +1,13 @@
 //! `wall images`: whether a node's conflict stays a conflict under the exchange its bound makes when the node goes on
 //! without a member, and what learning those images saves.  Units of the tuning suite are solved as `wall anatomy`
-//! solves them (one thread, fresh tables, from the known optimum), with a hook on every step (`search::StepHook`).  The
-//! notebook entry solver/notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md reads the lines and the
-//! files; this comment says what the code does.
+//! solves them (one thread, fresh tables, from the known optimum), with a hook on every step (`search::StepHook`); with
+//! `--root` the unit is the whole game, as `tune solve` solves `GAME-root`.  The notebook entry
+//! solver/notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md reads the lines and the files; this comment
+//! says what the code does.
 //!
 //! ```text
-//! cargo run --profile test --features studies --example wall -- images --suite FILE --known FILE --ids ID[,ID...]
-//!     [--learn [--closure] | --bare] [--trace DIR] [--nodes K] [--tactic NAME=VALUE]... N
+//! cargo run --profile test --features studies --example wall -- images --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) [--learn [--closure] | --bare | --count] [--trace DIR] [--nodes K] [--tactic NAME=VALUE]... N
 //! ```
 //!
 //! **The test** (the default).  A node branches on a member `x` of its conflict `K` and then goes on without `x`; at
@@ -28,11 +29,12 @@
 //! each that a peel finds, as it learned `K` (`search::StepHook::propose`).  The searcher learns only what the peel
 //! shows cannot be promoted, so the search stays exact.  With `--closure` the hook proposes the images of the images
 //! that are conflicts too, and so on, up to [`CLOSURE`] sets a conflict.  `--bare` solves the units with no hook at
-//! all, for the time of the search alone.
+//! all, for the time of the search alone.  `--count` solves them with the learning's hook that proposes nothing: the
+//! search of `--bare`, with `steps`, `tree_nodes` and `leaves` counted, which `--bare` cannot.
 //!
-//! **The line**, one a unit: `id`, `mode` (`check`, `learn`, `closure` or `bare`), `tactics`, `nodes` (the engine's
-//! steps), `completed`, `best` (the sum of the set the search ended with) and `opt`, `cpu_s`; but for `bare`, `steps`
-//! (the hook's: the same as `nodes`), `tree_nodes` and `leaves` (nodes with no child explored).  The test adds
+//! **The line**, one a unit: `id`, `mode` (`check`, `learn`, `closure`, `count` or `bare`), `tactics`, `nodes` (the
+//! engine's steps), `completed`, `best` (the sum of the set the search ended with) and `opt`, `cpu_s`; but for `bare`,
+//! `steps` (the hook's: the same as `nodes`), `tree_nodes` and `leaves` (nodes with no child explored).  The test adds
 //! `exclusions` (steps that went on without a member), `priced` (those whose node checked its bound again at its next
 //! step), `twin`, `paired` and `other` (the priced ones by their substitution), and `twin_images` and `paired_images`
 //! (of those, the ones whose image is a conflict).  The learning adds `conflicts` (the conflicts computed, each asked
@@ -84,9 +86,11 @@ use taxman::tactics::Tactics;
 /// The options of `images`.
 #[derive(Clone, Copy, Default)]
 pub struct Params {
-    /// Learn the images of the conflicts (`--learn`), or solve with no hook (`--bare`); else the test.
+    /// Learn the images of the conflicts (`--learn`), solve with no hook (`--bare`), or only count the tree
+    /// (`--count`); else the test.
     pub learn: bool,
     pub bare: bool,
+    pub count: bool,
     /// With `--learn`, propose the images of the images too, and so on (`--closure`).
     pub closure: bool,
 }
@@ -241,6 +245,8 @@ struct Game<const W: usize> {
     classes: bool,
     /// Propose the images of the images too (`--closure`).
     closure: bool,
+    /// The learning's hook proposes images; if not, it only counts the tree (`--count`).
+    propose: bool,
 }
 
 impl<const W: usize> Game<W> {
@@ -248,7 +254,8 @@ impl<const W: usize> Game<W> {
         let top = p.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(1);
         let (spf, _) = numtheory::sieve(top);
         let forget_period = p.tactics.forgetting().period;
-        Game { model: Arc::clone(&p.model), root: p.root, spf, forget_period, verify, classes, closure: false }
+        let model = Arc::clone(&p.model);
+        Game { model, root: p.root, spf, forget_period, verify, classes, closure: false, propose: true }
     }
 }
 
@@ -660,6 +667,9 @@ impl<const W: usize> StepHook<W> for Learner<W> {
         more: &mut Vec<Bits<W>>,
     ) {
         let game = &self.game;
+        if !game.propose {
+            return;
+        }
         cheap_images(&game.spf, conflict, cands, chosen, more);
         if game.closure {
             // The images of the images that are conflicts, and so on: the conflict's class closed under the cheap
@@ -797,6 +807,16 @@ fn line(n: u32, id: &str, mode: &str, o: &Options, opt: u64, s: &Solved) -> Line
     out
 }
 
+/// The units of game `n` to solve: the whole game with `--root`, as the suite names it (`GAME-root`); else the suite's
+/// units `--ids` names.
+fn units_of<const W: usize>(n: u32, o: &Options, p: &Prepared<W>) -> Result<Vec<(String, TaxUnit<W>)>, String> {
+    if o.exchanges.root {
+        return Ok(vec![(format!("{n}-root"), TaxUnit { promoted: Bits::EMPTY, cands: p.candidates })]);
+    }
+    let suite = o.params.suite.as_ref().ok_or("images needs --suite or --root")?;
+    suite_units::<W>(suite, n, &o.anatomy.ids)
+}
+
 /// `images` on game `n` at the set width `W`.
 fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
     let board = Board::<W>::for_n(n);
@@ -807,16 +827,23 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
     let Some((set, opt)) = known_incumbent(&board, &p, optimal)? else {
         return Err(format!("n={n}: needs its known optimum (--known)"));
     };
-    let suite = o.params.suite.as_ref().ok_or("images needs --suite")?;
-    let units = suite_units::<W>(suite, n, &o.anatomy.ids)?;
+    let units = units_of(n, o, &p)?;
     let graph = MatchGraph::new(&p.model, &p.root);
     let start = (opt, &set);
     let trace = o.anatomy.trace.as_ref();
-    let game = Arc::new(Game { closure: o.images.closure, ..Game::new(&p, false, trace.is_some()) });
+    let game =
+        Arc::new(Game { closure: o.images.closure, propose: !o.images.count, ..Game::new(&p, false, trace.is_some()) });
     for (id, unit) in units {
         if o.images.bare {
             let solved = solve(&p, &graph, None, unit, start, o.nodes);
             line(n, &id, "bare", o, opt, &solved).print();
+        } else if o.images.count {
+            let (solved, t) = learn(&p, &graph, &game, unit, start, o.nodes);
+            line(n, &id, "count", o, opt, &solved)
+                .field("steps", t.steps)
+                .field("tree_nodes", t.nodes)
+                .field("leaves", t.leaves)
+                .print();
         } else if o.images.learn {
             let (solved, t) = learn(&p, &graph, &game, unit, start, o.nodes);
             if let Some(dir) = trace {
@@ -864,8 +891,8 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
 
 /// `images` on each game of `o`.
 pub fn run(o: &Options, optimal: &Optimal) -> Result<(), String> {
-    if o.images.learn && o.images.bare {
-        return Err("images: --learn and --bare do not go together".to_owned());
+    if [o.images.learn, o.images.bare, o.images.count].into_iter().filter(|&mode| mode).count() > 1 {
+        return Err("images: --learn, --bare and --count do not go together".to_owned());
     }
     if o.images.closure && !o.images.learn {
         return Err("images: --closure needs --learn".to_owned());
@@ -943,6 +970,34 @@ mod tests {
     #[test]
     fn the_test_changes_no_tree_and_the_learning_no_best() {
         taxman::with_width!(1215, W => check_1215::<W>(), else panic!("{}", beyond(1215)));
+    }
+
+    /// The count of game 1215 from its known best set finds the tree of the search with no hook, the test's tree
+    /// (steps, nodes, leaves), and proposes and learns nothing; `--root` names the whole game as the suite does.
+    fn count_1215<const W: usize>() {
+        let n = 1215;
+        let board = Board::<W>::for_n(n);
+        let p = board.prepare(SearchTactics::default()).expect("prepare");
+        let (set, opt) = known_incumbent(&board, &p, Optimal::built_in()).expect("known").expect("a known game");
+        let graph = MatchGraph::new(&p.model, &p.root);
+        let root = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
+        let plain = solve(&p, &graph, None, root, (opt, &set), None);
+        let (_, t) = check(&p, &graph, &Arc::new(Game::new(&p, false, false)), root, (opt, &set), None);
+        let counting = Arc::new(Game { propose: false, ..Game::new(&p, false, false) });
+        let (counted, c) = learn(&p, &graph, &counting, root, (opt, &set), None);
+        assert_eq!((counted.nodes, counted.best, counted.completed), (plain.nodes, plain.best, true));
+        assert_eq!((c.steps, c.nodes, c.leaves), (t.steps, t.nodes, t.leaves));
+        assert!(c.leaves > 0 && c.proposed == 0 && c.learned == 0 && c.conflicts == 0);
+        let mut options = Options::new("images".to_owned());
+        options.exchanges.root = true;
+        let units = units_of(n, &options, &p).expect("the root");
+        let [(id, unit)] = units.as_slice() else { panic!("one unit, not {}", units.len()) };
+        assert_eq!((id.as_str(), unit.promoted, unit.cands), ("1215-root", root.promoted, root.cands));
+    }
+
+    #[test]
+    fn the_count_finds_the_tree_of_the_search_and_root_names_the_whole_game() {
+        taxman::with_width!(1215, W => count_1215::<W>(), else panic!("{}", beyond(1215)));
     }
 
     /// The root search of game `n` from a floor 60 under P*, with no set, with the learning (of the closures, with
