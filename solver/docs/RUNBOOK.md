@@ -991,10 +991,10 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "
   word.
 * **A resumed machine** passes the flag again (it is in `run/config`, which every machine reads), and the results file
   it restores from S3 gets the same checks.  The checkpoint of a searched game resumes as ever.
-* **The trade-off.**  Without the flag, the chain from n = 1 re-proves the committed chain (1 to 3440 took 1.76 hours on
-  the machine in the run of 2026-10-17); with it, that stretch costs seconds and the run checks nothing of the build
-  against the committed chain.  Use it for a run that goes past the repository's knowledge, and not for a run whose
-  point is that check.
+* **The trade-off.**  Without the flag, the chain from n = 1 re-proves the committed chain (in the run of 2026-10-17,
+  game 3440 alone took 1.76 hours of the machine); with it, that stretch costs seconds and the run checks nothing of the
+  build against the committed chain.  Use it for a run that goes past the repository's knowledge, and not for a run
+  whose point is that check.
 
 ### 5.5 The rehearsal
 
@@ -1047,8 +1047,8 @@ It passes if `status` ends in `ENDED ...: wall at N after H hours` within about 
   of `results/strict.jsonl` there is game N − 1 (no line for N).
 * The results pulled home agree with the committed chain:
   `aws s3 sync s3://taxman-013764204840-us-east-1/wall-rehearsal-1/results results-rehearsal-1/`, then
-  `solver/tools/cloud/verify.sh results-rehearsal-1/strict.jsonl` says N − 1 board sizes are in more than one file, with
-  equal scores in all.
+  `solver/tools/cloud/verify.sh results-rehearsal-1/strict.jsonl` prints
+  `N − 1 board sizes are in more than one file, with equal scores in all`.
 * If the build was slow enough that the budget of 0.3 hours came first, the end says
   `deadline: the budget of 0.3 instance-hours`.  That tests the budget, and you run the wall again with
   `--budget-hours 0.6`.
@@ -1144,31 +1144,36 @@ used there.  The instances of the earlier runs exercised all of these but the gr
 
 ## 6. The ledger's experiment
 
-Does the ledger (`examples/ledger/`; [README, "Keeping going past
-limits"](../frame/README.md#keeping-going-past-limits-and-the-sweep)) prove much of a stretch the chain has proven, for
-a small share of what the chain spent there, with the truth hidden from it?  On 2176..3440 (the run to the wall
-re-proved it in about 4.4 hours of 64 threads, about 280 core-hours), one `c8g.16xlarge` at spot for an hour of its 64
-CPUs: `solver/tools/ledger/cloud.sh 2176-3440` (its comment has the environment), which runs `ledger run` with no proven
-game, then `ledger report --known results/strict.jsonl`, which exits with status 1 if a bound is on the wrong side of
-the chain's optimum or a game does not replay (a bug: stop and report).  The laptop's dry run of 1301..1500 is [the
-entry](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md).  A first launch (2026-10-17) was stopped after
-9 minutes with the machine 95% idle, the main thread of the ledger the bottleneck; that is fixed ([the entry's section
-on
-it](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-first-cloud-attempt-stopped-and-the-fix)).
-A second (48 core-hours on 64 workers) proved 916 of 1,265 boards, all at the optimum, for about 2.2 times what the
-chain paid on the same games, because most searches began before the board below was proven.  The scheduler now climbs
-from each board it proves (the board above, and the board below, are searched at once, seeded with its game, for
-`CLIMB_LIMIT` seconds, 60 by default; [the entry's section on
-it](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)), and a launch
-with the climbs needs Brian's approval (the [rules for every launch](#rules-for-every-launch)).
+`solver/tools/ledger/cloud.sh FIRST-LAST` runs the ledger over a stretch of games for a budget of CPU, with the truth
+hidden from it, on one `c8g.16xlarge` at spot.  The ledger (`examples/ledger/`; [README, "Keeping going past
+limits"](../frame/README.md#keeping-going-past-limits-and-the-sweep)) proves games from both sides, bounds from below
+and above, in the order that its scheduler judges cheapest.  The experiment asks whether it proves much of a stretch
+that the chain has proven, for a small share of what the chain spent there: on 2176..3440, the run to the wall re-proved
+the stretch in about 4.4 hours of 64 threads, about 280 core-hours.  [The ledger's
+entry](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records the laptop's dry run of 1301..1500,
+every launch and what it found, and how the scheduler works.  A launch needs Brian's approval with the cost below
+([rules for every launch](#rules-for-every-launch)).
 
-**Cost.**  The build of `setup.sh` (about 10 minutes, or none with the commit's binaries in the build cache, section
-15), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the searches still going when it is spent, each limited to the
-budget left over the workers), the report (a minute): about 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour),
-about $3.3 on demand; the timer of 150 minutes bounds it at about $1.7 at spot.  The 40 GB volume is a few cents.
+`cloud.sh` runs `ledger run` with no proven game, then `ledger report --known results/strict.jsonl`.  The report exits
+with status 1 if a bound is on the wrong side of the chain's score or a game does not replay: that is a bug, so stop and
+report it.  The script's comment documents its environment.
 
-**Launch** as in section 7.3, with `Purpose=ledger` and this user data (`COMMIT` the pushed master that has the
-ledger, `DATE` the day):
+**Cost.**  About 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour) and about $3.3 on demand: the setup (a build
+of about 10 minutes, or none with the commit's binaries in the build cache, section 11), the run (`CPU_HOURS` 64, an
+hour of the 64 CPUs, and the searches still going when it is spent, each limited to the budget left over the workers),
+and the report (a minute).  The timer of 150 minutes bounds it at about $1.7 at spot, and the 40 GB volume costs a few
+cents.
+
+**Launch** as section 2.2 says, with these values, `ZONE` the zone of the lowest price that day (section 1) and the
+ceiling of section 7.3:
+
+```
+INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=ledger MAX_PRICE=1.0
+```
+
+Pass `--user-data file://ledger-user-data.sh` in place of 2.2's `--user-data` argument: the file sets the timer itself,
+so `TIMER_MINUTES` is not needed.  `ledger-user-data.sh` is, with `COMMIT` the pushed master that has the ledger and
+`DATE` the day:
 
 ```
 #!/bin/bash
@@ -1184,63 +1189,80 @@ sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman \
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
-The setup is a step of the tmux session now, after the job's `S3_DEST` is exported and before the job, so that a
-setup that fails (no tested binaries in the cache with `REQUIRE_CACHED=1`, or, with `RELEASE_TESTS=1` in its place, a
-suite that fails: `RELEASE_TESTS_FAILED` in `S3_DEST`) ends the machine and the job never starts.
+The setup runs in the tmux session, after the job's `S3_DEST` is exported and before the job, so that a setup that fails
+ends the machine and the job never starts.  It fails with no tested binaries in the cache under `REQUIRE_CACHED=1`, or,
+with `RELEASE_TESTS=1` in its place, with a suite that fails (`RELEASE_TESTS_FAILED` in `S3_DEST`).
 
-**Options.**  The environment of `solver/tools/ledger/cloud.sh` has the options (`WORKERS`, `CPU_HOURS`, `BASE`,
-`MAX_LIMIT`, `PROVEN`, and for the climbs `CLIMB`, their ways: `up`, `down`, `both` or `off`, unset the program's
-`both`; and `CLIMB_LIMIT`, their limit in seconds: unset the program's 60; `CLIMB=off` or `CLIMB_LIMIT=0` runs without
-climbs, as the second launch did; and `LNS_SECONDS`, the seconds of one thread the finder gets: unset the program's 1, 0
-runs without it).  The climbs are searches of a board next to a proven one, up from a proven board and down from it; the
-events and the report say what each way cost and proved.  The finder is large neighbourhood search ([the entry's section
-on it](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
-which runs on a worker after a board's map and before a search whose best seed has changed; it finds a legal game, not a
-proof, and its game is a lower bound once the referee has replayed it.  Its events (`lns_s`, `lns_from`, `lns_found`,
-`seed_from`, `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line are what the
-run is for: what sets up a run past 3440 best.
+**Options.**  The environment of `cloud.sh` sets the workers and the budget (`WORKERS`, `CPU_HOURS`), the searches'
+limits (`BASE`, `MAX_LIMIT`), the games the run is given (`PROVEN`), and the scheduler's three aids, each described in
+its section of the entry:
 
-**Floor steps** (`FLOOR_STEP`, `FLOOR_SLACK`; [the entry's section on
-them](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)).  An open
-board that is not climbed to is stepped down before its proof: a search under a floor `FLOOR_STEP` points (unset the
-program's 150; 0 turns the steps off and the order back to `level + gap / gap_unit`) below its upper bound, which if it
-completes having found nothing makes the floor the upper bound (rule `floor`), and whose cost grows about tenfold a
-step; a step's time limit is `FLOOR_SLACK` (unset 4) times its forecast, at least `BASE`, and doubles each time the
-limit stops it (the step is kept: its checkpoint is `ckpt/nN.floor.ckpt`, beside the board's `nN.ckpt`).  The boards go,
-after the climbs, by the forecast seconds of one thread of their proofs (the line of the board's own steps), cheapest
-first, so that a board forecast far beyond the rest waits until the cheaper work is done.  The status line says how many
-steps have ended (and how: lowered U, proved their board, found a set, stalled) and how many boards are forecast within
-an hour, a day, or longer; the events have each job's `forecast` (log10 of nodes) and `forecast_s`, and
-`solver/tools/ledger/events.py` compares the forecasts with the proofs.  **A run that goes on from a ledger written
-before the steps** (the stage on `ledger-frontier-2/out/run`, written by afe4513) reads it as it is: the boards get
-their root bounds at the start (a fraction of a second a board, on the workers), they have no steps, and the checkpoints
-of their ordinary searches stay where they are and are resumed when the board comes to its proof (nothing is dropped); a
-board with a wide gap takes its steps first, so a board whose old search was far along is forecast at least twice what
-that search spent and waits behind cheaper boards, as `level` made it wait.
+* **The climbs** ([wedge and
+  climb](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)): from each
+  board it proves, the scheduler searches the board above and the board below at once, seeded with its game.  `CLIMB` is
+  their ways (`up`, `down`, `both` or `off`; unset, the program's `both`), and `CLIMB_LIMIT` their limit in seconds
+  (unset, the program's 60).  `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs.  The events and the report say what
+  each way cost and proved.
+* **The finder**, large neighbourhood search ([the finder in the
+  ledger](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
+  runs on a worker after a board's map and before a search whose best seed has changed.  It finds a legal game, not a
+  proof, and its game is a lower bound once the referee has replayed it.  `LNS_SECONDS` is the seconds of one thread it
+  gets (unset, the program's 1; 0 runs without it).  Its events (`lns_s`, `lns_from`, `lns_found`, `seed_from`,
+  `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line say what it did.
+* **The floor steps** ([floor-guided
+  drilling](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)): an
+  open board that is not climbed to is stepped down before its proof.  A step is a search under a floor below the
+  board's upper bound; if it completes having found nothing, the floor becomes the upper bound (the rule `floor`), and
+  each step costs about ten times the one before.  `FLOOR_STEP` is the points a step goes down (unset, the program's
+  150; 0 turns the steps off, and the order goes back to `level + gap / gap_unit`).  `FLOOR_SLACK` sets a step's limit,
+  in times its forecast (unset, 4; at least `BASE`), and the limit doubles each time it stops the step.  A stopped step
+  is kept, with its checkpoint `ckpt/nN.floor.ckpt` beside the board's `nN.ckpt`.  After the climbs, the boards go
+  cheapest first by the forecast of their proofs.  The status line counts the steps that have ended, and how (lowered U,
+  proved their board, found a set, stalled), and the boards forecast within an hour, a day, or longer; the events give
+  each job's `forecast` (log10 of nodes) and `forecast_s`, and `solver/tools/ledger/events.py` compares the forecasts
+  with the proofs.
 
-**The bounds store.**  The bounds a run finds are kept in `results/bounds.jsonl` ([results/README,
-"bounds.jsonl"](../../results/README.md#boundsjsonl)).  `BOUNDS=results/bounds.jsonl` (an option of
-`solver/tools/ledger/cloud.sh`, with the file in the checkout the machine cloned) starts the run from the file's best
-bounds of its stretch, and a board with both needs no map (the maps of 3441..8191 cost about 65 core-hours); run
-`ledger verify-bounds` on the file first.  After the run, on the laptop with the results home (below),
-`ledger export solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run --bounds results/bounds.jsonl --source NAME --checkpoints s3://BUCKET/ledger-DATE/out/run/ckpt`
-appends what improved and prints it; `ledger verify-bounds results/bounds.jsonl` and
-`ledger games results/bounds.jsonl > games.jsonl; python3 -I solver/tools/check_bounds.py results/bounds.jsonl --games games.jsonl`
-check the file with both referees, and the file is then committed.  The checkpoints are in S3 only for the searches that
-are still going: a board proven has none.
+*Going on from a ledger written before the floor steps* (the stage on `ledger-frontier-2/out/run`, written by afe4513):
+the run reads it as it is.  The boards get their root bounds at the start (a fraction of a second a board, on the
+workers) and have no steps, and the checkpoints of their ordinary searches stay where they are, resumed when the board
+comes to its proof; nothing is dropped.  A board with a wide gap takes its steps first, so a board whose old search was
+far along is forecast at least twice what that search spent, and waits behind cheaper boards, as `level` made it wait.
 
-**Watch, stop, results home.**  `tail ~/ledger/run.err` (a status line a minute: the CPU spent, the boards proven, the
-searches going, the climbs of each way ended, those that proved their board and those that stopped at their limit
-(parked), and how long the main thread has been busy and results waited for it; after the maps the CPU spent should rise
-by nearly 64 a second, and if it does not, look at those two numbers before anything else) and `~/ledger/log`.
-`pkill -TERM -f 'examples/ledger run'` stops the run cleanly (each search writes its checkpoint, the ledger is saved)
-and the script goes on to the report; the same command again resumes (on a replacement machine, with `S3_DEST/out`
-copied back to `~/ledger` first).  Home:
-`aws s3 sync S3_DEST/out solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/ --exclude 'run/ckpt/*'`,
-then on the laptop
-`solver/frame/target/debug/examples/ledger report solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run --known results/strict.jsonl`
-and `solver/tools/ledger/events.py solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run`; then the
-end of the rules for every launch.
+**The bounds store.**  `results/bounds.jsonl` keeps the bounds that runs find ([results/README,
+"bounds.jsonl"](../../results/README.md#boundsjsonl)).  With `BOUNDS=results/bounds.jsonl`, the file in the checkout
+that the machine cloned, the run starts from the file's best bounds of its stretch, and a board with both bounds needs
+no map (the maps of 3441..8191 cost about 65 core-hours); run `ledger verify-bounds` on the file first.  After the run,
+on your machine with the results home (below), append what improved and check the file with both referees; `ledger` is
+the example's binary there (`solver/frame/target/debug/examples/ledger`, built as [the ledger's
+README](../tools/ledger/README.md) says):
+
+```
+ledger export solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run --bounds results/bounds.jsonl \
+    --source NAME --checkpoints s3://BUCKET/ledger-DATE/out/run/ckpt                  # prints what improved
+ledger verify-bounds results/bounds.jsonl
+ledger games results/bounds.jsonl > games.jsonl
+python3 -I solver/tools/check_bounds.py results/bounds.jsonl --games games.jsonl
+```
+
+Then commit the file.  The checkpoints are in S3 only for the searches still going: a proven board has none.
+
+**Watch, stop, bring the results home.**
+
+* **Watch** `tail ~/ledger/run.err` and `~/ledger/log`.  `run.err` has a status line a minute: the CPU spent, the boards
+  proven, the searches going, the climbs of each way ended, those that proved their board and those that stopped at
+  their limit (parked), and how long the main thread has been busy and results waited for it.  After the maps, the CPU
+  spent should rise by nearly 64 a second; if it does not, look at those last two numbers first.
+* **Stop** cleanly with `pkill -TERM -f 'examples/ledger run'`: each search writes its checkpoint, the ledger is saved,
+  and the script goes on to the report.  **Resume** by running `cloud.sh` again; on a replacement machine, copy
+  `S3_DEST/out` back to `~/ledger` first.
+* **Bring the results home**, then read them on your machine, and do the end of the rules for every launch:
+
+  ```
+  L=solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE
+  aws s3 sync S3_DEST/out $L/ --exclude 'run/ckpt/*'
+  solver/frame/target/debug/examples/ledger report $L/run --known results/strict.jsonl
+  solver/tools/ledger/events.py $L/run
+  ```
 
 ## 7. The sweep
 
@@ -1887,14 +1909,15 @@ a counterexample to U in section 9.8.
 
 ## 11. The build cache and the release suite
 
-A machine that needs the solver does not build it when a machine has already built and tested it: `setup.sh` takes the
-release binaries of the commit from S3.  The build is the dearest part of a start (about 10 minutes, with fat LTO and
-one codegen unit, which stay: the speed of the programs matters more than build minutes), and a run that is replaced
-after an interruption pays it again on every machine.  Nothing untested is stored, so a hit starts the job at once.
-Run on EC2 on 2026-10-18: the release of ca357bf for the run to 5000 (the solver's suite, 699 tests on 64 jobs in 311 s)
-and of 260e74f with the study tools for the A1 measurement, each tested before it was stored.
+A machine does not build what another machine has already built and tested: `setup.sh` takes the commit's release
+binaries from S3.  The build is the dearest part of a start, about 10 minutes, with fat LTO and one codegen unit, which
+stay, since the speed of the programs matters more than build minutes.  A run that is replaced after an interruption
+would pay it again on every machine.  Nothing untested is stored, so a hit starts the job at once.
 
 ### 11.1 The key and the layout
+
+An entry of the cache is a set of binaries of one commit, built for one architecture and one CPU, under the key of the
+three:
 
 ```
 s3://taxman-013764204840-us-east-1/builds/COMMIT-ARCH-CPU/SET/binaries.tar.gz
@@ -1902,56 +1925,57 @@ s3://taxman-013764204840-us-east-1/builds/COMMIT-ARCH-CPU/SET/binaries.tar.gz
 s3://taxman-013764204840-us-east-1/builds/test-times.json
 ```
 
-* **COMMIT** is `git rev-parse HEAD` of a clean checkout: no uncommitted change and no file git does not know of (build
-  outputs are ignored files and do not count).  **ARCH** is `uname -m`.  **CPU** is the CPU the build targets, which for
-  `-C target-cpu=native` (the default of `env.sh`) is the name the compiler reports (`rustc --print target-cpus`:
-  `neoverse-v2` on Graviton4), because that flag makes a binary for the CPU that builds it; no flag is `generic`.
-  `RUSTFLAGS` other than empty or one `-C target-cpu=...` is not in the key, so it bypasses the cache.  A dirty
-  checkout, no commit (a copy without `.git`), no `aws` command or no credentials, or `BUILD_CACHE=off` is a miss that
-  says why, and the build goes on as before.  The cache is never read or written then.
-* **SET** is what the tarball holds, named by its parts: `solver-bin-taxman+solver-example-ledger`,
-  `prover-bins+prover-examples+solver-bins+solver-examples` (everything: the default of `setup.sh`).  An entry serves a
-  request it covers: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or `--examples`.  So the entry
-  of the release, which is everything, serves any `BUILD`; an entry of a few binaries serves only those.  An entry is
-  never completed: a request that no entry covers builds what it needs, and nothing is stored.  The study tools (cargo's
-  feature `studies`: `tune`, `extended`, `structure` and `wall`, which `--examples` alone does not build) are a part of
-  the set when `STUDIES=1` asks for them: `solver-bins+solver-examples+solver-features-studies`, covered only by an
-  entry that has the part.  So a default build never claims to hold `wall`, and an entry with the studies serves a
-  request without them (the smaller entry first, when both exist).
-* **binaries.tar.gz** holds the executables only (paths relative to the checkout: `solver/frame/target/release/taxman`,
-  `.../examples/ledger`, `solver/noframe/target/release/exact`), not the objects, libraries or cargo's hash-named
-  copies.  **manifest** (`key=value` lines, uploaded last: an entry without one does not exist) has the commit,
-  architecture, CPU, `RUSTFLAGS`, `rustc`, host and time of the build, the **sha256** of the tarball, the parts
-  (`set=`), and the suite's result: `tests=passed`, `tests_solver=608 passed, 0 failed, 138 ignored`, its seconds and
-  the tests at once.  Only an entry with `tests=passed` is used.  `test-times.json` is how long each test took last
-  time, for ordering (11.2).
-* A download is **checked**: the tarball's sha256 against the manifest's before anything is unpacked, and every member
-  of the tarball must be a file under a crate's `target/release`.  A mismatch is a miss (the build goes on) and says so.
-* `aws s3 ls builds/` lists the commits; `aws s3 cp .../manifest -` says what an entry is.  Old entries are deleted by
-  hand (a deletion in the bucket is Brian's yes first, like every change there); they cost cents.
+The docstring of `solver/tools/cloud/build_cache.py` documents the key, the sets and the manifest.  What a launch
+depends on:
+
+* **The key** is the commit of a clean checkout (no uncommitted change, no file git does not know of; build outputs are
+  ignored files and do not count), `uname -m`, and the CPU the build targets.  For `-C target-cpu=native`, the default
+  of `env.sh`, that is the name the compiler reports (`neoverse-v2` on Graviton4), because the flag makes a binary for
+  the CPU that builds it; with no flag it is `generic`.
+* **The cache is not used**, with a message that says why, and the build goes on as before, never reading or writing the
+  cache, for a dirty checkout, no commit (a copy without `.git`), `RUSTFLAGS` other than empty or one
+  `-C target-cpu=...`, no `aws` command or no credentials, or `BUILD_CACHE=off`.
+* **SET** names what an entry's tarball holds, by its parts: `solver-bin-taxman+solver-example-ledger`, say, or
+  `prover-bins+prover-examples+solver-bins+solver-examples` for everything.
+* **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
+  `--example X` by `--example X` or `--examples`.  The release holds everything (the default of `setup.sh`), so it
+  serves any `BUILD`.  An entry is never completed: a request that no entry covers builds what it needs and stores
+  nothing.  The study tools (cargo's feature `studies`: `tune`, `extended`, `structure` and `wall`) are a part of their
+  own, so a default build never claims to hold `wall`, and an entry with them also serves a request without them (the
+  smaller entry first, when both exist).
+* **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result
+  (`tests=passed`, the counts in lines such as `tests_solver=608 passed, 0 failed, 138 ignored`, its seconds and the
+  tests at once); an entry without one does not exist.  The tarball holds the executables only
+  (`solver/frame/target/release/taxman`, `.../examples/ledger`, `solver/noframe/target/release/exact`).
+  `test-times.json` is how long each test took last time, for ordering the suite (11.3).
+* **A download is checked**: the tarball's sha256 against the manifest's before anything is unpacked, and every member
+  of the tarball must be a file under a crate's `target/release`.  A mismatch is a miss, and says so.
+* **Listing and deleting.**  `aws s3 ls builds/` lists the commits, and `aws s3 cp .../manifest -` says what an entry
+  is.  Old entries cost cents, and are deleted by hand; a deletion in the bucket needs Brian's yes first, like every
+  change there.
 
 ### 11.2 How a launch uses it, and what it builds
 
-`setup.sh` looks for an entry that covers the set it was asked for (`BUILD`) and, finding one, downloads, checks and
-unpacks it, builds nothing, and goes on to the smoke checks (they show that this machine runs the binaries).  Finding
-none, it builds the set and does not store it.  `REQUIRE_CACHED=1` turns that miss into an error, for a launch that must
-run only tested binaries: the user data of 5.4, 7.3 and 6 use it, so that a commit that has not been released ends the
+`setup.sh` looks for an entry that covers the set it was asked for (`BUILD`).  Finding one, it downloads, checks and
+unpacks it, builds nothing, and goes on to the smoke checks, which show that this machine runs the binaries.  Finding
+none, it builds the set and does not store it.  `REQUIRE_CACHED=1` turns a miss, or a cache it cannot use, into an
+error, for a launch that must run only tested binaries.  The user data of sections 6 and 7.3 use it, and the run to the
+wall takes it from the environment of `wall.sh launch` (5.4), so that a commit that has not been released ends the
 machine at once and costs minutes, not a run of untested binaries.
 
 **Build only what a run needs**, with `BUILD`, cargo's arguments for `solver/frame/` (`--bins`, `--examples`,
-`--bin NAME`, `--example NAME`; default `--bins --examples`, as before).  A `BUILD` leaves the prover out, unless
-`BUILD_PROVER` asks for it (the same for `solver/noframe/`; `none` for none; `PROVER_ONLY=1` is the prover alone, as
-before); the smoke checks of a part that is not built are left out.  `STUDIES=1` adds `--features studies` to the
-solver's build (and to its tests: the release suite, `cargo test`), for the study tools, which a build without it skips.
-What the jobs need:
+`--bin NAME`, `--example NAME`; default `--bins --examples`).  A `BUILD` leaves the prover out, unless `BUILD_PROVER`
+asks for it (the same for `solver/noframe/`; `none` for none; `PROVER_ONLY=1` is the prover alone).  The smoke checks of
+a part that is not built are left out.  `STUDIES=1` adds `--features studies` to the solver's build and to its tests
+(the release suite, `cargo test`), for the study tools, which a build without it skips.  What the jobs need:
 
 | job | `BUILD` |
 |---|---|
 | the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
-| the ledger (14) | `--bin taxman --example ledger` |
+| the ledger (section 6) | `--bin taxman --example ledger` |
 | the node-choice measurement | `STUDIES=1`, `--bin taxman --example wall --example perf` |
 | the scaling sweep (`scaling.sh`) | `--bin taxman --example ladder` |
-| the prover's proofs (9) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
+| the prover's proofs (section 8) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
 `taxman` is there for the smoke checks.  A machine of 32 CPUs or more builds the solver and the prover at the same time
 (each has fewer binaries to link than the machine has CPUs, and every link is a single thread); a smaller one builds
@@ -1960,68 +1984,76 @@ them in turn.  Nothing passes `-j` to cargo, so every build and every test build
 ### 11.3 The release: the suite, then the cache
 
 The release is `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` on **one machine, once for each commit and CPU**, with the
-default `BUILD` (everything, so that every smaller request hits it).  It is a launch under the rules at the top: a
-`c8g.16xlarge` on spot for about 10 to 20 minutes, **about $0.15 to $0.25**, Brian's yes first.  Any size serves (the
-key is the CPU, which every `c8g` shares); the suite gains nothing past about 64 vCPUs.  The study tools are the one
-thing that "everything" leaves out: `STUDIES=1` makes a release that also serves the node-choice measurement (its entry
-holds `wall`, and the suite runs the study tools' tests too; it serves every smaller request as well).
+default `BUILD`: everything, so that every smaller request hits it.  It is a launch under the [rules for every
+launch](#rules-for-every-launch): a `c8g.16xlarge` at spot for about 10 to 20 minutes, **about $0.15 to $0.25**, after
+Brian's yes.  Any size serves, since the key is the CPU, which every `c8g` shares; the suite gains nothing past about 64
+vCPUs.  The study tools are the one thing that "everything" leaves out: `STUDIES=1` makes a release that also serves the
+node-choice measurement.  Its entry holds `wall`, its suite runs the study tools' tests too, and it serves every smaller
+request as well.
 
 ```
 export S3_DEST=s3://taxman-013764204840-us-east-1/release-COMMIT       # where a failure is reported
 RELEASE_TESTS=1 NO_PULL=1 solver/tools/cloud/setup.sh                     # in the clone checked out at COMMIT
 ```
 
-In order: a hit ends it ("the binaries come from the build cache": nothing to run).  On a miss it builds everything,
-runs the smoke checks, then the **whole release suite of every crate built**, then stores.  If the suite fails,
-**nothing is stored**, `setup.sh` exits 1 (so a user data that chains the job with `&&` does not start it), and the
-failing tests are in `~/taxman-work/logs/release-tests.txt` (also saved with the logs) and, when `S3_DEST` is set, in
-`$S3_DEST/RELEASE_TESTS_FAILED`.  With the cache unusable (a dirty checkout, `BUILD_CACHE=off`) the suite still runs and
-nothing is stored.  `RELEASE_TESTS=1` in a job's own environment is the same on the job's first machine: it releases
-what it needs before starting; `TEST_JOBS` and `TEST_TIMEOUT` (3600 s a test) adjust the suite.
+A hit ends it ("the binaries come from the build cache": nothing to run).  On a miss, it builds everything, runs the
+smoke checks, then the **whole release suite of every crate built**, then stores.  If the suite fails, **nothing is
+stored**, and `setup.sh` exits 1, so a user data that chains the job with `&&` does not start it.  The failing tests are
+in `~/taxman-work/logs/release-tests.txt` (also saved with the logs) and, when `S3_DEST` is set, in
+`$S3_DEST/RELEASE_TESTS_FAILED`.  With the cache unusable (a dirty checkout, `BUILD_CACHE=off`) the suite still runs,
+and nothing is stored.  `RELEASE_TESTS=1` in a job's own environment does the same on the job's first machine: it
+releases what the job needs before starting.  `TEST_JOBS` and `TEST_TIMEOUT` (3600 s a test) adjust the suite.
 
-**How the suite runs** (`run_tests.py`; `cargo test` runs the test binaries one after another, and a long test in one
-leaves the other CPUs idle).  It builds the test executables of both crates at once
-(`cargo test --release --no-run --message-format=json`, which names them all), lists each one's tests (`--list`, leaving
-out the `#[ignore]`d ones that `cargo test` also leaves out, `--list --ignored`), and runs **every test as a process of
-its own** (`--exact NAME`), as many at once as there are CPUs, over all the binaries together: the tests with no time on
-record first, then the longest first (`test-times.json`, rewritten after each run, kept in the cache), so that the
-longest does not start last.  The doc tests run as `cargo test --doc`.  A failing test does not stop the others (as
-`--no-fail-fast`); each is run once more alone afterwards, to say in the report whether it fails only in company.  A
-test that outlasts `TEST_TIMEOUT` is killed and fails.  The summary (`--summary`) names the ten tests that used the most
-CPU, with their seconds of CPU (a test's own, which do not grow when the machine is busy); `solver/tools/quick_check.py`
-runs the suite without `--release` and judges it by them (DESIGN.md, section 9).  Every test in its own process is
-stricter than threads of one process (no shared statics, no leftover environment) and costs each test its own start; the
-suite passes that way (below).  Tests that start a thread per CPU themselves share the machine with all the others, so a
-test that depends on its speed shows it: lower `TEST_JOBS` to see whether that is it.
+**The suite runs every test as a process of its own, on every CPU** (`run_tests.py`).  `cargo test` runs the test
+binaries one after another, and a long test in one leaves the other CPUs idle.  So the runner builds the test
+executables of both crates at once (`cargo test --release --no-run --message-format=json`, which names them all), and
+lists each one's tests (`--list`, leaving out the `#[ignore]`d ones that `cargo test` also leaves out,
+`--list --ignored`).  It then runs every test with `--exact NAME`, as many at once as there are CPUs, over all the
+binaries together: the tests with no time on record first, then the longest first (`test-times.json`, rewritten after
+each run, kept in the cache), so that the longest does not start last.  The doc tests run as `cargo test --doc`.
 
-**Time**, by estimate for 64 vCPUs (measured on the laptop, below): the tests themselves about 30 to 60 seconds, the
-build of the test executables 3 to 5 minutes (the release profile, one codegen unit each: the library first, then the 35
-test executables side by side), so **4 to 6 minutes in all, against 13.5 minutes on the laptop**, where the test
-binaries run one after another.  The build is most of it.  **Measured** on the laptop, with the test profile
-(`cargo test` without `--release`), 5 tests at once, niced: the solver's 608 tests (138 ignored) and the prover's 41
-passed in 73 s, 276 CPU seconds in all, the longest test 24 s (so 64 CPUs cannot take less than that); a second run
-orders by the first's times.
+* **A failing test** does not stop the others (as `--no-fail-fast`); each is run once more alone afterwards, so that the
+  report says whether it fails only in company.  A test that outlasts `TEST_TIMEOUT` is killed and fails.
+* **The summary** (`--summary`) names the ten tests that used the most CPU, with their seconds of CPU: a test's own,
+  which do not grow when the machine is busy.  `solver/tools/quick_check.py` runs the suite without `--release` and
+  judges it by them ([DESIGN.md, section 9](DESIGN.md#9-testing)).
+* **Every test in its own process** is stricter than threads of one process (no shared statics, no leftover
+  environment), and costs each test its own start; the suite passes that way.  Tests that start a thread per CPU
+  themselves share the machine with all the others, so a test that depends on its speed shows it: lower `TEST_JOBS` to
+  see whether that is the cause.
 
-### 11.4 What was tested, and what was not
+**Time.**  On a `c8g.16xlarge` the test pass of the solver's suite in the release of ca357bf ran 699 tests on 64 jobs in
+311 s, and that of 260e74f, with the study tools, 752 tests in 306 s; `run_tests.py` reports the test pass and the build
+apart.  The build of the test executables comes first, in the release profile with one codegen unit each: the library,
+then the test executables side by side.  The release of 260e74f took 16 minutes from the launch to the start of its job,
+with the build of the examples (5 minutes), the build of the tests and the suite ([the A1
+measurement](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).  The suite's
+times on a laptop are in [DESIGN.md, section 9](DESIGN.md#9-testing).
 
-On the laptop (macOS, bash 3.2 and 5): `python3 -I test/test_build_cache.py` (the key, the dirty and the commit-less
-refusals, other `RUSTFLAGS`, which entry serves which request, a corrupted tarball, an entry without its manifest or its
-passed suite, a build that lacks a file, a stranger in the tarball, a build with the studies as an entry of its own, the
-same through the stand-in for aws), `python3 -I test/test_run_tests.py` (a toy crate: a failure, an ignored test, a doc
-test, a timeout, the order, a feature, a build that fails), `python3 -I test/test_setup.py` (`setup.sh` with a stand-in
-for cargo: what `BUILD` and `STUDIES` build, a hit and a miss, the release suite on a pass and on a failure, the dirty
-checkout, `REQUIRE_CACHED`, the two builds at once), and
-`test/run.sh node launch` (the settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both
-crates in the test profile; no release build was made on the laptop.  **Not run on EC2**: the S3 commands against S3
-(the listing's format, credentials from the instance profile, the transfer times), the release profile's build of the
-tests, and the suite at 64 processes at once.  The first release is its test: read its log for the build and suite
-times and the report for any test that fails only in company.
+### 11.4 What was tested
+
+* **On the laptop** (macOS, bash 3.2 and 5): `python3 -I test/test_build_cache.py` (the key, the dirty and the
+  commit-less refusals, other `RUSTFLAGS`, which entry serves which request, a corrupted tarball, an entry without its
+  manifest or its passed suite, a build that lacks a file, a stranger in the tarball, a build with the studies as an
+  entry of its own, the same through the stand-in for aws); `python3 -I test/test_run_tests.py` (a toy crate: a failure,
+  an ignored test, a doc test, a timeout, the order, a feature, a build that fails); `python3 -I test/test_setup.py`
+  (`setup.sh` with a stand-in for cargo: what `BUILD` and `STUDIES` build, a hit and a miss, the release suite on a pass
+  and on a failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once); and `test/run.sh node launch` (the
+  settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both crates in the test profile; no
+  release build was made on the laptop.
+* **On EC2, on 2026-10-18:** the releases of ca357bf, for the run to 5000, and of 260e74f, with the study tools, for the
+  A1 measurement, each tested before it was stored (11.3); and the node-choice measurement at 9d9dae3, which took its
+  binaries from the cache ([its entry](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).  All
+  three used the S3 commands with the instance profile's credentials, and the two releases built the tests in the
+  release profile and ran the suite at 64 processes at once.
 
 ## 12. The scripts, and what has run where
 
 ### The scripts
 
-The files in this directory:
+The scripts of `solver/tools/cloud/`; the ledger's are in `solver/tools/ledger/` (section 6).  The top of each says how
+to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `sweep.sh`, `prover.sh`, `certify.sh`, `wall.sh`,
+`wall-node.sh`) also give their variables and exit statuses.
 
 | file | what it does |
 |---|---|
@@ -2044,37 +2076,32 @@ The files in this directory:
 | `Dockerfile`, `Dockerfile.dockerignore` | a Linux build-and-test image (section 3.1) |
 
 All state lives in one directory, `$TAXMAN_WORK` (default `~/taxman-work`): `results/strict.jsonl` (and
-`exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid`
-(`prover.pid`), `deadline`.  Nothing is written inside the checkout except
-`solver/frame/target` (and `solver/frame/bench/history.jsonl` if you run `taxman bench` without `--history`).
+`exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid` (`prover.pid`)
+and `deadline`.  Nothing is written inside the checkout but `solver/frame/target` and `solver/noframe/target`, and
+`solver/frame/bench/history.jsonl` if you run `taxman bench` without `--history`.
 
 ### What has run where
 
-The scripts were exercised on macOS (arm64): `chain.sh` through a complete chain, a SIGTERM stop, deliberate
-interruptions and resumes, a crash loop and a deadline; `scaling.sh` in all three modes (a sweep, `--engine`,
-`--pauses`); `setup.sh` through its build and checks; `verify.sh`.  `prover.sh` (section 8) ran on macOS and in the
-Docker image (Linux, arm64) over a range, with a SIGTERM stop and a resume; `chain.sh` also ran in the image after the
-`run.sh` split.  On EC2 (Amazon Linux 2023, Graviton) the calibration
-([solver/notebook/graviton-calibration-2026-10/README.md](../notebook/graviton-calibration-2026-10/README.md)) ran the
-solver and the prover on a `c7g.16xlarge` and a `c8g.16xlarge` with its own scripts, and the prover's run of section 8
-(2026-10-14 and 15, to the end) used `setup.sh` (`PROVER_ONLY=1`), `prover.sh`, `save.sh` (with an instance role) and
-`spot-watch.sh`, all of which have run there; no spot interruption has yet tested `spot-watch.sh`, and the run's 15.9
-hours had none.  The chain's cloud run of 2026-10-15 and 16 (games 2176 to 3440 on a `c8g.16xlarge`, 24 hours, in two
-instances; section 4, and the entry on [the cloud run to
-3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)) used `setup.sh`, `chain.sh` (after a rehearsal of
-section 3.7 on the same machine type, which ran `verify.sh`), `save.sh` (with its restore on the second instance) and
-`spot-watch.sh`; no spot interruption came in it either, the first instance having been stopped on purpose.  The scaling
-run on a `c8g.48xlarge` ran `setup.sh` in full (without the tests) and `verify.sh` there.  `certify.sh` (section 9) ran
-on macOS (arm64, bash 3.2) with `taxman certify` on two lists at once through a complete run and its
-`verify-certificates`, a SIGTERM stop and its resume, and, with a stand-in for the binary, a counterexample, an error, a
-crash and a deadline; `run.sh` changed for it (`run_start` and `run_reap`), and `chain.sh` ran through the change to a
-complete chain, a SIGTERM stop and a deadline.  Not run on EC2: `certify.sh`, `scaling.sh` (the calibration and the
-scaling run did by hand what it does), and nothing has run on Ubuntu.  `wall.sh`, `wall-node.sh` and the ledger of
-`run.sh` (section 5) ran on macOS against a stand-in for aws (`test/run.sh`) and on EC2, in the rehearsal of section 5.5
-and in [the run to the wall](../notebook/the-run-to-the-wall-2026-10/README.md).  The build cache and the release suite
-(section 11) ran on macOS against a directory for the bucket, the stand-in for aws and a stand-in for cargo, and the
-suite's runner ran the whole solver and prover suites in the test profile; both ran on EC2 on 2026-10-18 (section 11).
-Sections 3.1 and 3.2 exist to find the problems that a macOS run cannot, on a machine that costs cents.  The speed of a
-Graviton core and the scaling of the solver to 64 and 192 threads are measured (the calibration and the [scaling
-run](../notebook/scaling-to-192-threads-2026-10/README.md)); what is not is in [the research agenda, section
+The scripts have run on macOS (arm64), most of them on EC2 (Amazon Linux 2023, Graviton), and none on Ubuntu.  Sections
+3.1 and 3.2 exist to find, on a machine that costs cents, the problems that a run on macOS cannot.
+
+| script | on macOS, or in the Docker image | on EC2 |
+|---|---|---|
+| `chain.sh` | a complete chain, a SIGTERM stop, deliberate interruptions and resumes, a crash loop and a deadline; in the image (Linux, arm64) after the split of `run.sh`; through the change of `run.sh` for `certify.sh` (`run_start`, `run_reap`) to a complete chain, a SIGTERM stop and a deadline | the chain's run of 2026-10-15 and 16 (2176 to 3440 on a `c8g.16xlarge`, 24 hours, two instances: [the cloud run to 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)), after a rehearsal of section 3.7 on the same machine type; the run to the wall, through `wall-node.sh` |
+| `setup.sh` | its build and checks | the prover's run (`PROVER_ONLY=1`), the chain's run, the scaling run on a `c8g.48xlarge` (in full, without the tests), and the releases of section 11 |
+| `verify.sh` | yes | the chain's rehearsal; the scaling run |
+| `save.sh` | | the prover's run (with an instance role); the chain's run (with its restore on the second instance) |
+| `spot-watch.sh` | the path after a notice (a SIGTERM, the final checkpoint), with a signal, in `test/run.sh node` (section 5.5) | the prover's run and the chain's run; no spot interruption has tested it, since none came in either run (the chain's first instance was stopped on purpose) |
+| `prover.sh` | over a range, with a SIGTERM stop and a resume, on macOS and in the image | the run of section 8 (2026-10-14 and 15, to the end) |
+| `certify.sh` | `taxman certify` on two lists at once (bash 3.2) through a complete run and its `verify-certificates`, a SIGTERM stop and its resume; with a stand-in for the binary, a counterexample, an error, a crash and a deadline | not run |
+| `scaling.sh` | all three modes: a sweep, `--engine`, `--pauses` | not run: the calibration and the scaling run did by hand what it does |
+| `wall.sh`, `wall-node.sh`, the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | the rehearsal of section 5.5 and [the run to the wall](../notebook/the-run-to-the-wall-2026-10/README.md) |
+| `sweep.sh` | against the stand-in (`test/run.sh sweep`) and on ranges a laptop can do ([its local test](../notebook/the-sweep-a-local-test-2026-10/README.md)) | not run |
+| `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)) |
+| the build cache and the release suite | against a directory for the bucket, the stand-in for aws and a stand-in for cargo; the runner, the whole suites of the solver and the prover in the test profile | the releases and the cache of 2026-10-18 (section 11.4) |
+
+The [calibration](../notebook/graviton-calibration-2026-10/README.md) ran the solver and the prover on a `c7g.16xlarge`
+and a `c8g.16xlarge` with its own scripts.  It and the [scaling
+run](../notebook/scaling-to-192-threads-2026-10/README.md) measured the speed of a Graviton core and the scaling of the
+solver to 64 and 192 threads; what is not measured is in [the research agenda, section
 6](AGENDA.md#6-what-the-cloud-runs-should-measure).

@@ -1,20 +1,25 @@
 # The certificates of U: the work list of 2176-3440, and the data it is made from
 
 What a certificate is and what it proves: DESIGN.md, ["Certificates of U"](../../docs/DESIGN.md#certificates-of-u), and
-docs/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates
-past 2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).
-Everything ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository, against the
-committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred bounds (`solver/noframe/data/upper_*.jsonl`).
-`U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314, 3315..3440).
+docs/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates past
+2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).  Everything
+ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository, against the
+committed chain (`results/strict.jsonl`, games 1..3440) and the prover's barred bounds
+(`solver/noframe/data/upper_*.jsonl`).  `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314,
+3315..3440).
 
 | file | command | what it is |
 |---|---|---|
-| `problems_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_600_3440.jsonl` (`cargo build --release --features studies --example extended`; 79 s) | one line per game of 600..3440 that needs a certificate (1,575): its extended problem Π⁺(O) set up without a search (frames, two-sided and one-sided candidates, rejected sources, in_the_bag⁺, the recorded game's worth, the GF(2) block words, the set width `certify` takes, the digest) and `same_as`, the latest game of the 8 board sizes before it with the same problem (340, every one of equal worth: the games `certify` settles with no search) |
-| `plan.jsonl`, `plan.md`, `lists/*.txt` | `solver/tools/certify_plan.py --results results/strict.jsonl --upper solver/noframe/data/upper_2176_3314.jsonl solver/noframe/data/upper_3315_3440.jsonl --problems solver/tools/certify/problems_600_3440.jsonl --gaps solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl solver/notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir solver/tools/certify` | the work list of the campaign and its estimate: per game of 2176..3440 whether it needs a certificate, why it costs what it is expected to cost, and the list files `taxman certify --list` takes (`plan.md` is the summary the owner's approval reads) |
+| `problems_600_3440.jsonl` | `extended problems 600 3440 U --known results/strict.jsonl --out problems_600_3440.jsonl` (`cargo build --release --features studies --example extended`; 79 s) | one line per game of 600..3440 that needs a certificate (1,575): its extended problem Π⁺(O) set up without a search (frames, two-sided and one-sided candidates, rejected sources, in_the_bag⁺, the recorded game's worth, the GF(2) block words, the set width `certify` takes, the digest) and `same_as`, the latest of the 8 games before it with the same problem (340, every one of equal worth: the games `certify` settles with no search) |
+| `plan.jsonl`, `plan.md`, `lists/*.txt` | `solver/tools/certify_plan.py --results results/strict.jsonl --upper solver/noframe/data/upper_2176_3314.jsonl solver/noframe/data/upper_3315_3440.jsonl --problems solver/tools/certify/problems_600_3440.jsonl --gaps solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl solver/notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir solver/tools/certify` | the work list of the campaign and its estimate: per game of 2176..3440 whether it needs a certificate, why it costs what it is expected to cost, and the list files `taxman certify --list` takes (`plan.md` is the summary that Brian's approval reads) |
 
-The certificates of 600..1300, `certificates_600_1300.jsonl`, are in [results/certificates/](../../../results/README.md#certificates) (a certificate file is a result, not a tool); the same games certified claim by claim, `certificates_claims_600_1300.jsonl`, and `problems_claims_600_3440.jsonl` are in the folder of [the entry on the claims of `unzip`](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md#files).
+The certificates of 600..1300, `certificates_600_1300.jsonl`, are in
+[results/certificates/](../../../results/README.md#certificates) (a certificate file is a result, not a tool); the same
+games certified claim by claim, `certificates_claims_600_1300.jsonl`, and `problems_claims_600_3440.jsonl` are in the
+folder of [the entry on the claims of
+`unzip`](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md#files).
 
-The campaign itself (the owner's approval, the phases, the stop rule of the pilot) has its own files, made on the same
+The campaign itself (Brian's approval, the phases, the stop rule of the pilot) has its own files, made on the same
 data after the plan:
 
 | file | what it is |
@@ -24,9 +29,9 @@ data after the plan:
 
 `solver/tools/certify_campaign.py check` verifies any directory of lists against `plan.jsonl` (every game that needs a
 certificate in one list, none in two, a game that shares after the game it shares with in the same list, `deferred` the
-unsettled repeats with their groups), and `solver/tools/certify_pilot.py` rates the certificates of the pilot against the plan
-and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and the cost table are in [RUNBOOK
-section 9](../../docs/RUNBOOK.md#9-certifying-u-stage-4).
+unsettled repeats with their groups), and `solver/tools/certify_pilot.py` rates the certificates of the pilot against
+the plan and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and the cost table are in [RUNBOOK section
+9](../../docs/RUNBOOK.md#9-certifying-u-stage-4).
 
 **The two eras.**  `certify_plan.py` prices a search by its nodes, at the thread-seconds per node that the chain's own
 run paid in each stretch of it, since the chain ran several searches at once and a game's recorded seconds are the
