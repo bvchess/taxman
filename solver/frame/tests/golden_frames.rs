@@ -186,7 +186,7 @@ fn check_reduced<const W: usize>(g: &Golden, bad: &mut Mismatches) {
     );
     bad.check(n, "greedy incumbent", greedy(&model, &root, &candidates).to_vec(), ints(g.field("greedy")));
     // The root of the search never narrows its candidates, so each must be a factor of a frame behind the first:
-    // `FrameMapper.homeFrame` is never the default 0.
+    // its home frame is never the default 0.
     for x in candidates.iter() {
         if !model.contains_factor(&root, x) || model.home(x) == 0 {
             bad.0.push(format!("n={n}: candidate {x} is not a factor of a frame behind the first"));
@@ -234,7 +234,7 @@ fn wide_boards_match_the_java() {
 // ---------------------------------------------------------------------------------------------------------
 // Where the previous game gives the answer
 
-/// `FrameSolver.solveBasedOnPrev` for a prime: the shortcut gives the game that the Java accelerated.
+/// For a prime, the shortcut gives the game that the Java accelerated.
 #[test]
 fn acceleration_matches_java() {
     let optimal = Optimal::built_in();

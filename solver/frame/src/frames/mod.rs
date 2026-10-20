@@ -28,7 +28,7 @@
 //! solver", maps them); this module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`],
 //! the search's copy of it (a `Copy` set of moves and factors that every promotion changes), and the two do not meet:
 //! no signature has both, and this module writes the search's as `model::Frame`.  A second word (`FrameDraft`) would
-//! only be one more name for what the wiki calls a frame.  The names of `unzip` and `removeImpossible`, and of the
+//! only be one more name for what the wiki calls a frame.  The names of `unzip` and `remove_impossible`, and of the
 //! fields `mandatory` and `claimed`, are the Java's.
 //!
 //! # Sources, factors and frames
@@ -72,7 +72,7 @@
 //!   candidate has the factor among its maximal factors, which the candidate filter makes so (`examples/structure.rs`
 //!   checks it on every board).  (Earlier notes call these moves "forced"; this code keeps that word out of the
 //!   frames, since the search has forced members of its own that are unrelated.)
-//! * **removeImpossible** drops, greedily from the largest source down, every source that cannot be played
+//! * **remove_impossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
 //!   plays.  What the greedy keeps is U\* (THEORY.md, M1), the heaviest playable set of sources wherever the
 //!   upper-half conjecture holds (certified on every board to 100,000), although the playable subsets of a frame's
@@ -145,11 +145,11 @@
 //!
 //! # The order of operations matters
 //!
-//! The construction mirrors the Java `FrameBuilder`/`WorkingFrame`, and the order is part of what it computes,
-//! because merging changes what the frames behind can do (a merged frame has more sources to place and more
-//! factors to share): the promotion candidates of the frames with one number are collected from them separately,
-//! *then* they are merged, and only then are the frames with the next number looked at.  Once all are merged,
-//! every frame is simplified once more (`BoardFrames::finish_setup`), since merging forgets what the parts had found.
+//! The construction mirrors that of the Java solver, and the order is part of what it computes, because merging changes
+//! what the frames behind can do (a merged frame has more sources to place and more factors to share): the promotion
+//! candidates of the frames with one number are collected from them separately, *then* they are merged, and only then
+//! are the frames with the next number looked at.  Once all are merged, every frame is simplified once more
+//! (`BoardFrames::finish_setup`), since merging forgets what the parts had found.
 //!
 //! # Parity with the Java
 //!
@@ -167,7 +167,7 @@
 //! for a board of a few thousand numbers.  Three things keep that cheap, and none changes an answer.  The peel works
 //! on a graph as large as the sets it is given, not as the width of a set (`Peel`).  A frame remembers which
 //! numbers it can take on as a source, until its sources change (`Frame::can_add`), and which of its sources
-//! `removeImpossible` has been through (`Frame::swept`).  And `unzip` asks each question about a factor once, however
+//! `remove_impossible` has been through (`Frame::swept`).  And `unzip` asks each question about a factor once, however
 //! many passes visit it (`Answers`).
 //!
 //! # Punctured boards
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn frames_of_85() {
-        // From FrameSetTest.java.
+        // From the Java's tests.
         let t = Tables::new(85);
         let found = build_frames::<2>(&t);
         let shape: Vec<(Vec<u32>, Vec<u32>)> =

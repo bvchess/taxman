@@ -1,7 +1,7 @@
-//! Setting a game up for the search ([`prepare`], the Java's `SearchManager.create`): the model and the root
-//! frame set, the greedy incumbent and `max_total`.  [`prepare_for_resume`] does the same for a search that a
-//! checkpoint will resume, taking the tactics from it.  [`prepare_extended`] and [`prepare_extended_for_resume`] are
-//! the same for a problem with one-sided candidates, the extended problem's (`crate::frames::build_extended`).
+//! Setting a game up for the search ([`prepare`]): the model and the root frame set, the greedy incumbent and
+//! `max_total`.  [`prepare_for_resume`] does the same for a search that a checkpoint will resume, taking the tactics
+//! from it.  [`prepare_extended`] and [`prepare_extended_for_resume`] are the same for a problem with one-sided
+//! candidates, the extended problem's (`crate::frames::build_extended`).
 //!
 //! The search problem a setup poses, in a canonical form that two games can be compared by, is a [`Problem`]
 //! ([`Prepared::problem`]); [`problem_of`] rebuilds it from the frames alone, without preparing a search, and
@@ -37,7 +37,7 @@ pub struct Prepared<const W: usize> {
     pub tactics: SearchTactics,
     /// The greedy incumbent.
     pub greedy: Bits<W>,
-    /// The most promotions a promotion set can have (`maxTotalPromotions`):
+    /// The most promotions a promotion set can have:
     /// `model.max_promotions_among(&root, &candidates)`, at least 0.  A count, not the ceiling on the promotion sum.
     pub max_total: u32,
     pub timings: PrepareTimings,
@@ -153,8 +153,7 @@ pub struct ProblemSize {
     pub max_total: u32,
 }
 
-/// The most promotions a promotion set of the root `root` of `model` can have among `candidates`
-/// (`maxTotalPromotions`).
+/// The most promotions a promotion set of the root `root` of `model` can have among `candidates`.
 fn max_total<const W: usize>(model: &FrameGraph, root: &FrameSet<W>, candidates: &Bits<W>) -> u32 {
     model.max_promotions_among(root, candidates).max(0) as u32
 }

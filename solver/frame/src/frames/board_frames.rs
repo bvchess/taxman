@@ -20,8 +20,8 @@ pub enum ClaimKind {
 }
 
 /// A frame as setup forms it: a connected group of sources with the factors they compete for, plus what the
-/// simplification found (the Java's `bombus.Hive`; before frames with the same number are merged, though a merged
-/// frame is a `Frame` again, see `Frame::merged`).
+/// simplification found (before frames with the same number are merged, though a merged frame is a `Frame` again, see
+/// `Frame::merged`).
 ///
 /// The fields relate like this: `mandatory ⊆ sources`, `claimed ⊆ factors`, `|mandatory| = |claimed|` (every
 /// mandatory move is paired with the factor it uses), and `impossible` is disjoint from `sources` (an impossible
@@ -148,10 +148,10 @@ enum Home {
     /// Merging builds a new frame from the parts' `sources` and `factors`, and re-homes the numbers the new frame
     /// holds ([`BoardFrames::merge`]).  An impossible source is no longer among a part's `sources`, so it is not
     /// re-homed: it keeps pointing at its old frame, which is no longer one of the board's frames but, as an
-    /// object, still remembers whether it had freedoms when it was merged.  The Java behaves exactly so (`hiveMap`
-    /// is updated only for `result.allNumbers()`), and `unzip`'s test for outside moves goes on consulting the
-    /// stale frame for such a number (`BoardFrames::has_outside_move_using`).  It is a quirk, not something the model
-    /// needs, and it is reproduced for parity.
+    /// object, still remembers whether it had freedoms when it was merged.  The Java behaves exactly so, and `unzip`'s
+    /// test for outside moves goes on consulting the stale frame for such a number
+    /// (`BoardFrames::has_outside_move_using`).  It is a quirk, not something the model needs, and it is reproduced for
+    /// parity.
     ///
     /// It is inert, in principle and in practice.  In principle: it can only make `unzip` claim less, and the frame
     /// model's exactness does not depend on how much `unzip` claims (docs/THEORY.md, lemma M5).  In practice:
@@ -166,10 +166,9 @@ enum Home {
     OffBoard,
 }
 
-/// All the frames of the board `1..=n` (the Java's `bombus.Apiary`), for a given set of promoted numbers,
-/// simplified and in playing order (see the documentation of [`crate::frames`] for what that means).  The lists
-/// `factors_of` and `composites_of` are the view of the divisibility relation that setup takes, with the promoted
-/// numbers and the sinks taken into account.
+/// All the frames of the board `1..=n`, for a given set of promoted numbers, simplified and in playing order (see the
+/// documentation of [`crate::frames`] for what that means).  The lists `factors_of` and `composites_of` are the view of
+/// the divisibility relation that setup takes, with the promoted numbers and the sinks taken into account.
 ///
 /// On a punctured board ([`Tables::punctured`]) the holes belong to no frame and to no factor or composite list,
 /// so they are never moves and never tax; a number whose maximal factor is a hole simply has one factor fewer.
@@ -211,8 +210,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     ///
     /// In order: find the sources and sinks, make the `factors_of` and `composites_of` tables for them, form the
     /// frames (a union-find over the source-to-factor edges), put them in playing order (front first), and simplify
-    /// them (`finish_setup`: `removeImpossible` on every frame, then `unzip` and
-    /// `removeImpossible` again until nothing changes).
+    /// them (`finish_setup`: `remove_impossible` on every frame, then `unzip` and
+    /// `remove_impossible` again until nothing changes).
     pub fn new(t: &'t Tables, treat_as_sources: Bits<W>) -> Self {
         let n = t.n;
         assert!(n <= Bits::<W>::MAX_VALUE, "the board 1..={n} does not fit in Bits<{W}>");
@@ -254,7 +253,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// be a move, because a move needs a divisor to pay it.
     ///
     /// Example: on the board `1..=20` with 8 promoted, 8 is a source and 16, whose only maximal factor is 8, is a
-    /// sink; since 16 is also above `n/2` it is a source with nothing to pay it, which `removeImpossible` finds.
+    /// sink; since 16 is also above `n/2` it is a source with nothing to pay it, which `remove_impossible` finds.
     fn sources_and_sinks(t: &Tables, promoted: Bits<W>) -> (Bits<W>, Bits<W>) {
         let (mut sources, mut sinks) = (promoted, Bits::EMPTY);
         for x in (1..=t.n).filter(|&x| !t.is_hole(x)) {
@@ -570,7 +569,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         }
     }
 
-    /// Simplifies frame `i` once (`unzip`, then `removeImpossible`, then the freedoms are recomputed as
+    /// Simplifies frame `i` once (`unzip`, then `remove_impossible`, then the freedoms are recomputed as
     /// `|factors| − |sources|`); whether it found anything new.
     fn finish_frame(&mut self, i: usize) -> bool {
         let found_mandatory = self.unzip(i);
@@ -582,8 +581,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
     /// Finds the mandatory moves of frame `i` until there are no more, recording each with the factor it claims;
     /// whether it found any.  (Earlier notes call these moves "forced", which this code avoids: the search has
-    /// forced members of its own that are unrelated.  The Java's field is `mandatoryMoves`.)  That no game is lost
-    /// by them is lemma M5 of docs/theory/frame-model.md (see [`crate::frames`]).
+    /// forced members of its own that are unrelated.)  That no game is lost by them is lemma M5 of
+    /// docs/theory/frame-model.md (see [`crate::frames`]).
     ///
     /// Two kinds of move are mandatory, as long as the factor involved is of no use outside the frame, so that
     /// settling the pair now takes nothing from the search:
@@ -839,7 +838,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// game (the sources set aside later are played earlier).  A move with a single choice goes first and one
     /// with a private factor goes last, as in the peel; that the result is a legal game is Theorem 2 of
     /// `docs/THEORY.md`.  A round that makes no progress panics: it would mean the frame's sources cannot be
-    /// played together, which `removeImpossible` rules out.
+    /// played together, which `remove_impossible` rules out.
     pub fn solution_of(&self, i: usize) -> Vec<u32> {
         let frame = &self.frames[i];
         let (mut sources, mut factors) = (frame.sources, frame.factors);
@@ -1152,8 +1151,8 @@ mod tests {
     use crate::game::replay;
     use crate::test_support::Rng;
 
-    /// The Java `countFreedoms`, verbatim: a scan per step, as the doc of `BoardFrames::count_freedoms` describes the
-    /// peel.  The reference for `BoardFrames::count_freedoms`.
+    /// The Java solver's way of counting freedoms, verbatim: a scan per step, as the doc of
+    /// `BoardFrames::count_freedoms` describes the peel.  The reference for `BoardFrames::count_freedoms`.
     fn naive_count_freedoms<const W: usize>(a: &BoardFrames<W>, moves: Bits<W>, factors: Bits<W>) -> Option<u32> {
         if moves.is_empty() {
             return Some(factors.len());
@@ -1448,7 +1447,7 @@ mod tests {
         assert_eq!(column_name(26 * 27), "AAA");
     }
 
-    /// The Java's `ApiaryTest.theMysteryOf528`: with these promotions the board's frames must give a legal game.
+    /// A case from the Java's tests: with these promotions the board's frames must give a legal game.
     #[test]
     fn the_mystery_of_528() {
         let t = Tables::new(528);

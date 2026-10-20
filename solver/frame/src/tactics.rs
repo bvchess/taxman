@@ -27,7 +27,7 @@ pub struct Tactics {
     /// Conclude a game whose search problem an earlier game of the chain already solved with that game's
     /// promotions, without a search (proven, given the earlier game's proof; see `crate::solver`).
     pub same_search: bool,
-    /// Stop the search as soon as the incumbent reaches `n + opt(n − 1) − inTheBag` (proven if `opt(n − 1)` is
+    /// Stop the search as soon as the incumbent reaches `n + opt(n − 1) − in_the_bag` (proven if `opt(n − 1)` is
     /// optimal).
     pub prev_cap: bool,
     /// Start the search from the better of the greedy set and the previous game's promotions (sound).

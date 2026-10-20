@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn java_factor_table_cases() {
-        // From FactorTableTest.java.
+        // From the Java's tests.
         let t100 = Tables::new(100);
         assert_eq!(t100.max_factors[66], vec![6, 22, 33]);
         assert_eq!(t100.max_factors[50], vec![10, 25]);

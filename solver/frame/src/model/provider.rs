@@ -25,8 +25,8 @@ pub struct FactorProvider {
 }
 
 impl FactorProvider {
-    /// The Java's `FactorProvider.create(board, numbers)`: each number's maximal factors and maximal composites,
-    /// restricted to `numbers`.  `tables` must cover the largest of `numbers`.
+    /// Each number's maximal factors and maximal composites, restricted to `numbers`.  `tables` must cover the largest
+    /// of `numbers`.
     pub fn new(tables: &Tables, numbers: &[u32]) -> Self {
         let max = numbers.iter().copied().max().unwrap_or(0);
         let mut member = vec![0u16; max as usize + 1];

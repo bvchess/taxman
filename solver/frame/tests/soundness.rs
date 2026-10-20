@@ -859,8 +859,8 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
 /// game of n = 833, the first board whose optimal game is not a longest one (`solver/noframe/docs/longest-games.md`):
 /// the optimal set promotes 48 numbers, as many as `max_total` allows less one, and a set the model accepts promotes
 /// 49, four heavy promotions of the optimal set exchanged for five light ones; both games are over, the second one move
-/// longer and 29 points lighter.  (The Java's `reviseFreedoms` assumed the conjecture of the two-frame game of frames 0
-/// and 1, which this does not decide.)
+/// longer and 29 points lighter.  (The Java solver's revision of the freedoms assumed the conjecture of the two-frame
+/// game of frames 0 and 1, which this does not decide.)
 #[test]
 fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
     const W: usize = 16;
