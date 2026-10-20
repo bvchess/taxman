@@ -371,7 +371,7 @@ const OPTIONS: [(&str, &[&str]); 64] = [
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
     ("--threads", &["grow", "landscape"]),
-    ("--out", &["landscape", "cycles"]),
+    ("--out", &["landscape", "cycles", "local"]),
     ("--cores", &["grow"]),
     ("--mem-cap", &["grow"]),
 ];

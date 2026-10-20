@@ -49,6 +49,14 @@
 //!
 //! `--checked` lists the sets, separated by `/`, each frame numbers separated by commas, or `all` or `none`: the
 //! default is `none/1/2/3/1,2/2,3/1,2,3/all`.
+//!
+//! With `--out FILE`, each node measured is also appended to `FILE` whole, as a line `{"kind":"instance",...}`, for
+//! the study of frame 2's exact problem (solver/notebook/search/the-exact-problem-of-frame-2-2026-10/): `id`, `node` (as
+//! in its `node` line, or null for a unit's own start), `depth`, `subtree`, `bound`, `need`, `max_add`, `promoted`
+//! (its promotions), `frames` (each frame of its state, front first: `[moves, factors, freedoms]`), `cands` (its
+//! candidates, each `[number, home]`), `chosen` (the GF(2) bound's heaviest set) and `flipped` (for each candidate,
+//! the GF(2) bound without it if it is in `chosen`, with it if not, or null for a loop).  For a game with no known
+//! best set only the units' own starts are written, and nothing is searched.
 
 use super::anatomy::suite_units;
 use super::{beyond, Line, Options};
@@ -56,7 +64,10 @@ use crate::counters::cpu_seconds;
 use crate::known::known_incumbent;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::hash::{Hash, Hasher};
+use std::io::Write;
+use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use taxman::bits::Bits;
 use taxman::board::Board;
@@ -469,6 +480,63 @@ fn bound_by_home<const W: usize>(
     (eval.value, by_home(&p.model, &eval.chosen), opt_homes)
 }
 
+/// Where a node of a unit's tree sits, for its line of `--out`.
+struct Placed<'a> {
+    id: &'a str,
+    node: Option<usize>,
+    depth: usize,
+    subtree: u64,
+    need: Option<u64>,
+}
+
+/// Appends the line `{"kind":"instance",...}` of the node `unit` (see the module docs) to `out`.
+fn dump_instance<const W: usize>(
+    p: &Prepared<W>,
+    bound: &mut Gf2Bound<'_, W>,
+    unit: &TaxUnit<W>,
+    at: &Placed<'_>,
+    out: &Path,
+) -> Result<(), String> {
+    let state = p.model.promote_all_using(&mut Scratch::new(), &p.root, &unit.promoted).expect("a node's promotions");
+    let max_add = max_additional(&p.model, p.max_total, &state, &unit.promoted, &unit.cands);
+    bound.reset(&unit.promoted, &unit.cands);
+    let eval = bound.evaluate(max_add, None);
+    let list = |set: &Bits<W>| format!("{:?}", set.iter().collect::<Vec<u32>>()).replace(' ', "");
+    let frames: Vec<String> =
+        state.frames().iter().map(|f| format!("[{},{},{}]", list(&f.moves), list(&f.factors), f.freedoms)).collect();
+    // Each candidate's GF(2) bound with its membership flipped against the heaviest set: without it for a member,
+    // with it for the others (null for a loop, which no completion holds).
+    let live = bound.live();
+    let mut value: HashMap<u32, u64> = HashMap::new();
+    for x in eval.chosen.iter() {
+        value.insert(x, bound.value_excluding(x, max_add, u64::MAX));
+    }
+    for x in (live - eval.chosen).iter() {
+        bound.reset(&unit.promoted.with(x), &unit.cands.without(x));
+        value.insert(x, bound.evaluate(max_add.saturating_sub(1), None).value + u64::from(x));
+    }
+    let flipped: Vec<String> =
+        unit.cands.iter().map(|x| value.get(&x).map_or("null".to_owned(), u64::to_string)).collect();
+    let cands: Vec<String> = unit.cands.iter().map(|x| format!("[{x},{}]", p.model.home(x))).collect();
+    let mut line = Line::of(p.n);
+    line.text("kind", "instance")
+        .text("id", at.id)
+        .maybe("node", at.node)
+        .field("depth", at.depth)
+        .field("subtree", at.subtree)
+        .field("bound", eval.value)
+        .maybe("need", at.need)
+        .field("max_add", max_add)
+        .field("promoted", list(&unit.promoted))
+        .list("frames", frames)
+        .list("cands", cands)
+        .field("chosen", list(&eval.chosen))
+        .list("flipped", flipped);
+    let mut file =
+        OpenOptions::new().create(true).append(true).open(out).map_err(|e| format!("{}: {e}", out.display()))?;
+    writeln!(file, "{}", line.render()).map_err(|e| format!("{}: {e}", out.display()))
+}
+
 /// `local` on game `n` at the set width `W`.
 fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
     let board = Board::<W>::for_n(n);
@@ -476,14 +544,23 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
         return Ok(());
     }
     let p = board.prepare(o.tactics)?;
-    let (opt_set, opt) =
-        known_incumbent(&board, &p, optimal)?.ok_or_else(|| format!("n={n}: needs a known optimum"))?;
     let units = if o.exchanges.root {
         vec![(format!("{n}-root"), TaxUnit { promoted: Bits::EMPTY, cands: p.candidates })]
     } else {
         let suite = o.params.suite.as_ref().ok_or("local needs --suite or --root")?;
         suite_units::<W>(suite, n, &o.anatomy.ids)?
     };
+    let known = known_incumbent(&board, &p, optimal)?;
+    let gf2 = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+    let mut bound = Gf2Bound::<W>::new(&gf2);
+    if let (None, Some(out)) = (&known, &o.out) {
+        for (id, unit) in &units {
+            let at = Placed { id, node: None, depth: 0, subtree: 0, need: None };
+            dump_instance(&p, &mut bound, unit, &at, out)?;
+        }
+        return Ok(());
+    }
+    let (opt_set, opt) = known.ok_or_else(|| format!("n={n}: needs a known optimum"))?;
     let l = &o.local;
     let parsed;
     let sets = if l.checked.is_empty() {
@@ -495,10 +572,8 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
     let per_unit = if l.per_unit == 0 { PER_UNIT } else { l.per_unit };
     let cap = if l.hybrid_cap == 0 { HYBRID_CAP } else { l.hybrid_cap };
     let graph = MatchGraph::new(&p.model, &p.root);
-    let gf2 = Gf2Graph::new(&p.model, &p.root, &p.candidates);
     let game = Arc::new(Game::new(&p, sets));
     let names: Vec<String> = sets.iter().map(|&s| set_name(s)).collect();
-    let mut bound = Gf2Bound::<W>::new(&gf2);
     for (id, unit) in units {
         let (value, homes, opt_homes) = bound_by_home(&p, &mut bound, &opt_set, &unit);
         let (solved, rec) = record(&p, &graph, &game, unit, &opt_set, o.nodes);
@@ -527,6 +602,11 @@ fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), St
         }
         for (i, node) in sample(&rec.nodes, per_unit).iter().enumerate() {
             let unit = TaxUnit { promoted: node.promoted, cands: node.cands };
+            if let Some(out) = &o.out {
+                let at =
+                    Placed { id: &id, node: Some(i), depth: node.depth, subtree: node.subtree, need: Some(node.need) };
+                dump_instance(&p, &mut bound, &unit, &at, out)?;
+            }
             let (value, homes, opt_homes) = bound_by_home(&p, &mut bound, &opt_set, &unit);
             let base = node.promoted.sum();
             let mut hybrids = Vec::new();
@@ -677,5 +757,48 @@ mod tests {
     #[test]
     fn the_hybrid_bounds_lie_between_the_gf2_bound_and_the_optimum() {
         taxman::with_width!(1215, W => hybrids_1215::<W>(), else panic!("{}", beyond(1215)));
+    }
+
+    /// The root of 600 written whole: its frames and candidates as the model has them, and each candidate's flipped
+    /// bound at most the root's bound, null exactly for the loops.
+    fn instance_600<const W: usize>() {
+        use taxman::json::Json;
+        let board = Board::<W>::for_n(600);
+        let p = board.prepare(SearchTactics::default()).expect("prepare");
+        let gf2 = Gf2Graph::new(&p.model, &p.root, &p.candidates);
+        let mut bound = Gf2Bound::<W>::new(&gf2);
+        let unit = TaxUnit { promoted: Bits::EMPTY, cands: p.candidates };
+        let out = std::env::temp_dir().join(format!("wall-local-instance-{}.jsonl", std::process::id()));
+        let _ = std::fs::remove_file(&out);
+        let at = Placed { id: "600-root", node: None, depth: 0, subtree: 0, need: None };
+        dump_instance(&p, &mut bound, &unit, &at, &out).expect("the line");
+        let text = std::fs::read_to_string(&out).expect("the file");
+        std::fs::remove_file(&out).expect("removed");
+        let line = Json::parse(text.trim()).expect("one JSON line");
+        let numbers = |key: &str| -> Vec<Json> { line.get(key).and_then(Json::as_arr).expect(key).to_vec() };
+        let frames = numbers("frames");
+        assert_eq!(frames.len(), p.root.frames().len());
+        for (frame, f) in frames.iter().zip(p.root.frames()) {
+            let moves: Vec<u32> =
+                frame.at(0).and_then(Json::as_arr).expect("moves").iter().filter_map(Json::as_u32).collect();
+            assert_eq!(moves, f.moves.to_vec());
+        }
+        let value = line.get("bound").and_then(Json::as_u64).expect("bound");
+        let (cands, flipped) = (numbers("cands"), numbers("flipped"));
+        let count = p.candidates.len() as usize;
+        assert_eq!((cands.len(), flipped.len()), (count, count));
+        bound.reset(&Bits::EMPTY, &p.candidates);
+        let live = bound.live();
+        for (c, v) in cands.iter().zip(&flipped) {
+            let x = c.at(0).and_then(Json::as_u32).expect("a candidate");
+            assert_eq!(c.at(1).and_then(Json::as_u64), Some(p.model.home(x) as u64));
+            assert_eq!(v.is_null(), !live.contains(x), "{x}");
+            assert!(v.as_u64().is_none_or(|v| v <= value), "{x}: {v:?} against {value}");
+        }
+    }
+
+    #[test]
+    fn an_instance_line_holds_the_node_whole() {
+        taxman::with_width!(600, W => instance_600::<W>(), else panic!("{}", beyond(600)));
     }
 }
