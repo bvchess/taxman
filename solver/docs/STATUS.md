@@ -40,7 +40,9 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
   entry](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).
 * **Finders for lower bounds** (2026-10-17): large neighbourhood search from the start incumbent finds opt(n) in 64% of
   253 games of 2176-3440 in 5 CPU seconds of one thread; it is in the ledger, not in the solver ([the
-  entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
+  entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  Seeding the chain with it is worth
+  about 15% of the search time past 2175 and none of the dear games' excess ([the dear
+  games](../notebook/the-dear-games-the-problem-or-the-chains-path-2026-10/README.md)).
 * **Floors for upper bounds** (2026-10-18): a search under a floor proves "nothing weighs more than F" far more cheaply
   than the proof (a decade of nodes per 147 points); it is in the ledger ([the
   entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
