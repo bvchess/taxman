@@ -121,15 +121,13 @@ Two verifiers check the files.  From the top of the repository:
 The first is the frame solver's own.  It also runs on any results file that `solve --out` opens, and in
 `tests/results.rs`.  The second is an independent verifier in Python, which shares no code with the solver; it also
 checks every score against the Franklín–Moniot upper bound and the best-known heuristic chain in `heuristics/results`.
-Both do the same checks:
-
-* they replay every game: legal, scoring what is recorded, with no legal move left, and opening with the largest prime;
-* they confirm each score against `optimal.json`, and check score(n − 1) ≤ score(n) ≤ n + score(n − 1);
-* they check the arithmetic of each line and the predecessor it names, and that the files agree;
-* they derive each line's proof kind, and what it assumes, by the rules in `src/results.rs`.
-
-Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 s on the laptop.
-[solver/docs/design/trust.md](../solver/docs/design/trust.md) defines the proof kinds and the assumptions.
+Both replay every game (legal, scoring what is recorded, with no legal move left, and opening with the largest prime),
+confirm each score against `optimal.json` and the bounds score(n − 1) ≤ score(n) ≤ n +
+score(n − 1), check each line's arithmetic and the predecessor it names and that the files agree, and derive each
+line's proof kind and what it assumes by the rules in `src/results.rs`.  [The frame solver's
+reference](../solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted) defines the proof kinds and the assumptions,
+and says what each verifier checks.  Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 s
+on the laptop.
 
 What that evidence amounts to:
 

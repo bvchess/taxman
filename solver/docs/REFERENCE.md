@@ -85,14 +85,15 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `results/optimal.json`.  The
   binaries built after that carry the new table.
 * **`certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`** proves, game by game, that statement U
-  holds: that the recorded scores of A..B that rest on the frame model are opt(n) on the whole board ([README, "What
-  optimal means"](../frame/README.md#what-optimal-means)).  The list FILE instead names the games, one n a line, in
-  order.  For each game that the prover's barred bounds (`--upper`, `solver/noframe/data/upper_*.jsonl`) say needs it,
-  it searches the extended problem, with the bounds' open members optional, from the recorded game.  The search ends
-  `certified` (nothing beats the score) or `beaten`.  A game that beats the score is written to
-  `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes `--threads`, the checkpoint
-  flags and the limits of `solve`, and resumes like it.  The extended problem keeps the claims of `unzip` that Lemma M5⁺
-  allows, unless `--no-claims`, the formulation of the certificates made before it; a line records which.
+  holds: that the recorded scores of A..B that rest on the frame model are opt(n) on the whole board
+  ([design/frame-model.md, “What "optimal" means”](design/frame-model.md#what-optimal-means)).  The list FILE instead
+  names the games, one n a line, in order.  For each game that the prover's barred bounds (`--upper`,
+  `solver/noframe/data/upper_*.jsonl`) say needs it, it searches the extended problem, with the bounds' open members
+  optional, from the recorded game.  The search ends `certified` (nothing beats the score) or `beaten`.  A game that
+  beats the score is written to `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes
+  `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.  The extended problem keeps the
+  claims of `unzip` that Lemma M5⁺ allows, unless `--no-claims`, the formulation of the certificates made before it; a
+  line records which.
 * **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
   that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
   the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they
@@ -269,15 +270,18 @@ What a game *assumes* is what its proof rests on beyond the frame model:
   bound of the frame model at game n rests on n, and a bound carried by a relation rests on what its source rests on.
   A game that rests on such a bound assumes "statement U holds at n=4501" for each of those games, and a game that
   rests on that game assumes the same.
-* The committed chain's games assume what their lines do: nothing.
+* The committed chain's games assume what their lines do: nothing, but for the games it took from the bounds store,
+  which assume statement U at the games their bounds rest on ([results/README.md](../../results/README.md#strictjsonl)
+  counts them).
 
 A game that assumes nothing is proven within the frame model, given that the solver is right.  `taxman solve` prints
 what a game assumes in its summary line, and `verify-results` counts together the games that assume statement U at
 some game.
 
-What a proof rests on through the frame model, statement U at n ([README, "What optimal
-means"](../frame/README.md#what-optimal-means)), is not recorded for the proofs that the frame model gives: an exhausted
-search, a trivial game and a repeat.  It holds at every game the prover has proven; past those, it is not yet certified.
+What a proof rests on through the frame model, statement U at n ([design/frame-model.md, “What "optimal"
+means”](design/frame-model.md#what-optimal-means)), is not recorded for the proofs that the frame model gives: an
+exhausted search, a trivial game and a repeat.  It holds at every game the prover has proven; past those, it is not yet
+certified.
 
 ### What a game had from n - 1
 
@@ -290,12 +294,13 @@ made it: a sweep goes over them more than once, and a run with no `--pass` has n
 | `source` `run` or `results`, `proof` null | the best game of an unfinished search of n − 1, as a seed, and no more: no ceiling (`setup.cap` null), no prime formula, nothing that rests on it | the same: never `cap` or `prime_formula` |
 | `proof` given (or `source` `optimal`, `strict`, `bounds`) | n − 1 proven (or assumed, from `optimal.json`; or the committed chain's or the bounds store's game, `--use-prev`): the seed, the ceiling n + score(n − 1), the prime formula for a prime n, and repeats | any |
 
-The game of n − 1 that a `results` line names is in the same file.  It is a completed game or, with no proof, an
-earlier incomplete line with the score and moves it records.  A record of the proof `known` (where the run took its
-copy from a known source) stands on the file's completed game with that score, those moves and those assumptions,
-whatever its own proof ([runbook/chain.md, "Verifying, and bringing the results home"](runbook/chain.md#verifying-and-bringing-the-results-home)).  A game that a retry searched again has several lines:
-an incomplete one made when the game of n − 1 had less to give, or was missing, and a later one made when it had more.
-Each says what it had.
+The game of n − 1 that a `results` line names is in the same file.  It is a completed game or, with no proof, an earlier
+incomplete line with the score and moves it records.  A record of the proof `known` (where the run took its copy from a
+known source) stands on the file's completed game with that score, those moves and those assumptions, whatever its own
+proof ([runbook/chain.md, "Verifying, and bringing the results
+home"](runbook/chain.md#verifying-and-bringing-the-results-home)).  A game that a retry searched again has several
+lines: an incomplete one made when the game of n − 1 had less to give, or was missing, and a later one made when it had
+more.  Each says what it had.
 
 So a file of a sweep, with its games that only an unfinished search is recorded for, reads this way:
 

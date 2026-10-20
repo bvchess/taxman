@@ -118,9 +118,9 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
-  `in_the_bag` + P\* = opt(n) ([theory/frame-model.md](theory/frame-model.md); [the frame solver's README, "What optimal
-  means"](../solver/frame/README.md#what-optimal-means)).  `model::FrameGraph` is the immutable factor graph and home
-  frames, not "the model".
+  `in_the_bag` + P\* = opt(n) ([theory/frame-model.md](theory/frame-model.md); [solver/docs/design/frame-model.md, “What
+  "optimal" means”](../solver/docs/design/frame-model.md#what-optimal-means)).  `model::FrameGraph` is the immutable
+  factor graph and home frames, not "the model".
 * **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their
   proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
   or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"

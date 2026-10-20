@@ -5,32 +5,27 @@ Part of the [design](../DESIGN.md).
 Every completed game records how its optimality is proven, its *proof*, and what that proof takes as given beyond the
 frame model, what it *assumes*.  The referee replays every game before it counts, and two verifiers that share no code
 check every results file.  [REFERENCE.md, "Why the answers can be
-trusted"](../REFERENCE.md#4-why-the-answers-can-be-trusted), has the proof kinds, the assumptions and the verifiers as a
-results line shows them, and [frame-model.md](frame-model.md) says what each kind of proof needs of the frame model.
-This section is the design behind them; `src/results.rs` has the full rules and the checks.
+trusted"](../REFERENCE.md#4-why-the-answers-can-be-trusted) has the proof kinds, the assumptions and the verifiers as a
+results line shows them, [frame-model.md](frame-model.md) says what each kind of proof needs of the frame model, and
+[results/README.md](../../../results/README.md#what-supports-the-scores) says what supports each committed score.  This
+file is the design behind them; `src/results.rs` has the full rules and the checks.
 
-**What a game assumes** is what its proof rests on beyond the frame model, inherited down the chain: a proof that rests
-on the game of n − 1 assumes what that game assumes, a repeat what the game it repeats assumes, and a `known` proof what
-its source's game assumes.  Two sources add assumptions.  A game taken from `optimal.json` (`--use-prev`) is assumed
-optimal, since the table records nothing about how a game was found: a proof that rests on its game of n − 1 assumes
-"the game of n − 1 in optimal.json is optimal", and a game of n taken from it "the game of n in optimal.json is
-optimal".  A bound of the bounds store holds wherever statement U holds at the games it rests on, so a game that rests
-on it assumes "statement U holds at n=B" for each such game B.  A game that assumes nothing is proven within the frame
-model, given that the solver is right, and a chain from n = 1 assumes nothing.  The solver refuses no game for what it
-assumes: the line says it, and the verifiers count it.
+**What a game assumes** is inherited down the chain: a proof that rests on the game of n − 1, a repeat and a `known`
+proof each assume what the game they rest on assumes.  Only two sources add an assumption, a game taken from
+`optimal.json` and a bound of the bounds store ([REFERENCE.md, "Assumptions"](../REFERENCE.md#assumptions) words them).
+So a chain from n = 1 that takes no game from `optimal.json` or the bounds store assumes nothing: it is proven within
+the frame model, given that the solver is right.  The solver
+refuses no game for what it assumes: the line says it, and the verifiers count it.
 
-**Checks and referees.**  Every game is replayed by `game::replay_finished` before it counts, and checked against its
-recorded arithmetic and the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`; a game that fails after it was found goes
-to `<results>.rejected.jsonl`, and the run fails.  `taxman verify-results` reads results files without changing them,
-and runs the same checks and the agreement between files.  `solver/tools/check_results.py` is an independent referee in
-Python: it derives every proof and assumption again, and compares the scores with `optimal.json`, the Franklín–Moniot
-upper bound and the best-known heuristic chain.  Both read results lines of schema 5 only.  Both refuse a line whose
-fields contradict each other (say a sum at the ceiling without `reached_cap`), since they derive the proof and the
-assumptions from the fields.  A line that cites a known source is checked against the sources, which both read as they
-are (`known::Known::check_cite`; the Python referee from the lines of the files).  No check can catch a game that is
-legal, finished and within the ceilings but not optimal, when the game of n − 1 is not optimal either: that is what the
-proof kinds and the assumptions track, and why a chain from n = 1 matters.
-[results/README.md](../../../results/README.md) says what supports each committed score.
+**Checks and referees.**  `game::replay_finished` replays every game before it counts, the solver checks its arithmetic
+and the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`, and two verifiers read results files without changing them:
+`taxman verify-results`, and `solver/tools/check_results.py`, an independent referee in Python ([REFERENCE.md, "The
+verifiers"](../REFERENCE.md#the-verifiers) says what each checks).  Both read results lines of schema 5 only.  Both
+derive the proof and the assumptions again from a line's fields, so both refuse a line whose fields contradict each
+other (say a sum at the ceiling without `reached_cap`).  A line that cites a known source is checked against the
+sources, which both read as they are (`known::Known::check_cite`; the Python referee from the lines of the files).  No
+check can catch a game that is legal, finished and within the ceilings but not optimal, when the game of n − 1 is not
+optimal either: that is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
 
 **Result lines** are one JSON object per line ([REFERENCE.md, "A results line
 (`--out`, schema 5)"](../REFERENCE.md#a-results-line---out-schema-5)).  A line is never rewritten, and a run locks the

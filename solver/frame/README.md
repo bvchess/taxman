@@ -118,34 +118,17 @@ into one frame 0 with two freedoms.
 ### What "optimal" means
 
 The solver's answer for game n is `in_the_bag` + [P\*](../../docs/GLOSSARY.md#the-frame-model).  That is opt(n) given
-three things: the frame model is exact at n, the search prunes nothing that could win, and, for some proofs, the game of
-n − 1 is optimal.
-
-* **The frame model is exact, given statement U.**  [docs/theory/frame-model.md](../../docs/theory/frame-model.md)
-  proves the model's rules: the greedy removal of impossible sources, the mandatory moves of `unzip`, freedoms = factors
-  − sources, closed frames taking no part in the search, and a promoted number paying tax only from the frame one
-  forward.  What is left is one statement about the game, [statement U](../../docs/GLOSSARY.md#the-frame-model): some
-  optimal game plays every member with three or more prime factors of [U\*](../../docs/GLOSSARY.md#the-frame-model), the
-  sources that setup keeps.  The games that play all of U\* are exactly U\* with a promotion set added (Theorem M), and
-  every optimal game plays the members of U\* with one or two prime factors (Theorem B).  So the heaviest promotion set
-  gives opt(n) exactly when U holds at n.
-
-  U is open in general.  It holds at every game the [prover](../noframe/README.md) has proven, since the prover proves
-  opt(n) on the whole board, without the frame model.  Past those games, a proof that uses the frame model assumes U at
-  n, and `taxman certify` ([the reference, section 2](../docs/REFERENCE.md#2-the-other-commands)) checks it game by
-  game; a proof by the ceiling or by the prime formula uses no model ([the reference, section
-  4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).  The results lines do not record U.
-  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and
-  [solver/docs/design/frame-model.md, “What "optimal" means”](../docs/design/frame-model.md#what-optimal-means) says
-  what each kind needs of the model.
-* **The pruning is exact.**  No [tactic](../../docs/GLOSSARY.md#the-search) prunes a promotion set that could win: each
-  is proven or sound, and [solver/docs/design/tactics.md](../docs/design/tactics.md) grades them.  So a result rests on
-  nothing but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so, the
-  game it was built from.
-* **The game of n − 1 is optimal, where a proof rests on it.**  The game of n is built from the game of n − 1: its
-  search starts from that game's promotions and stops at the [ceiling](../../docs/GLOSSARY.md#the-game).  So a
-  [chain](../../docs/GLOSSARY.md#results-and-trust) of games from n = 1 is proven game by game.  [The reference, section
-  4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests on.
+three things: the frame model is exact at n, which it is exactly when [statement
+U](../../docs/GLOSSARY.md#the-frame-model) holds at n (a proof by the ceiling or the prime formula uses no model); the
+search prunes nothing that could win, since every [tactic](../../docs/GLOSSARY.md#the-search) is proven or sound; and,
+for some proofs, the game of n − 1 is optimal, so a [chain](../../docs/GLOSSARY.md#results-and-trust) of games from n =
+1 is proven game by game.  So a result rests on nothing but U, where its proof uses the frame model; the correctness of
+the code; and, where its proof says so, the game it was built from.  U is open in general.  It holds at every game the
+[prover](../noframe/README.md) has proven, and `taxman certify` checks it game by game past them.
+[solver/docs/design/frame-model.md, “What "optimal" means”](../docs/design/frame-model.md#what-optimal-means) explains
+each premise and what each kind of proof needs of the model, [the
+reference](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests on, and
+[results/README.md](../../results/README.md) counts the committed games of each kind of proof.
 
 ## 2. Build, test, run
 
