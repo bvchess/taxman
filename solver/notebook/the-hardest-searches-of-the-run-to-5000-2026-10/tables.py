@@ -1,7 +1,8 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """Makes the tables of the entry from its data files.  Standard library only.
 
-usage: python3 -I tables.py [all|suite|runs|totals|group|order|checks|cpu]
+usage: python3 -I tables.py [all|games|fit|suite|runs|totals|group|order|checks|cpu]
+       python3 -I tables.py probed UNITS.jsonl...
 
 The data files, beside this script: `suite.jsonl` (the problems), `probes.jsonl` (the default search's solves that sized
 them), `runs.jsonl` (the lines of `wall images`, as the closure entry's `suite.py run` writes them), `checkpoints.jsonl`
@@ -25,6 +26,7 @@ import suite as old  # noqa: E402
 
 SUITE, PROBES, RUNS = HERE / "suite.jsonl", HERE / "probes.jsonl", HERE / "runs.jsonl"
 CHECKPOINTS, CPU = HERE / "checkpoints.jsonl", HERE / "cpu.jsonl"
+PROBED, STOPPED = HERE / "probed-units.jsonl", HERE / "runs-stopped.jsonl"
 MINUS = old.MINUS
 # The bands of the default search's steps: from, up to but not including, and the name.
 SIZES = [(0, 100_000, "under 100,000"), (100_000, 300_000, "100,000-299,999"), (300_000, 600_000, "300,000-599,999"),
@@ -44,8 +46,8 @@ def load():
     wholes = {p["game"] for p in problems if p["whole"]}
     rows = []
     for p in problems:
-        rows.append({**p, "group": "whole" if p["game"] in wholes else "hard", "learning": results.get((p["id"], "closure")),
-                     "default": results.get((p["id"], "count"))})
+        rows.append({**p, "group": "whole" if p["game"] in wholes else "hard",
+                     "learning": results.get((p["id"], "closure")), "default": results.get((p["id"], "count"))})
     return rows, results
 
 
@@ -60,8 +62,8 @@ def mean(values):
 # --- the suite ---------------------------------------------------------------------------------------------------
 def suite_table():
     rows, _ = load()
-    print("**The problems**: the default search's steps (the probes') and CPU seconds (the probes', of the release build "
-          "of `tune solve`)\n")
+    print("**The problems**: the default search's steps (the probes') and CPU seconds (the probes', of the release "
+          "build of `tune solve`)\n")
     body = []
     for r in sorted(rows, key=lambda r: (r["group"] == "whole", r["game"], r["whole"], r["steps"])):
         kind = "whole game" if r["whole"] else "unit"
@@ -69,12 +71,58 @@ def suite_table():
     old.table(["problem", "kind", "gap", "default steps", "probe CPU s"], body)
 
 
+# --- the games ---------------------------------------------------------------------------------------------------
+def games_table():
+    """Each game: its checkpoint, the units chosen from it, and what probing cost."""
+    lines = read_jsonl(SUITE)
+    headers = [line for line in lines if line["kind"] == "game"]
+    units = collections.defaultdict(list)
+    for line in lines:
+        if line["kind"] == "unit":
+            units[line["game"]].append(line)
+    cpu = {line["game"]: line["cpu_s"] for line in read_jsonl(CHECKPOINTS)}
+    probes = read_jsonl(PROBES)
+    print("**The games**: the checkpoint (a 120 s search on 4 threads), the units chosen from it and their probes\n")
+    body = []
+    for h in sorted(headers, key=lambda h: h["game"]):
+        g, chosen = h["game"], units[h["game"]]
+        mine = [p for p in probes if p["game"] == g]
+        steps = sorted(u["default"]["nodes"] for u in chosen)
+        body.append([g, f"{h['checkpoint_nodes']:,}", h["units_in_checkpoint"], h["incumbent_sum"],
+                     h["opt"] if h["opt"] is not None else "unknown", f"{cpu.get(g, 0):.0f}", len(chosen),
+                     sum("." in u["id"] for u in chosen), f"{steps[0]:,} to {steps[-1]:,}", len(mine),
+                     sum(not p["completed"] for p in mine), f"{sum(p['cpu_s'] for p in mine):,.0f}"])
+    old.table(["game", "checkpoint steps", "units in it", "its incumbent", "P*", "checkpoint CPU s", "units chosen",
+               "of them expanded", "default steps", "probe solves", "stopped at the limit", "probe CPU s"], body)
+
+
+# --- the gap band -------------------------------------------------------------------------------------------------
+def fit_table():
+    """The size of a unit against its gap, game by game, over the probes that finished: a line through the log of the
+    steps, and the gaps at which it crosses 100,000 and 3,000,000 steps."""
+    units = {line["id"]: line for line in read_jsonl(PROBED)}
+    by_game = collections.defaultdict(list)
+    for p in read_jsonl(PROBES):
+        if p["completed"] and p["id"] in units and p["nodes"] > 0:
+            by_game[p["game"]].append((units[p["id"]]["gap"], math.log10(p["nodes"])))
+    print("**The size of a unit against its gap**, over the probes that finished (a unit that stopped at its limit is "
+          "not in it, so the line is low for the large gaps)\n")
+    body = []
+    for g in sorted(by_game):
+        xs, ys = zip(*by_game[g])
+        slope, intercept = statistics.linear_regression(xs, ys)
+        body.append([g, len(xs), f"{statistics.correlation(xs, ys):+.2f}", f"{100 * slope:.2f}",
+                     f"{(5 - intercept) / slope:.0f}", f"{(math.log10(3e6) - intercept) / slope:.0f}"])
+    old.table(["game", "units", "correlation with the gap", "decades of steps per 100 of gap",
+               "gap at 100,000 steps", "gap at 3,000,000 steps"], body)
+
+
 # --- the hard games' units -----------------------------------------------------------------------------------------
 def runs_table():
     rows, _ = load()
     hard = [r for r in rows if r["group"] == "hard" and r["learning"]]
-    print("**The units of the hard games**, by game and size: the default search's steps (the probe's) and the learning's "
-          "steps, leaves and CPU\n")
+    print("**The units of the hard games**, by game and size: the default search's steps (the probe's) and the "
+          "learning's steps, leaves and CPU\n")
     body = []
     for r in sorted(hard, key=lambda r: (r["game"], r["steps"])):
         b = r["learning"]
@@ -134,6 +182,11 @@ def group_table():
                              f"{a['leaves']:,}", f"{b['leaves']:,}", change(a["leaves"], b["leaves"]),
                              f"{a['cpu_s']:.1f}", f"{b['cpu_s']:.1f}", change(a["cpu_s"], b["cpu_s"])])
     old.table(head, body)
+    for s in read_jsonl(STOPPED):
+        r = next(r for r in wholes if r["id"] == s["id"])
+        print(f"The learning on {s['id']} was stopped by hand at about {s['cpu_s']:,.0f} CPU s, "
+              f"{s['cpu_s'] / r['default']['cpu_s']:.1f} times the default search's {r['default']['cpu_s']:,.0f} s "
+              f"({r['default']['nodes']:,} steps, {r['default']['leaves']:,} leaves), and has no line.\n")
 
     print("**Each whole game against its own units**: the learning's change in the steps and in the CPU, for the game "
           "and for its units together and one by one\n")
@@ -157,9 +210,10 @@ def group_table():
                          f"{1000 * a['cpu_s'] / a['nodes']:.3f}", f"{1000 * b['cpu_s'] / b['nodes']:.3f}"])
     old.table(head, body)
 
-    print("**The three whole games, and their twelve units together**\n")
+    print("**The whole games run both ways, and the units of all three games, together**\n")
     body = []
-    for label, rs in (("whole games", [r for r in wholes if r["whole"]]), ("their units", [r for r in wholes if not r["whole"]])):
+    for label, rs in (("whole games", [r for r in wholes if r["whole"]]),
+                      ("their units", [r for r in wholes if not r["whole"]])):
         rs = [r for r in rs if pair(r)]
         if not rs:
             continue
@@ -172,7 +226,7 @@ def group_table():
                "change"], body)
 
 
-# --- the difficulty order ----------------------------------------------------------------------------------------------
+# --- the difficulty order ----------------------------------------------------------------------------------------
 def order_table(count=20):
     rows, _ = load()
     done = [r for r in rows if r["learning"]]
@@ -229,11 +283,24 @@ def cpu_table():
     print(f"In all {total:,.0f} CPU seconds, {total / 3600:.2f} hours.\n")
 
 
-COMMANDS = {"suite": suite_table, "runs": runs_table, "totals": totals_table, "group": group_table,
-            "order": order_table, "checks": checks, "cpu": cpu_table}
+COMMANDS = {"games": games_table, "fit": fit_table, "suite": suite_table, "runs": runs_table,
+            "totals": totals_table, "group": group_table, "order": order_table, "checks": checks, "cpu": cpu_table}
+
+
+def write_probed(units_files):
+    """`probed-units.jsonl`: the gap and depth of every unit the probes tried, from the units files of `tune units`
+    (and `tune expand`), which are not kept."""
+    tried = {p["id"] for p in read_jsonl(PROBES)}
+    keep = ("id", "game", "index", "depth", "n_cands", "gap")
+    lines = [{k: line[k] for k in keep} for path in units_files for line in read_jsonl(path)
+             if line["kind"] == "unit" and line["id"] in tried]
+    PROBED.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    print(f"{len(lines)} units in {PROBED}")
 
 
 def main():
+    if sys.argv[1:2] == ["probed"]:
+        return write_probed(sys.argv[2:])
     wanted = sys.argv[1:] or ["all"]
     for name in (COMMANDS if wanted == ["all"] else wanted):
         COMMANDS[name]()

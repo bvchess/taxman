@@ -36,7 +36,7 @@ def main():
         if opt is None or roots[n]["root_gap"] is None:
             raise SystemExit(f"{n}: a whole game needs its known optimum")
         default = {"nodes": a.nominal, "cpu_s": 0.0, "wall_s": 0.0, "best": opt, "completed": True}
-        out.append({"kind": "whole", "game": n, "id": f"{n}-root", "gap": roots[n]["root_gap"] - 1,
+        out.append({"kind": "whole", "game": n, "id": f"{n}-root", "nominal": True, "gap": roots[n]["root_gap"] - 1,
                     "default": default})
     Path(a.out).write_text("".join(json.dumps(line) + "\n" for line in out))
 

@@ -66,7 +66,8 @@ MINUS = "−"
 # --- the problems --------------------------------------------------------------------------------------------------
 def problems(suite=SUITE):
     """The problems of the suite file in its order: id, game, whole (a whole game), gap (the line's own, else the
-    tuning suite's whole games' in WHOLE_GAPS), and the default's steps, CPU seconds and best sum."""
+    tuning suite's whole games' in WHOLE_GAPS), the default's steps, CPU seconds and best sum, and `nominal`: the
+    line's steps are a stand-in for the size the run will find, and set only the limits of the runs."""
     out = []
     for line in Path(suite).read_text().splitlines():
         row = json.loads(line)
@@ -74,7 +75,7 @@ def problems(suite=SUITE):
             gap = row["gap"] if "gap" in row else WHOLE_GAPS[row["id"]]
             out.append({"id": row["id"], "game": row["game"], "whole": row["kind"] == "whole", "gap": gap,
                         "steps": row["default"]["nodes"], "cpu_s": row["default"]["cpu_s"],
-                        "best": row["default"]["best"]})
+                        "best": row["default"]["best"], "nominal": row.get("nominal", False)})
     return out
 
 
@@ -115,7 +116,7 @@ def complaints(problem, results):
     if len({(line["best"], line["completed"]) for line in lines}) > 1:
         found.append(f"{problem['id']}: the best or the conclusion differs between the searches")
     count = results.get((problem["id"], "count"))
-    if count and count["nodes"] != problem["steps"]:
+    if count and not problem["nominal"] and count["nodes"] != problem["steps"]:
         found.append(f"{problem['id']}: the default search took {count['nodes']} steps, "
                      f"the suite says {problem['steps']}")
     return found

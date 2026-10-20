@@ -1,5 +1,7 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""Ranks the searches of a stretch of the committed chain by their nodes, and lists the smallest.  Standard library only.
+"""Ranks the searches of a stretch of the committed chain by their nodes, and lists the smallest.
+
+Standard library only.
 
 usage: python3 -I ranking.py top [--from 3915] [--to 4547] [--count 20] [--strict FILE]
        python3 -I ranking.py smallest [--from 3915] [--to 4547] [--lo 1000000] [--count 12] [--strict FILE]
