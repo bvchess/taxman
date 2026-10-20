@@ -1,0 +1,785 @@
+diff --git a/solver/frame/examples/wall.rs b/solver/frame/examples/wall.rs
+index 3f8d5df..e35a8d4 100644
+--- a/solver/frame/examples/wall.rs
++++ b/solver/frame/examples/wall.rs
+@@ -206,6 +206,9 @@ mod fields;
+ /// `sample` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
+ #[path = "common/fixtures.rs"]
+ mod fixtures;
++/// `headroom`: how much smaller a unit's tree could be with other branching choices, in hindsight.
++#[path = "wall/headroom.rs"]
++mod headroom;
+ /// `images`: whether a node's conflict stays a conflict under the twin swap its bound makes for a member left out.
+ #[path = "wall/images.rs"]
+ mod images;
+@@ -261,7 +264,7 @@ use taxman::tactics::Tactics;
+ // ---------------------------------------------------------------------------------------------------------
+ // Arguments
+ 
+-const COMMANDS: [&str; 14] = [
++const COMMANDS: [&str; 15] = [
+     "setup",
+     "nodes",
+     "grow",
+@@ -276,10 +279,11 @@ const COMMANDS: [&str; 14] = [
+     "exchanges",
+     "near",
+     "images",
++    "headroom",
+ ];
+ 
+ /// The options, with the commands each applies to (an option given to another command is an error).
+-const OPTIONS: [(&str, &[&str]); 60] = [
++const OPTIONS: [(&str, &[&str]); 64] = [
+     (
+         "--known",
+         &[
+@@ -295,6 +299,7 @@ const OPTIONS: [(&str, &[&str]); 60] = [
+             "exchanges",
+             "near",
+             "images",
++            "headroom",
+         ],
+     ),
+     ("--cap", &["choice"]),
+@@ -305,17 +310,21 @@ const OPTIONS: [(&str, &[&str]); 60] = [
+     ("--best-cap", &["decompose"]),
+     ("--and-or-cap", &["decompose"]),
+     ("--and-or-min", &["decompose"]),
+-    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges", "near", "images"]),
++    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges", "near", "images", "headroom"]),
+     ("--units", &["cycles"]),
+-    ("--ids", &["anatomy", "exchanges", "near", "images"]),
++    ("--ids", &["anatomy", "exchanges", "near", "images", "headroom"]),
+     ("--prune", &["exchanges"]),
+     ("--below", &["exchanges"]),
+     ("--root", &["anatomy", "exchanges", "near", "images"]),
+     ("--sample", &["exchanges"]),
+-    ("--learn", &["anatomy", "images"]),
++    ("--learn", &["anatomy", "images", "headroom"]),
++    ("--levels", &["headroom"]),
++    ("--butterflies", &["headroom"]),
++    ("--conflicts", &["headroom"]),
++    ("--only", &["headroom"]),
+     ("--bare", &["images"]),
+     ("--count", &["images"]),
+-    ("--closure", &["anatomy", "images"]),
++    ("--closure", &["anatomy", "images", "headroom"]),
+     ("--within", &["near"]),
+     ("--probes", &["near"]),
+     ("--probe-gap", &["near"]),
+@@ -348,7 +357,7 @@ const OPTIONS: [(&str, &[&str]); 60] = [
+     ("--delta", &["nodes", "grow"]),
+     ("--width", &["setup", "nodes"]),
+     ("--no-seed", &["nodes"]),
+-    ("--tactic", &["nodes", "grow", "anatomy", "exchanges", "near", "images"]),
++    ("--tactic", &["nodes", "grow", "anatomy", "exchanges", "near", "images", "headroom"]),
+     ("--ckpt-dir", &["nodes", "grow"]),
+     ("--every", &["nodes", "grow"]),
+     ("--progress", &["grow"]),
+@@ -411,6 +420,8 @@ struct Options {
+     near: near::Params,
+     /// The options of `images` (its `--ids` and `--trace` are `anatomy`'s, its `--root` `exchanges'`).
+     images: images::Params,
++    /// The options of `headroom` (its `--ids` are `anatomy`'s, its `--learn` and `--closure` `images'`).
++    headroom: headroom::Params,
+     games: Vec<u32>,
+ }
+ 
+@@ -441,6 +452,7 @@ impl Options {
+             exchanges: exchanges::Params::default(),
+             near: near::Params::default(),
+             images: images::Params::default(),
++            headroom: headroom::Params::default(),
+             games: Vec::new(),
+         }
+     }
+@@ -576,6 +588,13 @@ fn parse() -> Result<Options, String> {
+             "--bare" => o.images.bare = true,
+             "--count" => o.images.count = true,
+             "--closure" => o.images.closure = true,
++            "--levels" => o.headroom.levels = number("--levels", value("--levels")?)?,
++            "--butterflies" => o.headroom.butterflies = number("--butterflies", value("--butterflies")?)?,
++            "--conflicts" => o.headroom.conflicts = true,
++            "--only" => {
++                let members = value("--only")?;
++                o.headroom.only = members.split(',').map(|m| number("--only", m.to_owned())).collect::<Result<_, _>>()?;
++            }
+             "--within" => o.near.within = number("--within", value("--within")?)?,
+             "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
+             "--probe-gap" => o.near.probe_gap = number("--probe-gap", value("--probe-gap")?)?,
+@@ -661,6 +680,10 @@ fn main() {
+         images::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
+         return;
+     }
++    if o.command == "headroom" {
++        headroom::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
++        return;
++    }
+     if let Some(command) = case::Command::named(&o.command) {
+         case::run(command, &o, &optimal).unwrap_or_else(|e| fail(&e));
+         return;
+diff --git a/solver/frame/examples/wall/anatomy.rs b/solver/frame/examples/wall/anatomy.rs
+index 3ab8365..6b7dd39 100644
+--- a/solver/frame/examples/wall/anatomy.rs
++++ b/solver/frame/examples/wall/anatomy.rs
+@@ -762,7 +762,7 @@ fn best_completion<const W: usize>(space: &SearchSpace<'_, W>, unit: &TaxUnit<W>
+ }
+ 
+ /// The minimal conflicts of `set` at `state`, one after the other, each one's members dropped before the next.
+-fn cores<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, set: &Bits<W>) -> Vec<Bits<W>> {
++pub(super) fn cores<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, set: &Bits<W>) -> Vec<Bits<W>> {
+     let mut scratch = Scratch::new();
+     let (mut left, mut found) = (*set, Vec::new());
+     while let Some(k) = model.conflict_using(&mut scratch, state, &left, true) {
+diff --git a/solver/frame/examples/wall/headroom.rs b/solver/frame/examples/wall/headroom.rs
+new file mode 100644
+index 0000000..e720e03
+--- /dev/null
++++ b/solver/frame/examples/wall/headroom.rs
+@@ -0,0 +1,592 @@
++//! `wall headroom`: how much smaller a hard unit's tree could be with other branching choices, found in hindsight.
++//! A unit is solved as `wall images` solves it (one thread, fresh tables, from the known optimum; with `--learn
++//! [--closure]`, with the learning), with a hook on the searcher (`search::StepHook`) that records every *decision*:
++//! a step where strong branching found no member of the node's conflict forced, so that the hook is asked which member
++//! to branch on.  The hook answers from a *plan*, and with strong branching's member where the plan has none.  Any
++//! member keeps the search exact, so only the tree changes; every full solve is checked against the known optimum.
++//!
++//! ```text
++//! cargo run --profile test --features studies --example wall -- headroom --known FILE --suite FILE --ids ID[,ID...]
++//!     [--learn [--closure]] [--butterflies K] [--levels K [--conflicts] [--only M[,M...]]] [--tactic NAME=VALUE]... N
++//! ```
++//!
++//! The study's notebook entry, solver/notebook/the-headroom-of-branching-in-hindsight-2026-10/README.md, reads the
++//! lines.  The hook's answer may lie outside the node's conflict (`StepHook::branch`, as this patch widens it): any
++//! candidate keeps the search exact.
++//!
++//! **Decisions.**  A decision is keyed by its node's promotions and its place among the decisions of that node's loop.
++//! No two nodes of a tree have the same promotions: a child promotes the member, and the node goes on without it.  A
++//! decision's *subtree* is the steps from it to the end of its node's loop; its *child* the steps from it to the first
++//! step back at its node, and its *rest* the steps from there to the end of the loop.
++//!
++//! **The butterflies** (`--butterflies K`): how far a small change moves the rest of the tree.  K decisions whose
++//! subtrees hold 20 to 300 steps, evenly spaced among those of the first fifth of the steps, are each changed alone to
++//! the first other member of the conflict, and the unit is solved to the end.  The change itself moves the tree by
++//! about that subtree; with the nogood table, the rest of the tree depends on what the table holds when the search
++//! reaches it.
++//!
++//! **The hindsight** (`--levels K`, default 0).  Level 1 is the unit's first decision, and level L + 1 the decisions
++//! of the child and the rest of each of level L's that are in no other's subtree there, in the search with the plan so
++//! far: the [`SLOTS`] biggest of those whose subtree holds at least 1/[`SLOT_SHARE`] of the tree.  For each decision
++//! of a level, in order, the unit is solved once for every member of the decision's conflict, with the plan so far and
++//! that member at the decision, up to the end of the decision's subtree; the member whose subtree is smallest joins the
++//! plan.  After each level the unit is solved with the plan to the end.  A solve of an alternative stops at three times
++//! the strong member's subtree (its `size` is then null).  With `--conflicts`, level 1 also tries the members of the
++//! heaviest set's other minimal conflicts, found one after the other as `wall anatomy` lists its cores, which only a
++//! search without the nogood table (`--tactic nogoods=off`) makes the same at every try.  With `--only`, level 1 tries
++//! only those members besides strong branching's.
++//!
++//! **The lines**, one a solve: `run` is `base` (the search with no plan), `butterfly`, `alt` (an alternative at a
++//! decision) or `level` (the plan after a level).  A `butterfly` adds `step`, `d`, `m` and `strong` (the decision's
++//! step and depth, the member tried and strong branching's), `before` and `after` (its subtree) and `base` (the base's
++//! steps).  Every line has `nodes` (the engine's steps), `completed`, `best`, `opt` and `cpu_s`.  `base` and `level`
++//! add `decisions` (how many the search made) and `missed` (decisions whose plan's member was not in the conflict, so
++//! that strong branching chose); `level` adds `level` and `plan` (each decision of the plan as `[promotions beyond the
++//! unit's, place, member]`).  `alt` adds `level`, `slot` (the decision's place in its level), `np`, `place` and `add`
++//! (its node's promotions, its place in the loop, and the promotions beyond the unit's), `d` (its depth below the
++//! unit), `k` (its conflict), `in_k`, `core` and `cores` (whether the member tried is in the conflict, the index of its
++//! core and the number of cores; -1 and 0 without `--conflicts`), `m` (the member tried) and `strong` (whether strong
++//! branching chose it), `size`, `child` and `rest`, then the decision's step: `need`, `value` (the node's bound),
++//! `child_value`, `child_forced` and `child_k` (the child's bound, its forced members and the size of its conflict,
++//! null if it had no check) and `next_value` (the node's bound at its next step, without the member: `value` less the
++//! member's price), the member's `home` and `twins` (the node's candidates that share a maximal factor with it: `m·p`
++//! and `m·q` for primes `p` and `q`).
++
++use super::anatomy::cores;
++use super::images::{units_of, Game, Learned, Learner};
++use super::{beyond, Line, Options};
++use crate::counters::cpu_seconds;
++use crate::known::known_incumbent;
++use std::collections::HashMap;
++use std::sync::{Arc, Mutex, PoisonError};
++use taxman::bits::Bits;
++use taxman::board::Board;
++use taxman::engine::{self, Control, EngineConfig, Start};
++use taxman::game::Optimal;
++use taxman::matchbound::MatchGraph;
++use taxman::model::FrameSet;
++use taxman::search::{
++    payload_of, set_of_payload, MakeHook, Prepared, SearchSpace, StepEnd, StepHook, StepRecord, TaxSearcher, TaxUnit,
++};
++
++/// The options of `headroom`.
++#[derive(Clone, Default)]
++pub struct Params {
++    /// The levels of decisions to look at in hindsight (`--levels`), and the small decisions to change one at a time
++    /// (`--butterflies`).
++    pub levels: usize,
++    pub butterflies: usize,
++    /// At level 1, also try the members of the heaviest set's other minimal conflicts (`--conflicts`).
++    pub conflicts: bool,
++    /// At level 1, try only these members besides strong branching's (`--only`; empty: all).
++    pub only: Vec<u32>,
++}
++
++/// A decision's key: its node's promotions and its place among that node's decisions.
++type Key<const W: usize> = (Bits<W>, u32);
++
++/// A step not yet reached.
++const OPEN: u64 = u64::MAX;
++
++/// A level's decisions: at most this many, the biggest, each with a subtree of at least 1/SLOT_SHARE of the tree.
++const SLOTS: usize = 8;
++const SLOT_SHARE: u64 = 50;
++
++/// A butterfly's decision has a subtree of this many steps.
++const BUTTERFLY: (u64, u64) = (20, 300);
++
++/// One decision, as the hook saw it (see the module docs).
++#[derive(Clone, Copy)]
++struct Event<const W: usize> {
++    key: Key<W>,
++    depth: usize,
++    step: u64,
++    conflict: Bits<W>,
++    strong: u32,
++    chosen: u32,
++    /// The plan's member for the key, if it had one (`chosen` unless it was not in the conflict).
++    planned: Option<u32>,
++    need: u64,
++    value: Option<u64>,
++    child_value: Option<u64>,
++    /// The child's check: its forced members, and the size of its conflict.
++    child_forced: Option<u32>,
++    child_k: Option<u32>,
++    child_end: u64,
++    next_value: Option<u64>,
++    loop_end: u64,
++    /// The node's candidates, for the decision watched only.
++    cands: Option<Bits<W>>,
++}
++
++impl<const W: usize> Event<W> {
++    fn subtree(&self) -> Option<u64> {
++        (self.loop_end != OPEN).then(|| self.loop_end + 1 - self.step)
++    }
++
++    fn child(&self) -> Option<u64> {
++        (self.child_end != OPEN).then(|| self.child_end - self.step)
++    }
++
++    fn rest(&self) -> Option<u64> {
++        (self.loop_end != OPEN && self.child_end != OPEN).then(|| self.loop_end + 1 - self.child_end)
++    }
++}
++
++/// A node on the hook's copy of the searcher's path.
++struct Frame<const W: usize> {
++    promoted: Bits<W>,
++    decisions: u32,
++    /// The node's bound and heaviest set as last checked.
++    value: Option<u64>,
++    chosen: Option<Bits<W>>,
++    /// The decision whose next step at this node is still to come.
++    pending: Option<usize>,
++    /// The node's decisions, whose loop's end is still to come.
++    mine: Vec<usize>,
++}
++
++impl<const W: usize> Frame<W> {
++    fn new(promoted: Bits<W>, check: Option<(u64, Bits<W>)>) -> Frame<W> {
++        let (value, chosen) = (check.map(|c| c.0), check.map(|c| c.1));
++        Frame { promoted, decisions: 0, value, chosen, pending: None, mine: Vec::new() }
++    }
++}
++
++/// What every hook of a solve shares: the plan, whether its members may lie outside the decision's conflict, the
++/// decision to stop at the end of, the decision whose candidates, state and heaviest set to keep, and the unit's
++/// promotions.
++struct Shared<const W: usize> {
++    plan: HashMap<Key<W>, u32>,
++    any: bool,
++    stop_at: Option<Key<W>>,
++    watch: Option<Key<W>>,
++    unit: Bits<W>,
++}
++
++/// The state and the heaviest set of the decision watched.
++type Watched<const W: usize> = Option<(FrameSet<W>, Bits<W>)>;
++
++/// The hook of one searcher.
++struct Planner<const W: usize> {
++    shared: Arc<Shared<W>>,
++    control: Arc<Control>,
++    learner: Option<Learner<W>>,
++    out: Arc<Mutex<Vec<Event<W>>>>,
++    watched: Arc<Mutex<Watched<W>>>,
++    events: Vec<Event<W>>,
++    stack: Vec<Frame<W>>,
++    steps: u64,
++    /// The decision of the step in progress.
++    current: Option<usize>,
++}
++
++impl<const W: usize> Drop for Planner<W> {
++    fn drop(&mut self) {
++        self.out.lock().unwrap_or_else(PoisonError::into_inner).append(&mut self.events);
++    }
++}
++
++impl<const W: usize> StepHook<W> for Planner<W> {
++    fn step(&mut self, r: &StepRecord<W>, state: &FrameSet<W>, child: Option<&FrameSet<W>>) {
++        if let Some(learner) = &mut self.learner {
++            learner.step(r, state, child);
++        }
++        let s = self.steps;
++        self.steps += 1;
++        let Some(frame) = self.stack.last_mut() else { return };
++        if let Some(i) = frame.pending.take() {
++            let e = &mut self.events[i];
++            e.child_end = s;
++            e.next_value = r.node.map(|c| c.value);
++        }
++        if let Some(c) = r.node {
++            (frame.value, frame.chosen) = (Some(c.value), Some(c.chosen));
++        }
++        if let Some(i) = self.current.take() {
++            let e = &mut self.events[i];
++            assert_eq!(r.branch, Some(e.chosen), "the step branched on what the hook chose");
++            e.need = r.need;
++            e.value = frame.value;
++            e.child_value = r.child.map(|c| c.value);
++            e.child_forced = r.child.map(|c| c.forced.len());
++            e.child_k = r.child.and_then(|c| c.conflict).map(|k| k.len());
++            if self.shared.watch == Some(e.key) {
++                e.cands = Some(r.cands);
++                let chosen = frame.chosen.expect("a decision's node has a heaviest set");
++                *self.watched.lock().unwrap_or_else(PoisonError::into_inner) = Some((*state, chosen));
++            }
++            frame.pending = Some(i);
++            frame.mine.push(i);
++        }
++        match r.end {
++            StepEnd::Child => self.stack.push(Frame::new(r.promoted | r.added, r.child.map(|c| (c.value, c.chosen)))),
++            StepEnd::LoopEnd(_) => {
++                let frame = self.stack.pop().expect("a node");
++                for &i in &frame.mine {
++                    self.events[i].loop_end = s;
++                }
++                if let Some(stop) = self.shared.stop_at {
++                    if frame.mine.iter().any(|&i| self.events[i].key == stop) {
++                        self.control.stop();
++                    }
++                }
++            }
++            _ => {}
++        }
++    }
++
++    fn branch(&mut self, conflict: &Bits<W>, strong: u32) -> u32 {
++        let depth = self.stack.len() - 1;
++        let frame = self.stack.last_mut().expect("a node");
++        let key = (frame.promoted, frame.decisions);
++        frame.decisions += 1;
++        let planned = self.shared.plan.get(&key).copied();
++        let chosen = planned.filter(|&x| self.shared.any || conflict.contains(x)).unwrap_or(strong);
++        self.events.push(Event {
++            key,
++            depth,
++            step: self.steps,
++            conflict: *conflict,
++            strong,
++            chosen,
++            planned,
++            need: 0,
++            value: None,
++            child_value: None,
++            child_forced: None,
++            child_k: None,
++            child_end: OPEN,
++            next_value: None,
++            loop_end: OPEN,
++            cands: None,
++        });
++        self.current = Some(self.events.len() - 1);
++        chosen
++    }
++
++    fn propose(
++        &mut self,
++        state: &FrameSet<W>,
++        promoted: &Bits<W>,
++        cands: &Bits<W>,
++        chosen: &Bits<W>,
++        conflict: &Bits<W>,
++        more: &mut Vec<Bits<W>>,
++    ) {
++        if let Some(learner) = &mut self.learner {
++            learner.propose(state, promoted, cands, chosen, conflict, more);
++        }
++    }
++
++    fn learned(&mut self, set: &Bits<W>, conflict: &Bits<W>, nogood: Option<&Bits<W>>) {
++        if let Some(learner) = &mut self.learner {
++            learner.learned(set, conflict, nogood);
++        }
++    }
++}
++
++/// One solve: the engine's outcome and the decisions, in the order of their steps.
++struct Run<const W: usize> {
++    nodes: u64,
++    completed: bool,
++    best: u64,
++    cpu_s: f64,
++    events: Vec<Event<W>>,
++    watched: Watched<W>,
++}
++
++impl<const W: usize> Run<W> {
++    fn event(&self, key: &Key<W>) -> Option<&Event<W>> {
++        self.events.iter().find(|e| e.key == *key)
++    }
++
++    /// The decisions at steps in `from..to` that are in no other's subtree there, with their subtrees.
++    fn maximal_in(&self, from: u64, to: u64) -> Vec<(Key<W>, u64)> {
++        let mut out = Vec::new();
++        let mut covered = None;
++        for e in self.events.iter().filter(|e| e.step >= from && e.step < to) {
++            if covered.is_some_and(|end| e.step <= end) {
++                continue;
++            }
++            covered = Some(e.loop_end);
++            out.extend(e.subtree().map(|size| (e.key, size)));
++        }
++        out
++    }
++
++    fn missed(&self) -> usize {
++        self.events.iter().filter(|e| e.planned.is_some_and(|x| x != e.chosen)).count()
++    }
++
++    fn line(&self, n: u32, id: &str, run: &str, opt: u64) -> Line {
++        let mut line = Line::of(n);
++        line.text("id", id)
++            .text("run", run)
++            .field("nodes", self.nodes)
++            .field("completed", self.completed)
++            .field("best", self.best)
++            .field("opt", opt)
++            .seconds("cpu_s", self.cpu_s);
++        line
++    }
++}
++
++/// What a solve needs besides its plan.
++struct Unit<'a, const W: usize> {
++    p: &'a Prepared<W>,
++    graph: &'a MatchGraph,
++    game: Option<Arc<Game<W>>>,
++    unit: TaxUnit<W>,
++    start: (u64, &'a Bits<W>),
++    /// Whether a plan's member may lie outside its decision's conflict (`--conflicts`).
++    any: bool,
++}
++
++impl<const W: usize> Unit<'_, W> {
++    /// Solves the unit with `plan` on one thread, stopping at the end of `stop_at`'s subtree or after `limit` steps.
++    fn solve(&self, plan: HashMap<Key<W>, u32>, stop_at: Option<Key<W>>, limit: Option<u64>) -> Run<W> {
++        let shared = Arc::new(Shared { plan, any: self.any, stop_at, watch: stop_at, unit: self.unit.promoted });
++        let control = Control::new();
++        let out = Arc::new(Mutex::new(Vec::new()));
++        let watched = Arc::new(Mutex::new(None));
++        let learned = Arc::new(Mutex::new(Learned::default()));
++        let make = {
++            let (shared, control, out, watched, game) =
++                (Arc::clone(&shared), Arc::clone(&control), Arc::clone(&out), Arc::clone(&watched), self.game.clone());
++            move || {
++                let learner = game.as_ref().map(|g| Learner::new(Arc::clone(g), Arc::clone(&learned)));
++                let root = Frame::new(shared.unit, None);
++                Box::new(Planner {
++                    shared: Arc::clone(&shared),
++                    control: Arc::clone(&control),
++                    learner,
++                    out: Arc::clone(&out),
++                    watched: Arc::clone(&watched),
++                    events: Vec::new(),
++                    stack: vec![root],
++                    steps: 0,
++                    current: None,
++                }) as Box<dyn StepHook<W>>
++            }
++        };
++        let space = SearchSpace { hooks: Some(&make as &MakeHook<W>), ..SearchSpace::new(self.p, self.graph) };
++        let cfg = EngineConfig { threads: 1, node_limit: limit, control: Some(control), ..EngineConfig::default() };
++        let (best, start) = self.start;
++        let begin = Start::Fresh { units: vec![self.unit], best, payload: payload_of(start) };
++        let before = cpu_seconds();
++        let outcome = engine::run(&cfg, begin, b"headroom", |_| TaxSearcher::new(&space)).expect("the engine");
++        let cpu_s = before.zip(cpu_seconds()).map_or(0.0, |(a, b)| b - a);
++        let mut events = std::mem::take(&mut *out.lock().unwrap_or_else(PoisonError::into_inner));
++        events.sort_by_key(|e| e.step);
++        let watched = watched.lock().unwrap_or_else(PoisonError::into_inner).take();
++        Run {
++            nodes: outcome.stats.nodes,
++            completed: outcome.completed,
++            best: set_of_payload::<W>(&outcome.payload).sum(),
++            cpu_s,
++            events,
++            watched,
++        }
++    }
++}
++
++/// Whether `v` is prime.
++fn is_prime(v: u32) -> bool {
++    v >= 2 && (2..).take_while(|d| d * d <= v).all(|d| v % d != 0)
++}
++
++/// Whether `a` and `b` are twins: `m·p` and `m·q` for primes `p` and `q`.
++fn twins(a: u32, b: u32) -> bool {
++    let (mut x, mut y) = (a, b);
++    while y != 0 {
++        (x, y) = (y, x % y);
++    }
++    a != b && is_prime(a / x) && is_prime(b / x)
++}
++
++fn members<const W: usize>(set: &Bits<W>) -> String {
++    format!("[{}]", set.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","))
++}
++
++/// Whether `run` completed with P* as its best.
++fn sound<const W: usize>(id: &str, run: &Run<W>, what: &str, opt: u64) -> Result<(), String> {
++    if run.completed && run.best == opt {
++        Ok(())
++    } else {
++        Err(format!("{id} {what}: completed {} with best {}, against P* {opt}", run.completed, run.best))
++    }
++}
++
++/// The butterflies of one unit (see the module docs): `count` small decisions of the first fifth of `base`'s steps,
++/// evenly spaced, each changed alone to its conflict's first other member, and the unit solved to the end.
++fn butterflies<const W: usize>(
++    n: u32,
++    id: &str,
++    u: &Unit<'_, W>,
++    base: &Run<W>,
++    count: usize,
++    opt: u64,
++) -> Result<(), String> {
++    let small: Vec<&Event<W>> = base
++        .events
++        .iter()
++        .filter(|e| e.step * 5 < base.nodes)
++        .filter(|e| e.subtree().is_some_and(|size| (BUTTERFLY.0..=BUTTERFLY.1).contains(&size)))
++        .collect();
++    for i in 0..count.min(small.len()) {
++        let e = small[i * small.len() / count];
++        let Some(m) = e.conflict.iter().find(|&x| x != e.chosen) else { continue };
++        let run = u.solve(HashMap::from([(e.key, m)]), None, None);
++        sound(id, &run, "a butterfly", opt)?;
++        let size = run.event(&e.key).and_then(Event::subtree);
++        run.line(n, id, "butterfly", opt)
++            .field("step", e.step)
++            .field("d", e.depth)
++            .field("m", m)
++            .field("strong", e.chosen)
++            .maybe("before", e.subtree())
++            .maybe("after", size)
++            .field("base", base.nodes)
++            .print();
++    }
++    Ok(())
++}
++
++/// The hindsight on one unit (see the module docs).
++fn explore<const W: usize>(n: u32, id: &str, u: &Unit<'_, W>, params: &Params, opt: u64) -> Result<(), String> {
++    let (levels, flutters) = (params.levels, params.butterflies);
++    let sound = |run: &Run<W>, what: &str| sound(id, run, what, opt);
++    let base = u.solve(HashMap::new(), None, None);
++    sound(&base, "base")?;
++    base.line(n, id, "base", opt).field("decisions", base.events.len()).field("missed", base.missed()).print();
++    butterflies(n, id, u, &base, flutters, opt)?;
++    let mut plan: HashMap<Key<W>, u32> = HashMap::new();
++    let mut current = base;
++    let mut slots: Vec<Key<W>> = current.events.first().map(|e| e.key).into_iter().collect();
++    for level in 1..=levels {
++        for (slot, &key) in slots.iter().enumerate() {
++            let here = u.solve(plan.clone(), Some(key), None);
++            let Some(&e) = here.event(&key) else {
++                eprintln!("{id}: level {level} slot {slot}: the decision is not made with the plan so far");
++                continue;
++            };
++            let strong_size = e.subtree().expect("the subtree of a decision the solve stopped at");
++            let limit = Some(e.step + 3 * strong_size + 1000);
++            let mut best = (strong_size, e.chosen);
++            // With `--conflicts`, at level 1: the heaviest set's minimal conflicts, one after the other.
++            let cores = match (&here.watched, params.conflicts && level == 1) {
++                (Some((state, chosen)), true) => cores(&u.p.model, state, chosen),
++                _ => Vec::new(),
++            };
++            let mut options = cores.iter().fold(e.conflict, |all, k| all | *k);
++            if level == 1 && !params.only.is_empty() {
++                options = options.iter().filter(|m| *m == e.chosen || params.only.contains(m)).collect();
++            }
++            for m in options.iter() {
++                let run = if m == e.chosen {
++                    None
++                } else {
++                    let mut tried = plan.clone();
++                    tried.insert(key, m);
++                    Some(u.solve(tried, Some(key), limit))
++                };
++                let r = run.as_ref().unwrap_or(&here);
++                let Some(&a) = r.event(&key) else { continue };
++                let size = a.subtree();
++                if let Some(size) = size.filter(|&size| size < best.0) {
++                    best = (size, m);
++                }
++                let cands = a.cands.unwrap_or_default();
++                let near = cands.iter().filter(|&y| twins(m, y)).count();
++                r.line(n, id, "alt", opt)
++                    .field("level", level)
++                    .field("slot", slot)
++                    .field("np", key.0.len())
++                    .field("place", key.1)
++                    .field("add", members(&(key.0 - u.unit.promoted)))
++                    .field("d", a.depth)
++                    .field("k", members(&a.conflict))
++                    .field("in_k", a.conflict.contains(m))
++                    .field("core", cores.iter().position(|k| k.contains(m)).map_or(-1, |i| i as i64))
++                    .field("cores", cores.len())
++                    .field("m", m)
++                    .field("strong", m == a.strong)
++                    .maybe("size", size)
++                    .maybe("child", a.child())
++                    .maybe("rest", a.rest())
++                    .field("need", a.need)
++                    .maybe("value", a.value)
++                    .maybe("child_value", a.child_value)
++                    .maybe("child_forced", a.child_forced)
++                    .maybe("child_k", a.child_k)
++                    .maybe("next_value", a.next_value)
++                    .field("home", u.p.model.home(m))
++                    .field("twins", near)
++                    .print();
++            }
++            plan.insert(key, best.1);
++        }
++        current = u.solve(plan.clone(), None, None);
++        sound(&current, "with the plan")?;
++        let listed = slots
++            .iter()
++            .chain(plan.keys().filter(|k| !slots.contains(k)))
++            .map(|k| format!("[{},{},{}]", members(&(k.0 - u.unit.promoted)), k.1, plan[k]))
++            .collect::<Vec<_>>();
++        current
++            .line(n, id, "level", opt)
++            .field("level", level)
++            .field("decisions", current.events.len())
++            .field("missed", current.missed())
++            .list("plan", listed)
++            .print();
++        let mut next = Vec::new();
++        for key in &slots {
++            let Some(e) = current.event(key) else { continue };
++            let child_end = if e.child_end == OPEN { e.loop_end } else { e.child_end };
++            next.extend(current.maximal_in(e.step + 1, child_end));
++            next.extend(current.maximal_in(child_end, e.loop_end.saturating_add(1)));
++        }
++        next.retain(|&(_, size)| size * SLOT_SHARE >= current.nodes);
++        next.sort_by_key(|&(_, size)| std::cmp::Reverse(size));
++        next.truncate(SLOTS);
++        slots = next.into_iter().map(|(key, _)| key).collect();
++    }
++    Ok(())
++}
++
++/// `headroom` on game `n` at the set width `W`.
++fn play<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), String> {
++    let board = Board::<W>::for_n(n);
++    if board.is_trivial() {
++        return Ok(());
++    }
++    let p = board.prepare(o.tactics)?;
++    let Some((set, opt)) = known_incumbent(&board, &p, optimal)? else {
++        return Err(format!("n={n}: needs its known optimum (--known)"));
++    };
++    let graph = MatchGraph::new(&p.model, &p.root);
++    let game = o.images.learn.then(|| {
++        let mut game = Game::new(&p, false, false);
++        game.closure = o.images.closure;
++        Arc::new(game)
++    });
++    for (id, unit) in units_of(n, o, &p)? {
++        let any = o.headroom.conflicts;
++        let u = Unit { p: &p, graph: &graph, game: game.clone(), unit, start: (opt, &set), any };
++        explore(n, &id, &u, &o.headroom, opt)?;
++    }
++    Ok(())
++}
++
++/// `headroom` on each game of `o`.
++pub fn run(o: &Options, optimal: &Optimal) -> Result<(), String> {
++    if o.images.closure && !o.images.learn {
++        return Err("headroom: --closure needs --learn".to_owned());
++    }
++    for &n in &o.games {
++        taxman::with_width!(n, W => play::<W>(n, o, optimal), else Err(beyond(n)))?;
++    }
++    Ok(())
++}
+diff --git a/solver/frame/src/search/hooks.rs b/solver/frame/src/search/hooks.rs
+index 7554876..4b2c4cc 100644
+--- a/solver/frame/src/search/hooks.rs
++++ b/solver/frame/src/search/hooks.rs
+@@ -9,7 +9,8 @@
+ //! hook is told is a copy: it cannot change the step.  What it is asked ([`StepHook::branch`]) can change the tree,
+ //! never the answer: every completion of a node leaves out a member of the conflict of its heaviest set, so branching
+ //! on any member, and going on without it, explores every completion (solver/docs/design/search.md, "The default step",
+-//! the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may also
++//! the second of the facts its exactness rests on); so does branching on any candidate of the node, which a study of
++//! the choice of conflict may do.  The searcher checks that the answer is a candidate of the node.  A hook may also
+ //! narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric pairs
+ //! does: that can change the answer, and is for a study of a rule whose soundness it has argued.  It may propose sets
+ //! for the searcher to learn conflicts within, as nogoods ([`StepHook::propose`]): the searcher learns only what a peel
+@@ -32,9 +33,10 @@ pub trait StepHook<const W: usize> {
+     fn step(&mut self, record: &StepRecord<W>, state: &FrameSet<W>, child: Option<&FrameSet<W>>);
+ 
+     /// The member of `conflict` (a node's conflict of two or more candidates, none of them forced) that the node
+-    /// branches on, where strong branching chose `strong`.  It must be a member of `conflict`.  Asked only with
+-    /// the default branching, [`Gf2Branching::Exact`](super::Gf2Branching::Exact), when strong branching found no
+-    /// member forced.
++    /// branches on, where strong branching chose `strong`.  It must be a candidate of the node, and is usually a
++    /// member of `conflict`; a study of which conflict to branch on may answer with a member of another.  Asked only
++    /// with the default branching, [`Gf2Branching::Exact`](super::Gf2Branching::Exact), when strong branching found
++    /// no member forced.
+     fn branch(&mut self, conflict: &Bits<W>, strong: u32) -> u32 {
+         let _ = conflict;
+         strong
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index c9aa3a2..bd9c0f5 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -1128,15 +1128,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
+                     if !to_need && !kept && !(space.fix_forced && !forced.is_empty()) {
+                         g.keep_certified(best.1);
+                     }
+-                    // A study's hook may branch on another member (any member keeps the search exact; the level kept
+-                    // for this one is then not used: `Gf2Bound::remove_candidate` takes it only for this member).
++                    // A study's hook may branch on another member, or on any candidate of the node: a node that
++                    // promotes a candidate in its child and goes on without it explores every completion, so any
++                    // candidate keeps the search exact.  The level kept for this one is then not used:
++                    // `Gf2Bound::remove_candidate` takes it only for this member.
+                     #[cfg(not(feature = "studies"))]
+                     let chosen = best.1;
+                     #[cfg(feature = "studies")]
+                     let chosen = match &mut self.hook {
+                         Some((hook, _)) if forced.is_empty() && !to_need => {
+                             let x = hook.branch(&k, best.1);
+-                            assert!(k.contains(x), "a hook chose {x}, which is not in the conflict {k:?}");
++                            assert!(node.cands.contains(x), "a hook chose {x}, which is no candidate of the node");
+                             x
+                         }
+                         _ => best.1,
