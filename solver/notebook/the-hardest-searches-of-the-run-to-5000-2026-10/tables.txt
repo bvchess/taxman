@@ -213,6 +213,7 @@ Checks over 42 problems with a learning run: all agree: the same best and conclu
 | clippy-studies | 1 | 14 |
 | expand | 3 | 148 |
 | landscape | 1 | 37 |
+| quick-check | 1 | 1,106 |
 | run stopped by hand | 2 | 4,700 |
 | test-tune | 1 | 120 |
 | test-wall-images | 1 | 227 |
@@ -224,5 +225,5 @@ Checks over 42 problems with a learning run: all agree: the same best and conclu
 | runs: the default search, counted | 13 | 5,406 |
 | runs: the learning | 42 | 5,742 |
 
-In all 34,598 CPU seconds, 9.61 hours.
+In all 35,704 CPU seconds, 9.92 hours.
 

@@ -15,3 +15,4 @@
 {"label": "run stopped by hand: 4005-root learning, at about 4,600 CPU s (2.2 times the default search's 2,084 s) with no line written", "cpu_s": 4600.0, "wall_s": 0, "status": 143}
 {"label": "run stopped by hand: the pair of 4050-78, started and stopped within a minute", "cpu_s": 100.0, "wall_s": 0, "status": 143}
 {"label": "build: release taxman and tune, not metered (estimate: two jobs for the 156 s it took)", "cpu_s": 312.0, "wall_s": 156, "status": 0}
+{"label": "quick-check", "cpu_s": 1105.6, "wall_s": 544.5, "status": 0}
