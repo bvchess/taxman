@@ -409,9 +409,11 @@ impl Queue {
     }
 }
 
-/// A monotone priority queue of keys (Ahuja, Mehlhorn, Orlin and Tarjan's radix heap): every key pushed must be at
-/// least the last one popped, and a pop takes the least key.  A key sits in the bucket of the highest bit in which it
-/// differs from the last one popped (bucket 0 if it equals it); a pop with bucket 0 empty takes the least key of the
+/// A monotone priority queue of keys (Ahuja, Mehlhorn, Orlin and Tarjan's radix heap), each a distance above a code
+/// of [`Queue::BITS`] bits: every key pushed must be at least the last one popped, and a pop takes the least key.  A
+/// key sits in the bucket of the highest bit in which its distance differs from the last key popped's; bucket 0
+/// holds the keys of that same distance, in decreasing order, so that the keys of one distance are sorted once
+/// instead of spread over the buckets of their codes' bits.  A pop with bucket 0 empty takes the least key of the
 /// first bucket that is not, and spreads that bucket over the ones below.
 struct RadixHeap {
     buckets: Vec<Vec<u64>>,
@@ -435,11 +437,23 @@ impl RadixHeap {
         self.last = 0;
     }
 
+    /// The bucket of `key`.
+    #[inline]
+    fn bucket(&self, key: u64) -> usize {
+        (64 - ((key ^ self.last) >> Queue::BITS).leading_zeros()) as usize
+    }
+
     #[inline]
     fn push(&mut self, key: u64) {
         debug_assert!(key >= self.last, "a key below the last one popped");
-        let b = (64 - (key ^ self.last).leading_zeros()) as usize;
-        self.buckets[b].push(key);
+        let b = self.bucket(key);
+        if b == 0 {
+            let zero = &mut self.buckets[0];
+            let at = zero.partition_point(|&k| k > key);
+            zero.insert(at, key);
+        } else {
+            self.buckets[b].push(key);
+        }
         self.full |= 1 << b;
     }
 
@@ -454,12 +468,13 @@ impl RadixHeap {
             self.full &= !(1 << i);
             self.last = *keys.iter().min().expect("a bucket marked full");
             for &k in &keys {
-                let b = (64 - (k ^ self.last).leading_zeros()) as usize;
+                let b = self.bucket(k);
                 self.buckets[b].push(k);
                 self.full |= 1 << b;
             }
             keys.clear();
             self.buckets[i] = keys;
+            self.buckets[0].sort_unstable_by(|a, b| b.cmp(a));
         }
         let k = self.buckets[0].pop();
         if self.buckets[0].is_empty() {
@@ -2722,6 +2737,35 @@ mod tests {
             }
         }
         assert!(wrapped > 1000, "{wrapped} workspaces wrapped");
+    }
+
+    /// The radix heap takes its keys in a binary heap's order, on monotone runs of pushes and pops whose keys share
+    /// distances and codes (the bucket of a distance sorted once, keys of the same distance pushed into it after).
+    #[test]
+    fn the_radix_heap_pops_as_a_binary_heap() {
+        let mut rng = Rng(0x2AD1_C0DE_0000_0001);
+        for trial in 0..300 {
+            let (mut radix, mut heap) = (RadixHeap::new(), BinaryHeap::new());
+            let mut last = 0u64;
+            for _ in 0..200 {
+                if rng.chance(55) {
+                    // A key no lower than the last taken: often of its distance, the code above or the same.
+                    let distance = (last >> Queue::BITS) + [0, 0, 0, 1, 2, 64, 1 << 20][rng.below(7) as usize];
+                    let code = if distance == last >> Queue::BITS {
+                        (last & Queue::FREE) + rng.below(4)
+                    } else {
+                        rng.below(Queue::FREE + 1)
+                    };
+                    let key = distance << Queue::BITS | code.min(Queue::FREE);
+                    radix.push(key);
+                    heap.push(Reverse(key));
+                } else {
+                    let (a, b) = (radix.pop(), heap.pop().map(|Reverse(k)| k));
+                    assert_eq!(a, b, "trial {trial}");
+                    last = a.unwrap_or(last);
+                }
+            }
+        }
     }
 
     /// A random word that is not a linear function of the generator's state over GF(2).  The generator is xorshift, so

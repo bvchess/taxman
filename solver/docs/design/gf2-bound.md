@@ -73,7 +73,8 @@ misses are the *odd* cores of movers with three or more factors.
   campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
   the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
   least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of
-  packed (distance, vertex) keys, which come out in the binary heap's order.
+  packed (distance, vertex) keys, bucketed by distance and the keys of one distance sorted once, which come out in the
+  binary heap's order.
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection is
   lowest.  The search reads each such bound off the exchange graph where it certifies it, and solves it where not: in
   the order of the split's bounds, each solve stopped once it reaches both the lowest so far and the need, after a
