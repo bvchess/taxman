@@ -31,22 +31,16 @@ continuation chain stays at the level that the optimal scores reach below it.
 
 ## The theory: the upper half is a matching problem
 
-No number above n/2 divides another (2c > n), so the upper half of any
-game is swept only through the lower half.  That turns upper-half
-selection into a bipartite question.  Define the *maximal factors* of
-c as the divisors f with c/f prime — the divisors reached by deleting
-one prime from c.
+No number above n/2 divides another (2c > n), so the upper half of any game is swept only through the lower half.  That
+turns upper-half selection into a bipartite question.  Define the *maximal factors* of c as the divisors f with c/f
+prime — the divisors reached by deleting one prime from c.
 
-> **Playability.**  A set S of selections can all be played, in some
-> order, **iff** there is a matching assigning each member a distinct
-> maximal factor not in S such that the precedence relation "a before
-> b whenever a's assigned factor divides b, or a divides b" is
-> acyclic.  Any topological order of the precedence is a legal game.
+> **Playability.**  A set S of selections can all be played, in some order, **iff** there is a matching assigning each
+> member a distinct maximal factor not in S such that the precedence relation "a before b whenever a's assigned factor
+> divides b, or a divides b" is acyclic.  Any topological order of the precedence is a legal game.
 
-Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder
-one by the Franklín–Moniot lifting argument turned inward, whose
-payoff is that maximal factors are the only factor notion the whole
-project needs.
+Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder one by the Franklín–Moniot lifting argument
+turned inward, whose payoff is that maximal factors are the only factor notion the whole project needs.
 
 For the upper half alone, the lifting argument gives a hard ceiling: every legal game's upper picks use distinct maximal
 factors from outside, so **no legal game's upper half can outscore M\*, the maximum-weight matchable upper set**, a

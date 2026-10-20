@@ -4,14 +4,15 @@ The prover proves the frame solver's games optimal on the whole board, without t
 3](#3-the-proofs-of-optn) says how far its proofs reach.  It is a branch and bound over sets of moves, which takes the
 recorded score of game n as its target and proves that no set of moves beats it.  It shares no code with the frame
 solver or with the heuristics, so the frame solver's answers are checked without assuming anything of the frame model.
+The [glossary](../../docs/GLOSSARY.md) defines the project's words.
 
 Why that matters: the frame solver ([its README](../frame/README.md)) searches the promotions of the frame model, whose
 answer is opt(n) exactly when one open statement, U, holds at n.  U says that some optimal game plays every source with
 three or more prime factors that the frame solver's setup keeps ([THEORY.md, "The frame model: what is proven and what
 remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's other rules are
-proven; [DESIGN.md, section 2](../docs/DESIGN.md#what-optimal-means)).  Where the prover proves opt(n), U holds.
-The sources that setup keeps, U\*, are the heaviest playable set of sources wherever conjecture (★), THEORY.md's
-upper-half conjecture, holds ([THEORY.md](../../docs/THEORY.md#the-open-problem)).
+proven; [DESIGN.md, section 2](../docs/DESIGN.md#what-optimal-means)).  Where the prover proves opt(n), U holds.  The
+sources that setup keeps, U\*, are the heaviest playable set of sources wherever THEORY.md's conjecture (★) holds
+(Theorem 8; [THEORY.md](../../docs/THEORY.md#the-open-problem)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
 searches for adversarial instances.  It rests only on THEORY.md's theorems and on elementary bounds, and every exact
@@ -23,10 +24,9 @@ method in it is tested against brute force.  The theorems are these:
 * Theorem B, the bottom layers of every optimal set, in the proofs that start from its roles, which is the default of
   `exact`.
 
-Section 3 lists what each proof rests on.  The [glossary](../../docs/GLOSSARY.md) defines the
-project's words.  This document says *pick* for a number the player takes, the frame solver's and the wiki's *move*.
-It says *forced picks* for the numbers fixed in at a node; the frame solver's *forced member* is the same idea for its
-own search.  A set's *upper part* is its members above n/2, its sources.
+Section 3 lists what each proof rests on.  This document says *pick* for a number the player takes, the frame solver's
+and the wiki's *move*.  It says *forced picks* for the numbers fixed in at a node; the frame solver's *forced member* is
+the same idea for its own search.  A set's *upper part* is its members above n/2, its sources.
 
 What the prover established, assumption by assumption ([section 1](#1-what-existed-before) has the evidence before
 it):
@@ -389,7 +389,7 @@ Four files, each made on one thread of the laptop:
 |---|---|---|---|---|
 | `data/upper_2_1300.jsonl` | the table's games 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
 | `data/upper_1301_2175.jsonl` | the committed chain's games 1301–2175, 875 | 490 | 300 s | |
-| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games the committed chain now has, which [the gap past 2175](../notebook/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
+| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](../notebook/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
 | `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | the input of the certificates of 2176-3440 (`../tools/certify/`) |
 
 By band, the open members and the margins of each game (the share is of all members):
@@ -743,7 +743,7 @@ cargo build --release
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --fix-low 0 --checkpoints work/fresh --out OUT.jsonl
                                     # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl; without
-                                    # --fix-low 0 the searches start from the roles of Theorem B, the default now)
+                                    # --fix-low 0 the searches start from the roles of Theorem B, the default)
 ./target/release/exact --from 2 --to 1231 --parity 0 --fix-low 0 --threads 6 --seconds 540 --out OUT.jsonl
                                     # the Franklín–Moniot bound alone (data/exact_2_1231.jsonl, which left open
                                     # searches:)

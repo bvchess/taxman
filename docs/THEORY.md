@@ -11,8 +11,11 @@ the statements that rest on computation.
 
 Each statement, its standing, and the section that proves it or states it.  *Proved* means a proof below; *given* names
 the open statement a proof assumes; *certified* means checked game by game by a computation that proves it for that
-game; *measured* means observed on the data named, with no proof.  [results/README.md](../results/README.md) says how
-far the proofs of the committed chain reach.
+game; *measured* means observed on the data named, with no proof.  A few rows name their computation instead: *proved by
+computation* is a finite computation that is the proof, *verified by exhaustive search* and *checked by machine* a
+program's check of the cases given, and *false* a counterexample.  The [glossary](GLOSSARY.md) defines the project's
+words, and the section "Definitions" the notation.  [results/README.md](../results/README.md) says how far the proofs of
+the committed chain reach.
 
 | label | statement | standing | section |
 |---|---|---|---|

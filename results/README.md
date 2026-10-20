@@ -2,7 +2,9 @@
 
 This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
 the games past the chain, and the certificates of statement U.  This page says what each file holds, how far it reaches,
-how it was made and what supports its scores.
+how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; the frame model
+and statement U, on which the frame solver's scores rest, are in [THEORY.md, "The upper
+part"](../docs/THEORY.md#the-upper-part), and the prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The

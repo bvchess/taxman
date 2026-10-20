@@ -1,10 +1,11 @@
 # Running the solver, and the prover's proofs, on a cloud machine
 
-This page is the procedure for running the frame solver and the prover on an AWS machine, for Brian or an agent he has
-approved.  The target is a Graviton instance of 4 to 64 vCPUs (`c8g`, `c9g` or `c7g`) running Linux, for hours or days
-(section 1, "Instance"); the prover's proofs (section 8) need only 4 to 16.  The scripts take the thread count from the
-machine, and they also work on x86_64, on Amazon Linux 2023 and on Ubuntu.  [The frame solver's
-README](../frame/README.md) says what the solver is, and [the reference](REFERENCE.md) says how to read its output.
+This page is the procedure for running the frame solver and the prover on an AWS machine, for Brian, the project's
+owner, or an agent he has approved.  The target is a Graviton instance of 4 to 64 vCPUs (`c8g`, `c9g` or `c7g`) running
+Linux, for hours or days (section 1, "Instance"); the prover's proofs (section 8) need only 4 to 16.  The scripts take
+the thread count from the machine, and they also work on x86_64, on Amazon Linux 2023 and on Ubuntu.  [The frame
+solver's README](../frame/README.md) says what the solver is, and [the reference](REFERENCE.md) says how to read its
+output.
 
 Read the [rules for every launch](#rules-for-every-launch) before you start anything.  Section 1 chooses the machine and
 section 2 launches it.  Section 3 is what to run before a big job.  Sections 4 to 9 are the jobs, one each; each says

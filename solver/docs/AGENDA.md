@@ -22,20 +22,20 @@ the research agenda](../notebook/measurements-made-for-the-research-agenda-2026-
 reaches and what each score rests on.  Outside the project the record stops at n = 1000 (OEIS A019312's table is this
 project's), and the literature has bounds and one asymptotic result, not values of opt(n) (section 5).
 
-**The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
-matchable exactly when some payment set has one payment scheme, an odd number of them, or at least one ([THEORY.md,
-Theorem 12](../../docs/THEORY.md#one-count-three-conditions)).  The search's GF(2) bound is the frame model's form of
-the middle condition (Theorem 11).  It equals the parity bound at every root measured, and it is exact on movers with at
-most two live factors.  It is blind only to *odd cores*: self-covering sets with an odd number of schemes, which need
-movers with three or more distinct primes.  At the roots, what the bound gets wrong is which candidates, never how many,
-through odd cores of frames 1-3 whose size grows with n ([the anatomy of the
-gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md)).
+**The theory the search stands on.**  One count decides three conditions on a set of moves ([THEORY.md, Theorem
+12](../../docs/THEORY.md#one-count-three-conditions)): the set is playable exactly when some payment set has one payment
+scheme, independent over GF(2) in the parity matroids when some has an odd number of them, and matchable when some has
+at least one.  The search's GF(2) bound is the frame model's form of the middle condition (Theorem 11).  It equals the
+parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind only to *odd
+cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct primes.  At the
+roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3 whose size grows
+with n ([the anatomy of the gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md)).
 
 **What has been tried,** by family (the register has every row):
 
 * *Bounds on top of GF(2)*: cover cuts and the Lagrangian bound over the nogoods, rank cuts, the per-frame exact bound,
-  Lorea's matroid, the Lagrangian bound of the symmetric pairs, and the multi-field bound (A1).  Every share of the gap
-  that one closed falls with n, and in a search each was a constant factor ([the anatomy of the
+  Lorea's matroid, the Lagrangian bound of the symmetric pairs, and the multi-field bound (avenue A1, section 3).  Every
+  share of the gap that one closed falls with n, and in a search each was a constant factor ([the anatomy of the
   gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md), [the per-frame
   bound](../notebook/the-per-frame-bound-2026-10/README.md), [how far nogoods can
   go](../notebook/how-far-can-nogoods-go-2026-10/README.md)).  Flat-cycle cuts, measured at roots only, add little to

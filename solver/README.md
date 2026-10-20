@@ -10,14 +10,15 @@ their documents.
   without the frame model, from the theorems of [docs/THEORY.md](../docs/THEORY.md) alone.  Where it has proven a
   game, U holds there too.
 
-[results/README.md](../results/README.md#what-supports-the-scores) says how far the games of each program reach.
-Cargo commands run in `solver/frame` or `solver/noframe`; every other command in the docs runs from the top of the
-repository.
+[results/README.md](../results/README.md#what-supports-the-scores) says how far the games of each program reach.  Cargo
+commands run in `solver/frame` or `solver/noframe`; every other command in the docs runs from the top of the repository,
+and the paths below are from this directory.
 
 ## The documents
 
-Each document is of one kind: a *guide* to a task, a *reference* to look things up in, an *explanation* of how
-something works and why, the *record* of what was tried, or a *time-bound* page about the state of the work.
+Each document is of one kind, or, for the prover's README, two: a *guide* to a task, a *reference* to look things up in,
+an *explanation* of how something works and why, the *record* of what was tried, or a *time-bound* page about the state
+of the work.
 
 | document | kind | what it holds |
 |---|---|---|
