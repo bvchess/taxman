@@ -240,8 +240,10 @@ core-hours: 112 at 72, 164 at 180, 212 at 288, 242 at 360.  The 4400..4799 board
 every proof; 4800..5399 took 30% and gave none.  After the finder the smallest U − L past 4800 is 1,664 (medians 2,054
 at 4800..5199, rising to 7,631 at 8000..8191).  Climbs: 22 of 30 up and 2 of 8 down proved their board.  The bounds of
 all 3,792 boards are the first lines of `results/bounds.jsonl` (8.4 MB), both referees passing.  Stage 2 (4300..4999 for
-12 hours from stage 1's state, commit afe4513) and stage 3 (3900..4999, with floor steps) went on from it; their surveys
-are under Files.
+12 hours from stage 1's state, commit afe4513) and stage 3 went on from it; their surveys are under Files.  Stage 3,
+3900..4999 with floor steps, ran on one `c8g.16xlarge` on spot at commit 92c1e44, 2026-10-18 17:18-18:02 UTC, for about
+$0.49: floors lowered U on 1,269 boards, and 382 boards of 3900..4999 were proven, 39 of them newly; its bounds are in
+`results/bounds.jsonl` (ca357bf).
 
 ### Later (2026-10-18): floor-guided drilling
 
@@ -401,5 +403,7 @@ the events, `events.py`, are in [solver/tools/ledger/](../../../tools/ledger/REA
 * f775cc0, 26c5c71 (2026-10-18): the floor steps, the forecast and the order, then the boards exploring first and the
   checkpoint of a step that found a set; 6088c21, a climb's source is the board just outside the class; 93056fd, the
   scheduler before them.
+* 92c1e44 (2026-10-18): the merge of floor-guided drilling, the build of stage 3; ca357bf, stage 3's bounds of 3900..4999
+  in `results/bounds.jsonl`.
 * 8ce120a, 113f468 (2026-10-18): the store's format moved into the library, then `--use-prev` with the known games,
   their referees and the tests.
