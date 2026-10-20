@@ -1,100 +1,59 @@
 # Status
 
-Updated 2026-10-18.
+Updated 2026-10-19.
 
 What is in flight, what is paused, what is decided and what waits on a decision, as of the date above.  This page is
 the only place for the current state: it is rewritten, not appended to, whenever work lands or a decision is made
-(with the date), and it stays under 150 lines.  History goes to an entry of the [lab notebook](../notebook/README.md); the
-results and how they are proven are in the [README](../frame/README.md); the research avenues are in the [agenda](AGENDA.md).
-
-## The results
-
-* The committed chain, `results/strict.jsonl`, reaches 3914.  Games 2-2175 are proven on the whole board by the
-  prover; games 2176-3914 within the frame model, which is exact given statement U ([README, "What optimal
-  means"](../frame/README.md#what-optimal-means)).  `optimal.json` stays at 1300; nothing is published.
-* The run to the wall solved 1..3440 again with the fixed build (the counter that could wrap), with the committed
-  chain's scores and proofs in all, game for game; 3440 took 1.76 hours and 1.36 billion nodes (5.05 hours and 3.72
-  billion before).  Its games 3441-3914 are appended, both referees passing.
+(with the date), and it stays under 150 lines.  History goes to an entry of the [lab notebook](../notebook/README.md);
+how far the chain reaches and what proves each part are in [results/README.md](../../results/README.md); the research
+avenues and the projections are in the [agenda](AGENDA.md).
 
 ## The priority: a larger n
 
-Brian's priority (2026-10-16): a larger n, the end of the chain pushed further; certifying U past 2175 is not one for now.
+Brian's priority (2026-10-16): a larger n, the end of the chain pushed further; certifying U past 2175 is not one for
+now.  Nothing is published: `optimal.json` stays at 1300.
 
-The cost of a searched game grows tenfold for about every 1,040 in n, in patches: the valley 2576-2975 cost minutes,
-the last forty games of the run held three of its four dearest (3440 alone 5 hours on 64 threads).  At the run's own
-trend, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about:
+**The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes more
+than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game has
+been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint, or
+when its budget is spent ([RUNBOOK 5.3](RUNBOOK.md#53-what-needs-brians-approval-and-what-it-costs)).  The chain's
+launch is [RUNBOOK section 4](RUNBOOK.md#4-the-production-chain), the unattended run [section
+5](RUNBOOK.md#5-the-unattended-run-to-the-wall); each needs Brian's approval.
 
-| more machine time | n reached | cost |
-|---|---|---|
-| 1 day | 3,740 | $16 |
-| 3 days | 4,050 | $49 |
-| 10 days | 4,500 | $160 |
-| a month | 5,000 | $530 |
+The cost of a searched game grows tenfold for about every 1,040 in n, in patches; [the agenda, section
+2](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes that
+slope.  On 64 threads the search loses nothing to threads (3.4 thousand nodes a second a thread at 3441, the same on 16,
+32 and 64), so what remains is cheaper nodes and smaller trees.  Every avenue tried for the bound is closed but the
+certificates (A2, paused): [the agenda, section 3](AGENDA.md#3-ranked-avenues).
 
-A single run can fall well short of its projection (the last one projected 4,100 and reached 3440).  Every doubling of
-speed or of spending is worth about 310 in n; only a tighter bound in the search changes the tenfold per 1,040.  The
-chain's launch is [RUNBOOK section 4](RUNBOOK.md#4-the-production-chain); it needs Brian's approval.
+## Recently closed
 
-**The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes
-more than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game
-has been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint,
-or when its budget (about $50) is spent.  On 64 threads the search loses nothing to threads (3.5 thousand nodes a
-second a thread at 3441, the same on 16, 32 and 64), so what remains is cheaper nodes and smaller trees.
-
-What has been tried for the bound, and where it stands:
-
-* **A1, the multi-field bound in the search: closed.**  At the roots it closes 0.4-0.6 of the gap; in a branch and
-  bound its trees are smaller by a factor that falls as the gap grows ([E3 pilot](../notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md),
-  [R3 and the slope test](../notebook/r3-and-the-slope-test-u4-of-a1-2026-10/README.md)); at 840 sampled nodes (2026-10-18)
-  its full bound cuts none from a gap of 500, where the cost is, and every policy of computing it loses
-  ([the entry](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).
-* **Carrying a search's work to the next game: closed.**  The trees of neighbours share 0.15% of their steps
-  ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
-* **A3, splitting by the number of promotions: closed.**  At 936, 1215 and 2112 every node's heaviest completion
-  already has the root's size, so a bound by size equals the plain one ([A3's test](../notebook/split-by-the-number-of-promotions-a3s-test-2026-10/README.md)).
-* **The strong bound at the nodes: closed** (2026-10-18).  Refitted at a node it cuts 92% of the open nodes with a gap
-  under 50, 19% at 100-199 and none from 300, where the cost is, and costs 164-234 GF(2) bounds: every policy of
-  computing it loses ([the entry](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
-* **A5, decomposing across the frames: closed** (2026-10-18): the conflicts sit in frames 1-3 and the work is the
-  separator's, not the sides' ([the entry](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
-* **Flat-cycle cuts: closed** (2026-10-18).  On the matching LP they add 0.12 of the gap; it does not beat A1, and the
-  rest is not cycle-shaped ([the entry](../notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md)).
-* **Why the trees are big** (2026-10-18): the gap is paid in exclusions priced at a tenth of the member left out (the
-  bound substitutes a near-equal number), 5-8 a path ([the entry](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)); the prime swaps behind them are no symmetries of their nodes but the root's pairs, so no pruning ([local exchanges](../notebook/local-prime-exchanges-at-the-nodes-2026-10/README.md)); and the trees are the bound's error, not near-optimal completions: four of five units, hard and easy, hold none within 100 of the optimum ([near completions](../notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md)).
-
-**The landscape past the chain** (2026-10-17): the standalone bounds of every game of 3441-8191 are measured
-([solver/notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).  None meets, the smallest standalone gap is 1,196
-(4176-4179) and the median rises from about 1,800 at 3441-4440 to 4,600-8,300 from 5441, so with today's heuristic no
-game past 3440 is within a few minutes of one-thread search ([the entry](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)).
-
-**Finders for lower bounds** (2026-10-17): a lower bound needs only a legal game, so a search that is not sound may
-find it.  Large neighbourhood search from the start incumbent (keep a random 70-90% of its promotions, search the rest
-exactly as a unit, repeat) finds the optimum of 64% of the games of 2176-3440 in 5 CPU seconds of one thread (the sound
-search for the same time: 21%), a mean shortfall of 28 against 297; the sound search seeded with its game takes 0.44 of
-the nodes and 0.48 of the CPU, finder included, of the search from today's start.  It is in the ledger (below), not in
-the solver (`wall finders` and `wall sound` measured it and are removed; [the entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
-
-**Floors for upper bounds** (2026-10-18): a search from a floor F, an incumbent worth F with no set
-(`search::search_above`, THEORY.md Lemma F), proves "nothing weighs more than F" for an F above the optimum far more
-cheaply than the proof: on 14 games of 2265-3259, proving down a quarter, a half and three quarters of the gap took a
-median 1/20,000, 1/740 and 1/26 of the full proof's nodes, the log of the nodes linear in the distance (a decade per
-147; r² 0.996).  It is in the ledger (`wall target` measured it and is removed; [the
-entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
+* **The run to the wall** (2026-10-18): 1..3440 solved again with the fixed build (the counter that could wrap), with
+  the committed chain's scores and proofs, game for game, and 3441-3914 appended, both referees passing ([the
+  entry](../notebook/the-run-to-the-wall-2026-10/README.md)).
+* **The bound's avenues** (2026-10-16 to 18): A1, A3 and A5, the Lagrangian bound over the nogoods refitted at a node,
+  and flat-cycle cuts; why the trees are big ([the agenda, sections 2 and 3](AGENDA.md#3-ranked-avenues)).
+* **The landscape past the chain** (2026-10-17): no game of 3441-8191 meets its standalone bounds, and the smallest
+  standalone gap is 1,196 ([the
+  entry](../notebook/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md), for $1.10).
+* **Finders for lower bounds** (2026-10-17): large neighbourhood search from the start incumbent finds opt(n) in 64% of
+  253 games of 2176-3440 in 5 CPU seconds of one thread; it is in the ledger, not in the solver ([the
+  entry](../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
+* **Floors for upper bounds** (2026-10-18): a search under a floor proves "nothing weighs more than F" far more cheaply
+  than the proof (a decade of nodes per 147 points); it is in the ledger ([the
+  entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
 
 ## Decided
 
-* **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16).
-  At 64 threads a window of 16 made the games past 2225 20 to 32% slower than 1, and 4 was the best measured
-  ([round B](../notebook/round-b-the-chain-on-many-threads-2026-10/README.md); [scaling to 192
-  threads](../notebook/scaling-to-192-threads-2026-10/README.md)).  It changes how threads are shared, not a score or proof.
-* **The forcing window is `all`** (2026-10-16; it was 80).  The tuning campaign (one `c8g.16xlarge`, 3.8 hours, about
-  $2.50) measured it on subtrees of 3300, 3425, 3440 and 3441 and six whole games on one thread, and on complete
-  proofs of seven games (3179-3395, 3300) on 64 threads: 0.60-0.63 of the CPU and 0.41-0.43 of the nodes on the
-  subtrees, 0.84 of the time and 0.61 of the nodes on the proofs (by the rule above, about 80 in n), and no problem
-  more than 4% slower.  A node costs 1.4 times more and the trees fall by more.  The run to the wall has this default
-  and no other change: `strong_limit=4` and `more_forced=off` are within a few percent of it, shorter nogood periods
-  and the Lagrangian bound gain nothing, and cheaper branching at depth is 4 to 6 times worse
-  ([the campaign](../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
+* **The window is 4** (2026-10-17), the default of `taxman solve --window` (it was 1) and of `chain.sh` (it was 16): at
+  64 threads a window of 16 made the games past 2225 20 to 32% slower than 1, and 4 was the best measured; it changes
+  how threads are shared, not a score or a proof ([round
+  B](../notebook/round-b-the-chain-on-many-threads-2026-10/README.md); [scaling to 192
+  threads](../notebook/scaling-to-192-threads-2026-10/README.md)).
+* **The forcing window is `all`** (2026-10-16; it was 80): on the proofs of seven games at the end of the chain on 64
+  threads it took 0.84 of the time and 0.61 of the nodes, each game faster, and on one thread no problem of the suite
+  was more than 4% slower ([the tuning
+  campaign](../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
 
 ## Paused
 
@@ -136,7 +95,7 @@ entry](../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor
   climb** (a board next to a proven one is searched first, from its game), **the finder** (large neighbourhood search
   for a lower bound, replayed by the referee) and **the bounds store** (`results/bounds.jsonl`, append-only; `ledger
   export`, `run --bounds`, `verify-bounds` and `solver/tools/check_bounds.py`; [results/README](../../results/README.md#boundsjsonl)).
-  On 2176..3440 with the truth hidden every proven board is at the optimum: 916 of 1,265 in 48 core-hours without the
+  On 2176..3440 with the truth hidden every proven board is at its committed score: 916 of 1,265 in 48 core-hours without the
   climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
 * **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
   proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
