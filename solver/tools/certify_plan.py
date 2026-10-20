@@ -10,7 +10,9 @@ This script makes the campaign's work list and the cost estimate that the owner 
 Inputs, all JSON lines (the flags that take several files read them in order):
   --results   the chain's results files (results/strict.jsonl format).  Completed lines only; a later line for a
               board replaces an earlier one.  Fields used: n, score, proof (exhausted, cap, same_search, prime_formula,
-              trivial), nodes, threads, seconds.search, and same_search.n (the game whose search a repeat repeats).
+              trivial, known), nodes, threads, seconds.search, same_search.n (the game whose search a repeat repeats)
+              and known.source (where a known game rests: bounds, the bounds store; strict, the committed chain; or
+              optimal, optimal.json).
   --upper     the prover's barred bounds.  Fields: n, score, relation (prime; chain, which is a score at its ceiling
               n + score(n-1); none), needs (1 if the game needs a certificate), open (where it needs one: a list of
               [u, omega, margin], so |O| is its length).  A board in two files must have equal lines, but for the
@@ -53,6 +55,12 @@ Per game, for every board of the range (plan.jsonl has one line each, null where
   expected_thread_hours_recorded   the same from the recorded seconds x threads (the upper end, which ignores the
               window; a gap-model game as above)
 
+A known game (proof known) rests on its source, known.source, not on a search of its own: the chain took its game from
+the source (nodes 0), or ran a search that the bounds store's upper bound stopped before it finished.  No search of its
+problem was exhausted, so there is nothing to price it by.  It is planned as any game is: relation, needs, open,
+rejected and share come from the other files, and it costs 0 where it needs no certificate or shares one.  One that
+needs a certificate and shares none stops the plan with an error that names the board, since a cost would be a guess.
+
 The lists (lists/*.txt in --out-dir; one n a line after the header lines that start with `# `).  A group is a
 game that has no share (its head) with the games that share with it, directly or through a chain of shares: it goes
 into one list, in increasing n, since a share is settled only from a certificate in the same output file.  pilot.txt
@@ -68,7 +76,8 @@ totals, the total from recorded seconds), and the games of unknown cost and with
 usage: certify_plan.py --results FILE... --upper FILE... --era A-B:HOURS [--era ...] [--problems FILE...]
            [--gaps FILE...] [--from A] [--to B] [--machine-threads T] [--overhead X] [--price-on-demand D]
            [--price-spot S] [--lists K] [--out-dir DIR]
-The exit status is 1 if an input is wrong (the message names the file and line, or the board).
+The exit status is 1 if an input is wrong (the message names the file and line, or the board), or if a known game
+needs a certificate and shares none (the message names the board).
 """
 import argparse
 import json
@@ -95,7 +104,7 @@ SPOTLIGHT = (3424, 3425, 3440)  # boards the report names
 # The cost model of the research agenda (solver/docs/AGENDA.md, "The diagnosis of the wall"): log10 nodes = a + b G /
 # n^p, plus the window.
 GAP_INTERCEPT, GAP_SLOPE, GAP_POWER, WINDOW_DECADES = 2.30, 0.0479, 0.3, 0.06
-PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search"}
+PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search", "known"}
 RELATIONS = {"prime": "prime", "chain": "ceiling", "none": "none"}  # upper's word -> the plan's
 INT = int
 NUMBER = (int, float)
@@ -117,6 +126,7 @@ class Result(NamedTuple):
     threads: int
     seconds: float  # seconds.search
     repeat_of: Optional[int]  # same_search.n of a repeat
+    known_source: Optional[str] = None  # known.source of a known game: bounds, strict or optimal
 
 
 class Era(NamedTuple):
@@ -201,6 +211,9 @@ def load_results(paths):
                 repeat_of = need(need(row, "same_search", dict, where), "n", INT, f"{where}, same_search", low=1)
                 if repeat_of >= n:
                     raise PlanError(f"{where}: repeats the search of board {repeat_of}, which is not below it")
+            known_source = None
+            if proof == "known":
+                known_source = need(need(row, "known", dict, where), "source", str, f"{where}, known")
             games[n] = Result(
                 n,
                 need(row, "score", INT, where),
@@ -209,6 +222,7 @@ def load_results(paths):
                 need(row, "threads", INT, where, low=1),
                 need(need(row, "seconds", dict, where), "search", NUMBER, f"{where}, seconds", low=0),
                 repeat_of,
+                known_source,
             )
     return games
 
@@ -461,6 +475,11 @@ def game_record(n, lo, hi, upper, results, problems, gaps, eras, overhead):
         unknown(f"the results have no completed line for board {n}")
     elif r.proof == "exhausted":
         priced("chain", r.nodes, r.seconds, r.threads)
+    elif r.proof == "known":
+        raise PlanError(
+            f"board {n} needs a certificate, but its proof is known (from {r.known_source}), not a search of its own: "
+            "there is no search to price it by"
+        )
     elif r.proof != "same_search":
         unknown(f"its proof is {r.proof}, which has no search to price")
     elif source is None:

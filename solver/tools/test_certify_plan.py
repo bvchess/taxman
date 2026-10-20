@@ -29,6 +29,14 @@ def completed(n, proof="exhausted", nodes=1000, threads=8, search=10.0, repeat_o
     return row
 
 
+def known(n, source="bounds", nodes=0):
+    """A completed results line of a known game: taken from a source with no search (nodes 0), or found by a search
+    that the bounds store's upper bound stopped (the nodes of that search)."""
+    row = completed(n, proof="known", nodes=nodes, search=0.0)
+    row["known"] = {"source": source}
+    return row
+
+
 def upper(n, needs=1, relation=None, members=3, secs=1.0):
     """A line of the barred bounds: a game that needs a certificate has relation none and its open members."""
     row = {"n": n, "score": 10 * n, "relation": relation or ("none" if needs else "chain"), "needs": int(needs),
@@ -250,6 +258,35 @@ class Bases(Case):
                              ("none", 0.0, 0.0))
             self.assertEqual((g["proof"], g["open"], g["rejected"], g["share_refused"]), (None,) * 4)
         self.assertEqual(games[LO]["relation"], "ceiling")
+
+    def test_a_known_game_that_needs_nothing_costs_nothing_and_counts_the_nodes_it_has(self):
+        # LO + 1 was taken from a source; LO + 2 was found by a search that the store's bound stopped.
+        results = [completed(LO, nodes=1000), known(LO + 1), known(LO + 2, nodes=500)]
+        uppers = [upper(n, needs=0) for n in range(LO, LO + 3)]
+        plan = self.plan(results, uppers)
+        self.assertEqual((plan.eras[0].games, plan.eras[0].nodes), (3, 1500))
+        for g in plan.games[1:]:
+            self.assertEqual((g["basis"], g["expected_thread_hours"], g["expected_thread_hours_recorded"]),
+                             ("none", 0.0, 0.0))
+
+    def test_a_known_game_that_shares_costs_nothing(self):
+        results = [completed(LO, nodes=1000), known(LO + 1)]
+        problems = [problem(LO), problem(LO + 1, same_as=LO)]
+        g = self.games(results, [upper(LO), upper(LO + 1)], problems=problems)[LO + 1]
+        self.assertEqual((g["basis"], g["proof"], g["share"]), ("shared", "known", LO))
+        self.assertEqual((g["expected_thread_hours"], g["expected_thread_hours_recorded"]), (0.0, 0.0))
+        self.assertEqual((g["source"], g["cost_nodes"]), (None, None))
+
+    def test_a_known_game_that_needs_a_certificate_and_shares_none_is_an_error(self):
+        results = [completed(LO, nodes=1000), known(LO + 1, source="strict"), known(LO + 2, nodes=500)]
+        uppers = [upper(LO), upper(LO + 1), upper(LO + 2, needs=0)]
+        refused = [problem(LO), problem(LO + 1, same_as=LO, worth=99)]  # its worth differs, so the share is refused
+        for problems in (None, refused):
+            code, out, err = self.run_main(results, uppers, problems=problems)
+            self.assertEqual((code, out), (1, ""))
+            self.assertIn(f"certify_plan.py: error: board {LO + 1} needs a certificate", err)
+            self.assertIn("proof is known (from strict)", err)
+            self.assertNotIn(f"board {LO + 2}", err)
 
     def test_relation_words(self):
         bounds = [upper(LO, needs=0, relation="prime"), upper(LO + 1, needs=0, relation="chain"), upper(LO + 2)]
@@ -551,6 +588,10 @@ class Inputs(Case):
             (dict(completed(LO), proof="mystery"), "unknown proof"),
             (dict(completed(LO, proof="same_search"), same_search={"n": LO + 5}), "not below"),
             (dict(completed(LO), seconds={}), "no field 'search'"),
+            (completed(LO, proof="known"), "no field 'known'"),
+            (dict(completed(LO, proof="known"), known="bounds"), "'known' is 'bounds', not an object"),
+            (dict(completed(LO, proof="known"), known={}), "no field 'source'"),
+            (dict(completed(LO, proof="known"), known={"source": 3}), "'source' is 3, not a string"),
         ]:
             code, _out, err = self.run_main([row], [upper(LO, needs=0)])
             self.assertEqual(code, 1, text)
