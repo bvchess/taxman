@@ -26,7 +26,7 @@
 //! cargo run --profile test --example wall --features studies -- exchanges --known FILE (--suite FILE --ids ID[,ID...]
 //!     | --root) [--prune] [--below D] [--sample K] [--nodes K] [--tactic NAME=VALUE]... N|A-B...
 //! cargo run --profile test --example wall --features studies -- near --known FILE (--suite FILE --ids ID[,ID...]
-//!     | --root) --within D [--nodes K] [--probes K [--frontier G] [--seed S]] [--sets DIR] [--tactic NAME=VALUE]... N
+//!     | --root) --within D [--nodes K] [--probes K [--probe-gap G] [--seed S]] [--sets DIR] [--tactic NAME=VALUE]... N
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -297,7 +297,7 @@ const OPTIONS: [(&str, &[&str]); 56] = [
     ("--sample", &["exchanges"]),
     ("--within", &["near"]),
     ("--probes", &["near"]),
-    ("--frontier", &["near"]),
+    ("--probe-gap", &["near"]),
     ("--sets", &["near"]),
     ("--trace", &["anatomy"]),
     ("--prefer", &["anatomy"]),
@@ -549,7 +549,7 @@ fn parse() -> Result<Options, String> {
             "--sample" => o.exchanges.sample = number("--sample", value("--sample")?)?,
             "--within" => o.near.within = number("--within", value("--within")?)?,
             "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
-            "--frontier" => o.near.frontier = number("--frontier", value("--frontier")?)?,
+            "--probe-gap" => o.near.probe_gap = number("--probe-gap", value("--probe-gap")?)?,
             "--sets" => o.near.sets = Some(value("--sets")?.into()),
             _ => texts.push(arg.clone()),
         }

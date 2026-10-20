@@ -217,7 +217,7 @@ That is a property of the bound's heaviest sets along the paths, not of the root
   --profile test --example wall --features studies`:
   `target/debug/examples/wall near --suite ../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl
   --known ../../results/strict.jsonl --ids ID --within D [--nodes K] --sets DIR N` for a unit, and `--root` in place
-  of `--suite` and `--ids` for a whole game; `--probes K --frontier G` for the estimates; `wall nodes --known
+  of `--suite` and `--ids` for a whole game; `--probes K --probe-gap G` for the estimates; `wall nodes --known
   ../../results/strict.jsonl --mode opt --nodes 5000000 N` for the proofs.  The units were counted within 91 and 41
   (3300-14, `--nodes 6000000` and `3000000`), 100 (3441-1262, 3425-149 and 3425-150) and 0 and 200 (3441-5459), the
   games within 30.  The lines of 3441-5459 and the estimates were copied from the terminal; the two marked `build`
