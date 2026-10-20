@@ -7,11 +7,11 @@ quickly but don't guarantee optimal results.
 
 ## The game
 
-Taxman is played on the numbers 1 to n, the *board*; the numbers still in play are the *pot*.  The player takes a
-number that still has a proper divisor in the pot and scores it.  The taxman then takes every divisor of that number
-still in the pot.  The game ends when no number left in the pot has a proper divisor in it, and the taxman takes what
-remains.  An *optimal game* scores the most.  For game 4, the player takes 3 (the taxman takes 1), then 4 (the taxman
-takes 2), and scores 7, the best possible.
+Taxman is played on the numbers 1 to n, the *board*; the numbers still in play are the *pot*.  The player takes a number
+that still has a proper divisor in the pot and scores it.  The taxman then takes every divisor of that number still in
+the pot.  The game ends when no number left in the pot has a proper divisor in it, and the taxman takes what remains.
+An *optimal game* scores the most, and its score is opt(n).  For game 4, the player takes 3 (the taxman takes 1), then 4
+(the taxman takes 2), and scores 7, the best possible: opt(4) = 7.
 
 The best scores for n = 1, 2, 3, ... are the Taxman sequence, [A019312](https://oeis.org/A019312) in the OEIS.  Finding
 an optimal game can turn into a search over an enormous tree of possibilities.  The [project
@@ -20,15 +20,16 @@ wiki](https://github.com/bvchess/taxman/wiki) explains the game and the algorith
 
 ## The results
 
-The file `results/strict.jsonl` holds a chain of optimal games for every n from 1 to its end.  Each game is built
-from the one before, and each is proven with nothing assumed beyond the frame model.  The games up to a smaller n are
-also proven on the whole board by a second program that shares no code with the first.  The rest are proven within
-the *frame model*, a decomposition of the game that is exact given one open statement about it, called U.
-[results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and what
-supports every score.
+The file `results/strict.jsonl` holds a chain of optimal games, one for every n from 1 up to the chain's last game.
+Each game is built from the one before: game n starts from the optimal game of n − 1.  Each is proven within the *frame
+model*, a decomposition of the game that is exact given one open statement about which numbers an optimal game plays,
+called [U](docs/THEORY.md#the-upper-part).  The proofs assume nothing beyond the model.  The first games of the chain,
+up to a smaller n, are also proven on the whole board by a second program that shares no code with the one that found
+them.  [results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and
+what supports every score.
 
-For a larger set of games past the end of the chain, the [results](results/README.md) directory also keeps an upper
-bound on opt(n) along with the best score we've found so far.
+For the games past the end of the chain, the [results](results/README.md) directory also keeps an upper bound on
+opt(n) and the best score found.
 
 ## The programs
 

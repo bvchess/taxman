@@ -154,8 +154,9 @@ def _playable_order(
 
     The fast path's acceptances are verified acyclic before being
     committed; the complete tier accepts peel's assignment
-    unconditionally, which is sound by the schedulability THEOREM (see
-    THEORY.md: peel-produced assignments are provably acyclic).
+    unconditionally, which is sound by Theorem 2, schedulability
+    (THEORY.md, section "The decision procedure": peel-produced
+    assignments are provably acyclic).
     Either way the final matching is acyclic, and a single
     Kahn's-algorithm pass orders every element.  A leftover cycle is
     impossible unless there is a bug, so this raises rather than
@@ -183,7 +184,8 @@ def _playable_order(
     if len(order) != len(selected):
         raise RuntimeError(
             "schedulability theorem violated - impossible unless there "
-            "is a bug (see THEORY.md, 'The schedulability theorem')"
+            "is a bug (see THEORY.md, section 'The decision procedure', "
+            "Theorem 2)"
         )
     return order
 

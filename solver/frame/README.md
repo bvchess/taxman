@@ -27,17 +27,20 @@ optimal game 3, 4: the taxman takes 1, then 2, and the player scores 7.  The val
 
 The solver's results are optimal games, each a sequence of moves with its score.  The file `results/strict.jsonl` holds
 a chain of them for every n from 1 to its end, each built from the one before (section 3, "A chain from n = 1"); this
-page calls it the *committed chain*.  The code can attempt any n up to 8191, the largest board its set widths cover.
+page calls it the *committed chain*.  The code can attempt any n up to 8191, the largest board that its bitsets of game
+numbers can hold ([DESIGN.md, section 3](../docs/DESIGN.md#3-architecture), "Width dispatch").
 
 [results/README.md](../../results/README.md) gives how far the chain reaches and how each game is proven: within the
 frame model, given statement U (below, "What optimal means"), and up to a smaller n also on the whole board, by the
 prover.
 
-*What a game costs.*  Finding an optimal game can turn into a search over an enormous tree, and its cost grows with n,
-in waves.  The chain from 1 to 2175 took 27 minutes on eight threads of a laptop, and over those games the cost has
-waves but no growth that a fit resolves ([the GF(2) bound in the
-search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md)).  Past 2175 the cost grows again: the search
-times of the games 2176 to 3440 rise tenfold for about every 1,040 in n, with about a decade of scatter ([the chain to
+*What a game costs.*  Finding an optimal game can turn into a search over an enormous tree, and its cost comes in waves
+of cheap and dear games.  How fast it grows with n depends on the range.  The first 2175 games of the committed chain
+took 27 minutes on eight threads of a laptop; the chain goes on past them ([how far it
+reaches](../../results/README.md#the-files)).  Over the games 1301 to 2175 the waves show no growth that a fit resolves
+(the notebook's study of [the GF(2) bound](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), which lets the
+search cut branches).  Past 2175 a fit does find growth: the search times of the games 2176 to 3440 rise tenfold for
+about every 1,040 in n, with about a decade of scatter ([the chain to
 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
 
 ### How the solver sees the game (the frame model)
@@ -47,14 +50,15 @@ settles what it can before it searches, and then searches only over which spare 
 decomposition is the *frame model*.
 
 1. **Sources and factors.**  Every number above n/2 divides nothing else on the board, so it can only be a move,
-   never tax.  It is a *source*, played unless setup finds it impossible (step 4).  Every other number is a *factor*:
-   tax for a larger number, and sometimes a move itself.
-2. **Maximal factors are enough.**  A move m is paid for by one of its *maximal factors* m/p, for a prime p that
-   divides m, and a factor pays for one move.  Taking m removes every divisor of m still in the pot, but the model
-   needs only the maximal ones.  If some proper divisor d of m is still in the pot, so is every f with d | f | m other
-   than m, since whatever removed f would have removed d too; and one of those f is a maximal factor of m.  So m can be
-   played exactly when one of its maximal factors is still in the pot.  This is the *lifting* argument of
-   [src/numtheory.rs](src/numtheory.rs) and [THEORY.md](../../docs/THEORY.md), Theorem 1.
+   never *tax*, a divisor that the taxman takes with a move.  It is a *source*, played unless setup finds it
+   impossible (step 4).  Every other number is a *factor*: tax for a larger number, and sometimes a move itself.
+2. **Maximal factors are enough.**  A move m is *paid for* by one of its *maximal factors* m/p, for a prime p that
+   divides m: that factor is among the divisors the taxman takes with m, and a factor pays for one move.  Taking m
+   removes every divisor of m still in the pot, but the model needs only the maximal ones.  If some proper divisor d of
+   m is still in the pot, so is every f with d | f | m other than m, since whatever removed f would have removed d too;
+   and one of those f is a maximal factor of m.  So m can be played exactly when one of its maximal factors is still in
+   the pot.  This is the *lifting* argument of [src/numtheory.rs](src/numtheory.rs) and
+   [THEORY.md](../../docs/THEORY.md), Theorem 1.
 3. **Frames.**  Sources that share a factor are in one *frame*, with all the factors they can be paid with.  Frame X
    is *in front of* frame Y, and Y is *behind* X, when a number of Y has a maximal factor in X: Y's numbers are
    multiples of X's.  The frames in front are played first.  Each frame is a small game, *Taxman Mini*: a set of
