@@ -61,8 +61,8 @@ to its glossary entry.
    [THEORY.md](../../docs/THEORY.md) proves as Theorem 1.
 3. **Frames.**  Sources that share a factor form a [frame](../../docs/GLOSSARY.md#the-frame-model), with the factors
    that can pay for them.  Frame X is [in front of](../../docs/GLOSSARY.md#the-frame-model) frame Y, and Y
-   [behind](../../docs/GLOSSARY.md#the-frame-model) X, when Y's numbers are multiples of X's; the frames in front are
-   played first.  Each frame plays a small game, [Taxman Mini](../../docs/GLOSSARY.md#the-frame-model), and is
+   [behind](../../docs/GLOSSARY.md#the-frame-model) X, when a number of Y has a maximal factor in X; the frames in front
+   are played first.  Each frame plays a small game, [Taxman Mini](../../docs/GLOSSARY.md#the-frame-model), and is
    [winnable](../../docs/GLOSSARY.md#the-frame-model) when some order takes all its moves.
 4. **Setup.**  Before the search, setup simplifies each frame.  It drops the [impossible
    sources](../../docs/GLOSSARY.md#the-frame-model), settles the [mandatory
@@ -77,7 +77,7 @@ to its glossary entry.
 6. **Promotions.**  What a game can still choose is which spare factors to
    [promote](../../docs/GLOSSARY.md#the-frame-model): to play as moves instead of leaving them as tax.  A promotion
    makes a factor of frame h a move of frame h − 1, one frame forward, and both frames must stay winnable.  Nothing
-   further forward is needed, which [THEORY.md](../../docs/theory/frame-model.md)
+   further forward is needed, which [docs/theory/frame-model.md](../../docs/theory/frame-model.md)
    proves.
 7. **The score.**  A game of the model scores its [`in_the_bag`](../../docs/GLOSSARY.md#the-frame-model) plus the sum of
    its [promotion set](../../docs/GLOSSARY.md#the-frame-model).  So the solver searches for the promotion set with the
@@ -153,8 +153,8 @@ Cargo's commands run in `solver/frame`.  The commands of the other sections run 
 
 The binary carries the table of optimal games built in: `results/optimal.json` as it was when the binary was compiled,
 the games 1 to 1300 ([results/README.md](../../results/README.md#optimaljson) says where they came from).  Every run
-checks its scores against that table, wherever the binary runs, and no option names another.  A changed table takes a
-rebuild, which cargo does by itself when the file has changed.
+checks its scores against that table, wherever the binary runs; only `verify-optimal FILE` and `extend-optimal --table
+FILE` name another.  A changed table takes a rebuild, which cargo does by itself when the file has changed.
 
 *Details.*  The study tools, the examples `tune`, `extended`, `structure` and `wall`, are behind the feature `studies`,
 which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
@@ -247,10 +247,10 @@ cargo test                           # the same tests, a binary at a time
 cargo test --release                 # the full suite
 ```
 
-The tests run as many threads as the machine has CPUs.  None of these builds the study tools; `--features studies` adds
-them and their tests.  [solver/docs/design/tests.md](../docs/design/tests.md) says what the suite checks, and
-[testing.md](../docs/design/testing.md) what each test takes and when each runs.  `tests/tripwires.rs` asserts exact
-node counts, so a change that alters the search tree on purpose fails it; the module comment of
+`cargo test` runs as many tests at once as the machine has CPUs.  None of these builds the study tools;
+`--features studies` adds them and their tests.  [solver/docs/design/tests.md](../docs/design/tests.md) says what the
+suite checks, and [testing.md](../docs/design/testing.md) what each test takes and when each runs.  `tests/tripwires.rs`
+asserts exact node counts, so a change that alters the search tree on purpose fails it; the module comment of
 `tests/tripwires.rs` says how to update the counts.
 
 The ignored tests are for large machines and long runs:
@@ -263,8 +263,9 @@ The ignored tests are for large machines and long runs:
 
 ## 3. Commands
 
-`taxman help` lists every command and flag.  This section shows each command with sample output.  A
-[tactic](../../docs/GLOSSARY.md#the-search) is set with `--tactic NAME=VALUE`, which is repeatable; `taxman help` and
+`taxman help` lists every command and flag.  This section shows `solve` with sample output, and
+[REFERENCE.md](../docs/REFERENCE.md) the other commands.  A [tactic](../../docs/GLOSSARY.md#the-search) is set with
+`--tactic NAME=VALUE`, which is repeatable; `taxman help` and
 [solver/docs/design/tactics.md](../docs/design/tactics.md) give the names, values and defaults, and switching one never
 changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
 
@@ -389,8 +390,8 @@ ends; a score that differs is a hard error.  So no proof in the file assumes any
 that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof rests on it, that it assumes
 that game optimal ("Known games", above).
 
-`results/strict.jsonl` is such a chain.  This command, up to the paths and the thread count, made its games 1 to 2175,
-and a run of it reproduces their scores.  [results/README.md](../../results/runs.md) says how
+`results/strict.jsonl` is such a chain.  This command, up to the paths, the thread count and the progress reports,
+made its games 1 to 2175, and a run of it reproduces their scores.  [results/runs.md](../../results/runs.md) says how
 the rest were made.
 
 ### Games in flight
@@ -407,7 +408,8 @@ While the searches run, the threads move between them, to the oldest game that k
 Games are still concluded, checked and recorded in order.  Every line has the score, proof, repeat and assumptions that
 a range solved one game after another gives it.  The moves may be another optimal set, and the nodes and times differ
 ([solver/docs/design/engine.md, "The window: games in flight"](../docs/design/engine.md#the-window-games-in-flight) and
-"What a window changes in the results").
+[solver/docs/design/trust.md, "What a window changes in the
+results"](../docs/design/trust.md#what-a-window-changes-in-the-results)).
 
 The default window is 4, the best measured on 64 threads, and what `solver/tools/cloud/chain.sh` runs with.  With one
 thread the window is always 1, one game after another.
@@ -457,12 +459,12 @@ them.
   not while it waits behind another.  Every search in flight stops with a final checkpoint, and nothing is recorded for
   that game, not even an incomplete line.  `solve` prints `wall at N after H hours` and exits with the status 4.  The
   game's clock is kept beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
-  ([DESIGN.md](../docs/design/engine.md#the-window-games-in-flight)).
+  ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  A searcher's state is bounded.  The shared queue of work units spills to `DIR/spill` beyond `--mem-cap`
   units (default 1048576).  The runs of the committed chain never came near it
-  ([results/README.md](../../results/README.md#strictjsonl) gives their largest queues).
+  ([results/runs.md](../../results/runs.md) gives their largest queues).
 
 ### Keeping going past limits, and the sweep
 
