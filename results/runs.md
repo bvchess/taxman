@@ -78,10 +78,10 @@ the deadline.  The run cost about $16.46 in all.
 **The third run, games 3441–3914.**  The command was `taxman solve` from n = 1, with a window of 4 games in flight on
 64 threads of one `c8g.16xlarge` at spot, with the build of commit eb84a6f.  It was launched on 2026-10-17 at 00:15 PDT
 and stopped on request on 2026-10-18 at 18:58Z, in the middle of game 3915, which has no line.  It solved games 1–3440
-again first, with this file's scores in all (checked), and only its lines from 3441 on were kept.  So the lines before
-them are the second run's, unchanged, and the game of 3440 that line 3441 names (`prev`, by digest) is this file's.
-Every kept line records that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or `--node-limit`,
-the `default` tactics, and a `prev.source` of `run`, 3441's too.  The [entry on the
+again first, with this file's scores in all (checked), and only its lines from 3441 on went into this file.  So the
+lines before them are the second run's, unchanged, and the game of 3440 that line 3441 names (`prev`, by digest) is this
+file's.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or
+`--node-limit`, the `default` tactics, and a `prev.source` of `run`, 3441's too.  The [entry on the
 run](../solver/notebook/the-run-to-the-wall-2026-10/README.md) has its story.
 
 *Details.*  The 474 games are 221 searches (178 exhausted, 43 at the ceiling), 193 repeats and 60 primes.  The searches

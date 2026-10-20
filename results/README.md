@@ -1,10 +1,11 @@
 # Results of the solver
 
 This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
-the games past the chain, and the certificates of statement U.  This page says what each file holds, how far it reaches,
-how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; the frame model
-and statement U, on which the frame solver's scores rest, are in [docs/theory/frame-model.md, "The upper
-part"](../docs/theory/frame-model.md#the-upper-part), and the prover in [its README](../solver/noframe/README.md).
+the games at the chain's end and past it, and the certificates of statement U.  This page says what each file holds,
+how far it reaches, how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the
+terms; the frame model and statement U, on which the frame solver's scores rest, are in [docs/theory/frame-model.md,
+"The upper part"](../docs/theory/frame-model.md#the-upper-part), and the prover in [its
+README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
@@ -120,9 +121,9 @@ Two verifiers check the files.  From the top of the repository:
 
 The first is the frame solver's own.  It also runs on any results file that `solve --out` opens, and in
 `tests/results.rs`.  The second is an independent verifier in Python, which shares no code with the solver; it also
-checks every score against the Franklín–Moniot upper bound and the best-known heuristic chain in `heuristics/results`.
-Both replay every game (legal, scoring what is recorded, with no legal move left, and opening with the largest prime),
-confirm each score against `optimal.json` and the bounds score(n − 1) ≤ score(n) ≤ n +
+checks each score against the Franklín–Moniot upper bound and the best-known heuristic chain where `heuristics/results`
+has them.  Both replay every game (legal, scoring what is recorded, with no legal move left, and opening with the
+largest prime), confirm each score against `optimal.json` and the bounds score(n − 1) ≤ score(n) ≤ n +
 score(n − 1), check each line's arithmetic and the predecessor it names and that the files agree, and derive each
 line's proof kind and what it assumes by the rules in `src/results.rs`.  [The frame solver's
 reference](../solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted) defines the proof kinds and the assumptions,
@@ -180,8 +181,8 @@ What that evidence amounts to:
      scores, proofs, methods, promotions and moves in every game they share with it (checked on the final file).  Past
      2300 the evidence is the run's own: the verifiers on the whole file.
    * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
-     before these games, with this file's scores in all of them (the lines it made of those games are not kept), and
-     the verifiers pass the whole file.
+     before these games, with this file's scores in all of them (its lines of those games are kept in [its
+     entry](../solver/notebook/the-run-to-the-wall-2026-10/README.md), not here), and the verifiers pass the whole file.
    * n = 3915–4547: no other chain reaches here either.  The evidence is the fourth run's own, which took games 1–3914
      from this file and did not solve them again, and the verifiers pass the whole file.
    * 1001–1231: the scores of `strict.jsonl`, the cost-curve study's chain (commit e710d16, 8 threads, a chain with the
@@ -220,7 +221,7 @@ beyond the frame model starts at n = 1.  `strict.jsonl` is such a chain, and its
 `optimal.json`'s scores with no unproven tactic on, in 7.5 s of search in all on 8 threads, the slowest n = 992 at
 0.7 s.
 
-The table stays at 1300.  `taxman extend-optimal results/strict.jsonl` would add the 3247 games of 1301–4547.
+The table stays at 1300.  `taxman extend-optimal results/strict.jsonl --out FILE` would add the 3247 games of 1301–4547.
 
 ## bounds.jsonl
 
@@ -311,9 +312,9 @@ The rules of an upper bound:
 * and the relations: `ceiling`, U(n) ≤ U(n − 1) + n; `monotone`, U(n − 1) ≤ U(n); `prime`, U(p) = U(p − 1) + p − q
   with q the largest prime below p, both ways; and `repeat`, U(n) − bag(n) ≤ U(m) − bag(m).
 
-A line of 4501 might read:
+A line of 3916 reads:
 
-    {"schema":1,"n":4501,"side":"upper","value":9051234,"rule":"ceiling","from":4500,"from_value":9046733,"rests_on":[4500],"source":"ledger-4400-8191","date":"2026-10-18"}
+    {"schema":1,"n":3916,"side":"upper","value":4827967,"rule":"ceiling","from":3915,"from_value":4824051,"rests_on":[3915],"source":"ledger-survey-stage3","date":"2026-10-18"}
 
 **A lower bound's game** is given in one of three forms, the most compact that is possible:
 
@@ -375,8 +376,8 @@ Both exit with status 1 if any check fails, and name the line (`line K (n=N)`).
 chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a game.  Its lines took 330 bytes for a
 game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155 for an upper bound.  At the end of
 the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, and a cited game and an upper
-bound about 150 and 220 bytes.  That is of the order of 3 kilobytes a game in a first export, about 12 megabytes for
-3,800 games, less than `strict.jsonl`'s 7 (30.0 megabytes for 4,547 games).
+bound about 150 and 220 bytes.  On 2026-10-20 the store held 4,277 games in 9.2 megabytes, about 2.1 kilobytes a game,
+against `strict.jsonl`'s 6.6 (30.0 megabytes for 4,547 games).
 
 ## certificates
 
