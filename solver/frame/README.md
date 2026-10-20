@@ -1,8 +1,8 @@
 # The frame solver
 
-The frame solver finds optimal games of Taxman.  It splits each game into independent groups of numbers, the *frames*,
-and searches for the best set of numbers to play beyond the ones the frames settle.  It can run on many threads, and
-its long runs can be resumed after an interruption.  Below, "the solver" is the frame solver.
+The frame solver finds optimal games of Taxman.  It splits each game into largely independent groups of numbers, the
+*frames*, and searches for the best set of numbers to play beyond the ones the frames settle.  It can run on many
+threads, and its long runs can be resumed after an interruption.  Below, "the solver" is the frame solver.
 
 This page is its guide: what it computes, how to build and run it, and the common tasks.  [The
 reference](../docs/REFERENCE.md) has every flag and command, how to read the output, and why the answers can be
@@ -42,10 +42,9 @@ times of the games 2176 to 3440 rise tenfold for about every 1,040 in n, with ab
 
 ### How the solver sees the game (the frame model)
 
-The solver does not search the game move by move.  It splits the numbers into independent groups, the frames,
+The solver does not search the game move by move.  It splits the numbers into largely independent groups, the frames,
 settles what it can before it searches, and then searches only over which spare numbers to play as moves.  This
-decomposition is the *frame model*.  The [glossary](../../docs/GLOSSARY.md#the-frame-model) defines its words, and
-[DESIGN.md, section 2](../docs/DESIGN.md#2-the-game-and-the-frame-model) gives it in full.
+decomposition is the *frame model*.
 
 1. **Sources and factors.**  Every number above n/2 divides nothing else on the board, so it can only be a move,
    never tax.  It is a *source*, played unless setup finds it impossible (step 4).  Every other number is a *factor*:
@@ -77,7 +76,7 @@ decomposition is the *frame model*.  The [glossary](../../docs/GLOSSARY.md#the-f
    needed is proven (below, "What optimal means").
 7. **The score.**  A game of the model scores `in_the_bag`, what the game with no promotions scores, plus the sum of its
    promotions.  So the solver searches for the *promotion set* with the largest sum, P\*, by a branch and bound over
-   which candidates to promote.  The moves of the game follow from its promotions (`frames::BoardFrames`; [DESIGN.md,
+   which candidates to promote.  The moves of the game then include the promotions (`frames::BoardFrames`; [DESIGN.md,
    section 7](../docs/DESIGN.md#7-per-game-pipeline-solver)).
 
 **An example: game 21.**  The board 1 to 21 has four frames.  `testdata/golden/n0021.json` has them, and the wiki's
