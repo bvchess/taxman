@@ -248,9 +248,10 @@ cargo test --release                 # the full suite
 ```
 
 The tests run as many threads as the machine has CPUs.  None of these builds the study tools; `--features studies` adds
-them and their tests.  [solver/docs/design/testing.md](../docs/design/testing.md) says what the suite checks, what each
-test takes and when each runs.  `tests/tripwires.rs` asserts exact node counts, so a change that alters the search tree
-on purpose fails it; DESIGN.md says how to update the counts.
+them and their tests.  [solver/docs/design/tests.md](../docs/design/tests.md) says what the suite checks, and
+[testing.md](../docs/design/testing.md) what each test takes and when each runs.  `tests/tripwires.rs` asserts exact
+node counts, so a change that alters the search tree on purpose fails it; the module comment of
+`tests/tripwires.rs` says how to update the counts.
 
 The ignored tests are for large machines and long runs:
 

@@ -55,5 +55,6 @@ old section numbers are given for the citations that still use them.
 | 8. Results and the trust model, but Same search and Certificates of U | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, past limits, known games, the ledger |
 | 8: Same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
 | 8: Certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of statement U |
-| 9. Testing | [testing.md](design/testing.md) | test a change: why small games, the quick check, the checklist, and the catalogue of the tests |
+| 9. Testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
+| 9: The tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
 | 10. Performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |
