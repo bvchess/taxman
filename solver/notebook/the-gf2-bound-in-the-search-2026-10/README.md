@@ -250,3 +250,11 @@ The examples `matroid` and `slope`, with the files of `examples/common/` they in
 2026-10-17.  They build at commit 8753189: `git checkout 8753189`, then
 `cargo build --release --example matroid --example slope` in `rust/`.  `examples/common/meet.rs`, which the entry says
 stays, went with them.
+
+## Later (2026-10): strong branching's solves
+
+The item "Next on the inner loop" above calls strong branching's solves untried.  The round after this one, [the inner
+loop of the GF(2) search](../the-inner-loop-of-the-gf2-search-2026-10/README.md), did without most of them: the
+heaviest set without a member is the heaviest set flipped along one cycle of its exchange graph, read off with no solve
+and certified by what the sets of other sizes lose (the rows of 2026-10-14 in [the
+register](../register/node-bound.md)).  The cancelling of negative cycles proposed here was not needed.

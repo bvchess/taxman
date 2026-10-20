@@ -270,9 +270,13 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
   games share 0.15% of their steps (median of 14 pairs), and a run costs at least its dearest game, which limits the
   saving to 18-29% of the nodes past 2175
   ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
-* **Strong branching's solves**, untried: 70% of the intersection's work, they restart far below their answer, and
-  cancelling the negative cycles of the optimal set less the member would start them next to it ([the GF(2) bound in the
-  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), the item "Next on the inner loop").
+* **Strong branching's solves**, done: the bound without each member of the conflict is read off the heaviest set's
+  exchange graph, its shortest cycle through the member, with no solve where the other sizes certify it, which they
+  nearly always do ([the inner loop](../notebook/the-inner-loop-of-the-gf2-search-2026-10/README.md)); the cancelling
+  of negative cycles proposed in [the GF(2) bound in the
+  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md) was not needed.  Where a step's cycles go since:
+  [what a GF(2) step carries from the
+  last](../notebook/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md).
 * **What only the matching path uses**, open: the GF(2) bound has made it idle, and it can be removed once a production
   run has been made with the GF(2) search: the Lagrangian bound in the search and refinement ([the same
   entry](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
