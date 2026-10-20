@@ -61,4 +61,4 @@ The [calibration](../../notebook/graviton-calibration-2026-10/README.md) ran the
 `c7g.16xlarge` and a `c8g.16xlarge` with its own scripts.  It and the [scaling
 run](../../notebook/scaling-to-192-threads-2026-10/README.md) measured the speed of a Graviton core and the scaling of
 the solver to 64 and 192 threads; what is not measured is in [solver/docs/AGENDA.md, "What the cloud runs should
-measure"](../AGENDA.md#6-what-the-cloud-runs-should-measure).
+measure"](../AGENDA.md#5-what-the-cloud-runs-should-measure).

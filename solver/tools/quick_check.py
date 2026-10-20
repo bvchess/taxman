@@ -21,7 +21,7 @@ exits with status 1 if
 
 A test is held to its CPU seconds, not to the seconds it takes: with every CPU busy a test takes several times as long
 as it does alone, and its CPU seconds do not change.  The limits are here and nowhere else; raising either needs
-Brian's approval.  A test that takes more than about a second is long: solver/docs/design/testing.md says what to do
+the project owner's approval.  A test that takes more than about a second is long: solver/docs/design/testing.md says what to do
 with it.
 """
 import ctypes
@@ -287,7 +287,7 @@ def main() -> int:
         for message in failed + over:
             print(f"  {message}", file=sys.stderr)
         if over:
-            print(f"  {POINTER}\n  The limits are in solver/tools/quick_check.py; raising one needs Brian's approval.",
+            print(f"  {POINTER}\n  The limits are in solver/tools/quick_check.py; raising one needs the project owner's approval.",
                   file=sys.stderr)
         return 1
     seconds = json.loads(SUMMARY.read_text())["seconds"]

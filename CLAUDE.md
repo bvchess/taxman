@@ -1,6 +1,6 @@
-# Working notes for Claude
+# Working notes
 
-Rules Brian has set for all work in this project.  Rules for the Rust programs are in solver/CLAUDE.md.  How-to lives
+The rules for all work on this project.  Rules for the Rust programs are in solver/CLAUDE.md.  How-to lives
 in the docs listed at the end.
 
 * **Commits.**  Never cite yourself in a commit message: no `Co-Authored-By: Claude` trailer and no Claude or
@@ -13,8 +13,9 @@ in the docs listed at the end.
 * **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and
   resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
   only when the question needs it.
-* **Money.**  Anything that costs money or changes the AWS account needs Brian's explicit approval, with a cost
-  estimate first, and nothing is left running (solver/docs/runbook/launch.md has the rules for a launch).
+* **Money.**  Anything that costs money or changes the AWS account needs the explicit approval of whoever owns the AWS
+  account, with a cost estimate first, and nothing is left running (solver/docs/runbook/launch.md has the rules for a
+  launch).
 * **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
   moniot/Makefile, not edited.
 * **Branch.**  Work on master; commit and push there.

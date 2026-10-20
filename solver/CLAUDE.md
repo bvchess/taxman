@@ -1,6 +1,6 @@
-# Working notes for Claude: the Rust programs
+# Working notes: the Rust programs
 
-Rules Brian has set for the frame solver and the prover, on top of the project's (../CLAUDE.md).  How-to lives in the
+The rules for the frame solver and the prover, on top of the project's (../CLAUDE.md).  How-to lives in the
 docs listed at the end.  Paths here are from the top of the repository; Cargo commands run in `solver/frame` or
 `solver/noframe`.
 

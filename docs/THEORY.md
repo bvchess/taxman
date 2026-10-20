@@ -9,8 +9,8 @@ the computations behind the statements that rest on computation.
 
 ## The files
 
-Each file proves the results of one subject.  The theorems and lemmas keep their names, so a citation by name finds
-its file in the last column.
+Each file proves the results of one subject.  The last column names the theorems and lemmas that each
+file proves.
 
 | file | read it for | holds |
 |---|---|---|

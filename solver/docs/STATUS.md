@@ -10,15 +10,15 @@ avenues and the projections are in the [agenda](AGENDA.md).
 
 ## The priority: a larger n
 
-Brian's priority (2026-10-16): a larger n, the end of the chain pushed further; certifying U past 2175 is not one for
-now.  Nothing is published: `optimal.json` stays at 1300.
+The priority (decided 2026-10-16): a larger n, the end of the chain pushed further; certifying U past 2175 is not one
+for now.  Nothing is published: `optimal.json` stays at 1300.
 
-**The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes more
+**The wall** (decided 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes more
 than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game has
 been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint, or
 when its budget is spent ([runbook/wall.md](runbook/wall.md#what-needs-approval-and-what-it-costs)).  The chain's
 launch is [runbook/chain.md](runbook/chain.md), the unattended run
-[runbook/wall.md](runbook/wall.md); each needs Brian's approval.
+[runbook/wall.md](runbook/wall.md); each needs the account owner's approval.
 
 The cost of a searched game grows tenfold for about every 1,040 in n, in patches; [AGENDA.md, "The diagnosis of the
 wall"](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes
@@ -65,11 +65,12 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 
 ## Paused
 
-* **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset
-  (Brian, 2026-10-16: Monday night).  Its branch `worktree-agent-a2db9341d6d4e8cd9` holds three commits (the third is the edit of
-  THEORY.md) and is on the old layout (`rust/`, `heuristics/THEORY.md`): its paths need the new ones before it merges.
+* **The claim-by-claim rule** (Lemma M5⁺ claim by claim, for the certificates): until after the weekly reset (decided
+  2026-10-16: Monday night).  Its branch `worktree-agent-a2db9341d6d4e8cd9` holds three commits (the third is the edit
+  of THEORY.md) and is on the old layout (`rust/`, `heuristics/THEORY.md`): its paths need the new ones before it
+  merges.
 * **Certifying 2176-3440** ([runbook/certify.md](runbook/certify.md)): ready, not
-  approved, shelved by Brian on 2026-10-16.  About 3,023 thread-hours, 47 hours of one `c8g.16xlarge`, $32 at spot
+  approved, shelved on 2026-10-16.  About 3,023 thread-hours, 47 hours of one `c8g.16xlarge`, $32 at spot
   ($121 on demand), the pilot first ($3); phases A and B on the build of 14beb7a, phase C on the claim-by-claim build
   ([certificates past 2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md),
   [the claims](../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).
@@ -79,7 +80,7 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 * E3 main (A1's large cloud run): dropped after the pilot.
 * E6 and E9(a) (the theory track's cloud measurements): superseded by the certificates.
 
-## Waiting on Brian
+## Waiting on a decision
 
 * Outside review of Theorems 1, 10 and 12 by Robert Moniot.
 * Publishing (`optimal.json` past 1300, OEIS).
@@ -90,7 +91,7 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
   search a game each, passes over the merged `explore.jsonl` until nothing changes
   ([runbook/sweep.md](runbook/sweep.md); `taxman solve --keep-going`); about $3.3 at 180 s a
   game.  The file is not a chain and never goes into `strict.jsonl`.  The ledger (next) may supersede it.
-* **The ledger**, built 2026-10-17 (Brian's idea: L and U for every board of a stretch at once, limited searches with
+* **The ledger**, built 2026-10-17 (the idea: L and U for every board of a stretch at once, limited searches with
   the dual bound of a stopped search, the relations between boards proven in THEORY.md, the effort where a proof looks
   cheapest; `examples/ledger/`; [the entry](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)), with **wedge and
   climb** (a board next to a proven one is searched first, from its game), **the finder** (large neighbourhood search
@@ -98,7 +99,7 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
   export`, `run --bounds`, `verify-bounds` and `solver/tools/check_bounds.py`; [results/README](../../results/README.md#boundsjsonl)).
   On 2176..3440 with the truth hidden every proven board is at its committed score: 916 of 1,265 in 48 core-hours without the
   climbs and the finder, 876 in 24 with both (the first run needed about 38 for as many).
-* **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
+* **The ledger past 4400** (approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
   proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343, and the survey to 382, the
   last 4783.  **The chain draws on it** (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or
   `optimal.json` has proven is recorded with no search, citing it;
