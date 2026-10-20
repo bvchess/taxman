@@ -1,4 +1,4 @@
-//! The check of conjecture (★) on one instance (THEORY.md, "The cardinality reformulation").
+//! The check of conjecture (★) on one instance (docs/theory/open-problem.md, "The cardinality reformulation").
 //!
 //! (★) says: on every connected component K of the instance and every truncation K_{≥t} of one, descending
 //! greedy keeps a maximum-cardinality playable subset.  It is checked exactly as follows.

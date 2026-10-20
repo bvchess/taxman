@@ -77,7 +77,7 @@ to its glossary entry.
 6. **Promotions.**  What a game can still choose is which spare factors to
    [promote](../../docs/GLOSSARY.md#the-frame-model): to play as moves instead of leaving them as tax.  A promotion
    makes a factor of frame h a move of frame h − 1, one frame forward, and both frames must stay winnable.  Nothing
-   further forward is needed, which [THEORY.md](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)
+   further forward is needed, which [THEORY.md](../../docs/theory/frame-model.md)
    proves.
 7. **The score.**  A game of the model scores its [`in_the_bag`](../../docs/GLOSSARY.md#the-frame-model) plus the sum of
    its [promotion set](../../docs/GLOSSARY.md#the-frame-model).  So the solver searches for the promotion set with the
@@ -121,14 +121,14 @@ The solver's answer for game n is `in_the_bag` + [P\*](../../docs/GLOSSARY.md#th
 three things: the frame model is exact at n, the search prunes nothing that could win, and, for some proofs, the game of
 n − 1 is optimal.
 
-* **The frame model is exact, given statement U.**  [THEORY.md, "The frame model: what is proven and what
-  remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains) proves the model's rules: the greedy
-  removal of impossible sources, the mandatory moves of `unzip`, freedoms = factors − sources, closed frames taking no
-  part in the search, and a promoted number paying tax only from the frame one forward.  What is left is one statement
-  about the game, [statement U](../../docs/GLOSSARY.md#the-frame-model): some optimal game plays every member with three
-  or more prime factors of [U\*](../../docs/GLOSSARY.md#the-frame-model), the sources that setup keeps.  The games that
-  play all of U\* are exactly U\* with a promotion set added (Theorem M), and every optimal game plays the members of
-  U\* with one or two prime factors (Theorem B).  So the heaviest promotion set gives opt(n) exactly when U holds at n.
+* **The frame model is exact, given statement U.**  [docs/theory/frame-model.md](../../docs/theory/frame-model.md)
+  proves the model's rules: the greedy removal of impossible sources, the mandatory moves of `unzip`, freedoms = factors
+  − sources, closed frames taking no part in the search, and a promoted number paying tax only from the frame one
+  forward.  What is left is one statement about the game, [statement U](../../docs/GLOSSARY.md#the-frame-model): some
+  optimal game plays every member with three or more prime factors of [U\*](../../docs/GLOSSARY.md#the-frame-model), the
+  sources that setup keeps.  The games that play all of U\* are exactly U\* with a promotion set added (Theorem M), and
+  every optimal game plays the members of U\* with one or two prime factors (Theorem B).  So the heaviest promotion set
+  gives opt(n) exactly when U holds at n.
 
   U is open in general.  It holds at every game the [prover](../noframe/README.md) has proven, since the prover proves
   opt(n) on the whole board, without the frame model.  Past those games, a proof that uses the frame model assumes U at

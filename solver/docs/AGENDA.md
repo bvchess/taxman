@@ -23,13 +23,13 @@ reaches and what each score rests on.  Outside the project the record stops at n
 project's), and the literature has bounds and one asymptotic result, not values of opt(n) (section 5).
 
 **The theory the search stands on.**  One count decides three conditions on a set of moves ([THEORY.md, Theorem
-12](../../docs/THEORY.md#one-count-three-conditions)): the set is playable exactly when some payment set has one payment
-scheme, independent over GF(2) in the parity matroids when some has an odd number of them, and matchable when some has
-at least one.  The search's GF(2) bound is the frame model's form of the middle condition (Theorem 11).  It equals the
-parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind only to *odd
-cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct primes.  At the
-roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3 whose size grows
-with n ([the anatomy of the gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md)).
+12](../../docs/theory/franklin-moniot.md#one-count-three-conditions)): the set is playable exactly when some payment set
+has one payment scheme, independent over GF(2) in the parity matroids when some has an odd number of them, and matchable
+when some has at least one.  The search's GF(2) bound is the frame model's form of the middle condition (Theorem 11).
+It equals the parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind
+only to *odd cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct
+primes.  At the roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3
+whose size grows with n ([the anatomy of the gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md)).
 
 **What has been tried,** by family (the register has every row):
 
@@ -314,11 +314,12 @@ then regions with holes.
 **C3 (the upper part).**  *Open.*  Every optimal game plays U\*, and game by game barred parity bounds and small
 searches could certify it.  This strong form holds in every game whose optimal sets were enumerated (954 games of
 2..989).  The weak form, U, that some optimal set contains U\*_{≥3}, holds wherever the prover has proven opt(n), every
-n up to 2175, and certificates prove it game by game for 600..1300 ([THEORY.md, "The upper
-part"](../../docs/THEORY.md#the-upper-part); [results/README.md](../../results/README.md#what-supports-the-scores)).
-*Evidence:* every game enumerated ([the prover's README, section 5](../noframe/README.md#5-is-the-optimal-set-unique));
-92-96% of U\* certified at the root by one bound each (measurements 7.3).  *Attack:* the frontier argument of [the
-prover's README, section 8](../noframe/README.md#8-what-remains-open) for a proof; A2 for certificates.
+n up to 2175, and certificates prove it game by game for 600..1300 ([docs/theory/frame-model.md, "The upper
+part"](../../docs/theory/frame-model.md#the-upper-part);
+[results/README.md](../../results/README.md#what-supports-the-scores)).  *Evidence:* every game enumerated ([the
+prover's README, section 5](../noframe/README.md#5-is-the-optimal-set-unique)); 92-96% of U\* certified at the root by
+one bound each (measurements 7.3).  *Attack:* the frontier argument of [the prover's README, section
+8](../noframe/README.md#8-what-remains-open) for a proof; A2 for certificates.
 
 **C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is within one of
 the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets have one size
@@ -348,10 +349,10 @@ gaps (section 2): the 47 searches of gap 1,100 or more are 12% of the exhausted 
 of the chain's nodes, and all of the 18 dearest have a gap of 1,094 or more.  What stays unexplained is a factor of 3
 (sd 0.48 decades) in a game's tree at its gap.
 
-**C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([THEORY.md, "The span
-certificate (♦)"](../../docs/THEORY.md#the-span-certificate-)).  Every source that descending greedy rejects on the
-sources' instance is a GF(2) combination of the sources it kept above it; it would prove the upper-half conjecture in
-general.  It is not on the critical path of the wall; C3 is.
+**C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([docs/theory/open-problem.md,
+"The span certificate (♦)"](../../docs/theory/open-problem.md#the-span-certificate-)).  Every source that descending
+greedy rejects on the sources' instance is a GF(2) combination of the sources it kept above it; it would prove the
+upper-half conjecture in general.  It is not on the critical path of the wall; C3 is.
 
 ## 5. Ideas from other domains
 

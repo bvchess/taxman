@@ -4,9 +4,8 @@
 //! the frame model with a set O of the sources of three or more prime factors that setup keeps made optional, and with
 //! a reference predicate for its promotion sets, `ExtendedFrames::promotable`, that peels the unreduced frames.  It
 //! comes in two formulations, both checked here: without the claims of `unzip` (nothing settled by it), and with the
-//! claims that Lemma M5⁺ allows (docs/THEORY.md; with O empty that is the frame model's own problem Π_n).  The
-//! tests with `with_claims` in their names have the claims, the others none.  The theorem (docs/THEORY.md, "The
-//! extended problem"):
+//! claims that Lemma M5⁺ allows (docs/THEORY.md; with O empty that is the frame model's own problem Π_n).  The tests
+//! with `with_claims` in their names have the claims, the others none.  The theorem (docs/theory/extended-problem.md):
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`),
 //! > O ⊆ U\*_{≥3} the open sources and F = U\* ∖ O.  For every S ⊆ {2, …, n} with S ⊇ F, no prime up to n/2 in S, and

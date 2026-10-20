@@ -3,8 +3,8 @@
 This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
 the games past the chain, and the certificates of statement U.  This page says what each file holds, how far it reaches,
 how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; the frame model
-and statement U, on which the frame solver's scores rest, are in [THEORY.md, "The upper
-part"](../docs/THEORY.md#the-upper-part), and the prover in [its README](../solver/noframe/README.md).
+and statement U, on which the frame solver's scores rest, are in [docs/theory/frame-model.md, "The upper
+part"](../docs/theory/frame-model.md#the-upper-part), and the prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
@@ -345,11 +345,11 @@ What that evidence amounts to:
    promotions ([the prover's README](../solver/noframe/README.md); [THEORY.md](../docs/THEORY.md), Theorem 10).  So
    `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are opt(n) on the whole board.  The
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
-   notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
-   The 2372 games of 2176–4547 are proven within the frame model, which is exact given U ([THEORY.md, "The frame model:
-   what is proven and what remains"](../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  `taxman
-   certify` can check U there game by game, with the prover's barred bounds ([the prover's
-   README](../solver/noframe/README.md#the-upper-part-game-by-game) has them to 3440).
+   notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 2372
+   games of 2176–4547 are proven within the frame model, which is exact given U
+   ([docs/theory/frame-model.md](../docs/theory/frame-model.md)).  `taxman certify` can check U there game by game, with
+   the prover's barred bounds ([the prover's README](../solver/noframe/README.md#the-upper-part-game-by-game) has them
+   to 3440).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the game of n
 − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
@@ -379,8 +379,7 @@ those proofs, which the lines of proof `known` in `strict.jsonl` cite.  The firs
 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
-bound is the frame model's, carried between games by the lemmas of [THEORY.md, "The ledger: bounds between
-boards"](../docs/THEORY.md#the-ledger-bounds-between-boards).
+bound is the frame model's, carried between games by the lemmas of [docs/theory/ledger.md](../docs/theory/ledger.md).
 
 A line is a bound, not a game of `taxman solve`.  It is not in the schema of the results lines, and an export adds
 no line of a game that `strict.jsonl` has.  It is not `explore.jsonl`'s kind of file either: that one holds the
@@ -478,8 +477,7 @@ A line of 4501 might read:
 **What an upper bound rests on.**  Every upper bound is a bound of the frame model at some game: a root bound, a dual
 bound, a completed search or a given game.  That is opt(n) where statement U holds at that game.  The lemmas carry it
 between games without more, except the second part of Lemma L4, the bound on opt(n) − in_the_bag(n), which rests on U
-at the game it is carried to ([THEORY.md, "The ledger: bounds between
-boards"](../docs/THEORY.md#the-ledger-bounds-between-boards)).
+at the game it is carried to ([docs/theory/ledger.md](../docs/theory/ledger.md)).
 `rests_on` lists the games:
 
 * a bound of the frame model has its own game alone;

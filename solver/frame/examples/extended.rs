@@ -1,6 +1,6 @@
 //! A chain of games searched on the extended problem Π⁺(∅): the frame model with or without `unzip`'s claims
 //! ([`taxman::frames::build_extended`], [`Board::prepare_extended`]).  Research code for the extended problem
-//! (docs/THEORY.md, "The extended problem"); the solver does not use it.  By Theorems M and M⁺ the promotion sets
+//! (docs/theory/extended-problem.md); the solver does not use it.  By Theorems M and M⁺ the promotion sets
 //! of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as `optimal.json` and
 //! `results/strict.jsonl` do.  With the claims Lemma M5⁺ keeps, the default, Π⁺(∅) is the frame model's problem itself,
 //! so `--compare` shows the same trees (a ratio of 1).  With `--no-claims`, the formulation of the first certificates

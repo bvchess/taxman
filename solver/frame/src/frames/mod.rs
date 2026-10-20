@@ -58,7 +58,7 @@
 //!
 //! After the frames are formed, [`BoardFrames::new`] simplifies each one until nothing changes (`finish_setup`).
 //! Three things are decided frame by frame.  All three were assumptions of the frame model, validated but not proven;
-//! they are theorems: docs/THEORY.md, "The frame model: what is proven and what remains" (Theorem M and its
+//! they are theorems: docs/theory/frame-model.md (Theorem M and its
 //! lemmas M1 to M6, which follow this code step by step), summed up in solver/docs/design/frame-model.md, “What "optimal" means”.  What remains is a statement about the game, not about this code:
 //! that some optimal game plays every source with three or more prime factors that setup keeps.
 //!

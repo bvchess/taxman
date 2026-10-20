@@ -98,10 +98,9 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **promote**, **promotion**: to play a factor as a move.  Promoting a factor of frame h takes it out of the frame's
   factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  The
   maximal factors that pay for the promoted number lie in the frames directly in front of its own, and the numbering
-  puts those that have freedoms in frame h − 1; that nothing further forward is needed is a theorem ([THEORY.md, "The
-  frame model: what is proven and what remains"](THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  After
-  promotions the frames are *reduced*: a move left with one live factor is paid by it, and the pair is dropped,
-  repeatedly.
+  puts those that have freedoms in frame h − 1; that nothing further forward is needed is a theorem
+  ([theory/frame-model.md](theory/frame-model.md)).  After promotions the frames are *reduced*: a move left with one
+  live factor is paid by it, and the pair is dropped, repeatedly.
 * **candidate** **(overloaded)**: (1) a number that setup says could be promoted (`SearchFrames::candidates`,
   `BoardFrames::promotion_candidates`).  Game 21 has 2 candidates, game 85 has 10, and game 1100 has 273.  (2) In a
   search node, `cands`: the candidates the node's loop still has to try.  (3) A role in the matching bound's graph: a
@@ -119,8 +118,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
-  `in_the_bag` + P\* = opt(n) ([THEORY.md, "The frame model: what is proven and what
-  remains"](THEORY.md#the-frame-model-what-is-proven-and-what-remains); [the frame solver's README, "What optimal
+  `in_the_bag` + P\* = opt(n) ([theory/frame-model.md](theory/frame-model.md); [the frame solver's README, "What optimal
   means"](../solver/frame/README.md#what-optimal-means)).  `model::FrameGraph` is the immutable factor graph and home
   frames, not "the model".
 * **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their

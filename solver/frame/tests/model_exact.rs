@@ -1,6 +1,6 @@
 //! Theorem M, the frame model's exactness, against the code.
 //!
-//! The theorem (docs/THEORY.md, "The frame model is exact, given its upper part"):
+//! The theorem (docs/theory/frame-model.md, "The frame model is exact, given its upper part"):
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`), and
 //! > Π_n the root problem the search is given (`Board::prepare`: the model, the root frame set, the candidates and

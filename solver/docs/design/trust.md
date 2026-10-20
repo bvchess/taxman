@@ -174,7 +174,7 @@ reads nothing of the truth (`optimal.json`, the results files) unless it is give
   computes it when it starts the unit (`search::NodeBound`);
 * given games;
 * the relations between games, applied to a fixpoint after every change: monotonicity, the ceiling and the game below
-  it, the prime formula both ways, and repeats (docs/THEORY.md, "The ledger: bounds between boards", Lemmas L1 to L4
+  it, the prime formula both ways, and repeats (docs/theory/ledger.md, Lemmas L1 to L4
   and D, with what each rests on).  The referee replays every game that a relation makes before it counts, if it could
   raise a game's L (a game that cannot is not shown to the referee, or not made), and an L above a U stops the run as
   an error;

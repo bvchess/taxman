@@ -56,9 +56,8 @@ and the game of n − 1 is optimal.
 
 **Within the frame model.**  The search finds [P\*](../../../docs/GLOSSARY.md#the-frame-model)(Π_n), the largest sum of
 a promotion set of the root problem Π_n ([same-search.md](same-search.md), defines the [search
-problem](../../../docs/GLOSSARY.md#the-frame-model) Π exactly).  The answer is in_the_bag + P\*(Π_n).  [THEORY.md, "The
-frame model: what is proven and what remains"](../../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)
-proves what that is:
+problem](../../../docs/GLOSSARY.md#the-frame-model) Π exactly).  The answer is in_the_bag + P\*(Π_n).
+[docs/theory/frame-model.md](../../../docs/theory/frame-model.md) proves what that is:
 
 * The sources that setup keeps are [U\*](../../../docs/GLOSSARY.md#the-frame-model), chosen greedily from the largest on
   each frame, and in_the_bag = ΣU\* (Theorem M, M1).

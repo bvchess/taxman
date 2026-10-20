@@ -381,8 +381,8 @@ mod tests {
         assert!(open_boards.iter().all(|&n| n < 187), "a board from 187 on is not closed: {open_boards:?}");
     }
 
-    /// The figures of the barred bounds at 600 (they appear in THEORY.md's "The upper part": 4 of the 161
-    /// members are open).
+    /// The figures of the barred bounds at 600 (they appear in docs/theory/frame-model.md's "The upper part": 4 of the
+    /// 161 members are open).
     #[test]
     fn the_barred_bounds_at_600() {
         let (known, spf) = (optimal(), smallest_prime_factors(600));

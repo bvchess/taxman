@@ -1,5 +1,5 @@
 //! Certificates of U: a recorded score proven optimal on the whole board, game by game, by a search of the extended
-//! problem (`taxman certify`; docs/THEORY.md, "The extended problem", Theorem M⁺ and its corollary).
+//! problem (`taxman certify`; docs/theory/extended-problem.md, Theorem M⁺ and its corollary).
 //!
 //! A game of `n` whose proof uses the frame model (an exhausted search, a trivial board, a repeat) is optimal on the
 //! whole board if some optimal game plays every source of three or more prime factors that setup keeps, U\*_{≥3}

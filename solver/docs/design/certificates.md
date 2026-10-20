@@ -4,7 +4,7 @@ Part of the [design](../DESIGN.md).
 
 A *certificate* proves statement U at one game: that the recorded score of a game whose proof uses the frame model
 (`exhausted`, `trivial`, `same_search`) is opt(n) on the whole board ([frame-model.md](frame-model.md)).
-`taxman certify` makes certificates game by game, by the corollary of Theorem M⁺ (THEORY.md, "The extended problem"),
+`taxman certify` makes certificates game by game, by the corollary of Theorem M⁺ (docs/theory/extended-problem.md),
 and `taxman verify-certificates` checks them.  [results/README.md](../../../results/README.md#certificates) says which
 games have one.
 

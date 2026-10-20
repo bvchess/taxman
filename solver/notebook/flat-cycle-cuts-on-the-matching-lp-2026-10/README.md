@@ -12,7 +12,7 @@ means the cuts are worth putting into the branch and bound; otherwise the gap th
 
 A playable set is the set of upper ends of a matching of the maximal-factor graph with no flat alternating cycle, a
 cycle within two adjacent ranks (Franklín and Moniot's Theorem 1, which is THEORY.md's Theorem 1 read set by set:
-[THEORY.md, "Relation to Franklín and Moniot"](../../../docs/THEORY.md#relation-to-franklín-and-moniot)).  That is the
+[THEORY.md, "Relation to Franklín and Moniot"](../../../docs/theory/franklin-moniot.md)).  That is the
 *acyclic* or *Morse* matching of discrete Morse theory, on the divisor poset: Joswig and Pfetsch observe that every
 directed cycle of a matching's modified Hasse diagram lies in one level, so "flat" is exactly "acyclic".  They solved
 maximum Morse matchings exactly by branch and cut, with the matching inequalities, Betti-number inequalities and, per

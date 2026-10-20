@@ -9,11 +9,11 @@ words.
 
 Why that matters: the frame solver ([its README](../frame/README.md)) searches the promotions of the frame model, whose
 answer is opt(n) exactly when [statement U](../../docs/GLOSSARY.md#the-frame-model) holds at n: some optimal game plays
-every source with three or more prime factors that setup keeps ([THEORY.md, "The frame model: what is proven and what
-remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's other rules are
-proven; [solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Where the prover proves opt(n), U holds.
-The sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
-wherever THEORY.md's conjecture (★) holds (Theorem 8; [THEORY.md](../../docs/THEORY.md#the-open-problem)).
+every source with three or more prime factors that setup keeps
+([docs/theory/frame-model.md](../../docs/theory/frame-model.md), where the model's other rules are proven;
+[solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Where the prover proves opt(n), U holds.  The
+sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
+wherever THEORY.md's conjecture (★) holds (Theorem 8; [THEORY.md](../../docs/theory/open-problem.md)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
 searches for adversarial instances.  It rests only on THEORY.md's theorems and on elementary bounds, and every exact
@@ -67,7 +67,7 @@ Before the prover, this was the state of the evidence.
     (Theorems 4–6);
   * greedy is weight-optimal wherever the frontier jam is hyperedge-free;
   * the bounds opt(n) ≤ n + opt(n − 1), the prime formula, and the Franklín–Moniot bound.
-* **(★), the upper-half conjecture.**  THEORY.md's "Evidence" had 3,231 of 3,236 rejection-bearing components (all n
+* **(★), the upper-half conjecture.**  docs/theory/evidence.md had 3,231 of 3,236 rejection-bearing components (all n
   = 6..1500, forty samples to 4000, n = 2873 and 9170) verified by exact search over the residual or certified by the
   matching-number bound.  Five were undecided (n = 3103, 3872, 3936, 4000, 9170, with search budgets of 2.7×10⁹ to
   1.1×10⁴⁷), the last "to be settled only by a theorem"; the uncertified 0.2% were exactly those five.  Besides:
@@ -185,7 +185,7 @@ The search:
   times faster than solving each node from scratch.
 * **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set is
   independent in two linear matroids over GF(2), split by the parity of Ω (THEORY.md, [the parity
-  matroids](../../docs/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game)).  So at a node, the heaviest set
+  matroids](../../docs/theory/bounds.md#the-parity-matroids-a-bound-on-the-whole-game)).  So at a node, the heaviest set
   independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
   * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.
   * It is reported only with a weight split that satisfies the local optimality conditions of both matroids, checked
@@ -359,8 +359,8 @@ the projection game by game, and what the run says about the projection's model.
 
 Past the prover's proofs, the frame solver's answer for a game that rests on its search is opt(n) exactly when U holds
 at n: some optimal set plays U\*_{≥3}, the members of U\* with three or more prime factors
-([THEORY.md](../../docs/THEORY.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity bound which
-of those members every set beating the recorded score V must play.
+([THEORY.md](../../docs/theory/frame-model.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity
+bound which of those members every set beating the recorded score V must play.
 
 * It fixes layers 1 and 2 as Theorem B says every optimal set has them: the largest prime and no other; U\*_2 among the
   sources of layer 2; and, where U\*_2 spans every prime up to n/2, which it decides for each board, no number of layer
@@ -457,7 +457,8 @@ the real game and varying another.  It checks (♦) on each and, where (♦) fai
 "≥" marks families where some thresholds stayed undecided within the search budget.  At n = 1000 every family passed,
 20 instances each: traps need three-prime jams, and THEORY.md finds the first failure of exchange at n = 2873.
 
-This sharpens THEORY.md's "the ordering is the protection, not the magnitudes":
+This sharpens [the open problem's](../../docs/theory/open-problem.md) "the ordering is the protection, not the
+magnitudes":
 
 * **The window law suffices; the rest of the order does not matter.**  Every order of the real incidence structure that
   keeps the members sharing a factor in the order of their cofactor primes, random or chosen adversarially, satisfied
@@ -480,7 +481,8 @@ could lean on it: to reuse the game of n − 1 when solving n, to justify shortc
 
 ### What is proven
 
-THEORY.md, ["Uniqueness of the optimal set"](../../docs/THEORY.md#uniqueness-of-the-optimal-set):
+THEORY.md, ["Uniqueness of the optimal
+set"](../../docs/theory/uniqueness-and-longest-games.md#uniqueness-of-the-optimal-set):
 
 * **Theorem 8: the heaviest playable set of sources is unique wherever (★) holds**, so in every game n ≤ 100,000
   (section 2).  More precisely, U\* dominates every playable set of sources S termwise: the i-th largest member of S is
@@ -618,8 +620,8 @@ stop searching every branch that cannot reach the most moves.  Neither the Java 
 
 ### What is proven
 
-THEORY.md, ["Longest games"](../../docs/THEORY.md#longest-games).  Let M(n) be the most moves of a game of n, the size
-of the largest playable set of picks.
+THEORY.md, ["Longest games"](../../docs/theory/uniqueness-and-longest-games.md#longest-games).  Let M(n) be the most
+moves of a game of n, the size of the largest playable set of picks.
 
 * **M(n) <= ν(n)**, the matching number of the board's maximal-factor graph, which joins each number to its maximal
   factors: a playable set pays each pick with a distinct maximal factor outside it (Theorem 1).  So a legal game of
@@ -800,7 +802,7 @@ entry](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-
   against brute force), so `optsets` with it would extend section 5 at about the cost of the proofs.
 * **Statement U past 2175.**  The frame model's individual assumptions are no longer open: they are theorems given a
   per-board fact that holds on every board to 8191
-  ([THEORY.md](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), Theorems B and M).  What the
+  ([THEORY.md](../../docs/theory/frame-model.md), Theorems B and M).  What the
   model's answers rest on is one statement, U: some optimal game plays every source of three or more prime factors that
   setup keeps.  The prover's proofs establish U at every n ≤ 2175.  Beyond, the committed games past 2175 that rest on
   U, by an exhausted search or a repeat, have it uncertified.  The barred parity bounds certify about 85% of those

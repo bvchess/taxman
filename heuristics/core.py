@@ -122,7 +122,7 @@ def peel(
     mean "no perfect matching exists".  Some sets have perfect payment
     matchings, every one of which is precedence-cyclic and hence
     unplayable; the forced-move discipline rejects those too.  Both
-    directions are theorems (THEORY.md, section "The decision procedure":
+    directions are theorems (docs/theory/decision-procedure.md, "The decision procedure":
     Theorem 2, schedulability, and Theorem 3, completeness): with
     maximal-factor pools, success here is exactly playability.  See the
     n=21 example.
@@ -227,8 +227,7 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     role of solving frames front-to-back in the wiki's walkthrough.)
 
     Any topological order of that precedence works, and one always
-    exists: by the schedulability theorem (THEORY.md, section "The decision
-    procedure", Theorem 2), an assignment produced by peel can never
+    exists: by the schedulability theorem (docs/theory/decision-procedure.md, "The decision procedure", Theorem 2), an assignment produced by peel can never
     have a cyclic precedence -- the prime-counting potential confines
     any would-be cycle to pool edges, and the peel rules refuse those
     configurations outright.

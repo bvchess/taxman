@@ -323,10 +323,10 @@ on each incidence of a mover with a maximal factor in the frame), given by numbe
 an incidence of both and the default (1, or a hashed 1 or 2) elsewhere: a signing of Π_{n+1}'s frame h.  So every
 promotion set of Π_{n+1} is independent in its matroid (Theorem 14), and with any multipliers (n's, by candidate number,
 0 for a new candidate) L bounds every promotion set of Π_{n+1} (Theorem 15; [THEORY.md, signed frame
-matroids](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields)).  A core of n whose
+matroids](../../../docs/theory/bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields)).  A core of n whose
 movers, their incidences and its factors are unchanged in n + 1 has the same column sums, so the carried signing still
 makes it dependent.  Frame h is the same layer in both games (numbering by layer, ℓ₀ = 3 on every board past 186;
-[THEORY.md, numbering by layer](../../../docs/THEORY.md#numbering-by-layer)).  Nothing is re-checked: validity is
+[THEORY.md, numbering by layer](../../../docs/theory/frame-model.md#numbering-by-layer)).  Nothing is re-checked: validity is
 unconditional, only the strength depends on the fit.
 
 *Ideas from other fields, and why they fit or not.*

@@ -1,4 +1,5 @@
-//! Dismantling, residuals and playability (THEORY.md, "Unplayable sets: cores and the residual").
+//! Dismantling, residuals and playability (docs/theory/decision-procedure.md, "Unplayable sets: cores and the
+//! residual").
 //!
 //! A set of members is *self-covering* when every factor of every member is listed by another member of the
 //! set.  *Dismantling* repeatedly removes a member holding a factor that no other remaining member lists; its

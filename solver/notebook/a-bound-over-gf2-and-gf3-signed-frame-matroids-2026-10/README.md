@@ -19,7 +19,7 @@ matroids and their greedy), `common/cores.rs` (a frame's cores with a set applie
 and their merging), `common/dw.rs` (the bound and its multipliers), `common/lp.rs` (the master's simplex), and
 `common/frames.rs` (the GF(2) frame matroids and the game setup, moved out of `examples/matroid.rs`, which prints the
 same lines as before); the data and the tables in [solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md](README.md).  Theorems 14 and 15 of
-[THEORY.md](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
+[THEORY.md](../../../docs/theory/bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the bound
 rests on.  No solver change.
 
 *The bound.*  A *signing* σ of frame h over a field gives each incidence (mover, maximal factor) a nonzero value, each

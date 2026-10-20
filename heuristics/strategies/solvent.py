@@ -155,7 +155,7 @@ def _playable_order(
     The fast path's acceptances are verified acyclic before being
     committed; the complete tier accepts peel's assignment
     unconditionally, which is sound by Theorem 2, schedulability
-    (THEORY.md, section "The decision procedure": peel-produced
+    (docs/theory/decision-procedure.md, "The decision procedure": peel-produced
     assignments are provably acyclic).
     Either way the final matching is acyclic, and a single
     Kahn's-algorithm pass orders every element.  A leftover cycle is

@@ -739,6 +739,7 @@ const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sourc
 const REWRITTEN: &[&str] = &[
     "docs/GLOSSARY.md",
     "docs/THEORY.md",
+    "docs/theory/",
     "docs/WRITING.md",
     "README.md",
     "solver/README.md",
@@ -1328,9 +1329,10 @@ const NUMBER_SEPARATORS: &[&str] = &[", sections ", " sections ", ", section ", 
 /// The longest heading, in characters, that a citation by name quotes: a longer quotation is a sentence.
 const LONGEST_QUOTED_HEADING: usize = 100;
 
-/// The fewest citations by name that the check must find in the repository (it found 107 on 2026-10-20): fewer means
-/// that a pattern broke, not that the citations went away.
-const FEWEST_BY_NAME: usize = 90;
+/// The fewest citations by name that the check must find in the repository: fewer means that a pattern broke.  It found
+/// 107 on 2026-10-20, and 79 once THEORY.md was split, since a citation of a heading that became a file's title names
+/// the file alone.
+const FEWEST_BY_NAME: usize = 40;
 
 /// How a text writes the name of a document.
 #[derive(Debug, PartialEq)]
@@ -1890,12 +1892,12 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 
 /// The documents that rule 8 of docs/WRITING.md would have split and that are still whole, by their paths from the
 /// repository.  A document leaves the list when it is split, and its old file, now an index, joins `INDEXES`.
-const STILL_TO_SPLIT: &[&str] =
-    &["docs/THEORY.md", "solver/noframe/README.md", "solver/docs/AGENDA.md", "results/README.md"];
+const STILL_TO_SPLIT: &[&str] = &["solver/noframe/README.md", "solver/docs/AGENDA.md", "results/README.md"];
 
 /// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
 /// file, and stays under the index limit.
-const INDEXES: &[&str] = &["solver/docs/DESIGN.md", "solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
+const INDEXES: &[&str] =
+    &["docs/THEORY.md", "solver/docs/DESIGN.md", "solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
 fn word_count(text: &str) -> usize {

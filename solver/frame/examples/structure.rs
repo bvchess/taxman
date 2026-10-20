@@ -1,9 +1,9 @@
-//! The census of the structure of the frames: for each game of a range, how the board's frames sit by the number
-//! of prime factors of their numbers (their *layer*), how they are numbered from the front, what `unzip` claimed, and
-//! whether the hypotheses of the exactness theorem of the frame model (docs/THEORY.md, "The frame model is exact, given
-//! its upper part") hold on the board.  It looks at the frames as setup forms them and at the frames the search takes,
-//! built by the very function the solver uses (`taxman::frames::numbering`), and at the model the search builds from
-//! them ([`taxman::model::FrameGraph`]).  It searches nothing.
+//! The census of the structure of the frames: for each game of a range, how the board's frames sit by the number of
+//! prime factors of their numbers (their *layer*), how they are numbered from the front, what `unzip` claimed, and
+//! whether the hypotheses of the exactness theorem of the frame model (docs/theory/frame-model.md, "The frame model is
+//! exact, given its upper part") hold on the board.  It looks at the frames as setup forms them and at the frames the
+//! search takes, built by the very function the solver uses (`taxman::frames::numbering`), and at the model the search
+//! builds from them ([`taxman::model::FrameGraph`]).  It searches nothing.
 //!
 //! ```text
 //! cargo run --release --example structure -- FROM TO [--threads K] [--out FILE]
@@ -45,8 +45,7 @@
 //!   maximal factor that no other remaining member lists; every member must go).  Item: `{"plain_only": [..],
 //!   "greedy_only": [..]}`, the numbers in one set and not the other.
 //! * **H** (the claims in Π⁺(∅)): the extended problem with nothing open and the claims of `unzip` given
-//!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; docs/THEORY.md, "The
-//!   extended problem", the paragraph "The claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no
+//!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; docs/theory/extended-problem.md, the paragraph "The claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no
 //!   claim, keeps every claim of the search's frames in the order made, has the search's frames and candidates, and
 //!   poses the same search problem
 //!   ([`taxman::search::problem_of_extended`] of its frames and candidates equals [`taxman::search::problem_of`] of
@@ -75,12 +74,12 @@
 //! check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`, `"G"`, `"H"`) whose value is the first 20 of its items, and `"A_count"`,
 //! ... with how many there are; `{}` when everything holds.  `extended_frames`, `[count, lowest, highest]`: the
 //! frames of the extended problem Π⁺(O) with every source of three or more prime factors open, the most frames any O
-//! gives (`taxman::frames::extended_frame_count`; docs/THEORY.md, "The extended problem"), and the layers they
+//! gives (`taxman::frames::extended_frame_count`; docs/theory/extended-problem.md), and the layers they
 //! span (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
 //!
 //! **Lemma M5⁺'s check.**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if `f` passes the check
 //! ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided candidate has it among its
-//! maximal factors (docs/THEORY.md, "The extended problem", the paragraph "The claims of `unzip` in Π⁺(O)"); a
+//! maximal factors (docs/theory/extended-problem.md, the paragraph "The claims of `unzip` in Π⁺(O)"); a
 //! component that fails it for one back claim keeps none of its claims, front claims included; so does one that holds
 //! a source in O.  The candidates of
 //! Π⁺(O) only grow with O, so a back claim fails the check for some O exactly when it fails for the largest O that

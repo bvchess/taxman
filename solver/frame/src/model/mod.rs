@@ -28,7 +28,7 @@
 //!
 //! # One-sided candidates
 //!
-//! The extended problem Π⁺(O) ([`crate::frames::build_extended`], docs/THEORY.md, "The extended problem")
+//! The extended problem Π⁺(O) ([`crate::frames::build_extended`], docs/theory/extended-problem.md)
 //! has, besides the candidates above (*two-sided*: out of one frame, into the one in front), *one-sided* candidates:
 //! sources that a game may play or leave out.  A one-sided candidate `s` has an *own* frame `j`
 //! ([`FrameGraph::own`]); promoting it adds `s` to the moves of frame `j` if that frame stays winnable, removes no

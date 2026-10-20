@@ -16,7 +16,7 @@ candidates, the odd frames' the blocks of a matroid `B`, and every promotable se
 common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial time), the
 node's *heaviest set* `I*`, bounds its completions.
 
-[THEORY.md](../../../docs/THEORY.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof; the
+[THEORY.md](../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof; the
 theorem is the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses.
 The module comments of `src/gf2.rs` and `src/gf2/meet.rs` have the algorithms.  The GF(2) bound is never above the
 matching bound, since independent vectors have a system of distinct representatives, which is a matching.  What it
@@ -102,7 +102,7 @@ themselves, the pair is *symmetric*, and the exchange maps promotion sets to pro
 more.  Here `c_r(S)` is the sum of `x / r` over the members `x` of `S` divisible by `r`; in the pairs used, no candidate
 is divisible by `pq`, `p²` or `q²`.  So every heaviest promotion set keeps `c_p ≤ c_q` for every symmetric pair at once:
 a set that breaks one pair's inequality is beaten by its image under that pair's exchange alone
-([docs/THEORY.md](../../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).
+([docs/THEORY.md](../../../docs/theory/bounds.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).
 
 The pairs come in classes of primes that the frame builder treats alike.  At 1300 the classes are {41, 43}, {59, 61},
 {67, 71}, {73, 79}, {89, …, 107}, {109, …, 139} and {149, 151, 157}, which make 32 pairs; there are 99 at 2175 and 300

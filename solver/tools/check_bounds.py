@@ -2,7 +2,7 @@
 """Independent referee for the bounds store (results/bounds.jsonl, one JSON line a bound; results/README.md,
 "bounds.jsonl", has the format).  Standard library only; it shares no code with the Rust crate.  The rules of the game
 and of a finished game are solver/tools/check_results.py's (the referee of the results files), which this loads from
-beside itself; the bounds' arithmetic (Lemmas L1-L4 of docs/THEORY.md, "The ledger: bounds between boards") is written
+beside itself; the bounds' arithmetic (Lemmas L1-L4 of docs/theory/ledger.md) is written
 out again here, and so is the format.
 
 For every line:

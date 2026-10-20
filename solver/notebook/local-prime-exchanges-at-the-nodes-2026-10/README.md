@@ -31,7 +31,7 @@ combinations that a path's own menus allow under the gap vary a hundredfold or m
   that maps x onto another candidate: leaving 1704 = 24·71 out brings 1608 = 24·67 in.
 * The root's *symmetric pairs* are the exchanges that map the root's frames and candidates onto themselves; the search
   keeps c_p ≤ c_q for each, c_r being the sum of the cofactors of r ([glossary](../../../docs/GLOSSARY.md#the-search),
-  "prime exchange"; [THEORY.md, Theorem 13](../../../docs/THEORY.md#prime-exchanges-symmetries-of-the-promotions)).
+  "prime exchange"; [THEORY.md, Theorem 13](../../../docs/theory/bounds.md#prime-exchanges-symmetries-of-the-promotions)).
 
 ## What changed in the solver
 

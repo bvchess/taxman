@@ -11,10 +11,10 @@ the account of the run and the estimate it was planned by.
 
 **A run searches from the roles of Theorem B.**  `exact` starts there by default (`--fix-low 1`), and the search is
 still a proof, because every optimal set obeys the roles ([THEORY.md, Theorem
-B](../../../docs/THEORY.md#the-bottom-layers)).  Each line records `"fix_low":1`, and the check counts the proofs that
-rest on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the time a node ([the
-prover's README](../../noframe/README.md#3-the-proofs-of-optn)).  The run of 1301..2175 searched from the plain root, so
-by that measurement a run from the roles costs about half as much.
+B](../../../docs/theory/frame-model.md#the-bottom-layers)).  Each line records `"fix_low":1`, and the check counts the
+proofs that rest on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the time a node
+([the prover's README](../../noframe/README.md#3-the-proofs-of-optn)).  The run of 1301..2175 searched from the plain
+root, so by that measurement a run from the roles costs about half as much.
 `EXTRA_ARGS='--fix-low 0' solver/tools/cloud/prover.sh 1301 2175` reproduces that run.  The two kinds of search keep
 separate checkpoints: `ckpt/exact_N_low.ckpt` from the roles, `ckpt/exact_N.ckpt` from the plain root.
 

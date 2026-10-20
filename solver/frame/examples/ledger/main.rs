@@ -29,8 +29,7 @@
 //!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
-//!   the boards with the same search problem, applied to a fixpoint after every change (docs/THEORY.md, "The
-//!   ledger: bounds between boards").  *Given* games (`given`): the completed games of `--proven FILE` (a results
+//!   the boards with the same search problem, applied to a fixpoint after every change (docs/theory/ledger.md).  *Given* games (`given`): the completed games of `--proven FILE` (a results
 //!   file) in A − 1..B, each replayed, are fixed points.  `trivial`: a board with nothing to promote.
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
 //!   searched, and no prime whose board before it the ledger has (the prime formula gives its bounds both ways).  A

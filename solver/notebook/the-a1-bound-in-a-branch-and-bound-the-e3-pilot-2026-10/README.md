@@ -31,7 +31,7 @@ inherited columns and inequalities, Wentges-stabilized pricing from the inherite
 with subtree sizes, checkpoints that resume to the same tree, paired Knuth dives; `solver/notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/e3.py`, the tables.
 
 *Validity.*  Nothing new to prove: every evaluation of L is a bound at any multipliers and any signings
-([THEORY.md](../../../docs/THEORY.md#signed-frame-matroids-the-frame-bound-over-other-fields), Theorems 14 and 15,
+([THEORY.md](../../../docs/theory/bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields), Theorems 14 and 15,
 at a node by Theorem 14 (2)), the bound is ⌊L⌋ evaluated in integers, and the master only proposes multipliers.  The
 tests (`cargo t --release --example fields`, 48 pass, one ignored and run once): a child's inherited columns common
 independent in its matroids and within `max_add`, and its inequalities, ranks taken again, holding for 20 random

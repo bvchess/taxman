@@ -1,9 +1,8 @@
-//! The book of the ledger: for every game n, a lower bound L(n), the score of a game it holds, and an upper
-//! bound U(n) on opt(n), each with its derivation (the rule and the board it came from), and the relations between
-//! boards, applied to a fixpoint.  The relations are proven in docs/THEORY.md, "The ledger: bounds between
-//! boards"; each lemma there gives an L direction (a game of one board made from a game of another, which the
-//! referee replays here before it counts, and which is made and replayed only if it can beat the board's own) and a
-//! U direction (an inequality on opt(n)):
+//! The book of the ledger: for every game n, a lower bound L(n), the score of a game it holds, and an upper bound U(n)
+//! on opt(n), each with its derivation (the rule and the board it came from), and the relations between boards, applied
+//! to a fixpoint.  The relations are proven in docs/theory/ledger.md; each lemma there gives an L direction (a game of
+//! one board made from a game of another, which the referee replays here before it counts, and which is made and
+//! replayed only if it can beat the board's own) and a U direction (an inequality on opt(n)):
 //!
 //! * `monotone` (Lemma L1): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still legal
 //!   (n composite); U(n − 1) ≤ U(n).
@@ -429,7 +428,7 @@ impl Book {
     /// the boards (each one's ceiling from the one before) is passed on in one sweep and a chain down them in the
     /// next, and a board is not improved again by every source that happens to reach it first.
     /// Returns the changes, in order.  An error is a violation (L > U), or a game a relation made that the referee
-    /// refuses: either is a bug, or a counterexample to statement U (THEORY.md, "The ledger: bounds between boards").
+    /// refuses: either is a bug, or a counterexample to statement U (docs/theory/ledger.md).
     pub fn propagate(&mut self, changed: impl IntoIterator<Item = u32>) -> Result<Vec<Change>, String> {
         let mut pending: BTreeSet<u32> = changed.into_iter().collect();
         let mut cursor = 0;

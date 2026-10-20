@@ -11,7 +11,7 @@ from its mathematics (no code shared with the solver or the study) and proven th
 model-free proofs to the end of the committed chain, 1300?  What does a proof cost, and how fast does that grow?
 
 *The theorem.*  THEORY.md, [the parity
-matroids](../../../docs/THEORY.md#the-parity-matroids-a-bound-on-the-whole-game) (Theorem 10): a playable set's
+matroids](../../../docs/theory/bounds.md#the-parity-matroids-a-bound-on-the-whole-game) (Theorem 10): a playable set's
 vectors of maximal factors, with the unit vectors of its own members up to n/2, are linearly independent (from a legal
 order and Theorem 1's lifting argument; for the upper half it is Theorem 7's lemma), and each vector lies in the
 coordinates of one parity of Ω, so every playable set is independent in both parity matroids; at a node of a search,

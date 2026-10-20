@@ -15,7 +15,7 @@ does the log of the nodes grow about linearly with the distance proven down?
 virtual incumbent worth `floor` and no start (no greedy set, seed, dive or local search); nodes are pruned against it as
 against a set of that weight, and a set found heavier becomes the incumbent as usual.  `SearchResult::floor_held` says
 that it completed and found none.  With no floor the code path is the old one (the tripwires' node counts, the probe's
-trees and every other test are unchanged).  [Lemma F](../../../docs/THEORY.md#the-ledger-bounds-between-boards) in
+trees and every other test are unchanged).  [Lemma F](../../../docs/theory/ledger.md) in
 THEORY.md: a completed search with a floor that found no set proves P\* ≤ F, by the argument of Lemma D (the search reads
 only the incumbent's value).  The tests (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400,
 a floor below the optimum finds it, a floor at it or above completes with nothing found, and a floor at the root's bound

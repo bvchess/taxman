@@ -11,7 +11,7 @@ by the number of prime factors), Theorem L (playability splits by layer), Theore
 largest prime and U\*_2) and Theorem M (given N, U\* ∪ L is playable iff L is a promotion set).  Its first steps,
 E1 to E4, are this entry: check the hypotheses on every board, test the theorems against the code and the data, and
 write them down.  The statements and proofs are now in [THEORY.md, "The frame model: what is proven and what
-remains"](../../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains); DESIGN.md (§2, "What optimal
+remains"](../../../docs/theory/frame-model.md); DESIGN.md (§2, "What optimal
 means") and the README say what each proof kind rests on.
 
 *E1, the census* (commits 631e027, a122f43).  `unzip` records its pairs as *claims*, front (a source with one

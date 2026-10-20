@@ -4,7 +4,7 @@
 
 """Franklín and Moniot's characterization of playability against the parity matroids, by brute force.
 
-THEORY.md, "Relation to Franklín and Moniot", has the statements and the proofs this module checks.  A *payment
+docs/theory/franklin-moniot.md, has the statements and the proofs this module checks.  A *payment
 scheme* of a pick set S pays each member s with a distinct maximal factor of s outside S: a matching of the
 maximal-factor graph whose upper ends are exactly S.  per(S, T) counts the schemes whose payments are exactly the set
 T, the permanent of S's rows on the columns T.  The section proves

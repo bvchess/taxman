@@ -1,6 +1,6 @@
 //! Theorem B, the bottom layers of an optimal set, against every recorded and enumerated optimal set.
 //!
-//! The theorem (docs/THEORY.md, "The bottom layers"):
+//! The theorem (docs/theory/frame-model.md, "The bottom layers"):
 //!
 //! > The *layer* of a number x is Ω(x), its number of prime factors counted with multiplicity.  Let q be the largest
 //! > prime ≤ n, and U\*_2 the numbers of layer 2 above n/2 that setup keeps (descending greedy; on layer 2 a set is

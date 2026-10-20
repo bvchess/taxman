@@ -273,7 +273,7 @@ floor](../../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-fl
 
 The search can also take the *extended problem* Π⁺(O), the problem that a certificate of U searches
 ([certificates.md](certificates.md)).  It is the frame model with a set O of the sources of three or more prime factors
-that setup keeps made optional (THEORY.md, ["The extended problem"](../../../docs/THEORY.md#the-extended-problem), and
+that setup keeps made optional (THEORY.md, ["The extended problem"](../../../docs/theory/extended-problem.md), and
 the corollary of Theorem M⁺; `frames::build_extended`).  Besides the candidates of the frame model, which are
 *two-sided* (out of one frame, into the one in front), it has *one-sided* candidates: the members of O and the sources
 that greedy rejected beside them, each a possible move of its *own* frame.  It is research code: the solver's own path
