@@ -183,7 +183,7 @@ wait for the workers to park (10 to 15 ms at most on the M1).  A `max` of a few 
 
 ## Rehearsal of the chain, with interruptions
 
-This is the production run to 1231 in miniature, in a separate work directory, with every search that lasts more than 5
+This is the chain in miniature, to 1231, in a separate work directory, with every search that lasts more than 5
 seconds stopped and resumed:
 
 ```

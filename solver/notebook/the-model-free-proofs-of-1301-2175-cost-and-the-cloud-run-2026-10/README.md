@@ -202,3 +202,16 @@ model's 8 million nodes), and the idle CPUs are paid for.  The run's own totals 
 on 16 vCPUs, inside the row's ranges; 2170-2173 took 7.7 to 7.9 hours each, and what set the wall time was the packing
 of the late starts, not those games
 ([EXPERIMENTS](#the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10)).
+
+## Later (2026-10-20): the run's launch, as the runbook gave it
+
+The runbook's page on the prover took this run as its example until the page was made general.  The values it gave:
+
+* the command, from the plain root: `EXTRA_ARGS='--fix-low 0' solver/tools/cloud/prover.sh 1301 2175`, with
+  `DEADLINE_HOURS=36 POWEROFF=always` and `S3_DEST=s3://taxman-013764204840-us-east-1/prover-1301-2175`;
+* the timer, `TIMER_MINUTES` 2220;
+* the results file, `solver/noframe/data/exact_parity_1301_2175.jsonl` (152 KB), checked with the default `BASELINE`,
+  the proofs of 2..1300;
+* the first passes on the `c8g.4xlarge`, 2.2 to 3.3 ms a node from the plain root, more for the late games; the
+  rehearsal's ten games, 2.44 ms a node, and about 3 minutes of one thread on a laptop.
+

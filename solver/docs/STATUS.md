@@ -16,7 +16,7 @@ now.  Nothing is published: `optimal.json` stays at 1300.
 **The wall** (Brian, 2026-10-16): the first n whose own search (not time spent waiting behind another game) takes more
 than 24 hours on one `c8g.16xlarge` with the run's build and settings (`solve --game-hours 24`: the hours the game has
 been the oldest of the window with its search running).  The next run stops there, keeping the game's checkpoint, or
-when its budget is spent ([runbook/wall.md](runbook/wall.md#what-needs-brians-approval-and-what-it-costs)).  The chain's
+when its budget is spent ([runbook/wall.md](runbook/wall.md#what-needs-approval-and-what-it-costs)).  The chain's
 launch is [runbook/chain.md](runbook/chain.md), the unattended run
 [runbook/wall.md](runbook/wall.md); each needs Brian's approval.
 

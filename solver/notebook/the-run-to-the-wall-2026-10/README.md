@@ -61,6 +61,131 @@ appended); the logs, the chart of the search times and `reproof_check.py` are in
 *Not kept.*  The checkpoint of game 3915 (2.9 MB; a build other than eb84a6f cannot resume it), the lines of the
 results file past 3440 (the committed ones) and the other checkpoints.
 
+
+## Later (2026-10-20): the rehearsal, as the runbook gave it
+
+The runbook's page on the run to the wall held this until the page was made general.
+
+The rehearsal tests the whole mechanism on a small machine, with the chain to 1300 instead of the whole committed chain
+and the limits tiny.  It takes two runs, because the wall is the end of a run: the first shows the wall and the end that
+takes the group to 0, and the second the replacement and the budget.  It costs about $0.15 in all.
+
+Use a `c8g.2xlarge` (8 vCPUs, 16 GiB, about $0.13 an hour at spot), whose machines build in about 7 minutes.  A
+`c8g.large` (2 vCPUs, 4 GiB) cannot build the solver: its first machine stopped answering Systems Manager three minutes
+after boot and sat at half its CPU for 35 minutes with the chain not started.
+
+**Slow the chain on purpose.**  No game up to 1300 takes a second under the default search (on 2 threads of an M1 Max,
+1232 takes 1.0 s, 1287 0.7 s, and none up to 400 takes 10 ms), so neither a wall of seconds nor a chain that outlasts
+the budget would come.  Both runs pass `--extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"`, the
+matching path (the search before the GF(2) bound), whose games are slower and give the same answers.  On 2 threads of
+the M1 Max it takes 2.1 s for game 950, 4.1 s for 988 and 989, 9.1 s for 990, 2.0 s for 1200, and hours for 1232
+to 1300.
+
+```
+cd ~/dev/taxman_work/taxman
+export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                 # after: aws login --profile bvc
+git fetch && git rev-parse origin/master                              # the merged master with these scripts, pushed
+export COMMIT=THE-40-DIGIT-ID-IT-PRINTED
+export UNTIL=$(date -u -v+2d +%F)                                     # GNU date: date -u -d '2 days' +%F.  Check it.
+```
+
+**Run 1: the wall, and the end that takes the group to 0** (budget 0.3 hours; about 15 minutes).  A wall of 3.6 seconds
+(`--game-hours 0.001`) falls at the first game whose search is longer as the head of the window.  No game from 400 to
+987 takes more than 2.1 s on 2 threads of the M1 Max, 988 and 989 take 4.1 s and 990 9.3 s (a Graviton4 core is a little
+slower), so the wall falls at 988, or at 989 or 990 if the head had less than 3.6 s of the search to do:
+
+```
+export RUN=rehearsal-1
+DRY_RUN=1 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+    --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.3 --game-hours 0.001 --chain-to 1300 --margin 60 --max-instances 4 \
+    --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+solver/tools/cloud/wall.sh status          # every few minutes
+```
+
+It passes if `status` ends in `ENDED ...: wall at N after H hours` within about 15 minutes of the launch, with N between
+988 and 992 (the run of 2026-10-17 ended at 992) and H at least 0.001, and:
+
+* `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names taxman-wall --query 'AutoScalingGroups[0].DesiredCapacity'`
+  says 0 and no instance remains (`describe-instances` of the end checks): the end took the group to 0 and nothing
+  replaced the machine.  Check again 5 minutes later.
+* `aws s3 ls s3://taxman-013764204840-us-east-1/wall-rehearsal-1/ckpt/` has `nN.ckpt` and `nN.clock`, and the last line
+  of `results/strict.jsonl` there is game N − 1 (no line for N).
+* The results pulled home agree with the committed chain:
+  `aws s3 sync s3://taxman-013764204840-us-east-1/wall-rehearsal-1/results results-rehearsal-1/`, then
+  `solver/tools/cloud/verify.sh results-rehearsal-1/strict.jsonl` prints
+  `N − 1 games are in more than one file, with equal scores in all`.
+* If the build was slow enough that the budget of 0.3 hours came first, the end says
+  `deadline: the budget of 0.3 instance-hours`.  That tests the budget, and you run the wall again with
+  `--budget-hours 0.6`.
+
+Then run `solver/tools/cloud/wall.sh cleanup`, which ends with the checks.
+
+**Run 2: a forced replacement, and the budget** (budget 0.6 hours, about 40 minutes).  The matching path's chain is
+still going when you terminate the machine and when the budget ends (it reaches 1231 in minutes and is then in games of
+hours).  Copies to S3 every 2 minutes and checkpoints every minute give the replacement something recent to restore:
+
+```
+export RUN=rehearsal-2
+solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --instance-type c8g.2xlarge --volume-gb 20 \
+    --spot-max 0.40 --budget-hours 0.6 --game-hours 24 --chain-to 1300 --margin 60 --max-instances 4 \
+    --save-every 120 --checkpoint-interval 60 --extra-args "--tactic gf2=off --tactic lagrange=on --tactic symmetry=off"
+solver/tools/cloud/wall.sh status          # until a game is in flight and the last save is recent
+```
+
+Once the chain is running and a save has followed it (about 13 minutes after the launch), terminate the machine without
+a notice, which is the worst case (no final checkpoint, no final save):
+
+```
+I=$(aws ec2 describe-instances --filters Name=tag:Project,Values=taxman Name=tag:Purpose,Values=wall \
+    Name=instance-state-name,Values=running --query 'Reservations[].Instances[].InstanceId' --output text)
+aws ec2 terminate-instances --instance-ids $I
+aws autoscaling describe-scaling-activities --auto-scaling-group-name taxman-wall --max-items 6 \
+    --query 'Activities[].[StartTime,StatusCode,Description]' --output text      # a termination, then a launch
+solver/tools/cloud/wall.sh status          # machines started: 2; the hours go on from where the first left them
+```
+
+It passes if:
+
+* the group launches a second machine without anyone (within about 3 minutes);
+* the log in S3
+  (`aws s3 cp s3://taxman-013764204840-us-east-1/wall-rehearsal-2/logs/chain.log - | grep -E 'starting|stopped|deadline'`)
+  shows a second `starting the solver` whose `games done so far` is at least the first's last save, and `chain.err`
+  shows the game in progress continuing from its checkpoint (a node count above zero at its first progress line);
+* `run/ledger` shows `base` equal to the first machine's `hours`;
+* the run ends within a few minutes of 0.6 instance-hours with `deadline: the budget of 0.6 instance-hours`, the group
+  at 0, no instance, and `hours` in the ledger between 0.55 and 0.65.
+
+Then run `solver/tools/cloud/wall.sh cleanup`.  Once you have read the logs, the two prefixes can go (a deletion in the
+bucket: Brian's yes first, like everything else here):
+
+```
+aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-1/
+aws s3 rm --recursive s3://taxman-013764204840-us-east-1/wall-rehearsal-2/
+```
+
+**The run of 2026-10-17** (commit eb84a6f; about $0.15 in all).  Run 1 ended `wall at 992 after 0.00100 hours`, with the
+group at 0, the checkpoint and clock of 992 in S3, and the results 1..991 equal to the committed scores.  In run 2 the
+machine terminated without notice at game 1289; the group replaced it 2 seconds later, the replacement resumed from S3
+(`games done so far: 1289`, the ledger's `base` the first machine's hours), and the chain ended
+`complete: the range 1-1300` before the budget, with the group at 0.  A third run, with a budget of 0.2 hours, ended
+`deadline: the budget of 0.2 instance-hours` at 0.18, with the group at 0.
+
+**Cost.**  Run 1 takes about 0.25 instance-hours and run 2 0.6, so 0.85 instance-hours of a `c8g.2xlarge`, with a 20 GB
+gp3 volume for as long (under a cent) and a few thousand requests to S3: **about $0.15 in all**, and under $0.40 at the
+spot ceiling of $0.40 an hour.  The account changes are those of [What needs approval, and what it
+costs](../../docs/runbook/wall.md#what-needs-approval-and-what-it-costs), with the spot instance of a `c8g.2xlarge` and
+the group's termination by `aws ec2 terminate-instances`.
+
+**What the rehearsal leaves out:** the 64-thread machine, the hours-long searches (the Rust tests check the clock at the
+wall for the window and its resume, not for 24 hours), and the spot interruption notice itself.  `terminate-instances`
+sends none, so the path through `spot-watch.sh` (a SIGTERM, the final checkpoint, the wait for AWS to take the machine)
+is what the local test `test/run.sh node` exercises with a signal.  AWS Fault Injection Service can send a real notice
+(`aws:ec2:send-spot-instance-interruptions`), at the cost of an experiment template and a role, which this procedure
+does not make.
+
 ## Files
 
 The run

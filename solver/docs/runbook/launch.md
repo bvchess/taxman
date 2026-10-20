@@ -7,10 +7,10 @@ Part of the [runbook](../RUNBOOK.md).
 These hold for every instance this project starts: a trial of the scripts, the prover's proofs, the chain, a
 calibration.  The jobs link here instead of repeating them.
 
-* **Get Brian's approval first.**  An instance, a volume, a key pair, a security group, a spot request, a bucket and a
-  role each cost money or change the AWS account, so each needs his explicit yes and a cost estimate before you make the
-  call.  Reading (describe, the spot price history, quotas) needs none.  The estimate is the hours times the spot price
-  of the hour: read the history first ([Quota, prices and spot
+* **Get the approval of whoever owns the AWS account first.**  An instance, a volume, a key pair, a security group, a
+  spot request, a bucket and a role each cost money or change the AWS account, so each needs their explicit yes and a
+  cost estimate before you make the call.  Reading (describe, the spot price history, quotas) needs none.  The estimate
+  is the hours times the spot price of the hour: read the history first ([Quota, prices and spot
   interruptions](machine.md#quota-prices-and-spot-interruptions)), and let the timer, below, bound the hours.
 * **Use spot, on `c8g`.**  Spot is the default ([Spot or on demand](machine.md#spot-or-on-demand) says where an
   interruption would ruin a run), on the `c8g` family (Graviton4), in the sizes that the calibration settled on:
@@ -67,7 +67,7 @@ aws login --profile bvc
 export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1
 ```
 
-The bucket and the role exist (Brian approved making them on 2026-10-14) and stay between runs.  The security group is
+The bucket and the role exist and stay between runs.  The security group is
 made for each launch and deleted at its end.
 
 | what | name | content |
@@ -95,12 +95,12 @@ aws iam add-role-to-instance-profile --instance-profile-name taxman-ec2 --role-n
 
 ### Launch
 
-Each job gives its own instance type, volume, `Purpose` and timer.  The values below are the prover's
-([prover.md](prover.md)): one `c8g.4xlarge` on spot, Amazon Linux 2023 arm64 (user `ec2-user`; Ubuntu 22.04 or 24.04
-arm64 has `ubuntu`), no key pair, in the zone with the lowest price in the spot price history.  The timer is the job's
-`DEADLINE_HOURS` plus an hour, in minutes: 36 + 1 hours is 2220.  The ceiling `MAX_PRICE` goes above the spot price
-([Spot or on demand](machine.md#spot-or-on-demand)).  `run-instances` resolves the AMI from an SSM parameter; check the
-parameter first with `aws ssm get-parameter --name ...` if you like.
+Each job gives its own instance type, volume, `Purpose` and timer.  The values below are an example, a run of the
+prover's ([prover.md](prover.md)) with a deadline of 36 hours: one `c8g.4xlarge` on spot, Amazon Linux 2023 arm64 (user
+`ec2-user`; Ubuntu 22.04 or 24.04 arm64 has `ubuntu`), no key pair, in the zone with the lowest price in the spot price
+history.  The timer is the job's `DEADLINE_HOURS` plus an hour, in minutes: 37 hours is 2220.  The ceiling `MAX_PRICE`
+goes above the spot price ([Spot or on demand](machine.md#spot-or-on-demand)).  `run-instances` resolves the AMI from an
+SSM parameter; check the parameter first with `aws ssm get-parameter --name ...` if you like.
 
 ```
 INSTANCE_TYPE=c8g.4xlarge ZONE=us-east-1b VOLUME_GB=20 PURPOSE=prover TIMER_MINUTES=2220 MAX_PRICE=0.40
@@ -225,7 +225,8 @@ budget alert on the account, set before the first launch, is the other half.
      starts (`aws s3 sync $S3_DEST/logs ~/taxman-work/logs`), or the first save of the replacement uploads its own
      `chain.log`, `chain.out`, `chain.err`, `save.log` and `spot-watch.log` over the old machine's in S3, which share
      their names.
-   * **The deadline.**  `save.sh` does not save `~/taxman-work/deadline`, so a replacement machine starts a fresh
+   * **The deadline.**  `save.sh` does not save the deadline's file (`~/taxman-work/deadline` for `chain.sh`,
+     `deadline.NAME` for the others, as `run.sh` names it), so a replacement machine starts a fresh
      deadline at its first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls
      where the first one did.  A run that replacements continue by themselves does not count that way: its
      `BUDGET_HOURS` and `RUN_UNTIL` live in S3 ([wall.md](wall.md)).
@@ -249,8 +250,8 @@ reader drops a torn last line.
 The bill is the instance's hours, not the search's.  For each instance, find its launch and termination times
 (`aws ec2 describe-instances --instance-ids I --query 'Reservations[].Instances[].[LaunchTime,StateTransitionReason]'`
 while it exists; the console's instance history or CloudTrail afterwards), multiply the hours by the spot price of those
-hours (`describe-spot-price-history`: [machine.md](machine.md)), and set the product beside the estimate Brian approved.
-Report the job's own measure of work beside it where it has one: the thread-hours of the prover's searches
+hours (`describe-spot-price-history`: [machine.md](machine.md)), and set the product beside the estimate that was
+approved.  Report the job's own measure of work beside it where it has one: the thread-hours of the prover's searches
 (`summarize.py exact`, [Bring the data home, verify, commit](prover.md#bring-the-data-home-verify-commit)), or those of
 the certificates against the plan's ([Results home, verification, and the
 spending](certify.md#results-home-verification-and-the-spending)).  The "Cost" paragraph of the calibration entry is the

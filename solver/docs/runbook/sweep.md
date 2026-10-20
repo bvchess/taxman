@@ -1,15 +1,12 @@
-# The sweep
+# The sweep (`sweep.sh`)
 
 Part of the [runbook](../RUNBOOK.md).
 
-`sweep.sh FIRST LAST` proves as many games of a long stretch as a cheap machine allows, with holes, on one
-`c8g.16xlarge` at spot.  Brian chose 3441 to 8191 for it (2026-10-17).  The chain of [chain.md](chain.md) proves every
-game in turn and stops at the first it cannot (the search of 3441 took 2.8 hours on 64 threads).  The sweep instead
-gives each game at
-most `GAME_SECONDS` (180) of one thread, goes on past the games that do not finish, and keeps what does.
-[STATUS](../STATUS.md) says whether it has run, and [a local
-test](../../notebook/the-sweep-a-local-test-2026-10/README.md) tried it on the laptop.  A launch needs Brian's approval
-with the estimate of [What it costs](#what-it-costs) ([rules for every launch](launch.md#rules-for-every-launch)).
+`sweep.sh FIRST LAST` proves as many games of a long stretch as a cheap machine allows, with holes, on one machine.  The
+chain of [chain.md](chain.md) proves every game in turn and stops at the first it cannot.  The sweep instead gives each
+game at most `GAME_SECONDS` (default 180) of one thread, goes on past the games that do not finish, and keeps what does.
+A launch needs the approval of whoever owns the AWS account, with the estimate of [What it costs](#what-it-costs)
+([rules for every launch](launch.md#rules-for-every-launch)).
 
 ## What it does
 
@@ -54,30 +51,27 @@ the agreement of its scores with the committed chain), and `sweep.sh` runs it wh
 
 ## What it costs
 
-**About $3.3 for pass 1.**  By `sweep_plan.py`'s sizes, 3441..8191 at `GAME_SECONDS` 180 is 4,751 games: 76 core-hours
-of setup and at most 238 of search, so at most 314 core-hours, 4.9 hours of 64 CPUs.  It splits into 64 blocks of 4.83
-to 4.97 core-hours each, the first of 95 games (3441..3535) and the last of 50 (8142..8191).  A `c8g.16xlarge` at spot
-cost $0.66 to $0.81 an hour on 2026-10-17, counted at $0.676 as in [What needs Brian's approval, and what it
-costs](wall.md#what-needs-brians-approval-and-what-it-costs), so pass 1 costs about $3.3.  The later passes cost a
-fraction of that, since they search again only the games whose game before has gained.  A deadline of 8 hours
-(`DEADLINE_HOURS`) bounds the run at about $5.4 at $0.676 an hour ($6.5 at $0.81), and the timer of 9 hours bounds the
-machine at $9 at the ceiling of $1.0; the 40 GB volume costs a few cents.  The launch builds nothing: it takes the
-solver from the build cache, which must already hold the commit ([Launch, watch, stop, bring the results
-home](#launch-watch-stop-bring-the-results-home)).  Releasing a commit is a launch of its own, $0.15
+**Pass 1 costs at most its core-hours.**  `solver/tools/sweep_plan.py` sizes the blocks from the setup times above and
+the limit: a game costs its setup and at most `GAME_SECONDS` of search, so FIRST..LAST costs at most the sum of its
+setups and its searches, in core-hours, over the machine's CPUs, at the spot price of the hour
+([machine.md](machine.md#quota-prices-and-spot-interruptions)).  The later passes cost a fraction of that, since they
+search again only the games whose game before has gained.  `DEADLINE_HOURS` bounds the run, and the timer, an hour
+longer, bounds the machine at the price ceiling; a 40 GB volume costs a few cents.  The launch builds nothing: it takes
+the solver from the build cache, which must already hold the commit; releasing a commit is a launch of its own, $0.15
 to $0.25 ([The release: the suite, then the cache](build-cache.md#the-release-the-suite-then-the-cache)).
 
 *Details.*  The estimate is an upper bound for pass 1: a game that a repeat or the prime formula settles costs its setup
-alone.  The setup times past 4000 are extrapolated from four measured points.  Nobody has measured what finishes in 180
-s past 3441.  Most searches will not, since the cost of a game grows tenfold in about 1,040 in n, so expect most lines
+alone.  The setup times past 4000 are extrapolated from four measured points.  Past the end of the committed chain most
+searches will not finish in 180 s, since the cost of a game grows tenfold in about 1,040 in n, so expect most lines
 unfinished, with the proofs among the primes, the repeats after a proven game and the easy searches.
 
 ## Launch, watch, stop, bring the results home
 
-**Launch one instance, not a group,** after Brian's yes.  Its user data runs the sweep by itself: it sets the timer,
-installs, clones the pinned commit, sets up from the build cache, restores what S3 holds, and runs the sweep in tmux as
-`ec2-user`.  `POWEROFF=always` shuts the machine down when the sweep ends, for any reason, and the timer is the
-backstop.  Launch as [Launch](launch.md#launch) says, with these values, `ZONE` the zone of the lowest price that day
-([machine.md](machine.md)) and the ceiling the run to the wall's:
+**Launch one instance, not a group,** after the account owner's yes.  Its user data runs the sweep by itself: it sets
+the timer, installs, clones the pinned commit, sets up from the build cache, restores what S3 holds, and runs the sweep
+in tmux as `ec2-user`.  `POWEROFF=always` shuts the machine down when the sweep ends, for any reason, and the timer is
+the backstop.  Launch as [Launch](launch.md#launch) says, with `ZONE` the zone of the lowest price that day
+([machine.md](machine.md)); one `c8g.16xlarge` at spot suits a stretch of a few thousand games:
 
 ```
 INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=sweep MAX_PRICE=1.0
@@ -85,19 +79,20 @@ INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=sweep MAX_PRICE=1.0
 
 Pass `--user-data file://sweep-user-data.sh` in place of the `--user-data` argument of [launch.md](launch.md#launch):
 the file sets the timer itself, so `TIMER_MINUTES` is not needed.  `sweep-user-data.sh` is, with `COMMIT` the id of the
-pushed master:
+pushed master, `HOURS` the deadline, `MINUTES` the timer (60 × (`HOURS` + 1)) and `PREFIX` the run's own prefix of the
+bucket (`sweep-FIRST-LAST`):
 
 ```
 #!/bin/bash
-shutdown -h +540                                    # the timer: DEADLINE_HOURS below, and an hour
+shutdown -h +MINUTES                                # the timer: DEADLINE_HOURS below, and an hour
 dnf install -y git tmux || { shutdown -h now; exit 1; }
 sudo -u ec2-user git clone https://github.com/bvchess/taxman.git /home/ec2-user/taxman
 sudo -u ec2-user git -C /home/ec2-user/taxman checkout COMMIT
 sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
-    'export S3_DEST=s3://taxman-013764204840-us-east-1/sweep-3441-8191
+    'export S3_DEST=s3://taxman-013764204840-us-east-1/PREFIX
      BUILD="--bin taxman" REQUIRE_CACHED=1 SKIP_TESTS=1 NO_PULL=1 solver/tools/cloud/setup.sh &&
-         { solver/tools/cloud/save.sh --restore; DEADLINE_HOURS=8 POWEROFF=always GAME_SECONDS=180 \
-               solver/tools/cloud/sweep.sh 3441 8191; }
+         { solver/tools/cloud/save.sh --restore; DEADLINE_HOURS=HOURS POWEROFF=always GAME_SECONDS=180 \
+               solver/tools/cloud/sweep.sh FIRST LAST; }
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
@@ -114,7 +109,7 @@ sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
 * **Bring the results home** and check them:
 
   ```
-  aws s3 sync s3://taxman-013764204840-us-east-1/sweep-3441-8191/results/ results-from-cloud/
+  aws s3 sync s3://taxman-013764204840-us-east-1/PREFIX/results/ results-from-cloud/
   solver/tools/cloud/verify.sh results-from-cloud/explore.jsonl
   ```
 
@@ -129,3 +124,9 @@ sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
 *Details.*  The tests of the script are `test/run.sh sweep` and, for the planner,
 `python3 -I solver/tools/test_sweep_plan.py`.  `test/run.sh sweep` runs `verify.sh`, so it replays the committed games
 three times; set `TAXMAN_BIN` to a non-release build if there is no release build.
+
+## An example
+
+[The sweep's local test](../../notebook/the-sweep-a-local-test-2026-10/README.md) ran it on the laptop, and [its later
+section](../../notebook/the-sweep-a-local-test-2026-10/README.md#later-2026-10-the-cloud-sweep-of-34418191-as-the-runbook-planned-it)
+has the plan and the estimate of a cloud sweep of 3441..8191.

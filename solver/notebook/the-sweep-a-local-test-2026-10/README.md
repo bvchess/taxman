@@ -60,3 +60,62 @@ four points); the passes at the scale of 64 blocks; anything on EC2.
 
 **Commits.**  The branch with `--keep-going`, `--retry`, `--retry-improved` and `--pass` in `taxman solve`, the referees'
 checks of unfinished lines, `sweep.sh` and `solver/tools/sweep_plan.py`.
+
+## Later (2026-10): the cloud sweep of 3441..8191, as the runbook planned it
+
+The runbook's page on the sweep held the plan of this campaign until its guide was made general (2026-10-20).  Brian
+chose 3441 to 8191 for it (2026-10-17); the chain had stopped at 3441, whose search took 2.8 hours on 64 threads.  The
+plan, as it stood:
+
+### What it would cost
+
+**About $3.3 for pass 1.**  By `sweep_plan.py`'s sizes, 3441..8191 at `GAME_SECONDS` 180 is 4,751 games: 76 core-hours
+of setup and at most 238 of search, so at most 314 core-hours, 4.9 hours of 64 CPUs.  It splits into 64 blocks of 4.83
+to 4.97 core-hours each, the first of 95 games (3441..3535) and the last of 50 (8142..8191).  A `c8g.16xlarge` at spot
+cost $0.66 to $0.81 an hour on 2026-10-17, counted at $0.676 as in [What needs Brian's approval, and what it
+costs](../../docs/runbook/wall.md#what-needs-approval-and-what-it-costs), so pass 1 costs about $3.3.  The later
+passes cost a fraction of that, since they search again only the games whose game before has gained.  A deadline of 8
+hours (`DEADLINE_HOURS`) bounds the run at about $5.4 at $0.676 an hour ($6.5 at $0.81), and the timer of 9 hours bounds
+the machine at $9 at the ceiling of $1.0; the 40 GB volume costs a few cents.  The launch builds nothing: it takes the
+solver from the build cache, which must already hold the commit ([Launch, watch, stop, bring the results
+home](../../docs/runbook/sweep.md#launch-watch-stop-bring-the-results-home)).  Releasing a commit is a launch of its
+own, $0.15 to $0.25 ([The release: the suite, then the
+cache](../../docs/runbook/build-cache.md#the-release-the-suite-then-the-cache)).
+
+*Details.*  The estimate is an upper bound for pass 1: a game that a repeat or the prime formula settles costs its setup
+alone.  The setup times past 4000 are extrapolated from four measured points.  Nobody has measured what finishes in 180
+s past 3441.  Most searches will not, since the cost of a game grows tenfold in about 1,040 in n, so expect most lines
+unfinished, with the proofs among the primes, the repeats after a proven game and the easy searches.
+
+### The launch
+
+**Launch one instance, not a group,** after Brian's yes.  Its user data runs the sweep by itself: it sets the timer,
+installs, clones the pinned commit, sets up from the build cache, restores what S3 holds, and runs the sweep in tmux as
+`ec2-user`.  `POWEROFF=always` shuts the machine down when the sweep ends, for any reason, and the timer is the
+backstop.  Launch as [Launch](../../docs/runbook/launch.md#launch) says, with these values, `ZONE` the zone of the
+lowest price that day ([machine.md](../../docs/runbook/machine.md)) and the ceiling the run to the wall's:
+
+```
+INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=sweep MAX_PRICE=1.0
+```
+
+Pass `--user-data file://sweep-user-data.sh` in place of the `--user-data` argument of
+[launch.md](../../docs/runbook/launch.md#launch): the file sets the timer itself, so `TIMER_MINUTES` is not needed.
+`sweep-user-data.sh` is, with `COMMIT` the id of the pushed master:
+
+```
+#!/bin/bash
+shutdown -h +540                                    # the timer: DEADLINE_HOURS below, and an hour
+dnf install -y git tmux || { shutdown -h now; exit 1; }
+sudo -u ec2-user git clone https://github.com/bvchess/taxman.git /home/ec2-user/taxman
+sudo -u ec2-user git -C /home/ec2-user/taxman checkout COMMIT
+sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
+    'export S3_DEST=s3://taxman-013764204840-us-east-1/sweep-3441-8191
+     BUILD="--bin taxman" REQUIRE_CACHED=1 SKIP_TESTS=1 NO_PULL=1 solver/tools/cloud/setup.sh &&
+         { solver/tools/cloud/save.sh --restore; DEADLINE_HOURS=8 POWEROFF=always GAME_SECONDS=180 \
+               solver/tools/cloud/sweep.sh 3441 8191; }
+     sudo shutdown -h now'                          # also if the setup failed
+```
+
+Its results would come home with
+`aws s3 sync s3://taxman-013764204840-us-east-1/sweep-3441-8191/results/ results-from-cloud/`.

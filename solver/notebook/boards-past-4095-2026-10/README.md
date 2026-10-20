@@ -124,6 +124,20 @@ its moves were also replayed by the Python referee's rules: every game legal, fi
 prime, and scoring its `best_so_far`, which is its `in_the_bag` plus its promotions' sum.  The chain behind a file
 that reaches 4095 is the cloud machine's to run: the RUNBOOK says how (section 5, "Past 4095").
 
+
+## Later (2026-10-20): taking a chain past 4095 on an older build, as the runbook said
+
+The runbook's page on the chain said this until the page was made general:
+
+* **Past 4095.**  The solver supports games up to n = 8191 (`taxman::solver::MAX_N`), those from 4096 with sets of 128
+  words ([the entry on boards past 4095](README.md)).  A build from before commit 4316168 stops at n = 4095, the widest
+  set it has.  To take a chain past 4095, stop it (or let `chain.sh 4095` finish), build the newer commit in the same
+  checkout (`git pull`, then `setup.sh`, or `cargo build --release` in `solver/frame`), and run `chain.sh N` again with
+  N up to 8191 (or `CHAIN_TO=N`).  It skips the completed games, and the checkpoint of a game below 4096 that the old
+  build wrote resumes, since the game keeps its width, frames, candidates and tactics (tried with checkpoints of 1133
+  and 3600).  The solver refuses a game past 8191 ("beyond the largest supported board"), which ends the script with an
+  error.
+
 ## Files
 
 From `wall` as in [the wall regime's files](../the-wall-regime-2026-10/README.md#files-and-the-commands-that-made-them):

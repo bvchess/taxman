@@ -1,29 +1,28 @@
-# The ledger's experiment
+# The ledger on a cloud machine (`ledger/cloud.sh`)
 
 Part of the [runbook](../RUNBOOK.md).
 
-`solver/tools/ledger/cloud.sh FIRST-LAST` runs the ledger over a stretch of games for a budget of CPU, with the truth
-hidden from it, on one `c8g.16xlarge` at spot.  The ledger (`examples/ledger/`; [README, "Keeping going past
+`solver/tools/ledger/cloud.sh FIRST-LAST` runs the ledger over a stretch of games for a budget of CPU on one machine.
+The ledger (`examples/ledger/`; [README, "Keeping going past
 limits"](../../frame/README.md#keeping-going-past-limits-and-the-sweep)) proves games from both sides, bounds from below
-and above, in the order that its scheduler judges cheapest.  The experiment asks whether it proves much of a stretch
-that the chain has proven, for a small share of what the chain spent there: on 2176..3440, the run to the wall re-proved
-the stretch in about 4.4 hours of 64 threads, about 280 core-hours.  [The ledger's
-entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records the laptop's dry run of 1301..1500,
-every launch and what it found, and how the scheduler works.  A launch needs Brian's approval with the cost below
-([rules for every launch](launch.md#rules-for-every-launch)).
+and above, in the order that its scheduler judges cheapest.  [The ledger's
+entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records how the scheduler works, the laptop's
+dry run, and every launch and what it found.  A launch needs the approval of whoever owns the AWS account, with the cost
+below ([rules for every launch](launch.md#rules-for-every-launch)).
 
-`cloud.sh` runs `ledger run` with no proven game, then `ledger report --known results/strict.jsonl`.  The report exits
+`cloud.sh` runs `ledger run`, with no proven game unless `PROVEN` gives some, then `ledger report --known
+results/strict.jsonl`.  The report exits
 with status 1 if a bound is on the wrong side of the chain's score or a game does not replay: that is a bug, so stop and
 report it.  The script's comment documents its environment.
 
-**Cost.**  About 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour) and about $3.3 on demand: the setup (a build
-of about 10 minutes, or none with the commit's binaries in the build cache, [build-cache.md](build-cache.md)), the run
-(`CPU_HOURS` 64, an hour of the 64 CPUs, and the searches still going when it is spent, each limited to the budget left
-over the workers), and the report (a minute).  The timer of 150 minutes bounds it at about $1.7 at spot, and the 40 GB
-volume costs a few cents.
+**Cost.**  With `CPU_HOURS` 64 on a `c8g.16xlarge`, about 1.3 instance-hours, **about $0.9 at spot** ($0.68 an hour) and
+about $3.3 on demand: the setup (a build of about 10 minutes, or none with the commit's binaries in the build cache,
+[build-cache.md](build-cache.md)), the run (`CPU_HOURS` 64, an hour of the 64 CPUs, and the searches still going when it
+is spent, each limited to the budget left over the workers), and the report (a minute).  The timer of 150 minutes bounds
+it at about $1.7 at spot, and the 40 GB volume costs a few cents.
 
-**Launch** as [Launch](launch.md#launch) says, with these values, `ZONE` the zone of the lowest price that day
-([machine.md](machine.md)) and the ceiling of [Launch, watch, stop, bring the results
+**Launch** as [Launch](launch.md#launch) says, with these values for one `c8g.16xlarge` at spot, `ZONE` the zone of the
+lowest price that day ([machine.md](machine.md)) and the ceiling of [Launch, watch, stop, bring the results
 home](sweep.md#launch-watch-stop-bring-the-results-home):
 
 ```
@@ -32,7 +31,7 @@ INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=ledger MAX_PRICE=1.0
 
 Pass `--user-data file://ledger-user-data.sh` in place of the `--user-data` argument of [launch.md](launch.md#launch):
 the file sets the timer itself, so `TIMER_MINUTES` is not needed.  `ledger-user-data.sh` is, with `COMMIT` the pushed
-master that has the ledger and `DATE` the day:
+master that has the ledger, `DATE` the day and `FIRST-LAST` the stretch:
 
 ```
 #!/bin/bash
@@ -44,7 +43,7 @@ sudo -u ec2-user bash -lc 'cd ~ && git clone -q https://github.com/bvchess/taxma
 sudo -u ec2-user tmux new-session -d -s ledger -c /home/ec2-user/taxman \
     'export S3_DEST=s3://taxman-013764204840-us-east-1/ledger-DATE
      BUILD="--bin taxman --example ledger" REQUIRE_CACHED=1 SKIP_TESTS=1 solver/tools/cloud/setup.sh > ~/setup.log 2>&1 &&
-         POWEROFF=1 solver/tools/ledger/cloud.sh 2176-3440;
+         POWEROFF=1 solver/tools/ledger/cloud.sh FIRST-LAST;
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
@@ -81,18 +80,12 @@ its section of the entry:
   each job's `forecast` (log10 of nodes) and `forecast_s`, and `solver/tools/ledger/events.py` compares the forecasts
   with the proofs.
 
-*Going on from a ledger written before the floor steps* (the stage on `ledger-frontier-2/out/run`, written by afe4513):
-the run reads it as it is.  The boards get their root bounds at the start (a fraction of a second a board, on the
-workers) and have no steps, and the checkpoints of their ordinary searches stay where they are, resumed when the board
-comes to its proof; nothing is dropped.  A board with a wide gap takes its steps first, so a board whose old search was
-far along is forecast at least twice what that search spent, and waits behind cheaper boards, as `level` made it wait.
-
 **The bounds store.**  `results/bounds.jsonl` keeps the bounds that runs find ([results/README.md,
 "bounds.jsonl"](../../../results/README.md#boundsjsonl)).  With `BOUNDS=results/bounds.jsonl`, the file in the checkout
 that the machine cloned, the run starts from the file's best bounds of its stretch, and a board with both bounds needs
-no map (the maps of 3441..8191 cost about 65 core-hours); run `ledger verify-bounds` on the file first.  After the run,
-on your machine with the results home (below), append what improved and check the file with both referees; `ledger` is
-the example's binary there (`solver/frame/target/debug/examples/ledger`, built as [the ledger's
+no map (the maps of 4,751 boards, 3441..8191, cost about 65 core-hours); run `ledger verify-bounds` on the file first.
+After the run, on your machine with the results home (below), append what improved and check the file with both
+referees; `ledger` is the example's binary there (`solver/frame/target/debug/examples/ledger`, built as [the ledger's
 README](../../tools/ledger/README.md) says):
 
 ```
@@ -122,3 +115,9 @@ Then commit the file.  The checkpoints are in S3 only for the searches still goi
   solver/frame/target/debug/examples/ledger report $L/run --known results/strict.jsonl
   solver/tools/ledger/events.py $L/run
   ```
+
+## Examples
+
+[The ledger's entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records each of its runs: the
+laptop's dry run, the first cloud attempt and its fix, and the stages past 4400 with the climbs, the finder and the
+floor steps, each with its settings and what it proved.

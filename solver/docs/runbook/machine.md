@@ -72,8 +72,8 @@ Each job's file names the instance that suits it; this page says why.
 * **Name a price ceiling.**  `aws ec2 run-instances` needs `SpotOptions` with a `MaxPrice` in its market options
   (`MarketType=spot,SpotOptions={MaxPrice=PRICE}`, PRICE in dollars an hour); `MarketType=spot` alone does not work.
   The instance pays the spot price of the hour, never the ceiling, which only bounds the price at which AWS takes it
-  back.  Brian approves a cost estimate at the spot price, and the ceiling goes above it.  [Launch](launch.md#launch)
-  shows where it goes.
+  back.  The account's owner approves a cost estimate at the spot price, and the ceiling goes above it.
+  [Launch](launch.md#launch) shows where it goes.
 
 ## Storage
 

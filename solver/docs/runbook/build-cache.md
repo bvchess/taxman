@@ -45,8 +45,8 @@ depends on:
 * **A download is checked**: the tarball's sha256 against the manifest's before anything is unpacked, and every member
   of the tarball must be a file under a crate's `target/release`.  A mismatch is a miss, and says so.
 * **Listing and deleting.**  `aws s3 ls builds/` lists the commits, and `aws s3 cp .../manifest -` says what an entry
-  is.  Old entries cost cents, and are deleted by hand; a deletion in the bucket needs Brian's yes first, like every
-  change there.
+  is.  Old entries cost cents, and are deleted by hand; a deletion in the bucket needs the account owner's yes first,
+  like every change there.
 
 ## How a launch uses it, and what it builds
 
@@ -81,8 +81,8 @@ them in turn.  Nothing passes `-j` to cargo, so every build and every test build
 The release is `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` on **one machine, once for each commit and CPU**, with the
 default `BUILD`: everything, so that every smaller request hits it.  It is a launch under the [rules for every
 launch](launch.md#rules-for-every-launch): a `c8g.16xlarge` at spot for about 10 to 20 minutes, **about $0.15 to
-$0.25**, after Brian's yes.  Any size serves, since the key is the CPU, which every `c8g` shares; the suite gains
-nothing past about 64 vCPUs.  The study tools are the one thing that "everything" leaves out: `STUDIES=1` makes a
+$0.25**, after the account owner's yes.  Any size serves, since the key is the CPU, which every `c8g` shares; the suite
+gains nothing past about 64 vCPUs.  The study tools are the one thing that "everything" leaves out: `STUDIES=1` makes a
 release that also serves the node-choice measurement.  Its entry holds `wall`, its suite runs the study tools' tests
 too, and it serves every smaller request as well.
 

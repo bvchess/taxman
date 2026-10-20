@@ -1,4 +1,4 @@
-# The production chain
+# The chain of optimal games (`chain.sh`)
 
 Part of the [runbook](../RUNBOOK.md).
 
@@ -29,7 +29,7 @@ Start in tmux, with a deadline and with the state copied off the machine:
 
 ```
 tmux new -s tx
-DEADLINE_HOURS=30 POWEROFF=always S3_DEST=s3://taxman-013764204840-us-east-1/chain-run1 solver/tools/cloud/chain.sh 1400
+DEADLINE_HOURS=HOURS POWEROFF=always S3_DEST=s3://taxman-013764204840-us-east-1/PREFIX solver/tools/cloud/chain.sh N
 ```
 
 The bucket is the one of [Access, and what the account holds](launch.md#access-and-what-the-account-holds), with a
@@ -90,13 +90,8 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
   checkpoint.  Do not `git pull` in the middle of a long game without a reason.  Changing only code generation (PGO,
   `target-cpu`) is harmless.
 * **Past 4095.**  The solver supports games up to n = 8191 (`taxman::solver::MAX_N`), those from 4096 with sets of 128
-  words ([the entry on boards past 4095](../../notebook/boards-past-4095-2026-10/README.md)).  A build from before
-  commit 4316168 stops at n = 4095, the widest set it has.  To take a chain past 4095, stop it (or let `chain.sh 4095`
-  finish), build the newer commit in the same checkout (`git pull`, then `setup.sh`, or `cargo build --release` in
-  `solver/frame`), and run `chain.sh N` again with N up to 8191 (or `CHAIN_TO=N`).  It skips the completed games, and
-  the checkpoint of a game below 4096 that the old build wrote resumes, since the game keeps its width, frames,
-  candidates and tactics (tried with checkpoints of 1133 and 3600).  The solver refuses a game past 8191 ("beyond the
-  largest supported board"), which ends the script with an error.
+  words ([the entry on boards past 4095](../../notebook/boards-past-4095-2026-10/README.md)).  The solver refuses a game
+  past 8191 ("beyond the largest supported board"), which ends the script with an error.
 
 ## Monitoring
 
@@ -150,11 +145,16 @@ and the assumptions are the line's.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
 committed `results/`: put a
-file next to them (say `results/strict-1-1400.jsonl`) and update `results/README.md` and the list of results files in
-`tests/results.rs`.  The scaling logs under
-`solver/notebook/` (in a folder of their own, or in `solver/notebook/graviton-calibration-2026-10/`) are your call.
+file next to them (say `results/strict-1-N.jsonl`) and update `results/README.md` and the list of results files in
+`tests/results.rs`.  Logs that a measurement needs go to its notebook entry.
 
 To extend the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
 `taxman extend-optimal results-from-cloud/strict.jsonl --out /tmp/optimal.json`.  It appends the games past the table's
 end that the file completed, and says where it stopped.  Check the result with `taxman verify-optimal /tmp/optimal.json`
 and `diff`, copy it over `results/optimal.json`, and rebuild, because the binary carries the table it was built with.
+
+## Examples
+
+[The chain to 3440](../../notebook/the-frontier-chain-to-3440-2026-10/README.md) ran `chain.sh 4095` on one
+`c8g.16xlarge` for a day, from a copy of the committed games to 2175; [results/runs.md](../../../results/runs.md)
+records each run that made the committed chain.

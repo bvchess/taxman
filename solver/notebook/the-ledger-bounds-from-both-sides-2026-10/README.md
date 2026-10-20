@@ -775,6 +775,16 @@ upper bounds on its word: `ledger verify-bounds` comes first.
 **Commits.**  The move of the format into the library, then `--use-prev` with the known games, their referees and the
 tests (`tests/known.rs`), then the documents and this record.
 
+## Later (2026-10-20): going on from a ledger written before the floor steps
+
+The runbook said this of the ledger's stages until its guide was made general.
+
+*Going on from a ledger written before the floor steps* (the stage on `ledger-frontier-2/out/run`, written by afe4513):
+the run reads it as it is.  The boards get their root bounds at the start (a fraction of a second a board, on the
+workers) and have no steps, and the checkpoints of their ordinary searches stay where they are, resumed when the board
+comes to its proof; nothing is dropped.  A board with a wide gap takes its steps first, so a board whose old search was
+far along is forecast at least twice what that search spent, and waits behind cheaper boards, as `level` made it wait.
+
 ## Files
 
 The program is `examples/ledger/` (its module comment defines every field of `ledger.jsonl` and `events.jsonl`), run
