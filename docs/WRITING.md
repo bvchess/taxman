@@ -11,7 +11,8 @@ formats).  An *explanation* says how something works and why (DESIGN.md, THEORY.
 Two more kinds sit outside these four: the lab notebook is the record of what was tried, and STATUS and AGENDA are
 time-bound.  A passage in the wrong kind of document moves, or becomes a link.  A how-to gives the advice that holds for
 every run; the plan, the values and the record of one campaign belong to its notebook entry, and the how-to links it as
-an example.
+an example.  A checklist of what to do every time is a how-to (the rules for every launch); a list of what is done and
+what remains is a scratchpad, not a doc, and STATUS holds the state of the work.
 
 ## 2. Lead with the point
 
@@ -37,8 +38,10 @@ general statement: "12 has the maximal factors 6 and 4."
 
 ## 5. Give every fact that can change one home
 
-Numbers, commands, status and terms each live in one place, and the other docs link to it.  A short summary of an idea
-plus a link is fine; a copied number is not, because it drifts ("the committed chain 1..3440" was wrong as soon as the
+Numbers, commands, status and terms each live in one place, and the other docs link to it.  Explanations are said once
+too, but not to the point of sending the reader to look up every idea: a few words that explain an idea where it is used
+are a kindness, and a link gives the rest, while a longer explanation, such as the rules of the game, lives in one
+place.  A copied number is never fine, because it drifts ("the committed chain 1..3440" was wrong as soon as the
 chain grew).  Avoid time-relative words such as "currently", "now" and "new": state the fact, or date it.  A rewrite
 keeps every fact its reader needs, and moves one that matters to few readers to a paragraph of details at the end of its
 section.  History and provenance that the notebook, git or another doc already holds go, or become a link; a fact with
@@ -66,9 +69,9 @@ it serves.  Files have plain names (`runbook/prover.md`), and a citation names t
 heading, never a section number.  A split copies nothing: a passage that two tasks need lives in one file, and the other
 links it (rule 5).  The notebook's entries are records and keep their length.
 
-## Voice
+## 9. Write plainly, modestly and briefly
 
-Write plainly, modestly and briefly:
+Say what the reader needs in plain words, and no more:
 
 * **Say a thing once.**  Leave out what a word already implies: "optimal" already means proven.
 * **Say what a thing does for the reader**, not how it was built or what came before it.  An overview names no

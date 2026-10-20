@@ -792,7 +792,7 @@ const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
 /// English word.
 const RETIRED_CASED: &[Retired] = &[
     retired("EXPERIMENTS", "the notebook (solver/notebook/README.md)"),
-    retired("Brian", "the role: whoever owns the AWS account, or the project's owner (docs/WRITING.md, \"Voice\")"),
+    retired("Brian", "the role: whoever owns the AWS account, or the project's owner (docs/WRITING.md, rule 9)"),
 ];
 
 /// Phrases that hold a word of `RETIRED_CASED` and stay: a copyright notice names its holder.
