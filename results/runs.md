@@ -39,11 +39,11 @@ took 1022.5 s of search and 332.0 M nodes, on 4 threads of a machine shared with
 pessimistic; the second took 1052 s, and the first 3359 s.  Three tactics account for it:
 
 * `same_search` concludes 545 of those games as repeats of an earlier game's search ([the
-  notebook](../solver/notebook/same-search-2026-10/README.md));
+  notebook](../solver/notebook/search/same-search-2026-10/README.md));
 * the Lagrangian bound over the nogoods makes the searches that remain shorter ([the
-  notebook](../solver/notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
+  notebook](../solver/notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
 * the GF(2) bound, which this is the first committed chain made with, makes them shorter again ([the
-  notebook](../solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md)).
+  notebook](../solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).
 
 **The second run, games 2176–3440.**  The command was `solver/tools/cloud/chain.sh 4095`, which runs `taxman solve
 1-4095 --window W --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 300 --progress 60` on all the CPUs.  It
@@ -139,11 +139,11 @@ sets"](README.md#games-with-several-optimal-sets)).
 * `default.jsonl` (1001–1231, schema 1), the first run past 1000, made with the unproven tactics `reuse_prev` and
   `revise_freedoms` on.  It is gone from the tree; `git show f72c332:rust/results/default.jsonl` has it.  It had 34
   prime, 78 exhausted and 119 proofs by `reuse_prev`, and 19 games resting on nothing unproven.
-* The cost-curve study's `solver/notebook/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (1001–1231, schema 1,
+* The cost-curve study's `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (1001–1231, schema 1,
   commit e710d16), a chain with those tactics off.  It has 34 prime, 127 exhausted and 70 at the ceiling, all 231
   resting on nothing unproven.
-* The GF(2) study's `solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (1301–2175, schema 5, commit
-  716ebd9, 2 threads), a chain from `optimal.json`'s game of 1300.
+* The GF(2) study's `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (1301–2175, schema 5,
+  commit 716ebd9, 2 threads), a chain from `optimal.json`'s game of 1300.
 
 The two chains stay as their studies' data.  The verifiers read the second beside `strict.jsonl`, and no longer read
 the first.

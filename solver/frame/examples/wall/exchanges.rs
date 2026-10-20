@@ -2,8 +2,8 @@
 //! pruning by them saves.  Units of the tuning suite (or whole games) are solved as `wall anatomy` solves them, with a
 //! hook on every step (`search::StepHook`) that checks, wherever a node goes on without a member, each exchange of two
 //! primes that maps the member onto another candidate; with `--prune` it also prunes by the exchanges that pass.  The
-//! notebook entry solver/notebook/local-prime-exchanges-at-the-nodes-2026-10/README.md states the checks and proves the
-//! rule; this comment says what the code does.
+//! notebook entry solver/notebook/search/local-prime-exchanges-at-the-nodes-2026-10/README.md states the checks and
+//! proves the rule; this comment says what the code does.
 //!
 //! ```text
 //! cargo run --profile test --features studies --example wall -- exchanges --suite FILE --known FILE --ids ID[,ID...]

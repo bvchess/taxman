@@ -48,7 +48,7 @@ jobs keeping the load at 3 to 6, so a few per cent of noise); the many-thread me
    which then settles it at once if the provisional game was final).
 5. *Tools* (13804bb, e4bfc4e): the ladder's scaling table has `µs/step` (busy time a step), `µs/tree` (the same without
    the units' starts), `reb %`, `1st %`, `ramp %` and `tail %`; `wall`'s lines have the new counters; `chain.sh` runs
-   with `WINDOW` (16 by default); `solver/notebook/the-wall-regime-2026-10/README.md`, "For a cloud machine", items 7 (where a step's time goes at 64
+   with `WINDOW` (16 by default); `solver/notebook/search/the-wall-regime-2026-10/README.md`, "For a cloud machine", items 7 (where a step's time goes at 64
    and 192 threads) and 8 (the window at 64 and 192 threads).
 
 *The same chains.*  With a window of 1, and with any window on one thread, the chain 1..1300 is line for line that of

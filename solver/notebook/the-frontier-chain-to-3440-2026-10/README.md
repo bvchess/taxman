@@ -2,7 +2,7 @@
 
 Part of the [lab notebook](../README.md).
 
-*Question.*  The day on one `c8g.16xlarge` that [the gap past 2175](../the-gap-past-2175-2026-10/README.md) projected (from the
+*Question.*  The day on one `c8g.16xlarge` that [the gap past 2175](../search/the-gap-past-2175-2026-10/README.md) projected (from the
 committed file's 2175 games, about 4,100, with 3,700 to 4,850 across its models) was run.  How far did it take the chain
 with every game proven within the frame model and nothing assumed; what did the dear games cost; do the independent
 chains that cover its games agree with them; and what did its operators find wrong in the procedure
@@ -52,7 +52,7 @@ three of the four dearest games of the run, 3424 (1.30 G, 2.0 hours on 64 thread
 minutes.  A least-squares line through the log of the search seconds of the 448 gives a decade per about 1,040 in n
 (1,070 without 3440), 7 s at 2200 and 97 s at 3400 (93 without 3440), with a standard deviation of one decade around
 it, nearly all of it the patches, against a decade per about 1,050-1,250 in n that [the gap past
-2175](../the-gap-past-2175-2026-10/README.md) projected from the gaps.  The long searches
+2175](../search/the-gap-past-2175-2026-10/README.md) projected from the gaps.  The long searches
 run at the engine's best: 3441 at 202 to 209 thousand nodes a second on 64 threads (3.2 thousand a thread), `eff`
 100%, `idle` and `lock` 0.0%, 71 pauses for checkpoints (0.0%, the longest 29.9 ms), 4,100 to 6,100 units queued in its
 last minutes, none spilled; its checkpoint is 5.5 MB.
@@ -65,7 +65,7 @@ percentile of five of the seven scenarios (all but the two that use the gap alon
 about where the model put it (6.1 hours), and the remaining 130 games took 17.4, the last forty holding three of the
 four dearest games of the run.  The projection's range for a single run's luck (−400 to +700 around 4,100) does not
 reach 3440; whether the patch at the end is luck or the trend is open, and what the gaps of 3315..3440 were is not
-measured (the committed games can be fed to `solver/notebook/the-gap-past-2175-2026-10/gap.py` and `examples/wall.rs nodes --nodes 1`: one thread, a
+measured (the committed games can be fed to `solver/notebook/search/the-gap-past-2175-2026-10/gap.py` and `examples/wall.rs nodes --nodes 1`: one thread, a
 few minutes).
 
 *Agreement.*  Both referees on the file (`solver/tools/cloud/verify.sh`: `taxman verify-results`, 10 s and 42 s of CPU on

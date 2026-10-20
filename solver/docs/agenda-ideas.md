@@ -73,14 +73,16 @@ the relevant pages, the others were seen in abstracts.
   three distinct primes, where all odd cores live, thicken in frames 1-3.
 
 Still open from [the pilots of ideas from other
-fields](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md) (2026-10), measured on the matching path:
+fields](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md) (2026-10), measured on the matching
+path:
 
 * **Knuth's estimate of a tree's size** (rank 3, not piloted): a game's cost before running it, and which units to split
-  first ([its section 5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered),
-  "Tree-size estimation").
+  first ([its section
+  5](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered), "Tree-size
+  estimation").
 * **Reliability branching** (rank 4): pseudocosts in place of strong branching's exact solves, built only if they
   predict the chosen member and the forced set ([its section
-  5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered)).
+  5](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered)).
 * **The tree's growth at many workers, and the nogood period at 192 threads** (rank 5): A7.
 * **The ideas considered and not piloted**, each with its cheapest experiment: [its section
-  5](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered).
+  5](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md#5-every-idea-considered).

@@ -1,9 +1,10 @@
 #!/bin/bash
 #
 # Where the time of a hard game goes (section 2 of the entry
-# solver/notebook/ideas-from-other-fields-the-pilots-2026-10/README.md): solves game N of the chain from 1 for SECONDS
-# on THREADS threads, as the chain solves it (its predecessor from a copy of results/strict.jsonl cut before N), samples
-# it with macOS `sample` every millisecond, and charges each sample to a kind of work and a purpose (attribute.py).
+# solver/notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md): solves game N of the chain from 1 for
+# SECONDS on THREADS threads, as the chain solves it (its predecessor from a copy of results/strict.jsonl cut before N),
+# samples it with macOS `sample` every millisecond, and charges each sample to a kind of work and a purpose
+# (attribute.py).
 #
 #   solver/tools/profile/profile.sh N SECONDS THREADS OUTDIR        (after cargo build --release in solver/frame)
 #

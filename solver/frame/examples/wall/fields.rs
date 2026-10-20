@@ -1,11 +1,11 @@
 //! The multi-field bound (A1) at a search node: the GF(2) frame matroids and a family of GF(3) signed frame matroids,
 //! coupled by Lagrangian multipliers that a column generation fits, for the node-choice measurement (`choice.rs`).  The
 //! bound, its proof (Theorems 14 and 15 of docs/THEORY.md) and the study that measured it at the roots and in a branch
-//! and bound are in solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md and
-//! solver/notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md; its code is that study's, from
-//! commit 8753189 (`dw` the bound and its fit, `gf3` the signed matroids, `cores` the signings the fit derives from the
-//! cores of its columns, `lp` the master's simplex, `frames` the GF(2) matroids as vectors, `fit` a root fit as a
-//! file), adapted to today's library and cut to what a node needs.
+//! and bound are in solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md and
+//! solver/notebook/search/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md; its code is that study's,
+//! from commit 8753189 (`dw` the bound and its fit, `gf3` the signed matroids, `cores` the signings the fit derives
+//! from the cores of its columns, `lp` the master's simplex, `frames` the GF(2) matroids as vectors, `fit` a root fit
+//! as a file), adapted to today's library and cut to what a node needs.
 //!
 //! Three things are made here, and nothing else is public:
 //!

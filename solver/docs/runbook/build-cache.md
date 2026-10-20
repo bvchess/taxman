@@ -123,8 +123,8 @@ each run, kept in the cache), so that the longest does not start last.  The doc 
 apart.  The build of the test executables comes first, in the release profile with one codegen unit each: the library,
 then the test executables side by side.  The release of 260e74f took 16 minutes from the launch to the start of its job,
 with the build of the examples (5 minutes), the build of the tests and the suite ([the A1
-measurement](../../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).  The suite's
-times on a laptop are in [solver/docs/design/testing.md](../design/testing.md).
+measurement](../../notebook/search/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).  The
+suite's times on a laptop are in [solver/docs/design/testing.md](../design/testing.md).
 
 ## What was tested
 
@@ -140,6 +140,6 @@ times on a laptop are in [solver/docs/design/testing.md](../design/testing.md).
 * **On EC2, on 2026-10-18:** the releases of ca357bf, for the run to 5000, and of 260e74f, with the study tools, for the
   A1 measurement, each tested before it was stored ([The release](#the-release-the-suite-then-the-cache)); and the
   node-choice measurement at 9d9dae3, which took its binaries from the cache ([its
-  entry](../../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).  All three used the S3 commands
-  with the instance profile's credentials, and the two releases built the tests in the release profile and ran the suite
-  at 64 processes at once.
+  entry](../../notebook/search/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).  All three used the S3
+  commands with the instance profile's credentials, and the two releases built the tests in the release profile and ran
+  the suite at 64 processes at once.

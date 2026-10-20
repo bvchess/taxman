@@ -3,7 +3,7 @@
 Part of the [lab notebook](README.md).
 
 The dated entries below use the words of their time; they were not rewritten.  In 2026-10 the project settled on the
-wiki's words, and the code, DESIGN.md, the README and the other guides, and the register and index below, use them.  An
+wiki's words, and the code, DESIGN.md, the README and the other guides, and the register below, use them.  An
 old word in an entry maps like this (the names of fields and files did not change: results keys, checkpoint headers,
 tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 
@@ -42,7 +42,7 @@ holds the guides to them.
 The example programs of finished experiments (`fields`, `matroid`, `dominance`, `slope`, `repeats`, `promotions`,
 `diff`, `hunt` and `sacrifice`) were removed from master on 2026-10-17, with the files of `examples/common/` that only
 they used and `solver/tools/cloud/hunt.sh`.  An entry that used one ends with a section `## Later (2026-10)` naming the
-commit where it builds (8753189); the register, the index and the entries keep the paths and commands of their time.
+commit where it builds (8753189); the register and the entries keep the paths and commands of their time.
 The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the example `wall` were removed on
 2026-10-18, with the code only they used (`choice-prepare` and `choice` stay); their entries end the same way, and name
 the commit 9d9dae3.  The study tools that stay (`tune`, `extended`, `structure` and `wall`) are built with

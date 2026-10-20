@@ -1,8 +1,8 @@
 //! `wall decompose`: A5's cheapest experiment (solver/docs/AGENDA.md, "A5. Decompose across the frames (AND/OR
 //! search)"): do the conflicts of a node that heads a big subtree split, across some home, into two sides that do not
 //! interact, so that an AND/OR search could solve the sides apart?  The question, the numbers and the verdict are in
-//! solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md, whose `analyze.py` reads
-//! the lines.
+//! solver/notebook/search/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md, whose `analyze.py`
+//! reads the lines.
 //!
 //! The frames form a path: a candidate of home `h` is a factor of frame `h` and, promoted, a move of frame `h - 1`,
 //! so a conflict (a set of candidates that cannot all be promoted, one frame's residual: `FrameGraph::conflict_using`)
@@ -45,7 +45,7 @@
 //!   the optimal set's own, for a node that holds it, else found by an optimizing solve from the greedy completion that
 //!   ends within that many steps.  From it come the bound's error by home, `excess_homes` (the weight of the heaviest
 //!   set at home `h` less that of `F*`; they sum to `today - best`, the gap the bound leaves to the node's own optimum:
-//!   the split of the gap that the anatomy of the gap, solver/notebook/the-anatomy-of-the-gap-2026-10/README.md, made at
+//!   the split of the gap that the anatomy of the gap, solver/notebook/search/the-anatomy-of-the-gap-2026-10/README.md, made at
 //!   the roots), `ideal` (the engine's steps to prove `F*` optimal from `F*`), and for each separator `h` with open
 //!   candidates on both sides the *oracle separator*: the node with the candidates of home `h` fixed as `F*` has them
 //!   (those of `F*` promoted, the rest left out), and each side, the open candidates below `h` and those above,

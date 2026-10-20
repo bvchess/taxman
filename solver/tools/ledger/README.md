@@ -1,8 +1,8 @@
 # The ledger's scripts
 
 The program is the example `ledger` of the frame solver (`solver/frame/examples/ledger/`; its module comment defines
-every field of `ledger.jsonl` and `events.jsonl`).  What was run with it and what it showed is in
-[the entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md), which also lists the data of every
+every field of `ledger.jsonl` and `events.jsonl`).  What was run with it and what it showed is in [the
+entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md), which also lists the data of every
 run.  These two scripts launch a run and read it.
 
 | file | command | what it is |

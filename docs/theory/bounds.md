@@ -78,8 +78,8 @@ independent; these are the self-covering sets no subset of which lists every fac
 another field it would miss more: over GF(3) or the rationals the unsigned vectors of a triangle of moves are
 independent.  The same construction, frame by frame, bounds the frame model's promotions (Theorem 11, below), and the
 two agree at every root measured ([Matroid intersection
-bounds](../../solver/notebook/matroid-intersection-bounds-2026-10/README.md)).  What the bound buys the prover's search
-is in the evidence table below.
+bounds](../../solver/notebook/search/matroid-intersection-bounds-2026-10/README.md)).  What the bound buys the prover's
+search is in the evidence table below.
 
 ## The frame matroids: a bound on the promotions
 
@@ -115,16 +115,16 @@ live factors (graph edges, with a ground vertex for one) independence over GF(2)
 itself, so what it misses are, as for Theorem 10, the odd cores of movers with three or more factors (the frames'
 residuals at the roots of 936-1300 hold 18-65 movers, and Lorea's matroid misses them too).  And Theorem 10's bound
 equals in_the_bag plus Theorem 11's at every root of 880-1300; its gap to opt(n) is a tenth of the Franklín–Moniot
-bound's to 1300.  The measurements are in solver/notebook/matroid-intersection-bounds-2026-10/README.md and
-solver/notebook/the-gf2-bound-in-the-search-2026-10/README.md; the search's forced members rest on weak duality for a
-weight split, as Theorem 10's certificate does (`gf2::meet`).
+bound's to 1300.  The measurements are in solver/notebook/search/matroid-intersection-bounds-2026-10/README.md and
+solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md; the search's forced members rest on weak duality
+for a weight split, as Theorem 10's certificate does (`gf2::meet`).
 
 ## Prime exchanges: symmetries of the promotions
 
 Exchanging two primes in every number is an automorphism of divisibility.  Where it maps the frame model's root onto
 itself, it maps promotion sets to promotion sets, and no optimal set is improved by it, which orders the two primes'
 shares in every optimal set at once.  This is the solver's tactic `symmetry` (solver/docs/design/gf2-bound.md, "Prime
-exchanges"; solver/notebook/dominance-and-symmetry-2026-10/README.md found the exchanges and measured them).
+exchanges"; solver/notebook/search/dominance-and-symmetry-2026-10/README.md found the exchanges and measured them).
 
 For primes p < q let π = π_{p,q} send p^a q^b m (m prime to pq) to p^b q^a m.  For a set S of numbers and a prime r let
 c_r(S) = Σ { x/r : x ∈ S, r | x }, the sum of S's cofactors of r.
@@ -174,7 +174,7 @@ with w_μ(mp) = m(p − μ), w_μ(mq) = m(q + μ) and w_μ(x) = x for the other 
 independent in the node's contracted matroids, so their heaviest common independent set under w_μ (of members of
 positive weight, and no more than the node can still promote), plus μ (c_q(P) − c_p(P)), bounds every such completion: a
 Lagrangian relaxation of the inequality (weak duality, as for Theorem 11's weight split).  The solver uses the first
-two; the third was measured and not kept (solver/notebook/prime-exchanges-in-the-search-2026-10/README.md).
+two; the third was measured and not kept (solver/notebook/search/prime-exchanges-in-the-search-2026-10/README.md).
 
 These hold for the search of the root's problem, whose subtrees all are; a search of one node's completions for their
 own best (as some tests run) finds the best of those that keep the inequalities.
@@ -185,7 +185,7 @@ Theorem 11's argument never uses that its entries are 1 or that the field is GF(
 triangular matrix with a nonzero diagonal under every choice of nonzero entries, over every field.  Each such choice
 gives a matroid per frame in which every promotable set is independent, and the GF(2) bound and any number of them
 combine by Lagrangian multipliers into one bound (the study of the multi-field bound,
-solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md, which measured it).
+solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md, which measured it).
 
 Fix a state and a frame h of it, with factors F_h and moves M_h; its *movers* are its moves and the candidates of home
 h + 1, and the candidates *touching* it, supp_h, are those of homes h and h + 1.  A *signing* of h over a field K gives

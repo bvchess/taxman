@@ -2,8 +2,8 @@
 //! without a member, and what learning those images saves.  Units of the tuning suite are solved as `wall anatomy`
 //! solves them (one thread, fresh tables, from the known optimum), with a hook on every step (`search::StepHook`); with
 //! `--root` the unit is the whole game, as `tune solve` solves `GAME-root`.  The notebook entry
-//! solver/notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md reads the lines and the files; this comment
-//! says what the code does.
+//! solver/notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/README.md reads the lines and the files; this
+//! comment says what the code does.
 //!
 //! ```text
 //! cargo run --profile test --features studies --example wall -- images --known FILE (--suite FILE --ids ID[,ID...]

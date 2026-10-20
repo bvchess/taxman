@@ -6,8 +6,8 @@ the ideas worth borrowing, and what the cloud runs should measure.  It is for an
 Each avenue says where it stands.  The [register](../notebook/README.md#register-of-everything-tried) is the record of
 what was tried, and an avenue started from here gets its row there when it ends.  The measurements made for this agenda
 are the entry [Measurements made for the research
-agenda](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as "measurements 7.1" to
-"7.4".
+agenda](../notebook/search/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as "measurements
+7.1" to "7.4".
 
 * [1. Where we are](#1-where-we-are)
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
@@ -30,33 +30,33 @@ when some has at least one.  The search's GF(2) bound is the frame model's form 
 It equals the parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind
 only to *odd cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct
 primes.  At the roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3
-whose size grows with n ([the anatomy of the gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md)).
+whose size grows with n ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md)).
 
 **What has been tried,** by family (the register has every row):
 
 * *Bounds on top of GF(2)*: cover cuts and the Lagrangian bound over the nogoods, rank cuts, the per-frame exact bound,
   Lorea's matroid, the Lagrangian bound of the symmetric pairs, and the multi-field bound (avenue A1, [Ranked
   avenues](#3-ranked-avenues)).  Every share of the gap that one closed falls with n, and in a search each was a
-  constant factor ([the anatomy of the gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md), [the per-frame
-  bound](../notebook/the-per-frame-bound-2026-10/README.md), [how far nogoods can
-  go](../notebook/how-far-can-nogoods-go-2026-10/README.md)).  Flat-cycle cuts, measured at roots only, add little to
-  the matching LP.
+  constant factor ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), [the per-frame
+  bound](../notebook/search/the-per-frame-bound-2026-10/README.md), [how far nogoods can
+  go](../notebook/search/how-far-can-nogoods-go-2026-10/README.md)).  Flat-cycle cuts, measured at roots only, add
+  little to the matching LP.
 * *Branching and learning*: strong branching, forced members, nogoods, the rule of symmetric pairs, dominance by
   exchange and transpositions.  Constant factors, all taken.  Closed, not adopted ([the
-  verdict](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)):
+  verdict](../notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)):
   learning each conflict's closure under the cheap exchanges, a bound that imposes its knot, and ladder branching.  The
   learning gains on units and not on whole games; the knot's bound would save under 4% of the steps, and ladder
   branching has nothing to impose.
 * *Reuse along the chain*: the ceiling, the prime formula and same search are in.  Carrying nogoods or a search's tree
   to the next game, a chain that comes back down, ceilings from neighbouring problems and equivalent problems gave
-  nothing more ([going higher](../notebook/going-higher-and-coming-back-down-2026-10/README.md),
-  [carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
+  nothing more ([going higher](../notebook/search/going-higher-and-coming-back-down-2026-10/README.md),
+  [carrying](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * *The node and the engine*: the inner-loop round, set widths, PGO, round A.  Constant factors.
 
 The GF(2) bound itself is the one change of slope in the project's history: the plain branch and bound's log10 nodes
 grow +0.14 per 100 in n, against the matching path's +0.48.  Everything since has moved the curve down, not bent it.
 This section's text of 2026-10-18, with its numbers and links, is [in the measurements
-entry](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md#later-2026-10-the-agendas-text-of-2026-10-18).
+entry](../notebook/search/measurements-made-for-the-research-agenda-2026-10/README.md#later-2026-10-the-agendas-text-of-2026-10-18).
 
 ## 2. The diagnosis of the wall
 
@@ -68,7 +68,7 @@ or with gaps that grow more slowly.
 
 **The cost model.**  Fitted on one build over 1301-3312, to 714 exhausted searches (the games of 1301-2175 solved again,
 and the EC2 chain's 400 of 2176-3312 with their nodes less 0.06 decades for the window and the threads; [the gap past
-2175](../notebook/the-gap-past-2175-2026-10/README.md)):
+2175](../notebook/search/the-gap-past-2175-2026-10/README.md)):
 
     log10 nodes ≈ 2.67 + G / 247                (R² 0.85, residual sd 0.47)
     log10 nodes ≈ 2.30 + 0.0479 G / n^0.3       (R² 0.875, residual sd 0.44)
@@ -81,11 +81,12 @@ overpredicts every later stretch by 0.2 to 0.6 decades, and the gap scaled by n^
 alone is the conservative end of every projection, p = 0.5 the optimistic one, and 0.3 the centre.
 
 *Details.*  The first model was fitted to the 314 exhausted searches of 1301-2175 in `results/strict.jsonl` (8 threads,
-the build of feba6d0), against the root GF(2) gaps of `solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl`
-(measurements 7.1): log10 nodes ≈ 3.24 + G / 255 (R² 0.50, residual sd 0.46).  It kept G alone, because n and G/n
-extrapolated worse past 2175 against the committed chain's trees; on one build that is reversed.  The later builds make
-trees 0.29 times as large: 0.27 at 1301-1500 and 0.41 near 2175 for the same 391 games solved again on one thread, and
-0.44 for the 39 searches of 2176-2276 against the Graviton calibration's chain (measurements 7.4).
+the build of feba6d0), against the root GF(2) gaps of
+`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl` (measurements 7.1): log10 nodes ≈ 3.24 + G /
+255 (R² 0.50, residual sd 0.46).  It kept G alone, because n and G/n extrapolated worse past 2175 against the committed
+chain's trees; on one build that is reversed.  The later builds make trees 0.29 times as large: 0.27 at 1301-1500 and
+0.41 near 2175 for the same 391 games solved again on one thread, and 0.44 for the 39 searches of 2176-2276 against the
+Graviton calibration's chain (measurements 7.4).
 
 **Past 2175 the trees still follow their gaps, and the gaps rise.**  With the root gaps of all 509 searched games of
 2176-3312 (measurements 7.4), the dear games are the games of high gap: the 47 searches of gap 1,100 or more hold 77% of
@@ -98,19 +99,19 @@ nothing at the root explains them (A4, [Ranked avenues](#3-ranked-avenues)): con
 
 **Why the trees are big** (2026-10-18).  The trees are the bound's error, not near-optimal completions: four of five
 units, hard and easy, hold no completion within 100 points of their best ([completions near the
-optimum](../notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md)).  The gap is paid in
+optimum](../notebook/search/completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md)).  The gap is paid in
 exclusions, each priced at a tenth of the member left out, since the bound substitutes a near-equal number: 5 to 8 a
-path ([the anatomy of a hard subtree](../notebook/the-anatomy-of-a-hard-subtree-2026-10/README.md)).  The prime swaps
-behind them are no symmetries of their nodes, only the root's pairs, so they prune nothing ([local prime
-exchanges](../notebook/local-prime-exchanges-at-the-nodes-2026-10/README.md)).
+path ([the anatomy of a hard subtree](../notebook/search/the-anatomy-of-a-hard-subtree-2026-10/README.md)).  The prime
+swaps behind them are no symmetries of their nodes, only the root's pairs, so they prune nothing ([local prime
+exchanges](../notebook/search/local-prime-exchanges-at-the-nodes-2026-10/README.md)).
 
 **How fast the gap grows decides the wall.**  Over 1301-2175 the root gap's trend was +6.9 ± 1.7 per 100 n ([the GF(2)
-bound in the search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md)), with a flat stretch below 2150 (+3.5 ±
-2.4).  The gap over the unseeded start rises +57 per 100 n to 4095, an upper bound: that start is about 770 below opt(n)
-at 3100, against 0 to 403 where it had been measured.  The true gaps of 2176-3312 grow +37 per 100 n over the whole
-1301-3312 (95%: 22 to 50 by blocks of 100 games, 6 to 63 by blocks of 200), and +25 over 2176-3312 alone (−43 to +83:
-the waves are longer than a window of 1,100 n); G/n stays at 300.  The regimes, the first two with the node's +0.042 at
-the root, the measured one with the +0.02 of a whole tree and the cost model above:
+bound in the search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)), with a flat stretch below 2150
+(+3.5 ± 2.4).  The gap over the unseeded start rises +57 per 100 n to 4095, an upper bound: that start is about 770
+below opt(n) at 3100, against 0 to 403 where it had been measured.  The true gaps of 2176-3312 grow +37 per 100 n over
+the whole 1301-3312 (95%: 22 to 50 by blocks of 100 games, 6 to 63 by blocks of 200), and +25 over 2176-3312 alone (−43
+to +83: the waves are longer than a window of 1,100 n); G/n stays at 300.  The regimes, the first two with the node's
++0.042 at the root, the measured one with the +0.02 of a whole tree and the cost model above:
 
 | gap trend | decades per 100 n | cost ×10 per | what 100 times the compute buys |
 |---|---|---|---|
@@ -126,10 +127,10 @@ valleys cost seconds.
 **What the trend projects.**  The models put a day of one `c8g.16xlarge` at about 4,100 (3,700 to 4,850 across the
 models, −400 to +700 for a single run's luck), 4000 at 13 to 20 hours past 3313, 5000 at four to ten days and 6000 at a
 month or more; a `c8g.48xlarge`, 1.9 to 2.7 times as fast, adds 300 to 500 n to a day ([the gap past
-2175](../notebook/the-gap-past-2175-2026-10/README.md) has the derivation).  The day that ran reached 3440, under the
-10th percentile of the centre model ([the cloud run to 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
-At that run's own trend, tenfold for about every 1,040 in n, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about
-(projected on 2026-10-16, from the run to 3440):
+2175](../notebook/search/the-gap-past-2175-2026-10/README.md) has the derivation).  The day that ran reached 3440, under
+the 10th percentile of the centre model ([the cloud run to
+3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).  At that run's own trend, tenfold for about every
+1,040 in n, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about (projected on 2026-10-16, from the run to 3440):
 
 | more machine time | n reached | cost |
 |---|---|---|
@@ -168,19 +169,19 @@ in n; only a tighter bound in the search changes the tenfold per 1,040.
 Ranked by expected gain to the wall over cost.  Each opens with where it stands.  An open avenue then says what must be
 proven before it can prune, since every rule the search relies on is proven and tested, as the project requires.  A
 closed avenue keeps its finding in a line; its text as it stood is [in the measurements
-entry](../notebook/measurements-made-for-the-research-agenda-2026-10/README.md#later-2026-10-the-agendas-text-of-2026-10-18).
+entry](../notebook/search/measurements-made-for-the-research-agenda-2026-10/README.md#later-2026-10-the-agendas-text-of-2026-10-18).
 
 ### A1. A bound over several fields and signings (a change of slope, if its share holds)
 
 *Closed* (2026-10-18; the slope test killed it in the search on 2026-10-16).  The multi-field bound, the GF(2) frame
 matroids and the signed GF(3) ones coupled by Lagrangian multipliers ([the glossary](../../docs/GLOSSARY.md); THEORY.md,
 Theorems 14 and 15), closes a large share of the root's gap ([the fields
-study](../notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound its
-trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost is,
-so every policy of computing it loses ([the E3
-pilot](../notebook/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), [R3 and the slope
-test](../notebook/r3-and-the-slope-test-u4-of-a1-2026-10/README.md), [the bound at the
-nodes](../notebook/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).
+study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound
+its trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost
+is, so every policy of computing it loses ([the E3
+pilot](../notebook/search/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), [R3 and the slope
+test](../notebook/search/r3-and-the-slope-test-u4-of-a1-2026-10/README.md), [the bound at the
+nodes](../notebook/search/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).
 
 ### A2. Certify the frame model, then prove with its facts (a change of slope for the proven wall)
 
@@ -237,7 +238,7 @@ because they are certified.
 
 *Closed* (2026-10-16), at the diagnostic: at the nodes of 936, 1215 and 2112 every node's heaviest completion already
 has the root's size, so the bound of each size equals the plain bound ([A3's
-test](../notebook/split-by-the-number-of-promotions-a3s-test-2026-10/README.md)).
+test](../notebook/search/split-by-the-number-of-promotions-a3s-test-2026-10/README.md)).
 
 ### A4. What the cost per unit of gap is made of (a diagnostic, then branching on cores)
 
@@ -248,14 +249,14 @@ the cores it runs into, the forced members or the sizes; the dear games are the 
 
 *Closed* (2026-10-18), at the measurement: the conflicts sit in adjacent homes of frames 1-3, and the cost is the
 separator's enumeration, which the AND/OR search must do too ([A5's
-test](../notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
+test](../notebook/search/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).
 
 ### A6. The prover's node (a constant factor that keeps verification in pace)
 
 *Open.*  A node of the prover costs 9 to 17 times the solver's ([The diagnosis of the
 wall](#2-the-diagnosis-of-the-wall)), because it solves the parity matroids at each node, warm-started from its parent,
 where the solver keeps contracted matroids by pivots along the path ([the GF(2) bound in the
-search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), item 5).  Reimplementing the technique in the
+search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), item 5).  Reimplementing the technique in the
 prover, without sharing code, which is the point of the prover, would give it most of that factor.  The bound without a
 member, read off the exchange graph, would cut its strong branching.  *Experiment:* the prover's node profile on 1300
 and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining searches will need near 3000.
@@ -264,28 +265,28 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
 
 * **192 threads**: the tree's growth with workers (10-20% at 32-128 emulated), the nogood period at 192 ([ideas from
   other fields, section
-  3](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)), checkpoints at
-  300 s.  The cloud machine measures them, and they are not designed further here; [scaling to 192
+  3](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)),
+  checkpoints at 300 s.  The cloud machine measures them, and they are not designed further here; [scaling to 192
   threads](../notebook/scaling-to-192-threads-2026-10/README.md) has what it measured.
 * **The intersection's shortest paths** (69% of a node at 4000), open: the GF(2) inner loop has left the solves of
   strong branching mostly certified; what remains is the augmentations of a level, a few dozen a node.
 * **Boards past 4095**, built: a width of 128, `MAX_FRAMES` 9 and the GF(2) vectors to 5 words ([the wall regime,
-  4](../notebook/the-wall-regime-2026-10/README.md)) take the boards to 8191 ([boards past
+  4](../notebook/search/the-wall-regime-2026-10/README.md)) take the boards to 8191 ([boards past
   4095](../notebook/boards-past-4095-2026-10/README.md)).
 * **Proving runs of neighbours that share a gap in one search**, closed, not worth building: the trees of consecutive
   games share 0.15% of their steps (median of 14 pairs), and a run costs at least its dearest game, which limits the
   saving to 18-29% of the nodes past 2175
-  ([carrying](../notebook/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
+  ([carrying](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * **Strong branching's solves**, done: the bound without each member of the conflict is read off the heaviest set's
   exchange graph, its shortest cycle through the member, with no solve where the other sizes certify it, which they
-  nearly always do ([the inner loop](../notebook/the-inner-loop-of-the-gf2-search-2026-10/README.md)); the cancelling
-  of negative cycles proposed in [the GF(2) bound in the
-  search](../notebook/the-gf2-bound-in-the-search-2026-10/README.md) was not needed.  Where a step's cycles go since:
-  [what a GF(2) step carries from the
-  last](../notebook/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md).
+  nearly always do ([the inner loop](../notebook/search/the-inner-loop-of-the-gf2-search-2026-10/README.md)); the
+  cancelling of negative cycles proposed in [the GF(2) bound in the
+  search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md) was not needed.  Where a step's cycles go
+  since: [what a GF(2) step carries from the
+  last](../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md).
 * **What only the matching path uses**, open: the GF(2) bound has made it idle, and it can be removed once a production
   run has been made with the GF(2) search: the Lagrangian bound in the search and refinement ([the same
-  entry](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
+  entry](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
 * **A unit that carries its GF(2) level**, not built: a rebuilt unit's first node would check the level instead of
   solving it, which wins at most the units' first nodes, 1 to 4% of a thread's time at 64 threads, nothing on long
   searches ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md), the paragraph "What to build
@@ -295,9 +296,9 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
 
 * **The Lagrangian bound over the nogoods, refitted at a node** (the entries' "strong bound"): it cuts most open nodes
   of small gap and none from a gap of 300, where the cost is, and every policy of computing it loses ([the node
-  choice](../notebook/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
+  choice](../notebook/search/the-node-choice-where-the-strong-bound-pays-2026-10/README.md)).
 * **Flat-cycle cuts** on the matching LP: they add a little of the gap, do not beat A1, and the rest is not cycle-shaped
-  ([the entry](../notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md)).
+  ([the entry](../notebook/search/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md)).
 
 ## 4. Conjectures
 
@@ -308,9 +309,9 @@ closed.*  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0
 signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  At the roots of
 2200-3400 it closes 0.46 of the gap, flat in n there, against 0.62 at 1700-2175, and over 900-3333 the share falls 1.0 ±
 0.34 points per 100 n, and 3.8 ± 1.1 per 100 points of gap ([E2 of the fields
-study](../notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#e2-past-2175-2026-10)).  *Evidence
-before the test:* the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of 300-1300,
-rising (measurements 7.2), and the signed GF(3) family is complete (Hershkowitz and Schneider,
+study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#e2-past-2175-2026-10)).
+*Evidence before the test:* the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of
+300-1300, rising (measurements 7.2), and the signed GF(3) family is complete (Hershkowitz and Schneider,
 [agenda-ideas.md](agenda-ideas.md)).
 
 **C2 (sign coherence of three-prime cores).**  *Open; not tested.*  On numbers p^a q^b r^c of three primes, movers of
@@ -336,14 +337,14 @@ open"](../noframe/docs/before-and-after.md#what-remains-open) for a proof; A2 fo
 
 **C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is within one of
 the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets have one size
-([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)).  The heaviest set has the size of
-an optimal set at all 361 roots of 880-1300 ([the anatomy of the
-gap](../notebook/the-anatomy-of-the-gap-2026-10/README.md), 1), and at 758 of the 760 searched and repeated games of
-1301-2175 (`solver/notebook/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s
-promotions).  At 1320 and 1322 it has 77 members and the optimal set 78, which is `max_total`: a tie of weights, or a
-heavier set of the wrong size, which is not known.  So the strict form, the same size, is false or rests on ties.  *Why
-it mattered:* with it, A3 would have searched two values of k at most (it was not needed for A3's soundness); A3 is
-closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
+([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)).  The heaviest set has the size of an optimal set
+at all 361 roots of 880-1300 ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1),
+and at 758 of the 760 searched and repeated games of 1301-2175
+(`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s promotions).
+At 1320 and 1322 it has 77 members and the optimal set 78, which is `max_total`: a tie of weights, or a heavier set of
+the wrong size, which is not known.  So the strict form, the same size, is false or rests on ties.  *Why it mattered:*
+with it, A3 would have searched two values of k at most (it was not needed for A3's soundness); A3 is closed.  *Test:*
+the heaviest set of each size at the roots of 1320 and 1322.
 
 **C5 (the gap law).**  *Measured (2026-10-15): both forms hold, and neither regime.*  The true root gap of the searched
 games grows linearly in n past 2175, at a rate between the two regimes of [The diagnosis of the
@@ -377,8 +378,8 @@ thread; what needs the machine is marked.
   (`examples/wall.rs nodes --nodes 1` over the results file, as in measurements 7.1): the gap's trend (C5, the two
   regimes of [The diagnosis of the wall](#2-the-diagnosis-of-the-wall)) and the residuals of the cost model, with the
   thread count in the fit.  *Done* for a snapshot of the EC2 chain at game 3314 (509 searched games: measurements 7.4,
-  [the gap past 2175](../notebook/the-gap-past-2175-2026-10/README.md)).  It can be repeated on the committed chain with
-  `solver/notebook/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep their level.
+  [the gap past 2175](../notebook/search/the-gap-past-2175-2026-10/README.md)).  It can be repeated on the committed
+  chain with `solver/notebook/search/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, to
   convert 192-thread trees to one-thread equivalents in that fit.  *Measured* for 2170 and 2172 (1 to 192 threads) and
   2184 (16 to 192): the trees differ by up to 18% with no trend in the threads, on proofs of a second or ten, not dear
@@ -392,7 +393,7 @@ thread; what needs the machine is marked.
   hold totals only, so where the tree branches needs a rerun that counts it.
 * **The scaling at 192** (on the machine): effective parallelism, idle and lock time on a dear game, the nogood period
   ([ideas from other fields, section
-  3](../notebook/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)), and the
+  3](../notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md#3-nogoods-with-very-many-threads)), and the
   checkpoint pause at 300 s (below, "What has not been measured").  *Measured* but for the nogood period, on searches of
   up to 85 s ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md)).
 * **The fixed costs on Graviton** after round A: *measured* ([scaling to 192 threads, "For a cloud

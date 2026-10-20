@@ -1396,8 +1396,8 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the games
 /// `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1854 games of
 /// the committed chain 1..4547 whose problem an earlier game posed repeats the last game before it that set a search
-/// up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/same-search-2026-10/README.md).  The window keeps
-/// the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
+/// up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/search/same-search-2026-10/README.md).  The window
+/// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
 
 /// An earlier completed game, as much of it as a repeat of its search needs.
@@ -1604,10 +1604,10 @@ fn previous_game(
     Ok(known.game(before)?.map(|game| Prev::from_known(&game)))
 }
 
-/// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the
-/// seed and the ceiling that the game of `n − 1` gives, so it costs more
-/// (`solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md` measures how much).  `in_table`: whether
-/// `optimal.json` has the game of `n − 1` (which `--use-prev` would take).
+/// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the seed
+/// and the ceiling that the game of `n − 1` gives, so it costs more
+/// (`solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md` measures how much).  `in_table`:
+/// whether `optimal.json` has the game of `n − 1` (which `--use-prev` would take).
 fn note_standalone(n: u32, in_table: bool) {
     let before = n - 1;
     let how = if in_table {

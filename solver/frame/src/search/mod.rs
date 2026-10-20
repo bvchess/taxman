@@ -124,7 +124,7 @@ use std::time::{Duration, Instant};
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
 /// tactic `nogood_period`).  Every interval from 10,000 to 100,000 steps was about as good on one thread (22–26% less
 /// time than never forgetting on hard games near n = 1200, games of fewer steps unchanged); see
-/// solver/notebook/forgetting-nogoods-2026-10/README.md.
+/// solver/notebook/search/forgetting-nogoods-2026-10/README.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// The outcome of [`search`].

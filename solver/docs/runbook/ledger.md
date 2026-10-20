@@ -6,9 +6,9 @@ Part of the [runbook](../RUNBOOK.md).
 The ledger (`examples/ledger/`; [README, "Keeping going past
 limits"](../../frame/README.md#keeping-going-past-limits-and-the-sweep)) proves games from both sides, bounds from below
 and above, in the order that its scheduler judges cheapest.  [The ledger's
-entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records how the scheduler works, the laptop's
-dry run, and every launch and what it found.  A launch needs the approval of whoever owns the AWS account, with the cost
-below ([rules for every launch](launch.md#rules-for-every-launch)).
+entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) records how the scheduler works, the
+laptop's dry run, and every launch and what it found.  A launch needs the approval of whoever owns the AWS account, with
+the cost below ([rules for every launch](launch.md#rules-for-every-launch)).
 
 `cloud.sh` runs `ledger run`, with no proven game unless `PROVEN` gives some, then `ledger report --known
 results/strict.jsonl`.  The report exits
@@ -56,19 +56,19 @@ limits (`BASE`, `MAX_LIMIT`), the games the run is given (`PROVEN`), and the sch
 its section of the entry:
 
 * **The climbs** ([wedge and
-  climb](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)): from
-  each board it proves, the scheduler searches the board above and the board below at once, seeded with its game.
+  climb](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)):
+  from each board it proves, the scheduler searches the board above and the board below at once, seeded with its game.
   `CLIMB` is their ways (`up`, `down`, `both` or `off`; unset, the program's `both`), and `CLIMB_LIMIT` their limit in
   seconds (unset, the program's 60).  `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs.  The events and the report say
   what each way cost and proved.
 * **The finder**, large neighbourhood search ([the finder in the
-  ledger](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
+  ledger](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
   runs on a worker after a board's map and before a search whose best seed has changed.  It finds a legal game, not a
   proof, and its game is a lower bound once the referee has replayed it.  `LNS_SECONDS` is the seconds of one thread it
   gets (unset, the program's 1; 0 runs without it).  Its events (`lns_s`, `lns_from`, `lns_found`, `seed_from`,
   `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line say what it did.
 * **The floor steps** ([floor-guided
-  drilling](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)):
+  drilling](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)):
   an open board that is not climbed to is stepped down before its proof.  A step is a search under a floor below the
   board's upper bound; if it completes having found nothing, the floor becomes the upper bound (the rule `floor`), and
   each step costs about ten times the one before.  `FLOOR_STEP` is the points a step goes down (unset, the program's
@@ -89,7 +89,7 @@ referees; `ledger` is the example's binary there (`solver/frame/target/debug/exa
 README](../../tools/ledger/README.md) says):
 
 ```
-ledger export solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run --bounds results/bounds.jsonl \
+ledger export solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE/run --bounds results/bounds.jsonl \
     --source NAME --checkpoints s3://BUCKET/ledger-DATE/out/run/ckpt                  # prints what improved
 ledger verify-bounds results/bounds.jsonl
 ledger games results/bounds.jsonl > games.jsonl
@@ -110,7 +110,7 @@ Then commit the file.  The checkpoints are in S3 only for the searches still goi
 * **Bring the results home**, then read them on your machine, and do the end of the rules for every launch:
 
   ```
-  L=solver/notebook/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE
+  L=solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE
   aws s3 sync S3_DEST/out $L/ --exclude 'run/ckpt/*'
   solver/frame/target/debug/examples/ledger report $L/run --known results/strict.jsonl
   solver/tools/ledger/events.py $L/run
@@ -118,6 +118,6 @@ Then commit the file.  The checkpoints are in S3 only for the searches still goi
 
 ## Examples
 
-[The ledger's entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) records each of its runs: the
-laptop's dry run, the first cloud attempt and its fix, and the stages past 4400 with the climbs, the finder and the
-floor steps, each with its settings and what it proved.
+[The ledger's entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) records each of its
+runs: the laptop's dry run, the first cloud attempt and its fix, and the stages past 4400 with the climbs, the finder
+and the floor steps, each with its settings and what it proved.

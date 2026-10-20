@@ -44,11 +44,11 @@ The ladder runs were stopped by their 60 s, none finished, so they measure node 
 
 Doubling the threads doubles the rate (1.90 to 2.05 times, a mean 1.95); without the forgetting the rate is 0.3 to 5.2%
 higher, as a table that grows unchecked would give, which says nothing about the tree (the [forgetting
-entry](../forgetting-nogoods-2026-10/README.md) measured the trees).
+entry](../search/forgetting-nogoods-2026-10/README.md) measured the trees).
 
 *What it decided.*  On 64 threads the search loses nothing to threads at the end of the chain, so what remains is cheaper
 nodes and smaller trees ([STATUS](../../docs/STATUS.md)), which is what [the tuning
-campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md) went on to measure the same day.  The cost of the
+campaign](../search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md) went on to measure the same day.  The cost of the
 machine was not read: about $0.40 at spot with the build, an estimate.
 
 *Commits.*  97db411 (the build; the laptop's profile merged just before).  The checkpoint (5.3 MB) and the four copies of

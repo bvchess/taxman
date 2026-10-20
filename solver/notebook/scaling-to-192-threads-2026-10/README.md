@@ -7,7 +7,7 @@ loop's round, round A, the prime-exchange rule and round B's window.  After them
 and 192 threads (the units' starts, the lock, the ramp and the tail, the step itself), what does the window of games in
 flight do at those counts, and does a 192-vCPU `c8g.48xlarge` keep its threads busy enough that the next run at the end
 of the chain should use one instead of a 64-vCPU `c8g.16xlarge`?  Items 1, 3, 4, 7 and 8 of
-[solver/notebook/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a cloud machine"; item 2 (hours of large
+[solver/notebook/search/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a cloud machine"; item 2 (hours of large
 trees) was not run.
 
 *What was run.*  One `c8g.48xlarge` on spot in us-east-1b on 2026-10-15: Graviton4 (Neoverse V2), 192 vCPUs on two
@@ -107,7 +107,7 @@ game before them is concluded) adds 30 to 55% nodes at 16 and 32: at 64 threads 
 slower than in order (68-75 s against 56.5); at 192 the spare threads absorb it (32-34 s at 1, 16 and 32 alike).  A
 window of 4 is the best measured at both counts in (b): 55.0 s at 64 threads with no more nodes, 29.6 s at 192 with 16
 to 19% more (one run each), and (a) points the same way (7.7 and 10.0 s against 11.0 and 16.1).  By the rule of
-solver/notebook/the-wall-regime-2026-10/README.md that makes `WINDOW` 4 the setting for the chain at 64 and at 192 threads, and `chain.sh`'s default
+solver/notebook/search/the-wall-regime-2026-10/README.md that makes `WINDOW` 4 the setting for the chain at 64 and at 192 threads, and `chain.sh`'s default
 of 16 costs a run at 64 threads a fifth of its games an hour past 2225; the default is not changed by this entry.  The
 trace at 192 threads with a window of 16 (`c8g48/window-trace.txt`): 555 grants, 152 reclaims, 36 suspensions, 75
 hints and 4 deferrals for the 51 games.
@@ -184,7 +184,7 @@ request or security group of the run was left.
 ### Scaling to 192 threads (`c8g48/`)
 
 One `c8g.48xlarge` (192 vCPUs, two sockets, two NUMA nodes; `machines/c8g48.txt`) on 2026-10-15, the code of 55287ff
-built by `solver/tools/cloud/setup.sh`, the items of [solver/notebook/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a
+built by `solver/tools/cloud/setup.sh`, the items of [solver/notebook/search/the-wall-regime-2026-10/README.md](README.md#for-a-cloud-machine), "For a
 cloud machine", that the entry names.  The 64-thread runs of the window and of the next games are bound to 64 CPUs of
 node 0 (`taskset`); the one-thread `wall setup` (item 1) ran beside them on CPU 191, and its lines are
 [setup_c8g.jsonl](setup_c8g.jsonl).

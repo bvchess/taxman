@@ -185,9 +185,9 @@ consequences:
 * The paper's hardness is for the general game.  The complexity of Taxman itself is open, and nothing here settles it.
   But the sources' instance (members above the factors they list) and the frames are instances of the two-rank problem
   that their Theorem 2 shows hard in general, and the gap left by Theorem 11 is the odd cores of frames 1–3
-  (solver/notebook/the-anatomy-of-the-gap-2026-10/README.md).  So wherever (♦) or the parity bound is exact in Taxman,
-  the exactness comes from the arithmetic, not the structure.  This matches what the adversarial experiments on (♦)
-  found.
+  (solver/notebook/search/the-anatomy-of-the-gap-2026-10/README.md).  So wherever (♦) or the parity bound is exact in
+  Taxman, the exactness comes from the arithmetic, not the structure.  This matches what the adversarial experiments on
+  (♦) found.
 
 ## Status
 

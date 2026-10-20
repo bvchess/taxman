@@ -37,7 +37,7 @@ README](../../noframe/docs/proofs.md#the-upper-part-game-by-game):
 
 No game is certified whole, and the open share follows the root's gap, not n (it falls with the gap at 2600-2699).
 The root's gap with layers 1 and 2 fixed is the solver's GF(2) gap at the root on all 400 games past 2175 that
-[the gap past 2175](../the-gap-past-2175-2026-10/README.md) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
+[the gap past 2175](../search/the-gap-past-2175-2026-10/README.md) measured, and the root's heaviest parity set plays all of U\*_{≥3} in
 every one of the 1,125 games, so no game is flagged.  The fixed set of the integrated search (U\* less a game's open
 members) is in these files.  THEORY.md's "What is known of U" now cites them; its scratch figures and the sentence on
 searches closing U to 1500, which the prover's proofs to 2175 supersede, are gone.

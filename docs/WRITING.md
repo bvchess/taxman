@@ -54,10 +54,13 @@ where each statement stands: proved, proved given U, measured on some games, or 
 
 ## 7. The notebook is the record
 
-An entry is dated, is never erased or rewritten to these rules, records failures as well as successes, and links to its
-files.  The [notebook's front page](../solver/notebook/README.md#how-this-notebook-is-kept) has the rules for filing it.
-A new entry opens with its question in a sentence and its answer in a sentence or two, then gives the method, the
-results and the decision.
+An entry is a working log while its work runs, and a record once the work concludes.  While the work runs, the entry
+gains dated sections, and nothing in it is rewritten.  When the work concludes, the entry is rewritten as a record for
+posterity: its question in a sentence and its answer in a sentence or two, then the method, the results with the
+numbers that decided them, and the decision.  The record keeps failures as well as successes and links to its files,
+and it leaves out the ups and downs of the journey, which git keeps.  Every entry says when its work started and, once
+it has, when it concluded.  The [notebook's front page](../solver/notebook/README.md#how-this-notebook-is-kept) has the
+rules for filing it.
 
 ## 8. Give each task one file
 

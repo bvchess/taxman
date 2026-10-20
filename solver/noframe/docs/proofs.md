@@ -237,7 +237,7 @@ Four files, each made on one thread of the laptop:
 |---|---|---|---|---|
 | `data/upper_2_1300.jsonl` | the table's games 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
 | `data/upper_1301_2175.jsonl` | the committed chain's games 1301–2175, 875 | 490 | 300 s | |
-| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](../../notebook/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
+| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](../../notebook/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
 | `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | the input of the certificates of 2176-3440 (`../tools/certify/`) |
 
 By band, the open members and the margins of each game (the share is of all members):
@@ -272,10 +272,9 @@ By band, the open members and the margins of each game (the share is of all memb
   (77,195 of 518,992), and 19.9% on 3315-3440 (14,704 of 73,968, 172 to 271 a game, the root's gap 1,103 to 1,555).
 * **The open share follows the root's gap, not n.**  It grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
   0.73, 0.73 and 0.91 in the three files), and it falls back with the gap (2600-2699).  The root's gap is the one the
-  frame solver's search
-  costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400 games past 2175 that
-  both measured (`../notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl`).  The margins grow with it, and the largest
-  is close to the gap.
+  frame solver's search costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400
+  games past 2175 that both measured (`../notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl`).  The margins
+  grow with it, and the largest is close to the gap.
 * **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,198 games that need it**, as at every root
   measured before; no game is flagged.
 * **The open members are mostly of layer 3** (52% to 2175 and 58% past it), then of layer 5 (21%, 27%) and 4 (19%, 9%),

@@ -101,7 +101,7 @@ What the data shows:
   two-frame game of frames 0 and 1 for its heaviest promotion set, and lowers frame 0's freedoms to that set's size,
   which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the tactic
   `revise_freedoms`, measured it and removed it ([which tactics earn their
-  keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+  keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)).
 * **833 refutes that "theorem" for the whole frame game.**  The exchange above is a promotable set: the
   optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
   (`solver/frame/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`).  So at 833 `max_total`

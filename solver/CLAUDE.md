@@ -10,7 +10,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
   Committed results are evidence, and runs never overwrite them.
 * **Record every experiment.**  Read the register's file of its subject (solver/notebook/register/) before proposing
   one, and record each when it ends, failures included, as the notebook's front page says (one folder an entry in
-  solver/notebook/, its README.md the entry, with its rows in the register and the index).
+  solver/notebook/ or solver/notebook/search/, its README.md the entry, with its rows in the register).
 
 * **Writing.**  Docs follow docs/WRITING.md.
 * **Keep the quick check quick.**  Every change passes `solver/tools/quick_check.py`, which fails on a slow test or a
@@ -26,7 +26,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
   changes are tested).
 * **solver/docs/STATUS.md**: the current state: the priority, and the projects in flight.
 * **solver/notebook/README.md**: the lab notebook's rules, and the map of its register (register/, a file a
-  subject) and its index (index.md); its entries are the folders beside it.
+  subject); its entries are the folders beside it and in search/.
 * **solver/docs/AGENDA.md**: the research avenues.
 * **solver/docs/RUNBOOK.md**: the guide to running on EC2, the index of solver/docs/runbook/, a file a job
   (launch.md has the rules for every launch).

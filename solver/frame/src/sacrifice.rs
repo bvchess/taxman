@@ -6,9 +6,9 @@
 //! a measured negative result, and because the tests use it as an independent check.
 //!
 //! * *The question.*  The tactic `reuse_prev` (since removed,
-//!   solver/notebook/which-tactics-earn-their-keep-2026-10/README.md) accepted a derived game unproven.  Could an upper
-//!   bound on `opt(n)` computed from games of `n − 1` prove those games optimal, or settle other games faster than
-//!   searching them?
+//!   solver/notebook/search/which-tactics-earn-their-keep-2026-10/README.md) accepted a derived game unproven.  Could
+//!   an upper bound on `opt(n)` computed from games of `n − 1` prove those games optimal, or settle other games faster
+//!   than searching them?
 //! * *The answer is no.*  The bound is a theorem, and the frame model computes it correctly (checked against
 //!   exhaustive search, [`crate::brute`]), but it is tight on too few of the games that matter, and computing it
 //!   costs about as much as solving the game: it is no replacement for the tactic, and putting it into the

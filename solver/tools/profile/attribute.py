@@ -1,5 +1,5 @@
 """Attribute macOS `sample` profiles of the solver to kinds of work and their purposes (section 2 of the entry
-solver/notebook/ideas-from-other-fields-the-pilots-2026-10/README.md).
+solver/notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md).
 
 usage: attribute.py BINARY sample.txt [sample.txt ...]   (run by profile.sh, with the binary that was sampled)
 

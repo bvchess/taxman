@@ -174,10 +174,11 @@ reads nothing of the truth (`optimal.json`, the results files) unless it is give
   raise a game's L (a game that cannot is not shown to the referee, or not made), and an L above a U stops the run as
   an error;
 * the *finder*, a large neighbourhood search (`examples/common/lns.rs`; [finders for good games that are not
-  sound](../../notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and proves
-  nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a game's
-  map and before a search whose best seed has changed since it last ran on the game (a climb's always has).  Its game,
-  which the referee replays like every lower bound, is offered as the game's L, and seeds the search if it is better.
+  sound](../../notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and
+  proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a
+  game's map and before a search whose best seed has changed since it last ran on the game (a climb's always has).  Its
+  game, which the referee replays like every lower bound, is offered as the game's L, and seeds the search if it is
+  better.
 
 *Its order.*  The maps of all the games come first, on the workers, and the relations carry their bounds once, when the
 last map is in; the main thread, which applies every result while the workers whose searches ended wait for it, does

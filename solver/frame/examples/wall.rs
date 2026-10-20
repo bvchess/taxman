@@ -2,7 +2,7 @@
 //! game of the chain costs is its search, which grows with the tree, plus everything around the search, which grows
 //! with `n` alone (the tables, the frames, the model, the GF(2) matroids of the root, the replays); the commands
 //! measure the two apart.  The study, its data and its conclusions are in
-//! solver/notebook/the-wall-regime-2026-10/README.md.
+//! solver/notebook/search/the-wall-regime-2026-10/README.md.
 //!
 //! ```text
 //! cargo run --release --example wall -- setup [--known FILE] [--repeat R] [--width W] N|A-B...
@@ -121,39 +121,39 @@
 //!   today's?  `choice-prepare` makes a game's file (its nogood pool, its root multipliers, its A1 root fit, its
 //!   sampled nodes) and `choice` measures each node of the file: its gap, the slower bounds and whether they cut, the
 //!   subtree today's search makes of it, and the times.  Defined in `wall/choice.rs`, whose module comment has the
-//!   options and the lines; `solver/notebook/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in the
-//!   cloud and reads the lines.
+//!   options and the lines; `solver/notebook/search/the-node-choice-where-the-strong-bound-pays-2026-10/` runs them in
+//!   the cloud and reads the lines.
 //! * **decompose**: do the conflicts of a node that heads a big subtree split, across some home, into two sides that do
 //!   not interact (A5, the decomposition across the frames)?  For the nodes of a game's proof (the probe's fixtures,
 //!   the open units of pauses of the proof, the root): how the conflicts of the node's heaviest set and the nogoods
 //!   its subtree learns lie against each separator home, how the node's gap splits by home, the two sides solved
 //!   apart under the separator of the node's best completion, and the AND/OR search itself.  Defined in
 //!   `wall/decompose.rs`, whose module comment has the options and the lines;
-//!   `solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/` reads them.
+//!   `solver/notebook/search/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/` reads them.
 //! * **anatomy**: units of the tuning suite, or whole games, solved with a hook on every step of the searcher, which
 //!   writes what each step saw and did (its bound, conflict, branch and how it ended, and the residues of the frames),
 //!   where each known conflict came from (a mirror of the nogood table), the nogoods the searcher learned, and
 //!   optionally with a branching order of its own and the learning of `images`; defined in `wall/anatomy.rs`, whose
 //!   module comment has the options and the files.
-//!   `solver/notebook/the-anatomy-of-a-hard-subtree-2026-10/` reads them.
+//!   `solver/notebook/search/the-anatomy-of-a-hard-subtree-2026-10/` reads them.
 //! * **cycles**: do flat-cycle cuts close the gap the field-rank bounds leave?  The matching LP of a game's root and of
 //!   its tuning-suite units, with cover, rank and flat-cycle cuts, against the GF(2) bound; defined in
 //!   `wall/cycles.rs`, whose module comment has the options and the stages, for
-//!   `solver/notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/`.
+//!   `solver/notebook/search/flat-cycle-cuts-on-the-matching-lp-2026-10/`.
 //! * **exchanges**: units of the tuning suite, or whole games, solved with a hook that checks at every exclusion
 //!   whether an exchange of two primes that maps the member onto another candidate is a symmetry of the node, and with
 //!   `--prune` prunes by the ones that are; defined in `wall/exchanges.rs`, whose module comment has the check, the
-//!   rule and the lines.  `solver/notebook/local-prime-exchanges-at-the-nodes-2026-10/` reads them.
+//!   rule and the lines.  `solver/notebook/search/local-prime-exchanges-at-the-nodes-2026-10/` reads them.
 //! * **near**: how many completions of a unit of the tuning suite, or of a whole game, come within `--within D` of
 //!   P*, by value, counted exactly by the search made to count (`search::StepHook::counting`) or estimated from
 //!   random descents; defined in `wall/near.rs`, whose module comment has the count, the estimate and the files.
-//!   `solver/notebook/completions-near-the-optimum-in-the-hard-subtrees-2026-10/` reads them.
+//!   `solver/notebook/search/completions-near-the-optimum-in-the-hard-subtrees-2026-10/` reads them.
 //! * **images**: units of the tuning suite, or whole games, solved with a hook that, wherever a node goes on without a
 //!   member and its bound swaps in the member's twin (a twin swap or a paired exchange), asks whether the node's
 //!   conflict with the same swap made is a conflict too, and with `--learn` makes the search learn those images;
 //!   `--count` only counts the tree's steps and leaves; defined in `wall/images.rs`, whose module comment has the test,
 //!   the learning, the lines and the files.
-//!   `solver/notebook/conflicts-closed-under-cheap-exchanges-2026-10/` reads them.
+//!   `solver/notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).

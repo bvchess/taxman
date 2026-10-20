@@ -126,13 +126,13 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   cost more than they help.  The table is a cache, so forgetting is sound; it is deterministic on one thread, and a game
   of fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
   checkpoints, does not pay ([carrying nogoods
-  over](../../notebook/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher keeps, and
-  for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.  Three
-  research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose defaults
-  are the behaviour above, with the same trees.  The table counts what it does (nogoods learned, lookups and the share
-  they answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and the ladder
-  and the progress lines print the counts.  A checkpoint does not record the policies, since the answer does not depend
-  on them and a resumed search starts with empty tables; the run that resumes says which it uses.
+  over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher
+  keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.
+  Three research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose
+  defaults are the behaviour above, with the same trees.  The table counts what it does (nogoods learned, lookups and
+  the share they answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and
+  the ladder and the progress lines print the counts.  A checkpoint does not record the policies, since the answer does
+  not depend on them and a resumed search starts with empty tables; the run that resumes says which it uses.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
   cannot be promoted from the root at all and could be filtered out once.  It cannot: on every game from 2 to 1230 the
   frame builder's candidates all pass that test at the root (a test checks every game to 511 and every sixth
@@ -140,7 +140,7 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   candidate that cannot be promoted *once the node's promotions are made*: its frame may have used it to pay for a move
   left with one live factor, say.  In another branch it is part of a nogood of two or more members.  The promotions that
   fail are under 4% of the steps, so little would be saved ([single-member
-  conflicts](../../notebook/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
+  conflicts](../../notebook/search/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
 
 ## The Lagrangian bound over the nogoods
 
@@ -175,8 +175,8 @@ The search computes it in integers (weights in 64ths), with nothing rounded; the
   cycles on one thread, about 3 times on average, with no trend in n; the chain 1201–1231 on four threads takes 2.4
   times less game time.  Each step costs about half as much again, so a search whose time goes into finding its best set
   late, as 992's does, is slower ([a Lagrangian bound over the
-  nogoods](../../notebook/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it changes no
-  tree measured ([tactics.md](tactics.md), the row of `lagrange`).
+  nogoods](../../notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it
+  changes no tree measured ([tactics.md](tactics.md), the row of `lagrange`).
 
 ## The default step
 
@@ -270,7 +270,7 @@ heavier than the floor ([docs/THEORY.md](../../../docs/THEORY.md), Lemma F, the 
 search), which `SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
 the proof's tree, node for node, as a search seeded with an optimal set makes it; above P\* a smaller one, by a factor
 of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
-floor](../../notebook/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
+floor](../../notebook/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
 
 ## Extended mode: one-sided candidates
 

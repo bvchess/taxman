@@ -34,8 +34,8 @@ file your task needs.
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | guide | running the frame solver, and the prover's proofs, on a cloud machine of many CPUs; the index of [docs/runbook/](docs/runbook/), a file a job, and [launch.md](docs/runbook/launch.md) has the rules for every launch |
 | [docs/STATUS.md](docs/STATUS.md) | time-bound | the priority, and the projects in flight; read it first |
 | [docs/AGENDA.md](docs/AGENDA.md) | time-bound | the research agenda: what limits the end of the chain, the avenues ranked, the conjectures, and what the cloud runs should measure; [agenda-ideas.md](docs/agenda-ideas.md) has the ideas from other domains |
-| [notebook/README.md](notebook/README.md) | record | the lab notebook: its rules, and the register of everything tried, kept or not, a file a subject in [notebook/register/](notebook/register/) (read your subject's before proposing an experiment); the [index of rounds](notebook/index.md); each entry is a folder beside it |
-| [the cost curve](notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n around 1231, in the search before the GF(2) bound, with projections for a larger machine |
+| [notebook/README.md](notebook/README.md) | record | the lab notebook: its rules, and the register of everything tried, kept or not, a file a subject in [notebook/register/](notebook/register/) (read your subject's before proposing an experiment); each entry is a folder beside it or in [notebook/search/](notebook/search/) |
+| [the cost curve](notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md) | record | how the cost of a game grew with n around 1231, in the search before the GF(2) bound, with projections for a larger machine |
 | [../docs/WRITING.md](../docs/WRITING.md) | guide | how the docs are written |
 | the [wiki](https://github.com/bvchess/taxman/wiki) | explanation | the game and the algorithm, with a walkthrough of game 21 |
 

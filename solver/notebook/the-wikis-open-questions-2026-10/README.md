@@ -100,7 +100,7 @@ half of n's committed game, accepted when the set is playable and scores opt(n))
 888 of 2..1300 and 1,456 of 2..2175 (67.0%), the primes included (the Java takes as they are the boards without
 promotion candidates, such as 8, 12 and 16, which the emulation does not); the Rust port of it (`reuse_prev`,
 removed) accepted 670 of the games of 2..1300 that are neither prime nor trivial ([tactics
-review](../which-tactics-earn-their-keep-2026-10/README.md#reuse_prev-nothing-left-to-save)).
+review](../search/which-tactics-earn-their-keep-2026-10/README.md#reuse_prev-nothing-left-to-save)).
 
 **7. What is proven about the procedure.**
 
@@ -160,7 +160,7 @@ the repeats and trivial boards at it (493 and 8).  The page's procedure succeeds
 Java's reuse at the primes, all 914 repeats, 191 of the `cap` games, 8 trivial boards and 17 `exhausted` games.  So the
 70% are, nearly exactly, the games the solver settles without a search, and the games it has to exhaust are the 30%: a
 game whose search problem is that of n − 1 (804) always adapts the Java's way, and the page's way only at the ceiling.
-From [going higher](../going-higher-and-coming-back-down-2026-10/README.md): δ(n) ≤ n/2 for even n is that entry's bound with
+From [going higher](../search/going-higher-and-coming-back-down-2026-10/README.md): δ(n) ≤ n/2 for even n is that entry's bound with
 K = 1, and at its even n with δ(n) = n/2 (8, 12, 16, 24, 32, 48, 64, 96, 256, 384, 512, 768, 1024, and now 2048)
 dropping n/2 and selecting n last is optimal; the page's procedure does that at the powers of two, not at 3·2^k.
 

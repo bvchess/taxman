@@ -8,7 +8,7 @@ the same search problem as an earlier one, so it has the same best promotions.  
 default) recognizes this and reuses the earlier game's promotions instead of searching again.  About half of the
 committed chain's games that need a search are such repeats ([results/README.md](../../../results/README.md#strictjsonl)
 has the counts).  Skipping their searches saves a large share of a chain's search time; [the
-entry](../../notebook/same-search-2026-10/README.md) has the measurements.
+entry](../../notebook/search/same-search-2026-10/README.md) has the measurements.
 
 *The search problem.*  A game's *search problem* Π is what setup gives the search, less what only changes how the search
 runs.  It has four parts:

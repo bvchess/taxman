@@ -40,8 +40,8 @@ prover.
 of cheap and dear games.  How fast it grows with n depends on the range.  The first 2175 games of the committed chain
 took 27 minutes on eight threads of a laptop; the chain goes on past them ([how far it
 reaches](../../results/README.md#the-files)).  Over the games 1301 to 2175 the waves show no growth that a fit resolves
-(the notebook's study of [the GF(2) bound](../notebook/the-gf2-bound-in-the-search-2026-10/README.md), which lets the
-search cut branches).  Past 2175 a fit does find growth: the search times of the games 2176 to 3440 rise tenfold for
+(the notebook's study of [the GF(2) bound](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), which lets
+the search cut branches).  Past 2175 a fit does find growth: the search times of the games 2176 to 3440 rise tenfold for
 about every 1,040 in n, with about a decade of scatter ([the chain to
 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
 
@@ -339,11 +339,11 @@ n=1302  score=533559    search  nodes=3723            0.178 s  optimal unknown  
 Game 1301 is a prime, but `--force-search` also skips the prime formula.  Game 1302 started from 1301.  A node limit
 would have stopped either with its checkpoint; the engine checks the limit every 1,024 steps of a thread.
 
-A game whose predecessor is in neither the run nor the results file, and not taken with `--use-prev`, runs
-*standalone*, with no seed and no ceiling: for example `taxman solve 1400`, or `taxman solve 480` without the flag.
-`solve` says so on stderr (`note: no previous game for n=...`), and the result line has `"prev": null`.  The answer is
-still correct, but costs about twice as much on the hard games, and many times more on the games that a chain settles
-at once by reaching the ceiling ([the cost curve](../notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
+A game whose predecessor is in neither the run nor the results file, and not taken with `--use-prev`, runs *standalone*,
+with no seed and no ceiling: for example `taxman solve 1400`, or `taxman solve 480` without the flag.  `solve` says so
+on stderr (`note: no previous game for n=...`), and the result line has `"prev": null`.  The answer is still correct,
+but costs about twice as much on the hard games, and many times more on the games that a chain settles at once by
+reaching the ceiling ([the cost curve](../notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
 
 ### Known games
 
@@ -525,4 +525,4 @@ bounds store, `results/bounds.jsonl` (`ledger export`; `run --bounds` starts fro
 own ([results/README.md](../../results/README.md#boundsjsonl)) and which `taxman solve --use-prev` draws on too ("Known
 games", above).  The ledger's files are its own, not results lines ([solver/docs/design/trust.md, "The
 ledger"](../docs/design/trust.md#the-ledger); the experiment: [the
-ledger](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)).
+ledger](../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md)).

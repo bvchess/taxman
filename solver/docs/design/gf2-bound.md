@@ -6,15 +6,15 @@ Part of the [design](../DESIGN.md).
 
 The *GF(2) bound*, the default node bound (tactic `gf2`), relaxes winnability less than matchability does, and so prunes
 more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound's ([matroid intersection
-bounds](../../notebook/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors coordinates
-over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal factors in the
-frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and the peel's order
-makes these vectors linearly independent.  The moves of a frame are fixed, so its condition is a linear matroid on the
-candidates that touch it, contracted by the moves, whose rank is the frame's freedoms.  A candidate of home `h` touches
-frames `h` and `h − 1`, one even and one odd.  So the even frames' matroids are the blocks of a matroid `A` on the
-candidates, the odd frames' the blocks of a matroid `B`, and every promotable set is independent in both.  The heaviest
-common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial time), the
-node's *heaviest set* `I*`, bounds its completions.
+bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors
+coordinates over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal
+factors in the frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and
+the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so its condition is a linear
+matroid on the candidates that touch it, contracted by the moves, whose rank is the frame's freedoms.  A candidate of
+home `h` touches frames `h` and `h − 1`, one even and one odd.  So the even frames' matroids are the blocks of a matroid
+`A` on the candidates, the odd frames' the blocks of a matroid `B`, and every promotable set is independent in both.
+The heaviest common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial
+time), the node's *heaviest set* `I*`, bounds its completions.
 
 [THEORY.md](../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof; the
 theorem is the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses.
@@ -57,30 +57,31 @@ misses are the *odd* cores of movers with three or more factors.
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by
   Bellman–Ford, each round from the vertices that changed.  It starts from the last split of the same node, or else of
   its parent, wherever the path of predecessors that gave a potential is still a path (`Meet::split_bounds_from`), and
-  reaches the same split, the shortest distances.  Its bound is loose, so for the members it leaves free within
-  the tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too
-  when no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
+  reaches the same split, the shortest distances.  Its bound is loose, so for the members it leaves free within the
+  tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too when
+  no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
   (`Meet::has_cycle_within`).  A member on a cycle that the search for another found within the slack is not searched,
   since that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the
   node's own or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`,
   a bit test an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that
   inherits its parent's heaviest set finds nearly all its members free on its parent's cycles ([what a GF(2) step
-  carries from the last](../../notebook/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  The
-  forced members are the same.  The window `all` costs each node more, since every member is checked exactly, and
+  carries from the last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).
+  The forced members are the same.  The window `all` costs each node more, since every member is checked exactly, and
   the trees fall by more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the
   former window, 80 (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
-  campaign](../../notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach the
-  elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the least
-  distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of packed
-  (distance, vertex) keys, which come out in the binary heap's order.
+  campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
+  the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
+  least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of
+  packed (distance, vertex) keys, which come out in the binary heap's order.
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection is
   lowest.  The search reads each such bound off the exchange graph where it certifies it, and solves it where not: in
   the order of the split's bounds, each solve stopped once it reaches both the lowest so far and the need, after a
   greedy lower bound.  A member whose bound falls below the need is forced too, and the chosen member's level, certified
   or solved, is what the node goes on with.  The cheaper choices (the split's bound alone, the largest member) take more
-  nodes and more time ([the GF(2) bound in the search](../../notebook/the-gf2-bound-in-the-search-2026-10/README.md)).
-  The tactics `branching`, `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set
-  how far strong branching goes ([tactics.md](tactics.md)).
+  nodes and more time ([the GF(2) bound in the
+  search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).  The tactics `branching`,
+  `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how far strong branching
+  goes ([tactics.md](tactics.md)).
 * **What it replaces.**  With `gf2` the search does not compute the matching bound, which as a first check before the
   intersection costs more than the cuts it saves; so `match_refine` has no effect.  The conflicts, nogoods, forced
   members and exact sets work as with the matching bound.  The Lagrangian bound over the nogoods still applies after the
@@ -114,9 +115,9 @@ a set that breaks one pair's inequality is beaten by its image under that pair's
 The pairs come in classes of primes that the frame builder treats alike.  At 1300 the classes are {41, 43}, {59, 61},
 {67, 71}, {73, 79}, {89, …, 107}, {109, …, 139} and {149, 151, 157}, which make 32 pairs; there are 99 at 2175 and 300
 at 4000.  `search::symmetry::root_pairs` finds them when a search is set up, in under a millisecond: it makes the full
-check only for the primes whose multiples have the same places and exponents in the frames, and only over the
-multiples.  [Dominance and symmetry](../../notebook/dominance-and-symmetry-2026-10/README.md) found the exchanges, and
-[prime exchanges in the search](../../notebook/prime-exchanges-in-the-search-2026-10/README.md) put them in.
+check only for the primes whose multiples have the same places and exponents in the frames, and only over the multiples.
+[Dominance and symmetry](../../notebook/search/dominance-and-symmetry-2026-10/README.md) found the exchanges, and [prime
+exchanges in the search](../../notebook/search/prime-exchanges-in-the-search-2026-10/README.md) put them in.
 
 The search uses the pairs through the cofactor sums of a node's promotions `P` and candidates `C`
 (`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):

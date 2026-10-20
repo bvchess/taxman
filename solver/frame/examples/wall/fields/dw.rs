@@ -1,8 +1,8 @@
 //! The multi-field bound and its multipliers: one GF(2) matroid intersection plus a greedy per signed GF(3) frame
 //! matroid, coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of the fields
-//! study (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at commit
-//! 8753189, with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer checked
-//! against a reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
+//! study (solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at
+//! commit 8753189, with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer
+//! checked against a reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
 //! # The bound
 //!
 //! Let `A`, `B` be the two GF(2) frame matroids of a state (`frames::FrameMatroids`) and `N_1, …, N_K` signed GF(3)
@@ -32,7 +32,7 @@
 //! `z(S) ≤ r_k(S)` (Edmonds' description of a matroid's polytope) rather than by columns of independent sets linked
 //! element by element: that master (link rows `Σ_j α_j [x ∈ Q_j] − Σ_i β_{k,i} [x ∈ I_{k,i}] ≤ ε`, the design's) was
 //! built and measured first, and its simplex spent nearly all its pivots in steps of the size of the perturbation
-//! (solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md).  A rank inequality's dual
+//! (solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md).  A rank inequality's dual
 //! `μ_{k,S} ≥ 0` gives `λ_{k,x} = Σ_{S ∋ x} μ_{k,S}`, and then `G_k(λ_k) ≤ Σ_S μ_{k,S} r_k(S)`, so the master's dual is
 //! a Lagrangian bound's, and at the LP's optimal duals they coincide.  A pricing at multipliers `λ` is one evaluation
 //! of `L(λ)`, a valid bound, and its intersection's set is a column.  The inequalities are found from the master's

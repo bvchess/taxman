@@ -132,7 +132,7 @@ the upper part of each punctured board.  It proves game 1133 and disagrees with 
 **Given the pruning is exact.**  Every [tactic](../../../docs/GLOSSARY.md#the-search) is proven or sound;
 [tactics.md](tactics.md) grades each.  The Java used two shortcuts that rest on conjectures, `reuse_prev` and
 `revise_freedoms`.  The frame solver had them as tactics for a while, measured that they no longer paid, and removed
-them ([which tactics earn their keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+them ([which tactics earn their keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)).
 
 **Given the previous game is optimal.**  The game of n is built from the game of n − 1, using the
 [ceiling](../../../docs/GLOSSARY.md#the-game) and the [prime formula](../../../docs/GLOSSARY.md#the-game).  So a chain
@@ -157,7 +157,8 @@ final score equals optimal.json's.
 The search is the frame solver's own.  It started as the Java's loop: its bound, its depth-2 preclusion table, the
 promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was replaced by
 something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
-keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md) has the last measurements of what was removed.
+keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md) has the last measurements of what was
+removed.
 
 The wiki's words map onto this document's:
 
@@ -170,4 +171,4 @@ The wiki's words map onto this document's:
 The port found one defect in the Java's bound: it can be too low.  Its runner-up replaces the
 failing number with the next candidate below the smallest bid member, but a skipped candidate from the failing number's
 frame can be larger.  At the root of n = 114, the Java's bound is 358 against the best completion's 360 ([the
-story](../../notebook/the-port-and-its-first-improvements/README.md)).
+story](../../notebook/search/the-port-and-its-first-improvements/README.md)).

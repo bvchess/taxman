@@ -144,17 +144,17 @@ What that evidence amounts to:
    (`src/results.rs`), and its 167 games of the bounds store.  A game of the store is a game the referee replays at the
    score of an upper bound the store holds ([below](#boundsjsonl)).
 3. **Standalone solves.**  Some games were solved again on their own, with no seed and no ceiling:
-   * `solver/notebook/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for every
-     game of 1001–1231 that is not prime (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads, commit
-     e710d16; see `solver/notebook/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`).  All of them finished, and
-     each found the promotion sum of the score recorded here.  These proofs rest on no other game.  So every game of
-     1001–1231 that is not prime is proven without the chain, and every prime one by the prime formula from a game so
-     proven.
+   * `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for
+     every game of 1001–1231 that is not prime (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads,
+     commit e710d16; see `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`).  All of them
+     finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other game.  So
+     every game of 1001–1231 that is not prime is proven without the chain, and every prime one by the prime formula
+     from a game so proven.
    * There is no such solve for 1232–1300.  Of those 69 games, 24 are proven by an exhausted search of their own, and
      the 7 proofs at the ceiling, the 9 prime ones and the 29 repeats rest on the game before them or on the game they
      repeat, so on the chain from n = 1 (see 5).
-   * Past 1300, `solver/notebook/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` has ten games of 1302–1352 solved
-     standalone (the matching path, 8 threads), each finishing with the promotion sum recorded here.  The rest of
+   * Past 1300, `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` has ten games of 1302–1352
+     solved standalone (the matching path, 8 threads), each finishing with the promotion sum recorded here.  The rest of
      1301–4547 is the chain's: 1090 exhausted searches of their own, 296 proofs at the ceiling, 385 prime ones and 1309
      repeats that rest on the games before them, and 167 games of the store.
 4. **Agreement between builds and files.**
@@ -166,13 +166,13 @@ What that evidence amounts to:
      it).  The lines say `optimal_match` true here too.  When the run was made the table held those games, so this is a
      second run reproducing the first's scores, not a comparison with another source.
    * n = 1301–2175: `optimal.json` has no game here (the lines say `optimal_match` null), so the comparison is with
-     another run of the same search.  The GF(2) study's chain was made from `optimal.json`'s game of 1300
-     (`--use-prev`) by the build of commit 716ebd9, on 2 threads in three invocations, and reached 2175 from 1301 in 92
-     minutes of game time.  Its 875 games have this file's scores, proofs and methods in every game, and its moves in
-     all but 1560–1563 (above).  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
-     `taxman verify-results results/strict.jsonl solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (93 s)
-     and `solver/tools/check_results.py` on both accept them, and find 875 games in both files, with equal scores in
-     all.
+     another run of the same search.  The GF(2) study's chain was made from `optimal.json`'s game of 1300 (`--use-prev`)
+     by the build of commit 716ebd9, on 2 threads in three invocations, and reached 2175 from 1301 in 92 minutes of game
+     time.  Its 875 games have this file's scores, proofs and methods in every game, and its moves in all but 1560–1563
+     (above).  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
+     `taxman verify-results results/strict.jsonl solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
+     (93 s) and `solver/tools/check_results.py` on both accept them, and find 875 games in both files, with equal scores
+     in all.
    * n = 2176–3440: `optimal.json` has no game here either, and no other chain reaches far.
      `solver/frame/testdata/c8g.chain-2176.jsonl`, the Graviton calibration's chain (64 threads, one game after
      another, the build of commit 407645f, 15 minutes), has the games 2176–2276, 101 in all.  A rehearsal of the second
@@ -226,10 +226,10 @@ The table stays at 1300.  `taxman extend-optimal results/strict.jsonl --out FILE
 ## bounds.jsonl
 
 The bounds store: the bounds on opt(n) that [the
-ledger](../solver/notebook/the-ledger-bounds-from-both-sides-2026-10/README.md) finds, kept for good, for the games
-from 3915 on.  A game is *proven* when its best lower bound equals its best upper bound, and the file is the record of
-those proofs, which the lines of proof `known` in `strict.jsonl` cite.  The first `ledger export` made it, from stage 1
-of the ledger past 4400 (2026-10-18), and each export since appends to it.
+ledger](../solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) finds, kept for good, for the
+games from 3915 on.  A game is *proven* when its best lower bound equals its best upper bound, and the file is the
+record of those proofs, which the lines of proof `known` in `strict.jsonl` cite.  The first `ledger export` made it,
+from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
 bound is the frame model's, carried between games by the lemmas of [docs/theory/ledger.md](../docs/theory/ledger.md).
@@ -372,9 +372,9 @@ A results line that rests on a proven game assumes that, one statement a game (`
 Both exit with status 1 if any check fails, and name the line (`line K (n=N)`).
 
 **Size.**  The laptop's dry run of 901..960, with the truth hidden, made [the ledger entry's
-`store/`](../solver/notebook/the-ledger-bounds-from-both-sides-2026-10/store/): 58 games of the stretch not in the
-chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a game.  Its lines took 330 bytes for a
-game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155 for an upper bound.  At the end of
+`store/`](../solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/store/): 58 games of the stretch not in
+the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a game.  Its lines took 330 bytes for
+a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155 for an upper bound.  At the end of
 the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, and a cited game and an upper
 bound about 150 and 220 bytes.  On 2026-10-20 the store held 4,277 games in 9.2 megabytes, about 2.1 kilobytes a game,
 against `strict.jsonl`'s 6.6 (30.0 megabytes for 4,547 games).

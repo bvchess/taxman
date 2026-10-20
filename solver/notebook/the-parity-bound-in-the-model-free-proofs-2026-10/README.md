@@ -5,7 +5,7 @@ Part of the [lab notebook](../README.md).
 *Question.*  The model-free proofs of opt(n) ([prover 3](../../noframe/docs/proofs.md))
 stopped at 989 (and 999-1019): the matching bound overrates the optimum by about 1,170 at n = 1000, and games 990,
 992, 993, 995, 996, 1020 and 1023-1027 had spent millions to tens of millions of nodes each without finishing.  The
-[matroid study](../matroid-intersection-bounds-2026-10/README.md) found a model-free bound with a tenth of that gap: every playable
+[matroid study](../search/matroid-intersection-bounds-2026-10/README.md) found a model-free bound with a tenth of that gap: every playable
 set is independent in two linear matroids over GF(2), split by the parity of Ω.  Reimplemented in the evidence crate
 from its mathematics (no code shared with the solver or the study) and proven there as a theorem, does it carry the
 model-free proofs to the end of the committed chain, 1300?  What does a proof cost, and how fast does that grow?

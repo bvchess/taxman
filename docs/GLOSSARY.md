@@ -183,10 +183,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 A bound below is an upper bound on what a set of promotions or moves can score, unless it says otherwise.
 
 * **the gap**: how far an upper bound lies above the best completion, in promotion units (equal to score units, since
-  `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched
-  games of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
-  2175](../solver/notebook/the-gap-past-2175-2026-10/README.md)).  The tools also measure three related gaps, each named
-  where it is used:
+  `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched games
+  of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
+  2175](../solver/notebook/search/the-gap-past-2175-2026-10/README.md)).  The tools also measure three related gaps,
+  each named where it is used:
   * a node's gap (`examples/tune.rs`, `wall choice`): the node's bound less its need, how far the bound must fall to
     cut the node;
   * the standalone root gap (`wall landscape`): the root's bound less the search's start incumbent, for a game solved
@@ -213,7 +213,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in the frame
   matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  The bound is the
   linear program over all of them, computed by Lagrangian decomposition ([THEORY.md](THEORY.md), Theorems 14 and 15;
-  [the fields study](../solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
+  [the fields study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
   agenda's A1 measured it and is closed ([solver/docs/AGENDA.md, "Ranked
   avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
   bound".
@@ -297,8 +297,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
 * **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): its rules, the
-  register of everything tried (a file a subject, in `register/`), the index of rounds (`index.md`), and the entries,
-  one folder each.  Older text calls it "EXPERIMENTS".
+  register of everything tried (a file a subject, in `register/`), and the entries, one folder
+  each.  Older text calls it "EXPERIMENTS".
 
 ## Labels
 

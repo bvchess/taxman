@@ -51,7 +51,7 @@ found in, and the tactics that were removed: the Java's two conjectures, `reuse_
 promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that
 the heaviest promotion set also has the most members, which is false at n = 833); and the tactics that lost, the
 Java's bound with its runner-up, its preclusion table, and the branchings other than strong branching
-([which tactics earn their keep](../../notebook/which-tactics-earn-their-keep-2026-10/README.md)).
+([which tactics earn their keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)).
 
 ## Adding a tactic
 

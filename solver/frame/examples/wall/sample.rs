@@ -1,10 +1,9 @@
 //! The search nodes that `choice-prepare` samples for a game, from three sources: the fixture `--fixtures DIR` has for
 //! the game (`nNNNN.nodes`, as the probe's, made by `perf make-nodes`: units that the proof seeded with an optimal set
 //! handed its searcher), the units of the game in the tuning suite `--suite FILE`
-//! (`solver/notebook/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl`), and `--paths K` nodes on the
-//! way to an optimal set (default 50): its promotions less a random 30 to 70% of them, its other candidates
-//! narrowed, whose best completion is at least P* less what they promote, which is a check of the bound's
-//! validity.
+//! (`solver/notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl`), and `--paths K` nodes on
+//! the way to an optimal set (default 50): its promotions less a random 30 to 70% of them, its other candidates
+//! narrowed, whose best completion is at least P* less what they promote, which is a check of the bound's validity.
 
 use super::case::Case;
 use crate::fixtures::{from_hex, read_nodes};

@@ -21,8 +21,8 @@ Inputs, all JSON lines (the flags that take several files read them in order):
               open (|O|, a count), rejected (|R|), frames, two_sided, one_sided, in_the_bag, worth, words, width,
               digest, same_as (a board m in n-8..n-1 whose extended problem equals n's, or null).  Without it the
               shares are unknown and |R| is null.
-  --gaps      (optional) lines of solver/notebook/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root gap
-              of the game's search problem.
+  --gaps      (optional) lines of solver/notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root
+              gap of the game's search problem.
 
 The cost of a plain search.  The chain ran several searches at once (a window), so a game's recorded seconds.search is
 the time it shared the machine, not what it cost.  The cost is taken from nodes instead.  Each --era A-B:HOURS says that

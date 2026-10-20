@@ -19,7 +19,7 @@ What it agrees with:
   `optimal.json`'s but at 539, 770-773 and 1215, where the previous file's were the table's, and the previous file's
   differed from the table at 684-687.  Of the 192 proofs by the cap, 191 were decided before the first node and 686's
   took 29.
-* The chain from `optimal.json`'s game of 1300 of the previous entry (`solver/notebook/the-gf2-bound-in-the-search-2026-10/chain.jsonl`, build 716ebd9, 2
+* The chain from `optimal.json`'s game of 1300 of the previous entry (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`, build 716ebd9, 2
   threads) in 1301..2175: every score, proof kind and method, and every move list but 1560-1563 (an exchange of five
   numbers of the sum 3008).  Both used the GF(2) bound, so this is a second run of the same search, not a check of the
   bound; the check on the whole board is the prover's, whose proofs of 1301..2175 were pending when this file was made

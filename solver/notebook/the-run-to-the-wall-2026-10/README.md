@@ -4,9 +4,9 @@ Part of the [lab notebook](../README.md).
 
 *Question.*  How far does the unattended run of [RUNBOOK section
 12](../../docs/runbook/wall.md) take the chain from n = 1 on one `c8g.16xlarge` at
-spot, with the settings of [the tuning campaign](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
+spot, with the settings of [the tuning campaign](../search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
 (`force_window=all`) and the counter that could no longer wrap ([the
-wrap](../cheaper-gf2-nodes-same-trees-2026-10/README.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)); does it solve
+wrap](../search/cheaper-gf2-nodes-same-trees-2026-10/README.md#later-2026-10-the-stamps-wrap-and-the-committed-chain)); does it solve
 1..3440 again with the committed chain's scores; and where is the wall, the first game whose own search takes more than
 24 hours?
 

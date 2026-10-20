@@ -4,7 +4,7 @@ Part of the [lab notebook](../README.md).
 
 *Question.*  The chain on the cloud machine reached 3314 overnight and would stop at 4095, the end of the set widths,
 for want of code.  What limits the boards to 4095, how far does one more width take them, and what does a board past
-4095 cost?  Item 8 of the [wall regime](../the-wall-regime-2026-10/README.md)'s design, built in commit 4316168, with no change
+4095 cost?  Item 8 of the [wall regime](../search/the-wall-regime-2026-10/README.md)'s design, built in commit 4316168, with no change
 at all to the boards up to 4095.
 
 *The limits.*  Everything that held the solver at 4095, and what it is now:
@@ -140,7 +140,7 @@ The runbook's page on the chain said this until the page was made general:
 
 ## Files
 
-From `wall` as in [the wall regime's files](../the-wall-regime-2026-10/README.md#files-and-the-commands-that-made-them):
+From `wall` as in [the wall regime's files](../search/the-wall-regime-2026-10/README.md#files-and-the-commands-that-made-them):
 
 | file | command | what it is |
 |---|---|---|

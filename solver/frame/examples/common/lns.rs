@@ -4,7 +4,7 @@
 //! It is not sound: it may miss an optimal game, and nothing it finds proves anything.  A lower bound needs only a
 //! legal game, so a caller may offer what it finds as one, after the referee (`taxman::game::replay_finished`) has
 //! replayed it at its score.  The measurements are in
-//! solver/notebook/finders-for-good-games-that-are-not-sound-2026-10/README.md.
+//! solver/notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md.
 
 use crate::rng::Rng;
 use std::sync::Arc;

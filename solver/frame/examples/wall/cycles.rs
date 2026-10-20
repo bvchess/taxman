@@ -1,6 +1,6 @@
 //! `cycles`: do Taxman's flat-cycle cuts close the gap that the field-rank bounds leave?  A measurement of LP bounds
 //! only, with no search; the question, the method and the results are in
-//! solver/notebook/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md.
+//! solver/notebook/search/flat-cycle-cuts-on-the-matching-lp-2026-10/README.md.
 //!
 //! ```text
 //! wall cycles [--known FILE] [--suite FILE] [--units K] [--seconds S] [--out FILE] N...
@@ -31,7 +31,7 @@
 //!
 //! * *Cover cuts* `Σ_K z ≤ |K| − 1`, `K` a minimal conflict of the node (`FrameGraph::conflict_using`) among the
 //!   candidates whose `z` is at least a threshold, as the anatomy of the gap separated them
-//!   (solver/notebook/the-anatomy-of-the-gap-2026-10/README.md, finding 2).
+//!   (solver/notebook/search/the-anatomy-of-the-gap-2026-10/README.md, finding 2).
 //! * *Rank cuts* `Σ_T z ≤ r` for sets `T` of at most 26 candidates built from the tight cuts (the anatomy's), with `r`
 //!   the largest integer below `Σ_T z`, made only when an exhaustive check proves that no promotable set holds more
 //!   than `r` of `T` ([`Relax::exceeds`]).

@@ -54,7 +54,7 @@ on macOS cannot.
 | `scaling.sh` | all three modes: a sweep, `--engine`, `--pauses` | not run: the calibration and the scaling run did by hand what it does |
 | `wall.sh`, `wall-node.sh`, the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the rehearsal](../../notebook/the-run-to-the-wall-2026-10/README.md#later-2026-10-20-the-rehearsal-as-the-runbook-gave-it) and [the run to the wall](../../notebook/the-run-to-the-wall-2026-10/README.md) and [the run to 5000](../../notebook/the-run-to-5000-2026-10/README.md) |
 | `sweep.sh` | against the stand-in (`test/run.sh sweep`) and on ranges a laptop can do ([its local test](../../notebook/the-sweep-a-local-test-2026-10/README.md)) | not run |
-| `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](../../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md)) |
+| `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md)) |
 | the build cache and the release suite | against a directory for the bucket, the stand-in for aws and a stand-in for cargo; the runner, the whole suites of the solver and the prover in the test profile | the releases and the cache of 2026-10-18 ([What was tested](build-cache.md#what-was-tested)) |
 
 The [calibration](../../notebook/graviton-calibration-2026-10/README.md) ran the solver and the prover on a
