@@ -200,9 +200,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.
 * **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in the frame
   matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  The bound is the
-  linear program over all of them, computed by Lagrangian decomposition ([AGENDA.md, section
-  3](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
-  bound".
+  linear program over all of them, computed by Lagrangian decomposition ([THEORY.md](THEORY.md), Theorems 14 and 15;
+  [the fields study](../solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
+  agenda's A1 measured it and is closed ([AGENDA.md, section 3](../solver/docs/AGENDA.md#3-ranked-avenues)).  The
+  notebook's entries call it the "fields bound" or the "A1 bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
   [THEORY.md](THEORY.md), Lemma D).  A search stopped before its first node has the root's bound as its dual bound.
