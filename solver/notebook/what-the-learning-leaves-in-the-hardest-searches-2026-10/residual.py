@@ -6,6 +6,7 @@ usage: python3 -I residual.py profile DIR_A DIR_B ID...
        python3 -I residual.py misses DIR ID... [--every K] [--period P]
        python3 -I residual.py windows DIR ID... [--period P]
        python3 -I residual.py branched DIR_A DIR_B ID...
+       python3 -I residual.py knots FILE STEPS [FILE STEPS]...
 
 DIR holds what `wall anatomy --trace DIR` writes, with `--learn --closure` or without: `ID.steps.tsv`,
 `ID.nogoods.tsv` and `N.candidates.tsv`; their fields are defined in the module comment of
@@ -22,6 +23,10 @@ solver/frame/examples/wall/anatomy.rs.
 * `branched` puts side by side the conflicts two searches of each unit branched on: their sizes, the prices of the
   exclusions, and the cheap ones by the substitution the bound made.  Its DIRs hold `ID.images.tsv`, the rows that
   `wall images --trace DIR` writes without `--learn` (solver/frame/examples/wall/images.rs, "The rows").
+* `knots` reads the knots' measure, `ID.knots.tsv`, that `wall images --count --knots N [--wide] --trace DIR` writes
+  with the prototype of `knots.patch`, for searches of STEPS steps: the bound's fall at the kept node checks with the
+  conflict alone and with its knot imposed, against the gap; the checks the knot would close and the exclusions whose
+  member it would force, with the steps after or under them.
 
 Standard library only; the anatomy's script (beside its README.md) supplies the tree.
 """
@@ -112,6 +117,13 @@ def bits(v):
 # profile
 
 
+def conflict_sizes(path):
+    """The size of each conflict of a conflicts file, by id."""
+    with open(path) as f:
+        next(f)
+        return {int(i): int(size) for i, size, _ in (line.split("\t") for line in f)}
+
+
 def profile(path):
     """The figures of one search, from its steps file (see the module docs)."""
     s = Steps(path)
@@ -131,7 +143,8 @@ def profile(path):
     f["branching steps"] = branching
     # Exclusions: the branching steps of a node before the one that made the next node on a path (as the anatomy).
     excl = [0] * len(nodes)
-    drops = []
+    drops, cheap_pairs = [], 0
+    sizes = conflict_sizes(Path(path).with_name(Path(path).name.replace(".steps.tsv", ".conflicts.tsv")))
     for k, n in enumerate(nodes):
         made, branched = {nodes[c].first - 1: c for c in n.children}, 0
         for i in n.rows:
@@ -142,12 +155,17 @@ def profile(path):
         for a, b in zip(n.rows, n.rows[1:]):
             if s.br[a] and value[a] is not None and value[b] is not None:
                 drops.append((value[a] - s.need[a]) - (value[b] - s.need[b]))
+                if drops[-1] < CHEAP:
+                    # The conflict branched on: the node's check's, or the one it had as a child.
+                    kid = s.kid[a] if s.kid[a] >= 0 else (s.ckid[a - 1] if s.inh[a] and a > 0 else -1)
+                    cheap_pairs += sizes.get(kid) == 2
     leaf_excl = [excl[k] for k, n in enumerate(nodes) if not n.children]
     q = anatomy.quantiles(leaf_excl)
     f["exclusions on a path to a leaf, median (p10-p90)"] = f"{q[1]} ({q[0]}-{q[2]})"
     f["exclusions priced"] = len(drops)
     f["price of an exclusion, median"] = anatomy.quantiles(drops)[1]
     f["exclusions priced under 50"] = anatomy.pct(sum(1 for d in drops if d < CHEAP), len(drops))
+    f["of those, of conflicts of 2 members"] = anatomy.pct(cheap_pairs, sum(1 for d in drops if d < CHEAP))
     f["exclusions priced 50-149"] = anatomy.pct(sum(1 for d in drops if CHEAP <= d < 150), len(drops))
     f["exclusions priced 150 or more"] = anatomy.pct(sum(1 for d in drops if d >= 150), len(drops))
     leaf_gaps = [n.gap0 for n in nodes if not n.children and n.gap0 is not None]
@@ -605,6 +623,56 @@ def run_branched(dir_a, dir_b, ids):
         anatomy.table([[key, a[key], b.get(key, "-")] for key in a], ["", Path(dir_a).name, Path(dir_b).name])
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# knots
+
+
+def covered(intervals):
+    """The steps in the union of the closed intervals of steps."""
+    total, last = 0, 0
+    for a, b in sorted(intervals):
+        a = max(a, last)
+        if b + 1 > a:
+            total, last = total + b + 1 - a, b + 1
+    return total
+
+
+def run_knots(path, steps):
+    """The knots' measure of one search (`ID.knots.tsv` of `wall images --knots`, from knots.patch) of `steps`
+    steps."""
+    keys = ("step", "start", "end", "x", "value", "base", "need", "knot", "fall1", "fallk")
+    with open(path) as f:
+        at = {h: i for i, h in enumerate(next(f).rstrip("\n").split("\t"))}
+        rows = [{k: int(v[at[k]]) for k in keys} for v in (line.rstrip("\n").split("\t") for line in f)]
+    checks = [r for r in rows if not r["x"] and r["value"] > r["need"]]
+    excl = [r for r in rows if r["x"] and r["base"] >= r["need"]]
+    f = {}
+    q = lambda xs: "/".join(str(v) for v in anatomy.quantiles(xs, (0.25, 0.5, 0.75)))  # noqa: E731
+    f["node checks kept"] = len(checks)
+    f["gap, p25/median/p75"] = q([r["value"] - r["need"] for r in checks])
+    f["knot's conflicts, p25/median/p75"] = q([r["knot"] for r in checks])
+    f["fall with the conflict alone, p25/median/p75"] = q([r["fall1"] for r in checks])
+    f["fall with the knot, p25/median/p75"] = q([r["fallk"] for r in checks])
+    for lo, hi in ((0, 100), (100, 400), (400, 10 ** 6)):
+        part = [r for r in checks if lo <= r["value"] - r["need"] < hi]
+        f[f"gap {lo}-{hi if hi < 10 ** 6 else ''}: checks; median fall with the knot"] = \
+            f"{len(part)}; {anatomy.quantiles([r['fallk'] for r in part])[1]}"
+    closed = [r for r in checks if r["fallk"] >= r["value"] - r["need"]]
+    f["checks the knot closes"] = anatomy.pct(len(closed), len(checks))
+    f["steps left in their loops, median"] = anatomy.quantiles([r["end"] - r["step"] for r in closed])[1]
+    f["steps after them (union)"] = anatomy.pct(covered((r["step"], r["end"]) for r in closed), steps)
+    f["exclusions kept"] = len(excl)
+    forced = [r for r in excl if r["base"] - r["fallk"] < r["need"]]
+    f["exclusions whose member the knot forces"] = anatomy.pct(len(forced), len(excl))
+    f["steps under them, median"] = anatomy.quantiles([r["end"] - r["start"] + 1 for r in forced])[1]
+    f["steps under them (union)"] = anatomy.pct(covered((r["start"], r["end"]) for r in forced), steps)
+    big = [r for r in excl if r["end"] - r["start"] + 1 > 100]
+    f["exclusions over 100 steps: count; median slack; median knot fall"] = \
+        f"{len(big)}; {anatomy.quantiles([r['base'] - r['need'] for r in big])[1]}; " \
+        f"{anatomy.quantiles([r['fallk'] for r in big])[1]}"
+    return f
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -633,6 +701,12 @@ def main():
         return run_windows(rest[0], rest[1:], period)
     if args[0] == "branched":
         return run_branched(args[1], args[2], args[3:])
+    if args[0] == "knots":
+        pairs = [(args[i], int(args[i + 1])) for i in range(1, len(args) - 1, 2)]
+        tables = [run_knots(path, steps) for path, steps in pairs]
+        anatomy.table([[key] + [t[key] for t in tables] for key in tables[0]], [""] + [Path(p).parent.name + "/" +
+                      Path(p).name.split(".")[0] for p, _ in pairs])
+        return None
     sys.exit(__doc__)
 
 

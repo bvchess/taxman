@@ -19,6 +19,12 @@ under other witnesses makes the trees 14% larger on 22 units.  A whole game forg
 does, step for step, and its image nogoods give fewer of its known conflicts.  Keeping the used nogoods does not make
 the search branch on smaller conflicts.  ([Three follow-ups](#three-follow-ups-on-the-old-suite).)
 
+**Stage 2, on today's hardest units (2026-10-20).**  The anatomy at 4416 is the old suite's at higher prices: 6-7
+exclusions a path at a median of 156-176 points, with a thinner tail of cheap ones.  A bound that imposes the knot of a
+node's conflict (its images under twin swaps and paired exchanges that are conflicts too) falls by about one exclusion
+at every gap, so it closes only nodes that were closing anyway: cutting by it would save under 4% of the steps.  So
+ladder branching is moot too.  ([Stage 2](#stage-2-todays-hardest-units-and-the-knot).)
+
 The study follows [conflicts closed under cheap exchanges](../conflicts-closed-under-cheap-exchanges-2026-10/README.md),
 whose learning took 20.6% off the steps of the tuning suite and only 4.5% off the CPU of its whole games.  It has three
 stages: the instruments, built and tried on two units of the old [tuning
@@ -256,6 +262,116 @@ each exclusion with the size of the conflict and the price; `residual.py branche
   cheap conflicts had dear alternatives; keeping the nogoods also rules more candidates out, which changes the prices
   as much as a choice would.
 
+## Stage 2: today's hardest units, and the knot
+
+Stage 2 asks stage 1's questions of today's hardest units, and tests a bound that sees the knot of a conflict
+(2026-10-20).  The units are those of the suite of the run to 5000: 30 units of 3940, 4225, 4416 and 4548, built and
+solved with the learning by its own entry, the hardest searches of the run to 5000.  In short:
+
+* **The anatomy is the same, at higher prices.**  A path still pays its gap in 6-7 exclusions, but each costs more, and
+  the cheap ones are rarer.
+* **A bound that imposes the knot saves little.**  Its fall is about one exclusion at every gap, so it closes nodes that
+  were about to close, and where the tree is it has nothing to impose.
+* **Ladder branching is moot**, for the same reason.
+
+Every search here completed with the optimum as its best.
+
+### The anatomy at 4416
+
+Three of 4416's biggest units were traced with `wall anatomy --learn --closure` from the known optimum, and taken apart
+by `residual.py profile` and `misses` (every 8th computed conflict at 4416-83, every 2nd at 4416-148).  `wall anatomy`
+needs a known optimum, which 4548 does not have, so 4416 stands in for it.  The old suite's 3300-14, with the learning,
+is from stage 1:
+
+| | 3300-14 | 4416-169 | 4416-83 | 4416-148 |
+|---|---|---|---|---|
+| the unit's gap | 998 | 1,307 | 1,407 | 1,684 |
+| steps, default; with the learning | 1,248,609; 790,609 | 327,742; 226,756 | 1,048,736; 907,314 | 831,246; 420,508 |
+| exclusions on a path to a leaf, median (p10-p90) | 7 (5-10) | 7 (5-9) | 6 (4-9) | 6 (4-8) |
+| price of an exclusion, median | 123 | 176 | 156 | 176 |
+| exclusions priced under 50 | 19.7% | 5.2% | 12.1% | 5.1% |
+| of those, of conflicts of 2 members | 71% | 65% | 56% | 68% |
+| gap at which a leaf closes, median | 91 | 181 | 168 | 196 |
+| leaves^(1/exclusions) | 4.9 | 4.1 | 6.5 | 5.7 |
+| a decade of subtree per ... points of gap | 241 | 301 | 335 | 473 |
+| known conflicts given by image nogoods | 15.6% | 7.6% | 13.7% | 5.3% |
+| computed conflicts: forgotten nogoods | 57.0% | 29.2% | 45.2% | 39.8% |
+| the same conflict, another nogood | 26.0% | 48.3% | 48.1% | 34.2% |
+| exchanges outside the closure | 7.9% | 9.1% | 2.5% | 14.6% |
+| nogood size, median | 25 | 36 | 39 | 30 |
+
+* **The same shape, dearer steps.**  A path pays its gap in 6-7 exclusions, as before, but at a median of 156-176
+  points instead of 123, and only 5-12% of the exclusions are cheap, against 20%.  Most cheap ones are still of
+  conflicts of two members.  Leaves close at twice the gap, and a decade of subtree takes 300-470 points of gap.
+* **What is new.**  Nogoods are larger (a median of 30-39 members), and a third to a half of the conflicts the search
+  computes are conflicts it met under another nogood.  By the follow-ups that costs peels, not tree.  The image nogoods
+  give fewer of the known conflicts, 5-14%.
+* **4548.**  The learning took 7.2% off 4548's ten units, against 25-30% for the other three games (the suite's own
+  runs).  The start does not explain it.  No unit beat the incumbent, so each unit's search is the one it would make
+  from an optimum equal to the incumbent, and the gaps (929-1,224) are those of 3940 and 4225.  The learning finds less
+  to learn there: 4.3 conflicts learned a computed conflict, against 6.5 at 4416, and 3.2 conflicts computed a thousand
+  steps, against 7.8.  So the difference is in the problem, not in the start.
+
+### The knot in the bound
+
+**The question.**  [The anatomy](../the-anatomy-of-a-hard-subtree-2026-10/README.md) found that leaving a member out
+costs the bound little because a twin steps in, and [completions near the
+optimum](../completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md) found that the hardness is the bound's
+error.  Does a bound that sees a conflict's whole *knot* close a real share of a node's gap?  The knot is the conflict
+with the conflicts within its images under twin swaps and paired exchanges.
+
+**The measure.**  At every 10th node check with a conflict and every 10th exclusion of a unit's default tree, the hook
+keeps the node's knot: its conflict, and the minimal conflict at the node within each of the conflict's images that is
+one.  The *narrow* knot takes the images of the closure under the cheap exchanges, as the learning does; the *wide*
+knot also takes the images under every twin swap of a member, at any price.  After the search, a best-first search over
+the members left out finds the heaviest set of the node's candidates that holds no conflict of the knot whole, with
+the GF(2) bound.  Every completion of the node leaves out a member of each conflict, so that is a bound on them: the
+bound *with the knot*.  At an exclusion, the member is left out from the start.  There, a bound with the knot below
+the need would force the member, and the node's loop would end after the child that promotes it.  The hook also
+records the steps after each check, and under each exclusion, to the end of the node's loop.  Their union over the
+checks the knot closes, or the exclusions it forces, is a static estimate of what cutting by the knot saves.  The
+prototype is `wall images --count --knots N [--wide]` (`knots.patch`); `residual.py knots` makes the table.
+
+| | 4416-169 narrow | 4416-169 wide | 3940-104 narrow | 3940-104 wide |
+|---|---|---|---|---|
+| node checks kept | 6,565 | 6,565 | 2,654 | 2,654 |
+| gap, p25/median/p75 | 103/160/243 | 103/160/243 | 50/90/152 | 50/90/152 |
+| the knot's conflicts, median | 2 | 13 | 6 | 34 |
+| fall with the conflict alone, median | 49 | 49 | 4 | 4 |
+| fall with the knot, p25/median/p75 | 49/66/103 | 49/78/140 | 23/72/120 | 25/76/160 |
+| fall with the knot, median: gaps under 100; 100-400; over 400 | 52; 72; 72 | 55; 87; 76 | 72; 72; 72 | 76; 76; 76 |
+| checks the knot closes | 16.4% | 23.0% | 40.2% | 45.6% |
+| steps left in their loops, median | 1 | 1 | 1 | 1 |
+| steps after them (union) | 0.9% | 1.2% | 2.9% | 3.6% |
+| exclusions kept | 10,656 | 10,656 | 3,034 | 3,034 |
+| exclusions whose member the knot forces | 8.6% | 16.2% | 18.2% | 25.6% |
+| steps under them, median | 2 | 1 | 2 | 2 |
+| steps under them (union) | 0.6% | 1.0% | 1.5% | 2.0% |
+| exclusions over 100 steps: count; median slack; median fall with the knot | 188; 529; 0 | 188; 529; 0 | 58; 328; 0 | 58; 328; 0 |
+
+* **The knot's fall is about one exclusion, at every gap.**  Imposing the knot lowers a node's bound by a median of
+  66-78 points, against 4-49 for its conflict alone, at gaps under 100 as at gaps over 400.  The best usually leaves out
+  a single member.  That is 40-85% of the median gap of the nodes kept, most of them near the leaves.  But it is 5-20%
+  of the gaps of 400 to 1,300 at the nodes that hold the tree.
+* **What it closes was closing.**  The bound with the knot is below the need at 16-46% of the checks kept, and those
+  nodes had a median of one step left in their loops: cutting them saves 0.9-3.6% of the steps.
+* **Where the tree is, the knot has nothing to impose.**  The knot would force the member at 9-26% of the exclusions
+  kept, with a median of 1-2 steps under them (0.6-2.0% of the steps).  Under the exclusions with more than 100 steps,
+  the slack is 330-530 points and the knot's fall is 0 at the median: the heaviest set without the member holds none of
+  the knot's conflicts.  At this scale what the bound puts in for a member left out is rarely a twin that makes an
+  image of the conflict a conflict.  On the old suite's 3441-5459 the narrow knot does no better (0.2-0.3% of the
+  steps).
+* **Decision: not built.**  A bound carrying the knot would save a few percent of the steps by this estimate, and cost
+  a dozen bound evaluations at each node (the measure's median is 13-16 a check, 4-5 an exclusion).
+
+### Ladder branching
+
+The anatomy's second hypothesis was a bound or branching that charges a payer's whole ladder at once: its composites
+`m·p` over the primes `p`, which step in for each other one rung at a time.  The wide knot is that ladder for each
+member of a conflict: every twin swap of a member, imposed at once.  It forces members only above subtrees of a step or
+two, and finds nothing to impose under the big exclusions, so a branching that walks the ladder at once has nothing
+there to gain.  It was not tested further.
+
 ## Files
 
 * `residual.py`: `profile` and `misses`, the tables of this entry; its module comment has the usage.
@@ -272,6 +388,11 @@ each exclusion with the size of the conflict and the price; `residual.py branche
   anatomy --root --learn --closure --trace DIR 3128`, then `residual.py windows DIR 3128-root` and `misses`), and the
   lines labelled `test-default` and `test-keep` (`wall images --ids 3300-14 [--tactic nogood_keep=hit] --trace DIR
   3300`, then `residual.py branched DIR_DEFAULT DIR_KEEP 3300-14`).
+* Stage 2: `knots.patch`, the knot's prototype, against commit 752071f; `residual.py knots`, and `profile`'s row of
+  the cheap exclusions of conflicts of two members; in `runs.jsonl`, the lines labelled `stage 2` (`wall anatomy
+  --suite SUITE --ids ID --learn --closure --trace DIR 4416`, SUITE the suite of the run to 5000) and those labelled
+  `knots` and `knots-wide` (`wall images --suite SUITE --ids ID --count --knots 10 [--wide] --trace DIR GAME`, then
+  `residual.py knots DIR/ID.knots.tsv STEPS ...`).
 
 Commits: the commit of this entry (`wall anatomy --learn`, `--closure`, `--root`, the mirror, the nogood log, with
 their tests).
