@@ -443,6 +443,36 @@ impl RadixHeap {
     }
 }
 
+/// Cycles of exchange graphs, each its elements in the order of its arcs (from each to the next, and from the last to
+/// the first), kept from the searches for forced members ([`Meet::keep_cycle`]) to check against a later exchange
+/// graph ([`Meet::cycle_length`]).
+#[derive(Clone, Default)]
+pub struct Cycles {
+    elems: Vec<u32>,
+    ends: Vec<usize>,
+}
+
+impl Cycles {
+    pub fn clear(&mut self) {
+        self.elems.clear();
+        self.ends.clear();
+    }
+
+    pub fn push(&mut self, cycle: &[u32]) {
+        self.elems.extend_from_slice(cycle);
+        self.ends.push(self.elems.len());
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &[u32]> {
+        let mut start = 0;
+        self.ends.iter().map(move |&end| {
+            let cycle = &self.elems[start..end];
+            start = end;
+            cycle
+        })
+    }
+}
+
 /// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): per
 /// matroid, the elements by block (the blocks' ends in `ends`) with their masks and residues, and the members of each
 /// block in slot order (their ends in `slot_ends`).
@@ -1597,26 +1627,50 @@ impl<const R: usize> Meet<R> {
         true
     }
 
-    /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: its members besides
-    /// `x`, each of which has that cycle through it too, as long.
-    pub fn cycle_members(&self, x: u32, mut f: impl FnMut(u32)) {
-        // The search's predecessors from the element that closed the cycle lead back to x (checked first).
-        let walk = |f: &mut dyn FnMut(u32)| {
-            let (mut v, mut steps) = (self.found, 0);
-            while v != x && v != NONE && steps <= self.pos.len() {
-                f(v);
-                v = self.back[v as usize];
-                steps += 1;
-            }
-            v == x
-        };
-        if walk(&mut |_| {}) {
-            walk(&mut |v| {
-                if self.inside[v as usize] {
-                    f(v);
-                }
-            });
+    /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: that cycle, added to
+    /// `cycles` from `x` on, and returned (empty if there is none).  Each of its members has it through it too, as
+    /// long.
+    pub fn keep_cycle<'c>(&self, x: u32, cycles: &'c mut Cycles) -> &'c [u32] {
+        // The search's predecessors from the element that closed the cycle lead back to x, against the arcs.
+        let start = cycles.elems.len();
+        let (mut v, mut steps) = (self.found, 0);
+        while v != x && v != NONE && steps <= self.pos.len() {
+            cycles.elems.push(v);
+            v = self.back[v as usize];
+            steps += 1;
         }
+        if v != x {
+            cycles.elems.truncate(start);
+            return &[];
+        }
+        cycles.elems.push(x);
+        cycles.elems[start..].reverse();
+        cycles.ends.push(cycles.elems.len());
+        &cycles.elems[start..]
+    }
+
+    /// Whether `cycle`, live elements in the order of its arcs, is a cycle of the exchange graph of the set whose
+    /// tableau the workspace holds: if so, its length, the weights of its members less those of the others.  It
+    /// costs a bit test an arc, where a search for a cycle settles hundreds of vertices.
+    pub fn cycle_length(&self, p: &Problem<'_, R>, cycle: &[u32]) -> Option<i64> {
+        let mut length = 0;
+        let mut u = *cycle.last()? as usize;
+        for &v in cycle {
+            let v = v as usize;
+            if self.inside[u] == self.inside[v] {
+                return None;
+            }
+            // An arc of A from a member to an element outside free in A or whose circuit there holds it, or one of B
+            // to a member from an element outside free in B or whose circuit there holds it.
+            let (m, x, y) = if self.inside[u] { (0, u, v) } else { (1, v, u) };
+            let in_circuit = || p.block[m][x] == p.block[m][y] && bit(&self.mask[m][y], usize::from(self.slot[m][x]));
+            if is_zero(&self.res[m][y]) && !in_circuit() {
+                return None;
+            }
+            length += if self.inside[u] { p.weight[u] } else { -p.weight[u] };
+            u = v;
+        }
+        Some(length)
     }
 
     /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,

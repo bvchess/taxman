@@ -74,7 +74,7 @@ pub mod meet;
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet};
-use meet::{bit, is_zero, lowest, xor, Meet, Problem, Snapshot, Vector};
+use meet::{bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, Vector};
 
 const NONE: u32 = u32::MAX;
 
@@ -766,6 +766,10 @@ struct Levels<'g, const W: usize, const R: usize> {
     stats: Gf2Stats,
     /// Which free members are searched for being forced ([`ForceWindow`]).
     force_window: ForceWindow,
+    /// The cycles within the slack that the last search for forced members at each depth found or kept
+    /// ([`force_by_cycles`](Self::force_by_cycles)), and scratch for the next search's.
+    cycles: Vec<Cycles>,
+    next_cycles: Cycles,
 }
 
 impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
@@ -797,6 +801,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             start_idx: Vec::with_capacity(n),
             stats: Gf2Stats::default(),
             force_window: ForceWindow::default(),
+            cycles: Vec::new(),
+            next_cycles: Cycles::default(),
         }
     }
 
@@ -956,6 +962,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// `need`, which holds when the sets of other sizes than the heaviest set's lose more than the slack `value −
     /// need` and its exchange graph has no cycle through the member that short (see `meet`'s module docs).  Only the
     /// members whose split bound the window admits are searched (the tactic `force_window`, [`ForceWindow`]).
+    ///
+    /// A cycle within the slack shows every member on it free, so the cycles that the last searches at the parent's
+    /// depth, at this one and at the child's found are tried first: each that is still a cycle of this exchange graph
+    /// and within the slack ([`Meet::cycle_length`]) frees its members with no search.  A child's exchange graph is
+    /// its parent's less the elements it promoted or dropped (contracting a member keeps the circuits of the others),
+    /// and no cycle within the slack passes through a forced member, so a child that inherits its parent's heaviest
+    /// set finds nearly all its members free on its parent's cycles.  The forced members are those a search for each
+    /// would find: a member is free exactly when some cycle within the slack passes through it.
     fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) {
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
@@ -975,8 +989,31 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             return;
         }
         level.loss_floor = losses.smaller;
-        // The members of a cycle found within the slack: that cycle passes through each, as long, so none is forced.
+        // The members of the cycles within the slack, each of which passes through them: the cycles kept first, then
+        // those that the searches find.  `within` becomes this depth's cycles.
+        let d = self.depth;
+        if self.cycles.len() <= d {
+            self.cycles.resize_with(d + 1, Cycles::default);
+        }
+        let mut within = std::mem::take(&mut self.next_cycles);
+        within.clear();
         let mut free = Bits::<W>::EMPTY;
+        let meet = &self.meet;
+        for cycles in &self.cycles[d.saturating_sub(1)..self.cycles.len().min(d + 2)] {
+            for cycle in cycles.iter() {
+                let live = cycle.iter().all(|&e| level.live.contains(graph.elems[e as usize]));
+                let frees = || cycle.iter().any(|&e| meet.contains(e) && !free.contains(graph.elems[e as usize]));
+                if live && frees() && meet.cycle_length(&problem, cycle).is_some_and(|length| length <= slack) {
+                    free_members(graph, meet, cycle, &mut free);
+                    within.push(cycle);
+                }
+            }
+        }
+        #[cfg(debug_assertions)]
+        for x in free.iter() {
+            let found = self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack);
+            assert!(found, "{x} is on a cycle kept within the slack {slack}, which the search does not find");
+        }
         for &(x, bound) in &level.split {
             let near = self.force_window.admits(bound - need as i64, slack);
             if !near || forced.contains(x) || free.contains(x) {
@@ -984,12 +1021,13 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             }
             let e = graph.index[x as usize];
             if self.meet.has_cycle_within(&problem, &level.pot, e, slack) {
-                self.meet.cycle_members(e, |z| free.insert(graph.elems[z as usize]));
+                free_members(graph, &self.meet, self.meet.keep_cycle(e, &mut within), &mut free);
             } else {
                 forced.insert(x);
                 self.stats.forced_by_cycles += 1;
             }
         }
+        self.next_cycles = std::mem::replace(&mut self.cycles[d], within);
     }
 
     fn value_excluding(&mut self, x: u32, cap: usize, stop: u64) -> u64 {
@@ -1104,6 +1142,13 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             std::mem::swap(&mut self.scratch, &mut self.kept);
             self.kept_for = Some((self.depth, x));
         }
+    }
+}
+
+/// Adds the members of the workspace's set on `cycle` (elements) to `free` (candidates).
+fn free_members<const W: usize, const R: usize>(graph: &Gf2Graph, meet: &Meet<R>, cycle: &[u32], free: &mut Bits<W>) {
+    for &e in cycle.iter().filter(|&&e| meet.contains(e)) {
+        free.insert(graph.elems[e as usize]);
     }
 }
 
