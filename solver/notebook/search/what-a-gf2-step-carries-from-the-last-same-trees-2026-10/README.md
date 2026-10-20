@@ -304,6 +304,134 @@ prize left if a cheaper test than a pass over the arcs within the slack is found
 for the bounds without each member (`split_bounds_from` less Bellman–Ford and the columns, about 10%) is the next
 largest part not yet studied.
 
+## 2026-10-20: the loops that come back
+
+*Question.*  The counters of the round above found, in half of the inherited children's splits, vertices that the start
+had not, 9.6 a split: the parent's loops (elements whose vector is zero in a matroid, so that no common independent set
+holds them), live again in the child.  Why do they come back, what do they cost, and does leaving them out change a
+tree?
+
+*Answer.*  A child's live candidates are rebuilt from the search's candidates, which know nothing of loops, so the loops
+of every contraction above the child return (`Levels::push_all`).  A split holds 52 of them among 745 live elements at
+3441-2994 and 67 among 1,011 at 4548-124, and they cost 4.5% of a step (3.0 to 5.4% on five units).  Leaving them out
+is sound and takes one line, but it changes the trees of 25 of the games 1..1300 (+178 steps of 276,918): the weight
+split's bounds without a member differ, which reorders the members that strong branching tries, and where two tie it
+chooses the other.  The saving is under the 5% that a change which alters trees has to reach to be measured against the
+10 to 25% by which the size of a tree varies from game to game, so it is not kept (`loops-drop.diff`).
+
+*How it was measured.*  As above: the five units on one thread (`tune solve`, `--known results/strict.jsonl`, the
+default tactics, built with `--features studies`), the cycles and instructions of the process (`/usr/bin/time -l`), the
+laptop (M1 Max) waited to a load of 8 before each run.  The counts come from a scratch build (`loops.diff`) that counts
+the loops in each pass of the split and the derivations, times those passes with the timer `cntvct_el0`, leaves the
+loops out of the live set (`LOOPS_DROP`), computes beside each split the split of the same tableau without the loops
+(`LOOPS_SHADOW`), and writes the value, heaviest set and forced members of each evaluation and the member each node
+branches on (`LOOPS_TRACE`; `loops_trace.py` finds the first difference of two traces).  The speed comes from clean
+builds, master (384ee7b) and master with `loops-drop.diff`, run in turn, three rounds.
+
+### Why they come back
+
+`Level::live` holds the candidates that are elements, with the loops left out, and `contract` takes out the candidates
+whose vectors fall to zero when a member is promoted.  `reset` contracts every promoted member from the root's vectors,
+so a unit's root is right.  `push_all` sets the child's live candidates to `live_of(child_cands)`, the candidates that
+are elements of the root's matroids, and then contracts the child's own promotions.  The loops those make leave, but the
+loops that the parent's level had taken out are live again, with the zero vectors that the child copied from the
+parent.  So a level holds the loops of every contraction above it but its own.  A tableau derived from the parent's
+meets the loops of the parent's contraction as elements the parent's tableau did not have (`fresh` in `Meet::derive`,
+role 0 in `SplitStart`), which the round above saw as 9.6 vertices in half of the splits.
+
+The search never drops a loop by hand: none of the 12,153 candidates removed from a node at 3441-2994 was one.  So a
+child's live candidates are exactly the parent's that it keeps, less the loops of its own contraction.
+
+### What they cost
+
+Counts of a split (the build of `loops.diff`, loops live), over the whole unit:
+
+| | 3441-2994 | 4548-124 |
+|---|---|---|
+| live elements | 745 | 1,011 |
+| loops | 52.4 (7.0%) | 67.1 (6.6%) |
+| loops zero in A only, in B only | 33.5, 18.8 | 42.4, 23.3 (1.4 in both) |
+| loops that the parent's split lacked | 3.0 | 9.2 |
+| Bellman–Ford vertex visits (without the loops) | 629 (592) | 638 (590) |
+| arcs offered, from and into loops | 3,666, 1.1% and 0.8% | 3,646, 0.9% and 1.0% |
+| steps of the walks that start it (without the loops) | 747 (694) | 1,013 (946) |
+
+A loop has arcs in one matroid only, so the relaxations of the split barely feel the loops (under 2% of the arcs); the
+vertices and the walks do (6 to 8%).  The split takes 31.5% of the unit's CPU with the loops and 30.2% without them at
+3441-2994 (34.3% and 33.1% at 4548-124), the derivations 8.8% and 8.5% (9.2% and 8.9%).  Of the 0.33 s that leaving the
+loops out saves of 5.32 s (0.72 s of 14.56 s), half is in the split (52%; 57%), a seventh in the derivations (13%; 15%),
+and the rest in the other passes over the live elements, which were not timed.
+
+The speed of the clean builds, the means of three runs, with every step count equal in the three rounds:
+
+| unit | steps | cycles a step | instructions a step | CPU seconds |
+|---|---|---|---|---|
+| 3441-2994 | 36,500 | 450.9k to 431.7k (-4.2%) | 1,495k to 1,437k | 5.06 to 4.87 |
+| 3441-5231 | 82,172 | 424.0k to 402.2k (-5.2%) | 1,370k to 1,310k | 10.96 to 10.38 |
+| 4225-24 | 32,030 | 542.1k to 525.9k (-3.0%) | 1,790k to 1,744k | 5.32 to 5.16 |
+| 4548-236 | 22,613 | 526.7k to 501.3k (-4.8%) | 1,747k to 1,674k | 3.56 to 3.39 |
+| 4548-124 | 83,169 | 522.8k to 494.4k (-5.4%) | 1,719k to 1,638k | 13.65 to 12.92 |
+
+The mean is 4.5% fewer cycles and 3.9% fewer instructions a step.  On the chain 1..1300 (one thread) the cycles fall by
+2.5%, 75.4 G to 73.5 G, the instructions by 1.6%, and the searches from 20.3 s to 19.5 s.
+
+### What removing them changes
+
+On the five units the steps, the best and every counter are the same, but for the augmentations of the solves at the two
+units of 3441 (47,057 to 47,001 and 69,386 to 69,305).  A solve starts from the longer of its last dominant set and the
+run of the heaviest live elements that is common independent, and a loop among the heaviest elements ended the run: 19
+of the 985 solves at 3441-2994.  The start is longer without the loops, and the heaviest set has the same weight.  A
+trace of 4548-236 with and without the loops is the same in all 18,739 evaluations (value, heaviest set, forced
+members) and 13,202 branch choices.
+
+The weight split is what differs.  Beside each split, the split of the same tableau without the loops:
+
+| unit | splits | splits that differ | bounds that differ, of those compared | higher with the loops | through replacements, through potentials |
+|---|---|---|---|---|---|
+| 3441-2994 | 30,544 | 3,360 (11%) | 3,599 of 1.94 M | 3,524 | 3,363, 458 |
+| 3441-5231 | 66,734 | 1,495 (2.2%) | 2,371 of 4.60 M | 2,255 | 2,168, 585 |
+| 4548-124 | 68,714 | 951 (1.4%) | 1,319 of 5.62 M | 1,319 | 1,319, 0 |
+| 4548-236 | 18,739 | 83 (0.4%) | 83 of 1.51 M | 83 | 83, 0 |
+
+Two things make a bound without a member differ:
+
+* *The replacements.*  The bound without a member `x` adds the heaviest element of positive weight whose circuit in a
+  matroid holds `x`.  A loop of A with a circuit in B counts as such an element in B (a loop of B in A), though it is in
+  no common independent set, so the bound without `x` is higher.
+* *The potentials.*  A loop of A has no arc into it, since nothing in A bounds its `w1`, but Bellman–Ford starts it at
+  potential 0 and relaxes its arcs out, to the zero node if it is free in B and to the members of its circuit in B
+  otherwise.  The loop then caps their potentials as if its own were 0, which no constraint of the others asks, so some
+  members' potentials change, and some bounds are lower with the loops (75 and 116 bounds in the two units of 3441).
+
+What the search takes from the bounds is less:
+
+* *Forced members.*  The searches for forced members run in 96 to 97% of the evaluations and then give the exact set,
+  whatever the split: a member that the split's bound shows forced lies on no cycle within the slack.  The bounds that
+  cross `need` (674 members at 3441-2994, 562 at 3441-5231, 150 at 4548-124, 7 at 4548-236) were all in such
+  evaluations; in the other 3 to 4% (5,870 evaluations of the four units) none did.
+* *Strong branching.*  It tries the members of the conflict in the order of their split bounds and chooses the first
+  with the lowest exact bound, so a tie between two members goes to the one the split puts first.  The order differs in
+  26 of 72,240 choices on the four units, and the choice with it in none of the 1,756 ties.
+
+The chain finds what the units do not: 25 of the 1300 games change, all from 930 up, 23 of them in their number of
+steps (from -2.5% at 1269 to +14.7% at 936, 401 to 460), 178 steps more in all (+0.06%); the best, the proofs and
+every other field are the same, and `taxman regress --to 1000 --threads 1` matches every game.  The whole games 940 and
+936 (`tune solve GAME --ids root`) reproduce the difference, and their traces first differ in a strong-branching
+choice.  At 940 the conflict has two members, 340 and 434, whose bounds without them are equal (9,713).  With the loops
+the split's bounds without them are 9,705 and 9,713 (the loops lower the first, which only the potentials can do), and
+without the loops both are 9,713; the order of the two, and with it the member chosen, changes.  At 936 it is the same
+kind of tie.
+
+### Decision
+
+*Not kept.*  Leaving the loops out saves 4.5% of a step and changes 25 games of the chain by a tie in strong branching,
+so it cannot be measured against the swings of the trees, and the chain's total saving is 2.5%.  `loops-drop.diff` is
+the change: the child's live candidates are the parent's that its candidates keep, a debug check that they are the
+elements of its candidates, and the paragraphs of `gf2-bound.md`.  It is sound, since the loops are in no common
+independent set and any weight split of the others bounds them.  A way to keep the trees would have to give the split
+the loops' replacements and arcs, which need the circuits that the change saves.  Loops that are a larger share of the
+live elements, or a tie-break of strong branching that does not depend on the split's bounds, would reopen it.
+
 ## Files
 
 * `prof.diff`: the counters by kind of level and by the outcome of each search, with the parent's cycles checked in
@@ -323,7 +451,21 @@ largest part not yet studied.
   cycles and instructions a step (from `tune solve` under `/usr/bin/time -l`).
 * `round2-profile_3441.txt`, `round2-profile_4548.txt`: the parts of a step and the samples by function, before the
   second round and after it, from the traces with `tp.py`.
+* `loops.diff`: the scratch build of the section on the loops (on 384ee7b, not kept): counters of the loops in the
+  split and the derivations with the timer `cntvct_el0`, the switch `LOOPS_DROP` that leaves the loops out of a
+  child's live candidates, the shadow split without the loops beside each split (`LOOPS_SHADOW`; with its parts, the
+  replacements and the potentials, and the choice of strong branching under its order), and the trace
+  (`LOOPS_TRACE`) of each evaluation and branch.
+* `loops-drop.diff`: the change that leaves the loops out, not kept: the child's live candidates are the parent's that
+  its candidates keep, a debug check that they are the elements of its candidates, and the paragraphs of
+  `solver/docs/design/gf2-bound.md` it changes.
+* `loops-runs.jsonl`: the runs of the section, one line a run: the build, the unit, steps, CPU seconds, best, cycles
+  and instructions a step (`b0_`, `b1_`: the scratch build with the loops live and out; `ab1_` to `ab3_`: master and
+  master with `loops-drop.diff` in turn, from `tune solve` under `/usr/bin/time -l`).
+* `loops_trace.py`: the first evaluation or branch that differs between two traces, with the order of strong branching
+  and the splits that differ (`loops_trace.py A.err B.err`, the stderr of `tune solve` with `LOOPS_TRACE=1`).
 
 *Commits*: 1735e60 (the cycles kept), 28c5669 (the split started), and this entry; in the second round b0082ae (blocks
 reduced where the span changes), 854d65d (slots kept), 2e07cd2 (the queue by distance), 994ae69 (no offer past the best
-cycle), f22561c (the first round narrowed), and this section.
+cycle), f22561c (the first round narrowed), and this section.  The section on the loops (2026-10-20) kept no code;
+its notebook files are in its commit.
