@@ -400,10 +400,10 @@ The bill is the instance's hours, not the search's.  For each instance, find its
 (`aws ec2 describe-instances --instance-ids I --query 'Reservations[].Instances[].[LaunchTime,StateTransitionReason]'`
 while it exists; the console's instance history or CloudTrail afterwards), multiply the hours by the spot price of those
 hours (`describe-spot-price-history`: section 1), and set the product beside the estimate Brian approved.  Report the
-job's own measure of work beside it where it prints one: `certify_pilot.py` prints the thread-hours of the search
-against the plan's, and what they come to on one machine.  The "Cost" paragraph of the calibration entry is the model.
-Then do the end of the [rules for every launch](#rules-for-every-launch): terminate what is left, confirm that nothing
-of the project remains, and delete the launch's security group.
+job's own measure of work beside it where it has one: the thread-hours of the prover's searches (`summarize.py exact`,
+section 8.6), or those of the certificates against the plan's (section 9.9).  The "Cost" paragraph of the calibration
+entry is the model.  Then do the end of the [rules for every launch](#rules-for-every-launch): terminate what is left,
+confirm that nothing of the project remains, and delete the launch's security group.
 
 ## 3. Before a big run
 
@@ -1244,80 +1244,86 @@ end of the rules for every launch.
 
 ## 7. The sweep
 
-As many proven games as the time allows over a long stretch of board sizes (Brian, 2026-10-17: 3441 to 8191), holes
-allowed, for little time and money, on one `c8g.16xlarge` at spot: `sweep.sh FIRST LAST`.  It is not the chain of
-section 4.  The chain proves every game in turn and stops at the first it cannot (3441 took 5.9 hours on 64 threads);
-the sweep gives each game a search of at most `GAME_SECONDS` (180) on one thread, goes on past the ones that do not
-finish, and keeps what does.  Built and tested on the laptop against a stand-in for aws (`test/run.sh sweep`); **not yet
-run on EC2**, and a launch needs Brian's approval with the estimate of 7.2 (the [rules for every
+`sweep.sh FIRST LAST` proves as many games of a long stretch as a cheap machine allows, with holes, on one
+`c8g.16xlarge` at spot.  Brian chose 3441 to 8191 for it (2026-10-17).  The chain of section 4 proves every game in turn
+and stops at the first it cannot (3441 took 5.9 hours on 64 threads).  The sweep instead gives each game at most
+`GAME_SECONDS` (180) of one thread, goes on past the games that do not finish, and keeps what does.  [STATUS](STATUS.md)
+says whether it has run, and [a local test](../notebook/the-sweep-a-local-test-2026-10/README.md) tried it on the
+laptop.  A launch needs Brian's approval with the estimate of section 7.2 ([rules for every
 launch](#rules-for-every-launch)).
 
 ### 7.1 What it does
 
-**Pass 1.**  FIRST..LAST is split into `BLOCKS` blocks of consecutive games (default one a CPU), sized so that the
-expected work of each is about equal: a game costs its setup, which grows steeply with n (on one thread about 1 s at
-2200, 3 s at 3000, 9 s at 4000 and 48 s at 6000: `solver/tools/sweep_plan.py` interpolates), and at most the limit of
-its search.  Each block is one `taxman solve --threads 1 --time-limit $GAME_SECONDS --keep-going` over its range, in
-increasing n, into a file of its own.  A game whose search finishes is a proof.  One that reaches the limit leaves an
-unfinished line with its best game, and the next game goes on from that game as a seed and nothing more: it gets the
-ceiling `n + opt(n - 1)`, the prime formula and a repeat of an earlier search only from a game that is proven ([README,
-"Keeping going past limits"](../frame/README.md#keeping-going-past-limits-and-the-sweep)).  A block's first game has no
-game before it and is solved standalone, but for the first block's if `KNOWN` (default the committed
-`results/strict.jsonl`) holds a proven game of FIRST - 1: that block's file starts as a copy of KNOWN's games, as one
-extends a chain, and the solver goes on from the last.  The blocks are merged into `explore.jsonl` every `MERGE_EVERY`
-seconds and at the end.
+The sweep runs in passes over blocks of consecutive games, each block on one thread.  The top of `sweep.sh` documents
+the passes, the exit statuses and the variables.
 
-**Passes 2, 3, ...**  A block's first game began without the game before it, which another block made.  So each pass
-searches again, with the same limit, every game that has only unfinished searches and whose game before it, as the
-merged file holds it now, has more to give than it had when the game was last tried: it is proven (the ceiling, and
-perhaps the prime formula or a repeat), or it has a better best game than the seed was, or the game had none.  A pass
-runs one `taxman solve --keep-going --retry-improved` a block that has such a game, each on one thread, over an excerpt
-of the merged file (`solver/tools/sweep_plan.py passes`, which reads the merged file once and cuts all the excerpts: the
-block, the 8 board sizes before it that a repeat can repeat, and what their lines rest on, so that the solver's checks
-of its file hold), in increasing n, so that a game it has just proven helps the next.  Passes repeat until one finds
-nothing to do, which leaves the games as an unbroken chain would have left them, whatever it could prove with this limit
-(`MAX_PASSES`, default 20, bounds them).  A game that is searched again starts from the start: there are no checkpoints,
-since a game costs at most `GAME_SECONDS`.
+* **Pass 1.**  FIRST..LAST is split into `BLOCKS` blocks (default one a CPU), sized so that their expected work is about
+  equal.  A game costs its setup and at most the limit of its search, and the setup grows steeply with n: on one thread
+  about 1 s at 2200, 3 s at 3000, 9 s at 4000 and 48 s at 6000 (`solver/tools/sweep_plan.py` interpolates).  Each block
+  is one `taxman solve --threads 1 --time-limit $GAME_SECONDS --keep-going` over its range, in increasing n, into a file
+  of its own.
+* **What a game gets from the one before.**  A game whose search finishes is a proof.  One that reaches the limit leaves
+  an unfinished line with its best game, and the next game takes that game as a seed and nothing more: the ceiling n +
+  opt(n − 1), the prime formula and a repeat of an earlier search come only from a proven game ([README, "Keeping going
+  past limits"](../frame/README.md#keeping-going-past-limits-and-the-sweep)).  A block's first game has no game before
+  it and is solved standalone, but for the first block's.  If `KNOWN` (default the committed `results/strict.jsonl`)
+  holds a proven game of FIRST − 1, the first block's file starts as a copy of KNOWN's games, and the solver goes on
+  from the last, as it extends a chain.
+* **Passes 2, 3, ...**  A block's first game began without the game before it, which another block made.  So each pass
+  searches again, with the same limit, every game that has only unfinished searches and whose game before it, as the
+  merged file holds it now, has more to give than when the game was last tried: it is now proven, or it has a better
+  best game than the seed it gave, or it gave none.  A pass runs one `taxman solve --keep-going --retry-improved` a
+  block that has such a game, on one thread, in increasing n, so that a game it has just proven helps the next.  Each
+  reads an excerpt of the merged file: `sweep_plan.py passes` reads that file once and cuts all the excerpts, each the
+  block, the 8 values of n before it that a repeat can repeat, and what their lines rest on, so that the solver's checks
+  of its file hold.  Passes repeat until one finds nothing to do, at most `MAX_PASSES` (default 20) of them.  The games
+  are then as an unbroken chain would have left them, with what it could prove at this limit.
+* **No checkpoints.**  A game that is searched again starts from the start, since a game costs at most `GAME_SECONDS`.
 
-**What the files hold.**  `$TAXMAN_WORK/results/explore.jsonl`, the merge of every line of every block and pass
-(deduplicated, `awk '!seen[$0]++'`, so that merging is idempotent), and `results/explore-blocks/` beside it: `plan` (the
-blocks, kept so that a rerun finds them), `block-NNN.jsonl` (each block's file, which only grows) and `passes` (the last
-pass made).  `save.sh` copies the directory, so both reach S3.  The pass work files are in `$TAXMAN_WORK/sweep-pass/`
-(not saved; a pass that was stopped leaves its lines there, and the next start merges them first).  Each line says what
-its game had from n - 1 in `prev` and which pass made it in `options.pass` ([REFERENCE.md, "What a game had from n −
-1"](REFERENCE.md#what-a-game-had-from-n---1)); pass 1 is the blocks, and a pass is numbered by the launch of the pass (a
-rerun after an interruption counts as another).  `explore.jsonl` has holes and games built on unfinished ones: it is
-**not a chain and never goes into `results/strict.jsonl`**, and
-[`verify.sh`](#44-verifying-and-bringing-the-results-home) accepts it (both referees, and the agreement of its scores
-with the committed chain), which `sweep.sh` runs when the passes are done.
+**The files.**  The blocks are merged into `$TAXMAN_WORK/results/explore.jsonl` every `MERGE_EVERY` seconds and at the
+end.  The merge drops repeated lines (`awk '!seen[$0]++'`), so it can run any number of times.  Beside it,
+`results/explore-blocks/` holds `plan` (the blocks, kept so that a rerun finds them), `block-NNN.jsonl` (each block's
+file, which only grows) and `passes` (the last pass made).  `save.sh` copies the directory, so both reach S3.  A pass
+works in `$TAXMAN_WORK/sweep-pass/`, which is not saved; a pass that was stopped leaves its lines there, and the next
+start merges them first.  Each line says what its game had from n − 1 in `prev`, and which pass made it in
+`options.pass` ([REFERENCE.md, "What a game had from n − 1"](REFERENCE.md#what-a-game-had-from-n---1)).  Pass 1 is the
+blocks, and a rerun after an interruption counts as another pass.
+
+**`explore.jsonl` is not a chain.**  It has holes, and games built on unfinished ones, so it never goes into
+`results/strict.jsonl`.  [`verify.sh`](#44-verifying-and-bringing-the-results-home) accepts it (both referees, and the
+agreement of its scores with the committed chain), and `sweep.sh` runs it when the passes are done.
 
 ### 7.2 What it costs
 
-The work of 3441..8191 at `GAME_SECONDS` 180, by `sweep_plan.py`'s sizes: 4,751 games, 76 core-hours of setup and at
-most 238 of search, so at most **314 core-hours: 4.9 hours of 64 CPUs**, in 64 blocks of 4.83 to 4.97 core-hours each
-(the first of 95 games, 3441..3535, the last of 50, 8142..8191).  A `c8g.16xlarge` at spot was $0.66 to $0.81 an hour on
-2026-10-17 (counted at $0.676 in section 5): **about $3.3 for pass 1** at the cost of an hour, a build of about 10
-minutes (none from the build cache, section 11), and the later passes, a fraction of the first (only the games that
-gained something); a deadline of 8 hours (`DEADLINE_HOURS`) bounds the machine at about $5.4, and the 40 GB volume is a
-few cents.  The estimate is an upper bound for pass 1 (a game that is settled by a repeat or the prime formula costs its
-setup alone), and the setup times past 4000 are extrapolated from four measured points.  What finishes in 180 s past
-3441 is not measured: most searches will not (the cost of a game grows tenfold in about 1,040), so expect most lines
-unfinished, with the proofs among the primes and repeats after a proven game and the easy searches.
+**About $3.3 for pass 1.**  By `sweep_plan.py`'s sizes, 3441..8191 at `GAME_SECONDS` 180 is 4,751 games: 76 core-hours
+of setup and at most 238 of search, so at most 314 core-hours, 4.9 hours of 64 CPUs.  It splits into 64 blocks of 4.83
+to 4.97 core-hours each, the first of 95 games (3441..3535) and the last of 50 (8142..8191).  A `c8g.16xlarge` at spot
+cost $0.66 to $0.81 an hour on 2026-10-17, counted at $0.676 as in section 5.3, so pass 1 costs about $3.3.  The later
+passes cost a fraction of that, since they search again only the games whose game before has gained.  A deadline of 8
+hours (`DEADLINE_HOURS`) bounds the run at about $5.4 at $0.676 an hour ($6.5 at $0.81), and the timer of 9 hours bounds
+the machine at $9 at the ceiling of $1.0; the 40 GB volume costs a few cents.  The launch builds nothing: it takes the
+solver from the build cache, which must already hold the commit (7.3).  Releasing a commit is a launch of its own, $0.15
+to $0.25 (section 11.3).
 
-### 7.3 Launch (approval first), watch, stop, results home
+*Details.*  The estimate is an upper bound for pass 1: a game that a repeat or the prime formula settles costs its setup
+alone.  The setup times past 4000 are extrapolated from four measured points.  Nobody has measured what finishes in 180
+s past 3441.  Most searches will not, since the cost of a game grows tenfold in about 1,040 in n, so expect most lines
+unfinished, with the proofs among the primes, the repeats after a proven game and the easy searches.
 
-One instance, not a group: the user data is self-running (it sets the timer, installs, clones the pinned commit, builds,
-restores what S3 holds and runs the sweep in tmux as `ec2-user`), `POWEROFF=always` shuts the machine down when the
-sweep ends, for any reason, and the timer is the backstop.  `COMMIT` is the pushed master.
+### 7.3 Launch, watch, stop, bring the results home
+
+**Launch one instance, not a group,** after Brian's yes.  Its user data runs the sweep by itself: it sets the timer,
+installs, clones the pinned commit, sets up from the build cache, restores what S3 holds, and runs the sweep in tmux as
+`ec2-user`.  `POWEROFF=always` shuts the machine down when the sweep ends, for any reason, and the timer is the
+backstop.  Launch as section 2.2 says, with these values, `ZONE` the zone of the lowest price that day (section 1) and
+the ceiling the run to the wall's:
 
 ```
-export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                       # after: aws login --profile bvc
-aws ec2 run-instances --instance-type c8g.16xlarge ... --user-data file://sweep-user-data.sh \
-    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true}'
-# the rest of the command is section 2.2's (the image, the security group with no inbound rule, the instance profile
-# taxman-ec2, the tags, terminate on shutdown, the spot market options in the zone of the lowest price), with
-# Purpose=sweep; sweep-user-data.sh is, with COMMIT the pushed master's id:
+INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=sweep MAX_PRICE=1.0
 ```
+
+Pass `--user-data file://sweep-user-data.sh` in place of 2.2's `--user-data` argument: the file sets the timer itself,
+so `TIMER_MINUTES` is not needed.  `sweep-user-data.sh` is, with `COMMIT` the id of the pushed master:
 
 ```
 #!/bin/bash
@@ -1333,25 +1339,33 @@ sudo -u ec2-user -i tmux new-session -d -s tx -c /home/ec2-user/taxman \
      sudo shutdown -h now'                          # also if the setup failed
 ```
 
-`setup.sh` takes the solver from the build cache (`REQUIRE_CACHED=1`: the commit must have been released, section 11.3,
-or the machine ends at once; without it a miss builds the solver with `target-cpu=native`, a few minutes on 64 vCPUs,
-untested) and runs its smoke checks; the chain-style commands of section 4 then apply:
-`tail ~/taxman-work/logs/sweep.log` (one status line every `STATUS_EVERY` seconds: the pass, the blocks done, the lines
-in the merged file), `ls ~/taxman-work/logs/sweep-*.err` for a block's own log,
-`kill -TERM $(cat ~/taxman-work/sweep.pid)` to stop cleanly (the games in progress have no line; the others are merged
-and saved), and the same command to go on after a stop or an interruption (on a replacement machine: `save.sh --restore`
-first, with the same `S3_DEST`; the plan is in the saved directory, so it finds the same blocks).  Results home:
-`aws s3 sync s3://taxman-013764204840-us-east-1/sweep-3441-8191/results/ results-from-cloud/`, then `solver/tools/cloud/verify.sh results-from-cloud/explore.jsonl`.
-`taxman verify-results results-from-cloud/explore.jsonl` reports the completed games, the missing board sizes, the board
-sizes that only an unfinished search is recorded for, and the proofs.  To spend more on the failures, search them again
-with a longer limit by hand, `taxman solve A-B --keep-going --retry --time-limit 600 --out BLOCKFILE` on a block's file,
-and run `sweep.sh` again: it merges the new lines, and the passes search again the games next to the ones that improved.
-Everything else is section 4's: the end of a launch is the [rules for every launch](#rules-for-every-launch)'s checks,
-and the bucket prefix goes once the results are home.
+* **Setup.**  `setup.sh` takes the solver from the build cache and runs its smoke checks.  With `REQUIRE_CACHED=1` the
+  commit must have been released (section 11.3), or the machine ends at once.  Without it, a miss builds the solver with
+  `target-cpu=native`, a few minutes on 64 vCPUs, untested.
+* **Watch.**  `tail ~/taxman-work/logs/sweep.log` shows a status line every `STATUS_EVERY` seconds: the pass, the blocks
+  done, the lines in the merged file.  `~/taxman-work/logs/sweep-*.err` is a block's own log.
+* **Stop** cleanly with `kill -TERM $(cat ~/taxman-work/sweep.pid)`: the games in progress have no line, and the others
+  are merged and saved.  **Go on** after a stop or an interruption with the same command; on a replacement machine, run
+  `save.sh --restore` first, with the same `S3_DEST`.  The plan is in the saved directory, so the sweep finds the same
+  blocks.
+* **Bring the results home** and check them:
 
-The tests of the script are `test/run.sh sweep` (with `TAXMAN_BIN` set to a non-release build, if there is none of the
-release; it runs `verify.sh`, so it replays the committed games three times) and, for the planner, `python3 -I
-solver/tools/test_sweep_plan.py`.
+  ```
+  aws s3 sync s3://taxman-013764204840-us-east-1/sweep-3441-8191/results/ results-from-cloud/
+  solver/tools/cloud/verify.sh results-from-cloud/explore.jsonl
+  ```
+
+  `taxman verify-results results-from-cloud/explore.jsonl` reports the completed games, the missing ones, the games that
+  only an unfinished search is recorded for, and the proofs.
+* **Spend more on the failures** by hand: search them again with a longer limit,
+  `taxman solve A-B --keep-going --retry --time-limit 600 --out BLOCKFILE` on a block's file, and run `sweep.sh` again.
+  It merges the new lines, and its passes search again the games next to the ones that improved.
+* **End** with the checks of the [rules for every launch](#rules-for-every-launch); the bucket's prefix goes once the
+  results are home.
+
+*Details.*  The tests of the script are `test/run.sh sweep` and, for the planner,
+`python3 -I solver/tools/test_sweep_plan.py`.  `test/run.sh sweep` runs `verify.sh`, so it replays the committed games
+three times; set `TAXMAN_BIN` to a non-release build if there is no release build.
 
 ## 8. The prover's proofs of opt(n)
 
@@ -1559,8 +1573,8 @@ python3 solver/noframe/tools/summarize.py cost --band 100 solver/noframe/data/ex
 Commit `solver/noframe/data/exact_parity_1301_2175.jsonl` (152 KB), and never let a later run overwrite it: `OUT` names
 another file.  Do not commit the work directory, the checkpoints or the logs.  Record the run:
 
-* the totals of the two commands, and the real milliseconds a node by n, in [the prover's
-  README](../noframe/README.md#3-the-proofs-of-optn), which holds the proofs and their cost;
+* the totals of the two commands (`summarize.py exact` gives the searches' thread-hours), and the real milliseconds a
+  node by n, in [the prover's README](../noframe/README.md#3-the-proofs-of-optn), which holds the proofs and their cost;
 * the new end of the prover's proofs in [results/README.md](../../results/README.md), which holds how far each kind of
   proof reaches; then search the docs for the old end and update what still names it;
 * the run itself in a notebook entry, with its rows in the register ([the notebook's
@@ -1571,23 +1585,27 @@ which terminates it; confirm that nothing is left, the launch's security group i
 
 ## 9. Certifying U (stage 4)
 
-The campaign of [Certificates past
-2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md):
-`taxman certify` on every game of 2176-3440 that rests on the frame model, so that every game to 3440 is proven on the
-whole board, where today the proven end of the chain is 2175.  Built, tested on the laptop and **not run**: it waits for
-Brian's approval with the estimate below ([rules for every launch](#rules-for-every-launch)).  What a certificate is:
-[DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u); the work list, its data and the lists:
-[solver/tools/certify/README.md](../tools/certify/README.md).  It launches as section 2 says (an instance profile, steps
-through SSM, `S3_DEST`, a timer, `spot-watch.sh` beside the run, tmux); only the machine, the commands and the checks
-differ.
+`certify.sh` runs `taxman certify` on every game of 2176..3440 that rests on the frame model, so that every game to 3440
+is proven on the whole board, as the games to 2175 are ([results/README.md](../../results/README.md)).  It is the
+campaign of the entry [Certificates past
+2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md); the heading's
+"stage 4" names the campaign as the notebook's register does (the row "S4 preparation", after E8's stages 1 and 2).
+[STATUS](STATUS.md) says where it stands, and a launch waits for Brian's approval with the estimate of 9.1 ([rules for
+every launch](#rules-for-every-launch)).  [DESIGN.md, "Certificates of U"](DESIGN.md#certificates-of-u) says what a
+certificate is, and [solver/tools/certify/README.md](../tools/certify/README.md) describes the work list, its data and
+the lists.  The campaign launches as section 2 says: an instance profile, steps through SSM, `S3_DEST`, a timer,
+`spot-watch.sh` beside the run, tmux.  Only the machine, the commands and the checks differ.
 
 ### 9.1 What it costs, and what to approve
 
-708 games need a certificate.  145 of them the rule of the same problem settles with no search: they sit in the list of
-the game they rest on, after it.  115 more are repeats of a search that the rule cannot settle; they are searched too,
-and go last.  The plan prices a certificate at twice the plain search of its problem, by nodes at the cost per node of
-the chain's own run (`solver/tools/certify/plan.md`).  The lists and their prices, in thread-hours of the plan, in hours
-of one `c8g.16xlarge` (64 threads) and in dollars at the spot price paid on 2026-10-15 ($0.6752 an hour) and on demand
+**Approve up to $50 at spot (or $160 on demand), in two steps:** phase A first ($3 at spot, $11 on demand), then phases
+B and C once the stop rule of 9.2 says GO.  The table below prices the campaign at $31 to $35 at spot.
+
+708 games need a certificate.  The rule of the same problem settles 145 of them with no search: each sits in the list of
+the game it rests on, after it.  115 more repeat a search that the rule cannot settle; they are searched too, and go
+last.  The plan prices a certificate at twice the plain search of its problem, by its nodes at the cost of a node in the
+chain's own run (`solver/tools/certify/plan.md`).  The lists and their prices, in thread-hours of the plan, in hours of
+one `c8g.16xlarge` (64 threads), and in dollars at the spot price paid on 2026-10-15 ($0.6752 an hour) and on demand
 ($2.5517):
 
 | phase | lists | games | thread-hours | hours on 64 threads | spot | on demand |
@@ -1598,76 +1616,70 @@ of one `c8g.16xlarge` (64 threads) and in dollars at the spot price paid on 2026
 | C: the repeats the rule cannot settle | `deferred` | 117 (115 searched) | 0-361 | 0-5.6 | $0-3.81 | $0-14.40 |
 | **all** | | **708** | **2,940-3,301** | **46-52** | **$31-35** | **$117-132** |
 
-Phase C costs nothing if a build with Lemma M5⁺ (unzip's claims in the extended problem, the open item of [the entry on
-certificates past
-2175](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md)) is merged by
-then, since its rule settles 3427 and its like from the certificates of phases A and B (3427 alone is 223 thread-hours);
-without it the 117 games are searched, 361 thread-hours.
+Phase C costs nothing if a build with Lemma M5⁺ is merged by then: that lemma, unzip's claims in the extended problem,
+is the open item of [the
+entry](../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md), and its rule
+settles 3427 and its like from the certificates of phases A and B (3427 alone is 223 thread-hours).  Without it, the 117
+games are searched, for 361 thread-hours.
 
-* **If the overhead is not 2.**  The plan priced it at 2 times the plain search; stage 2 measured a median of 1.55.  At
-  1.6 the campaign costs 2,350-2,640 thread-hours ($25-28 at spot, $94-105 on demand), at 2.4 3,530-3,960 ($37-42,
-  $141-158).  The pilot measures it where the money goes (|O| near 200-300, root gaps 1,100-1,550).
-* **What to approve.**  Up to $50 at spot (or $160 on demand), released in two steps: phase A first ($3 at spot, $11
-  on demand), phases B and C once the stop rule of 9.2 says GO.
+* **If the overhead is not 2.**  The plan prices a certificate at 2 times the plain search; the certificates of eight
+  games of 1400..2156 took a median of 1.55 times it ([one-sided candidates in the
+  search](../notebook/one-sided-candidates-in-the-search-2026-10/README.md), the second stage).  At 1.6 the campaign
+  costs 2,350-2,640 thread-hours ($25-28 at spot, $94-105 on demand), at 2.4 3,530-3,960 ($37-42, $141-158).  The pilot
+  measures it where the money goes (|O| near 200-300, root gaps 1,100-1,550).
 * **Spending past 1.5 times the estimate pauses the campaign.**  Each phase runs under a `DEADLINE_HOURS` of 1.5 times
   its expected hours (the table of 9.4), after which the script stops cleanly and the campaign waits for a report.
   Resume only with Brian's yes.
 * **Wall time.**  About two days on one machine; the dearest game, 3440, takes 10.6 hours by itself.  Two machines (the
-  dear list on one, the four rest lists on the other, each with its own S3 prefix, 9.6) bring the rest down to about
-  29 hours at the same cost.
+  dear list on one, the four rest lists on the other, each with its own S3 prefix, 9.6) bring the rest down to about 29
+  hours at the same cost.
 * **Risks.**  The overhead at the dear end could be worse than the plan's; the pilot finds that out for $3.  A spot
-  interruption costs at most a checkpoint interval (5 minutes), nothing with `spot-watch.sh`.  A counterexample (a game
-  that beats a recorded score) stops everything and is the result itself: the chain's score would be too low at that
-  game.
+  interruption costs at most a checkpoint interval (5 minutes), and nothing with `spot-watch.sh`.  A counterexample (a
+  game that beats a recorded score) stops everything and is the result itself: the chain's score would be too low at
+  that game.
 
 ### 9.2 The stop rule of the pilot
 
+**Go on if the median R is at most 3 and no R is above 5,** where R is a certificate's cost over the plan's price of its
+plain search; the campaign then costs at most 1.5 times the plan.  **Stop** otherwise: report, and build the speedups
+(Lemma M5⁺ and a faster node) before spending more.  **Stop at once** on any `beaten` verdict.
+`solver/tools/certify_pilot.py` (its header defines the quantities) computes all of it from the certificates and the
+plan (9.5).
+
 The seven games of `pilot7` (2340, 3175, 3300, 3335, 3336, 3408, 3420, with the games that rest on them) run one after
 the other on all 64 threads, so that each game's time per node is measured cleanly.  For each game that was searched,
-with N its nodes in the chain (`plan.jsonl`, `cost_nodes`) and c the cost per node of its stretch of the chain
-(243.84 microseconds of a thread up to 3310, 326.73 after; the table of eras in `plan.md`):
+with N its nodes in the chain (`plan.jsonl`, `cost_nodes`) and c the cost of a node in its stretch of the chain (243.84
+microseconds of a thread up to 3310, 326.73 after; the table of eras in `plan.md`):
 
 * **R** = the certificate's thread-seconds (`seconds_all_runs` x `threads`) / (N x c): the plan priced it at 2.
 * **R_nodes** = the certificate's nodes / N, and **R_node** = its thread-microseconds per node / c, so that R = R_nodes
-  x R_node splits the overhead into the tree and the node.  Stage 2 predicts R_nodes about 1.1-1.5 (the rule of
+  x R_node splits the overhead into the tree and the node.  The second stage predicts R_nodes about 1.1-1.5 (the rule of
   symmetric pairs is missing) and R_node about 1.2-1.6.
-
-**Go on** if the median R is at most 3 and no R is above 5: the campaign then costs at most 1.5 times the plan.
-**Stop** otherwise: report, and build the speedups (Lemma M5⁺ and a faster node) before spending more.  **Stop at once**
-on any `beaten` verdict.  `solver/tools/certify_pilot.py` (its header defines the quantities) computes all of it from
-the certificates and the plan (9.5).
 
 ### 9.3 The machine and the build
 
-* **Machine.**  One `c8g.16xlarge` (64 vCPUs, Graviton4) on spot in us-east-1, in the zone with the lowest price of the
-  spot price history below (read it first: it is the price of the estimate), on demand if spot has no capacity.
-  Amazon Linux 2023 arm64 (`ec2-user`), no key pair, a gp3 root volume of 40 GB, the instance profile `taxman-ec2`,
-  IMDSv2 required, a security group with no inbound rule, and `Purpose=certify` on everything the launch creates.
-  Memory is no concern (a few hundred MB a process, the results file loaded in each).
-
-  ```
-  aws ec2 describe-spot-price-history --instance-types c8g.16xlarge --product-descriptions Linux/UNIX \
-      --start-time $(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ) --query 'SpotPriceHistory[].[AvailabilityZone,SpotPrice]' \
-      --output text                                          # GNU date: -d '3 hours ago' in place of -v-3H
-  ```
-* **The commit.**  The commit of master that holds this section, pushed first (the instance clones it).  Call it
-  `COMMIT`; the whole campaign runs on it, and the lines of every certificate record it (`build`).  The build is
+* **Machine.**  One `c8g.16xlarge` (64 vCPUs, Graviton4) at spot in us-east-1, in the zone with the lowest price of the
+  spot price history (section 1, "Quota, prices and spot interruptions": read it first, since it is the price of the
+  estimate), or on demand if spot has no capacity.  A gp3 root volume of 40 GB, `Purpose=certify`, and the rest as
+  section 2.2 launches it.  Memory is no concern: a few hundred MB a process, the results file loaded in each.
+* **The commit.**  The commit of master that holds this section, pushed first, since the instance clones it.  Call it
+  `COMMIT`: the whole campaign runs on it, and the lines of every certificate record it (`build`).  The build is
   `setup.sh` with the tests skipped (they run on the laptop), which builds the solver and the prover for the CPU of the
   machine and runs its smoke checks.
 * **Phase C on another build.**  If a build with Lemma M5⁺ is merged by phase C, check it out on the machine of phase C
-  (`git fetch && git checkout M5COMMIT`), build again, and delete the checkpoint directory of `deferred` if an earlier
-  attempt left one (a checkpoint of another build is refused).  Phases A and B never change build: a checkpoint is
+  (`git fetch && git checkout M5COMMIT`) and build again.  Delete the checkpoint directory of `deferred` if an earlier
+  attempt left one, since a checkpoint of another build is refused.  Phases A and B never change build: a checkpoint is
   resumed only by the build that made it, and the lines of one list should come from one build.
-* **Inputs**, all committed: `results/strict.jsonl` (the recorded games), `solver/noframe/data/upper_*.jsonl`
-  (the prover's barred bounds: 2..1300, 1301..2175, 2176..3314, 3315..3440), `solver/tools/certify/plan.jsonl` and
-  `plan.md`, and the lists in `solver/tools/certify/lists/stage4/`.  `certify.sh` takes them from the checkout.
+* **Inputs,** all committed: `results/strict.jsonl` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
+  prover's barred bounds: 2..1300, 1301..2175, 2176..3314, 3315..3440), `solver/tools/certify/plan.jsonl` and `plan.md`,
+  and the lists in `solver/tools/certify/lists/stage4/`.  `certify.sh` takes them from the checkout.
 
 ### 9.4 The lists, and the commands of the phases
 
-The lists are made from `plan.jsonl` by `solver/tools/certify_campaign.py lists` (its header says how) and checked by
-`solver/tools/certify_campaign.py check`; run the check on the machine before the first phase.  A game that rests on
-another's certificate follows it in the same list (the rule reads only the certificates of its own output file), and no
-game is in two lists.
+`solver/tools/certify_campaign.py lists` makes the lists from `plan.jsonl` (its header says how), and
+`solver/tools/certify_campaign.py check` checks them; run the check on the machine before the first phase.  A game that
+rests on another's certificate follows it in the same list, since the rule reads only the certificates of its own output
+file, and no game is in two lists.
 
 ```
 python3 solver/tools/certify_campaign.py check --plan solver/tools/certify/plan.jsonl \
@@ -1683,11 +1695,11 @@ python3 solver/tools/certify_campaign.py check --plan solver/tools/certify/plan.
 
 `certify.sh LIST[:THREADS]...` runs each list as a process of its own: `taxman certify --list` the list, with its output
 file `certificates_LIST.jsonl` in `$TAXMAN_WORK/results`, its checkpoint directory `$TAXMAN_WORK/ckpt/LIST` and a
-checkpoint every 300 seconds.  Without `:THREADS` the machine's threads are shared equally among the lists, so `rest_1
-rest_2 rest_3 rest_4` is four processes of 16.  One script, one deadline, one S3 saver and one `spot-watch.sh` for all
-of them.  Its header has the exit statuses and the variables.  When every list is done it runs `taxman
-verify-certificates` over their output files and exits 0 only if that passes.  A counterexample (status 2 of `taxman
-certify`) stops all the processes at once, with their checkpoints, and ends the script with status 2.
+checkpoint every 300 seconds.  Without `:THREADS` the machine's threads are shared equally among the lists, so
+`rest_1 rest_2 rest_3 rest_4` is four processes of 16.  All of them share one script, one deadline, one S3 saver and one
+`spot-watch.sh`; the script's header has the exit statuses and the variables.  When every list is done, the script runs
+`taxman verify-certificates` over their output files and exits 0 only if that passes.  A counterexample (status 2 of
+`taxman certify`) stops all the processes at once, with their checkpoints, and ends the script with status 2.
 
 | phase | command (in tmux, from `~/taxman`) | S3 prefix | timer at launch |
 |---|---|---|---|
@@ -1695,38 +1707,24 @@ certify`) stops all the processes at once, with their checkpoints, and ends the 
 | B | `DEADLINE_HOURS=43 S3_DEST=$D/B solver/tools/cloud/certify.sh dear_rest && DEADLINE_HOURS=19 POWEROFF=always S3_DEST=$D/B solver/tools/cloud/certify.sh rest_1 rest_2 rest_3 rest_4` | `$D/B` | `shutdown -h +3900` |
 | C | `DEADLINE_HOURS=9 POWEROFF=done S3_DEST=$D/C solver/tools/cloud/certify.sh deferred` | `$D/C` | `shutdown -h +600` |
 
-`D=s3://taxman-013764204840-us-east-1/certify-2176-3440`: one prefix a phase, because a machine saves its checkpoint
-directory with `--delete`, and another machine's prefix must not be touched by it.  `POWEROFF=done` shuts the machine
-down (and so terminates it) when the phase is complete, after the final save; a phase that stops for any other reason
-leaves the machine up until its timer, so that the work directory can be looked at: pull what you need and terminate it
-(the rules for every launch).  The timers are the deadlines plus an hour for the setup, the final save and the
+`D=s3://taxman-013764204840-us-east-1/certify-2176-3440`, with one prefix a phase: a machine saves its checkpoint
+directory with `--delete`, so it must not touch another machine's prefix.  `POWEROFF=done` shuts the machine down, and
+so terminates it, when the phase is complete, after the final save.  A phase that stops for any other reason leaves the
+machine up until its timer, so that the work directory can be looked at: pull what you need and terminate it (the rules
+for every launch).  The timers are the deadlines plus an hour or more for the setup, the final save and the
 verification.
 
 ### 9.5 Phase A: the pilot
 
-Launch as section 2.2 says, with these values: `c8g.16xlarge`, a 40 GB volume, `Purpose=certify`, the user data
-`shutdown -h +480`, `ZONE` the zone of 9.3 and a `MaxPrice` above the spot price (a ceiling of $1.2 an hour is above any
-price seen).  Only after Brian's yes:
+Launch as section 2.2 says, after Brian's yes, with these values:
 
 ```
-export AWS_PROFILE=bvc AWS_DEFAULT_REGION=us-east-1                         # after: aws login --profile bvc
-tags='{Key=Project,Value=taxman},{Key=Purpose,Value=certify}'
-vpc=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text)
-sg=$(aws ec2 create-security-group --group-name taxman-certify-$(date +%Y%m%d) --vpc-id $vpc \
-    --description 'taxman certificates, no inbound' --tag-specifications "ResourceType=security-group,Tags=[$tags]" \
-    --query GroupId --output text)
-aws ec2 run-instances --instance-type c8g.16xlarge --placement AvailabilityZone=ZONE \
-    --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
-    --security-group-ids $sg --iam-instance-profile Name=taxman-ec2 --metadata-options HttpTokens=required \
-    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=40,VolumeType=gp3,DeleteOnTermination=true}' \
-    --instance-initiated-shutdown-behavior terminate --user-data $'#!/bin/bash\nshutdown -h +480' \
-    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=taxman-certify},$tags]" \
-        "ResourceType=volume,Tags=[$tags]" "ResourceType=spot-instances-request,Tags=[$tags]" \
-    --instance-market-options 'MarketType=spot,SpotOptions={MaxPrice=1.2}'
+INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=certify TIMER_MINUTES=480 MAX_PRICE=1.2
 ```
 
-Then, through SSM as in section 2.3 (`$I` the instance id; the first step as root, the others as `ec2-user`, from script
-files), on the instance, with `COMMIT` the campaign's:
+`ZONE` is the zone of the lowest price that day (9.3), and the ceiling of $1.2 an hour is above any price seen.  Then
+send the steps through SSM as in section 2.3, the first as root and the others as `ec2-user`, with `COMMIT` the
+campaign's:
 
 ```
 dnf install -y git tmux                                                     # as root
@@ -1736,8 +1734,9 @@ NO_PULL=1 SKIP_TESTS=1 solver/tools/cloud/setup.sh                            # 
 
 and the check of the lists (9.4).
 
-**A rehearsal first** (minutes, cents): six small games of 1301-2175, in a work directory of its own, to see the build,
-the S3 saves and the deadline work on the machine itself:
+**A rehearsal first** (minutes, cents): six small games of 1301..2175, in a work directory of its own, to see the build,
+the S3 saves and the deadline work on the machine itself.  It must end `ended: complete`, with `verify-certificates`
+passing (status 0).
 
 ```
 export TAXMAN_WORK=~/rehearsal D=s3://taxman-013764204840-us-east-1/certify-rehearsal
@@ -1746,7 +1745,7 @@ LISTS=~/rehearsal/lists DEADLINE_HOURS=1 S3_DEST=$D solver/tools/cloud/certify.s
 unset TAXMAN_WORK; aws s3 rm --recursive $D; rm -rf ~/rehearsal
 ```
 
-The rehearsal must end `ended: complete` with `verify-certificates` passing (status 0).  Then the pilot:
+**Then the pilot:**
 
 ```
 cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
@@ -1755,7 +1754,7 @@ tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
 ```
 
 In about 4.5 hours the log says `ended: complete` and the machine shuts itself down; the results are in
-`$D/A/results/certificates_pilot7.jsonl`.  At home, the stop rule:
+`$D/A/results/certificates_pilot7.jsonl`.  At home, apply the stop rule:
 
 ```
 export AWS_PROFILE=bvc                                                     # after: aws login --profile bvc
@@ -1764,17 +1763,17 @@ python3 solver/tools/certify_pilot.py certify-run/A/results/certificates_pilot7.
     --list solver/tools/certify/lists/stage4/pilot7.txt --bands
 ```
 
-The report has a line a searched game (|O|, root gap, GF(2) words, set width, nodes against the chain's, R_nodes,
-R_node, R, thread-hours against the plan's), the median and largest R, the search time in dollars, and the verdict.
-Exit status 0 is GO, 3 STOP, 2 COUNTEREXAMPLE, 4 UNFINISHED (a game has no verdict yet; it also says STOP at once if a
-game is already above 5).  While the pilot runs, the same command on the copy in S3 (`aws s3 cp
-$D/A/results/certificates_pilot7.jsonl -`, saved every 10 minutes) shows the games so far.  On GO, report to Brian with
-the table and ask for phases B and C; on STOP, report and build the speedups; on COUNTEREXAMPLE, 9.8.
+The report has a line for each searched game (|O|, root gap, GF(2) words, set width, nodes against the chain's, R_nodes,
+R_node, R, thread-hours against the plan's), the median and largest R, the search time in dollars, and the verdict.  Its
+exit status is 0 for GO, 3 for STOP, 2 for COUNTEREXAMPLE, and 4 for UNFINISHED: a game has no verdict yet, and the
+report says STOP at once if a game is already above 5.  While the pilot runs, the same command on the copy in S3
+(`aws s3 cp $D/A/results/certificates_pilot7.jsonl -`, saved every 10 minutes) shows the games so far.  On GO, report to
+Brian with the table and ask for phases B and C; on STOP, report and build the speedups; on COUNTEREXAMPLE, see 9.8.
 
 ### 9.6 Phase B
 
-A new machine (the pilot's is gone), launched and set up as in 9.5 with the user data `shutdown -h +3900`, no
-rehearsal needed:
+Phase B runs on a new machine, since the pilot's is gone.  Launch and set it up as in 9.5 with `TIMER_MINUTES=3900`,
+with no rehearsal:
 
 ```
 cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440
@@ -1783,18 +1782,20 @@ tmux new-session -d -s cert "DEADLINE_HOURS=43 S3_DEST=$D/B solver/tools/cloud/c
 tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
 ```
 
-`dear_rest` goes first, the dearest games first (3440 alone takes 10.6 hours), on all threads, one game after the
-other; if it stops for any reason the second command does not run.  Then the four rest lists run together.  Two
-machines instead: the same two commands, one on each, `dear_rest` with `D/B1` and `POWEROFF=done`, the four rest lists
-with `D/B2` and `POWEROFF=done`, and a timer for each of its own deadline plus an hour; phase C then fetches both
+`dear_rest` goes first, the dearest games first (3440 alone takes 10.6 hours), on all threads, one game after the other;
+if it stops for any reason, the second command does not run.  Then the four rest lists run together.  On two machines
+instead, run the same two commands, one on each: `dear_rest` with `D/B1` and `POWEROFF=done`, and the four rest lists
+with `D/B2` and `POWEROFF=done`, each machine with a timer of its own deadline plus an hour.  The second launch reuses
+the first's security group (`sg`), since 2.2 names a group by the purpose and the day.  Phase C then fetches both
 prefixes.
 
 ### 9.7 Phase C
 
-The repeats the rule cannot settle, searched, or settled by the rule of a build with Lemma M5⁺ (9.3).  The output file
-of phase C starts as a copy of everything the earlier phases wrote, so that the rule finds the certificates of the games
-it rests on, and so that the file at the end is the whole campaign's.  On a machine set up as in 9.5 (on the build
-that phase C is to run on):
+Phase C searches the repeats that the rule cannot settle, or settles them by the rule of a build with Lemma M5⁺ (9.3).
+Its output file starts as a copy of everything the earlier phases wrote (with two machines in phase B, sync
+`$D/B1/results` and `$D/B2/results` in place of `$D/B/results` below), so that the rule finds the certificates of the
+games it rests on, and so that the file at the end is the whole campaign's.  On a machine set up as in 9.5, on the build
+that phase C is to run on, with `TIMER_MINUTES=600`:
 
 ```
 cd ~/taxman && export D=s3://taxman-013764204840-us-east-1/certify-2176-3440 W=$HOME/taxman-work/results
@@ -1805,8 +1806,8 @@ tmux new-session -d -s cert "DEADLINE_HOURS=9 POWEROFF=done S3_DEST=$D/C solver/
 tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh
 ```
 
-`certify.sh` ends with `verify-certificates` over that file, which then holds all 708 games.  (The files of
-phases A and B, copied by `aws s3 sync` alongside, are the same lines again.)
+`certify.sh` ends with `verify-certificates` over that file, which then holds all 708 games.  The files of phases A and
+B, which `aws s3 sync` copies alongside, hold the same lines again.
 
 ### 9.8 Watch, stop, resume, and a counterexample
 
@@ -1817,25 +1818,25 @@ tail -n 3 ~/taxman-work/logs/certify_dear_rest.err     # the progress lines of t
 ls -l ~/taxman-work/ckpt/*                              # a checkpoint no older than 5 minutes while a long game runs
 ```
 
-The log of a phase is `certify_PHASE.log`, PHASE being the list's name, or the first list's with `x` and the number of
-lists for several (`certify_rest_1x4.log`); each list has its `certify_LIST.out` and `.err`.  The saves in S3 (as old
-as the last save, about 10 minutes) hold the same files under `$D/X/logs/` and the certificates under `$D/X/results/`,
-X being the phase's letter (A, B or C) of 9.4.
+The log of a phase is `certify_PHASE.log`, PHASE being the list's name, or for several lists the first list's with `x`
+and the number of lists (`certify_rest_1x4.log`); each list has its `certify_LIST.out` and `.err`.  The saves in S3, as
+old as the last save (about 10 minutes), hold the same files under `$D/X/logs/` and the certificates under
+`$D/X/results/`, X being the phase's letter (A, B or C) of 9.4.
 
-* **Stop on purpose**: Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/certify_PHASE.pid)`.  Every process writes a
-  final checkpoint; the script ends with status 143.  **Resume**: the same command; it skips every game with a verdict
-  and resumes the search with a checkpoint.  The thread counts and `S3_DEST` may differ; the build may not.
-* **Spot interruption**: `spot-watch.sh` stops the run and saves.  On a replacement machine: set up as in 9.5 (the
-  same `COMMIT`), `S3_DEST=$D/X solver/tools/cloud/save.sh --restore`, copy the logs back (`aws s3 sync $D/X/logs
-  ~/taxman-work/logs`, or the new machine's first save overwrites the old ones), and run the same command with
-  `DEADLINE_HOURS` set to the hours that remain (the deadline is not saved).
+* **Stop on purpose** with Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/certify_PHASE.pid)`.  Every process writes
+  a final checkpoint, and the script ends with status 143.  **Resume** with the same command: it skips every game with a
+  verdict and resumes the search with a checkpoint.  The thread counts and `S3_DEST` may differ; the build may not.
+* **A spot interruption:** `spot-watch.sh` stops the run and saves.  On a replacement machine, set up as in 9.5 with the
+  same `COMMIT`, run `S3_DEST=$D/X solver/tools/cloud/save.sh --restore` and copy the logs back
+  (`aws s3 sync $D/X/logs ~/taxman-work/logs`), or the new machine's first save overwrites the old ones.  Then run the
+  same command with `DEADLINE_HOURS` set to the hours that remain, since the deadline is not saved (section 2.6).
 * **An error stop** (status 1): a game failed a check (a recorded game that does not replay, a certificate that
   contradicts another, a checkpoint of another build).  Nothing is retried; read `certify_LIST.err`.
-* **A counterexample** (status 2, `COUNTEREXAMPLE` in the log): a game scores more than the recorded score of its
-  board.  The processes stopped with their checkpoints and the script saved to S3.  The game is in
+* **A counterexample** (status 2, `COUNTEREXAMPLE` in the log): a game scores more than its recorded score.  The
+  processes stopped with their checkpoints, and the script saved to S3.  The game is in
   `certificates_LIST.counterexample.jsonl` and in the last lines of `certify_LIST.out`.  Keep `~/taxman-work` as it is,
-  pull what is in S3, terminate the machine, and tell Brian: the recorded score at that board is too low, and the
-  chain is wrong from there.  Do not go on.
+  pull what is in S3, terminate the machine, and tell Brian: the recorded score of that game is too low, and the chain
+  is wrong from there.  Do not go on.
 
 ### 9.9 Results home, verification, and the spending
 
@@ -1849,12 +1850,17 @@ nice -n 10 solver/frame/target/release/taxman verify-certificates results/certif
 python3 solver/tools/certify_pilot.py results/certificates_2176_3440.jsonl --bands > certify-run/overhead.txt
 ```
 
-`verify-certificates` must report every game to 3440 proven (`proven frontier: every game to 3440 is proven`, which
-`results/README.md` and the guides then say).  If phase C was left for later, the file of the earlier phases is the
-`cat` of 9.7, the proven end of the chain is the first of the 117 games, and the same commands finish it.  Commit
-`results/certificates_2176_3440.jsonl` (under 1 MB, never overwritten: a rerun is another file), update the
-places that say how far the proofs reach (`results/README.md`, README, DESIGN.md, `docs/THEORY.md`) and write the
-EXPERIMENTS entry with the times against the estimate and the overhead by |O| and gap (the report above, `--bands`).
+`verify-certificates` must report every game to 3440 proven (`proven frontier: every game to 3440 is proven`).  If phase
+C was left for later, the file of the earlier phases is the `cat` of 9.7, the proven end of the chain is the first of
+the 117 games, and the same commands finish it.  Commit `results/certificates_2176_3440.jsonl` (under 1 MB), and never
+let a rerun overwrite it: a rerun writes another file.  Then record the campaign:
+
+* the new end of the proofs on the whole board in [results/README.md](../../results/README.md), which holds how far each
+  kind of proof reaches; then search the docs for the old end and update what still names it;
+* a notebook entry with the times against the estimate and the overhead by |O| and gap (the report above, `--bands`),
+  and its rows in the register ([the notebook's rules](../notebook/README.md#how-this-notebook-is-kept));
+* the spending, as section 2.8 says, with the thread-hours of the search against the plan's, and what they come to on
+  one machine, which `certify_pilot.py` prints.
 
 ## 10. When something goes wrong
 
