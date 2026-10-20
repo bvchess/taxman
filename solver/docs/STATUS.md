@@ -20,12 +20,12 @@ when its budget is spent ([runbook/wall.md](runbook/wall.md#what-needs-brians-ap
 launch is [runbook/chain.md](runbook/chain.md), the unattended run
 [runbook/wall.md](runbook/wall.md); each needs Brian's approval.
 
-The cost of a searched game grows tenfold for about every 1,040 in n, in patches; [the agenda, section
-2](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes that
-slope.  On 64 threads the search loses nothing to threads (3.4 thousand nodes a second a thread at 3441, the same on 16,
-32 and 64), so what remains is cheaper nodes and smaller trees.  Every avenue tried for the bound is closed but the
-certificates (A2, paused): [the agenda, section 3](AGENDA.md#3-ranked-avenues).  For smaller trees, learning each
-conflict's closure under cheap twin exchanges takes 21% off the steps and 16% off the CPU of the 46 problems of the
+The cost of a searched game grows tenfold for about every 1,040 in n, in patches; [AGENDA.md, "The diagnosis of the
+wall"](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes
+that slope.  On 64 threads the search loses nothing to threads (3.4 thousand nodes a second a thread at 3441, the same
+on 16, 32 and 64), so what remains is cheaper nodes and smaller trees.  Every avenue tried for the bound is closed but
+the certificates (A2, paused): [AGENDA.md, "Ranked avenues"](AGENDA.md#3-ranked-avenues).  For smaller trees, learning
+each conflict's closure under cheap twin exchanges takes 21% off the steps and 16% off the CPU of the 46 problems of the
 tuning suite (37-49% off three hard units' steps, 4.5% of the CPU off its six whole games), in the studies build only so
 far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md)).
 

@@ -3,7 +3,7 @@
 Part of the [lab notebook](../README.md).
 
 *Question.*  The wiki's [Questions](https://github.com/bvchess/taxman/wiki/Questions) page has two open questions
-besides the one about longest games ([prover 6](../../noframe/README.md#6-does-an-optimal-game-play-the-most-moves)).
+besides the one about longest games ([prover 6](../../noframe/docs/longest-games.md)).
 (1) No optimal game the owner had seen pays more than two numbers of tax for one move: is that always so, or an
 artifact of the n he looked at?  Read three ways: (a) does some optimal game of some n have a move that pays three or
 more; (b) is there an n every optimal game of which has one; (c) does every n have an optimal game in which every move
@@ -142,7 +142,7 @@ emulated in section 6, and δ(n) = 0.
 
 * *Even n.*  The procedure succeeds whenever n/2 is not a move of the game of n − 1 (section 7), and seldom when it is.
   Whether it is, is decided by the upper half of n − 1, which the descending greedy finds in polynomial time (U\*,
-  [prover 2](../../noframe/README.md#2-conjecture--at-scale)).  By the cofactor c = n/p of n's largest prime factor p: n/2
+  [prover 2](../../noframe/docs/star.md#conjecture--at-scale)).  By the cofactor c = n/p of n's largest prime factor p: n/2
   is never a move at c = 2, and the procedure succeeds at 98 of the 100 n with c = 4, 67 of 71 with c = 6 and 44 of 45
   with c = 10, but at 1 of 58 with c = 8 and 1 of 41 with c = 12 (where the Java's reuse takes none).
 * *Odd n.*  The procedure succeeds only where δ(n) = 0 (54 of the 762 odd composites, each of them).  At the odd

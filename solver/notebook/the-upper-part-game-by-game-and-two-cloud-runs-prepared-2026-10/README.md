@@ -23,7 +23,7 @@ alone; 1,403 checks), Theorem B's roles hold for every optimal set there and eve
 figures at 600 are the consultation's.  It reproduces the consultation's scratch figures where they overlap (600, 1000,
 1300, 2000).  The committed chain's 1301-2175 (490 games need it, 300 s) and the copy of the EC2 chain's results of
 2026-10-15, 2176-3314 (635, 1,272 s), one thread on the laptop; the table by band is in [the prover's
-README](../../noframe/README.md#the-upper-part-game-by-game):
+README](../../noframe/docs/proofs.md#the-upper-part-game-by-game):
 
 | | 1301-2175 | 2176-3314 |
 |---|---|---|

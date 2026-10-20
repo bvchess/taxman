@@ -222,7 +222,7 @@ problem](../the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md)
 of the model the prover becomes a cross-check that can lag.
 
 *Risk.*  Low for (1) and (2), which are certificates.  A general proof of "every optimal game plays U\*" is the open
-problem of [prover 8](../../noframe/README.md#8-what-remains-open) and may be hard; the game-by-game certificate does
+problem of [prover 8](../../noframe/docs/before-and-after.md#what-remains-open) and may be hard; the game-by-game certificate does
 not need it.
 
 *Proven first.*  Nothing new for barring (Theorem 10 with barred numbers); the forced members in the prover are sound
@@ -237,7 +237,7 @@ sound without any conjecture, and the root's bounds of each size prune most k at
 
 *Why it might work.*  The GF(2) heaviest set at the root has the optimum's size at 1,119 of the 1,121 roots measured
 (C4), and the optimal sets of every game enumerated have one size ([prover
-5](../../noframe/README.md#5-is-the-optimal-set-unique)).  So only one or two k survive at the root, and at a node whose
+5](../../noframe/docs/uniqueness.md)).  So only one or two k survive at the root, and at a node whose
 heaviest completion has the wrong size the exact-size bound is lower.  Unlike `revise_freedoms`, it assumes nothing
 about which size the optimum has.
 

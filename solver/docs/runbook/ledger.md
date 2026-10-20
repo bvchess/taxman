@@ -87,7 +87,7 @@ workers) and have no steps, and the checkpoints of their ordinary searches stay 
 comes to its proof; nothing is dropped.  A board with a wide gap takes its steps first, so a board whose old search was
 far along is forecast at least twice what that search spent, and waits behind cheaper boards, as `level` made it wait.
 
-**The bounds store.**  `results/bounds.jsonl` keeps the bounds that runs find ([results/README,
+**The bounds store.**  `results/bounds.jsonl` keeps the bounds that runs find ([results/README.md,
 "bounds.jsonl"](../../../results/README.md#boundsjsonl)).  With `BOUNDS=results/bounds.jsonl`, the file in the checkout
 that the machine cloned, the run starts from the file's best bounds of its stretch, and a board with both bounds needs
 no map (the maps of 3441..8191 cost about 65 core-hours); run `ledger verify-bounds` on the file first.  After the run,

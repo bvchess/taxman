@@ -203,7 +203,7 @@ with three or more live factors, over as many factors as movers or a few more.
 | 1201-1300 | 85 | 167.0 | 176 | 282 | 0 | 545 |
 
 The model-free matching bound's gap is 140-430 around 500-700 and 650-1,200 from 800 on
-([prover 3](../../noframe/README.md#3-the-proofs-of-optn)); this one's is a tenth of that, from the
+([prover 3](../../noframe/docs/proofs.md)); this one's is a tenth of that, from the
 reference algorithm in half a second at 1300.  That the two constructions agree at every root of 880-1300 checks
 each against the other.
 

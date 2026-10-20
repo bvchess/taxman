@@ -406,7 +406,7 @@ that takes a game from `optimal.json` (`--use-prev`) records, in every result wh
 that game optimal ("Known games", above).
 
 `results/strict.jsonl` is such a chain.  This command, up to the paths and the thread count, made its games 1 to 2175,
-and a run of it reproduces their scores.  [results/README.md](../../results/README.md#how-the-file-was-made) says how
+and a run of it reproduces their scores.  [results/README.md](../../results/runs.md) says how
 the rest were made.
 
 ### Games in flight

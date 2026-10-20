@@ -5,7 +5,7 @@
 #   solver/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
 #   OUT=FILE solver/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
-# It runs `exact` of the prover (solver/noframe/README.md, section 3), which knows nothing of the solver's frame
+# It runs `exact` of the prover (solver/noframe/docs/proofs.md), which knows nothing of the solver's frame
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may

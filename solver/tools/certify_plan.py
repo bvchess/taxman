@@ -92,8 +92,8 @@ DEAREST_SHOWN = 20  # games in the report's table of the dearest
 BAND = 100  # boards in a band of the report's table
 PART_END = 3314  # the first part of the table ends here, the second starts after it
 SPOTLIGHT = (3424, 3425, 3440)  # boards the report names
-# The cost model of the research agenda (solver/docs/AGENDA.md, section 2): log10 nodes = a + b G / n^p, plus the
-# window.
+# The cost model of the research agenda (solver/docs/AGENDA.md, "The diagnosis of the wall"): log10 nodes = a + b G /
+# n^p, plus the window.
 GAP_INTERCEPT, GAP_SLOPE, GAP_POWER, WINDOW_DECADES = 2.30, 0.0479, 0.3, 0.06
 PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search"}
 RELATIONS = {"prime": "prime", "chain": "ceiling", "none": "none"}  # upper's word -> the plan's

@@ -271,7 +271,8 @@ A result proven at the ceiling or by the prime formula rests on the game before 
   model, 7.5% of the members (1 to 102 a game, 84% to 99.7% certified), and over the 635 of the EC2 chain's 2176..3314,
   14.9% (15 to 317 a game, 54% to 98% certified), the open share growing with the root's gap by 2 to 3 points per 100.
   The root's heaviest set plays all of U\*_{≥3} in every one of these games.  (`solver/noframe`, `bin/upper.rs`; the
-  data in `solver/noframe/data/upper_*.jsonl` and the table in its README, section 3.)
+  data in `solver/noframe/data/upper_*.jsonl` and the table in `solver/noframe/docs/proofs.md`, "The upper part, game by
+  game".)
 
 *Where a proof stops.*  Take an optimal S without U\*_{≥3}, and d the largest source where S and U\* disagree, in layer
 k ≥ 3.  If d ∈ S ∖ U\*, S holds d and the members of U\*_k above it, which greedy found unplayable even with all their

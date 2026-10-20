@@ -121,9 +121,9 @@ lighter ones:
     heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
 
 *Proof (computational, by the prover).*  The prover finds opt(833) = 218,226, and the optimal set unique, with 362
-members (`solver/noframe`, sections 3 and 5).  The longer set replays by the rules, and ν(833) = 363, so M(833) = 363.
-The branch and bound of `solver/noframe`, weighting the move c by K + c with K above every sum, proves that no playable
-set of 363 members sums to more than 218,197.  ∎
+members (`solver/noframe/docs/proofs.md` and `uniqueness.md`).  The longer set replays by the rules, and ν(833) = 363,
+so M(833) = 363.  The branch and bound of `solver/noframe`, weighting the move c by K + c with K above every sum, proves
+that no playable set of 363 members sums to more than 218,197.  ∎
 
 The mechanism is a trade of weight for count below n/2.  Every payment is a maximal factor, so at most n/2; a move above
 n/2 uses one number up to n/2 (its payment), and a move up to n/2 uses two (itself and its payment), so a playable S has

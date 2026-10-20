@@ -635,7 +635,7 @@ fn check_the_committed_results_to(last: u32) {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
     // And its sets of moves are the table's but at six games, 539, 770 to 773 and 1215, where the chain found another
-    // of the several optimal sets (solver/noframe/README.md, "Is the optimal set unique?" lists the exchanges of the
+    // of the several optimal sets (solver/noframe/docs/uniqueness.md lists the exchanges of the
     // first five; it enumerates the sets only to 989).  The previous chain differed from the table at 684 to 687
     // instead.
     let sorted = |moves: &[u32]| {

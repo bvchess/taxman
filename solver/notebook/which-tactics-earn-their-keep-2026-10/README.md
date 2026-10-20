@@ -50,7 +50,7 @@ game at the ceiling) and `same_search` (the rest) now prove.
 ## `revise_freedoms`: the same trees
 
 Its premise is false for the whole frame game ([n =
-833](../../noframe/README.md#6-does-an-optimal-game-play-the-most-moves), `tests/soundness.rs`), and the owner decided to
+833](../../noframe/docs/longest-games.md), `tests/soundness.rs`), and the owner decided to
 remove it; measuring stopped there.  Measured before that: in every one of the 60 searched or repeated games of
 1232..1300 it searches the two-frame game (282 to 2,238 nodes, 16 to 27 ms, 1.2 s for the 60) and lowers frame 0's
 freedoms by 4 to 6 and `max_total` by 0 to 5, so every problem changes; yet seven frontier proofs have the same trees

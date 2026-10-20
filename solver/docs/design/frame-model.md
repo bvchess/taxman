@@ -75,7 +75,7 @@ The statement U is open in general.  It holds at every game that the
 [prover](../../../docs/GLOSSARY.md#programs-files-and-documents) has proven, since the prover proves opt(n) on the whole
 board; [results/README.md](../../../results/README.md#what-supports-the-scores) says how far its proofs of the committed
 chain reach.  The prover ([its README](../../noframe/README.md)) is a separate program that uses nothing of frames;
-[the section on its proofs](../../noframe/README.md#3-the-proofs-of-optn) lists the facts that they use.
+[the section on its proofs](../../noframe/docs/proofs.md) lists the facts that they use.
 
 Past the prover's proofs, the committed games are proven within the frame model, so each is opt(n) wherever U holds at
 n.  Proving U at such an n takes two steps, which the command `taxman certify` combines game by game ("Certificates of
@@ -85,7 +85,7 @@ certificates.
 First, the prover's [barred bounds](../../../docs/GLOSSARY.md#bounds) settle most members of U\*: each member that a
 barred bound certifies is played by every set of moves that beats the recorded score and obeys Theorem B, and the
 members it does not certify are *open*.  It certifies most members in each game, within the prover's proofs and past
-them, but closes no game alone ([the prover's README](../../noframe/README.md#the-upper-part-game-by-game) has the
+them, but closes no game alone ([the prover's README](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the
 method, and [the entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the
 shares).
 
@@ -140,8 +140,8 @@ Optimal games need not be unique, though, and that matters to any step that reus
 some games have two or three [optimal sets](../../../docs/GLOSSARY.md#the-game).  In all of them the members above n/2
 are U\*; they differ below n/2.  For example, the recorded game of 685 plus the move 686 is unplayable, although
 opt(686) = 686 + opt(685): the equality holds through another optimal set of 685.  So a chain step is decided by the
-complete list of the optimal sets of n − 1, not by one of them ([the prover's README, section
-5](../../noframe/README.md#5-is-the-optimal-set-unique)).
+complete list of the optimal sets of n − 1, not by one of them
+([solver/noframe/docs/uniqueness.md](../../noframe/docs/uniqueness.md)).
 
 ## The Java solver and the frame solver
 

@@ -5,15 +5,16 @@ Part of the [runbook](../RUNBOOK.md).
 `prover.sh A B` proves opt(n) = V(n), the score that `results/strict.jsonl` records, for every n from A to B, on the
 whole board.  It runs the prover's `exact` over the range in passes, one game a thread, and it is a small job next to
 the chain.  The run of 1301..2175 is the example throughout this section: it took 15.9 hours on one `c8g.4xlarge` at
-spot, for $3.84, on 2026-10-14 and 15.  [The prover's README](../../noframe/README.md#to-2175-on-a-cloud-machine) has
-its results, and [its entry](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
-the account of the run and the estimate it was planned by.
+spot, for $3.84, on 2026-10-14 and 15.  [The prover's README](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine)
+has its results, and [its
+entry](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) the account of the
+run and the estimate it was planned by.
 
 **A run searches from the roles of Theorem B.**  `exact` starts there by default (`--fix-low 1`), and the search is
 still a proof, because every optimal set obeys the roles ([THEORY.md, Theorem
 B](../../../docs/theory/frame-model.md#the-bottom-layers)).  Each line records `"fix_low":1`, and the check counts the
 proofs that rest on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the time a node
-([the prover's README](../../noframe/README.md#3-the-proofs-of-optn)).  The run of 1301..2175 searched from the plain
+([the prover's README](../../noframe/docs/proofs.md)).  The run of 1301..2175 searched from the plain
 root, so by that measurement a run from the roles costs about half as much.
 `EXTRA_ARGS='--fix-low 0' solver/tools/cloud/prover.sh 1301 2175` reproduces that run.  The two kinds of search keep
 separate checkpoints: `ckpt/exact_N_low.ckpt` from the roles, `ckpt/exact_N.ckpt` from the plain root.
@@ -51,12 +52,13 @@ their ceiling or met the prime formula.  Its dearest games, 2170 to 2173, took 7
 was 11 % of the machine's thread-hours.  From the roles, expect about half the thread-hours (above).
 
 For the estimate that Brian approves, price the range from the cost by bands of 100 in n in [the prover's
-README](../../noframe/README.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles, over the vCPUs,
-with the idle tail, at the spot price of the hour ([machine.md](machine.md)).  The bands stop at 2175, the end of the
-prover's proofs; past it, [AGENDA, section 2](../AGENDA.md#2-the-diagnosis-of-the-wall) carries the trend of the
-prover's nodes against the solver's to about 15 times them near 3000, an extrapolation.  The cost of a game follows the
-root's parity gap, not n, so the bands are a guide, not a rule, and the first passes of the run check the estimate (8.4,
-step 4, reads the cost of a node from the log).
+README](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles, over the
+vCPUs, with the idle tail, at the spot price of the hour ([machine.md](machine.md)).  The bands stop at 2175, the end of
+the prover's proofs; past it, [solver/docs/AGENDA.md, "The diagnosis of the
+wall"](../AGENDA.md#2-the-diagnosis-of-the-wall) carries the trend of the prover's nodes against the solver's to about
+15 times them near 3000, an extrapolation.  The cost of a game follows the root's parity gap, not n, so the bands are a
+guide, not a rule, and the first passes of the run check the estimate (8.4, step 4, reads the cost of a node from the
+log).
 
 *Details.*  [The entry](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
 holds the estimate the run was planned by (about 140 thread-hours at 2.5 ms a node, and a table of wall time and price
@@ -213,7 +215,7 @@ Commit `solver/noframe/data/exact_parity_1301_2175.jsonl` (152 KB), and never le
 another file.  Do not commit the work directory, the checkpoints or the logs.  Record the run:
 
 * the totals of the two commands (`summarize.py exact` gives the searches' thread-hours), and the real milliseconds a
-  node by n, in [the prover's README](../../noframe/README.md#3-the-proofs-of-optn), which holds the proofs and their
+  node by n, in [the prover's README](../../noframe/docs/proofs.md), which holds the proofs and their
   cost;
 * the new end of the prover's proofs in [results/README.md](../../../results/README.md), which holds how far each kind
   of proof reaches; then search the docs for the old end and update what still names it;

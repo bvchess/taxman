@@ -35,7 +35,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   opt(n).  Game 6 has the optimal game 5, 4, 6 (the taxman takes 1, then 2, then 3), so opt(6) = 15.
 * **Taxman sequence**: opt(1), opt(2), opt(3), ..., which is [OEIS A019312](https://oeis.org/A019312).
 * **optimal set**: the set of moves of an optimal game.  Many orders play one set.  From game 425 on, some games have
-  two or three optimal sets ([the prover's README, section 5](../solver/noframe/README.md#5-is-the-optimal-set-unique)).
+  two or three optimal sets ([solver/noframe/docs/uniqueness.md](../solver/noframe/docs/uniqueness.md)).
 * **maximal factor**: of a number m, the quotient m/p for a prime p that divides m.  12 has the maximal factors 6 and
   4.  Its inverse is the **maximal composite**: on the board of 85, 8 has the maximal composites 16, 24, 40 and 56.
   The **maximal factor graph** joins each number to its maximal factors.  A move is legal exactly when one of its
@@ -82,9 +82,9 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   them greedily from the largest source down (`removeImpossible`) and drops them from the frame's moves.  On the board
   of 21 the sources 11, 13 and 17 are impossible: their frame's only factor, 1, pays for 19.
 * **U\***: the sources that setup keeps.  It is the heaviest playable set of sources wherever conjecture (★) holds,
-  which is certified for every game to 100,000 ([the prover's README, section
-  2](../solver/noframe/README.md#2-conjecture--at-scale)).  Its members with two prime factors are U\*_2,
-  and those with three or more U\*_{≥3}.
+  which is certified for every game to 100,000 ([solver/noframe/docs/star.md, "Conjecture (★) at
+  scale"](../solver/noframe/docs/star.md#conjecture--at-scale)).  Its members with two prime factors are U\*_2, and
+  those with three or more U\*_{≥3}.
 * **freedoms**: a frame's factors minus its moves, the number of factors it can spare.  A promotion into or out of the
   frame uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
@@ -210,8 +210,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  The bound is the
   linear program over all of them, computed by Lagrangian decomposition ([THEORY.md](THEORY.md), Theorems 14 and 15;
   [the fields study](../solver/notebook/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
-  agenda's A1 measured it and is closed ([AGENDA.md, section 3](../solver/docs/AGENDA.md#3-ranked-avenues)).  The
-  notebook's entries call it the "fields bound" or the "A1 bound".
+  agenda's A1 measured it and is closed ([solver/docs/AGENDA.md, "Ranked
+  avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
+  bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
   [THEORY.md](THEORY.md), Lemma D).  A search stopped before its first node has the root's bound as its dual bound.
@@ -223,10 +224,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **parity bound**: the prover's bound.  Every playable set is independent in two matroids over GF(2), split by the
   parity of the number of prime factors, and the bound is their heaviest common independent set ([THEORY.md](THEORY.md),
   Theorem 10).
-* **barred bound**: the parity bound with one member u of U\* barred.  The prover *certifies* u when the barred bound
-  is at most the recorded score: then every set of moves that beats the score, and obeys Theorem B, plays u.  The
-  members it does not certify are *open* ([the prover's README, "The upper part, game by
-  game"](../solver/noframe/README.md#the-upper-part-game-by-game)).
+* **barred bound**: the parity bound with one member u of U\* barred.  The prover *certifies* u when the barred bound is
+  at most the recorded score: then every set of moves that beats the score, and obeys Theorem B, plays u.  The members
+  it does not certify are *open* ([solver/noframe/docs/proofs.md, "The upper part, game by
+  game"](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 * **sacrifice bound** (`src/sacrifice.rs`): an upper bound on opt(n) from games on boards with holes.  The frame solver
   does not use it.
 
@@ -299,9 +300,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 Plans and theorems carry short labels.  A reference document gives the descriptive name first and the label once after
 it.
 
-* **A1 to A7**: the research avenues of [AGENDA.md, section 3](../solver/docs/AGENDA.md#3-ranked-avenues), such as A1,
-  the multi-field bound, and A3, splitting the search by the number of promotions.
-* **C1 to C7**: the conjectures of [AGENDA.md, section 4](../solver/docs/AGENDA.md#4-conjectures).
+* **A1 to A7**: the research avenues of [solver/docs/AGENDA.md, "Ranked
+  avenues"](../solver/docs/AGENDA.md#3-ranked-avenues), such as A1, the multi-field bound, and A3, splitting the search
+  by the number of promotions.
+* **C1 to C7**: the conjectures of [solver/docs/AGENDA.md, "Conjectures"](../solver/docs/AGENDA.md#4-conjectures).
 * **E-numbers** (E1, E6, E9(a), ...): the experiments of one plan, numbered within it.  The same number means
   different experiments in different plans; the entry or document that uses one defines it.  R1 to R3 likewise name
   the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.

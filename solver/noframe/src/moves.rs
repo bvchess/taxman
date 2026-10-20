@@ -211,7 +211,7 @@ mod tests {
     use crate::game::MatchingBound;
     use crate::primes::smallest_prime_factors;
 
-    /// The first game whose optimal game is not a longest one (solver/noframe/README.md, section 6): the recorded
+    /// The first game whose optimal game is not a longest one (solver/noframe/docs/longest-games.md): the recorded
     /// game of 833 has 362 moves, and exchanging four of its moves below n/2 for five lighter ones gives a legal game
     /// of 363, the most any game of 833 can have (ν(833) = 363), worth 29 less.  (That no game of 363 moves is worth
     /// more is a search of 2.6 million nodes, `bin/moves`.)

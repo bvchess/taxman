@@ -3,7 +3,7 @@
 Part of the [lab notebook](../README.md).
 
 *Question.*  The committed chain now reaches 2175, and the model-free proofs of [prover
-3](../../noframe/README.md#3-the-proofs-of-optn) stopped at 1300 (the entry above, when this one began, said that the check
+3](../../noframe/docs/proofs.md) stopped at 1300 (the entry above, when this one began, said that the check
 of 1301..2175 was pending).
 What does it cost, can `exact` use the many cores of a cloud machine, and how should it be run?  Measured on the M1 Max
 (10 cores, other jobs running throughout), with `exact` as it is: no proving code was changed.
@@ -96,7 +96,7 @@ optimum on the whole board, and no search found a set that beat one.  With the 1
 and 199 by the parity bound at the root, 1,047 by a search (557 and 490), 607 at their ceiling and 276 by the prime
 formula (337 and 270, 161 and 115).  Of the 875 games 490 needed a search, and all of them ran to the end.  They took
 309.2 million nodes and **226.0 thread-hours**, 2.63 ms a node; the 385 others took 83 seconds in all.
-[The prover's README](../../noframe/README.md#to-2175-on-a-cloud-machine) has the table by band (`summarize.py cost --band
+[The prover's README](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine) has the table by band (`summarize.py cost --band
 100`).
 
 *Against the projection above.*

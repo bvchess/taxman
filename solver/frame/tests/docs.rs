@@ -756,6 +756,9 @@ const REWRITTEN: &[&str] = &[
     "solver/tools/certify/README.md",
     "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
+    "solver/noframe/docs/",
+    "solver/docs/agenda-ideas.md",
+    "results/runs.md",
     "solver/notebook/README.md",
     "solver/notebook/index.md",
     "solver/notebook/register/",
@@ -1892,12 +1895,17 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 
 /// The documents that rule 8 of docs/WRITING.md would have split and that are still whole, by their paths from the
 /// repository.  A document leaves the list when it is split, and its old file, now an index, joins `INDEXES`.
-const STILL_TO_SPLIT: &[&str] = &["solver/noframe/README.md", "solver/docs/AGENDA.md", "results/README.md"];
+const STILL_TO_SPLIT: &[&str] = &[];
 
 /// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
 /// file, and stays under the index limit.
-const INDEXES: &[&str] =
-    &["docs/THEORY.md", "solver/docs/DESIGN.md", "solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
+const INDEXES: &[&str] = &[
+    "docs/THEORY.md",
+    "solver/noframe/README.md",
+    "solver/docs/DESIGN.md",
+    "solver/docs/RUNBOOK.md",
+    "solver/notebook/README.md",
+];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
 fn word_count(text: &str) -> usize {
