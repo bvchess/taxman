@@ -17,7 +17,7 @@ Some words are used inside one part of the code only, and are defined there:
 
 The Java solver's and the wiki's words map onto these in [DESIGN.md, "The Java solver and the frame
 solver"](../solver/docs/DESIGN.md#the-java-solver-and-the-frame-solver).  The old words of the notebook's dated
-entries map onto these in the notebook's ["Terms changed"](../solver/notebook/README.md#terms-changed-2026-10).
+entries map onto these in the notebook's ["Terms changed"](../solver/notebook/terms-changed.md).
 
 ## The game
 

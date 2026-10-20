@@ -8,7 +8,7 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
   entries their task needs.
 * **Nothing unproven.**  Every rule the frame solver relies on is proven (docs/THEORY.md) and tested.
   Committed results are evidence, and runs never overwrite them.
-* **Record every experiment.**  Search the register at the top of solver/notebook/README.md before proposing one, and
+* **Record every experiment.**  Read the register's file of its subject (solver/notebook/register/) before proposing one, and
   record each when it ends, failures included, as the notebook's front page says (one folder an entry in
   solver/notebook/, its README.md the entry, with its rows in the register and the index).
 
@@ -24,8 +24,8 @@ docs listed at the end.  Paths here are from the top of the repository; Cargo co
 * **docs/GLOSSARY.md**: every term, defined once.
 * **solver/docs/DESIGN.md**: the design, and how changes are tested.
 * **solver/docs/STATUS.md**: the current state: what is in flight, paused, decided, and waiting on a decision.
-* **solver/notebook/README.md**: the lab notebook's register and index, with its rules; its entries are the folders
-  beside it.
+* **solver/notebook/README.md**: the lab notebook's rules, and the map of its register (register/, a file a
+  subject) and its index (index.md); its entries are the folders beside it.
 * **solver/docs/AGENDA.md**: the research avenues.
 * **solver/docs/RUNBOOK.md**: the guide to running on EC2.
 * **results/**: the committed chain of proven games.

@@ -3,16 +3,18 @@
 //! * DESIGN.md's table of tactics lists the tactics of `taxman::tactics::Tactics`, in order, with their defaults;
 //! * every relative link and `#anchor` of the repository's markdown files (the README, `docs/`, `results/`, `solver/`
 //!   with the lab notebook, and the READMEs of `heuristics/` and `moniot/`) resolves;
-//! * the lab notebook keeps its register and index on one page, `solver/notebook/README.md`, and its entries in the
-//!   folders beside it, one README.md each: every entry opens with its title and a link back, and the register or the
-//!   index links to it; `solver/docs/STATUS.md` is short and dated;
+//! * the lab notebook keeps its rules on its front page, `solver/notebook/README.md`, its register in the files of
+//!   `register/` (a file a subject), its index in `index.md`, and its entries in the folders beside them, one README.md
+//!   each: every entry opens with its title and a link back, and the register or the index links to it, and the front
+//!   page holds no entry and no table row; `solver/docs/STATUS.md` is short and dated;
 //! * the reference's (`solver/docs/REFERENCE.md`) table of the fields of a result line has the keys the code writes,
 //!   and its example line shows them;
 //! * DESIGN.md's reading order (section 3) is the module map of `src/lib.rs`, and `rust-version` is what the README
 //!   and the cloud setup say;
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
-//!   for the ceiling, ...) or the old names of the prover's directory and script;
+//!   for the ceiling, ...) or the old names of the prover's directory and script, but for the note that lists them,
+//!   `solver/notebook/terms-changed.md`;
 //! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
 //!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
 //!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...);
@@ -280,17 +282,29 @@ fn anchors_follow_githubs_rules() {
 /// The second line of every entry of the lab notebook, after a blank one.
 const BACK_LINK: &str = "Part of the [lab notebook](../README.md).";
 
-/// The sections of the notebook's front page: the introduction's, and no entry.
-const FRONT_SECTIONS: [&str; 4] =
-    ["How this notebook is kept", "Terms changed (2026-10)", "Register of everything tried", "Index of rounds"];
+/// The sections of the notebook's front page: the rules for filing an entry and for the register, and no entry.
+const FRONT_SECTIONS: [&str; 2] = ["How this notebook is kept", "Register of everything tried"];
 
-/// The README.md of every entry of the lab notebook, which is the folder `solver/notebook/NAME/` beside the front page;
-/// sorted by name.
+/// The folder of the lab notebook that holds the register, a file a subject: it is not an entry.
+const REGISTER_FOLDER: &str = "register";
+
+/// The notebook's index of rounds, by its path from the repository.
+const NOTEBOOK_INDEX: &str = "solver/notebook/index.md";
+
+/// The notebook's note that maps the words the project retired to the words that replaced them, by its path from the
+/// repository.  It lists the old words, so the vocabulary check skips it.
+const TERMS_CHANGED: &str = "solver/notebook/terms-changed.md";
+
+/// The README.md of every entry of the lab notebook, which is the folder `solver/notebook/NAME/` beside the front page
+/// (the folder `register/` is not an entry); sorted by name.
 fn entry_files() -> Vec<PathBuf> {
     let dir = notebook_dir();
     let mut folders: Vec<PathBuf> =
         std::fs::read_dir(&dir).expect("solver/notebook/").map(|e| e.unwrap().path()).collect();
-    folders.retain(|path| path.is_dir() && !path.file_name().unwrap().to_string_lossy().starts_with('.'));
+    folders.retain(|path| {
+        let name = path.file_name().unwrap().to_string_lossy();
+        path.is_dir() && !name.starts_with('.') && name != REGISTER_FOLDER
+    });
     folders.sort();
     folders
         .into_iter()
@@ -307,18 +321,47 @@ fn entry_name(file: &Path) -> String {
     file.parent().and_then(Path::file_name).expect("an entry's folder").to_string_lossy().into_owned()
 }
 
-#[test]
-fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
-    // What the register and the index link to: `NAME/README.md`, with or without an anchor.
-    let front = read(notebook_dir().join("README.md"));
-    let mut listed = BTreeSet::new();
-    for heading in ["## Register of everything tried", "## Index of rounds"] {
-        for line in without_code(section(&front, heading)) {
+/// The folder of an entry of the lab notebook and the path below it, for the file at `shown` (a path from the
+/// repository), if it lies in an entry's folder: `("NAME", "README.md")` for `solver/notebook/NAME/README.md`.  The
+/// front page, `index.md`, `terms-changed.md` and the files of `register/` lie in no entry's folder.
+fn in_entry_folder(shown: &str) -> Option<(&str, &str)> {
+    let (folder, below) = shown.strip_prefix("solver/notebook/")?.split_once('/')?;
+    (folder != REGISTER_FOLDER).then_some((folder, below))
+}
+
+/// The files of the register, `solver/notebook/register/*.md`, a file a subject; sorted by path.
+fn register_files() -> Vec<PathBuf> {
+    files_with_extensions(&notebook_dir().join(REGISTER_FOLDER), &["md"])
+}
+
+/// The files that the links of the register's files and of the index reach (without their anchors): each link is
+/// resolved from the folder of the file that holds it, so that `../NAME/README.md` and `NAME/README.md` both reach
+/// the entry NAME.  A link to a file that does not exist reaches nothing (the link test finds it).
+fn files_linked_by_register_and_index() -> BTreeSet<PathBuf> {
+    let mut files = register_files();
+    assert!(
+        !files.is_empty(),
+        "the check found no file in solver/notebook/{REGISTER_FOLDER}/: has the layout changed?"
+    );
+    files.push(repo_dir().join(NOTEBOOK_INDEX));
+    let mut linked = BTreeSet::new();
+    for file in files {
+        for line in without_code(&read(&file)) {
             for target in link_targets(&line) {
-                listed.insert(target.split('#').next().unwrap_or("").to_owned());
+                let path = target.split('#').next().unwrap_or("");
+                if let Ok(reached) = file.parent().expect("a file has a directory").join(path).canonicalize() {
+                    linked.insert(reached);
+                }
             }
         }
     }
+    linked
+}
+
+/// Every entry opens with its title, named for its anchor, and a back link, and the register or the index links to it.
+#[test]
+fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
+    let listed = files_linked_by_register_and_index();
     let files = entry_files();
     assert!(files.len() > 40, "the check found only {} entries: has the layout changed?", files.len());
     let mut problems = Vec::new();
@@ -338,9 +381,10 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
         if top.get(1) != Some(&"") || top.get(2) != Some(&BACK_LINK) {
             problems.push(format!("{name}: the third line is not {BACK_LINK:?}, after a blank line"));
         }
-        if !listed.contains(&format!("{name}/README.md")) {
-            problems
-                .push(format!("{name}: neither the register nor the index of solver/notebook/README.md links to it"));
+        if !listed.contains(&file) {
+            problems.push(format!(
+                "{name}: neither a file of solver/notebook/{REGISTER_FOLDER}/ nor {NOTEBOOK_INDEX} links to it"
+            ));
         }
     }
     assert!(
@@ -350,15 +394,49 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
     );
 }
 
+/// The front page keeps the rules of the notebook and of the register (`FRONT_SECTIONS`), and no entry; and it holds no
+/// table row, since the rows are in the files of `register/` and in `index.md`.
 #[test]
-fn the_front_page_of_the_notebook_has_no_entries() {
-    let front = read(notebook_dir().join("README.md"));
-    let sections: Vec<String> =
-        without_code(&front).into_iter().filter_map(|line| line.strip_prefix("## ").map(str::to_owned)).collect();
+fn the_front_page_of_the_notebook_has_no_entries_and_no_table_rows() {
+    let front = without_code(&read(notebook_dir().join("README.md")));
+    let sections: Vec<String> = front.iter().filter_map(|line| line.strip_prefix("## ").map(str::to_owned)).collect();
     assert_eq!(
         sections, FRONT_SECTIONS,
-        "solver/notebook/README.md keeps the register and the index; an entry is a folder of solver/notebook/"
+        "solver/notebook/README.md keeps the rules of the notebook and of the register; an entry is a folder of \
+         solver/notebook/"
     );
+    let rows: Vec<String> = front
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.starts_with("| "))
+        .map(|(i, line)| format!("solver/notebook/README.md:{}: {line}", i + 1))
+        .collect();
+    assert!(
+        rows.is_empty(),
+        "the front page of the notebook holds no table: the rows of the register are in the files of \
+         solver/notebook/{REGISTER_FOLDER}/ and the rows of the index in {NOTEBOOK_INDEX}:\n{}",
+        rows.join("\n")
+    );
+}
+
+/// The register's files, the index and the note on the terms changed lie in no entry's folder; a file in the folder
+/// of an entry, at any depth, does.
+#[test]
+fn the_register_and_the_top_files_are_told_from_the_entries() {
+    let beside = [
+        "solver/notebook/README.md",
+        NOTEBOOK_INDEX,
+        TERMS_CHANGED,
+        "solver/notebook/register/node-bound.md",
+        "solver/notebook/register/README.md",
+        "solver/docs/DESIGN.md",
+    ];
+    for shown in beside {
+        assert!(!is_entry(shown) && !is_in_an_entry(shown), "{shown} lies in no entry's folder");
+    }
+    assert!(is_entry("solver/notebook/x-2026-10/README.md") && is_in_an_entry("solver/notebook/x-2026-10/README.md"));
+    assert!(!is_entry("solver/notebook/x-2026-10/fields_output.md"));
+    assert!(is_in_an_entry("solver/notebook/x-2026-10/fields_output.md") && is_in_an_entry("solver/notebook/x/y/z.md"));
 }
 
 /// Whether `line` is `Updated YYYY-MM-DD.`, a plausible date.
@@ -513,15 +591,19 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 // ---------------------------------------------------------------------------------------------------------
 // Vocabulary
 
-/// The text files that explain the code: the guides, the lab notebook with its entries, and the comments.
+/// The text files that explain the code: the guides, the lab notebook (its front page, register, index and note on the
+/// terms changed, and its entries), and the comments.
 fn prose_files() -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = vec![
         crate_dir().join("README.md"),
         reference_md(),
         design_md(),
         notebook_dir().join("README.md"),
+        repo_dir().join(NOTEBOOK_INDEX),
+        repo_dir().join(TERMS_CHANGED),
         repo_dir().join("solver/docs/STATUS.md"),
     ];
+    files.extend(register_files());
     files.extend(entry_files());
     files.extend(files_with_extensions(&crate_dir().join("src"), &["rs"]));
     files
@@ -649,6 +731,8 @@ const REWRITTEN: &[&str] = &[
     "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
     "solver/notebook/README.md",
+    "solver/notebook/index.md",
+    "solver/notebook/register/",
     "results/README.md",
     "heuristics/README.md",
 ];
@@ -711,10 +795,10 @@ const STAYS: &[&str] = &[
 const SKIPPED: &str = "solver/frame/tests/docs.rs";
 
 /// Whether the file at `shown` (a path from the repository) is an entry of the lab notebook, `solver/notebook/NAME/
-/// README.md`: the entries are history and keep the words of their time, so the check skips them.
+/// README.md`: the entries are history and keep the words of their time, so the check skips them.  The register's
+/// files, the index, the note on the terms changed and the front page are no entries.
 fn is_entry(shown: &str) -> bool {
-    let parts: Vec<&str> = shown.split('/').collect();
-    matches!(parts.as_slice(), ["solver", "notebook", _, "README.md"])
+    in_entry_folder(shown).is_some_and(|(_, below)| below == "README.md")
 }
 
 /// `line` with the targets of its links (`](target)`) taken out: a target names a file or an anchor, not a word.
@@ -792,20 +876,16 @@ fn glossary_words_in(lines: &[String]) -> Vec<(usize, &'static str, &'static str
     found
 }
 
-/// The front page of the lab notebook, `solver/notebook/README.md`, describes the present: all of it, but for the note
-/// that maps the old words, which keeps them, and the titles of the entries in the first column of the index, which
-/// keep the words of their time.  Those are blanked or cut, so that line numbers stay.  The entries themselves
-/// (`solver/notebook/NAME/README.md`) are history and are skipped (see `is_entry`).
-fn experiments_now(text: &str) -> String {
-    let (before, after) = text.split_once("## Terms changed (2026-10)").expect("the note on the terms changed");
-    let (note, register) = after.split_once("\n## Register of everything tried").expect("the register");
-    let blank = |part: &str| vec![""; part.lines().count()].join("\n");
+/// The index of the lab notebook, `solver/notebook/index.md`, describes the present: all of it, but for the titles of
+/// the entries in its first column, which keep the words of their time.  `text` without those titles, which are cut
+/// line by line so that line numbers stay.  The entries themselves (`solver/notebook/NAME/README.md`) are history and
+/// are skipped (see `is_entry`), and so is the note that maps the old words (`TERMS_CHANGED`).
+fn without_entry_titles(text: &str) -> String {
     let titles_out = |line: &str| match line.starts_with("| [") {
         true => line.splitn(3, '|').nth(2).unwrap_or("").to_owned(),
         false => line.to_owned(),
     };
-    let register: Vec<String> = register.lines().map(titles_out).collect();
-    format!("{before}{}\n## Register of everything tried\n{}", blank(note), register.join("\n"))
+    text.lines().map(titles_out).collect::<Vec<_>>().join("\n")
 }
 
 /// The comments of the Rust source `text`, line by line: the text after `//`, `///` or `//!` outside string and
@@ -998,7 +1078,8 @@ fn keeps_own_words(shown: &str) -> bool {
 }
 
 /// The files to check: the solver's directory and `results/` (which a Linux dry run has), and, in a full checkout, the
-/// repository's README and `docs/`, and the READMEs of `heuristics/` and `moniot/`.
+/// repository's README and `docs/`, and the READMEs of `heuristics/` and `moniot/`; but for the files that list the old
+/// words (`SKIPPED`, `TERMS_CHANGED`) and the notebook's entries.
 fn vocabulary_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
@@ -1027,7 +1108,8 @@ fn vocabulary_files() -> Vec<PathBuf> {
         walk(&root.join("docs"), &mut found);
         found.extend(["README.md", "heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
     }
-    found.into_iter().filter(|path| from_repo(path) != SKIPPED && !is_entry(&from_repo(path))).collect()
+    let is_checked = |shown: &str| shown != SKIPPED && shown != TERMS_CHANGED && !is_entry(shown);
+    found.into_iter().filter(|path| is_checked(&from_repo(path))).collect()
 }
 
 #[test]
@@ -1038,8 +1120,8 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
     for path in files {
         let shown = from_repo(&path);
         let mut text = read(&path);
-        if shown == "solver/notebook/README.md" {
-            text = experiments_now(&text);
+        if shown == NOTEBOOK_INDEX {
+            text = without_entry_titles(&text);
         }
         let mut lists: Vec<&[Retired]> = vec![RETIRED_EVERYWHERE];
         if !keeps_own_words(&shown) {
@@ -1064,11 +1146,7 @@ fn the_retired_words_stay_out_of_the_guides_and_comments() {
             }
         }
     }
-    assert!(
-        found.is_empty(),
-        "words and names the project has retired (solver/notebook/README.md, \"Terms changed\"):\n{}",
-        found.join("\n")
-    );
+    assert!(found.is_empty(), "words and names the project has retired ({TERMS_CHANGED}):\n{}", found.join("\n"));
 }
 
 #[test]
@@ -1081,6 +1159,8 @@ fn the_vocabulary_check_finds_what_it_should() {
     let found: Vec<(usize, &str)> = found.iter().map(|&(at, word, _)| (at, word)).collect();
     assert_eq!(found, [(1, "hive"), (3, "hive"), (3, "downstream"), (4, "cap"), (4, "many cores")]);
     assert_eq!(without_link_targets("[a](b.md#c) and [d](e)"), "[a] and [d]");
+    let index = "| entry | question |\n| [A hive](a.md) | the hive? | yes |\n| 2026-10 | a hive |";
+    assert_eq!(without_entry_titles(index), "| entry | question |\n the hive? | yes |\n| 2026-10 | a hive |");
 
     let text = "every Board Size, the optimum's score, the `board size` and the \"strong bound\" (quoted)\n\
                 the experiments of EXPERIMENTS and [the notebook](EXPERIMENTS.md), and a type checker";
@@ -1125,11 +1205,7 @@ fn the_glossarys_words_stay_out_of_the_comments_of_the_code() {
             found.push(format!("{}:{at}: {word:?}, say {instead}", from_repo(&path)));
         }
     }
-    assert!(
-        found.is_empty(),
-        "words docs/GLOSSARY.md replaced (solver/notebook/README.md, \"Terms changed\"), in comments:\n{}",
-        found.join("\n")
-    );
+    assert!(found.is_empty(), "words docs/GLOSSARY.md replaced ({TERMS_CHANGED}), in comments:\n{}", found.join("\n"));
 }
 
 #[test]
@@ -1793,7 +1869,6 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 const STILL_TO_SPLIT: &[&str] = &[
     "solver/docs/DESIGN.md",
     "docs/THEORY.md",
-    "solver/notebook/README.md",
     "solver/noframe/README.md",
     "solver/docs/AGENDA.md",
     "results/README.md",
@@ -1801,7 +1876,7 @@ const STILL_TO_SPLIT: &[&str] = &[
 
 /// The old files of the documents that were split, by their paths from the repository: each is now an index, a line a
 /// file, and stays under the index limit.
-const INDEXES: &[&str] = &["solver/docs/RUNBOOK.md"];
+const INDEXES: &[&str] = &["solver/docs/RUNBOOK.md", "solver/notebook/README.md"];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
 fn word_count(text: &str) -> usize {
@@ -1831,9 +1906,10 @@ fn word_limits() -> (usize, usize) {
 }
 
 /// Whether the file at `shown` (a path from the repository) lies in the folder of an entry of the lab notebook: the
-/// entry's README.md and the files beside it, which its scripts wrote and which are committed as they were.
+/// entry's README.md and the files beside it, which its scripts wrote and which are committed as they were.  The front
+/// page, the index, the note on the terms changed and the register's files are guides and keep the limits.
 fn is_in_an_entry(shown: &str) -> bool {
-    shown.starts_with("solver/notebook/") && shown != "solver/notebook/README.md"
+    in_entry_folder(shown).is_some()
 }
 
 /// The word counts of the guides that rule 8 holds to the file limit, with their paths from the repository: those of
@@ -1898,7 +1974,7 @@ fn documents_keep_the_size_limits_of_rule_8() {
     assert!(problems.is_empty(), "documents that break rule 8 of docs/WRITING.md:\n{}", problems.join("\n"));
 }
 
-/// The limits are read from the rule's sentences, words are counted as `wc -w` does, and a file of an entry is told.
+/// The limits are read from the rule's sentences, and words are counted as `wc -w` does.
 #[test]
 fn the_limits_are_read_from_the_rule_and_words_are_counted_as_wc_does() {
     let rule = "A file stays under 6,000 words, and should stay under 5,000.  \
@@ -1908,8 +1984,4 @@ fn the_limits_are_read_from_the_rule_and_words_are_counted_as_wc_does() {
     assert_eq!(limit_after(rule, "stays as its table, under "), None, "a sentence that is gone");
     assert_eq!(limit_after("under 750, with a line", "under "), Some(750));
     assert_eq!(word_count("a  b\n\tc—d \n"), 3);
-    assert!(
-        is_in_an_entry("solver/notebook/x-2026-10/fields_output.md") && is_in_an_entry("solver/notebook/x/README.md")
-    );
-    assert!(!is_in_an_entry("solver/notebook/README.md") && !is_in_an_entry("solver/docs/DESIGN.md"));
 }
