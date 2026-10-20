@@ -87,6 +87,10 @@ pub struct FrameGraph {
     /// (empty when there are none).
     one_sided_by_frame: Vec<Vec<u64>>,
     one_sided_all: Vec<u64>,
+    /// The frames whose winnability this model does not check, a bit a frame (see [`relaxing`](Self::relaxing)); none
+    /// in a model as built.  Only in a build with the feature `studies`.
+    #[cfg(feature = "studies")]
+    relaxed: u16,
 }
 
 impl FrameGraph {
@@ -169,9 +173,48 @@ impl FrameGraph {
         if sorted.is_empty() {
             (by_frame, all) = (Vec::new(), Vec::new());
         }
-        let model =
-            FrameGraph { graph, home, own, one_sided: sorted, one_sided_by_frame: by_frame, one_sided_all: all };
+        let model = FrameGraph {
+            graph,
+            home,
+            own,
+            one_sided: sorted,
+            one_sided_by_frame: by_frame,
+            one_sided_all: all,
+            #[cfg(feature = "studies")]
+            relaxed: 0,
+        };
         Ok((model, root))
+    }
+
+    /// For a study: this model with the frames of `frames` (bit `i` for frame `i`) *relaxed*, their winnability no
+    /// longer checked.  Promoting a set at once then needs every other frame winnable with its part of the set
+    /// applied, and the conflicts and nogoods are those of the other frames; each frame's freedoms are still spent, and
+    /// a frame with none left still narrows its candidates.  A relaxed frame of a state may be unwinnable; reducing it
+    /// still pays each move left with one live factor by it, which takes that factor out of the candidates.  That never
+    /// happens to a member of a set independent in the GF(2) frame matroids: each reduction is a pivot of the frame's
+    /// vectors, so a factor it takes has its unit vector in the span of the moves and the factors promoted out, and a
+    /// set holding it is dependent.  So such a set can be promoted one member after another, in any order, exactly when
+    /// it can be at once.  A search of this model with the GF(2) bound, which promotes only members of its heaviest
+    /// sets, therefore finds the heaviest set that is independent in the frame matroids and leaves the checked frames
+    /// winnable: the bound exact in the checked frames and GF(2) in the relaxed ones (`examples/wall/local.rs`).
+    #[cfg(feature = "studies")]
+    pub fn relaxing(&self, frames: u16) -> FrameGraph {
+        FrameGraph { relaxed: frames, ..self.clone() }
+    }
+
+    /// Whether this model checks the winnability of frame `i` (always, but in a relaxed model of a study:
+    /// [`relaxing`](Self::relaxing)).
+    #[inline]
+    fn checks(&self, i: usize) -> bool {
+        #[cfg(feature = "studies")]
+        {
+            self.relaxed & (1 << i) == 0
+        }
+        #[cfg(not(feature = "studies"))]
+        {
+            let _ = i;
+            true
+        }
     }
 
     /// The factor graph, restricted to the frames each number belongs to; valid for every frame of this model.

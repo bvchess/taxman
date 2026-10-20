@@ -30,6 +30,10 @@
 //!     | --root) --within D [--nodes K] [--probes K [--probe-gap G] [--seed S]] [--sets DIR] [--tactic NAME=VALUE]... N
 //! cargo run --profile test --example wall --features studies -- images --known FILE (--suite FILE --ids ID[,ID...]
 //!     | --root) [--learn [--closure] | --bare | --count] [--trace DIR] [--nodes K] [--tactic NAME=VALUE]... N
+//! cargo run --profile test --example wall --features studies -- local --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) [--nodes K] [--checked SETS] [--per-unit K] [--hybrid-cap STEPS] [--compare] [--tactic NAME=VALUE]...
+//!     N
+//! cargo run --profile test --example wall --features studies -- local --compare N|A-B...
 //! ```
 //!
 //! The example is a study tool: it is built with the feature `studies` (`--features studies`; Cargo.toml).
@@ -154,6 +158,11 @@
 //!   `--count` only counts the tree's steps and leaves; defined in `wall/images.rs`, whose module comment has the test,
 //!   the learning, the lines and the files.
 //!   `solver/notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/` reads them.
+//! * **local**: is the GF(2) bound's error local?  Units of the suite, or whole games, solved with a hook that records
+//!   the nodes that hold the tree and how often the local situation of a few frames recurs; at a sample of those
+//!   nodes, the *hybrid bound* that is exact in a set of frames and GF(2) in the others, found by a search of a relaxed
+//!   model; defined in `wall/local.rs`, whose module comment has the bound, the options and the lines.
+//!   `solver/notebook/search/a-bound-exact-in-a-few-frames-2026-10/` reads them.
 //!
 //! The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the finished experiments were removed
 //! from master (solver/notebook/README.md, "How this notebook is kept", says where they build).
@@ -215,6 +224,9 @@ mod known;
 #[allow(dead_code)] // `wall` reads the part that harvests nogoods; the ledger reads the rest
 #[path = "common/lns.rs"]
 mod lns;
+/// `local`: how much of a node's gap a bound exact in a few frames, and GF(2) in the others, closes.
+#[path = "wall/local.rs"]
+mod local;
 /// `near`: the completions of a unit near P*, counted or estimated.
 #[path = "wall/near.rs"]
 mod near;
@@ -261,7 +273,7 @@ use taxman::tactics::Tactics;
 // ---------------------------------------------------------------------------------------------------------
 // Arguments
 
-const COMMANDS: [&str; 14] = [
+const COMMANDS: [&str; 15] = [
     "setup",
     "nodes",
     "grow",
@@ -276,10 +288,11 @@ const COMMANDS: [&str; 14] = [
     "exchanges",
     "near",
     "images",
+    "local",
 ];
 
 /// The options, with the commands each applies to (an option given to another command is an error).
-const OPTIONS: [(&str, &[&str]); 60] = [
+const OPTIONS: [(&str, &[&str]); 64] = [
     (
         "--known",
         &[
@@ -295,6 +308,7 @@ const OPTIONS: [(&str, &[&str]); 60] = [
             "exchanges",
             "near",
             "images",
+            "local",
         ],
     ),
     ("--cap", &["choice"]),
@@ -305,12 +319,12 @@ const OPTIONS: [(&str, &[&str]); 60] = [
     ("--best-cap", &["decompose"]),
     ("--and-or-cap", &["decompose"]),
     ("--and-or-min", &["decompose"]),
-    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges", "near", "images"]),
+    ("--suite", &["choice-prepare", "anatomy", "cycles", "exchanges", "near", "images", "local"]),
     ("--units", &["cycles"]),
-    ("--ids", &["anatomy", "exchanges", "near", "images"]),
+    ("--ids", &["anatomy", "exchanges", "near", "images", "local"]),
     ("--prune", &["exchanges"]),
     ("--below", &["exchanges"]),
-    ("--root", &["anatomy", "exchanges", "near", "images"]),
+    ("--root", &["anatomy", "exchanges", "near", "images", "local"]),
     ("--sample", &["exchanges"]),
     ("--learn", &["anatomy", "images"]),
     ("--bare", &["images"]),
@@ -342,13 +356,17 @@ const OPTIONS: [(&str, &[&str]); 60] = [
     ("--fix", &["choice-prepare"]),
     ("--unit-nodes", &["choice-prepare"]),
     ("--repeat", &["setup"]),
-    ("--nodes", &["nodes", "grow", "anatomy", "exchanges", "near", "images"]),
+    ("--nodes", &["nodes", "grow", "anatomy", "exchanges", "near", "images", "local"]),
     ("--seconds", &["nodes", "grow", "cycles"]),
     ("--mode", &["nodes"]),
     ("--delta", &["nodes", "grow"]),
     ("--width", &["setup", "nodes"]),
     ("--no-seed", &["nodes"]),
-    ("--tactic", &["nodes", "grow", "anatomy", "exchanges", "near", "images"]),
+    ("--tactic", &["nodes", "grow", "anatomy", "exchanges", "near", "images", "local"]),
+    ("--checked", &["local"]),
+    ("--per-unit", &["local"]),
+    ("--hybrid-cap", &["local"]),
+    ("--compare", &["local"]),
     ("--ckpt-dir", &["nodes", "grow"]),
     ("--every", &["nodes", "grow"]),
     ("--progress", &["grow"]),
@@ -411,6 +429,9 @@ struct Options {
     near: near::Params,
     /// The options of `images` (its `--ids` and `--trace` are `anatomy`'s, its `--root` `exchanges'`).
     images: images::Params,
+    /// The options of `local` (its `--suite` is `choice-prepare`'s, its `--ids` `anatomy`'s, its `--root`
+    /// `exchanges'`).
+    local: local::Params,
     games: Vec<u32>,
 }
 
@@ -441,6 +462,7 @@ impl Options {
             exchanges: exchanges::Params::default(),
             near: near::Params::default(),
             images: images::Params::default(),
+            local: local::Params::default(),
             games: Vec::new(),
         }
     }
@@ -580,6 +602,10 @@ fn parse() -> Result<Options, String> {
             "--probes" => o.near.probes = number("--probes", value("--probes")?)?,
             "--probe-gap" => o.near.probe_gap = number("--probe-gap", value("--probe-gap")?)?,
             "--sets" => o.near.sets = Some(value("--sets")?.into()),
+            "--checked" => o.local.checked = local::parse_checked(&value("--checked")?)?,
+            "--per-unit" => o.local.per_unit = number("--per-unit", value("--per-unit")?)?,
+            "--hybrid-cap" => o.local.hybrid_cap = number("--hybrid-cap", value("--hybrid-cap")?)?,
+            "--compare" => o.local.compare = true,
             _ => texts.push(arg.clone()),
         }
     }
@@ -659,6 +685,10 @@ fn main() {
     }
     if o.command == "images" {
         images::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
+        return;
+    }
+    if o.command == "local" {
+        local::run(&o, &optimal).unwrap_or_else(|e| fail(&e));
         return;
     }
     if let Some(command) = case::Command::named(&o.command) {

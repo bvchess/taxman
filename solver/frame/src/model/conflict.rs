@@ -59,7 +59,7 @@ impl FrameGraph {
         let mut best: Option<Bits<W>> = None;
         for (i, frame) in state.frames().iter().enumerate() {
             let (gained, lost) = (edits.gained[i], edits.lost[i]);
-            if gained.is_empty() && lost.is_empty() {
+            if (gained.is_empty() && lost.is_empty()) || !self.checks(i) {
                 continue;
             }
             let key = FrameEdits { moves: frame.moves, factors: frame.factors, gained, lost, minimal };
@@ -106,7 +106,7 @@ impl FrameGraph {
         let mut best: Option<Bits<W>> = None;
         for (i, frame) in root.frames().iter().enumerate() {
             let (gained, lost) = (&edits.gained[i], &edits.lost[i]);
-            if !k.is_subset(&(*gained | *lost)) {
+            if !k.is_subset(&(*gained | *lost)) || !self.checks(i) {
                 continue;
             }
             if let Some(n) = self.frame_conflict(scratch, frame, gained, lost, true) {
