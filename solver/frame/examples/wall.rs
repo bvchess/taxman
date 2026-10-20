@@ -19,8 +19,9 @@
 //!     [--a1-seconds S] --prep DIR [--results DIR --worker K] [--claims DIR] N|A-B...
 //! cargo run --profile test --example wall --features studies -- decompose --known FILE [--fixtures DIR [--keep K]]
 //!     [--pauses P --span STEPS] [--unit-cap STEPS] [--best-cap STEPS] [--and-or-cap K [--and-or-min STEPS]] N|A-B...
-//! cargo run --profile test --example wall --features studies -- anatomy --suite FILE --known FILE --ids ID[,ID...]
-//!     [--trace DIR] [--prefer FILE] [--best-cpu S] [--nodes K] [--tactic NAME=VALUE]... N
+//! cargo run --profile test --example wall --features studies -- anatomy --known FILE (--suite FILE --ids ID[,ID...]
+//!     | --root) [--learn [--closure]] [--trace DIR] [--prefer FILE] [--best-cpu S] [--nodes K]
+//!     [--tactic NAME=VALUE]... N
 //! cargo run --profile test --example wall --features studies -- cycles [--known FILE] [--suite FILE] [--units K]
 //!     [--seconds S] [--out FILE] N...
 //! cargo run --profile test --example wall --features studies -- exchanges --known FILE (--suite FILE --ids ID[,ID...]
@@ -129,9 +130,11 @@
 //!   apart under the separator of the node's best completion, and the AND/OR search itself.  Defined in
 //!   `wall/decompose.rs`, whose module comment has the options and the lines;
 //!   `solver/notebook/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/` reads them.
-//! * **anatomy**: units of the tuning suite solved with a hook on every step of the searcher, which writes what each
-//!   step saw and did (its bound, conflict, branch and how it ended, and the residues of the frames), optionally with a
-//!   branching order of its own; defined in `wall/anatomy.rs`, whose module comment has the options and the files.
+//! * **anatomy**: units of the tuning suite, or whole games, solved with a hook on every step of the searcher, which
+//!   writes what each step saw and did (its bound, conflict, branch and how it ended, and the residues of the frames),
+//!   where each known conflict came from (a mirror of the nogood table), the nogoods the searcher learned, and
+//!   optionally with a branching order of its own and the learning of `images`; defined in `wall/anatomy.rs`, whose
+//!   module comment has the options and the files.
 //!   `solver/notebook/the-anatomy-of-a-hard-subtree-2026-10/` reads them.
 //! * **cycles**: do flat-cycle cuts close the gap the field-rank bounds leave?  The matching LP of a game's root and of
 //!   its tuning-suite units, with cover, rank and flat-cycle cuts, against the GF(2) bound; defined in
@@ -307,12 +310,12 @@ const OPTIONS: [(&str, &[&str]); 60] = [
     ("--ids", &["anatomy", "exchanges", "near", "images"]),
     ("--prune", &["exchanges"]),
     ("--below", &["exchanges"]),
-    ("--root", &["exchanges", "near", "images"]),
+    ("--root", &["anatomy", "exchanges", "near", "images"]),
     ("--sample", &["exchanges"]),
-    ("--learn", &["images"]),
+    ("--learn", &["anatomy", "images"]),
     ("--bare", &["images"]),
     ("--count", &["images"]),
-    ("--closure", &["images"]),
+    ("--closure", &["anatomy", "images"]),
     ("--within", &["near"]),
     ("--probes", &["near"]),
     ("--probe-gap", &["near"]),
@@ -399,7 +402,8 @@ struct Options {
     units: Option<usize>,
     /// The options of `choice-prepare` and `choice`.
     params: case::Params,
-    /// The options of `anatomy` (and its `--ids`, of `exchanges`).
+    /// The options of `anatomy` (and its `--ids`, of `exchanges`; its `--root` is `exchanges'`, its `--learn` and
+    /// `--closure` are `images'`).
     anatomy: anatomy::Params,
     /// The options of `exchanges`.
     exchanges: exchanges::Params,
