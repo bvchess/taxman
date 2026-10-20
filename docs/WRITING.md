@@ -85,9 +85,10 @@ for every n" but "The file `results/strict.jsonl` holds a chain of optimal games
 ## The check
 
 The docs test, `solver/frame/tests/docs.rs`, runs in `solver/tools/quick_check.py`.  It checks that every relative link
-resolves, that every heading cited by name or by number exists, and that every document but the notebook's entries
-keeps rule 8's limits, but for a list of documents still to be split.  It also checks that neither the guides nor the
-comments of the code and the scripts use the words the project has retired.
+resolves, that every heading cited by name or by number exists (and every paragraph or list item cited by the bold or
+italic words it opens with), and that every document but the notebook's entries keeps rule 8's limits, but for a list
+of documents still to be split.  It also checks that neither the guides nor the comments of the code and the scripts
+use the words the project has retired.
 
 ## Sources
 

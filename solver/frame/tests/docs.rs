@@ -20,8 +20,9 @@
 //!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
 //!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...);
 //! * every heading that a guide, a comment or a script cites by name (`WRITING.md, "Give each task one file"`) or by
-//!   number (`WRITING.md, section 8`) exists in the document it names, and so does every `PATH.md#anchor` cited in the
-//!   code;
+//!   number (`WRITING.md, section 8` or `section 8 of WRITING.md`), and every paragraph or list item that it cites by
+//!   the bold or italic words it opens with (`DESIGN.md, the paragraph "Width dispatch"`), exists in the document it
+//!   names, and so does every `PATH.md#anchor` cited in the code;
 //! * every guide but the notebook's entries keeps the limit of words of docs/WRITING.md, rule 8, but those still to be
 //!   split (`STILL_TO_SPLIT`), and the old files of the split documents (`INDEXES`) stay under the limit of an index.
 //!
@@ -200,16 +201,16 @@ fn without_code(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// The level (the number of `#`s) and the text, trimmed, of a line that is a markdown heading.
+fn heading_line(line: &str) -> Option<(usize, &str)> {
+    let rest = line.strip_prefix('#')?;
+    let text = rest.trim_start_matches('#');
+    Some((1 + rest.len() - text.len(), text.strip_prefix(' ')?.trim()))
+}
+
 /// The headings of a markdown file, at any level and outside fenced code: their text, trimmed, without the `#`s.
 fn headings(text: &str) -> Vec<&str> {
-    let mut found = Vec::new();
-    for line in outside_fences(text) {
-        let Some(rest) = line.strip_prefix('#') else { continue };
-        if let Some(heading) = rest.trim_start_matches('#').strip_prefix(' ') {
-            found.push(heading.trim());
-        }
-    }
-    found
+    outside_fences(text).into_iter().filter_map(heading_line).map(|(_, heading)| heading).collect()
 }
 
 /// The anchors GitHub gives the headings of a markdown file: the heading in lower case, punctuation but `-` and `_`
@@ -1332,13 +1333,24 @@ const NUMBER_SEPARATORS: &[&str] = &[", sections ", " sections ", ", section ", 
 /// The longest heading, in characters, that a citation by name quotes: a longer quotation is a sentence.
 const LONGEST_QUOTED_HEADING: usize = 100;
 
+/// How a citation names the kind of passage whose lead-in it quotes, longest first: `the paragraph "Width dispatch"`.
+const LEAD_IN_KINDS: &[&str] = &["the paragraph ", "the item "];
+
+/// What may stand between `of` or `in` and the name of a document that a citation precedes (`section 2 of the entry
+/// solver/notebook/.../README.md`), longest first.
+const ARTICLES: &[&str] = &["the entry ", "the "];
+
 /// The fewest citations by name that the check must find in the repository: fewer means that a pattern broke.  It found
 /// 107 on 2026-10-20, and 79 once THEORY.md was split, since a citation of a heading that became a file's title names
 /// the file alone.
 const FEWEST_BY_NAME: usize = 40;
 
+/// The fewest citations by lead-in that the check must find in the repository: fewer means that a pattern broke.  It
+/// found 14 on 2026-10-20.
+const FEWEST_BY_LEAD_IN: usize = 8;
+
 /// How a text writes the name of a document.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct DocName {
     /// The path or file name as written, or the target of a link (`RUNBOOK` is written `RUNBOOK.md`).
     written: String,
@@ -1353,9 +1365,12 @@ enum Cited {
     Heading(String),
     /// Sections, by their numbers (`9`, `5.4`).
     Sections(Vec<String>),
+    /// A paragraph or list item, by the bold or italic words it opens with, in the section of the heading `within`
+    /// if there is one.
+    LeadIn { within: Option<String>, name: String },
 }
 
-/// A heading or a section cited after the name of a document, with the line where the document is named.
+/// A heading, a section or a lead-in cited next to the name of a document, with the line where the citation starts.
 #[derive(Debug, PartialEq)]
 struct Citation {
     line: usize,
@@ -1363,7 +1378,7 @@ struct Citation {
     cited: Cited,
 }
 
-/// A document named in a text, from byte `start` to byte `end` of it.
+/// A document named in a text, from byte `start` to byte `end` of it (a link, from its `[` to its `)`).
 struct Mention {
     start: usize,
     end: usize,
@@ -1442,8 +1457,8 @@ fn file_mentions(text: &str) -> Vec<Mention> {
     text.match_indices(".md").filter_map(|(at, _)| file_mention_at(text, at)).collect()
 }
 
-/// The markdown links of `text` whose target is a `.md` file with no anchor, whatever their text says; the mention ends
-/// after the link.
+/// The markdown links of `text` whose target is a `.md` file with no anchor, whatever their text says; the mention runs
+/// from the link's `[` to its `)`.
 fn link_mentions(text: &str) -> Vec<Mention> {
     let is_file =
         |target: &str| target.ends_with(".md") && !target.contains("://") && !target.contains(char::is_whitespace);
@@ -1451,7 +1466,7 @@ fn link_mentions(text: &str) -> Vec<Mention> {
         .into_iter()
         .filter(|range| is_file(&text[range.clone()]))
         .map(|range| Mention {
-            start: range.start,
+            start: text[..range.start - "](".len()].rfind('[').unwrap_or(range.start),
             end: range.end + 1,
             doc: DocName { written: text[range].to_owned(), link: true },
         })
@@ -1485,17 +1500,28 @@ fn mentions(text: &str) -> Vec<Mention> {
     found
 }
 
-/// The heading quoted at the start of `text`, in straight or curly double quotes (a heading that has straight quotes in
-/// it is quoted in curly ones): at most `LONGEST_QUOTED_HEADING` characters, starting with a capital letter, a digit or
-/// a backtick (a quotation that starts with a lower-case word is a key or a phrase).
-fn quoted_heading(text: &str) -> Option<String> {
+/// The text between the double quotes at the start of `text`, straight or curly, and the text after the closing quote.
+fn quotation(text: &str) -> Option<(&str, &str)> {
     let (close, inside) =
         text.strip_prefix('"').map(|rest| ('"', rest)).or_else(|| text.strip_prefix('“').map(|rest| ('”', rest)))?;
-    let (heading, _) = inside.split_once(close)?;
+    inside.split_once(close)
+}
+
+/// The heading quoted at the start of `text` and the text after it.  The quotes are straight or curly (a heading that
+/// has straight quotes in it is quoted in curly ones); the heading has at most `LONGEST_QUOTED_HEADING` characters and
+/// starts with a capital letter, a digit or a backtick (a quotation that starts with a lower-case word is a key or a
+/// phrase).
+fn quoted_heading_then(text: &str) -> Option<(String, &str)> {
+    let (heading, after) = quotation(text)?;
     let starts_like_a_heading =
         heading.starts_with(|c: char| c.is_uppercase() || c.is_ascii_digit() || c == '`') || is_file_name(heading);
     let short = heading.chars().count() <= LONGEST_QUOTED_HEADING && !heading.contains('\n');
-    (starts_like_a_heading && short).then(|| heading.to_owned())
+    (starts_like_a_heading && short).then(|| (heading.to_owned(), after))
+}
+
+/// The heading quoted at the start of `text` (see `quoted_heading_then`).
+fn quoted_heading(text: &str) -> Option<String> {
+    quoted_heading_then(text).map(|(heading, _)| heading)
 }
 
 /// Whether `text` is one word with a dot in it, a file's name (`bounds.jsonl`), which a heading may be.
@@ -1521,36 +1547,111 @@ fn number_at(text: &str) -> Option<(&str, &str)> {
     Some(text.split_at(end))
 }
 
-/// The section numbers at the start of `text`: `9`, `5.4`, and those that follow `and` (`3 and 4`, `§2 and §5`).
-fn section_numbers(text: &str) -> Vec<String> {
+/// The section numbers at the start of `text`: `9`, `5.4`, and those that follow `and` (`3 and 4`, `§2 and §5`), and
+/// the text after them.
+fn section_numbers(text: &str) -> (Vec<String>, &str) {
     let mut numbers = Vec::new();
     let mut rest = text;
     while let Some((number, after)) = number_at(rest) {
         numbers.push(number.to_owned());
-        rest = after.strip_prefix(" and ").map_or("", |next| next.trim_start_matches('§'));
+        rest = after;
+        let Some(next) = after.strip_prefix(" and ") else { break };
+        rest = next.trim_start_matches('§');
     }
-    numbers
+    (numbers, rest)
 }
 
-/// The sections cited by number at the start of `rest`, the text that follows a document's name.
-fn sections_cited(rest: &str) -> Option<Cited> {
-    let numbers = section_numbers(NUMBER_SEPARATORS.iter().find_map(|separator| rest.strip_prefix(separator))?);
-    (!numbers.is_empty()).then_some(Cited::Sections(numbers))
+/// The sections cited by number at the start of `rest`, the text that follows a document's name, and the text after
+/// them.
+fn sections_cited(rest: &str) -> Option<(Cited, &str)> {
+    let (numbers, tail) = section_numbers(NUMBER_SEPARATORS.iter().find_map(|separator| rest.strip_prefix(separator))?);
+    (!numbers.is_empty()).then_some((Cited::Sections(numbers), tail))
 }
 
-/// The headings and sections that the text of a file (of the given extension) cites, after the names of documents
-/// (written in code font or not), in order.
+/// The lead-in quoted at the start of `text`, after the kind of passage it opens (`LEAD_IN_KINDS`), and the text after
+/// it: `the item "Golden tests"`.
+fn quoted_lead_in(text: &str) -> Option<(String, &str)> {
+    let (name, after) = quotation(LEAD_IN_KINDS.iter().find_map(|kind| text.strip_prefix(kind))?)?;
+    (!name.is_empty() && !name.contains('\n')).then(|| (name.to_owned(), after))
+}
+
+/// The lead-in cited at the start of `rest`, the text that follows a document's name, and the text after it: after a
+/// separator, `the item "X"`, or a quoted heading, `, ` and then that (the lead-in is in the heading's section).
+fn lead_in_cited(rest: &str) -> Option<(Cited, &str)> {
+    NAME_SEPARATORS.iter().find_map(|separator| {
+        let after = rest.strip_prefix(separator)?;
+        if let Some((name, tail)) = quoted_lead_in(after) {
+            return Some((Cited::LeadIn { within: None, name }, tail));
+        }
+        let (heading, after) = quoted_heading_then(after)?;
+        let (name, tail) = quoted_lead_in(after.strip_prefix(", ")?)?;
+        Some((Cited::LeadIn { within: Some(heading), name }, tail))
+    })
+}
+
+/// The sections cited by number at the end of `head`: `section 3`, `Sections 2 and 5`.  The offset is where the
+/// citation starts.  A `subsection` is no section.
+fn sections_before(head: &str) -> Option<(usize, Cited)> {
+    let lower = head.to_ascii_lowercase();
+    let (at, label) = ["sections ", "section "]
+        .into_iter()
+        .filter_map(|label| Some((lower.rfind(label)?, label)))
+        .max_by_key(|&(at, _)| at)?;
+    let (numbers, rest) = section_numbers(&head[at + label.len()..]);
+    let alone = !head[..at].ends_with(char::is_alphanumeric);
+    (alone && rest.is_empty() && !numbers.is_empty()).then_some((at, Cited::Sections(numbers)))
+}
+
+/// The lead-in cited at the end of `head`: `the paragraph "X"`, `the item “X”`.  The offset is where the citation
+/// starts.
+fn lead_in_before(head: &str) -> Option<(usize, Cited)> {
+    let (open, close) = [('"', '"'), ('“', '”')].into_iter().find(|&(_, close)| head.ends_with(close))?;
+    let name_end = head.len() - close.len_utf8();
+    let name_start = head[..name_end].rfind(open)?;
+    let at = LEAD_IN_KINDS.iter().find_map(|kind| head[..name_start].strip_suffix(kind))?.len();
+    let name = &head[name_start + open.len_utf8()..name_end];
+    (!name.is_empty()).then(|| (at, Cited::LeadIn { within: None, name: name.to_owned() }))
+}
+
+/// The sections or the lead-in cited just before the name of a document, in `before`, the text that precedes the name:
+/// `section 3 of`, `sections 2 and 5 in the`, `the paragraph "X" of the entry`.  The offset is where the citation
+/// starts.
+fn cited_before(before: &str) -> Option<(usize, Cited)> {
+    let before = before.strip_suffix('`').unwrap_or(before);
+    let before = ARTICLES.iter().find_map(|article| before.strip_suffix(article)).unwrap_or(before);
+    let head = before.strip_suffix(" of ").or_else(|| before.strip_suffix(" in "))?;
+    sections_before(head).or_else(|| lead_in_before(head))
+}
+
+/// Whether `tail`, the end of `text`, goes on with `of` or `in` and the name of a document, which starts at one of
+/// `starts`: what comes before `tail` is then cited in that document (`section 3 of DESIGN.md`), not in the document
+/// named before it (`README.md, section 3 of DESIGN.md`).
+fn goes_on_to_a_document(text: &str, tail: &str, starts: &BTreeSet<usize>) -> bool {
+    let Some(named) = tail.strip_prefix(" of ").or_else(|| tail.strip_prefix(" in ")) else { return false };
+    let named = ARTICLES.iter().find_map(|article| named.strip_prefix(article)).unwrap_or(named);
+    starts.contains(&(text.len() - named.strip_prefix('`').unwrap_or(named).len()))
+}
+
+/// The headings, sections and lead-ins that the text of a file (of the given extension) cites, next to the names of
+/// documents (written in code font or not): after the name or, for sections and lead-ins, before it (`section 3 of
+/// DESIGN.md`).  In order of their names.
 fn citations(extension: Option<&str>, text: &str) -> Vec<Citation> {
     let joined = join_wrapped_lines(extension, text);
-    mentions(&joined.text)
-        .into_iter()
-        .filter_map(|mention| {
-            let rest = &joined.text[mention.end..];
-            let rest = rest.strip_prefix('`').unwrap_or(rest);
-            let cited = heading_cited(rest).or_else(|| sections_cited(rest))?;
-            Some(Citation { line: joined.line_at(mention.start), doc: mention.doc, cited })
-        })
-        .collect()
+    let all = mentions(&joined.text);
+    let starts: BTreeSet<usize> = all.iter().map(|mention| mention.start).collect();
+    let mut found = Vec::new();
+    for mention in all {
+        let rest = &joined.text[mention.end..];
+        let rest = rest.strip_prefix('`').unwrap_or(rest);
+        let after = lead_in_cited(rest)
+            .or_else(|| heading_cited(rest).map(|cited| (cited, "")))
+            .or_else(|| sections_cited(rest));
+        let after = after.filter(|&(_, tail)| !goes_on_to_a_document(&joined.text, tail, &starts));
+        let before = cited_before(&joined.text[..mention.start]);
+        let cited = before.into_iter().chain(after.map(|(cited, _)| (mention.start, cited)));
+        found.extend(cited.map(|(at, cited)| Citation { line: joined.line_at(at), doc: mention.doc.clone(), cited }));
+    }
+    found
 }
 
 /// The `PATH.md#anchor` mentions of the text of a source file: the line, the document and the anchor.
@@ -1595,17 +1696,90 @@ fn has_number(heading: &str, number: &str) -> bool {
     heading.strip_prefix(number).is_some_and(|rest| rest.starts_with(['.', ' ']))
 }
 
-/// What the citations are checked against: the repository's markdown files, and the headings and anchors of the
-/// documents cited so far.
+/// A paragraph or list item of a markdown file that opens with a bold or italic lead-in.
+#[derive(Debug, PartialEq)]
+struct LeadIn {
+    /// The lead-in's words, as headings are compared with quotations (`plain`).
+    name: String,
+    /// The headings whose sections it is in, outermost first.
+    under: Vec<String>,
+}
+
+/// `line` without its indentation and its list marker (`* `, `- `, `+ `, `12. `), if it has one.
+fn without_list_marker(line: &str) -> &str {
+    let line = line.trim_start();
+    if let Some(item) = line.strip_prefix(['*', '-', '+']).and_then(|rest| rest.strip_prefix(' ')) {
+        return item.trim_start();
+    }
+    let digits = line.find(|c: char| !c.is_ascii_digit()).unwrap_or(line.len());
+    match line[digits..].strip_prefix(". ") {
+        Some(item) if digits > 0 => item.trim_start(),
+        _ => line,
+    }
+}
+
+/// How many lines after its first a lead-in may wrap over.
+const LEAD_IN_WRAP: usize = 2;
+
+/// The words that the paragraph or list item starting at `lines[0]` opens with in bold or italics (`**X.**`, `*X*`),
+/// after its indentation and list marker.  A lead-in that is too long for a line ends on one of the next
+/// `LEAD_IN_WRAP` lines of the paragraph.
+fn lead_in_at(lines: &[&str]) -> Option<String> {
+    let first = without_list_marker(lines[0]);
+    let mark = if first.starts_with("**") { "**" } else { "*" };
+    let mut words = first.strip_prefix(mark)?.to_owned();
+    for next in lines[1..].iter().take(LEAD_IN_WRAP).take_while(|line| !line.trim().is_empty()) {
+        if words.contains(mark) {
+            break;
+        }
+        words = format!("{words} {}", next.trim());
+    }
+    let end = words.find(mark)?;
+    (end > 0 && !words.starts_with(char::is_whitespace)).then(|| words[..end].to_owned())
+}
+
+/// The lead-ins of a markdown file, outside fenced code, in order.
+fn lead_ins(text: &str) -> Vec<LeadIn> {
+    let lines = outside_fences(text);
+    let (mut found, mut under): (Vec<LeadIn>, Vec<(usize, &str)>) = (Vec::new(), Vec::new());
+    for (i, line) in lines.iter().enumerate() {
+        if let Some((level, heading)) = heading_line(line) {
+            under.retain(|&(above, _)| above < level);
+            under.push((level, heading));
+        } else if let Some(words) = lead_in_at(&lines[i..]) {
+            let under = under.iter().map(|&(_, heading)| heading.to_owned()).collect();
+            found.push(LeadIn { name: plain(&words), under });
+        }
+    }
+    found
+}
+
+/// Whether one of `lead_ins` is the one that the quotation `quoted` names (its words, as `names_heading` compares
+/// them), in the section of the heading that `within` names if it names one.
+fn has_lead_in(lead_ins: &[LeadIn], within: Option<&str>, quoted: &str) -> bool {
+    let quoted = plain(quoted);
+    let in_section =
+        |lead_in: &LeadIn| within.is_none_or(|heading| lead_in.under.iter().any(|h| names_heading(heading, h)));
+    lead_ins.iter().any(|lead_in| lead_in.name == quoted && in_section(lead_in))
+}
+
+/// What the citations are checked against: the repository's markdown files, and the headings, lead-ins and anchors of
+/// the documents cited so far.
 struct DocSet {
     markdown: Vec<PathBuf>,
     headings: BTreeMap<PathBuf, Vec<String>>,
+    lead_ins: BTreeMap<PathBuf, Vec<LeadIn>>,
     anchors: BTreeMap<PathBuf, BTreeSet<String>>,
 }
 
 impl DocSet {
     fn new() -> DocSet {
-        DocSet { markdown: markdown_files(), headings: BTreeMap::new(), anchors: BTreeMap::new() }
+        DocSet {
+            markdown: markdown_files(),
+            headings: BTreeMap::new(),
+            lead_ins: BTreeMap::new(),
+            anchors: BTreeMap::new(),
+        }
     }
 
     /// The markdown file called `name` that is the only one of that name, or why there is not one.
@@ -1651,27 +1825,59 @@ impl DocSet {
             .or_insert_with(|| headings(&read(doc)).into_iter().map(str::to_owned).collect())
     }
 
+    /// The lead-ins of the markdown file `doc`.
+    fn lead_ins_of(&mut self, doc: &Path) -> &[LeadIn] {
+        self.lead_ins.entry(doc.to_path_buf()).or_insert_with(|| lead_ins(&read(doc)))
+    }
+
+    /// What is wrong with the heading quoted as `quoted`, cited in the markdown file `doc`, if anything.
+    fn heading_problem(&mut self, doc: &Path, quoted: &str) -> Option<String> {
+        let is_named = self.headings_of(doc).iter().any(|heading| names_heading(quoted, heading));
+        (!is_named).then(|| {
+            format!(
+                "{} has no heading \"{quoted}\": cite a heading by its text, with its number or without",
+                from_repo(doc)
+            )
+        })
+    }
+
+    /// What is wrong with the lead-in quoted as `quoted`, cited in the markdown file `doc`, in the section of the
+    /// heading `within` if there is one, if anything.
+    fn lead_in_problem(&mut self, doc: &Path, within: Option<&str>, quoted: &str) -> Option<String> {
+        let found = has_lead_in(self.lead_ins_of(doc), within, quoted);
+        let section = within.map_or(String::new(), |heading| format!(" in its section \"{heading}\""));
+        (!found).then(|| {
+            format!(
+                "{} has no paragraph or item that opens with \"{quoted}\"{section}: cite a paragraph or an item by \
+                 the bold or italic words it opens with",
+                from_repo(doc)
+            )
+        })
+    }
+
     /// What is wrong with `citation`, written in the file `citing`, if anything.
     fn citation_problem(&mut self, citing: &Path, citation: &Citation) -> Option<String> {
         let doc = match self.resolve(citing, &citation.doc) {
             Ok(doc) => doc,
             Err(problem) => return Some(problem),
         };
-        let shown = from_repo(&doc);
-        let headings = self.headings_of(&doc);
-        let is_named = |quoted: &str| headings.iter().any(|heading| names_heading(quoted, heading));
-        let is_numbered = |number: &str| headings.iter().any(|heading| has_number(heading, number));
         match &citation.cited {
-            Cited::Heading(quoted) if !is_named(quoted) => Some(format!(
-                "{shown} has no heading \"{quoted}\": cite a heading by its text, with its number or without"
-            )),
-            Cited::Sections(numbers) => numbers.iter().find(|number| !is_numbered(number)).map(|number| {
-                format!(
-                    "{shown} has no heading numbered {number}: cite the heading by its name, as docs/WRITING.md, \
-                     rule 8, says"
-                )
-            }),
-            Cited::Heading(_) => None,
+            Cited::Heading(quoted) => self.heading_problem(&doc, quoted),
+            Cited::Sections(numbers) => {
+                let headings = self.headings_of(&doc);
+                let is_numbered = |number: &str| headings.iter().any(|heading| has_number(heading, number));
+                numbers.iter().find(|number| !is_numbered(number)).map(|number| {
+                    format!(
+                        "{} has no heading numbered {number}: cite the heading by its name, as docs/WRITING.md, \
+                         rule 8, says",
+                        from_repo(&doc)
+                    )
+                })
+            }
+            Cited::LeadIn { within, name } => within
+                .as_deref()
+                .and_then(|heading| self.heading_problem(&doc, heading))
+                .or_else(|| self.lead_in_problem(&doc, within.as_deref(), name)),
         }
     }
 
@@ -1708,11 +1914,13 @@ fn citing_files() -> Vec<PathBuf> {
     files
 }
 
-/// What the check found in the files: how many citations by name, and what is wrong.  Citations by number have no
-/// floor: rule 8's splits remove them on purpose, and the unit tests below check that the pattern still finds them.
+/// What the check found in the files: how many citations by name and by lead-in, and what is wrong.  Citations by
+/// number have no floor: rule 8's splits remove them on purpose, and the unit tests below check that the pattern still
+/// finds them.
 #[derive(Default)]
 struct Found {
     by_name: usize,
+    by_lead_in: usize,
     problems: Vec<String>,
 }
 
@@ -1723,8 +1931,10 @@ fn check_citations(docs: &mut DocSet, file: &Path, found: &mut Found) {
     let extension = file.extension().and_then(|ext| ext.to_str());
     let at = |line: usize, problem: String| format!("{}:{line}: {problem}", from_repo(file));
     for citation in citations(extension, &text) {
-        if matches!(citation.cited, Cited::Heading(_)) {
-            found.by_name += 1;
+        match citation.cited {
+            Cited::Heading(_) => found.by_name += 1,
+            Cited::LeadIn { .. } => found.by_lead_in += 1,
+            Cited::Sections(_) => {}
         }
         found.problems.extend(docs.citation_problem(file, &citation).map(|problem| at(citation.line, problem)));
     }
@@ -1736,7 +1946,8 @@ fn check_citations(docs: &mut DocSet, file: &Path, found: &mut Found) {
 }
 
 /// Every heading that a guide, a comment or a script cites by name (`DESIGN.md, "Testing"`) or by number
-/// (`DESIGN.md, section 9`) exists, and so does every `#anchor` that the code cites.
+/// (`DESIGN.md, section 9`, `section 9 of DESIGN.md`) exists, and so does every lead-in that it cites
+/// (`DESIGN.md, the item "Golden tests"`) and every `#anchor` that the code cites.
 #[test]
 fn every_heading_cited_by_name_or_number_exists_and_so_does_every_anchor_cited_in_the_code() {
     if !repo_dir().join("README.md").exists() {
@@ -1748,16 +1959,24 @@ fn every_heading_cited_by_name_or_number_exists_and_so_does_every_anchor_cited_i
         check_citations(&mut docs, &file, &mut found);
     }
     assert!(found.problems.is_empty(), "broken citations of headings:\n{}", found.problems.join("\n"));
-    let by_name = found.by_name;
+    let (by_name, by_lead_in) = (found.by_name, found.by_lead_in);
     assert!(by_name >= FEWEST_BY_NAME, "the check found only {by_name} citations by name: has their syntax changed?");
+    assert!(
+        by_lead_in >= FEWEST_BY_LEAD_IN,
+        "the check found only {by_lead_in} citations by lead-in: has their syntax changed?"
+    );
 }
 
-/// The citations of `text` as short lines: the line, the document, and the heading in quotes or the sections after `§`.
+/// The citations of `text` as short lines: the line, the document, and the heading in quotes, the sections after `§` or
+/// the lead-in in quotes after `¶` (and the heading of its section, in quotes, before that).
 fn citations_shown(extension: Option<&str>, text: &str) -> Vec<String> {
     let shown = |c: &Citation| {
         let cited = match &c.cited {
             Cited::Heading(heading) => format!("\"{heading}\""),
             Cited::Sections(numbers) => format!("§{}", numbers.join("+")),
+            Cited::LeadIn { within, name } => {
+                format!("{}¶\"{name}\"", within.as_ref().map_or(String::new(), |heading| format!("\"{heading}\" ")))
+            }
         };
         format!("{} {}{} {cited}", c.line, c.doc.written, if c.doc.link { " (link)" } else { "" })
     };
@@ -1804,6 +2023,115 @@ fn citations_are_found_in_every_form_of_markdown() {
             "10 DESIGN.md \"Same search\"",
         ]
     );
+}
+
+/// A lead-in is cited after the name of a document (`DOC, the item "X"`, and within a heading's section `DOC,
+/// "Heading", the item "X"`) or before it (`the paragraph "X" of DOC`), and sections are cited before it too (`section
+/// 3 of DOC`, `sections 2 and 5 in the DOC`, `section 2 of the entry DOC`); a phrase that cites after one document what
+/// the next one holds belongs to the next; a lead-in with no document, a subsection and a bare "its README" are no
+/// citations.
+#[test]
+fn lead_ins_and_sections_are_cited_after_the_name_of_a_document_or_before_it() {
+    let text = [
+        r#"See DESIGN.md, the item "Golden tests" and [the runbook](RUNBOOK.md), the paragraph "Width dispatch"."#,
+        r#"The docs/THEORY.md's “Longest games”, the paragraph “Why it holds”, and REFERENCE.md (the item "Keys"),"#,
+        r#"STATUS.md: "Open", the item "Next", but not README.md, the item without quotes,"#,
+        r#"nor RUNBOOK.md, the entry "X"."#,
+        r#"* A list item that cites DESIGN.md, the item"#,
+        r#"  "Wrapped", and the paragraph "Also wrapped" of"#,
+        r#"  RUNBOOK.md."#,
+        r#""#,
+        r#"Read the paragraph "Pruning" of docs/THEORY.md, the item “Curly” in the entry STATUS.md, and the"#,
+        r#"item "Past 4095" of [the runbook](RUNBOOK.md).  See section 3 of DESIGN.md, sections 2 and 5 in the"#,
+        r#"RUNBOOK.md, Section 4.2 of [the design](DESIGN.md), section 5 of the `STATUS.md` and"#,
+        r#"section 7 of the entry docs/THEORY.md, and the paragraph "Bare" of RUNBOOK."#,
+        r#""#,
+        r#"Not subsection 3 of DESIGN.md, nor section 2 of its README, nor section 3 of the entry,"#,
+        r#"nor section 4 of slope.py, nor the item "Past" of the runbook; the paragraph "Last" of RUNBOOK.md ends"#,
+        r#"the text before a fence:"#,
+        r#"```"#,
+        r#"section 3 of DESIGN.md, the item "Fenced" of RUNBOOK.md"#,
+        r#"```"#,
+    ]
+    .join("\n");
+    assert_eq!(
+        citations_shown(Some("md"), &text),
+        [
+            r#"1 DESIGN.md ¶"Golden tests""#,
+            r#"1 RUNBOOK.md (link) ¶"Width dispatch""#,
+            r#"2 docs/THEORY.md "Longest games" ¶"Why it holds""#,
+            r#"2 REFERENCE.md ¶"Keys""#,
+            r#"3 STATUS.md "Open" ¶"Next""#,
+            r#"5 DESIGN.md ¶"Wrapped""#,
+            r#"6 RUNBOOK.md ¶"Also wrapped""#,
+            r#"9 docs/THEORY.md ¶"Pruning""#,
+            r#"9 STATUS.md ¶"Curly""#,
+            r#"9 RUNBOOK.md (link) ¶"Past 4095""#,
+            "10 DESIGN.md §3",
+            "10 RUNBOOK.md §2+5",
+            "11 DESIGN.md (link) §4.2",
+            "11 STATUS.md §5",
+            "12 docs/THEORY.md §7",
+            r#"12 RUNBOOK.md ¶"Bare""#,
+            r#"15 RUNBOOK.md ¶"Last""#,
+        ]
+    );
+}
+
+/// A lead-in is the bold or italic words that open a paragraph or a list item, after its list marker and with its
+/// wrapped line; it is in the sections of the headings above it, and a citation names it by those words as headings
+/// are named (backticks and a final `.` ignored, case counted), within a section if it says so.
+#[test]
+fn lead_ins_are_the_bold_or_italic_words_that_open_a_paragraph_or_an_item() {
+    let text = [
+        "# Title",
+        "**Intro.**  Opens the file.",
+        "",
+        "## Design",
+        "* **Golden tests** (`tests/golden_frames.rs`) check the port.",
+        "  *Details.*  A second paragraph of the same item.",
+        "- **A lead-in that is too long for one line and wraps",
+        "  over the next.**  Then the text.",
+        "1. **`taxman` runs.**  A numbered item.",
+        "Text with **bold** inside, and *italics* too, is no lead-in.",
+        "* a plain item",
+        "```",
+        "**In a fence.**",
+        "```",
+        "### Part",
+        "*Deep.*  Under Part.",
+        "## Other",
+        "**Elsewhere.**  In Other.",
+        "## 2. Numbered",
+        "*Counted*  in a numbered section.",
+    ]
+    .join("\n");
+    let found = lead_ins(&text);
+    let shown: Vec<String> =
+        found.iter().map(|lead_in| format!("{} {}", lead_in.under.join("/"), lead_in.name)).collect();
+    assert_eq!(
+        shown,
+        [
+            "Title Intro",
+            "Title/Design Golden tests",
+            "Title/Design Details",
+            "Title/Design A lead-in that is too long for one line and wraps over the next",
+            "Title/Design taxman runs",
+            "Title/Design/Part Deep",
+            "Title/Other Elsewhere",
+            "Title/2. Numbered Counted",
+        ]
+    );
+    assert!(has_lead_in(&found, None, "Golden tests") && has_lead_in(&found, None, "Golden tests."));
+    assert!(has_lead_in(&found, None, "`taxman` runs") && has_lead_in(&found, None, "taxman runs."));
+    assert!(has_lead_in(&found, Some("Design"), "Details") && has_lead_in(&found, Some("Title"), "Elsewhere"));
+    assert!(has_lead_in(&found, Some("Design"), "Deep"), "a subsection is in its section");
+    assert!(has_lead_in(&found, Some("Numbered"), "Counted") && has_lead_in(&found, Some("2. Numbered"), "Counted"));
+    assert!(!has_lead_in(&found, Some("Other"), "Details"), "a lead-in of another section");
+    assert!(!has_lead_in(&found, Some("Part"), "Details"), "a lead-in above the section");
+    assert!(!has_lead_in(&found, None, "golden tests"), "case counts");
+    assert!(!has_lead_in(&found, None, "Golden") && !has_lead_in(&found, None, "bold"), "the whole lead-in only");
+    assert!(!has_lead_in(&found, None, "In a fence") && !has_lead_in(&found, None, "italics"));
 }
 
 /// A citation that a line break splits is found, over `//!`, `///` and `//` lines, over `#` lines and over a string
