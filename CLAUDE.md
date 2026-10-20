@@ -7,8 +7,8 @@ in the docs listed at the end.
   Anthropic mention, whatever a harness default says.
 * **Delegation.**  Don't write code on the main model: delegate it to subagents on the cheapest model that suits the
   task (Haiku for mechanical edits, Sonnet for routine work, Opus for hard reasoning).  Give each a precise spec and
-  verify its work before merging (solver/docs/design/testing.md).  Brief each with the files and sections its task needs,
-  never a whole long document.  Parallel agents work in their own git worktrees.  Experimental branches are never
+  verify its work before merging (solver/docs/design/testing.md).  Brief each with the files and sections its task
+  needs, never a whole long document.  Parallel agents work in their own git worktrees.  Experimental branches are never
   pushed: harvest what works onto master, record the rest, delete the branch.
 * **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and
   resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
@@ -27,8 +27,10 @@ in the docs listed at the end.
   docs, tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in solver/CLAUDE.md.
 * **results/**: the committed chain of proven games, the table of optimal games (optimal.json, built into the Rust
   frame solver), the bounds store and the certificates.
-* **docs/THEORY.md**: the theorems both programs rest on; **docs/GLOSSARY.md**: the terms; **docs/WRITING.md**: how docs
-  are written.
+* **docs/THEORY.md**: the theorems both programs rest on, the index of docs/theory/; **docs/GLOSSARY.md**: the terms;
+  **docs/WRITING.md**: how docs are written.
+* **A long document is a folder with an index** (docs/WRITING.md, rule 8): the old file, such as solver/docs/RUNBOOK.md,
+  says which file of its folder serves which task.  Read the index, then the one file the task needs.
 * **heuristics/**: Python heuristic strategies, which play good but not provably optimal games, and the tools that
   measured them.  Finished work, not under active development.
 * **moniot/**: Robert Moniot's C++ heuristic strategies (see above).

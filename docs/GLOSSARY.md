@@ -292,8 +292,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   tools of [solver/docs/design/performance.md](../solver/docs/design/performance.md).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
-* **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): the register of
-  everything tried, the index of rounds, and the entries, one folder each.  Older text calls it "EXPERIMENTS".
+* **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): its rules, the
+  register of everything tried (a file a subject, in `register/`), the index of rounds (`index.md`), and the entries,
+  one folder each.  Older text calls it "EXPERIMENTS".
 
 ## Labels
 
