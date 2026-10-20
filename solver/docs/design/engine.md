@@ -195,10 +195,12 @@ starts with the final seed and the ceiling, on every thread.
   the oldest keeps the threads busy, so a game that follows a dear one would arrive at its own search with that time
   already on its clock.  The driver keeps the clock in `nNNNN.clock` beside the checkpoint, every checkpoint interval
   and when the search stops, and reads it back when a search starts from a checkpoint.  A game that restarts from its
-  beginning starts its clock again, and a finished game's clock goes with its checkpoint.  At the limit the range ends
-  as it does at a stop signal, every search in flight stopped with a final checkpoint, but records nothing for the
-  game, not even an incomplete line; `solve` prints `wall at N after H hours` and exits with the status 4
-  (`RangeSummary::walled`).  Run again with a larger limit, the game goes on from its checkpoint and its clock.
+  beginning starts its clock again, and a finished game's clock goes with its checkpoint.  At the limit the driver
+  stops the game's search, and once it has ended the range ends as it does at a stop signal, every search in flight
+  stopped with a final checkpoint, but records nothing for the game, not even an incomplete line; `solve` prints
+  `wall at N after H hours` and exits with the status 4 (`RangeSummary::walled`).  A search that completes before the
+  stop reaches it is recorded like any other, and the range goes on.  Run again with a larger limit, the game goes on
+  from its checkpoint and its clock.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 

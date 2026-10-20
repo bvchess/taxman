@@ -111,10 +111,18 @@
 //! game's checkpoint every checkpoint interval and when the search ends, and reads it back when a search starts with a
 //! checkpoint to resume, so that a spot interruption, a new machine or a rerun goes on from it.
 //!
-//! When the head's clock reaches the limit the range ends, as it ends at a stop signal: every search in flight is
-//! stopped with its final checkpoint, and nothing is recorded for the head, not even an incomplete line (the
-//! games before it are recorded already); [`RangeSummary::walled`] names it and its clock.  Run again with a larger
-//! limit the head resumes from its checkpoint and its clock.
+//! When the head's clock reaches the limit, the driver stops the head's search, and once the search has ended the
+//! range ends as it does at a stop signal: every search in flight is stopped with its final checkpoint, and nothing is
+//! recorded for the head, not even an incomplete line (the games before it are recorded already).
+//! [`RangeSummary::walled`] names the head and its clock.  Run again with a larger limit, the head resumes from its
+//! checkpoint and its clock.
+//!
+//! The driver looks at the clock only when it wakes, every tick or at an event, so the head's search may end before
+//! the stop reaches it.  A search that completed is concluded like any other and the range goes on, as a search that
+//! ends before the engine looks at its time limit completes.  One that a limit of its own stopped has its final
+//! checkpoint, and is at the wall all the same.  At each look the driver counts the time since the last look as the
+//! head's search before it takes in the event that woke it, so a search whose end arrives once its clock has reached
+//! the limit has passed the wall, however late the driver wakes.
 //!
 //! # Past limits
 //!
@@ -265,6 +273,9 @@ struct Game {
     headed: Duration,
     /// What was last written to its clock file.
     headed_kept: Duration,
+    /// Whether its search has been stopped at the wall: the range ends at it once the search has ended, unless the
+    /// search completed first (see "The wall").
+    stopped_at_wall: bool,
     /// The sender of its go while its thread may wait for one; dropping it cancels the game's search.
     go: Option<Sender<Go>>,
 }
@@ -543,15 +554,16 @@ impl<'a> Window<'a> {
             } else {
                 received.recv().ok()
             };
-            // The time since the last look was spent with the head's search as it was before this event.
+            // The time since the last look was spent with the head's search as it was before this event, so a clock
+            // that has reached the limit by now reached it while the search ran: the search is stopped at the wall
+            // before the event, which may be its end, is taken in.
             let now = Instant::now();
             self.advance_clock(now);
+            self.stop_at_wall();
             if let Some(event) = event {
                 self.handle(event);
             }
             if let Some(wall) = self.walled() {
-                self.keep_clock(wall.n);
-                self.trace(format_args!("wall n={} held={:?}", wall.n, wall.held));
                 self.summary.walled = Some(wall);
                 return Ok(());
             }
@@ -634,6 +646,7 @@ impl<'a> Window<'a> {
                     own: Duration::ZERO,
                     headed: Duration::ZERO,
                     headed_kept: Duration::ZERO,
+                    stopped_at_wall: false,
                     go: None,
                 };
                 self.games.insert(n, game);
@@ -1093,12 +1106,27 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// The head, if its search runs and its wall clock has reached the limit.
+    /// Stops the head's search once its wall clock has reached the limit (see "The wall"): the range ends at the head
+    /// when the search has ended, unless it completed first ([`walled`](Self::walled)).
+    fn stop_at_wall(&mut self) {
+        let Some(limit) = self.opts.game_limit else { return };
+        let n = self.next;
+        let Some(game) = self.games.get_mut(&n) else { return };
+        let Stage::Search(set, Plan::Search(Search::Running(_))) = &game.stage else { return };
+        if game.stopped_at_wall || game.headed < limit {
+            return;
+        }
+        set.job.control().stop();
+        game.stopped_at_wall = true;
+        let held = game.headed;
+        self.trace(format_args!("wall n={n} held={held:?}"));
+    }
+
+    /// The head, if its search was stopped at the wall and has ended without completing.
     fn walled(&self) -> Option<Wall> {
-        let limit = self.opts.game_limit?;
         let game = self.games.get(&self.next)?;
-        let running = matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_))));
-        (running && game.headed >= limit).then_some(Wall { n: self.next, held: game.headed })
+        let ended = matches!(&game.stage, Stage::Search(_, Plan::Search(Search::Done(outcome))) if !outcome.completed);
+        (game.stopped_at_wall && ended).then_some(Wall { n: self.next, held: game.headed })
     }
 
     /// Samples every running search's engine.

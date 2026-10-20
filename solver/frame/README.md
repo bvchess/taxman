@@ -457,8 +457,9 @@ them.
 * **The wall.**  `--game-hours H` ends the range at the first game whose own search passes H hours.  The hours are
   summed over every invocation, and counted only while the game is the oldest of the window with its search running,
   not while it waits behind another.  Every search in flight stops with a final checkpoint, and nothing is recorded for
-  that game, not even an incomplete line.  `solve` prints `wall at N after H hours` and exits with the status 4.  The
-  game's clock is kept beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
+  that game, not even an incomplete line.  A search that completes before the stop reaches it is recorded, and the
+  range goes on.  `solve` prints `wall at N after H hours` and exits with the status 4.  The game's clock is kept
+  beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.

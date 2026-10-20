@@ -584,8 +584,8 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
 
 /// A game that passes the wall (`--game-hours`) ends `solve` with exit status 4 and the line `wall at N after H
 /// hours` on stdout; nothing is recorded for the game, its checkpoint and clock are kept, and the same command with a
-/// larger limit finishes it (and removes the clock).  (A limit of about a millisecond is passed by any search of the
-/// game, which takes 0.2 s on one thread.)
+/// larger limit finishes it (and removes the clock).  (A node limit stops the search before it can complete, and a
+/// limit of a few nanoseconds is passed by any time it runs.)
 #[test]
 fn solve_stops_at_the_wall_with_status_4_and_goes_on_when_the_limit_is_raised() {
     let dir = TempDir::new("solve-wall");
@@ -603,7 +603,7 @@ fn solve_stops_at_the_wall_with_status_4_and_goes_on_when_the_limit_is_raised() 
         "--out",
         path(&results),
     ];
-    let run = taxman(&[&args[..], &["--game-hours", "0.0000003"]].concat());
+    let run = taxman(&[&args[..], &["--game-hours", "1e-12", "--node-limit", "200"]].concat());
     assert_eq!(run.code, Some(4), "{}", run.stderr);
     assert!(run.stdout.starts_with("wall at 1000 after "), "{}", run.stdout);
     assert!(run.stdout.contains("nothing is recorded for it"), "{}", run.stdout);
