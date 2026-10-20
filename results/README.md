@@ -211,7 +211,8 @@ assumptions are the line's ([RUNBOOK, section
 *Details.*  The run was launched on 2026-10-18 at 12:40 PDT, continued once with `wall.sh launch --continue`, and ended
 on 2026-10-20 at 05:31 PDT on its budget of 40.5 instance-hours (36 at the launch), in the middle of game 4548, which
 has a checkpoint and no completed line.  It cost about $27.32, on four instances: spot interruptions replaced the first
-two, and the budget ended the third, which `--continue` took up with a fourth.
+two, and the budget ended the third, which `--continue` took up with a fourth.  [The notebook
+entry](../solver/notebook/the-run-to-5000-2026-10/README.md) records the run.
 
 * `invocations` is 1 in every kept line but 3940, 3942, 4340, 4431, 4432 and 4433.  Those games were in flight when an
   instance stopped, and the next took them up from their checkpoints (2 each).  `prev.source` is `results` for 3940,

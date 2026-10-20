@@ -1,0 +1,20 @@
+2026-10-18T19:28:18Z wall-node on ip-172-31-25-99.ec2.internal: s3://taxman-013764204840-us-east-1/wall-to-5000, group taxman-wall
+2026-10-18T19:28:19Z setup.sh
+2026-10-18T19:40:49Z chain.sh 8191 (commit ca357bf3046a7c891c28958a548d5284bd602431; wall 24 h; budget 36 h; until 2026-10-22T00:00:00Z)
+2026-10-19T02:08:26Z chain.sh exited with status 143: stopped by a signal
+2026-10-19T02:08:26Z an interruption, it seems: the group will replace this machine; waiting 300s to be taken away
+2026-10-19T02:11:11Z wall-node on ip-172-31-28-206.ec2.internal: s3://taxman-013764204840-us-east-1/wall-to-5000, group taxman-wall
+2026-10-19T02:11:12Z setup.sh
+2026-10-19T02:11:35Z chain.sh 8191 (commit ca357bf3046a7c891c28958a548d5284bd602431; wall 24 h; budget 36 h; until 2026-10-22T00:00:00Z)
+2026-10-19T21:18:49Z chain.sh exited with status 143: stopped by a signal
+2026-10-19T21:18:49Z an interruption, it seems: the group will replace this machine; waiting 300s to be taken away
+2026-10-19T21:22:14Z wall-node on ip-172-31-27-38.ec2.internal: s3://taxman-013764204840-us-east-1/wall-to-5000, group taxman-wall
+2026-10-19T21:22:16Z setup.sh
+2026-10-19T21:22:40Z chain.sh 8191 (commit ca357bf3046a7c891c28958a548d5284bd602431; wall 24 h; budget 36 h; until 2026-10-22T00:00:00Z)
+2026-10-20T07:28:09Z chain.sh exited with status 3: deadline: the budget of 36 instance-hours
+2026-10-20T07:28:09Z the run is over: deadline: the budget of 36 instance-hours
+2026-10-20T08:01:27Z wall-node on ip-172-31-34-56.ec2.internal: s3://taxman-013764204840-us-east-1/wall-to-5000, group taxman-wall
+2026-10-20T08:01:28Z setup.sh
+2026-10-20T08:01:51Z chain.sh 8191 (commit ca357bf3046a7c891c28958a548d5284bd602431; wall 24 h; budget 40.5 h; until 2026-10-22T00:00:00Z)
+2026-10-20T12:30:59Z chain.sh exited with status 3: deadline: the budget of 40.5 instance-hours
+2026-10-20T12:30:59Z the run is over: deadline: the budget of 40.5 instance-hours

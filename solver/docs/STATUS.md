@@ -31,6 +31,9 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 
 ## Recently closed
 
+* **The run to 5000** (2026-10-18 to 20): games 3915-4547 appended to the committed chain, 167 of them from the bounds
+  store with no search, for 40.4 instance-hours and $27.32, both referees passing; the budget ended it in game 4548,
+  whose checkpoint is in S3 ([the entry](../notebook/the-run-to-5000-2026-10/README.md)).
 * **The run to the wall** (2026-10-18): 1..3440 solved again with the fixed build (the counter that could wrap), with
   the committed chain's scores and proofs, game for game, and 3441-3914 appended, both referees passing ([the
   entry](../notebook/the-run-to-the-wall-2026-10/README.md)).
@@ -84,12 +87,6 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 
 ## In flight
 
-* **The run to 5000**, launched 2026-10-18 at commit ca357bf with `--use-prev` (the chain draws on the committed
-  chain, the bounds store and `optimal.json` and starts at 3915: [RUNBOOK
-  5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)), budget 36 instance-hours.  The **run to the wall**
-  before it ([RUNBOOK section 5](RUNBOOK.md#5-the-unattended-run-to-the-wall), launched 2026-10-17 at
-  00:15 PDT with eb84a6f) was stopped at 3914 on 2026-10-18 after 35.7 instance-hours and $24.14, the wall far off: its
-  dearest game took 2.77 hours ([the entry](../notebook/the-run-to-the-wall-2026-10/README.md)).
 * **The sweep**, built 2026-10-17 and not run: blocks of consecutive games of 3441..8191, one thread and a limited
   search a game each, passes over the merged `explore.jsonl` until nothing changes
   ([RUNBOOK section 7](RUNBOOK.md#7-the-sweep); `taxman solve --keep-going`); about $3.3 at 180 s a
@@ -105,7 +102,8 @@ far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-1
 * **The ledger past 4400** (Brian approved up to $25, 2026-10-17): stage 1 (4400..8191, 360 core-hours, about $3.80)
   proved 242 boards in 4400..4799; stage 2 (2026-10-18, 4300..4999) took the store to 343.  **The chain draws on it**
   (2026-10-18, `solve --use-prev`: a board that the store, the committed chain or `optimal.json` has proven is recorded
-  with no search, citing it; not run in the cloud; [RUNBOOK 5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)).
+  with no search, citing it; the run to 5000 took 167 games from it; [RUNBOOK
+  5.4](RUNBOOK.md#54-launch-watch-stop-clean-up)).
 * **Floor-guided drilling** (2026-10-18, f775cc0 and 26c5c71; [the entry's
   section](../notebook/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)): the ledger
   steps an open board down by searches under floors (150 points, a tenfold of cost a step; each lowers U), fits a line
