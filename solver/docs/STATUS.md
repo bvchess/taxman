@@ -24,7 +24,9 @@ The cost of a searched game grows tenfold for about every 1,040 in n, in patches
 2](AGENDA.md#2-the-diagnosis-of-the-wall) has the projections, and why only a tighter bound in the search changes that
 slope.  On 64 threads the search loses nothing to threads (3.4 thousand nodes a second a thread at 3441, the same on 16,
 32 and 64), so what remains is cheaper nodes and smaller trees.  Every avenue tried for the bound is closed but the
-certificates (A2, paused): [the agenda, section 3](AGENDA.md#3-ranked-avenues).
+certificates (A2, paused): [the agenda, section 3](AGENDA.md#3-ranked-avenues).  For smaller trees, learning each
+conflict's closure under cheap twin exchanges takes 37-49% off three hard units' steps, in the studies build only so
+far ([cheap exchanges](../notebook/conflicts-closed-under-cheap-exchanges-2026-10/README.md)).
 
 ## Recently closed
 

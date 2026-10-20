@@ -358,6 +358,9 @@ struct Stepper<'a, const W: usize> {
     /// ([`StepHook::counting`]) branches on it.
     #[cfg(feature = "studies")]
     promotable: bool,
+    /// The sets a study's hook proposed to learn ([`StepHook::propose`]), reused.
+    #[cfg(feature = "studies")]
+    proposals: Vec<Bits<W>>,
 }
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
@@ -395,6 +398,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 hook: space.hooks.map(|make| (make(), StepRecord::default())),
                 #[cfg(feature = "studies")]
                 promotable: false,
+                #[cfg(feature = "studies")]
+                proposals: Vec::new(),
             },
         }
     }
@@ -652,6 +657,47 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Ok(());
         }
         self.drop_candidates(node, &dropped, need)
+    }
+
+    /// Learns what a study's hook proposes ([`StepHook::propose`]) when the check of a node (its state `state`,
+    /// promotions `promoted` and candidates `cands`) has learned the conflict `k` of its heaviest set `chosen`.  Of
+    /// each set proposed, a minimal conflict that a peel finds within it ([`FrameGraph::conflict_using`]) is learned as
+    /// `k` was ([`Seek::conflict`]): known for the node and its subtree, and as a nogood, unless the table already
+    /// knows a conflict within it.  A set that can be promoted has no conflict, and nothing is learned of it: whatever
+    /// the hook proposes, only conflicts of the node are learned, so the search stays exact.
+    #[cfg(feature = "studies")]
+    fn learn_proposed(
+        &mut self,
+        state: &FrameSet<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        chosen: &Bits<W>,
+        k: &Bits<W>,
+    ) {
+        let Some((hook, _)) = &mut self.hook else { return };
+        let mut proposals = std::mem::take(&mut self.proposals);
+        proposals.clear();
+        hook.propose(state, promoted, cands, chosen, k, &mut proposals);
+        let space = self.space;
+        for set in &proposals {
+            let Some(c) = space.model.conflict_using(&mut self.scratch, state, set, true) else { continue };
+            let nogood = match &mut self.nogoods {
+                Some(table) => {
+                    if table.conflict(promoted, &c).is_some() {
+                        continue;
+                    }
+                    let nogood = space.model.nogood(&mut self.scratch, space.root, promoted, &c);
+                    if let Some(n) = nogood {
+                        table.insert(n);
+                    }
+                    nogood
+                }
+                None => None,
+            };
+            self.known.push(c);
+            hook.learned(set, &c, nogood.as_ref());
+        }
+        self.proposals = proposals;
     }
 
     /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
@@ -967,6 +1013,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
         #[cfg(feature = "studies")]
+        if let (true, Lookup::Conflict(k)) = (computed, &found) {
+            self.learn_proposed(state, &promoted, cands, &eval.chosen, k);
+        }
+        #[cfg(feature = "studies")]
         if self.hook.is_some() {
             let k = match &found {
                 Lookup::Conflict(k) => Some((*k, computed)),
@@ -1112,7 +1162,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         #[cfg(feature = "studies")]
         if let Some((hook, _)) = &mut self.hook {
             if !(space.fix_forced && !forced.is_empty()) {
-                hook.excluding(&node.state, &node.promoted, &node.cands, n);
+                hook.excluding(&node.state, &node.promoted, &node.cands, conflict.as_ref(), n);
             }
         }
         node.cands.remove(n);

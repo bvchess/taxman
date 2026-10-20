@@ -11,8 +11,10 @@
 //! branching on any member, and going on without it, explores every completion (DESIGN.md, section 4, "The default
 //! step", the second of the facts its exactness rests on).  The searcher checks that the member is one.  A hook may
 //! also narrow a node's candidates by a rule of its own ([`StepHook::narrow`]), which prunes as the rule of symmetric
-//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.  And it may
-//! make the search count the completions that reach the need instead of beating it ([`StepHook::counting`]).
+//! pairs does: that can change the answer, and is for a study of a rule whose soundness it has argued.  It may propose
+//! sets for the searcher to learn conflicts within, as nogoods ([`StepHook::propose`]): the searcher learns only what
+//! a peel shows cannot be promoted, so that changes the tree, never the answer.  And it may make the search count the
+//! completions that reach the need instead of beating it ([`StepHook::counting`]).
 //!
 //! The hook is the GF(2) path's (the tactic `gf2`, the default): on the matching path it is told of the steps, without
 //! their bound checks, and asked nothing.
@@ -39,10 +41,18 @@ pub trait StepHook<const W: usize> {
     }
 
     /// Before a node branches on `member` and goes on without it (no member is forced, so the node's loop goes on
-    /// after this child): the node's state, promotions and candidates (`member` among them).  Told only on the GF(2)
-    /// path.
-    fn excluding(&mut self, state: &FrameSet<W>, promoted: &Bits<W>, cands: &Bits<W>, member: u32) {
-        let _ = (state, promoted, cands, member);
+    /// after this child): the node's state, promotions and candidates (`member` among them), and the conflict it
+    /// branches on (`member` among its members; `None` for a node with no conflict, which branches on its largest
+    /// candidate).  Told only on the GF(2) path.
+    fn excluding(
+        &mut self,
+        state: &FrameSet<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        conflict: Option<&Bits<W>>,
+        member: u32,
+    ) {
+        let _ = (state, promoted, cands, conflict, member);
     }
 
     /// The candidates `cands` of a node with the promotions `promoted`, at a step after its first (after the rule of
@@ -53,6 +63,31 @@ pub trait StepHook<const W: usize> {
     fn narrow(&mut self, promoted: &Bits<W>, cands: &mut Bits<W>) -> bool {
         let _ = (promoted, cands);
         false
+    }
+
+    /// When a bound check has computed, and learned, the conflict `conflict` of its heaviest set `chosen` at a node
+    /// with the state `state`, the promotions `promoted` and the candidates `cands`: more sets for the searcher to
+    /// learn, put in `more`.  The searcher learns, of each, a conflict that a peel finds within it, as it learned
+    /// `conflict` (a nogood, and known for the node and its subtree), unless the nogoods it holds already give one
+    /// there, and then tells the hook ([`learned`](Self::learned)).  A set that can be promoted has no conflict within
+    /// it and teaches nothing, so this changes the tree, never the answer, whatever the study proposes.  Asked only on
+    /// the GF(2) path.
+    fn propose(
+        &mut self,
+        state: &FrameSet<W>,
+        promoted: &Bits<W>,
+        cands: &Bits<W>,
+        chosen: &Bits<W>,
+        conflict: &Bits<W>,
+        more: &mut Vec<Bits<W>>,
+    ) {
+        let _ = (state, promoted, cands, chosen, conflict, more);
+    }
+
+    /// A conflict the searcher learned within a set that [`propose`](Self::propose) proposed, and the nogood it made of
+    /// it (`None` without the tactic `nogoods`, which keeps the conflict for the node and its subtree only).
+    fn learned(&mut self, set: &Bits<W>, conflict: &Bits<W>, nogood: Option<&Bits<W>>) {
+        let _ = (set, conflict, nogood);
     }
 
     /// Whether the search *counts* (asked at each offer and at each heaviest set that can be promoted; the answer must

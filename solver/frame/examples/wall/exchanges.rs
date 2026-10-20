@@ -774,7 +774,7 @@ impl<const W: usize> StepHook<W> for Local<W> {
         }
     }
 
-    fn excluding(&mut self, state: &FrameSet<W>, _promoted: &Bits<W>, cands: &Bits<W>, member: u32) {
+    fn excluding(&mut self, state: &FrameSet<W>, _: &Bits<W>, cands: &Bits<W>, _: Option<&Bits<W>>, member: u32) {
         self.tally.exclusions += 1;
         let game = Arc::clone(&self.game);
         let view = View { game: &game, frames: state.frames(), cands };
@@ -1034,7 +1034,7 @@ mod tests {
     impl<const W: usize> StepHook<W> for Verifier<W> {
         fn step(&mut self, _: &StepRecord<W>, _: &FrameSet<W>, _: Option<&FrameSet<W>>) {}
 
-        fn excluding(&mut self, state: &FrameSet<W>, _: &Bits<W>, cands: &Bits<W>, member: u32) {
+        fn excluding(&mut self, state: &FrameSet<W>, _: &Bits<W>, cands: &Bits<W>, _: Option<&Bits<W>>, member: u32) {
             let game = Arc::clone(&self.game);
             let view = View { game: &game, frames: state.frames(), cands };
             for (p, q, _) in game.exchanges_of(cands, member, &mut self.scratch.factors) {
