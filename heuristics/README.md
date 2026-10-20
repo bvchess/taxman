@@ -1,20 +1,19 @@
 # Heuristic strategies
 
-Taxman is played on the pot {1..n}: picking c (the solver's and the wiki's *move*) keeps c and surrenders every divisor
-of c still in the pot; every pick must surrender at least one divisor, and the taxman takes the leftovers.  Finding an
-optimal game can be hard (Franklín and Moniot prove a variant of the game NP-hard, below), but playing a nearly optimal
-game is not.
+Taxman is played on the pot {1..n} ([the game](../docs/GLOSSARY.md#the-game)): picking c keeps c and surrenders every
+divisor of c still in the pot, and the taxman takes the leftovers.  Finding an optimal game can be hard (Franklín and
+Moniot prove a variant of the game NP-hard, below), but playing a nearly optimal game is not.
 
 This is finished work: strategies that play good games quickly but don't guarantee optimal results, and the tools that
-measured them.  It keeps some words of its own: a *pick* or *selection* is a move, the *upper half* is the numbers above
-n/2 (the frame solver's *sources*), and the *lower half* the numbers up to n/2.  The project's
-[glossary](../docs/GLOSSARY.md) defines the rest.
+measured them.  It keeps some words of its own: a *pick* or *selection* is a [move](../docs/GLOSSARY.md#the-game), the
+*upper half* is the numbers above n/2 (the frame solver's [sources](../docs/GLOSSARY.md#the-frame-model)), and the
+*lower half* the numbers up to n/2.  The project's [glossary](../docs/GLOSSARY.md) defines the rest.
 
 The two main strategies:
 
 1. **Solvent**, an O(n² log n) strategy with no search and no lookahead, scores **99.85% of all optimal points** over
    n = 1..1000, and never below 99.08% in any game.  Its selections above n/2 are those of an optimal game, assuming
-   [statement U](../docs/GLOSSARY.md) holds.
+   [statement U](../docs/GLOSSARY.md#the-frame-model) holds.
 2. **The continuation solver**, which builds each game from its own game of n − 1, scores **99.97% of all optimal
    points**, starting from nothing at n = 2.  It extends to n = 1001..2000, within 0.35% of the Franklín–Moniot upper
    bound in aggregate.  The optimal games of those n are in `results/strict.jsonl`, and
@@ -32,15 +31,16 @@ continuation chain stays at the level that the optimal scores reach below it.
 ## The theory: the upper half is a matching problem
 
 No number above n/2 divides another (2c > n), so the upper half of any game is swept only through the lower half.  That
-turns upper-half selection into a bipartite question.  Define the *maximal factors* of c as the divisors f with c/f
-prime — the divisors reached by deleting one prime from c.
+turns upper-half selection into a bipartite question about the [maximal factors](../docs/GLOSSARY.md#the-game) of a
+number c, the divisors f for which c/f is prime.
 
 > **Playability.**  A set S of selections can all be played, in some order, **iff** there is a matching assigning each
 > member a distinct maximal factor not in S such that the precedence relation "a before b whenever a's assigned factor
 > divides b, or a divides b" is acyclic.  Any topological order of the precedence is a legal game.
 
-Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder one by the Franklín–Moniot lifting argument
-turned inward, whose payoff is that maximal factors are the only factor notion the whole project needs.
+Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder one by the Franklín–Moniot [lifting
+argument](../docs/GLOSSARY.md#the-game) turned inward, whose payoff is that maximal factors are the only factor notion
+the whole project needs.
 
 For the upper half alone, the lifting argument gives a hard ceiling: every legal game's upper picks use distinct maximal
 factors from outside, so **no legal game's upper half can outscore M\*, the maximum-weight matchable upper set**, a

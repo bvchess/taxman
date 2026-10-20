@@ -39,9 +39,10 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 * **maximal factor**: of a number m, the quotient m/p for a prime p that divides m.  12 has the maximal factors 6 and
   4.  Its inverse is the **maximal composite**: on the board of 85, 8 has the maximal composites 16, 24, 40 and 56.
   The **maximal factor graph** joins each number to its maximal factors.  A move is legal exactly when one of its
-  maximal factors is still in the pot.  If a proper divisor d of m is in the pot, so is every f with d | f | m other
-  than m, since whatever removed f would have removed d; and one such f is a maximal factor of m.  This is the
-  *lifting argument* (`solver/frame/src/numtheory.rs`; [THEORY.md](THEORY.md), Theorem 1).
+  maximal factors is still in the pot: if some proper divisor of the move is in the pot, so is a maximal factor.  This
+  is the *lifting argument* (`solver/frame/src/numtheory.rs`; [THEORY.md](THEORY.md), Theorem 1, which proves it).  A
+  maximal factor still in the pot *pays for* the move: it is among the divisors the taxman takes with it.  The taxman
+  takes every divisor of a move, but the frame model needs only the maximal factors, and a factor pays for one move.
 * **playable**: a set of numbers is playable when all of its members can be played as moves, in some order.
   **peel**: the procedure that decides it.  It repeatedly drops a member that has a factor no other member has, and the
   set is playable exactly when nothing is left ([THEORY.md](THEORY.md), Theorems 1 to 3).  Inside a frame the same
@@ -57,9 +58,10 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 
 ## The frame model
 
-* **source**: a number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing.
-  On the board of 21 the sources are 11 to 21.  The frame solver's docs and code, and THEORY.md, never say "upper half"
-  for them; the heuristics do.
+* **source**: a number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing,
+  and a move unless setup finds it impossible.  On the board of 21 the sources are 11 to 21.  A set's **upper part** is
+  its members above n/2, which are sources.  The frame solver's docs and code, and THEORY.md, never say "upper half" for
+  them; the heuristics do.
 * **factor**: a number up to n/2.  It is tax for a larger number, and sometimes a move itself.  Not "lower half".
 * **frame**: a group of sources that share factors, with all the factors they can be paid with.  On the board of 21, one
   frame has the sources 14, 15 and 21 and the factors 2, 3, 5 and 7.  In the code a frame is `frames::Frame` as setup
@@ -87,13 +89,17 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
   frame uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
   frame's layer is its sources'.  The frames in front of a frame lie one layer lower.
-* **frame number**: setup numbers the frames that have freedoms by layer, from the front.  If L is the lowest layer of
-  a frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged
-  into one, so that a promotion always has one frame to go to.  The numbering is **clean** (statement N of
-  THEORY.md): every frame with freedoms directly in front of frame h is frame h − 1.  On every board the solver
-  supports it equals the numbering breadth first from the front.
+* **frame number**: setup numbers the frames that have freedoms by layer, from the front.  If L is the lowest layer of a
+  frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged into
+  one, so that a promotion always has one frame to go to.  The numbering is **clean** (statement N of THEORY.md): every
+  frame with freedoms directly in front of frame h is frame h − 1.  The numbering by layer is clean by construction.  On
+  every board the solver supports it equals the numbering breadth first from the front, the Java's: frame 0 is every
+  frame with freedoms that has no other in front of it, and frame k + 1 every frame directly behind frame k.
 * **promote**, **promotion**: to play a factor as a move.  Promoting a factor of frame h takes it out of the frame's
-  factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  After
+  factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  The
+  maximal factors that pay for the promoted number lie in the frames directly in front of its own, and the numbering
+  puts those that have freedoms in frame h − 1; that nothing further forward is needed is a theorem ([THEORY.md, "The
+  frame model: what is proven and what remains"](THEORY.md#the-frame-model-what-is-proven-and-what-remains)).  After
   promotions the frames are *reduced*: a move left with one live factor is paid by it, and the pair is dropped,
   repeatedly.
 * **candidate** **(overloaded)**: (1) a number that setup says could be promoted (`SearchFrames::candidates`,
@@ -113,11 +119,15 @@ entries map onto these in the notebook's ["Terms changed"](../solver/notebook/RE
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
-  `in_the_bag` + P\* = opt(n) ([the frame solver's README, "What optimal
+  `in_the_bag` + P\* = opt(n) ([THEORY.md, "The frame model: what is proven and what
+  remains"](THEORY.md#the-frame-model-what-is-proven-and-what-remains); [the frame solver's README, "What optimal
   means"](../solver/frame/README.md#what-optimal-means)).  `model::FrameGraph` is the immutable factor graph and home
   frames, not "the model".
-* **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where
-  their proofs use the frame model.  It is open in general, and proven at every n the prover has proven.
+* **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their
+  proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
+  or by the prime formula does not ([DESIGN.md, "What optimal means"](../solver/docs/DESIGN.md#what-optimal-means)).  U
+  is open in general, and proven at every n the prover has proven.  Past those games `taxman certify` checks it game by
+  game ([certificate of U](#results-and-trust)).
 * **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional
   ([THEORY.md](THEORY.md), Theorem M⁺; `frames::build_extended`).  The certificates of U search it.
 
@@ -240,7 +250,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from
   `optimal.json`, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
 * **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
-  ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).
+  ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).  A game is **proven** there when its best
+  lower bound equals its best upper bound.
 * **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
   at once, raising lower bounds and lowering upper bounds until they meet.
 * **the sweep** (`solver/tools/cloud/sweep.sh`): a limited search of every game of a long stretch, holes allowed.  Its

@@ -1,18 +1,19 @@
 # The prover
 
-The prover proves the frame solver's games optimal on the whole board, without the frame model; [section
-3](#3-the-proofs-of-optn) says how far its proofs reach.  It is a branch and bound over sets of moves, which takes the
-recorded score of game n as its target and proves that no set of moves beats it.  It shares no code with the frame
-solver or with the heuristics, so the frame solver's answers are checked without assuming anything of the frame model.
-The [glossary](../../docs/GLOSSARY.md) defines the project's words.
+The prover proves the frame solver's games optimal on the whole board, without the [frame
+model](../../docs/GLOSSARY.md#the-frame-model); [section 3](#3-the-proofs-of-optn) says how far its proofs reach.  It is
+a branch and bound over sets of moves, which takes the recorded score of game n as its target and proves that no set of
+moves beats it.  It shares no code with the frame solver or with the heuristics, so the frame solver's answers are
+checked without assuming anything of the frame model.  The [glossary](../../docs/GLOSSARY.md) defines the project's
+words.
 
 Why that matters: the frame solver ([its README](../frame/README.md)) searches the promotions of the frame model, whose
-answer is opt(n) exactly when one open statement, U, holds at n.  U says that some optimal game plays every source with
-three or more prime factors that the frame solver's setup keeps ([THEORY.md, "The frame model: what is proven and what
+answer is opt(n) exactly when [statement U](../../docs/GLOSSARY.md#the-frame-model) holds at n: some optimal game plays
+every source with three or more prime factors that setup keeps ([THEORY.md, "The frame model: what is proven and what
 remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains), where the model's other rules are
 proven; [DESIGN.md, section 2](../docs/DESIGN.md#what-optimal-means)).  Where the prover proves opt(n), U holds.  The
-sources that setup keeps, U\*, are the heaviest playable set of sources wherever THEORY.md's conjecture (★) holds
-(Theorem 8; [THEORY.md](../../docs/THEORY.md#the-open-problem)).
+sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
+wherever THEORY.md's conjecture (★) holds (Theorem 8; [THEORY.md](../../docs/THEORY.md#the-open-problem)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
 searches for adversarial instances.  It rests only on THEORY.md's theorems and on elementary bounds, and every exact
@@ -24,9 +25,9 @@ method in it is tested against brute force.  The theorems are these:
 * Theorem B, the bottom layers of every optimal set, in the proofs that start from its roles, which is the default of
   `exact`.
 
-Section 3 lists what each proof rests on.  This document says *pick* for a number the player takes, the frame solver's
-and the wiki's *move*.  It says *forced picks* for the numbers fixed in at a node; the frame solver's *forced member* is
-the same idea for its own search.  A set's *upper part* is its members above n/2, its sources.
+Section 3 lists what each proof rests on.  This document says *pick* for a [move](../../docs/GLOSSARY.md#the-game),
+*forced picks* for the numbers fixed in at a node (the frame solver's [forced member](../../docs/GLOSSARY.md#the-search)
+is the same idea for its own search), and [upper part](../../docs/GLOSSARY.md#the-frame-model) for a set's sources.
 
 What the prover established, assumption by assumption ([section 1](#1-what-existed-before) has the evidence before
 it):

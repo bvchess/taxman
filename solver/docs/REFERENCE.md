@@ -216,9 +216,9 @@ check every results file.
 |---|---|---|
 | `trivial` | the game has no promotion candidates, so the game with no promotions is the only one | no |
 | `exhausted` | the search explored its whole tree | no |
-| `cap` | the search reached the ceiling n + score(n − 1), which no game of n can exceed: removing the move n from an optimal game of n leaves a game of n − 1 | yes |
-| `prime_formula` | a prime n plays the game of n − 1 with its first move replaced by n, which is optimal if the game of n − 1 is (proved in `src/accelerate.rs`, at `prime_shortcut`) | yes |
-| `same_search` | the game's search problem (frames, candidates, `max_total`, the factor graph among their numbers) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [DESIGN.md](DESIGN.md#same-search) has the argument) | no: on the game m it repeats |
+| `cap` | the search reached the [ceiling](../../docs/GLOSSARY.md#the-game) | yes |
+| `prime_formula` | the [prime formula](../../docs/GLOSSARY.md#the-game), optimal if the game of n − 1 is | yes |
+| `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap` or `same_search`) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [DESIGN.md](DESIGN.md#same-search) has the argument) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search; the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
 
 ### Citing a known source

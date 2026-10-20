@@ -1,8 +1,9 @@
 # The frame solver
 
 The frame solver finds optimal games of Taxman.  It splits each game into largely independent groups of numbers, the
-*frames*, and searches for the best set of numbers to play beyond the ones the frames settle.  It can run on many
-threads, and its long runs can be resumed after an interruption.  Below, "the solver" is the frame solver.
+[frames](../../docs/GLOSSARY.md#the-frame-model), and searches for the best set of numbers to play beyond the ones the
+frames settle.  It can run on many threads, and its long runs can be resumed after an interruption.  Below, "the solver"
+is the frame solver.
 
 This page is its guide: what it computes, how to build and run it, and the common tasks.  [The
 reference](../docs/REFERENCE.md) has every flag and command, how to read the output, and why the answers can be
@@ -45,43 +46,43 @@ about every 1,040 in n, with about a decade of scatter ([the chain to
 
 ### How the solver sees the game (the frame model)
 
-The solver does not search the game move by move.  It splits the numbers into largely independent groups, the frames,
-settles what it can before it searches, and then searches only over which spare numbers to play as moves.  This
-decomposition is the *frame model*.
+The solver does not search the game move by move.  It splits the numbers into largely independent groups, settles what
+it can before it searches, and then searches only over which spare numbers to play as moves.  This decomposition is the
+[frame model](../../docs/GLOSSARY.md#the-frame-model).  The steps below follow the solver's setup, and each term links
+to its glossary entry.
 
-1. **Sources and factors.**  Every number above n/2 divides nothing else on the board, so it can only be a move,
-   never *tax*, a divisor that the taxman takes with a move.  It is a *source*, played unless setup finds it
-   impossible (step 4).  Every other number is a *factor*: tax for a larger number, and sometimes a move itself.
-2. **Maximal factors are enough.**  A move m is *paid for* by one of its *maximal factors* m/p, for a prime p that
-   divides m: that factor is among the divisors the taxman takes with m, and a factor pays for one move.  Taking m
-   removes every divisor of m still in the pot, but the model needs only the maximal ones.  If some proper divisor d of
-   m is still in the pot, so is every f with d | f | m other than m, since whatever removed f would have removed d too;
-   and one of those f is a maximal factor of m.  So m can be played exactly when one of its maximal factors is still in
-   the pot.  This is the *lifting* argument of [src/numtheory.rs](src/numtheory.rs) and
-   [THEORY.md](../../docs/THEORY.md), Theorem 1.
-3. **Frames.**  Sources that share a factor are in one *frame*, with all the factors they can be paid with.  Frame X
-   is *in front of* frame Y, and Y is *behind* X, when a number of Y has a maximal factor in X: Y's numbers are
-   multiples of X's.  The frames in front are played first.  Each frame is a small game, *Taxman Mini*: a set of
-   moves and a set of factors, in which the moves must be playable in some order.
-4. **Setup.**  Before the search, setup simplifies each frame.  It drops the *impossible* sources, which cannot be
-   played together with the larger ones.  It settles the *mandatory moves*, such as a source with one usable factor,
-   which must take it.  And it counts the frame's *freedoms*, its factors minus its moves: how many factors it can
-   spare.  A frame with no freedoms is *closed* and takes no part in the search.
-5. **Numbering.**  Setup numbers the frames that have freedoms from the front, by *layer*: the number of prime factors
-   of their sources.  All the sources of a frame have the same number of prime factors, and the frames in front of
-   it have one fewer.  Frame 0 is the frames with freedoms whose sources have the fewest, frame 1 those with one more,
-   and so on.  Frames with the same number are merged into one, so that a promotion always has one frame to go to.
-   On every board the solver supports, frame 0 is every frame with freedoms that has no other in front of it, and
-   frame 1 every one directly behind those.
-6. **Promotions.**  What a game can still choose is which spare factors to *promote*: to play as moves instead of
-   leaving them as tax.  Promoting a factor of frame h makes it a move of frame h − 1, one frame forward, and both
-   frames must stay winnable.  The number's own maximal factors, which pay for it, lie in the frames directly in front
-   of its frame, and the numbering puts those that have freedoms in frame h − 1.  That nothing further forward is
-   needed is proven (below, "What optimal means").
-7. **The score.**  A game of the model scores `in_the_bag`, what the game with no promotions scores, plus the sum of its
-   promotions.  So the solver searches for the *promotion set* with the largest sum, P\*, by a branch and bound over
-   which candidates to promote.  The moves of the game then include the promotions (`frames::BoardFrames`; [DESIGN.md,
-   section 7](../docs/DESIGN.md#7-per-game-pipeline-solver)).
+1. **Sources and factors.**  The numbers above n/2 are [sources](../../docs/GLOSSARY.md#the-frame-model): each divides
+   nothing else on the board, so it is a move or nothing.  Every other number is a
+   [factor](../../docs/GLOSSARY.md#the-frame-model), which serves as tax and sometimes as a move.
+2. **Maximal factors are enough.**  A move needs only one of its [maximal factors](../../docs/GLOSSARY.md#the-game) to
+   be still in the pot, and that factor pays for it, whatever else the taxman takes with the move.  This is the [lifting
+   argument](../../docs/GLOSSARY.md#the-game) of [src/numtheory.rs](src/numtheory.rs), which
+   [THEORY.md](../../docs/THEORY.md) proves as Theorem 1.
+3. **Frames.**  Sources that share a factor form a [frame](../../docs/GLOSSARY.md#the-frame-model), with the factors
+   that can pay for them.  Frame X is [in front of](../../docs/GLOSSARY.md#the-frame-model) frame Y, and Y
+   [behind](../../docs/GLOSSARY.md#the-frame-model) X, when Y's numbers are multiples of X's; the frames in front are
+   played first.  Each frame plays a small game, [Taxman Mini](../../docs/GLOSSARY.md#the-frame-model), and is
+   [winnable](../../docs/GLOSSARY.md#the-frame-model) when some order takes all its moves.
+4. **Setup.**  Before the search, setup simplifies each frame.  It drops the [impossible
+   sources](../../docs/GLOSSARY.md#the-frame-model), settles the [mandatory
+   moves](../../docs/GLOSSARY.md#the-frame-model), and counts the frame's
+   [freedoms](../../docs/GLOSSARY.md#the-frame-model): how many factors it can spare.  A frame with none is
+   [closed](../../docs/GLOSSARY.md#the-frame-model) and takes no part in the search.
+5. **Numbering.**  Setup numbers the frames that have freedoms from the front, by
+   [layer](../../docs/GLOSSARY.md#the-frame-model), the number of prime factors of their sources: frame 0 is the frames
+   with the fewest, frame 1 those with one more, and so on.  Frames with the same [frame
+   number](../../docs/GLOSSARY.md#the-frame-model) are merged into one, so that a promotion always has one frame to go
+   to.
+6. **Promotions.**  What a game can still choose is which spare factors to
+   [promote](../../docs/GLOSSARY.md#the-frame-model): to play as moves instead of leaving them as tax.  A promotion
+   makes a factor of frame h a move of frame h − 1, one frame forward, and both frames must stay winnable.  Nothing
+   further forward is needed, which [THEORY.md](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)
+   proves.
+7. **The score.**  A game of the model scores its [`in_the_bag`](../../docs/GLOSSARY.md#the-frame-model) plus the sum of
+   its [promotion set](../../docs/GLOSSARY.md#the-frame-model).  So the solver searches for the promotion set with the
+   largest sum, [P\*](../../docs/GLOSSARY.md#the-frame-model), by a branch and bound over which
+   [candidates](../../docs/GLOSSARY.md#the-frame-model) to promote.  The moves of the game then include the promotions
+   (`frames::BoardFrames`; [DESIGN.md, section 7](../docs/DESIGN.md#7-per-game-pipeline-solver)).
 
 **An example: game 21.**  The board 1 to 21 has four frames.  `testdata/golden/n0021.json` has them, and the wiki's
 [walkthrough of game 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows them in pictures:
@@ -99,12 +100,13 @@ source that is not impossible, and scores `in_the_bag` = 135 (19 + 14 + 15 + 21 
 takes it out of C's factors and makes it a move of B, and the game scores 144; promoting 4 instead would score 139.
 Both frames stay winnable.
 
-After a promotion the frames are *reduced*: a move left with one live factor must be paid by it, so the pair drops
-out, repeatedly.  Here 9's only maximal factor is 3, so the pair (9, 3) drops out of B.  That leaves 21 only the factor
-7 and 14 only the factor 2, so they drop out too.  In C, 18 is left with 6 and 12 with 4.  Each frame has spent its one
-freedom, and the game plays the frames from the front: 19; 9, 15, 21, 14; 18, 12, 20; 16.
+After a promotion the frames are [reduced](../../docs/GLOSSARY.md#the-frame-model): a move left with one live factor is
+paid by it, so the pair drops out, repeatedly.  Here 9's only maximal factor is 3, so the pair (9, 3) drops out of B.
+That leaves 21 only the factor 7 and 14 only the factor 2, so they drop out too.  In C, 18 is left with 6 and 12 with 4.
+Each frame has spent its one freedom, and the game plays the frames from the front: 19; 9, 15, 21, 14; 18, 12, 20; 16.
 
-The search is over such choices.  Game 21 has 2 candidates, game 85 has 10, and game 1100 has 273.
+The search is over such choices, and a larger game has more of them: the glossary counts the
+[candidates](../../docs/GLOSSARY.md#the-frame-model) of three games.
 
 Frames are first merged at game 20.  There the frames of 14 and of 15 share no factor, but neither has a frame with
 freedoms in front of it, so both are frame 0.  Both sit directly in front of the frame of 12, 18 and 20, whose factor 6
@@ -113,42 +115,33 @@ into one frame 0 with two freedoms.
 
 ### What "optimal" means
 
-The solver's answer for game n is `in_the_bag` + P\*.  That is opt(n) given three things: the frame model is exact at
-n, the search prunes nothing that could win, and, for some proofs, the game of n − 1 is optimal.
+The solver's answer for game n is `in_the_bag` + [P\*](../../docs/GLOSSARY.md#the-frame-model).  That is opt(n) given
+three things: the frame model is exact at n, the search prunes nothing that could win, and, for some proofs, the game of
+n − 1 is optimal.
 
-* **The frame model is exact, given statement U.**  Five rules of the decomposition above are theorems ([THEORY.md,
-  "The frame model: what is proven and what
-  remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains)):
-  * the greedy removal of impossible sources;
-  * the mandatory moves of `unzip`;
-  * freedoms = factors − sources;
-  * closed frames taking no part in the search;
-  * a promoted number paying tax only from the frame one forward.
-
-  What is left is one statement about the game:
-
-  > **U**: some optimal game plays every source with three or more prime factors that setup keeps.
-
-  The sources that setup keeps are called U\*.  The games that play all of U\* are exactly U\* with a promotion set
-  added (Theorem M).  Theorem M needs the numbering to be *clean*: every frame with freedoms directly in front of
-  frame h is frame h − 1, as the numbering by layer is by construction.  Every optimal game plays the members of U\*
-  with one or two prime factors (Theorem B).  So the heaviest promotion set gives opt(n) exactly when U holds at n.
+* **The frame model is exact, given statement U.**  [THEORY.md, "The frame model: what is proven and what
+  remains"](../../docs/THEORY.md#the-frame-model-what-is-proven-and-what-remains) proves the model's rules: the greedy
+  removal of impossible sources, the mandatory moves of `unzip`, freedoms = factors − sources, closed frames taking no
+  part in the search, and a promoted number paying tax only from the frame one forward.  What is left is one statement
+  about the game, [statement U](../../docs/GLOSSARY.md#the-frame-model): some optimal game plays every member with three
+  or more prime factors of [U\*](../../docs/GLOSSARY.md#the-frame-model), the sources that setup keeps.  The games that
+  play all of U\* are exactly U\* with a promotion set added (Theorem M), and every optimal game plays the members of
+  U\* with one or two prime factors (Theorem B).  So the heaviest promotion set gives opt(n) exactly when U holds at n.
 
   U is open in general.  It holds at every game the [prover](../noframe/README.md) has proven, since the prover proves
-  opt(n) on the whole board, without the frame model.  Past those games, a proof by an exhausted search, a trivial game
-  or a repeat assumes U at n, and `taxman certify` ([the reference, section
-  2](../docs/REFERENCE.md#2-the-other-commands)) checks it game by game.  A proof by the ceiling or by the prime formula
-  does not assume U at n ([the reference, section 4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).  The
-  results lines do not record U; [results/README.md](../../results/README.md) counts the committed games of each kind of
-  proof, and [DESIGN.md, "What optimal means"](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the
-  model.
-* **The pruning is exact.**  Every tactic, a switchable piece of the search, is proven or sound: none prunes a
-  promotion set that could win ([DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) grades each).  So a result rests
-  on nothing but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so,
-  the game it was built from.
-* **The game of n − 1 is optimal, where a proof rests on it.**  The game of n is built from the game of n − 1.  Its
-  search starts from the previous game's promotions, and stops as soon as it reaches the proven ceiling n + score(n −
-  1).  So a chain of games from n = 1 is proven game by game.  [The reference, section
+  opt(n) on the whole board, without the frame model.  Past those games, a proof that uses the frame model assumes U at
+  n, and `taxman certify` ([the reference, section 2](../docs/REFERENCE.md#2-the-other-commands)) checks it game by
+  game; a proof by the ceiling or by the prime formula uses no model ([the reference, section
+  4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).  The results lines do not record U.
+  [results/README.md](../../results/README.md) counts the committed games of each kind of proof, and [DESIGN.md, "What
+  optimal means"](../docs/DESIGN.md#what-optimal-means) says what each kind needs of the model.
+* **The pruning is exact.**  No [tactic](../../docs/GLOSSARY.md#the-search) prunes a promotion set that could win: each
+  is proven or sound, and [DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) grades them.  So a result rests on nothing
+  but U, where its proof uses the frame model; the correctness of the code; and, where its proof says so, the game it
+  was built from.
+* **The game of n − 1 is optimal, where a proof rests on it.**  The game of n is built from the game of n − 1: its
+  search starts from that game's promotions and stops at the [ceiling](../../docs/GLOSSARY.md#the-game).  So a
+  [chain](../../docs/GLOSSARY.md#results-and-trust) of games from n = 1 is proven game by game.  [The reference, section
   4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted) says how each result records what it rests on.
 
 ## 2. Build, test, run
@@ -219,10 +212,10 @@ by field.  The methods:
 
 * `trivial` (games 1, 4, 6 and others): the game has no candidate to promote, so the game with no promotions is the
   only one.
-* `prime` (games 2, 3, 5 and every other prime): the game of n − 1 with its first move replaced by n, which is the
-  *prime formula*.  For game 7, 7 + 15 − 5 = 17.
-* `search` with the proof `cap` (game 18): the search's starting game reached the *ceiling* n + score(n − 1) =
-  18 + 93 = 111, which no game of 18 can exceed, before it took a step.
+* `prime` (games 2, 3, 5 and every other prime): the [prime formula](../../docs/GLOSSARY.md#the-game) gives the game of
+  n from the game of n − 1.
+* `search` with the proof `cap` (game 18): the search's starting game reached the
+  [ceiling](../../docs/GLOSSARY.md#the-game) of game 18, 18 + 93 = 111, before it took a step.
 * `search` with the proof `exhausted` (games 20 and 21): the search explored its whole tree.
 * `repeat` (game 22): game 22 poses the same search problem as game 21, which settled it, so the solver takes 21's
   promotions without a search.
@@ -282,11 +275,10 @@ The ignored tests are for large machines and long runs:
 
 ## 3. Commands
 
-`taxman help` lists every command and flag.  This section shows each command with sample output.  A *tactic* is a
-switchable piece of the algorithm, set with `--tactic NAME=VALUE`, which is repeatable.  `taxman help` and [DESIGN.md,
-section 5](../docs/DESIGN.md#5-tactics) give the names, values and defaults.  Every tactic is proven or sound, so
-switching one changes how fast an answer comes, never the answer.  [The
-reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
+`taxman help` lists every command and flag.  This section shows each command with sample output.  A
+[tactic](../../docs/GLOSSARY.md#the-search) is set with `--tactic NAME=VALUE`, which is repeatable; `taxman help` and
+[DESIGN.md, section 5](../docs/DESIGN.md#5-tactics) give the names, values and defaults, and switching one never changes
+the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) has every flag of `solve`.
 
 ### Solve one game
 
@@ -320,10 +312,10 @@ n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof
 ```
 
 Each game of a range is built from the one before it.  Moving from one game to the next often leaves the search
-untouched.  A game whose search problem an earlier game of the range or of the results file already posed and settled is
-concluded at once with that game's promotions: it is a *repeat* (tactic `same_search`, method `repeat`, proof
-`same_search`; [the reference, "Proof kinds"](../docs/REFERENCE.md#proof-kinds)).  About half of the committed chain's
-games that need a search are repeats ([results/README.md](../../results/README.md#strictjsonl) has the counts).
+untouched: the game is a [repeat](../../docs/GLOSSARY.md#results-and-trust), concluded at once with the promotions of
+the earlier game that posed the same search problem ([the reference, "Proof kinds"](../docs/REFERENCE.md#proof-kinds)).
+About half of the committed chain's games that need a search are repeats
+([results/README.md](../../results/README.md#strictjsonl) has the counts).
 
 With `--out FILE`, each result is appended to the file as soon as it is done: one JSON line per game, flushed and
 synced.  A rerun skips every game the file already completed, whatever the tactics of the rerun, since the file's lines

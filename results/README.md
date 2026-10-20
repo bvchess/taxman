@@ -60,7 +60,7 @@ Its games, by proof, as `taxman verify-results` and `solver/tools/check_results.
 | games | 1300 | 875 | 1265 | 474 | 3914 |
 | proof `trivial` | 13 | 0 | 0 | 0 | 13 |
 | proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 178 | 1356 |
-| proof `cap`: the search reached the ceiling n + score(n − 1) | 115 | 77 | 119 | 43 | 354 |
+| proof `cap`: the search reached the [ceiling](../docs/GLOSSARY.md#the-game) | 115 | 77 | 119 | 43 | 354 |
 | proof `prime_formula` | 211 | 115 | 155 | 60 | 541 |
 | proof `same_search`: a repeat of an earlier game's search | 545 | 369 | 543 | 193 | 1650 |
 | rest on nothing beyond the frame model | 1300 | 875 | 1265 | 474 | 3914 |
@@ -243,14 +243,15 @@ Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 
 
 What that evidence amounts to:
 
-1. **Arithmetic certificates.**  A score equal to n + score(n − 1), the ceiling opt(n) ≤ n + opt(n − 1), is optimal
-   whenever the game of n − 1 is, whatever found it.  So is a score equal to n + score(n − 1) − P for a prime n, with
-   P the largest prime below n (proven in `src/accelerate.rs`).  1784 of `strict.jsonl`'s games have such a score:
-   1244 at n + score(n − 1), among them its 354 proofs at the ceiling, and 540 prime ones.
+1. **Arithmetic certificates.**  A score at the [ceiling](../docs/GLOSSARY.md#the-game), n + score(n − 1), is optimal
+   whenever the game of n − 1 is, whatever found it.  So is a score equal to n + score(n − 1) − P for a prime n, with P
+   the largest prime below n (the [prime formula](../docs/GLOSSARY.md#the-game), proven in `src/accelerate.rs`).  1784
+   of `strict.jsonl`'s games have such a score: 1244 at n + score(n − 1), among them its 354 proofs at the ceiling, and
+   540 prime ones.
 2. **Exhaustive searches.**  `strict.jsonl`'s 1356 `exhausted` games are proven by a search that explored its whole
    tree, as the solver reports it.  The rest of the file is its 354 proofs at the ceiling, its 541 prime games, its 13
-   trivial ones (no promotion candidate, so there is only one game), and its 1650 repeats.  A repeat takes the
-   promotions and the proof of an earlier game that posed the same search problem, which both verifiers check
+   trivial ones (no promotion candidate, so there is only one game), and its 1650
+   [repeats](../docs/GLOSSARY.md#results-and-trust), which both verifiers check against the earlier game
    (`src/results.rs`).
 3. **Standalone solves.**  Some games were solved again on their own, with no seed and no ceiling:
    * `solver/notebook/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for every
