@@ -147,22 +147,41 @@ solver/tools/cloud/wall.sh cleanup         # once it has ended: delete the group
 `status` reads S3 and the group. It shows whether the run has ended and why; the run's age; the instance-hours against
 the budget and the spend against its estimate; how many machines have started; the group's capacity and instances; and,
 from what the machine last saved (every `SAVE_EVERY`, 10 minutes), the time of that save and how long ago it was, the
-game the results are recorded through, and a line for each game in flight ([the
-window](../../frame/README.md#games-in-flight)):
+game the results are recorded through, and one table of the last 6 games recorded and the games in flight ([the
+window](../../frame/README.md#games-in-flight)).  `--recorded N` shows the last N games recorded instead of 6, and 0
+leaves them out; the option goes before the command or after it, as `--verbose` does:
 
 ```
 the chain (as of the last save to S3)
   last save to S3: 2026-10-18 15:17 PDT, 5 min 24 s ago
-  recorded through 3929 (score 4854280)
-  games in flight (window 4; "own search" counts toward the wall of 24 hours):
+  recorded through 4871 (score 7461794)
+  the last 6 games recorded and the 4 in flight (window 4; "own search" counts toward the wall of 24 hours):
       n  own search  elapsed             nodes     best  state
-   3930  1h15m00s    1h45m00s       1086013550   341541  running, 242.8k nodes/s
-   3931  -           -                       -        -  no recent progress line
-   3932  -           -                       -        -  no recent progress line
-   3933  -           1h15m00s                63   341541  suspended
+   4866  -           0.2s                    0        -  recorded, score 7446689 (repeat, same_search of 4865)
+   4867  -           2m07s            34218766        -  recorded, score 7449976 (search, exhausted)
+   4868  -           1h17m16s       1133462769        -  recorded, score 7453452 (search, exhausted)
+   4869  -           0.2s                    0        -  recorded, score 7456914 (search, cap)
+   4870  -           0.2s                    0        -  recorded, score 7459353 (repeat, same_search of 4868)
+   4871  -           0.1s                    0        -  recorded, score 7461794 (prime, prime_formula)
+   4872  1h15m00s    1h45m00s       1086013550   341541  running, 242.8k nodes/s
+   4873  -           -                       -        -  no recent progress line
+   4874  -           -                       -        -  no recent progress line
+   4875  -           1h10m00s               63   341541  suspended
 ```
 
-`status` tells a game's state from its last progress line in `logs/chain.err`:
+The recorded games come first, in increasing n, and the games in flight follow.  A recorded game's row comes from its
+line in `logs/chain.out` ([the summary line](../REFERENCE.md#the-summary-line-stdout-one-per-game)), the last one if a
+replacement machine printed the game again after an interruption:
+
+* `elapsed` and `nodes`: the line's seconds and nodes.  The seconds are `elapsed` as a game in flight has it, the time
+  from the game's setup to its conclusion with the waits of its search included, but only in the run that recorded the
+  game: a search that an interruption split shows its last run;
+* `state`: `recorded`, the score, and in parentheses the line's method and proof, then `optimal ok` when the score is
+  the one in `optimal.json`;
+* `own search` and `best`: `-`.  A game's clock goes with its checkpoint when it is recorded, and `best` is the sum of
+  promotions of a progress line, not the score.
+
+`status` tells the state of a game in flight from its last progress line in `logs/chain.err`:
 
 * `running`: 1000 nodes a second or more in its last interval;
 * `suspended`: its threads belong to another game;
@@ -172,11 +191,11 @@ the chain (as of the last save to S3)
 * `no recent progress line`: the game has no line, or three lines of another game follow its line. A setup, a prime or
   repeated game and a search not started look alike in the logs.
 
-`own search` is the wall clock that the oldest game keeps in `ckpt/nNNNN.clock` (up to a checkpoint interval old; `-`
-for a game without one), `elapsed` the time since its search began, waits included, and `best` the progress line's sum
-of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.  `save.sh` copies the logs before
-the checkpoints, so the clock can be a minute or two ahead of `elapsed`, which comes from the last progress line of the
-logs.
+For a game in flight, `own search` is the wall clock that the oldest game keeps in `ckpt/nNNNN.clock` (up to a
+checkpoint interval old; `-` for a game without one), `elapsed` the time since its search began, waits included, and
+`best` the progress line's sum of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.
+`save.sh` copies the logs before the checkpoints, so the clock can be a minute or two ahead of `elapsed`, which comes
+from the last progress line of the logs.
 
 `RUN` names the run.  Without it, `launch` makes `run1`, and `status`, `stop` and `cleanup` take the one run in
 progress, the one with a config in S3 and no `ended` object.  With none, or several, they refuse and say so, and list

@@ -498,12 +498,24 @@ fake_run() {
     printf 'start=1792352449\nboot=b\nbase=0\nhours=2.7711\nupdated=1792361647\n' >"$(sobj "wall-$name/run/ledger")"
 }
 
+# The solver's line for a game it recorded (solver.rs, summary_line): recorded_line N SCORE METHOD NODES SECONDS OPTIMAL
+# PROOF [MORE], where OPTIMAL is the word after `optimal` (ok or unknown) and MORE is any text after the proof.
+recorded_line() {
+    printf 'n=%-5d score=%-9d %-7s nodes=%-11d %9.3f s  optimal %s  proof=%s%s\n' "$1" "$2" "$3" "$4" "$5" "$6" "$7" \
+        "${8:-}"
+}
+
 # The solver's line for each of the games 1..LAST that it recorded, in logs/chain.out of the run NAME (NAME LAST).
 fake_recorded() {
     local n
     for ((n = 1; n <= $2; n++)); do
-        printf 'n=%-5d score=%-9d search  nodes=%-12d 1.000 s  optimal ok  proof=exhausted\n' "$n" $((n * 10)) 0
+        recorded_line "$n" $((n * 10)) search 0 1 ok exhausted
     done >"$(sobj "wall-$1/logs/chain.out")"
+}
+
+# The games of the table in the output $1 (normalized), in the order printed, as one line: "35 36 ... ".
+table_games() {
+    sed -n 's/^ \([0-9][0-9]*\) .*/\1/p' "$1" | tr '\n' ' '
 }
 
 # A progress line of the solver (engine.rs, progress_line): the game, the time since its search began, the nodes, the
@@ -541,11 +553,24 @@ scenario_status() {
     mkdir -p "$(sobj chain-9/run)"
     printf "x\n" >"$(sobj chain-9/run/config)"
 
-    # The run in progress: it has recorded 1..40, and its window of 5 holds 41..45.  The saved progress lines (the
+    # The run in progress: it has recorded 1..40, and its window of 5 holds 41..45.  The games 35 to 40 are of every
+    # kind; a replacement machine printed 37 and 38 again after an interruption (the first lines of 37 and 38 are the
+    # earlier machine's); the search of 41 was stopped, and its line is incomplete.  The saved progress lines (the
     # oldest game, 41, runs; 42 is suspended; 43's search is done; 44 has no line; 45's only line is from before three
     # of 41's) and the clock of 41, which is the oldest game with its search running.
     fake_run t-live
-    fake_recorded t-live 40
+    fake_recorded t-live 34
+    {
+        recorded_line 35 350 search 1133462769 4636.026 unknown exhausted
+        recorded_line 36 360 repeat 0 0.240 unknown "same_search of 34"
+        recorded_line 37 370 search 7 123.456 unknown exhausted
+        recorded_line 38 380 search 9 1.5 unknown exhausted
+        recorded_line 37 370 prime 0 0.055 unknown prime_formula
+        recorded_line 38 380 known 0 0.003 ok "known from the committed chain (strict.jsonl)"
+        recorded_line 39 390 search 0 0.247 unknown cap "  assumes statement U"
+        recorded_line 40 400 search 248002917 812.5 unknown exhausted
+        printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete\n'
+    } >>"$(sobj wall-t-live/logs/chain.out)"
     {
         progress 40 9m00s 100 done 1
         echo 'note: a line of the solver that is not a progress line'
@@ -588,9 +613,26 @@ scenario_status() {
     check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - - no recent progress line'
     check "and a game whose last line three of another's follow" has_line "$tmp/s1.norm" \
         ' 45 - - - - no recent progress line'
-    check "a recorded game is not in flight" lacks "$tmp/s1.norm" '^ 40 '
-    check "the games in flight are the window after the last recorded" equals \
-        "$(grep -c '^ [0-9][0-9] ' "$tmp/s1.norm")" 5
+    check "the table has the last 6 games recorded, then the window after them, in order" equals \
+        "$(table_games "$tmp/s1.norm")" '35 36 37 38 39 40 41 42 43 44 45 '
+    check "its heading says what it holds" has_line "$tmp/s1.norm" \
+        ' the last 6 games recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "one header line of columns stands over both" equals \
+        "$(grep -c '^ n own search elapsed nodes best state$' "$tmp/s1.norm")" 1
+    check "a searched game has its nodes and seconds, elapsed (1h17m16s), no wall clock and no best" has_line \
+        "$tmp/s1.norm" ' 35 - 1h17m16s 1133462769 - recorded, score 350 (search, exhausted)'
+    check "a repeat has the game whose search it repeats" has_line "$tmp/s1.norm" \
+        ' 36 - 0.2s 0 - recorded, score 360 (repeat, same_search of 34)'
+    check "a game printed again is the last of its lines: a prime game" has_line "$tmp/s1.norm" \
+        ' 37 - 0.1s 0 - recorded, score 370 (prime, prime_formula)'
+    check "and a known one, with the words of its proof, and optimal ok if the solver had it in its table" has_line \
+        "$tmp/s1.norm" \
+        ' 38 - 0.0s 0 - recorded, score 380 (known, known from the committed chain (strict.jsonl), optimal ok)'
+    check "the proof ends at what the solver adds to it" has_line "$tmp/s1.norm" \
+        ' 39 - 0.2s 0 - recorded, score 390 (search, cap)'
+    check "a recorded game's seconds are formatted as an in-flight game's" has_line "$tmp/s1.norm" \
+        ' 40 - 13m32s 248002917 - recorded, score 400 (search, exhausted)'
+    check "an incomplete line is not a recorded game" lacks "$tmp/s1.norm" 'score 410'
     check "every time is in Pacific time: the date (a day and a half ahead)" matches "$tmp/s1.norm" \
         'until 2026-10-21 17:00 PDT$'
     check "the run's beginning" matches "$tmp/s1.norm" 'the run began 2026-10-18 12:40 PDT, '
@@ -650,6 +692,44 @@ scenario_status() {
     check "a stopped search says so" has_line "$tmp/s6.norm" \
         ' 44 - 5m00s 70 9 search stopped, its checkpoint kept'
 
+    # --recorded N: how many of the games recorded the table shows, before the command or after it.
+    TZ=America/Los_Angeles RUN=t-live "$wall" status --recorded 2 >"$tmp/r1.out" 2>&1
+    check "--recorded 2 succeeds" equals $? 0
+    sed 's/  */ /g' "$tmp/r1.out" >"$tmp/r1.norm"
+    check "it shows the last 2 games recorded, then those in flight" equals "$(table_games "$tmp/r1.norm")" \
+        '39 40 41 42 43 44 45 '
+    check "the heading counts them" has_line "$tmp/r1.norm" \
+        ' the last 2 games recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "the line of the last game recorded stays" has_line "$tmp/r1.norm" ' recorded through 40 (score 400)'
+    RUN=t-live "$wall" --recorded 2 status >"$tmp/r2.out" 2>&1
+    sed 's/  */ /g' "$tmp/r2.out" >"$tmp/r2.norm"
+    check "the option may come before the command" equals "$(table_games "$tmp/r2.norm")" '39 40 41 42 43 44 45 '
+    RUN=t-live "$wall" status --recorded 0 >"$tmp/r3.out" 2>&1
+    check "--recorded 0 succeeds" equals $? 0
+    sed 's/  */ /g' "$tmp/r3.out" >"$tmp/r3.norm"
+    check "it leaves the recorded games out" equals "$(table_games "$tmp/r3.norm")" '41 42 43 44 45 '
+    check "and the heading is the games in flight's" has_line "$tmp/r3.out" \
+        '  games in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "no row says recorded" lacks "$tmp/r3.out" 'recorded, score'
+    RUN=t-live "$wall" status --recorded 100 >"$tmp/r4.out" 2>&1
+    sed 's/  */ /g' "$tmp/r4.out" >"$tmp/r4.norm"
+    check "more than the games recorded shows the 40 there are" equals "$(table_games "$tmp/r4.norm")" \
+        "$(seq 1 45 | tr '\n' ' ')"
+    check "and the heading counts the 40" has_line "$tmp/r4.norm" \
+        ' the last 40 games recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    for value in x 2.5 -1 ''; do
+        RUN=t-live "$wall" status --recorded "$value" >"$tmp/r5.out" 2>&1
+        check "--recorded \"$value\" is refused" equals $? 1
+        check "with the words for it" matches "$tmp/r5.out" "error: --recorded: \"$value\" is not a whole number"
+    done
+    check "and nothing was printed of the run" lacks "$tmp/r5.out" '^run t-live'
+    RUN=t-live "$wall" status --recorded >"$tmp/r6.out" 2>&1
+    check "--recorded with no value is refused" equals $? 1
+    check "which says it needs one" matches "$tmp/r6.out" 'error: --recorded needs a value'
+    "$wall" help >"$tmp/r7.out" 2>&1
+    check "the usage text names the option with the command" matches "$tmp/r7.out" 'wall.sh status \[--recorded N\]'
+    check "and gives its default" matches "$tmp/r7.out" '^  --recorded N .*default 6$'
+
     # A run that ended with the range recorded: no game in flight, the end in Pacific time (standard), the save a long
     # time ago.
     TZ=America/Los_Angeles RUN=t-ended "$wall" status >"$tmp/s7.out" 2>&1
@@ -659,6 +739,16 @@ scenario_status() {
     check "and its last save, long ago" matches "$tmp/s7.norm" \
         '^ last save to S3: 2026-01-14 19:30 PST, [0-9]* d [0-9]* h ago$'
     check "and no game in flight" matches "$tmp/s7.norm" 'no game in flight: the range to 40 is recorded'
+    check "above it the last 6 games recorded" equals "$(table_games "$tmp/s7.norm")" '35 36 37 38 39 40 '
+    check "under a heading that holds no game in flight" has_line "$tmp/s7.norm" ' the last 6 games recorded:'
+    check "and the note comes after them" equals "$(tail -n 1 "$tmp/s7.norm")" \
+        ' no game in flight: the range to 40 is recorded'
+    TZ=America/Los_Angeles RUN=t-ended "$wall" status --recorded 0 >"$tmp/s7b.out" 2>&1
+    check "with --recorded 0 an ended run's status succeeds" equals $? 0
+    check "and has the note" matches "$tmp/s7b.out" '^  no game in flight: the range to 40 is recorded$'
+    check "without a table" lacks "$tmp/s7b.out" 'own search'
+    check "or a heading" lacks "$tmp/s7b.out" '^  the last .* recorded'
+    check "or a recorded game" lacks "$tmp/s7b.out" 'recorded, score'
 
     # Two runs in progress: status lists them and asks for RUN.
     fake_run t-live2
@@ -682,6 +772,52 @@ scenario_status() {
     check "in place of the games in flight" lacks "$tmp/s10.out" 'no recent progress line'
     check "and nothing is saved at all" matches "$tmp/s10.out" '^  nothing has been saved to S3 yet$'
     rm -rf "$(sobj wall-t-early)"
+
+    # No game recorded yet (only an incomplete line), and a progress line: the table has no recorded game, and its
+    # heading claims none.
+    fake_run t-new
+    printf 'n=1     score=10        search  nodes=5          2.000 s  incomplete\n' >"$(sobj wall-t-new/logs/chain.out)"
+    progress 1 1m00s 5000 120.0k/s 0 >"$(sobj wall-t-new/logs/chain.err)"
+    RUN=t-new "$wall" status >"$tmp/n1.out" 2>&1
+    check "a run with no game recorded succeeds" equals $? 0
+    sed 's/  */ /g' "$tmp/n1.out" >"$tmp/n1.norm"
+    check "it says no game is recorded" has_line "$tmp/n1.out" '  recorded through: no game yet'
+    check "the table is the games in flight" equals "$(table_games "$tmp/n1.norm")" '1 2 3 4 5 '
+    check "under their heading" has_line "$tmp/n1.out" \
+        '  games in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "with a game that runs" has_line "$tmp/n1.norm" ' 1 - 1m00s 5000 0 running, 120.0k nodes/s'
+    check "and no game recorded" lacks "$tmp/n1.out" 'recorded, score\|^  the last'
+    rm -rf "$(sobj wall-t-new)"
+
+    # Fewer games recorded than the table shows: those there are.
+    fake_run t-few
+    fake_recorded t-few 3
+    progress 4 1m00s 5000 120.0k/s 0 >"$(sobj wall-t-few/logs/chain.err)"
+    RUN=t-few "$wall" status >"$tmp/f1.out" 2>&1
+    sed 's/  */ /g' "$tmp/f1.out" >"$tmp/f1.norm"
+    check "with 3 games recorded the table has 3" equals "$(table_games "$tmp/f1.norm")" '1 2 3 4 5 6 7 8 '
+    check "and its heading says 3" has_line "$tmp/f1.norm" \
+        ' the last 3 games recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    RUN=t-few "$wall" status --recorded 1 >"$tmp/f2.out" 2>&1
+    sed 's/  */ /g' "$tmp/f2.out" >"$tmp/f2.norm"
+    check "one game is not games" has_line "$tmp/f2.norm" \
+        ' the last game recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "and it is the last recorded" equals "$(table_games "$tmp/f2.norm")" '3 4 5 6 7 8 '
+    rm -rf "$(sobj wall-t-few)"
+
+    # Games recorded and no progress lines saved: the recorded games, then the note for the games in flight.
+    fake_run t-quiet
+    fake_recorded t-quiet 3
+    RUN=t-quiet "$wall" status >"$tmp/q1.out" 2>&1
+    check "recorded games and no chain.err succeeds" equals $? 0
+    sed 's/  */ /g' "$tmp/q1.out" >"$tmp/q1.norm"
+    check "the table has the recorded games only" equals "$(table_games "$tmp/q1.norm")" '1 2 3 '
+    check "under the heading of both" has_line "$tmp/q1.norm" \
+        ' the last 3 games recorded and the 5 in flight (window 5; "own search" counts toward the wall of 24 hours):'
+    check "and the note for the games in flight follows" equals "$(tail -n 1 "$tmp/q1.out")" \
+        '  no progress lines saved yet'
+    check "in place of their rows" lacks "$tmp/q1.out" 'no recent progress line'
+    rm -rf "$(sobj wall-t-quiet)"
 
     default_run
 }

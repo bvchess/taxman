@@ -5,7 +5,7 @@
 # (solver/docs/runbook/wall.md).
 #
 #   solver/tools/cloud/wall.sh launch --commit SHA --until DATE [options]   create everything and start the run
-#   solver/tools/cloud/wall.sh status                                        where the run is, from S3 and the group
+#   solver/tools/cloud/wall.sh status [--recorded N]                         where the run is, from S3 and the group
 #   solver/tools/cloud/wall.sh stop [--now]                                  end the run (cleanly, or at once)
 #   solver/tools/cloud/wall.sh cleanup [--force]                             delete what launch made; check what is left
 #
@@ -51,8 +51,10 @@
 # release suite and, if it passes, stores the binaries; if it fails the run ends with RELEASE_TESTS_FAILED in $S3_DEST),
 # REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
 # status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
-# time, in the local time zone (TZ), and how long ago) the last game recorded and a line for each game in flight
-# (solver/docs/runbook/wall.md, "Launch, watch, stop, clean up").
+# time, in the local time zone (TZ), and how long ago) the last game recorded and a table, a line for each of the last
+# games recorded and then for each game in flight (solver/docs/runbook/wall.md, "Launch, watch, stop, clean up").  Its
+# option goes before the command or after it, as --verbose does:
+#   --recorded N          the games recorded that the table shows: the last N (0: none)               default 6
 # Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1 for launch,
 # and for status, stop and cleanup the one run in progress, the one whose prefix has a config and no ended object; with
 # none they refuse and say so, and with several they refuse and list the runs to choose from),
@@ -75,6 +77,7 @@ NAME=taxman-wall
 ROLE=taxman-ec2
 DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
+SHOW_RECORDED=6
 TAGS='{Key=Project,Value=taxman},{Key=Purpose,Value=wall}'
 IMAGE="resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
 
@@ -192,6 +195,11 @@ usage() {
 
 is_number() {
     case "$1" in '' | *[!0-9.]* | *.*.*) return 1 ;; esac
+    return 0
+}
+
+is_whole_number() {
+    case "$1" in '' | *[!0-9]*) return 1 ;; esac
     return 0
 }
 
@@ -535,21 +543,37 @@ launch() {
 
 # --- status ------------------------------------------------------------------------------------------------------
 
-# The games in flight, a line each, from the progress lines of the solver (the text on stdin: logs/chain.err).  A game
-# whose search has started prints one every PROGRESS seconds, `n=3930 1h45m00s nodes 1086013550 (242.8k/s) best 341541
-# queue ...` (the time since the search began, waits included; the nodes so far; the nodes a second in the last
-# interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of promotions so
-# far), and nothing else says where a game is: a game with no recent line has no state to tell (a setup, a prime or
-# repeated game, a search not started).  Arguments: the first and the last game in flight, and the games' wall
-# clocks (ckpt/nNNNN.clock) as "n seconds n seconds ...".  A line is recent unless three lines of another game in
-# flight follow it (a game that still searches prints once an interval).  The state of a game is told from its last
-# line:
+# The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
+# (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
+# line of a game is the one that counts.
+recorded_games() {
+    awk -v count="$1" -v through="$2" '
+    { n = substr($1, 3) + 0; if (n <= through) line[n] = $0 }
+    END {
+        for (n = through; n >= 1 && shown < count; n--) if (n in line) game[++shown] = n
+        for (i = shown; i >= 1; i--) print line[game[i]]
+    }'
+}
+
+# The games, a line each: the recorded games, then those in flight.  The text on stdin is the lines of the recorded
+# games (recorded_games), then the progress lines of the solver (logs/chain.err).  A recorded game's line, `n=4864
+# score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted`, gives its nodes and its
+# seconds: its setup, its search from the start (waits included) and its conclusion, in the run that recorded it, so
+# they go under `elapsed` (less the runs of a search before an interruption); it has no wall clock and no best sum of
+# promotions.  A game in flight whose search has started prints one progress line every PROGRESS seconds, `n=3930
+# 1h45m00s nodes 1086013550 (242.8k/s) best 341541 queue ...` (the time since the search began, waits included; the
+# nodes so far; the nodes a second in the last interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the
+# last line; the best sum of promotions so far), and nothing else says where a game is: a game with no recent line has
+# no state to tell (a setup, a prime or repeated game, a search not started).  Arguments: the first game in flight, how
+# many games are in flight, and the games' wall clocks (ckpt/nNNNN.clock) as "n seconds n seconds ...".  A line is
+# recent unless three lines of another game in flight follow it (a game that still searches prints once an interval).
+# The state of a game in flight is told from its last line:
 #   running      the nodes grow (1000 a second or more in the last interval)
 #   suspended    the search has started, but the threads are another game's, and the nodes do not grow
 #   search done  the search has ended (`done` or `optimal`) and the game is not recorded yet: the oldest game is being
 #                recorded, any other waits for the games before it
-games_in_flight() {
-    awk -v first="$1" -v last="$2" -v clocks="$3" '
+games_table() {
+    awk -v first="$1" -v flight="$2" -v clocks="$3" '
     function duration(s) {
         if (s < 60) return sprintf("%.1fs", s)
         if (s < 3600) return sprintf("%dm%02ds", s / 60, s % 60)
@@ -570,9 +594,24 @@ games_in_flight() {
     }
     BEGIN {
         first += 0
-        last += 0
+        last = first + flight - 1
         count = split(clocks, c, " ")
         for (i = 1; i < count; i += 2) held[c[i] + 0] = c[i + 1] + 0
+        row("n", "own search", "elapsed", "nodes", "best", "state")
+    }
+    # A recorded game, a row at once, so that the recorded games come above those in flight.  Its state is its score,
+    # its method, its proof (the text after `proof=` up to the next two spaces) and `optimal ok`, if the solver found
+    # the game in its table of optimal games.
+    $1 ~ /^n=[0-9]+$/ && $2 ~ /^score=[0-9]+$/ && $4 ~ /^nodes=[0-9]+$/ && $6 == "s" {
+        detail = $3
+        where = index($0, "  proof=")
+        if (where) {
+            proof = substr($0, where + 8)
+            sub(/  .*/, "", proof)
+            detail = detail ", " proof
+        }
+        if ($7 == "optimal" && $8 != "unknown") detail = detail ", optimal " $8
+        row(substr($1, 3), "-", duration($5 + 0), substr($4, 7), "-", "recorded, score " substr($2, 7) " (" detail ")")
     }
     $1 ~ /^n=[0-9]+$/ && $3 == "nodes" && $4 ~ /^[0-9]+$/ && $5 ~ /^\(.*\)$/ && $6 == "best" && $8 == "queue" {
         n = substr($1, 3) + 0
@@ -587,7 +626,6 @@ games_in_flight() {
         last_how[n] = how
     }
     END {
-        row("n", "own search", "elapsed", "nodes", "best", "state")
         for (g = first; g <= last; g++) {
             own = (g in held) ? duration(held[g]) : "-"
             how = (g in at) ? last_how[g] : ""
@@ -633,6 +671,22 @@ group_lines() {
         if (missing || NR == 0) printf "  no group %s\n", name
         else if (!instances) printf "  no instance\n"
     }'
+}
+
+# The line above the table of games: the RECORDED games it shows, and the IN_FLIGHT games in flight (WINDOW is the most
+# at a time, and the wall of WALL_HOURS is what "own search" counts toward).  No line for a table with no game.
+table_heading() {
+    local recorded="$1" in_flight="$2" window="$3" wall_hours="$4" what=""
+    case "$recorded" in
+        0) ;;
+        1) what="the last game recorded" ;;
+        *) what="the last $recorded games recorded" ;;
+    esac
+    if [ "$in_flight" -gt 0 ]; then
+        if [ -n "$what" ]; then what="$what and the $in_flight in flight"; else what="games in flight"; fi
+        what="$what (window $window; \"own search\" counts toward the wall of $wall_hours hours)"
+    fi
+    [ -z "$what" ] || printf '  %s:\n' "$what"
 }
 
 status() {
@@ -692,7 +746,8 @@ status() {
     # The chain is as old as the last save: the newest object of results/, logs/ and ckpt/ (the ledger and the rest of
     # run/ are written on their own).
     printf 'the chain (as of the last save to S3)\n'
-    local listing prefix saved saved_epoch out recorded score first_n last_n clocks="" name n seconds
+    local listing prefix saved saved_epoch lines out recorded score first_n last_n in_flight shown shown_count name n
+    local seconds clocks=""
     prefix="${S3_DEST#s3://$BUCKET/}"
     listing="$(s3_ls --recursive "$S3_DEST/")"
     saved="$(printf '%s\n' "$listing" | awk -v p="$prefix" '
@@ -706,7 +761,8 @@ status() {
         printf '  nothing has been saved to S3 yet\n'
     fi
     # The solver prints a line to chain.out for each game it records: the last is the last game of the results.
-    out="$(s3_text logs/chain.out | grep '^n=' | grep -v ' incomplete$' | tail -n 1)"
+    lines="$(s3_text logs/chain.out | grep '^n=' | grep -v ' incomplete$')"
+    out="$(printf '%s\n' "$lines" | tail -n 1)"
     recorded="$(printf '%s\n' "$out" | sed -n 's/^n=\([0-9]*\) .*/\1/p')"
     if [ -n "$recorded" ]; then
         score="$(printf '%s\n' "$out" | sed -n 's/.* score=\([0-9]*\) .*/\1/p')"
@@ -718,10 +774,8 @@ status() {
     first_n=$((recorded + 1))
     last_n=$((recorded + window))
     [ "$last_n" -le "$chain_to" ] || last_n="$chain_to"
-    if [ "$first_n" -gt "$last_n" ]; then
-        printf '  no game in flight: the range to %s is recorded\n' "$chain_to"
-        return 0
-    fi
+    in_flight=$((last_n - first_n + 1))
+    [ "$in_flight" -gt 0 ] || in_flight=0
     for name in $(printf '%s\n' "$listing" | awk -v p="$prefix/ckpt/" \
         'index($4, p) == 1 && substr($4, length(p) + 1) ~ /^n[0-9]+[.]clock$/ {print substr($4, length(p) + 1)}'); do
         n="${name#n}"
@@ -731,12 +785,20 @@ status() {
             [ -z "$seconds" ] || clocks="$clocks $n $seconds"
         fi
     done
-    printf '  games in flight (window %s; "own search" counts toward the wall of %s hours):\n' "$window" "$wall_hours"
+    shown="$(printf '%s\n' "$lines" | recorded_games "$SHOW_RECORDED" "$recorded")"
+    shown_count="$(printf '%s\n' "$shown" | grep -c .)"
+    table_heading "$shown_count" "$in_flight" "$window" "$wall_hours"
     # The machine saves chain.err with its first save: until then it is not in S3, and that is no error.
-    if printf '%s\n' "$listing" | awk -v f="$prefix/logs/chain.err" '$4 == f { found = 1 } END { exit !found }'; then
-        s3_text logs/chain.err | games_in_flight "$first_n" "$last_n" "$clocks"
+    if [ "$in_flight" -gt 0 ] &&
+        printf '%s\n' "$listing" | awk -v f="$prefix/logs/chain.err" '$4 == f { found = 1 } END { exit !found }'; then
+        { printf '%s\n' "$shown"; s3_text logs/chain.err; } | games_table "$first_n" "$in_flight" "$clocks"
     else
-        printf '  no progress lines saved yet\n'
+        [ "$shown_count" -eq 0 ] || printf '%s\n' "$shown" | games_table "$first_n" 0 ""
+        if [ "$in_flight" -gt 0 ]; then
+            printf '  no progress lines saved yet\n'
+        else
+            printf '  no game in flight: the range to %s is recorded\n' "$chain_to"
+        fi
     fi
 }
 
@@ -826,13 +888,21 @@ cleanup() {
 
 # --- main --------------------------------------------------------------------------------------------------------
 
-# --verbose goes with any command, before it or after (and VERBOSE=1 does without it).
+# --verbose goes with any command, before it or after (and VERBOSE=1 does without it); so does --recorded N, which
+# status takes.
 args=()
-for arg in "$@"; do
-    case "$arg" in
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         --verbose) VERBOSE=1 ;;
-        *) args+=("$arg") ;;
+        --recorded)
+            [ "$#" -ge 2 ] || die "--recorded needs a value (see the top of $0)"
+            is_whole_number "$2" || die "--recorded: \"$2\" is not a whole number"
+            SHOW_RECORDED="$2"
+            shift
+            ;;
+        *) args+=("$1") ;;
     esac
+    shift
 done
 set -- ${args[@]+"${args[@]}"}
 command="${1:-}"
