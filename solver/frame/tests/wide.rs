@@ -3,8 +3,8 @@
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
 //! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so the boards above n = 1023 meet few tests besides
-//! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to 4546 and 2049) and the committed results
-//! (`results/strict.jsonl`, n = 1..4547; `optimal.json` has its games to 1300, but that is the solver's own answer and
+//! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to 4874 and 2049) and the committed results
+//! (`results/strict.jsonl`, n = 1..4874; `optimal.json` has its games to 1300, but that is the solver's own answer and
 //! no check of it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095

@@ -587,20 +587,22 @@ fn clean(file: &FileReport) -> usize {
 
 /// The last game of the committed results; of the run on a laptop that made their first part, which the prover
 /// proved on the whole board; of the second run, which made the games past the first, on EC2; and of `optimal.json`,
-/// which they reproduce.  The third run, also on EC2, made the games past the second, and the fourth the games past
-/// the third.
-const LAST: u32 = 4547;
+/// which they reproduce.  The third run, also on EC2, made the games past the second, the fourth the games past the
+/// third, and the fifth the games past the fourth.
+const LAST: u32 = 4874;
+const LAST_OF_FOURTH_RUN: u32 = 4547;
 const LAST_OF_THIRD_RUN: u32 = 3914;
 const LAST_OF_SECOND_RUN: u32 = 3440;
 const LAST_OF_FIRST_RUN: u32 = 2175;
 const LAST_OF_TABLE: u32 = 1300;
-/// The builds that made the four runs (a prefix of the commit each line records), and the games that two invocations
+/// The builds that made the five runs (a prefix of the commit each line records), and the games that two invocations
 /// solved: they were in flight when an instance of the second run, or of the fourth, was stopped, and the next took
 /// them up.
 const FIRST_BUILD: &str = "feba6d0";
 const SECOND_BUILD: &str = "55287ff";
 const THIRD_BUILD: &str = "eb84a6f";
 const FOURTH_BUILD: &str = "ca357bf";
+const FIFTH_BUILD: &str = "4974a71";
 const RESUMED: [u32; 9] = [3311, 3312, 3315, 3940, 3942, 4340, 4431, 4432, 4433];
 
 /// The games of the committed chain that the quick check verifies: the first of them, which cost little to set up.
@@ -649,15 +651,16 @@ fn check_the_committed_results_to(last: u32) {
         (LAST_OF_FIRST_RUN, 1_492_209),
         (LAST_OF_SECOND_RUN, 3_727_726),
         (LAST_OF_THIRD_RUN, 4_820_492),
-        (LAST, 6_498_966),
+        (LAST_OF_FOURTH_RUN, 6_498_966),
+        (LAST, 7_473_314),
     ];
     for (n, score) in last_scores {
         assert!(n > last || games[&n].score == score, "n={n}");
     }
     // Every line records the one clean build that made its part of the file (the first run's to 2175, the second's to
-    // 3440, the third's to 3914, the fourth's after), a single invocation but at the games that the stop of an
-    // instance interrupted, and the verdict on optimal.json, which has the games to 1300 and none beyond:
-    // `optimal_match` is true where it has the game and null where it has not.
+    // 3440, the third's to 3914, the fourth's to 4547, the fifth's after), a single invocation but at the games that
+    // the stop of an instance interrupted, and the verdict on optimal.json, which has the games to 1300 and none
+    // beyond: `optimal_match` is true where it has the game and null where it has not.
     for (k, line) in text.lines().enumerate() {
         let (n, line) = (k as u32 + 1, Json::parse(line).unwrap_or_else(|e| panic!("line {}: {e:?}", k + 1)));
         let build = line.get("build").unwrap_or_else(|| panic!("n={n}: no build"));
@@ -669,8 +672,10 @@ fn check_the_committed_results_to(last: u32) {
             SECOND_BUILD
         } else if n <= LAST_OF_THIRD_RUN {
             THIRD_BUILD
-        } else {
+        } else if n <= LAST_OF_FOURTH_RUN {
             FOURTH_BUILD
+        } else {
+            FIFTH_BUILD
         };
         assert!(commit.starts_with(expected), "n={n}: built by {commit}, not {expected}");
         let invocations = if RESUMED.contains(&n) { 2 } else { 1 };
@@ -707,23 +712,25 @@ fn check_the_committed_results_to(last: u32) {
 
     // Its proofs, in the order trivial, prime formula, `cap`, exhausted, same search, known (taken from the bounds
     // store, with no search): in all, in the games of the table (where the previous chain, of commit 271c817, had
-    // every one of them), and past it, in the first run's, in the second's, in the third's and in the fourth's.  The
-    // known games, which only the fourth run made, assume statement U; every other game assumes nothing.
+    // every one of them), and past it, in the first run's, in the second's, in the third's, in the fourth's and in the
+    // fifth's.  The known games, which only the fourth and fifth runs made, assume statement U; every other game
+    // assumes nothing.
     let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch, Proof::Known];
     let by = |range: RangeInclusive<u32>| kinds.map(|p| proofs(strict, range.clone(), p));
     assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");
     let from_store = by(1..=last)[5];
     assert_eq!(clean(strict), last as usize - from_store);
     if last == LAST {
-        assert_eq!(by(1..=LAST), [13, 596, 411, 1506, 1854, 167]);
+        assert_eq!(by(1..=LAST), [13, 609, 425, 1541, 1904, 382]);
         assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545, 0]);
         assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369, 0]);
         assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST_OF_SECOND_RUN), [0, 155, 119, 448, 543, 0]);
         assert_eq!(by(LAST_OF_SECOND_RUN + 1..=LAST_OF_THIRD_RUN), [0, 60, 43, 178, 193, 0]);
-        assert_eq!(by(LAST_OF_THIRD_RUN + 1..=LAST), [0, 55, 57, 150, 204, 167]);
+        assert_eq!(by(LAST_OF_THIRD_RUN + 1..=LAST_OF_FOURTH_RUN), [0, 55, 57, 150, 204, 167]);
+        assert_eq!(by(LAST_OF_FOURTH_RUN + 1..=LAST), [0, 13, 14, 35, 50, 215]);
         // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
         let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
-        assert_eq!(ceilings, [1462, 615]);
+        assert_eq!(ceilings, [1577, 651]);
     }
 }
 
@@ -734,7 +741,7 @@ fn the_start_of_the_committed_results_passes_the_verifier() {
     check_the_committed_results_to(QUICK_LAST);
 }
 
-/// All 4547 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
+/// All 4874 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
 #[test]
 #[cfg_attr(
     debug_assertions,

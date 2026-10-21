@@ -78,8 +78,8 @@ Each job's file names the instance that suits it; this page says why.
 ## Storage
 
 Put checkpoints and results on a disk that survives a stop or a reboot and has local semantics (`flock`, `fsync`).  Use
-the root EBS volume (gp3; 40 GB is plenty, since the toolchain and `target/` take 3 to 4 GB and the results 30 MB for
-the 4,547 games of the committed chain on 2026-10-20), or a separate EBS volume that you mount and name with
+the root EBS volume (gp3; 40 GB is plenty, since the toolchain and `target/` take 3 to 4 GB and the results 34 MB for
+the 4,874 games of the committed chain on 2026-10-21), or a separate EBS volume that you mount and name with
 `TAXMAN_WORK`.  Turn "delete on termination" off for a
 separate volume if the state should outlive the instance; the end of the run deletes it with the rest.  Avoid three
 things:
