@@ -138,6 +138,7 @@ for `setup.sh` on each machine ([build-cache.md](build-cache.md)); neither is on
 
 ```
 solver/tools/cloud/wall.sh status          # the run, the ledger, the group, the games recorded and in flight
+solver/tools/cloud/wall.sh status --host USER@HOST   # a chain on a machine of yours, over ssh: no S3, no AWS
 solver/tools/cloud/wall.sh stop            # clean: within 30 s the machine stops the chain (final checkpoint), saves, ends
 solver/tools/cloud/wall.sh stop --now      # at once: records the end, takes the group to 0 (the machine is terminated;
                                          #   what it did since its last save, at most SAVE_EVERY, is lost)
@@ -196,6 +197,16 @@ checkpoint interval old; `-` for a game without one), `elapsed` the time since i
 `best` the progress line's sum of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.
 `save.sh` copies the logs before the checkpoints, so the clock can be a minute or two ahead of `elapsed`, which comes
 from the last progress line of the logs.
+
+`status --host USER@HOST` reports a chain that runs on a machine you reach by ssh (`chain.sh` in the tmux session `tx`,
+its state in `~/taxman-work`) instead of a spot instance: it reads that state in one ssh call (key authentication,
+`BatchMode`) and needs no AWS profile and makes no aws call.  It prints the host and its `uptime` line; whether the chain
+runs (the session exists and a `taxman solve` process is alive); `ENDED:` and the line of `chain.outcome`, if there is
+one; the window and the wall, from the last line of `logs/chain.log` that starts the chain; when `logs/chain.err` last
+changed, as `last progress line`; and `recorded through`, taken from the last completed game of the results file; then
+the same table.  The recorded rows come from `logs/chain.out`, which holds only the games that the host's own run
+recorded, so a run that has recorded none shows the games in flight alone; the clocks come from `ckpt/nNNNN.clock` and
+the progress lines from the last 3000 lines of `logs/chain.err`.  `--recorded N` goes with it as above.
 
 `RUN` names the run.  Without it, `launch` makes `run1`, and `status`, `stop` and `cleanup` take the one run in
 progress, the one with a config in S3 and no `ended` object.  With none, or several, they refuse and say so, and list

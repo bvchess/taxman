@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A stand-in for ssh, for test/run.sh: the host is this machine, with the home directory $FAKE_HOME.  It skips the
+# options (-o NAME=VALUE) and the host, and runs the command that follows, as a line of the shell, as ssh does.
+set -u
+while [ "${1:-}" = -o ]; do
+    shift 2
+done
+shift
+HOME="${FAKE_HOME:?}" exec bash -c "$*"

@@ -6,6 +6,7 @@
 #
 #   solver/tools/cloud/wall.sh launch --commit SHA --until DATE [options]   create everything and start the run
 #   solver/tools/cloud/wall.sh status [--recorded N]                         where the run is, from S3 and the group
+#   solver/tools/cloud/wall.sh status [--recorded N] --host USER@HOST        where the chain is, over ssh
 #   solver/tools/cloud/wall.sh stop [--now]                                  end the run (cleanly, or at once)
 #   solver/tools/cloud/wall.sh cleanup [--force]                             delete what launch made; check what is left
 #
@@ -53,15 +54,21 @@
 # status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
 # time, in the local time zone (TZ), and how long ago) the last game recorded and a table, a line for each of the last
 # games recorded and then for each game in flight (solver/docs/runbook/wall.md, "Launch, watch, stop, clean up").  Its
-# option goes before the command or after it, as --verbose does:
+# options go before the command or after it, as --verbose does:
 #   --recorded N          the games recorded that the table shows: the last N (0: none)               default 6
+#   --host USER@HOST      read the state of a chain that runs on that machine (chain.sh in the tmux session tx, its
+#                         state in ~/taxman-work) in one ssh call, instead of S3 and the group: no AWS profile, no aws
+#                         call.  It shows the machine's uptime, whether the chain runs, how it ended (chain.outcome),
+#                         the window and the wall (chain.log), when logs/chain.err last changed, the game the results
+#                         file is recorded through, and the same table.  ssh runs with BatchMode: the key must need no
+#                         password
 # Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1 for launch,
 # and for status, stop and cleanup the one run in progress, the one whose prefix has a config and no ended object; with
 # none they refuse and say so, and with several they refuse and list the runs to choose from),
 # BUCKET, AWS_PROFILE (never defaulted: export it, aws login --profile NAME) and AWS_DEFAULT_REGION (us-east-1),
-# DRY_RUN, VERBOSE, AWS_CLI, and WALL_DIR (default ~/taxman-wall/RUN): where the files that the commands take are
-# written and kept (the user data, the launch template's data, the config).  The group, template, policy and security
-# group are always named taxman-wall: there is one run at a time.
+# DRY_RUN, VERBOSE, AWS_CLI, SSH_CLI (ssh), and WALL_DIR (default ~/taxman-wall/RUN): where the files that the commands
+# take are written and kept (the user data, the launch template's data, the config).  The group, template, policy and
+# security group are always named taxman-wall: there is one run at a time.
 
 set -u
 set -o pipefail
@@ -71,6 +78,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/env.sh"
 
 AWS_CLI="${AWS_CLI:-aws}"
+SSH_CLI="${SSH_CLI:-ssh}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 BUCKET="${BUCKET:-taxman-013764204840-us-east-1}"
 NAME=taxman-wall
@@ -78,6 +86,7 @@ ROLE=taxman-ec2
 DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
 SHOW_RECORDED=6
+WALL_HOST=""
 TAGS='{Key=Project,Value=taxman},{Key=Purpose,Value=wall}'
 IMAGE="resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
 
@@ -689,6 +698,60 @@ table_heading() {
     [ -z "$what" ] || printf '  %s:\n' "$what"
 }
 
+# The seconds on the clock of a game (ckpt/nNNNN.clock) in S3, for the file NAME.
+s3_clock() {
+    s3_text "ckpt/$1" | awk '{print $1}'
+}
+
+# The progress lines of the solver in S3 (logs/chain.err).
+s3_progress() {
+    s3_text logs/chain.err
+}
+
+# The games of the chain, from what each path reads.  Arguments: the game recorded through and its score (both empty for
+# no game), the window, the last game of the chain and the wall in hours, the lines of the recorded games
+# (logs/chain.out), the command that prints the progress lines of the solver (logs/chain.err; empty if there are none to
+# read) and the note for the games in flight when there are none, the command that prints the seconds on the clock of
+# the file NAME (ckpt/nNNNN.clock) and the names of those files.  It prints the line of the game recorded through, the
+# heading, and the table of the last SHOW_RECORDED games recorded and the games in flight after the game recorded
+# through.
+chain_games() {
+    local recorded="$1" score="$2" window="$3" chain_to="$4" wall_hours="$5" lines="$6" progress_fn="$7" note="$8"
+    local clock_fn="$9" clock_names="${10}" first_n last_n in_flight shown shown_count name n seconds clocks=""
+    if [ -n "$recorded" ]; then
+        printf '  recorded through %s (score %s)\n' "$recorded" "$score"
+    else
+        printf '  recorded through: no game yet\n'
+        recorded=0
+    fi
+    first_n=$((recorded + 1))
+    last_n=$((recorded + window))
+    [ "$last_n" -le "$chain_to" ] || last_n="$chain_to"
+    in_flight=$((last_n - first_n + 1))
+    [ "$in_flight" -gt 0 ] || in_flight=0
+    for name in $clock_names; do
+        n="${name#n}"
+        n=$((10#${n%.clock}))
+        if [ "$n" -ge "$first_n" ] && [ "$n" -le "$last_n" ]; then
+            seconds="$("$clock_fn" "$name")"
+            [ -z "$seconds" ] || clocks="$clocks $n $seconds"
+        fi
+    done
+    shown="$(printf '%s\n' "$lines" | recorded_games "$SHOW_RECORDED" "$recorded")"
+    shown_count="$(printf '%s\n' "$shown" | grep -c .)"
+    table_heading "$shown_count" "$in_flight" "$window" "$wall_hours"
+    if [ "$in_flight" -gt 0 ] && [ -n "$progress_fn" ]; then
+        { printf '%s\n' "$shown"; "$progress_fn"; } | games_table "$first_n" "$in_flight" "$clocks"
+    else
+        [ "$shown_count" -eq 0 ] || printf '%s\n' "$shown" | games_table "$first_n" 0 ""
+        if [ "$in_flight" -gt 0 ]; then
+            printf '  %s\n' "$note"
+        else
+            printf '  no game in flight: the range to %s is recorded\n' "$chain_to"
+        fi
+    fi
+}
+
 status() {
     need_run
     local config ended ledger hours start updated budget price until_epoch boots window chain_to wall_hours group
@@ -746,8 +809,7 @@ status() {
     # The chain is as old as the last save: the newest object of results/, logs/ and ckpt/ (the ledger and the rest of
     # run/ are written on their own).
     printf 'the chain (as of the last save to S3)\n'
-    local listing prefix saved saved_epoch lines out recorded score first_n last_n in_flight shown shown_count name n
-    local seconds clocks=""
+    local listing prefix saved saved_epoch lines out recorded score progress_fn=""
     prefix="${S3_DEST#s3://$BUCKET/}"
     listing="$(s3_ls --recursive "$S3_DEST/")"
     saved="$(printf '%s\n' "$listing" | awk -v p="$prefix" '
@@ -764,42 +826,113 @@ status() {
     lines="$(s3_text logs/chain.out | grep '^n=' | grep -v ' incomplete$')"
     out="$(printf '%s\n' "$lines" | tail -n 1)"
     recorded="$(printf '%s\n' "$out" | sed -n 's/^n=\([0-9]*\) .*/\1/p')"
-    if [ -n "$recorded" ]; then
-        score="$(printf '%s\n' "$out" | sed -n 's/.* score=\([0-9]*\) .*/\1/p')"
-        printf '  recorded through %s (score %s)\n' "$recorded" "$score"
-    else
-        printf '  recorded through: no game yet\n'
-        recorded=0
-    fi
-    first_n=$((recorded + 1))
-    last_n=$((recorded + window))
-    [ "$last_n" -le "$chain_to" ] || last_n="$chain_to"
-    in_flight=$((last_n - first_n + 1))
-    [ "$in_flight" -gt 0 ] || in_flight=0
-    for name in $(printf '%s\n' "$listing" | awk -v p="$prefix/ckpt/" \
-        'index($4, p) == 1 && substr($4, length(p) + 1) ~ /^n[0-9]+[.]clock$/ {print substr($4, length(p) + 1)}'); do
-        n="${name#n}"
-        n=$((10#${n%.clock}))
-        if [ "$n" -ge "$first_n" ] && [ "$n" -le "$last_n" ]; then
-            seconds="$(s3_text "ckpt/$name" | awk '{print $1}')"
-            [ -z "$seconds" ] || clocks="$clocks $n $seconds"
-        fi
-    done
-    shown="$(printf '%s\n' "$lines" | recorded_games "$SHOW_RECORDED" "$recorded")"
-    shown_count="$(printf '%s\n' "$shown" | grep -c .)"
-    table_heading "$shown_count" "$in_flight" "$window" "$wall_hours"
+    score="$(printf '%s\n' "$out" | sed -n 's/.* score=\([0-9]*\) .*/\1/p')"
     # The machine saves chain.err with its first save: until then it is not in S3, and that is no error.
-    if [ "$in_flight" -gt 0 ] &&
-        printf '%s\n' "$listing" | awk -v f="$prefix/logs/chain.err" '$4 == f { found = 1 } END { exit !found }'; then
-        { printf '%s\n' "$shown"; s3_text logs/chain.err; } | games_table "$first_n" "$in_flight" "$clocks"
-    else
-        [ "$shown_count" -eq 0 ] || printf '%s\n' "$shown" | games_table "$first_n" 0 ""
-        if [ "$in_flight" -gt 0 ]; then
-            printf '  no progress lines saved yet\n'
-        else
-            printf '  no game in flight: the range to %s is recorded\n' "$chain_to"
-        fi
+    if printf '%s\n' "$listing" | awk -v f="$prefix/logs/chain.err" '$4 == f { found = 1 } END { exit !found }'; then
+        progress_fn=s3_progress
     fi
+    chain_games "$recorded" "$score" "$window" "$chain_to" "$wall_hours" "$lines" "$progress_fn" \
+        "no progress lines saved yet" s3_clock "$(printf '%s\n' "$listing" | awk -v p="$prefix/ckpt/" \
+        'index($4, p) == 1 && substr($4, length(p) + 1) ~ /^n[0-9]+[.]clock$/ {print substr($4, length(p) + 1)}')"
+}
+
+# The script that the host runs (bash -s), one ssh call for all that status --host shows: sections, each after a line
+# @@NAME, of the state of a chain in ~/taxman-work.  The results file's last lines are enough to find the last game
+# completed, and the last 3000 lines of chain.err to tell the games in flight apart.
+host_script() {
+    cat <<'EOF'
+work="$HOME/taxman-work"
+changed() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
+echo @@now
+date +%s
+echo @@uptime
+uptime
+echo @@session
+if tmux has-session -t tx 2>/dev/null; then echo yes; else echo no; fi
+echo @@solver
+if ps -eo args | grep -q '[t]axman solve'; then echo yes; else echo no; fi
+echo @@outcome
+cat "$work/chain.outcome" 2>/dev/null
+echo @@start
+grep -E ' chain [0-9]+-[0-9]+; threads: ' "$work/logs/chain.log" 2>/dev/null | tail -n 1
+echo @@errtime
+changed "$work/logs/chain.err"
+echo @@err
+tail -n 3000 "$work/logs/chain.err" 2>/dev/null
+echo @@result
+tail -n 100 "$work/results/strict.jsonl" 2>/dev/null | grep '"completed":true' | tail -n 1 |
+    grep -o '"n":[0-9]*,"score":[0-9]*' | head -n 1
+echo @@out
+grep '^n=' "$work/logs/chain.out" 2>/dev/null | grep -v ' incomplete$'
+echo @@clocks
+for f in "$work"/ckpt/n*.clock; do
+    [ -f "$f" ] && echo "$(basename "$f") $(awk '{print $1; exit}' "$f")"
+done
+true
+EOF
+}
+
+# The section NAME of the host's answer (HOST_DATA), without its marker.
+host_section() {
+    printf '%s\n' "$HOST_DATA" | awk -v marker="@@$1" '$0 == marker { on = 1; next } /^@@/ { on = 0 } on'
+}
+
+# The seconds on the clock of a game (ckpt/nNNNN.clock) on the host, for the file NAME, from HOST_CLOCKS: the section
+# clocks of the answer.
+host_clock() {
+    printf '%s\n' "$HOST_CLOCKS" | awk -v name="$1" '$1 == name { print $2; exit }'
+}
+
+# The progress lines of the solver on the host (logs/chain.err).
+host_progress() {
+    host_section err
+}
+
+# status for a chain on another machine: what it shows is in ~/taxman-work there, read over ssh, and no AWS.
+status_host() {
+    local now session solver running outcome start window chain_to wall_hours changed result recorded score
+    local progress_fn=""
+    HOST_DATA="$(host_script | "$SSH_CLI" -o BatchMode=yes -o ConnectTimeout=10 "$WALL_HOST" 'bash -s')" ||
+        die "cannot read the chain on $WALL_HOST over ssh"
+    now="$(host_section now)"
+    [ -n "$now" ] || die "$WALL_HOST did not answer as expected: $(printf '%s\n' "$HOST_DATA" | head -n 1)"
+    printf 'host %s\n' "$WALL_HOST"
+    printf '  %s\n' "$(host_section uptime | sed 's/^ *//')"
+    session="$(host_section session)"
+    solver="$(host_section solver)"
+    running="is NOT running"
+    if [ "$session" = yes ] && [ "$solver" = yes ]; then running="is running"; fi
+    if [ "$session" = yes ]; then session="the tmux session tx exists"; else session="no tmux session tx"; fi
+    if [ "$solver" = yes ]; then solver="a taxman solve process is alive"; else solver="no taxman solve process"; fi
+    printf '  the chain %s (%s, %s)\n' "$running" "$session" "$solver"
+    outcome="$(host_section outcome)"
+    if [ -n "$outcome" ]; then printf '  ENDED: %s\n' "$outcome"; fi
+
+    start="$(host_section start)"
+    window="$(printf '%s\n' "$start" | sed -n 's/.* window \([0-9][0-9]*\);.*/\1/p')"
+    window="${window:-4}"
+    chain_to="$(printf '%s\n' "$start" | sed -n 's/.* chain 1-\([0-9][0-9]*\);.*/\1/p')"
+    chain_to="${chain_to:-8191}"
+    wall_hours="$(printf '%s\n' "$start" | sed -n 's/.* wall: \([^ ]*\) hours;.*/\1/p')"
+    if [ -n "$start" ]; then
+        printf '  chain 1-%s, window %s, wall %s hours\n' "$chain_to" "$window" "$wall_hours"
+    else
+        printf '  no line of chain.log starts the chain yet\n'
+    fi
+    changed="$(host_section errtime)"
+    if [ -n "$changed" ]; then
+        printf '  last progress line: %s, %s ago\n' "$(epoch_local "$changed")" "$(span_text $((now - changed)))"
+        progress_fn=host_progress
+    else
+        printf '  no progress line yet: no logs/chain.err\n'
+    fi
+    # The results file holds the whole chain; chain.out only the games of this machine's run.
+    result="$(host_section result)"
+    recorded="$(printf '%s\n' "$result" | sed -n 's/^"n":\([0-9]*\),.*/\1/p')"
+    score="$(printf '%s\n' "$result" | sed -n 's/.*"score":\([0-9]*\)$/\1/p')"
+    HOST_CLOCKS="$(host_section clocks)"
+    chain_games "$recorded" "$score" "$window" "$chain_to" "$wall_hours" "$(host_section out)" "$progress_fn" \
+        "no progress lines yet" host_clock "$(printf '%s\n' "$HOST_CLOCKS" | awk '{print $1}')"
 }
 
 # --- stop --------------------------------------------------------------------------------------------------------
@@ -888,8 +1021,8 @@ cleanup() {
 
 # --- main --------------------------------------------------------------------------------------------------------
 
-# --verbose goes with any command, before it or after (and VERBOSE=1 does without it); so does --recorded N, which
-# status takes.
+# --verbose goes with any command, before it or after (and VERBOSE=1 does without it); so do --recorded N and --host
+# USER@HOST, which status takes.
 args=()
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -898,6 +1031,17 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || die "--recorded needs a value (see the top of $0)"
             is_whole_number "$2" || die "--recorded: \"$2\" is not a whole number"
             SHOW_RECORDED="$2"
+            shift
+            ;;
+        --host)
+            [ "$#" -ge 2 ] || die "--host needs a value (see the top of $0)"
+            # USER@HOST, so that ssh cannot take it for an option.
+            case "$2" in
+                -* | *[!A-Za-z0-9_.:@%+-]* | @* | *@ | *@*@*) die "--host: \"$2\" is not USER@HOST" ;;
+                *@*) ;;
+                *) die "--host: \"$2\" is not USER@HOST" ;;
+            esac
+            WALL_HOST="$2"
             shift
             ;;
         *) args+=("$1") ;;
@@ -911,12 +1055,13 @@ command="${1:-}"
 case "$command" in
     launch) [ -n "$RUN" ] || set_run run1 ;;
 esac
+[ -z "$WALL_HOST" ] || [ "$command" = status ] || die "--host is for status: wall.sh status --host USER@HOST"
 case "$command" in
     launch) launch "$@" ;;
-    status) status ;;
+    status) if [ -n "$WALL_HOST" ]; then status_host; else status; fi ;;
     stop) stop "$@" ;;
     cleanup) cleanup "$@" ;;
     -h | --help | help) usage ;;
-    *) die "usage: wall.sh launch --commit SHA --until DATE [options] | status | stop [--now] | cleanup [--force]" \
-        "(any command: --verbose)" ;;
+    *) die "usage: wall.sh launch --commit SHA --until DATE [options] | status [--recorded N] [--host USER@HOST]" \
+        "| stop [--now] | cleanup [--force]   (any command: --verbose)" ;;
 esac

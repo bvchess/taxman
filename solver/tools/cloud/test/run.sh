@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the unattended-run scripts that need no cloud: chain.sh with the wall and the ledger (run.sh), wall-node.sh
-# and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file) and for sudo
-# and shutdown.  The scenarios that run the chain (chain, ledger, node, sweep) need the release build of the solver
+# and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file), for ssh
+# (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run the chain (chain, ledger, node, sweep) need the release build of the solver
 # (cd solver/frame && cargo build --release; or TAXMAN_BIN names another build of the same sources, say the debug build
 # that `cargo build` makes) and rsync; launch and status need neither.  sweep.sh's scenario also runs the real verify.sh
 # on the sweep's files, which replays the committed games three times.
@@ -819,7 +819,39 @@ scenario_status() {
     check "in place of their rows" lacks "$tmp/q1.out" 'no recent progress line'
     rm -rf "$(sobj wall-t-quiet)"
 
+    check_status_host
     default_run
+}
+
+# --- wall.sh status --host ---------------------------------------------------------------------------------------
+
+# A chain on another machine, the home directory $FAKE_HOME of the stand-in for ssh: the results file is recorded
+# through 3 (its last line is a game not completed), logs/chain.out has the game 2 only (the games of the machine's own
+# run), the window is 3 and game 4 has a clock.
+check_status_host() {
+    echo "== wall.sh status --host: a chain on another machine, over ssh"
+    local wall="$cloud/wall.sh" work="$tmp/home/taxman-work" calls
+    export FAKE_HOME="$tmp/home"
+    mkdir -p "$work/results" "$work/logs" "$work/ckpt"
+    printf '%s\n' '{"schema":5,"n":2,"score":20,"moves":[2],"completed":true}' \
+        '{"schema":5,"n":3,"score":30,"moves":[3],"completed":true}' \
+        '{"schema":5,"n":4,"score":40,"moves":[4],"completed":false}' >"$work/results/strict.jsonl"
+    printf '%s chain 1-100; threads: all available; window 3; wall: 48 hours; results x; checkpoints y\n' \
+        2026-10-21T00:00:00Z >"$work/logs/chain.log"
+    recorded_line 2 20 search 5 1.5 unknown exhausted >"$work/logs/chain.out"
+    progress 4 1h40m00s 1000000000 250.0k/s 341541 >"$work/logs/chain.err"
+    printf '7200.5\n' >"$work/ckpt/n0004.clock"
+    : >"$FAKE_LOG"
+    TZ=America/Los_Angeles env -u RUN "$wall" status --host user@fake.example >"$tmp/h1.out" 2>&1
+    calls="$?,$(wc -l <"$FAKE_LOG" | tr -d ' ')"
+    sed 's/  */ /g' "$tmp/h1.out" >"$tmp/h1.norm"
+    check "status --host succeeds with no RUN, no profile and no aws call" equals "$calls" 0,0
+    check "it is recorded through the last game completed of the results file, not of chain.out" has_line \
+        "$tmp/h1.norm" ' recorded through 3 (score 30)'
+    check "the table has the game of chain.out, the game in flight with its clock, and the window of chain.log" equals \
+        "$(grep -c -e ' 2 - 1.5s 5 - recorded, score 20 (search, exhausted)$' \
+            -e ' 4 2h00m00s 1h40m00s 1000000000 341541 running, 250.0k nodes/s$' \
+            -e ' 6 - - - - no recent progress line$' "$tmp/h1.norm")" 3
 }
 
 # --- wall.sh stop and cleanup: the run in progress ---------------------------------------------------------------
