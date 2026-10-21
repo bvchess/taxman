@@ -33,9 +33,9 @@ opt(n) and the best score found.
 
 ## The programs
 
-* **The frame solver** ([solver/frame](solver/frame/README.md)) splits the board into independent groups of numbers,
-  the *frames*, and searches for the best set of numbers to play.  It can run on many CPUs, and its long runs can be
-  resumed after an interruption.
+* **The frame solver** ([solver/frame](solver/frame/README.md)) splits the board into almost independent groups of
+  numbers, the *frames*, and searches for the best set of numbers to play.  It can run on many CPUs, and its long runs
+  can be resumed after an interruption.
 * **The prover** ([solver/noframe](solver/noframe/README.md)) finds optimal solutions over the whole board, without the
   frame model.  It shares no code with the frame solver, so each checks the other.
 * **The heuristics** ([heuristics](heuristics/README.md)) play near-optimal games quickly.

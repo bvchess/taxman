@@ -86,26 +86,28 @@ to its glossary entry.
    (`frames::BoardFrames`; [solver/docs/design/engine.md, "Per-game pipeline
    (`solver`)"](../docs/design/engine.md#per-game-pipeline-solver)).
 
-**An example: game 21.**  The board 1 to 21 has four frames.  `testdata/golden/n0021.json` has them, and the wiki's
+**An example: game 21.**  The board 1 to 21 has four frames.  Two of them are closed, so they have no number.
+`testdata/golden/n0021.json` has the frames, and the wiki's
 [walkthrough of game 21](https://github.com/bvchess/taxman/wiki/Walkthrough-for-N=21) shows them in pictures:
 
 ```
-frame A   sources 19 11 13 17   factors 1           closed: 11, 13 and 17 are impossible (the 1 pays for one of them)
-frame B   sources 14 15 21      factors 2 3 5 7     1 freedom (15 must take 5)             frame 0
-frame C   sources 12 18 20      factors 4 6 9 10    1 freedom (20 must take 10)            frame 1
-frame D   sources 16            factors 8           closed
-candidates: 4 9 (factors of C that B can accept as moves and still play all its own)
+closed    sources 19 11 13 17   factors 1           11, 13 and 17 are impossible (the 1 pays for 19)
+frame 0   sources 14 15 21      factors 2 3 5 7     1 freedom (15 must take 5)
+frame 1   sources 12 18 20      factors 4 6 9 10    1 freedom (20 must take 10)
+closed    sources 16            factors 8
+candidates: 4 9 (factors of frame 1 that frame 0 can accept as moves and still play all its own)
 ```
 
-B is in front of C, because 9, a factor of C, has the maximal factor 3 in B.  The game with no promotions plays every
-source that is not impossible, and scores `in_the_bag` = 135 (19 + 14 + 15 + 21 + 12 + 18 + 20 + 16).  Promoting 9
-takes it out of C's factors and makes it a move of B, and the game scores 144; promoting 4 instead would score 139.
-Both frames stay winnable.
+Frame 0 is in front of frame 1, because 9, a factor of frame 1, has the maximal factor 3 in frame 0.  The game with no
+promotions plays every source that is not impossible, and scores `in_the_bag` = 135 (19 + 14 + 15 + 21 + 12 + 18 +
+20 + 16).  Promoting 9 takes it out of frame 1's factors and makes it a move of frame 0, and the game scores 144;
+promoting 4 instead would score 139.  Both frames stay winnable.
 
 After a promotion the frames are [reduced](../../docs/GLOSSARY.md#the-frame-model): a move left with one live factor is
-paid by it, so the pair drops out, repeatedly.  Here 9's only maximal factor is 3, so the pair (9, 3) drops out of B.
-That leaves 21 only the factor 7 and 14 only the factor 2, so they drop out too.  In C, 18 is left with 6 and 12 with 4.
-Each frame has spent its one freedom, and the game plays the frames from the front: 19; 9, 15, 21, 14; 18, 12, 20; 16.
+paid by it, so the pair drops out, repeatedly.  Here 9's only maximal factor is 3, so the pair (9, 3) drops out of
+frame 0.  That leaves 21 only the factor 7 and 14 only the factor 2, so they drop out too.  In frame 1, 18 is left with
+6 and 12 with 4.  Frames 0 and 1 have each spent their one freedom, and the game plays the frames from the front:
+19; 9, 15, 21, 14; 18, 12, 20; 16.
 
 The search is over such choices, and a larger game has more of them: the glossary counts the
 [candidates](../../docs/GLOSSARY.md#the-frame-model) of three games.
