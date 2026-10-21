@@ -114,6 +114,12 @@ read_aws() {
     "$AWS_CLI" "$@"
 }
 
+# A command that only reads, and whose error text is left out: the caller says what failed.
+read_aws_quiet() {
+    show_read "$@"
+    "$AWS_CLI" "$@" 2>/dev/null
+}
+
 # A command that only reads, whose output is a check that is meaningless without the command: always printed.
 check_aws() {
     show "$@"
@@ -146,14 +152,12 @@ change_aws_value() {
 # The text of the object PATH of S3_DEST (run/config, logs/chain.err, ...); the status of aws, and no text, if it is not
 # there.
 s3_text() {
-    show_read s3 cp "$S3_DEST/$1" - --only-show-errors
-    "$AWS_CLI" s3 cp "$S3_DEST/$1" - --only-show-errors 2>/dev/null
+    read_aws_quiet s3 cp "$S3_DEST/$1" - --only-show-errors
 }
 
 # `aws s3 ls`, its times in UTC (it prints them in the time zone of the machine otherwise).
 s3_ls() {
-    show_read s3 ls "$@"
-    TZ=UTC "$AWS_CLI" s3 ls "$@" 2>/dev/null
+    TZ=UTC read_aws_quiet s3 ls "$@"
 }
 
 # Whether the object NAME is in S3_DEST/run.
@@ -618,9 +622,22 @@ games_in_flight() {
     }'
 }
 
+# The group's capacity and instances, a line each, from the text of describe-auto-scaling-groups on stdin: the desired
+# capacity, then `ID ZONE STATE` (tab-separated) for each instance; `None` is a group that does not exist.
+group_lines() {
+    awk -F '\t' -v name="$NAME" '
+    NR == 1 && ($0 == "None" || $0 == "") { missing = 1; exit }
+    NR == 1 { printf "  desired capacity %s\n", $0; next }
+    NF >= 3 { printf "  instance %s in %s, %s\n", $1, $2, $3; instances++ }
+    END {
+        if (missing || NR == 0) printf "  no group %s\n", name
+        else if (!instances) printf "  no instance\n"
+    }'
+}
+
 status() {
     need_run
-    local config ended ledger hours start updated budget price until_epoch boots window chain_to wall_hours
+    local config ended ledger hours start updated budget price until_epoch boots window chain_to wall_hours group
     config="$(s3_text run/config)" || die "no run $RUN in $S3_DEST (nothing at $S3_DEST/run/config)"
     budget="$(printf '%s\n' "$config" | field BUDGET_HOURS)"
     price="$(printf '%s\n' "$config" | field PRICE)"
@@ -664,9 +681,13 @@ status() {
     printf '  machines started so far: %s\n' "$boots"
 
     printf 'the group %s\n' "$NAME"
-    read_aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$NAME" --output text \
-        --query 'AutoScalingGroups[0].[DesiredCapacity,Instances[].[InstanceId,AvailabilityZone,LifecycleState]]' \
-        2>&1 | sed 's/^/  /'
+    if group="$(read_aws_quiet autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$NAME" \
+        --output text --query \
+        'AutoScalingGroups[0].[DesiredCapacity,Instances[].[InstanceId,AvailabilityZone,LifecycleState]]')"; then
+        printf '%s\n' "$group" | group_lines
+    else
+        printf '  cannot read the group %s\n' "$NAME"
+    fi
 
     # The chain is as old as the last save: the newest object of results/, logs/ and ckpt/ (the ledger and the rest of
     # run/ are written on their own).
@@ -711,7 +732,12 @@ status() {
         fi
     done
     printf '  games in flight (window %s; "own search" counts toward the wall of %s hours):\n' "$window" "$wall_hours"
-    s3_text logs/chain.err | games_in_flight "$first_n" "$last_n" "$clocks"
+    # The machine saves chain.err with its first save: until then it is not in S3, and that is no error.
+    if printf '%s\n' "$listing" | awk -v f="$prefix/logs/chain.err" '$4 == f { found = 1 } END { exit !found }'; then
+        s3_text logs/chain.err | games_in_flight "$first_n" "$last_n" "$clocks"
+    else
+        printf '  no progress lines saved yet\n'
+    fi
 }
 
 # --- stop --------------------------------------------------------------------------------------------------------

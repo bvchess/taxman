@@ -156,6 +156,16 @@ case "$service $command" in
             case "$query" in *DesiredCapacity*) echo None ;; *) true ;; esac
         else
             case "$query" in
+                # The capacity, then an instance a line as --output text prints it (ID, zone and state, tab-separated):
+                # the lines of $state/group-instances, or one instance if there is no such file.
+                *Instances*)
+                    cat "$state/desired"
+                    if [ -f "$state/group-instances" ]; then
+                        cat "$state/group-instances"
+                    else
+                        printf 'i-0123\tus-east-1a\tInService\n'
+                    fi
+                    ;;
                 *DesiredCapacity*) cat "$state/desired"; echo i-0123 us-east-1a InService Healthy ;;
                 *) echo taxman-wall ;;
             esac

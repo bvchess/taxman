@@ -575,6 +575,7 @@ scenario_status() {
     check "it takes the one run in progress" matches "$tmp/s1.norm" '^run t-live (s3://'
     check "and says that RUN was not set" matches "$tmp/s1.norm" 'the run in progress (RUN was not set)'
     check "it does not print the aws commands" lacks "$tmp/s1.out" '^+ aws'
+    check "without a group, it says so" has_line "$tmp/s1.out" '  no group taxman-wall'
     check "it recorded through 40" has_line "$tmp/s1.norm" ' recorded through 40 (score 400)'
     check "the last save is the newest object saved, in Pacific time, and not the ledger's" matches "$tmp/s1.norm" \
         "^ last save to S3: $saved, 4 min [0-9]* s ago$"
@@ -605,8 +606,35 @@ scenario_status() {
     TZ=America/Los_Angeles RUN=t-live "$wall" status --verbose >"$tmp/s4.out" 2>&1
     check "--verbose prints the commands that read" matches "$tmp/s4.out" '^+ aws sts get-caller-identity'
     check "all of them" matches "$tmp/s4.out" '^+ aws s3 ls s3://.*/wall-t-live/'
+    check "among them the read of the group" matches "$tmp/s4.out" '^+ aws autoscaling describe-auto-scaling-groups'
     TZ=America/Los_Angeles RUN=t-live VERBOSE=1 "$wall" status >"$tmp/s5.out" 2>&1
     check "so does VERBOSE=1" matches "$tmp/s5.out" '^+ aws sts get-caller-identity'
+
+    # The group, with one instance, with two, with none, and when it cannot be read.
+    printf 'x\n' >"$FAKE_STATE/asg"
+    echo 1 >"$FAKE_STATE/desired"
+    printf 'i-039bffbd48f5ab778\tus-east-1b\tInService\n' >"$FAKE_STATE/group-instances"
+    TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/g1.out" 2>&1
+    check "a group with an instance says its capacity" has_line "$tmp/g1.out" '  desired capacity 1'
+    check "and the instance, its zone and its state" has_line "$tmp/g1.out" \
+        '  instance i-039bffbd48f5ab778 in us-east-1b, InService'
+    check "and no number is bare" lacks "$tmp/g1.out" '^  [0-9]'
+    printf 'i-0123456789abcdef0\tus-east-1c\tPending\n' >>"$FAKE_STATE/group-instances"
+    TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/g2.out" 2>&1
+    check "a line for each of two instances" equals "$(grep -c '^  instance i-' "$tmp/g2.out")" 2
+    check "the second with its own zone and state" has_line "$tmp/g2.out" \
+        '  instance i-0123456789abcdef0 in us-east-1c, Pending'
+    echo 0 >"$FAKE_STATE/desired"
+    : >"$FAKE_STATE/group-instances"
+    TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/g3.out" 2>&1
+    check "a group at capacity 0" has_line "$tmp/g3.out" '  desired capacity 0'
+    check "has no instance" has_line "$tmp/g3.out" '  no instance'
+    FAKE_FAIL=describe-auto-scaling-groups TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/g4.out" 2>&1
+    check "a group that cannot be read does not fail the status" equals $? 0
+    check "which says so" has_line "$tmp/g4.out" '  cannot read the group taxman-wall'
+    check "without the error text of aws" lacks "$tmp/g4.out" 'AccessDenied'
+    check "and goes on with the chain" matches "$tmp/g4.out" '^  recorded through 40 '
+    rm -f "$FAKE_STATE/asg" "$FAKE_STATE/desired" "$FAKE_STATE/group-instances"
 
     # The oldest game's search is done (it is being recorded), and a stopped search.
     {
@@ -644,6 +672,16 @@ scenario_status() {
     env -u RUN "$wall" status >"$tmp/s9.out" 2>&1
     check "no run in progress is an error" equals $? 1
     check "which says so" matches "$tmp/s9.out" 'no run is in progress'
+
+    # A run whose machine has not saved yet: logs/chain.err is not in S3, and the status is whole.
+    fake_run t-early
+    env -u RUN "$wall" status >"$tmp/s10.out" 2>&1
+    check "a run before its first save is no error" equals $? 0
+    check "it takes the run" matches "$tmp/s10.out" '^run t-early  (s3://'
+    check "it says no progress line is saved" has_line "$tmp/s10.out" '  no progress lines saved yet'
+    check "in place of the games in flight" lacks "$tmp/s10.out" 'no recent progress line'
+    check "and nothing is saved at all" matches "$tmp/s10.out" '^  nothing has been saved to S3 yet$'
+    rm -rf "$(sobj wall-t-early)"
 
     default_run
 }

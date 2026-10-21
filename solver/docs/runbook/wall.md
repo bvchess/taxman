@@ -174,7 +174,9 @@ the chain (as of the last save to S3)
 
 `own search` is the wall clock that the oldest game keeps in `ckpt/nNNNN.clock` (up to a checkpoint interval old; `-`
 for a game without one), `elapsed` the time since its search began, waits included, and `best` the progress line's sum
-of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.
+of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.  `save.sh` copies the logs before
+the checkpoints, so the clock can be a minute or two ahead of `elapsed`, which comes from the last progress line of the
+logs.
 
 `RUN` names the run.  Without it, `launch` makes `run1`, and `status`, `stop` and `cleanup` take the one run in
 progress, the one with a config in S3 and no `ended` object.  With none, or several, they refuse and say so, and list
