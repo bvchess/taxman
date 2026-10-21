@@ -17,9 +17,10 @@
 //! (solver/notebook/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).  So a search that proves long
 //! gets a finder, and one that ends first never pays for one.
 //!
-//! The tactic `finder_after` is the number of steps, over every run of a search, after which the search starts one
-//! finder thread (the tactic `finder_seconds` is its budget); [`Plan`] carries the two, and the seed of the game of
-//! `n − 1` if the search has one.  The thread ([`beside`]) runs *rounds* of LNS, each with a random seed of its own
+//! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
+//! finder thread (`--finder-seconds` is its budget; both are `SolveOptions`, no tactics); [`Plan`] carries the two, and
+//! the seed of the game of `n − 1` if the search has one.  The thread ([`beside`]) runs *rounds* of LNS, each with a
+//! random seed of its own
 //! ([`Plan::random`] plus the round's number) for [`ROUND`] at most: the odd rounds start from the survivors of the
 //! seed, if there is one, the others from the search's incumbent as it is when the round starts, and adopt a better
 //! incumbent that the search finds meanwhile.  A game better than the search's incumbent is offered to the search at
@@ -190,7 +191,7 @@ pub const ROUND: Duration = Duration::from_secs(15);
 /// How often the thread looks at the search's steps while it waits to start, and for the search's end.
 const POLL: Duration = Duration::from_millis(20);
 
-/// When and how a search runs its finder (the tactics `finder_after` and `finder_seconds`).
+/// When and how a search runs its finder (the flags `--finder-after` and `--finder-seconds`).
 #[derive(Clone, Debug)]
 pub struct Plan<const W: usize> {
     /// The finder starts when the search has taken this many steps, over every run of it (a resumed search counts the

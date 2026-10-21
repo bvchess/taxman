@@ -1,0 +1,15 @@
+diff --git a/solver/frame/examples/tune.rs b/solver/frame/examples/tune.rs
+index 6545f29..8b91644 100644
+--- a/solver/frame/examples/tune.rs
++++ b/solver/frame/examples/tune.rs
+@@ -161,7 +161,9 @@ fn solve_unit<const W: usize>(
+     node_limit: Option<u64>,
+ ) -> Result<Solved, String> {
+     let cfg = EngineConfig { threads: 1, node_limit, progress: None, ..EngineConfig::default() };
+-    let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: search::payload_of(start) };
++    // Throwaway experiment patch: the incumbent value the search must beat comes from TUNE_INCUMBENT_SUM when set.
++    let best = std::env::var("TUNE_INCUMBENT_SUM").map_or(start.sum(), |text| text.parse().expect("a number"));
++    let begin = Start::Fresh { units: vec![unit], best, payload: search::payload_of(start) };
+     let cpu = AtomicU64::new(0);
+     let t0 = Instant::now();
+     let outcome =

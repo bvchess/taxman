@@ -1,0 +1,69 @@
+== the frames: frames, candidates, max_total, greedy sum, search nodes
+4863 repeat 9 1342 288 529520 0
+4864 search 9 1343 288 529776 1133462769
+4865 search 9 1343 287 527853 1012180800
+4872 search 9 1344 287 529493 944972906
+== experiment B: 20 subtrees solved from 5 incumbents
+  537927: 20 subtrees, geometric mean of steps relative to 537971 1.455, -0.370 decades per 100
+  537971: 20 subtrees, geometric mean of steps relative to 537971 1.000, +0.000 decades per 100
+  538000: 20 subtrees, geometric mean of steps relative to 537971 0.780, -0.373 decades per 100
+  538030: 20 subtrees, geometric mean of steps relative to 537971 0.526, -0.473 decades per 100
+  538080: 20 subtrees, geometric mean of steps relative to 537971 0.327, -0.445 decades per 100
+  fit over 100 solves: log10 steps = 0.178 + 0.471 * gap/100, sd 0.43, slope error 0.018; gaps of the solves 209 to 959 at 537971
+== the work left in the open units of the two checkpoints (gap > 0), by the fit
+  units.jsonl: 3559994536 nodes, incumbent 537971, 5536 units, 5462 with a gap above 0; 2.654e+10 steps left; the 139 units of gap 1500 to 2001 hold 94.0%
+   units with gap above 1,000, by gap/100:  {10: 260, 11: 221, 12: 185, 13: 135, 14: 79, 15: 74, 16: 39, 17: 17, 18: 6, 19: 2}
+  units-b.jsonl: 4575743054 nodes, incumbent 538080, 4852 units, 4638 with a gap above 0; 7.431e+09 steps left; the 50 units of gap 1502 to 1892 hold 85.6%
+   units with gap above 1,000, by gap/100:  {10: 238, 11: 162, 12: 132, 13: 77, 14: 59, 15: 29, 16: 13, 17: 5, 18: 3, 19: 0}
+  units.jsonl: with the slope two errors lower and higher, 1.041e+10 and 6.921e+10 steps left
+  units-b.jsonl: with the slope two errors lower and higher, 3.16e+09 and 1.789e+10 steps left
+== between the checkpoints: 1015748518 steps taken; the fit's work left at the first checkpoint, at the second one's incumbent, 8.137e+09; at the second 7.431e+09; the fit's work done 7.063e+08, steps taken over the fit's 1.44
+== the root gap: root bound less the incumbent (a promotion sum)
+  3440: root gap 1555 (best known), nodes of the run 0
+  3940: root gap 1485 (best known), nodes of the run 0
+  4005: root gap 1149 (best known), nodes of the run 0
+  4050: root gap 1013 (best known), nodes of the run 0
+  4176: root gap 1011 (best known), nodes of the run 0
+  4192: root gap 1343 (best known), nodes of the run 0
+  4225: root gap 1633 (best known), nodes of the run 0
+  4416: root gap 2406 (best known), nodes of the run 0
+  4830: root gap 1845 (best exhausted), nodes of the run 76948276
+  4832: root gap 1793 (best exhausted), nodes of the run 107097077
+  4836: root gap 1793 (best exhausted), nodes of the run 57311088
+  4840: root gap 1961 (best exhausted), nodes of the run 164681819
+  4848: root gap 1940 (best exhausted), nodes of the run 172080130
+  4851: root gap 2056 (best exhausted), nodes of the run 432233279
+  4856: root gap 2056 (best exhausted), nodes of the run 531566282
+  4860: root gap 2095 (best exhausted), nodes of the run 857056875
+  4864: root gap 1944 (best exhausted), nodes of the run 1133462769
+  4865: root gap 1944 (best exhausted), nodes of the run 1012180800
+  4872: root gap 1898 (best exhausted), nodes of the run 944972906
+  19 games: 1011 to 2406, median 1845
+  4875 against 537927: 2183
+  4875 against 537971: 2139
+  4875 against 538080: 2030
+== the searches of the run over 100 million nodes: incumbent of the first progress line, final, nodes
+  4548: 454465 454465 150858831
+  4641: 477100 477100 148073403
+  4760: 509069 509069 170414767
+  4761: 509018 509018 411222327
+  4764: 509066 509066 437291135
+  4767: 508839 508839 249699271
+  4784: 511653 511653 300377686
+  4788: 514043 514043 144965730
+  4792: 514067 514067 147443148
+  4795: 516053 516053 114429761
+  4807: 516186 516186 226247949
+  4808: 516194 516194 124589996
+  4832: 525134 525134 107097077
+  4840: 527873 527873 164681819
+  4848: 534239 534239 172080130
+  4851: 535248 535248 432233279
+  4856: 535272 535272 531566282
+  4860: 537495 537495 857056875
+  4864: 537898 537902 1133462769  starts 4 below its best
+  4865: 537485 537485 1012180800
+  4872: 539895 539895 944972906
+  4875: 537927 538080 4589053646  starts 153 below its best
+  4875 rises (seconds, incumbent, steps): [(60.0, 537927, 63), (8460.0, 537962, 1024314552), (10260.0, 537971, 1478490936), (21001.0, 538068, 4053982171), (22021.0, 538080, 4302771107)]
+  4864 rises (seconds, incumbent, steps): [(60.0, 537898, 14691255), (360.0, 537902, 85836657)]

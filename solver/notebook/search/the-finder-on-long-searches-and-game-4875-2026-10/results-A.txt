@@ -1,0 +1,39 @@
+Experiment A: the LNS finder (wall sound --from lns --cap 0.01, i.e. the finder alone) on games 4875 and 4872
+Built at 9d9dae3 (crate in rust/), `cargo build --profile test --example wall` (no feature needed), CARGO_TARGET_DIR=finder-target.
+Command: wall sound --from lns --cpu BUDGET --cap 0.01 --seed SEED --known past5000.jsonl N   (nice -n 10, one thread)
+Scores below are promotion sums (score - in_the_bag; in_the_bag(4875) = 6938294, in_the_bag(4872) = 6926745).
+Root GF(2) bound for 4875: 540110.  Cloud run: start 537927, checkpoint incumbent 537971.  4872: known best 539895.
+'start' = the standalone start (no seed from n-1) of the wall tool ('plain'), or the start seeded with the game of n-1 from
+past5000.jsonl ('prev', needed a 3-line throwaway patch, finder-seed.patch).  The cloud run's own start (537927) is neither.
+
+mode  game  cpu_s seed  start  lns_result  found_at_cpu_ms  units  improvements  referee_replay
+plain 4872     5    1  539639  539822     3373    386    9  True
+plain 4872     5    2  539639  539849     1614    466    8  True
+plain 4872     5    3  539639  539849     2160    426    7  True
+plain 4872    60    1  539639  539895    16357   6775   13  True
+plain 4872    60    2  539639  539849     1609   5725    8  True
+plain 4872    60    3  539639  539849     2167   5804    7  True
+plain 4875     5    1  537742  537870     2635    240    4  True
+plain 4875     5    2  537742  537858      570    180    2  True
+plain 4875     5    3  537742  537870      915    274    3  True
+plain 4875    60    1  537742  537870     2641   3027    4  True
+plain 4875    60    2  537742  538080    45097   3992   12  True
+plain 4875    60    2  537742  538080    45068   3993   12  True
+plain 4875    60    3  537742  538051    16178   3586    9  True
+plain 4875    60    3  537742  538051    16159   3597    9  True
+prev  4875     5    1  537693  537838     4933    236    4  True
+prev  4875     5    2  537693  538059     3765    228    5  True
+prev  4875     5    3  537693  538080     1161    420    5  True
+prev  4875    60    1  537693  538080     9442   4568   12  True
+prev  4875    60    2  537693  538080    10579   5190    6  True
+prev  4875    60    3  537693  538080     1163   5156    5  True
+
+Notes
+* plain 4875 cpu60 seed2/seed3 appear twice: the first run (unpatched wall) and a rerun (patched wall, same seed) that saved
+  the game; the results agree (538080 and 538051).
+* Every game was replayed by the old tool's referee (replay_finished) at its score; the 8 saved games (A-game-*.json) were also
+  replayed by an independent Python checker (scripts/replay.py): legal, finished, player score = claimed.
+* GAME BETTER THAN THE RUN'S INCUMBENT: promotion sum 538080 (score 7476374), 109 above 537971 and 153 above 537927.
+  Saved: game-4875-538080.json (n, score, promotion_sum, promotions, moves).  The identical game (same md5) came from all 5
+  saved runs that reached 538080 (plain 60 s seed 2; prev 5 s seed 3; prev 60 s seeds 1, 2, 3).  The other saved runs
+  gave 538051 (plain 60 s seed 3), 538059 (prev 5 s seed 2) and 537838 (prev 5 s seed 1).

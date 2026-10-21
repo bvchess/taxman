@@ -1,0 +1,32 @@
+== a-run: checkpoint n4875.ckpt (3.56 G steps, incumbent 537971)
+nice -n 10 taxman solve 1-8191 --threads 2 --game-hours 24 --window 4 --out R --checkpoint-dir C --checkpoint-interval 300 --progress 20 --use-prev --finder-after 1000000 --finder-seconds 30
+exit: exit 130 after 60 s
+-- stderr (the progress lines cut at the first 130 characters):
+n=4875 finder: started at 3559994553 nodes, from 537971, for 30 s
+n=4875 finder: 538080 after 0.3 s (round 1, from the seed)
+n=4875 5h15m21s nodes 3560147110 (7.6k/s) best 538080 queue 5434 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full
+n=4875 finder: ended after 30.1 s: best 538080, 1 sets accepted
+n=4875 5h15m41s nodes 3560293542 (7.3k/s) best 538080 queue 5367 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full
+n=4875 5h15m41s nodes 3560295799 (stopped) best 538080 queue 5396 spilled 0 | eff 99.9% idle 0.0% lock 0.0% splits 0 steals 0 full
+-- stdout:
+n=4875  score=7476374   search  nodes=3560295799     56.570 s  incomplete
+skipped 4874 games already done in R
+stopped: the search for n=4875 was stopped by a signal before it finished; run the same command to resume it
+-- the unfinished line of 4875: {"n": 4875, "completed": false, "best_so_far": 7476374, "nodes": 3560295799, "invocations": 2, "engine": {"splits": 0, "checkpoints": 1, "spilled_units": 0, "max_queue": 5536, "finder": {"at_nodes": 3559994553, "from": 537971, "best": 538080, "improved": 1, "refused": 0, "seconds": 30.062121416, "found_seconds": 0.274497333}}, "options": {"force_search": false, "use_prev": true, "finder_after": 1000000, "finder_seconds": 30.0}}
+
+== b-final: checkpoint n4875-b.ckpt (4.58 G steps, incumbent 538080)
+nice -n 10 taxman solve 1-8191 --threads 2 --game-hours 24 --window 4 --out R --checkpoint-dir C --checkpoint-interval 300 --progress 20 --use-prev --finder-after 100000000 --finder-seconds 60
+exit: exit 130 after 91 s
+-- stderr (the progress lines cut at the first 130 characters):
+n=4875 finder: started at 4575743065 nodes, from 538080, for 60 s
+n=4875 6h25m21s nodes 4575912012 (8.4k/s) best 538080 queue 4757 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full
+n=4875 6h25m41s nodes 4576057420 (7.3k/s) best 538080 queue 4757 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full
+n=4875 6h26m01s nodes 4576212044 (7.7k/s) best 538080 queue 4757 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 full
+n=4875 finder: ended after 60.0 s: best 538080, 0 sets accepted
+n=4875 6h26m10s nodes 4576288595 (stopped) best 538080 queue 4831 spilled 0 | eff 100.0% idle 0.0% lock 0.0% splits 0 steals 0 ful
+-- stdout:
+n=4875  score=7476374   search  nodes=4576288595     85.871 s  incomplete
+skipped 4874 games already done in R
+stopped: the search for n=4875 was stopped by a signal before it finished; run the same command to resume it
+-- the unfinished line of 4875: {"n": 4875, "completed": false, "best_so_far": 7476374, "nodes": 4576288595, "invocations": 2, "engine": {"splits": 0, "checkpoints": 1, "spilled_units": 0, "max_queue": 4852, "finder": {"at_nodes": 4575743065, "from": 538080, "best": 538080, "improved": 0, "refused": 0, "seconds": 60.000657125, "found_seconds": 0.0}}, "options": {"force_search": false, "use_prev": true, "finder_after": 100000000, "finder_seconds": 60.0}}
+
