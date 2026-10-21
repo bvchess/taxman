@@ -155,22 +155,23 @@ leaves them out; the option goes before the command or after it, as `--verbose` 
 ```
 the chain (as of the last save to S3)
   last save to S3: 2026-10-18 15:17 PDT, 5 min 24 s ago
-  recorded through 4871 (score 7461794)
+  recorded through 4871 (score 7,461,794)
   the last 6 games recorded and the 4 in flight (window 4; "own search" counts toward the wall of 24 hours):
-      n  own search  elapsed             nodes     best  state
-   4866  -           0.2s                    0        -  recorded, score 7446689 (repeat, same_search of 4865)
-   4867  -           2m07s            34218766        -  recorded, score 7449976 (search, exhausted)
-   4868  -           1h17m16s       1133462769        -  recorded, score 7453452 (search, exhausted)
-   4869  -           0.2s                    0        -  recorded, score 7456914 (start, cap)
-   4870  -           0.2s                    0        -  recorded, score 7459353 (repeat, same_search of 4868)
-   4871  -           0.1s                    0        -  recorded, score 7461794 (prime, prime_formula)
-   4872  1h15m00s    1h45m00s       1086013550   341541  running, 242.8k nodes/s
-   4873  -           -                       -        -  no recent progress line
-   4874  -           -                       -        -  no recent progress line
-   4875  -           1h10m00s               63   341541  suspended
+      n  own search  elapsed              nodes       best  state
+   4866  -           0.2s                     0          -  recorded, score 7,446,689 (repeat, same_search of 4865)
+   4867  -           2m07s           34,218,766          -  recorded, score 7,449,976 (search, exhausted)
+   4868  -           1h17m16s     1,133,462,769          -  recorded, score 7,453,452 (search, exhausted)
+   4869  -           0.2s                     0          -  recorded, score 7,456,914 (start, cap)
+   4870  -           0.2s                     0          -  recorded, score 7,459,353 (repeat, same_search of 4868)
+   4871  -           0.1s                     0          -  recorded, score 7,461,794 (prime, prime_formula)
+   4872  1h15m00s    1h45m00s     1,086,013,550    341,541  running, 242.8k nodes/s
+   4873  -           -                        -          -  no recent progress line
+   4874  -           -                        -          -  no recent progress line
+   4875  -           1h10m00s                63    341,541  suspended
 ```
 
-The recorded games come first, in increasing n, and the games in flight follow.  A recorded game's row comes from its
+The recorded games come first, in increasing n, and the games in flight follow.  Scores, nodes and best sums have
+thousands separators; game numbers and times do not.  A recorded game's row comes from its
 line in `logs/chain.out` ([the summary line](../REFERENCE.md#the-summary-line-stdout-one-per-game)), the last one if a
 replacement machine printed the game again after an interruption:
 

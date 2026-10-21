@@ -567,7 +567,7 @@ scenario_status() {
         recorded_line 38 380 search 9 1.5 unknown exhausted
         recorded_line 37 370 prime 0 0.055 unknown prime_formula
         recorded_line 38 380 known 0 0.003 ok "known from the committed chain (strict.jsonl)"
-        recorded_line 39 390 search 0 0.247 unknown cap "  assumes statement U"
+        recorded_line 39 7466640 search 0 0.247 unknown cap "  assumes statement U"
         recorded_line 40 400 search 248002917 812.5 unknown exhausted
         printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete\n'
     } >>"$(sobj wall-t-live/logs/chain.out)"
@@ -605,11 +605,11 @@ scenario_status() {
     check "the last save is the newest object saved, in Pacific time, and not the ledger's" matches "$tmp/s1.norm" \
         "^ last save to S3: $saved, 4 min [0-9]* s ago$"
     check "the oldest game runs, with the clock of the wall" has_line "$tmp/s1.norm" \
-        ' 41 1h15m00s 1h40m00s 1000000000 341541 running, 250.0k nodes/s'
+        ' 41 1h15m00s 1h40m00s 1,000,000,000 341,541 running, 250.0k nodes/s'
     check "a game whose threads are another's is suspended" has_line "$tmp/s1.norm" \
-        ' 42 - 1h10m00s 63 341541 suspended'
+        ' 42 - 1h10m00s 63 341,541 suspended'
     check "a game whose search is done waits for the game before" has_line "$tmp/s1.norm" \
-        ' 43 - 30m30s 5000 777 search done, waiting for the game before'
+        ' 43 - 30m30s 5,000 777 search done, waiting for the game before'
     check "a game with no line has no state to tell" has_line "$tmp/s1.norm" ' 44 - - - - no recent progress line'
     check "and a game whose last line three of another's follow" has_line "$tmp/s1.norm" \
         ' 45 - - - - no recent progress line'
@@ -620,7 +620,7 @@ scenario_status() {
     check "one header line of columns stands over both" equals \
         "$(grep -c '^ n own search elapsed nodes best state$' "$tmp/s1.norm")" 1
     check "a searched game has its nodes and seconds, elapsed (1h17m16s), no wall clock and no best" has_line \
-        "$tmp/s1.norm" ' 35 - 1h17m16s 1133462769 - recorded, score 350 (search, exhausted)'
+        "$tmp/s1.norm" ' 35 - 1h17m16s 1,133,462,769 - recorded, score 350 (search, exhausted)'
     check "a repeat has the game whose search it repeats" has_line "$tmp/s1.norm" \
         ' 36 - 0.2s 0 - recorded, score 360 (repeat, same_search of 34)'
     check "a game printed again is the last of its lines: a prime game" has_line "$tmp/s1.norm" \
@@ -629,9 +629,9 @@ scenario_status() {
         "$tmp/s1.norm" \
         ' 38 - 0.0s 0 - recorded, score 380 (known, known from the committed chain (strict.jsonl), optimal ok)'
     check "the proof ends at what the solver adds to it" has_line "$tmp/s1.norm" \
-        ' 39 - 0.2s 0 - recorded, score 390 (search, cap)'
+        ' 39 - 0.2s 0 - recorded, score 7,466,640 (search, cap)'
     check "a recorded game's seconds are formatted as an in-flight game's" has_line "$tmp/s1.norm" \
-        ' 40 - 13m32s 248002917 - recorded, score 400 (search, exhausted)'
+        ' 40 - 13m32s 248,002,917 - recorded, score 400 (search, exhausted)'
     check "an incomplete line is not a recorded game" lacks "$tmp/s1.norm" 'score 410'
     check "every time is in Pacific time: the date (a day and a half ahead)" matches "$tmp/s1.norm" \
         'until 2026-10-21 17:00 PDT$'
@@ -686,9 +686,9 @@ scenario_status() {
     TZ=America/Los_Angeles RUN=t-live "$wall" status >"$tmp/s6.out" 2>&1
     sed 's/  */ /g' "$tmp/s6.out" >"$tmp/s6.norm"
     check "the oldest game, searched, is being recorded" has_line "$tmp/s6.norm" \
-        ' 41 1h15m00s 1h41m00s 1001000000 341541 search done, being recorded'
+        ' 41 1h15m00s 1h41m00s 1,001,000,000 341,541 search done, being recorded'
     check "a suspended game is still current after the oldest game's last line" has_line "$tmp/s6.norm" \
-        ' 42 - 1h10m00s 63 341541 suspended'
+        ' 42 - 1h10m00s 63 341,541 suspended'
     check "a stopped search says so" has_line "$tmp/s6.norm" \
         ' 44 - 5m00s 70 9 search stopped, its checkpoint kept'
 
@@ -785,7 +785,7 @@ scenario_status() {
     check "the table is the games in flight" equals "$(table_games "$tmp/n1.norm")" '1 2 3 4 5 '
     check "under their heading" has_line "$tmp/n1.out" \
         '  games in flight (window 5; "own search" counts toward the wall of 24 hours):'
-    check "with a game that runs" has_line "$tmp/n1.norm" ' 1 - 1m00s 5000 0 running, 120.0k nodes/s'
+    check "with a game that runs" has_line "$tmp/n1.norm" ' 1 - 1m00s 5,000 0 running, 120.0k nodes/s'
     check "and no game recorded" lacks "$tmp/n1.out" 'recorded, score\|^  the last'
     rm -rf "$(sobj wall-t-new)"
 
@@ -834,12 +834,12 @@ check_status_host() {
     export FAKE_HOME="$tmp/home"
     mkdir -p "$work/results" "$work/logs" "$work/ckpt"
     printf '%s\n' '{"schema":5,"n":2,"score":20,"moves":[2],"completed":true}' \
-        '{"schema":5,"n":3,"score":30,"moves":[3],"completed":true}' \
+        '{"schema":5,"n":3,"score":7466640,"moves":[3],"completed":true}' \
         '{"schema":5,"n":4,"score":40,"moves":[4],"completed":false}' >"$work/results/strict.jsonl"
     printf '%s chain 1-100; threads: all available; window 3; wall: 48 hours; results x; checkpoints y\n' \
         2026-10-21T00:00:00Z >"$work/logs/chain.log"
     recorded_line 2 20 search 5 1.5 unknown exhausted >"$work/logs/chain.out"
-    progress 4 1h40m00s 1000000000 250.0k/s 341541 >"$work/logs/chain.err"
+    progress 4 1h40m00s 14000000000 250.0k/s 341541 >"$work/logs/chain.err"
     printf '7200.5\n' >"$work/ckpt/n0004.clock"
     : >"$FAKE_LOG"
     TZ=America/Los_Angeles env -u RUN "$wall" status --host user@fake.example >"$tmp/h1.out" 2>&1
@@ -847,11 +847,15 @@ check_status_host() {
     sed 's/  */ /g' "$tmp/h1.out" >"$tmp/h1.norm"
     check "status --host succeeds with no RUN, no profile and no aws call" equals "$calls" 0,0
     check "it is recorded through the last game completed of the results file, not of chain.out" has_line \
-        "$tmp/h1.norm" ' recorded through 3 (score 30)'
+        "$tmp/h1.norm" ' recorded through 3 (score 7,466,640)'
     check "the table has the game of chain.out, the game in flight with its clock, and the window of chain.log" equals \
         "$(grep -c -e ' 2 - 1.5s 5 - recorded, score 20 (search, exhausted)$' \
-            -e ' 4 2h00m00s 1h40m00s 1000000000 341541 running, 250.0k nodes/s$' \
+            -e ' 4 2h00m00s 1h40m00s 14,000,000,000 341,541 running, 250.0k nodes/s$' \
             -e ' 6 - - - - no recent progress line$' "$tmp/h1.norm")" 3
+    check "a node count of 14,000,000,000 has its commas and ends under the header's right-aligned nodes" equals \
+        "$(awk '/ own search / {head = index($0, "nodes") + 4}
+            /14,000,000,000/ {row = index($0, "14,000,000,000") + 13}
+            END {print (head > 0 && head == row) ? "ok" : "head " head " row " row}' "$tmp/h1.out")" ok
 }
 
 # --- wall.sh stop and cleanup: the run in progress ---------------------------------------------------------------

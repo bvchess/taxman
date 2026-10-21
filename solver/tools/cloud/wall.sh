@@ -552,6 +552,26 @@ launch() {
 
 # --- status ------------------------------------------------------------------------------------------------------
 
+# The awk function commas(x) that the awk programs of status include (as "$AWK_COMMAS"): the whole number x with a comma
+# between each three digits, 6971841261 as 6,971,841,261; any other text (a `-`) as it is.  The one definition of it:
+# commas, below, runs it for the shell.
+AWK_COMMAS='
+    function commas(x,    s, out) {
+        s = x ""
+        if (s !~ /^[0-9]+$/) return s
+        while (length(s) > 3) {
+            out = "," substr(s, length(s) - 2) out
+            s = substr(s, 1, length(s) - 3)
+        }
+        return s out
+    }
+'
+
+# The whole number $1 with its thousands separators (AWK_COMMAS), not by printf's ' flag, which depends on the locale.
+commas() {
+    awk -v x="$1" "$AWK_COMMAS"'BEGIN { print commas(x) }'
+}
+
 # The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
 # (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
 # line of a game is the one that counts.
@@ -582,7 +602,7 @@ recorded_games() {
 #   search done  the search has ended (`done` or `optimal`) and the game is not recorded yet: the oldest game is being
 #                recorded, any other waits for the games before it
 games_table() {
-    awk -v first="$1" -v flight="$2" -v clocks="$3" '
+    awk -v first="$1" -v flight="$2" -v clocks="$3" "$AWK_COMMAS"'
     function duration(s) {
         if (s < 60) return sprintf("%.1fs", s)
         if (s < 3600) return sprintf("%dm%02ds", s / 60, s % 60)
@@ -599,7 +619,7 @@ games_table() {
         return text
     }
     function row(n, own, elapsed, nodes, best, state) {
-        printf "  %5s  %-10s  %-10s  %13s  %7s  %s\n", n, own, elapsed, nodes, best, state
+        printf "  %5s  %-10s  %-10s  %14s  %9s  %s\n", n, own, elapsed, commas(nodes), commas(best), state
     }
     BEGIN {
         first += 0
@@ -620,7 +640,8 @@ games_table() {
             detail = detail ", " proof
         }
         if ($7 == "optimal" && $8 != "unknown") detail = detail ", optimal " $8
-        row(substr($1, 3), "-", duration($5 + 0), substr($4, 7), "-", "recorded, score " substr($2, 7) " (" detail ")")
+        row(substr($1, 3), "-", duration($5 + 0), substr($4, 7), "-",
+            "recorded, score " commas(substr($2, 7)) " (" detail ")")
     }
     $1 ~ /^n=[0-9]+$/ && $3 == "nodes" && $4 ~ /^[0-9]+$/ && $5 ~ /^\(.*\)$/ && $6 == "best" && $8 == "queue" {
         n = substr($1, 3) + 0
@@ -719,7 +740,7 @@ chain_games() {
     local recorded="$1" score="$2" window="$3" chain_to="$4" wall_hours="$5" lines="$6" progress_fn="$7" note="$8"
     local clock_fn="$9" clock_names="${10}" first_n last_n in_flight shown shown_count name n seconds clocks=""
     if [ -n "$recorded" ]; then
-        printf '  recorded through %s (score %s)\n' "$recorded" "$score"
+        printf '  recorded through %s (score %s)\n' "$recorded" "$(commas "$score")"
     else
         printf '  recorded through: no game yet\n'
         recorded=0
