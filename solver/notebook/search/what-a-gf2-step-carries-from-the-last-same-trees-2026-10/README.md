@@ -432,6 +432,20 @@ independent set and any weight split of the others bounds them.  A way to keep t
 the loops' replacements and arcs, which need the circuits that the change saves.  Loops that are a larger share of the
 live elements, or a tie-break of strong branching that does not depend on the split's bounds, would reopen it.
 
+## 2026-10-20: the loops left out, adopted
+
+The section above is adopted without a measurement of its own: the project's owner judged its numbers enough, and its
+whole-game runs (4050 and 4176) and cycle counts were not repeated.  A child's live candidates are now its parent's that
+its candidates keep (`Levels::push_all`, the change of `loops-drop.diff`, with its debug assertion), which saves 4.5% of
+the cycles of a step (3.0 to 5.4% on five units, 2.5% on the chain 1..1300) and changes the trees only where strong
+branching ties (25 of the games 1..1300, +178 steps of 276,918; every best, proof and other field the same).  The
+release suite (with the study tools' tests) passes but for the node-count tripwires of game 936, which move: default
+390 to 449, `nogoods=off` 344 to 345, `lagrange=on` 390 to 449, `symmetry=off` 663 to 652, and in the extended table
+`default` 363 to 366 and `extended` 663 to 652 (the answers, 20,507, stay).  The probe's fingerprints with `gf2=on`
+move, from a58ade4629ab6186 to 38f7687db16be4a7 and, with `force_window=80`, from f3deaac0dbdc030a to 547eda4e1dc3967b,
+through the windows of 936 (both) and of 1215 (the second); every kernel's fingerprint, and the probe's other two, are
+the same.  The code is in 1cef63c.
+
 ## Files
 
 * `prof.diff`: the counters by kind of level and by the outcome of each search, with the parent's cycles checked in
@@ -456,9 +470,9 @@ live elements, or a tie-break of strong branching that does not depend on the sp
   child's live candidates, the shadow split without the loops beside each split (`LOOPS_SHADOW`; with its parts, the
   replacements and the potentials, and the choice of strong branching under its order), and the trace
   (`LOOPS_TRACE`) of each evaluation and branch.
-* `loops-drop.diff`: the change that leaves the loops out, not kept: the child's live candidates are the parent's that
-  its candidates keep, a debug check that they are the elements of its candidates, and the paragraphs of
-  `solver/docs/design/gf2-bound.md` it changes.
+* `loops-drop.diff`: the change that leaves the loops out (adopted in the last section, in 1cef63c): the child's live
+  candidates are the parent's that its candidates keep, a debug check that they are the elements of its candidates, and
+  the paragraphs of `solver/docs/design/gf2-bound.md` it changes.
 * `loops-runs.jsonl`: the runs of the section, one line a run: the build, the unit, steps, CPU seconds, best, cycles
   and instructions a step (`b0_`, `b1_`: the scratch build with the loops live and out; `ab1_` to `ab3_`: master and
   master with `loops-drop.diff` in turn, from `tune solve` under `/usr/bin/time -l`).
@@ -468,4 +482,4 @@ live elements, or a tie-break of strong branching that does not depend on the sp
 *Commits*: 1735e60 (the cycles kept), 28c5669 (the split started), and this entry; in the second round b0082ae (blocks
 reduced where the span changes), 854d65d (slots kept), 2e07cd2 (the queue by distance), 994ae69 (no offer past the best
 cycle), f22561c (the first round narrowed), and this section.  The section on the loops (2026-10-20) kept no code;
-its notebook files are in its commit.
+its notebook files are in its commit.  The loops left out: 1cef63c.
