@@ -71,7 +71,7 @@ has the exact steps and checks.  The steps:
 | 1a | with `use_prev` and `known.boards` (`solve --use-prev`): a game that a known source has proven (the committed chain, the bounds store, the table, in that order) is taken with no search (method `known`; [Known games](trust.md#known-games)) |
 | 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
-| 4 | the search (method `search`): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
+| 4 | the search (method `search`, or `start` when its starting game reaches a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
 | 5 | `conclude`: replay and check the game, confirm its score against `optimal.json`, assign its proof and what it assumes |
 | 6 | record the result (a range) |
 

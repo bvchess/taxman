@@ -43,7 +43,7 @@ fn sampled_lines(every: usize, up_to: u32) -> Vec<Line> {
         .take(up_to as usize)
         .filter(|l| !l.trim().is_empty())
         .map(|l| Json::parse(l).expect("a results line"))
-        .filter(|j| matches!(j.get("method").and_then(Json::as_str), Some("search" | "repeat")))
+        .filter(|j| matches!(j.get("method").and_then(Json::as_str), Some("start" | "search" | "repeat")))
         .collect();
     let last = searched.len() - 1;
     let line = |j: &Json| {

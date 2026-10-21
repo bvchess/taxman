@@ -22,7 +22,8 @@
 //! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]): the
 //!   game is taken from the source without a search (method `known`: `optimal.json`, the committed chain, or a board
 //!   that the bounds store has proven), or a search found a game that scores what the bounds store's upper bound of the
-//!   board allows (method `search`; the bound stops the search the way `cap` does, and is checked against the store).
+//!   board allows (method `search` or `start`; the bound stops the search the way `cap` does, and is checked against
+//!   the store).
 //!
 //! `cap` and `prime_formula` rest on the game of `n − 1` ([`Proof::rests_on_prev`]), and `same_search` on the game
 //! it repeats.  A proof that rests on another game assumes what that game's proof assumes ([`assumptions_of`]), and
@@ -199,9 +200,9 @@ impl Proof {
             Method::Prime => Some(Proof::PrimeFormula),
             Method::Repeat => Some(Proof::SameSearch),
             Method::Known => Some(Proof::Known),
-            Method::Search if !completed => None,
-            Method::Search if reached_cap => Some(Proof::Cap),
-            Method::Search => Some(Proof::Exhausted),
+            Method::Search | Method::Start if !completed => None,
+            Method::Search | Method::Start if reached_cap => Some(Proof::Cap),
+            Method::Search | Method::Start => Some(Proof::Exhausted),
         }
     }
 
@@ -848,10 +849,11 @@ struct Pred<'a> {
 }
 
 /// What the fields of a line say against each other, if anything: combinations the solver never writes, through
-/// which a hand-edited line could change the proof or the assumptions derived from it.
+/// which a hand-edited line could change the proof or the assumptions derived from it.  The label does not change a
+/// proof, so a `search` with no node (a line of a build that had no method `start`) is not one of them.
 fn contradiction(e: &Entry) -> Option<String> {
     let method = e.method.as_str();
-    let searched = e.method == Method::Search;
+    let searched = matches!(e.method, Method::Search | Method::Start);
     if e.method.sets_up() != e.setup.is_some() {
         return Some(if e.method.sets_up() {
             format!("a {method} game without a \"setup\"")
@@ -884,25 +886,25 @@ fn contradiction(e: &Entry) -> Option<String> {
     // ceiling, ended it, so it did not reach that ceiling, and the bound is the store's, with no game of the store's.
     match (&e.known, e.method) {
         (None, Method::Known) => return Some("a known game that cites no source (\"known\")".to_owned()),
-        (Some(_), method) if !matches!(method, Method::Known | Method::Search) => {
+        (Some(_), method) if !matches!(method, Method::Known | Method::Search | Method::Start) => {
             return Some(format!(
                 "a {} game with a \"known\" citation, which only a known or searched game has",
                 method.as_str()
             ));
         }
-        (Some(Cite::Bounds { lower: Some(_), .. }), Method::Search) => {
+        (Some(Cite::Bounds { lower: Some(_), .. }), Method::Search | Method::Start) => {
             return Some("a searched game that cites a game of the store, which only a known game does".to_owned());
         }
         (Some(Cite::Bounds { lower: None, .. }), Method::Known) => {
             return Some("a known game that cites the store without the lower bound whose game it plays".to_owned());
         }
-        (Some(Cite::Optimal | Cite::Strict), Method::Search) => {
+        (Some(Cite::Optimal | Cite::Strict), Method::Search | Method::Start) => {
             return Some(
                 "a searched game that cites optimal.json or the committed chain, which only a known game does"
                     .to_owned(),
             );
         }
-        (Some(_), Method::Search) if e.reached_cap => {
+        (Some(_), Method::Search | Method::Start) if e.reached_cap => {
             return Some("a searched game that reached its cap and cites the store's bound as well".to_owned());
         }
         _ => {}
@@ -1659,9 +1661,12 @@ mod tests {
 
     #[test]
     fn proofs_and_assumptions() {
-        assert_eq!(Proof::of(Method::Search, false, false), None);
-        assert_eq!(Proof::of(Method::Search, true, true), Some(Proof::Cap));
-        assert_eq!(Proof::of(Method::Search, true, false), Some(Proof::Exhausted));
+        // A search whose starting game reached a ceiling (start) is proven as a search is.
+        for method in [Method::Search, Method::Start] {
+            assert_eq!(Proof::of(method, false, false), None);
+            assert_eq!(Proof::of(method, true, true), Some(Proof::Cap));
+            assert_eq!(Proof::of(method, true, false), Some(Proof::Exhausted));
+        }
         assert!(Proof::ALL.iter().all(|&p| Proof::parse(p.as_str()) == Some(p)));
         let names = |assumes: Assumptions| assumes.into_iter().collect::<Vec<_>>();
         // Inherited only by a proof that rests on the game of n − 1.

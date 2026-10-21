@@ -75,7 +75,7 @@ fn compare(on: &[GameResult], off: &[GameResult], expected: &[(u32, u32)]) {
                 (Method::Repeat, Some(Proof::SameSearch), 0, sum)
             );
             assert_eq!(g.setup.map(|s| (s.digest, s.cap)), Some((same.digest, None)), "n={}", g.n);
-            if let Some(earlier) = earlier.filter(|e| e.method == Method::Search) {
+            if let Some(earlier) = earlier.filter(|e| matches!(e.method, Method::Start | Method::Search)) {
                 assert_eq!(g.promotions, earlier.promotions, "n={}", g.n);
             }
         }

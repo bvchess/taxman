@@ -17,7 +17,8 @@
 //!    replaced by `n` (method `prime`).
 //! 3. The board's frames ([`Board`]).  With no promotion candidates the game with no promotions is the only one
 //!    (method `trivial`).
-//! 4. Otherwise the search (method `search`): [`Board::prepare`] (or [`Board::prepare_for_resume`]), then
+//! 4. Otherwise the search (method `search`, or `start` when the search's starting game reached a ceiling before
+//!    it took a step): [`Board::prepare`] (or [`Board::prepare_for_resume`]), then
 //!    [`search::search`] for the promotion set with the largest sum.  It starts from the better of the greedy set
 //!    and the previous game's promotions that are candidates here (`seed_incumbent`, [`Board::seed`]) and stops
 //!    as soon as it reaches `n + opt(n − 1) − in_the_bag` (`prev_cap`, [`Board::promotion_cap`]).  The promotions
@@ -386,20 +387,24 @@ pub enum Method {
     Prime,
     /// `same_search`: an earlier game's promotions, which settled the same search problem.
     Repeat,
-    /// The branch-and-bound search.
+    /// The search's starting game reached a ceiling before the search took a step: the search ran no tree.
+    Start,
+    /// The branch-and-bound search: its tree ran.
     Search,
     /// Taken from a known source (`--use-prev`, [`crate::known`]): the game, with no search.
     Known,
 }
 
 impl Method {
-    pub const ALL: [Method; 5] = [Method::Trivial, Method::Prime, Method::Repeat, Method::Search, Method::Known];
+    pub const ALL: [Method; 6] =
+        [Method::Trivial, Method::Prime, Method::Repeat, Method::Start, Method::Search, Method::Known];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Method::Trivial => "trivial",
             Method::Prime => "prime",
             Method::Repeat => "repeat",
+            Method::Start => "start",
             Method::Search => "search",
             Method::Known => "known",
         }
@@ -410,10 +415,10 @@ impl Method {
         Method::ALL.into_iter().find(|method| method.as_str() == name)
     }
 
-    /// Whether the game set a search up (and its result line has a `setup`): a search, and a repeat, which set one
-    /// up to compare it with an earlier game's.
+    /// Whether the game set a search up (and its result line has a `setup`): a search, whether its tree ran or its
+    /// starting game reached a ceiling, and a repeat, which set one up to compare it with an earlier game's.
     pub fn sets_up(self) -> bool {
-        matches!(self, Method::Search | Method::Repeat)
+        matches!(self, Method::Start | Method::Search | Method::Repeat)
     }
 }
 
@@ -572,7 +577,7 @@ pub struct GameResult {
     /// For a repeat (method [`Method::Repeat`], proof `same_search`), the earlier game whose search it repeats.
     pub same_search: Option<SameSearch>,
     /// For a game taken from a known source (method [`Method::Known`]), or found by a search that an upper bound of the
-    /// bounds store stopped (method [`Method::Search`]; both proof `known`), the source it cites.
+    /// bounds store stopped (method [`Method::Search`] or [`Method::Start`]; both proof `known`), the source it cites.
     pub known: Option<Cited>,
 }
 
@@ -1207,6 +1212,11 @@ fn conclude_game(
             }
             result.completed = searched.completed || result.reached_cap || result.known.is_some();
             result.nodes = searched.stats.nodes;
+            // A search that took no step (in any of its runs: the nodes are the total, the engine restores the stats
+            // of a checkpoint) ran no tree: its starting game reached a ceiling.
+            if result.completed && result.nodes == 0 {
+                result.method = Method::Start;
+            }
             result.stats = searched.stats;
             result.counters = searched.counters;
             result.phases.search = searched.time;

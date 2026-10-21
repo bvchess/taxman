@@ -171,8 +171,9 @@ every second line of the Java fixtures), and the comment on each says what the w
     first and second polls shows in the rebuild and first-step times.
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
   * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions,
-    repeats and previous games of the committed chain, and pass `verify_files`; with one thread any window gives the
-    lines of a window of one, but for the times and the build;
+    repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a window, by
+    whether its search took a step), and pass `verify_files`; with one thread any window gives the lines of a window
+    of one, but for the times and the build;
   * a repeat of a game still in flight (301 of 300) names it, on a later line;
   * a range stopped by a node limit ends at its first unfinished game, with the lines before it in order, and completes
     when run again;
@@ -196,7 +197,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   `results/README.md` quotes; a game stopped by a node limit and resumed reads back assuming nothing.  Both verifiers
   refuse forged repeats (another game named; the digests, promotions or promotion sum changed; the game repeated
   unfinished, after the repeat, or settling no search; its assumptions dropped), and `verify-results` refuses two more
-  that only setting the problems up again can catch (the Python referee accepts them, as its docstring says).
+  that only setting the problems up again can catch (the Python referee accepts them, as its docstring says).  A search
+  that took no step is the method `start`: `verify-results` still reads the `search` line of an older build, and the
+  Python referee refuses it, and a `start` line that took a node or did not finish.
 * **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tests/sweep.rs`,
   `solver/tools/test_sweep_plan.py`, `solver/tools/cloud/test/run.sh sweep`):
   * a range whose games all stop at a limit goes on, each game built on the best game of the one before it, with no

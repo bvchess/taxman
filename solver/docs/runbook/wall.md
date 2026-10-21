@@ -160,7 +160,7 @@ the chain (as of the last save to S3)
    4866  -           0.2s                    0        -  recorded, score 7446689 (repeat, same_search of 4865)
    4867  -           2m07s            34218766        -  recorded, score 7449976 (search, exhausted)
    4868  -           1h17m16s       1133462769        -  recorded, score 7453452 (search, exhausted)
-   4869  -           0.2s                    0        -  recorded, score 7456914 (search, cap)
+   4869  -           0.2s                    0        -  recorded, score 7456914 (start, cap)
    4870  -           0.2s                    0        -  recorded, score 7459353 (repeat, same_search of 4868)
    4871  -           0.1s                    0        -  recorded, score 7461794 (prime, prime_formula)
    4872  1h15m00s    1h45m00s       1086013550   341541  running, 242.8k nodes/s

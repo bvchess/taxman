@@ -165,7 +165,7 @@ fn derivations_can_be_switched_off() {
             ..options(2)
         },
     );
-    assert!(results.iter().all(|r| matches!(r.method, Method::Trivial | Method::Search)));
+    assert!(results.iter().all(|r| matches!(r.method, Method::Trivial | Method::Start | Method::Search)));
     assert!(results.iter().all(|r| r.optimal_match == Some(true)));
 }
 

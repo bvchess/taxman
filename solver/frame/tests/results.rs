@@ -161,6 +161,54 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
     both_verifiers(&TempDir::new("contradictions"), &lines, &accepted, &refused);
 }
 
+/// A search whose starting game reaches the ceiling before the search takes a step has the method `start`, with the
+/// proof `cap` and no nodes: game 18's greedy set already scores `n + score(n − 1)`.  Games 20 and 21 run their trees
+/// and stay `search`.  Both verifiers read the file.  The line of an older build, which called game 18 a `search`
+/// with no node, still reads in the Rust verifier, which guards what could change a proof and not the label; the
+/// Python referee refuses it, and a `start` line that took a node or did not finish.
+#[test]
+fn a_search_whose_starting_game_reaches_the_ceiling_is_a_start_game() {
+    let games = solver::solve_range(1, 21, &common::options(1), None).unwrap();
+    let start = &games[17];
+    assert_eq!((start.n, start.method, start.proof, start.nodes), (18, Method::Start, Some(Proof::Cap), 0));
+    assert!(start.completed && start.reached_cap && start.setup.is_some());
+    for ran in &games[19..] {
+        assert_eq!((ran.method, ran.proof), (Method::Search, Some(Proof::Exhausted)), "n={}", ran.n);
+        assert!(ran.nodes > 0, "n={}", ran.n);
+    }
+    let lines: Vec<Json> = games.iter().map(GameResult::to_json).collect();
+    assert_eq!(lines[17].get("method").and_then(Json::as_str).and_then(Method::parse), Some(Method::Start));
+
+    let s = |text: &str| Json::from(text);
+    let file = |last: Json| -> Vec<Json> { lines[..17].iter().cloned().chain([last]).collect() };
+    let old_build = file(with(&lines[17], "method", &s("search")));
+    let stepped = file(with(&lines[17], "nodes", &Json::from(1u32)));
+    let unfinished = file(stopped_at(&lines[17]));
+    let dir = TempDir::new("start-game");
+    let write = |name: &str, file: &[Json]| {
+        let path = dir.join(name);
+        fs::write(&path, file.iter().map(|line| format!("{line}\n")).collect::<String>()).unwrap();
+        path
+    };
+    let ok = write("ok.jsonl", &lines[..18]);
+    let (old, stepping) = (write("old.jsonl", &old_build), write("stepping.jsonl", &stepped));
+    let unending = write("unending.jsonl", &unfinished);
+    for path in [&ok, &old, &stepping] {
+        verify_files(std::slice::from_ref(path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
+    }
+    let run = python_referee(&[ok, old, stepping, unending]);
+    let report = String::from_utf8_lossy(&run.stdout);
+    assert_eq!(run.status.code(), Some(1), "{report}");
+    assert!(report.contains("3 PROBLEMS"), "{report}");
+    for problem in [
+        "old.jsonl line 18 (n=18): a completed search with nodes 0",
+        "stepping.jsonl line 18 (n=18): a start game with nodes 1",
+        "unending.jsonl line 18 (n=18): a start game that is not completed",
+    ] {
+        assert!(report.contains(problem), "{problem}\n{report}");
+    }
+}
+
 /// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
 /// `optimal.json`'s game of 32 (`--use-prev`): 33 reaches its ceiling and 34 repeats 33, so both assume that game
 /// optimal; 35 exhausts its search, which rests on no game, so it and the games after it that rest on it assume
@@ -214,8 +262,10 @@ fn forged_repeats_are_refused_by_both_verifiers() {
     // The latest searched games before 64 with other promotions and with the same ones (but another problem), and a
     // prime game, which settles no search.
     let searched = |same: bool| {
-        let found =
-            games[..i - 1].iter().rev().find(|g| g.method == Method::Search && (g.promotions == m.promotions) == same);
+        let found = games[..i - 1]
+            .iter()
+            .rev()
+            .find(|g| matches!(g.method, Method::Start | Method::Search) && (g.promotions == m.promotions) == same);
         found.unwrap()
     };
     let (other, twin) = (searched(false), searched(true));

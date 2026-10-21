@@ -188,7 +188,7 @@ n=3     score=3         prime   nodes=0               0.000 s  optimal ok  proof
 n=4     score=7         trivial nodes=0               0.000 s  optimal ok  proof=trivial
 ...
 n=17    score=93        prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
-n=18    score=111       search  nodes=0               0.000 s  optimal ok  proof=cap
+n=18    score=111       start   nodes=0               0.000 s  optimal ok  proof=cap
 n=19    score=113       prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
 n=20    score=124       search  nodes=1               0.007 s  optimal ok  proof=exhausted
 n=21    score=144       search  nodes=1               0.015 s  optimal ok  proof=exhausted
@@ -203,13 +203,13 @@ by field.  The methods:
   only one.
 * `prime` (games 2, 3, 5 and every other prime): the [prime formula](../../docs/GLOSSARY.md#the-game) gives the game of
   n from the game of n − 1.
-* `search` with the proof `cap` (game 18): the search's starting game reached the
+* `start` with the proof `cap` (game 18): the search's starting game reached the
   [ceiling](../../docs/GLOSSARY.md#the-game) of game 18, 18 + 93 = 111, before it took a step.
 * `search` with the proof `exhausted` (games 20 and 21): the search explored its whole tree.
 * `repeat` (game 22): game 22 poses the same search problem as game 21, which settled it, so the solver takes 21's
   promotions without a search.
 
-The fifth method, `known`, takes a game that the repository has already proven (section 3, "Known games").  "optimal
+The sixth method, `known`, takes a game that the repository has already proven (section 3, "Known games").  "optimal
 ok" says that the score equals the table's: a check, not a proof.
 
 `--show` prints a game's promotions and moves.  Solved alone, game 21 is the example of section 1:

@@ -143,8 +143,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **incumbent**: the best promotion set found so far, shared by all threads.  A node's **need** is what its
   completions must reach to beat the incumbent: the incumbent's sum, less the node's own, plus one.
 * **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best of the greedy
-  set, the seed and a rounding of the root's matching ([solver/docs/design/search.md, "The starting incumbent, the
-  ceiling and the seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).
+  set, the seed and a rounding of the root's matching, which a local search improves ([solver/docs/design/search.md,
+  "The starting incumbent, the ceiling and the
+  seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).  A game whose start reaches
+  the ceiling takes no step of the search, and has the method `start`.
 * **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, or the game of a lower
   bound that the bounds store holds.
 * **conflict**: a subset of a promotion set that cannot be promoted together from a node.  Every completion leaves out

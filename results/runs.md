@@ -128,8 +128,9 @@ entry](../solver/notebook/the-run-to-5000-2026-10/README.md) records the run.
 * the second, of commit 243af9b, in schema 4: `git show 2487671:rust/results/strict.jsonl`;
 * the third, of commit 271c817, in schema 5, on 4 threads: `git show 0133afe:rust/results/strict.jsonl`.
 
-All three have this file's scores in games 1–1300, and the second and the third its proofs and methods too.  The first
-was made before the tactic `same_search` existed, so it searched the 545 games that this file concludes as repeats.
+All three have this file's scores in games 1–1300, and the second and the third its proofs and methods too, but that a
+game whose search took no step is `search` in them and `start` here.  The first was made before the tactic
+`same_search` existed, so it searched the 545 games that this file concludes as repeats.
 Their moves differ from this file's in a few games ([README.md, "Games with several optimal
 sets"](README.md#games-with-several-optimal-sets)).
 

@@ -16,7 +16,9 @@ For every completed game:
               problem; every game but a prime or a known one records in_the_bag; only a search reaches its ceiling;
               a prime game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the
               game it repeats (same_search), and its setup has no `cap`; a known game, and a search that the bounds
-              store's upper bound ended, and only those, cite a source (`known`)
+              store's upper bound ended, and only those, cite a source (`known`); a start game (a search whose
+              starting game reached a ceiling, so that it took no step) is completed with nodes 0, and a completed
+              search has nodes above 0, so a line of an older build, which called a start game a search, is a problem
   optimal     the score is optimal.json's, where the table has the game
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
@@ -90,7 +92,8 @@ HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 SCHEMA = 5  # the only format of a result line this referee reads
 RESTS_ON_PREV = {"prime_formula", "cap"}
 SETTLES_SEARCH = {"exhausted", "cap", "same_search", "known"}  # the proofs a repeat can repeat
-SETS_UP = {"search", "repeat"}  # the methods whose lines have a setup
+SETS_UP = {"start", "search", "repeat"}  # the methods whose lines have a setup
+SEARCHED = {"start", "search"}  # the methods of a game that set a search up to find its game
 NO_BAG = {"prime", "known"}  # the methods whose lines have no in_the_bag: they set no board up
 DIGEST = re.compile("[0-9a-f]{16}")
 PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
@@ -298,19 +301,26 @@ def contradictions(n, row, reached):
             found.append("a repeat game whose setup has a cap, which only a search has")
     if (row.get("in_the_bag") is None) != (method in NO_BAG):
         found.append(f"a {method} game {'without' if method not in NO_BAG else 'with'} in_the_bag")
-    if reached and method != "search":
+    if reached and method not in SEARCHED:
         found.append(f"a {method} game that reached a cap, which only a search does")
+    # A start game is a completed search that took no step: its starting game reached a ceiling.  A search with nodes
+    # 0 is a line of an older build, which called it a search.
+    nodes = row.get("nodes")
+    if method == "start" and nodes != 0:
+        found.append(f"a start game with nodes {nodes}, which took no step")
+    if method == "search" and nodes == 0:
+        found.append("a completed search with nodes 0, which took no step: a start game")
     known = row.get("known")
     kind = known.get("source") if isinstance(known, dict) else None
     if known is None and method == "known":
         found.append("a known game that cites no source (known)")
     elif known is not None and not isinstance(known, dict):
         found.append("known is not an object")
-    elif known is not None and method not in ("known", "search"):
+    elif known is not None and method not in SEARCHED | {"known"}:
         found.append(f"a {method} game with a known citation, which only a known or searched game has")
-    elif method == "search" and known is not None and (kind != "bounds" or known.get("lower") is not None):
+    elif method in SEARCHED and known is not None and (kind != "bounds" or known.get("lower") is not None):
         found.append("a searched game that cites something other than the store's upper bound")
-    elif method == "search" and known is not None and reached:
+    elif method in SEARCHED and known is not None and reached:
         found.append("a searched game that reached its cap and cites the store's bound as well")
     elif method == "known" and kind == "bounds" and known.get("lower") is None:
         found.append("a known game that cites the store without the lower bound whose game it plays")
@@ -411,6 +421,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
             )
             continue
         if not row.get("completed"):
+            if row.get("method") == "start":
+                problems.append(f"{path.name} line {number} (n={row.get('n')}): a start game that is not completed")
             stopped.add(row["n"])
             check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
             continue

@@ -36,7 +36,7 @@ of the repository.
 ```
 $ taxman regress --to 400                       # solve 1..400 in memory and check every score against optimal.json
 solved 1..=400 (2 threads, tactics default) in 0.2 s
-by method: trivial 13, prime 78, repeat 151, search 158, known 0
+by method: trivial 13, prime 78, repeat 151, start 43, search 115, known 0
 400 games match optimal.json, 0 are not in it
 ```
 
@@ -117,7 +117,7 @@ The fields, in order:
 
 1. n;
 2. the score, or for an incomplete game the best found so far;
-3. the method: `trivial`, `prime`, `repeat`, `search` or `known`;
+3. the method: `trivial`, `prime`, `repeat`, `start`, `search` or `known`;
 4. the search's nodes, which are steps ([glossary](../../docs/GLOSSARY.md#the-search));
 5. the seconds the game took in this invocation;
 6. how the score compares with `optimal.json`: `optimal ok`, equal; `optimal unknown`, the table has no game of n; or
@@ -184,7 +184,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `schema`, `n` | the format of the line (5, the only one this build reads), and n |
 | `score`, `moves`, `best_so_far` | the game and its score; for an unfinished search `score` is null, and `best_so_far`, a key that only such a line has, holds the best so far |
 | `promotions` | the promoted numbers, ascending |
-| `method` | how the game was found: `trivial`, `prime`, `repeat`, `search` or `known` (taken from a known source with no search, `--use-prev`) |
+| `method` | how the game was found: `trivial`, `prime`, `repeat`, `start` (the search's starting game reached a ceiling, so the search took no step and `nodes` is 0), `search` (its tree ran) or `known` (taken from a known source with no search, `--use-prev`) |
 | `completed` | false only if a limit or a signal stopped the search; such a line records an unfinished search, and its checkpoint is kept (a `--keep-going` run writes none for a signal) |
 | `proof` | how optimality is established: `trivial`, `prime_formula`, `cap`, `exhausted`, `same_search` or `known` (section 4); null if incomplete |
 | `reached_cap` | the promotions reach `cap`, where the search stops (a search started before its ceiling was known, in a window of games in flight, may have run to the end of its tree; solver/docs/design/trust.md, "What a window changes in the results") |
@@ -231,7 +231,7 @@ A line of proof `known` has a `known` field that says which source it rests on:
 | `{"source":"optimal"}` | method `known`: the table's game of n, assumed optimal | the table has a game of n that scores the line's score |
 | `{"source":"strict"}` | method `known`: the committed chain's game of n, as proven as its line is | the committed chain has a game of n that scores it; the line assumes what that line does |
 | `{"source":"bounds","lower":{..},"upper":{..}}` | method `known`: a game that the bounds store has proven; the `lower` bound is the game played | the store has a lower line and an upper line of game n worth the score, by the `rule` from the `source` (the run that found it) that the field says |
-| `{"source":"bounds","lower":null,"upper":{..}}` | method `search`: the search found the game and stopped at the store's upper bound, which it meets; `reached_cap` is false, since the ceiling of n − 1 is not what it reached | the store has an upper line of game n worth the score, as cited |
+| `{"source":"bounds","lower":null,"upper":{..}}` | method `search` or `start`: the search found the game and stopped at the store's upper bound, which it meets; `reached_cap` is false, since the ceiling of n − 1 is not what it reached | the store has an upper line of game n worth the score, as cited |
 
 The score of the line is the cited value of game n.  The store has one line of a game, side and value, so the game,
 the side and the score name the line; `rule` and `source` are that line's own, as `bounds.jsonl` has them.  The score
@@ -344,7 +344,9 @@ So a file of a sweep, with its games that only an unfinished search is recorded 
   the game repeated is earlier in the file and settles its search, and the recorded digests and promotions agree.  It
   checks a `known` line against the sources (`--committed FILE` and `--bounds FILE`, by default the committed chain
   and the store of `results/`), from the lines of the files alone.  It cannot play the store's promotion sets, so it
-  does not check the digest of a game of n − 1 taken from the store.
+  does not check the digest of a game of n − 1 taken from the store.  It also asks that the method fits the nodes: a
+  `start` line is completed with `nodes` 0 and a completed `search` line has more, which refuses a line of a build
+  that called a `start` game a `search`.
 
 On 2026-10-20, the committed chain gave, on four threads of the laptop:
 

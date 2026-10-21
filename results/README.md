@@ -71,9 +71,10 @@ Its games, by proof, as `taxman verify-results` and `solver/tools/check_results.
 | score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 60 | 75 | 615 |
 
 Of its 1917 searched games, 1506 are exhausted and 411 at the ceiling.  The proofs at the ceiling were all decided
-before the search explored a node but six: 686's took 29 nodes, and 2695's, 3052's, 3306's, 3796's and 3933's took
-7,175, 2,826, 5,366, 5,530 and 3,093.  A repeat takes the promotions of the latest earlier game that posed the same
-search problem: the game of n − 1 for 1647 of the 1854 repeats, and of n − 2 for the other 207, where n − 1 is prime.
+before the search explored a node (the method `start`) but six: 686's took 29 nodes, and 2695's, 3052's, 3306's, 3796's
+and 3933's took 7,175, 2,826, 5,366, 5,530 and 3,093.  A repeat takes the promotions of the latest earlier game that
+posed the same search problem: the game of n − 1 for 1647 of the 1854 repeats, and of n − 2 for the other 207, where
+n − 1 is prime.
 
 *The proofs by range, in detail:*
 
@@ -168,18 +169,19 @@ What that evidence amounts to:
    * n = 1301–2175: `optimal.json` has no game here (the lines say `optimal_match` null), so the comparison is with
      another run of the same search.  The GF(2) study's chain was made from `optimal.json`'s game of 1300 (`--use-prev`)
      by the build of commit 716ebd9, on 2 threads in three invocations, and reached 2175 from 1301 in 92 minutes of game
-     time.  Its 875 games have this file's scores, proofs and methods in every game, and its moves in all but 1560–1563
-     (above).  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
+     time.  Its 875 games have this file's scores and proofs in every game, and its moves in all but 1560–1563 (above).
+     Its methods are this file's too, except that a game whose search took no step was labelled `search` then and is
+     `start` here.  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
      `taxman verify-results results/strict.jsonl solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
-     (93 s) and `solver/tools/check_results.py` on both accept them, and find 875 games in both files, with equal scores
-     in all.
+     (93 s) accepts them and finds 875 games in both files, with equal scores in all.  `solver/tools/check_results.py`
+     finds the same, and refuses the label `search` of the games with no node.
    * n = 2176–3440: `optimal.json` has no game here either, and no other chain reaches far.
      `solver/frame/testdata/c8g.chain-2176.jsonl`, the Graviton calibration's chain (64 threads, one game after
      another, the build of commit 407645f, 15 minutes), has the games 2176–2276, 101 in all.  A rehearsal of the second
      run, made on the same machine type just before it started (the build of commit 55287ff, 64 threads, a window of
      16, stopped and killed and resumed on purpose; not committed), has 2176–2300, 125 in all.  Both have this file's
-     scores, proofs, methods, promotions and moves in every game they share with it (checked on the final file).  Past
-     2300 the evidence is the run's own: the verifiers on the whole file.
+     scores, proofs, promotions and moves in every game they share with it, and its methods but for that label (checked
+     on the final file).  Past 2300 the evidence is the run's own: the verifiers on the whole file.
    * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
      before these games, with this file's scores in all of them (its lines of those games are kept in [its
      entry](../solver/notebook/the-run-to-the-wall-2026-10/README.md), not here), and the verifiers pass the whole file.

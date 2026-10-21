@@ -84,7 +84,9 @@ records what the range solved in order records, but for what a multi-threaded se
   only delays a search, a suspended search keeps every unit, and the ceiling is proven given the game of n − 1 optimal,
   which a proof by `cap` records that it rests on.
 * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts), and
-  with them the next line's `prev.moves_digest`; the nodes, the search's counters, the engine's, and the times.
+  with them the next line's `prev.moves_digest`; the nodes, the search's counters, the engine's, and the times.  The
+  nodes decide the method of a game at its ceiling: `start` when its search took no step, as in order, `search` when it
+  began before the ceiling was known and took some.
 
 ## Past limits
 
@@ -130,13 +132,13 @@ sets only the first, so that it takes just the game before its range, from the t
 * *An open game of the store* lends its lower bound's game as a seed, and its upper bound as a second ceiling
   (`StoreCap`, `search_cap`: the engine is given the lower of it and the ceiling of the game before, at the start and
   when the game before is concluded).  A search whose best promotion sum reaches the store's bound, when it is not the
-  chain's ceiling that it reached, is proven by the bound: proof `known`, method `search`, `known` citing the upper
-  line alone, `reached_cap` false and `setup.cap` as for any search.  Such a game settles its search problem, as an
-  exhausted search or one at the ceiling does: its promotions are a promotable set of that sum, and no promotable set
-  weighs more than the bound allows (a game of the frame model is a game of the board, so it scores at most opt(n),
-  which the bound bounds).  So a later game that poses the same problem repeats it, and assumes what the bound does.  A
-  search that finds a game above the store's bound fails the run at that game: the store is wrong, or statement U fails
-  at a game that its bound rests on.
+  chain's ceiling that it reached, is proven by the bound: proof `known`, method `search` (or `start`, if the starting
+  game reached the bound before a step), `known` citing the upper line alone, `reached_cap` false and `setup.cap` as
+  for any search.  Such a game settles its search problem, as an exhausted search or one at the ceiling does: its
+  promotions are a promotable set of that sum, and no promotable set weighs more than the bound allows (a game of the
+  frame model is a game of the board, so it scores at most opt(n), which the bound bounds).  So a later game that poses
+  the same problem repeats it, and assumes what the bound does.  A search that finds a game above the store's bound
+  fails the run at that game: the store is wrong, or statement U fails at a game that its bound rests on.
 * *`force_search`* leaves out the known games and the store's help, since a forced search is the chain's own.  A game
   with a checkpoint is resumed, never replaced.
 
