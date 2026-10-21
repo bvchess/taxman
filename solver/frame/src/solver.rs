@@ -98,7 +98,7 @@ use crate::results::{
     assumed_optimal, assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile,
     SCHEMA,
 };
-use crate::search::{self, stat, Prepared, Problem, ProblemSize, SearchTactics};
+use crate::search::{self, finder, stat, Prepared, Problem, ProblemSize, SearchTactics};
 use crate::tactics::Tactics;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -177,6 +177,14 @@ pub struct SolveOptions {
     /// see `window`), which share the `threads`.  With one thread it is 1 whatever it says: there is no thread to run
     /// a second game on.
     pub window: usize,
+    /// The finder (`--finder-after`, `--finder-seconds`): once a game's search has taken `finder_after` steps, over
+    /// every run of it, a thread of its own looks for a better game than the search's incumbent for `finder_budget`
+    /// and offers what it finds ([`search::finder`]); 0, the default: none.  It is no tactic and no part of what a
+    /// checkpoint records: a checkpoint resumes with any finder or none, and the finder changes no answer, only how
+    /// soon the incumbent is good.
+    pub finder_after: u64,
+    /// The finder thread's budget, from the moment it starts (it ends sooner if the game's search does).
+    pub finder_budget: Duration,
 }
 
 impl Default for SolveOptions {
@@ -201,6 +209,8 @@ impl Default for SolveOptions {
             retry: false,
             retry_improved: false,
             window: 4,
+            finder_after: 0,
+            finder_budget: Duration::from_secs(60),
         }
     }
 }
@@ -569,6 +579,11 @@ pub struct GameResult {
     pub retry: bool,
     pub retry_improved: bool,
     pub pass: Option<u32>,
+    /// The finder's settings (`--finder-after`, in steps, and `--finder-seconds`): 0 for none.
+    pub finder_after: u64,
+    pub finder_budget: Duration,
+    /// What the finder did in the last invocation, if it started.
+    pub finder: Option<finder::Report>,
     /// `Some(true)` when `optimal.json` has the game, whose score the game's equals (else it is rejected); `None`
     /// if the game is incomplete or the table lacks `n`.
     pub optimal_match: Option<bool>,
@@ -610,6 +625,9 @@ impl GameResult {
             retry: opts.retry,
             retry_improved: opts.retry_improved,
             pass: opts.pass,
+            finder_after: opts.finder_after,
+            finder_budget: opts.finder_budget,
+            finder: None,
             optimal_match: None,
             prev: prev.map(|p| p.info(n)),
             same_search: None,
@@ -630,12 +648,29 @@ impl GameResult {
     /// The result as one JSON object (schema [`SCHEMA`]; [`crate::results`] describes the provenance fields).
     pub fn to_json(&self) -> Json {
         let c = &self.counters;
-        let engine = Json::object([
-            ("splits", Json::from(c.splits)),
-            ("checkpoints", Json::from(c.checkpoints)),
-            ("spilled_units", Json::from(c.spilled_units)),
-            ("max_queue", Json::from(c.max_queue)),
-        ]);
+        // What the finder did is there only on a line whose search started one: the lines made before it do not have it.
+        let finder = self.finder.map(|f| {
+            let report = Json::object([
+                ("at_nodes", Json::from(f.at_nodes)),
+                ("from", Json::from(f.from)),
+                ("best", Json::from(f.best)),
+                ("improved", Json::from(f.improved)),
+                ("refused", Json::from(f.refused)),
+                ("seconds", Json::Num(f.seconds)),
+                ("found_seconds", Json::Num(f.found)),
+            ]);
+            ("finder", report)
+        });
+        let engine = Json::object(
+            [
+                ("splits", Json::from(c.splits)),
+                ("checkpoints", Json::from(c.checkpoints)),
+                ("spilled_units", Json::from(c.spilled_units)),
+                ("max_queue", Json::from(c.max_queue)),
+            ]
+            .into_iter()
+            .chain(finder),
+        );
         let setup = self.setup.map_or(Json::Null, |s| {
             Json::object([
                 ("frames", Json::from(s.frames)),
@@ -662,13 +697,18 @@ impl GameResult {
         let retry = self.retry.then_some(("retry", Json::Bool(true)));
         let improved = self.retry_improved.then_some(("retry_improved", Json::Bool(true)));
         let pass = self.pass.map(|pass| ("pass", Json::from(pass)));
+        let finder_after = (self.finder_after > 0).then(|| ("finder_after", Json::from(self.finder_after)));
+        let finder_seconds =
+            (self.finder_after > 0).then_some(("finder_seconds", Json::Num(self.finder_budget.as_secs_f64())));
         let options = Json::object(
             [("force_search", Json::Bool(self.force_search)), ("use_prev", Json::Bool(self.use_prev))]
                 .into_iter()
                 .chain(keep_going)
                 .chain(retry)
                 .chain(improved)
-                .chain(pass),
+                .chain(pass)
+                .chain(finder_after)
+                .chain(finder_seconds),
         );
         // The citation of a known source is there only on a line that has one: the lines made before it do not.
         let known = self.known.as_ref().map(|cited| ("known", cited.cite.to_json()));
@@ -892,6 +932,10 @@ struct Go {
     /// The game of `n − 1`, final or provisional, whose promotions seed the search: given when the search takes a
     /// seed ([`Job::seeds`]) and the game has a previous game.
     seed: Option<Vec<u32>>,
+    /// The game of `n − 1`, final or provisional, that the finder starts from besides the search's incumbent, if the
+    /// search runs one ([`SolveOptions::finder_after`]): given also when the search takes no seed (a resumed search
+    /// has its incumbent in its checkpoint, and no seed).
+    finder_seed: Option<Vec<u32>>,
     /// The ceiling on the promotion sum, given when the game of `n − 1` is concluded and `prev_cap` is on.
     cap: Option<u64>,
     /// The workers the search starts with.
@@ -910,6 +954,8 @@ struct Outcome {
     /// Of this invocation, and over every invocation of a resumed search.
     time: Duration,
     time_all_runs: Duration,
+    /// What the finder did, if it started.
+    finder: Option<finder::Report>,
 }
 
 /// A game set up for a search, whatever its set width: what the game's thread and the driver of the range need of it.
@@ -991,6 +1037,14 @@ impl<const W: usize> Job for SearchJob<W> {
         let seed = seeds
             .map(|moves| self.board.seed(moves))
             .max_by_key(|seed| search::seed_survivors_sum(&self.prepared, seed));
+        // The finder starts from the same seed, or from the game of `n − 1` alone when the search takes none.
+        let finder = (opts.finder_after > 0).then(|| {
+            let seeds = [self.store_game.as_deref(), go.finder_seed.as_deref()].into_iter().flatten();
+            let seed = seeds
+                .map(|moves| self.board.seed(moves))
+                .max_by_key(|seed| search::seed_survivors_sum(&self.prepared, seed));
+            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seed, random: 0 }
+        });
         let (spill_dir, own) = spill_dir(opts, n);
         let cfg = EngineConfig {
             threads: go.threads,
@@ -1007,7 +1061,7 @@ impl<const W: usize> Job for SearchJob<W> {
             cores: None,
             control: Some(Arc::clone(&self.control)),
         };
-        let found = search::search(&self.prepared, &cfg, seed.as_ref(), go.cap, self.resuming);
+        let found = search::search_beside(&self.prepared, &cfg, seed.as_ref(), go.cap, self.resuming, finder.as_ref());
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);
@@ -1021,6 +1075,7 @@ impl<const W: usize> Job for SearchJob<W> {
             counters: found.counters,
             time: found.time,
             time_all_runs: found.time_all_runs,
+            finder: found.finder,
         })
     }
 }
@@ -1219,6 +1274,7 @@ fn conclude_game(
             }
             result.stats = searched.stats;
             result.counters = searched.counters;
+            result.finder = searched.finder;
             result.phases.search = searched.time;
             result.phases.search_all_runs = searched.time_all_runs;
             if set.job.resuming() {

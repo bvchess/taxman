@@ -45,7 +45,7 @@ pub struct Settings {
     /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
     pub climb_up: bool,
     pub climb_down: bool,
-    /// The seconds of one thread that the finder (large neighbourhood search, `common/lns.rs`) is given after a board's
+    /// The seconds of one thread that the finder (large neighbourhood search, `search/finder.rs`) is given after a board's
     /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game is
     /// offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders'
     /// measurements (solver/notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md) it has most of

@@ -176,7 +176,7 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
   when it finds them ([build-cache.md](build-cache.md)); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the
   solver, its examples `ledger`, `perf` and `ladder`, and the prover (`solver/noframe`) (`STUDIES=1` adds the study
   tools `tune`, `extended`,
-  `structure` and `wall`, which a default build skips);
+  `structure`, `finder` and `wall`, which a default build skips);
 * replays `optimal.json`, runs both result verifiers on the committed files, and runs `taxman regress --to 400`;
 * runs `cargo test -- --test-threads=4`, and the prover's `cargo test --release`.
 

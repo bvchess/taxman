@@ -117,7 +117,7 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 4] = ["--out", WINDOW_FLAG, "--game-hours", "--pass"];
+const SOLVE_FLAGS: [&str; 6] = ["--out", WINDOW_FLAG, "--game-hours", "--pass", "--finder-after", "--finder-seconds"];
 
 /// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
 /// reads the words up to the colon (`chain.sh`).
@@ -175,6 +175,10 @@ pub fn solve(args: &[String]) -> CliResult {
         ));
     }
     opts.game_limit = args.positive_hours("--game-hours")?;
+    opts.finder_after = args.parsed("--finder-after")?.unwrap_or(0);
+    if let Some(budget) = args.positive_seconds("--finder-seconds")? {
+        opts.finder_budget = budget;
+    }
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);
     let show = args.has("--show");

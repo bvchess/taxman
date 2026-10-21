@@ -158,7 +158,7 @@ the games 1 to 1300 ([results/README.md](../../results/README.md#optimaljson) sa
 checks its scores against that table, wherever the binary runs; only `verify-optimal FILE` and `extend-optimal --table
 FILE` name another.  A changed table takes a rebuild, which cargo does by itself when the file has changed.
 
-*Details.*  The study tools, the examples `tune`, `extended`, `structure` and `wall`, are behind the feature `studies`,
+*Details.*  The study tools, the examples `tune`, `extended`, `structure`, `finder` and `wall`, are behind the feature `studies`,
 which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
 that names one (`cargo build --release --example wall`) needs `--features studies` too.  The build is long for a program
 of this size because the search is compiled once for every set width
@@ -463,6 +463,12 @@ them.
   range goes on.  `solve` prints `wall at N after H hours` and exits with the status 4.  The game's clock is kept
   beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
+* **A finder beside a long search.**  `--finder-after NODES` starts a thread of its own, beside the workers, once a game's
+  search has taken NODES steps (over all its invocations), which looks for a better game than the incumbent and offers it
+  to the search; `--finder-seconds S` is its budget (default 60).  It changes no answer, and it is not part of a
+  checkpoint: a checkpoint resumes with any finder or none.  The line records what it did (`engine.finder`, [the
+  reference](../docs/REFERENCE.md#a-results-line---out-schema-5)); [the design](../docs/design/search.md#the-finder) says
+  how it works.
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.
 * **Memory.**  A searcher's state is bounded.  The shared queue of work units spills to `DIR/spill` beyond `--mem-cap`

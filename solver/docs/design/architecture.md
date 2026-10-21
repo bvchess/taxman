@@ -17,7 +17,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
    `taxman certify`).
 3. `src/bits.rs`: `Bits<W>`, the fixed-width bitsets of game numbers that everything above is generic over, and the set
    widths.  The module comment is enough at first.
-4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.
+4. `src/json.rs`: the small JSON reader and writer.  Skim it; it matters once you read results lines.  `src/rng.rs`
+   is the seeded generator that the finder draws its neighbourhoods with.
 
 **The frame model.**
 
@@ -80,7 +81,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
   between games; [The ledger](trust.md#the-ledger));
 * behind the Cargo feature `studies` (`--features studies`), the study tools: `tune` (the tuning benchmark: units of a
   search at the end of the chain, each solved on one thread), `structure` (the census of the frames' structure, game by
-  game), `extended` (chains and problems of the extended problem) and `wall` (what grows with n and with a tree: a
+  game), `extended` (chains and problems of the extended problem), `finder` (the finder alone on a game: how soon it
+  reaches the game's best from the start a search begins at) and `wall` (what grows with n and with a tree: a
   game's fixed costs piece by piece, a node's cost at any set width, large trees with their memory and checkpoints, the
   frames of any game, and the `landscape` of a range of games, each solved standalone: the root's GF(2) bound over the
   incumbent a search starts from).

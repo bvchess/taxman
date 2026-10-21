@@ -35,6 +35,11 @@ tactics of `tactics::Tactics`, in order, with their defaults.
 | `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of the game of n − 1 that are still promotable |
 
+**The finder is not a tactic.**  `--finder-after` and `--finder-seconds` start a thread beside a long search that looks
+for a better incumbent ([search.md, "The finder"](search.md#the-finder)); they are flags of `solve`, in no checkpoint's
+header and no row above, so a checkpoint resumes with any value, and a result line records them in `options`, not in
+`tactic_switches`.
+
 **The frame model's own rules are not tactics.**  They define the search space, and cannot be switched off inside the
 model: the greedy removal of impossible sources inside frames; the mandatory moves;
 freedoms = factors − sources; closed frames

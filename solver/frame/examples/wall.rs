@@ -220,10 +220,6 @@ mod fixtures;
 mod images;
 #[path = "common/known.rs"]
 mod known;
-/// The finder, shared with the ledger.
-#[allow(dead_code)] // `wall` reads the part that harvests nogoods; the ledger reads the rest
-#[path = "common/lns.rs"]
-mod lns;
 /// `local`: how much of a node's gap a bound exact in a few frames, and GF(2) in the others, closes.
 #[path = "wall/local.rs"]
 mod local;
@@ -233,8 +229,6 @@ mod near;
 /// The nogoods that the finder and the sound search learn, and the Lagrangian bound fitted over them.
 #[path = "wall/nogoods.rs"]
 mod nogoods;
-#[path = "common/rng.rs"]
-mod rng;
 /// The nodes of a game that `choice-prepare` samples: the probe's fixtures, the tuning suite's units and nodes on the
 /// way to an optimal set.
 #[path = "wall/sample.rs"]
@@ -263,6 +257,8 @@ use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
 use taxman::model::Scratch;
 use taxman::numtheory::Tables;
+use taxman::rng;
+use taxman::search::finder as lns;
 use taxman::search::{
     search, start_incumbent, stat, Diagnostics, Neighbourhood, Prepared, SearchSpace, SearchTactics, TaxSearcher,
     TaxUnit,

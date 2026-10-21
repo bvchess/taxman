@@ -49,7 +49,7 @@ The *full suite* is `cargo test --release`: every test, the long ones too, about
 minutes.  It runs before a cloud run, after any change that changes search trees or results, and in the gates (the
 one-thread re-solve of 1301-2175).  A default build, and so every run above and the cloud setup, covers the library, the
 binary, the tests, and the examples `ledger`, `perf` and `ladder`.  The study tools (the examples `tune`, `extended`,
-`structure` and `wall`, with the tests of `tune` and `wall`) are behind the Cargo feature `studies`: build them with
+`structure`, `finder` and `wall`, with the tests of `tune` and `wall`) are behind the Cargo feature `studies`: build them with
 `--features studies`, and run `cargo test --features studies` and `cargo clippy --all-targets --features studies` after
 a change to the library that they read.
 

@@ -1000,6 +1000,17 @@ impl<'a> Window<'a> {
             }
             Known::Provisional(_) | Known::NotYet | Known::None => (None, search_cap(set, n, None, self.opts), None),
         };
+        // The finder's seed is the game before it as the search takes it, and for a search that takes none (a resumed
+        // one) the game before it all the same, if there is one.
+        let finder_seed = if self.opts.finder_after == 0 {
+            None
+        } else {
+            match self.known_before(n) {
+                Known::Final(prev) => Some(prev.moves.clone()),
+                Known::Provisional(before) => Some(before.moves()),
+                Known::NotYet | Known::None => None,
+            }
+        };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
         let wall = self.opts.game_limit.is_some();
         let Some(game) = self.games.get_mut(&n) else { return };
@@ -1010,7 +1021,7 @@ impl<'a> Window<'a> {
         }
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
-            let _ = go.send(Go { seed, cap, threads });
+            let _ = go.send(Go { seed, finder_seed, cap, threads });
         }
         if let Stage::Search(_, plan) = &mut game.stage {
             *plan = Plan::Search(Search::Running(Run::new(threads, now, given)));

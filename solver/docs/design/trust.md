@@ -46,7 +46,9 @@ version 6.  The default's window is `all`, so the default's search writes versio
 version 5 (or 4) only as `--tactic force_window=80`, as for any tactic that differs; a build from before that change
 reads a checkpoint of version 6 as the search it is.  The tactics that set how the nogoods are kept (`nogood_period`,
 `nogood_keep` and `nogood_limit`) are in no version: they change the trees and never the answer, and a resumed search
-starts with empty tables, so the run that resumes says which it uses.
+starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`, [search.md, "The
+finder"](search.md#the-finder)) is in none either: it only offers sets, each after the check below, so a checkpoint
+resumes with any finder or none.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header
@@ -175,7 +177,7 @@ reads nothing of the truth (`optimal.json`, the results files) unless it is give
   and D, with what each rests on).  The referee replays every game that a relation makes before it counts, if it could
   raise a game's L (a game that cannot is not shown to the referee, or not made), and an L above a U stops the run as
   an error;
-* the *finder*, a large neighbourhood search (`examples/common/lns.rs`; [finders for good games that are not
+* the *finder*, a large neighbourhood search (`search/finder.rs`; [finders for good games that are not
   sound](../../notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and
   proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a
   game's map and before a search whose best seed has changed since it last ran on the game (a climb's always has).  Its

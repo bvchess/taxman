@@ -33,6 +33,11 @@ commands:
       --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
                                nogood_period and nogood_limit are whole numbers, nogood_keep is none, hit, sizeN
                                or topN.  Names: {tactics}
+      --finder-after NODES     once a game's search has taken NODES steps (over all its runs), start a finder beside
+                               it: a thread that looks for a better game than the incumbent, from the incumbent and
+                               from the game of n-1, and offers it to the search (default 0: none).  It changes no
+                               answer and is no part of a checkpoint, which resumes with any finder or none
+      --finder-seconds S       the finder thread's budget, from the moment it starts (default 60)
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)

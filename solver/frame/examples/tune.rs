@@ -64,12 +64,9 @@
 mod fixtures;
 #[path = "common/known.rs"]
 mod known;
-#[path = "common/rng.rs"]
-mod rng;
 
 use fixtures::{from_hex, to_hex};
 use known::{known_incumbent, survivors};
-use rng::Rng;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -80,6 +77,7 @@ use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
+use taxman::rng::Rng;
 use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 

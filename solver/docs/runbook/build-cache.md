@@ -33,7 +33,7 @@ depends on:
 * **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
   `--example X` by `--example X` or `--examples`.  The release holds everything (the default of `setup.sh`), so it
   serves any `BUILD`.  An entry is never completed: a request that no entry covers builds what it needs and stores
-  nothing.  The study tools (cargo's feature `studies`: `tune`, `extended`, `structure` and `wall`) are a part of their
+  nothing.  The study tools (cargo's feature `studies`: `tune`, `extended`, `structure`, `finder` and `wall`) are a part of their
   own, so a default build never claims to hold `wall`, and an entry with them also serves a request without them (the
   smaller entry first, when both exist).
 * **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result

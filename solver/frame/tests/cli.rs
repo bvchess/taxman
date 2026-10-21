@@ -31,6 +31,8 @@ fn help_lists_the_commands_and_every_tactic() {
             "certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE",
             "verify-certificates CERTS... --results FILE... --upper FILE...",
             "--no-claims",
+            "--finder-after NODES",
+            "--finder-seconds S",
             "tables N K...",
             "--history FILE",
         ] {
@@ -64,6 +66,11 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--game-hours", "-1"], "is not a number of hours");
     assert_usage_error(&["solve", "12", "--game-hours", "soon"], "--game-hours: cannot read");
     assert_usage_error(&["regress", "--game-hours", "1"], "unknown option --game-hours");
+    assert_usage_error(&["solve", "12", "--finder-after", "soon"], "--finder-after: cannot read");
+    assert_usage_error(&["solve", "12", "--finder-after", "-1"], "--finder-after: cannot read");
+    assert_usage_error(&["solve", "12", "--finder-seconds", "0"], "--finder-seconds must be more than 0 seconds");
+    assert_usage_error(&["regress", "--finder-after", "1"], "unknown option --finder-after");
+    assert_usage_error(&["bench", "--finder-seconds", "1"], "unknown option --finder-seconds");
     assert_usage_error(&["regress", "12"], "regress takes no positional arguments");
     assert_usage_error(&["bench", "many"], "not a game n");
     assert_usage_error(&["tables"], "usage: tables N K...");

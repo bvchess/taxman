@@ -1,10 +1,12 @@
-//! A seeded generator, for the examples that sample (`#[path = "common/rng.rs"] mod rng;`; `tune` samples the units of
-//! a checkpoint and the large neighbourhood search, `common/lns.rs`, picks its neighbourhoods).
+//! A seeded generator, for the code that samples: the large neighbourhood search of [`crate::search::finder`] picks
+//! its neighbourhoods with it, and the tuning benchmark (`examples/tune.rs`) samples the units of a checkpoint.
 
 /// SplitMix64: a small, good generator, seeded.
 pub struct Rng(pub u64);
 
 impl Rng {
+    /// The next 64 random bits.
+    #[allow(clippy::should_implement_trait)] // a generator, not an iterator: it never ends
     pub fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
@@ -14,19 +16,16 @@ impl Rng {
     }
 
     /// A number in `0..n` (`n` positive; the bias of the remainder is negligible for the small `n` used here).
-    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn below(&mut self, n: usize) -> usize {
         (self.next() % n as u64) as usize
     }
 
     /// A number in `[0, 1)`.
-    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn unit(&mut self) -> f64 {
         (self.next() >> 11) as f64 / (1u64 << 53) as f64
     }
 
     /// `items` in a random order (Fisher-Yates).
-    #[allow(dead_code)] // only the large neighbourhood search reads it
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
             items.swap(i, self.below(i + 1));

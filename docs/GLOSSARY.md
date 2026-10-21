@@ -149,6 +149,12 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   the ceiling takes no step of the search, and has the method `start`.
 * **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, or the game of a lower
   bound that the bounds store holds.
+* **finder**: a large neighbourhood search for a good game, which only offers sets: it fixes a random share of an
+  incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.  It
+  is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search as
+  an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps starts one
+  beside it ([solver/docs/design/search.md, "The finder"](../solver/docs/design/search.md#the-finder)); the ledger runs
+  it before its searches.
 * **conflict**: a subset of a promotion set that cannot be promoted together from a node.  Every completion leaves out
   one of its members.
 * **nogood**: a conflict of the root, learned from a conflict found at a node.  It holds at every node, on any thread

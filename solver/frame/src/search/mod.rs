@@ -86,6 +86,7 @@
 
 mod diagnostics;
 mod dual;
+pub mod finder;
 mod header;
 #[cfg(feature = "studies")]
 mod hooks;
@@ -112,7 +113,7 @@ pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
 use crate::bits::Bits;
 use crate::engine::{self, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
 use crate::matchbound::MatchGraph;
-use crate::model::{NogoodStats, Scratch};
+use crate::model::NogoodStats;
 use header::Header;
 use incumbent::{dive, surviving};
 use searcher::{get_bits, put_bits};
@@ -154,6 +155,8 @@ pub struct SearchResult<const W: usize> {
     pub time_all_runs: Duration,
     /// When this call found its best incumbent (`None` if it found none better than the starting one).
     pub found: Option<Found>,
+    /// What the finder did, if it started ([`finder`]: a search is given a [`finder::Plan`] by [`search_beside`]).
+    pub finder: Option<finder::Report>,
     /// The incumbent the search started from: the best of the greedy set, the seed and the matching dive, improved
     /// by the local search (the dive and the local search are skipped when the set before them reaches the
     /// ceiling, and the local search ends when its set does).  Empty under a floor, which is a value and no set.
@@ -215,7 +218,7 @@ pub fn search_above<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, None, cap, resume, None, prepared.tactics.forgetting(), Some(floor))
+    search_forgetting(prepared, cfg, None, cap, resume, None, prepared.tactics.forgetting(), Some(floor), None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -227,7 +230,22 @@ pub fn search_with<const W: usize>(
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting(), None)
+    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting(), None, None)
+}
+
+/// [`search`] with the finder of `plan` beside it, if there is one: once the search has taken `plan.after` steps, a
+/// thread of its own looks for a better game than the incumbent and offers it ([`finder`]).  The finder only offers
+/// sets, each after the check of [`offer_found`], so the search stays exhaustive and its answer is the same as without
+/// it; it is not part of what a checkpoint is checked against, so a checkpoint resumes with any finder or none.
+pub fn search_beside<const W: usize>(
+    prepared: &Prepared<W>,
+    cfg: &EngineConfig,
+    seed: Option<&Bits<W>>,
+    cap: Option<u64>,
+    resume: bool,
+    plan: Option<&finder::Plan<W>>,
+) -> io::Result<SearchResult<W>> {
+    search_forgetting(prepared, cfg, seed, cap, resume, None, prepared.tactics.forgetting(), None, plan)
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
@@ -242,6 +260,7 @@ fn search_forgetting<const W: usize>(
     diagnostics: Option<&Mutex<Diagnostics>>,
     forgetting: Forgetting,
     floor: Option<u64>,
+    plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seed.is_none(), "a floor is the start: there is no seed");
     let t0 = Instant::now();
@@ -288,6 +307,7 @@ fn search_forgetting<const W: usize>(
             time: t0.elapsed(),
             time_all_runs: earlier + t0.elapsed(),
             found: None,
+            finder: None,
             start: incumbent,
         });
     }
@@ -312,7 +332,11 @@ fn search_forgetting<const W: usize>(
         None => Header::of(prepared).encode(),
     };
     let engine_start = Instant::now();
-    let outcome = engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))?;
+    let label = cfg.progress.map(|_| cfg.label.as_str());
+    let (outcome, finder) = finder::run_beside(prepared, &control, plan, before.nodes, label, || {
+        engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))
+    });
+    let outcome = outcome?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
     let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());
     let promotions = set_of_payload(&outcome.payload);
@@ -336,6 +360,7 @@ fn search_forgetting<const W: usize>(
         time,
         time_all_runs: time + earlier_runs,
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
+        finder,
         start: incumbent,
     })
 }
@@ -398,6 +423,30 @@ pub fn offer_seed<const W: usize>(prepared: &Prepared<W>, control: &Control, see
     offer_set(control, &surviving(prepared, seed))
 }
 
+/// Offers `set`, a game that a finder ([`finder`]) found and claims is worth `claimed`, to the run of `control` as an
+/// incumbent, after the checks that a checkpoint's incumbent passes on resuming ([`resume_point`]): it must be a set of
+/// candidates that can be promoted from the root ([`Prepared::can_promote`]) and worth `claimed`.  It then goes the way a
+/// worker's improvement does ([`Control::offer`]), so the run adopts it if it beats the incumbent, and ends if it reaches
+/// the ceiling.  Returns whether it became the incumbent.
+///
+/// # Errors
+///
+/// Why the set was refused, with the incumbent left as it was.
+pub fn offer_found<const W: usize>(
+    prepared: &Prepared<W>,
+    control: &Control,
+    set: &Bits<W>,
+    claimed: u64,
+) -> Result<bool, String> {
+    if !prepared.can_promote(set) {
+        return Err("it is not a set of candidates that can be promoted in this game".into());
+    }
+    if set.sum() != claimed {
+        return Err(format!("it is worth {}, not the {claimed} claimed", set.sum()));
+    }
+    Ok(offer_set(control, set))
+}
+
 /// The promotion sum of what survives of `seed` in `prepared`, the game searched: of the candidates of `seed` that can
 /// still be promoted, from the largest down, the set that [`search`] and [`offer_seed`] make of a seed.  A search
 /// seeded with `seed` starts from that set or a better one, so a ceiling that this sum reaches settles it at once.
@@ -458,9 +507,7 @@ fn resume_point<const W: usize>(
         return Err(at(format!("its incumbent has {} bytes, not {}", head.payload.len(), 8 * W)));
     }
     let kept = set_of_payload(&head.payload);
-    let fits = kept.is_subset(&prepared.candidates)
-        && prepared.model.promote_all_using(&mut Scratch::new(), &prepared.root, &kept).is_some();
-    if !fits {
+    if !prepared.can_promote(&kept) {
         return Err(at("its incumbent cannot be promoted in this game".into()));
     }
     if let Some(floor) = floor.filter(|&floor| head.best < floor) {

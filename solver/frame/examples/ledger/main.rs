@@ -86,7 +86,7 @@
 //!   run side by side.  A board just outside the repeat class of one that is being climbed to waits (no ordinary job of
 //!   it starts), as the climb may prove that board within its limit; the climb into a class is seeded with the games of
 //!   the boards just outside it, the proven one it goes from included.
-//! * **The finder** (`common/lns.rs`; `--lns-seconds` seconds of one thread, default
+//! * **The finder** (`search/finder.rs`; `--lns-seconds` seconds of one thread, default
 //!   1; 0: none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the
 //!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:
 //!   its game is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other
@@ -166,12 +166,6 @@ mod counters;
 #[allow(dead_code)] // the ledger reads only `survivors`
 #[path = "../common/known.rs"]
 mod known;
-/// The finder, shared with `wall choice-prepare`.
-#[allow(dead_code)] // `wall choice-prepare` reads another part of it than the ledger does
-#[path = "../common/lns.rs"]
-mod lns;
-#[path = "../common/rng.rs"]
-mod rng;
 /// The helpers of the tests (temporary directories), shared with the other tests.
 #[cfg(test)]
 #[path = "../../tests/common/support.rs"]
@@ -188,6 +182,7 @@ mod verify;
 
 use schedule::Settings;
 use std::path::PathBuf;
+use taxman::search::finder as lns;
 
 /// The committed chain, whose games the bounds store cites and leaves out.
 const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/strict.jsonl");

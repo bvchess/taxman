@@ -15,9 +15,10 @@ name = "taxman"
 path = "src/main.rs"
 
 [features]
-# The study tools: the examples `tune`, `extended`, `structure` and `wall`, which the occasional studies use.  A default
-# build, `cargo test`, `cargo clippy --all-targets` and the cloud setup skip them; `--features studies` builds them (and
-# `cargo test --features studies` runs their tests).  The examples `ledger`, `perf` and `ladder` are in every build.
+# The study tools: the examples `tune`, `extended`, `structure`, `finder` and `wall`, which the occasional studies use.
+# A default build, `cargo test`, `cargo clippy --all-targets` and the cloud setup skip them; `--features studies` builds
+# them (and `cargo test --features studies` runs their tests).  The examples `ledger`, `perf` and `ladder` are in every
+# build.
 studies = []
 
 # The tuning benchmark's solver has tests of its own (units are solved the same every time; a root unit is the
@@ -41,6 +42,10 @@ required-features = ["studies"]
 
 [[example]]
 name = "structure"
+required-features = ["studies"]
+
+[[example]]
+name = "finder"
 required-features = ["studies"]
 
 [[example]]

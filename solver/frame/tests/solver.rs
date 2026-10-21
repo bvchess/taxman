@@ -248,6 +248,83 @@ fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
     assert!(assumptions(finished).is_empty() && assumptions(prime).is_empty());
 }
 
+/// The finder, started as early as it can be, changes no score: games 600..=604, whose searches on the matching path
+/// take a few thousand steps (no ceiling from the game before, `prev_cap` off, so that they are searched to the end),
+/// have `optimal.json`'s scores with it as without it, and the finder's record is in the lines of the games it started
+/// for, which the verifier accepts.
+#[test]
+fn a_finder_started_early_changes_no_score() {
+    let optimal = Optimal::built_in();
+    let dir = TempDir::new("finder-scores");
+    let mut base = SolveOptions { force_search: true, ..matching_options(2) };
+    base.tactics.prev_cap = false;
+    let without = solve_all(600, 604, &base);
+    let finder = SolveOptions { finder_after: 1, finder_budget: Duration::from_secs(1), ..base };
+    let results = dir.join("results.jsonl");
+    let with = solve_all(600, 604, &SolveOptions { checkpoint_dir: None, ..finder.clone() });
+    let written = solver::solve_range(600, 604, &finder, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
+    for ((a, b), c) in without.iter().zip(&with).zip(&written) {
+        assert!(a.completed && b.completed && c.completed, "n={}", a.n);
+        assert_eq!(Some(a.score), optimal.score(a.n), "n={}", a.n);
+        assert_eq!((b.score, c.score), (a.score, a.score), "n={}: the finder changed the score", a.n);
+        assert!(a.finder.is_none(), "n={}: no finder was asked for", a.n);
+    }
+    // A search that ends before the finder looks reports nothing, but of five of a few thousand steps some do start it.
+    let started: Vec<_> = written.iter().filter_map(|r| r.finder.map(|f| (r.n, f))).collect();
+    assert!(!started.is_empty(), "no game started its finder");
+    for (n, f) in &started {
+        assert!(f.best >= f.from && f.refused == 0 && f.seconds <= 1.5, "n={n}: {f:?}");
+    }
+    // The lines say what the finder did, where it did something, and what it was asked for.
+    let lines: Vec<Json> =
+        fs::read_to_string(&results).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect();
+    for (line, game) in lines.iter().zip(&written) {
+        let options = line.get("options").unwrap();
+        assert_eq!(options.get("finder_after").and_then(Json::as_u64), Some(1), "n={}", game.n);
+        assert_eq!(options.get("finder_seconds").and_then(Json::as_f64), Some(1.0), "n={}", game.n);
+        let record = line.get("engine").unwrap().get("finder");
+        assert_eq!(record.is_some(), game.finder.is_some(), "n={}", game.n);
+        if let (Some(record), Some(f)) = (record, game.finder) {
+            assert_eq!(record.get("at_nodes").and_then(Json::as_u64), Some(f.at_nodes), "n={}", game.n);
+            assert_eq!(record.get("best").and_then(Json::as_u64), Some(f.best), "n={}", game.n);
+            assert_eq!(record.get("improved").and_then(Json::as_u64), Some(f.improved), "n={}", game.n);
+            assert_eq!(record.get("refused").and_then(Json::as_u64), Some(0), "n={}", game.n);
+        }
+    }
+    verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
+}
+
+/// A checkpoint is the same search whatever the finder: a search stopped by a node limit is resumed, piece after piece,
+/// with the finder off, on early, off, and on later and with another budget, and finishes with the right score.
+#[test]
+fn a_checkpoint_resumes_with_any_finder_settings() {
+    let optimal = Optimal::built_in();
+    let dir = TempDir::new("finder-resume");
+    let base = SolveOptions {
+        checkpoint_dir: Some(dir.0.clone()),
+        checkpoint_interval: Duration::from_secs(3600),
+        node_limit: Some(1_000),
+        queue_mem_cap: 4,
+        force_search: true,
+        ..matching_options(2)
+    };
+    let settings = [(0, 60), (1, 1), (0, 60), (2_000, 5), (1, 60)];
+    let mut pieces = 0;
+    let result = loop {
+        let (finder_after, seconds) = settings[pieces % settings.len()];
+        let opts = SolveOptions { finder_after, finder_budget: Duration::from_secs(seconds), ..base.clone() };
+        let r = solver::solve_game_with(600, None, &opts, optimal).unwrap_or_else(|e| panic!("piece {pieces}: {e}"));
+        pieces += 1;
+        if r.completed {
+            break r;
+        }
+        assert!(base.checkpoint_file(600).unwrap().exists(), "an unfinished game keeps its checkpoint");
+        assert!(pieces < 100, "no progress");
+    };
+    assert!(pieces >= 3, "only {pieces} pieces");
+    assert_eq!((result.score, result.optimal_match), (optimal.score(600).unwrap(), Some(true)));
+}
+
 #[test]
 fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     let optimal = Optimal::built_in();

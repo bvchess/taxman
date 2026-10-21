@@ -370,7 +370,7 @@ fn forgetting_nogoods_often_does_not_change_answers() {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
             let every = Forgetting::every(period);
-            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None).unwrap();
+            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None, None).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -415,7 +415,8 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
-                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None).unwrap();
+                let r =
+                    search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None, None).unwrap();
                 let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
                 assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
                 assert_eq!(r.sum, golden_sum(g), "{what}");

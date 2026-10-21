@@ -56,12 +56,13 @@
 //! | | [`playable`] | whether a set of numbers can all be played on the whole board, with nothing of the frame model |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
+//! | | [`rng`] | a seeded generator, for the finder's random neighbourhoods and the tuning benchmark's samples |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, an upper bound on a node's completions; the Lagrangian bound |
 //! | | [`gf2`] | the GF(2) bound, the default node bound: two frame matroids and their weighted intersection |
-//! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header |
+//! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header, and the finder |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
@@ -100,6 +101,7 @@ pub mod numtheory;
 pub mod paths;
 pub mod playable;
 pub mod results;
+pub mod rng;
 pub mod sacrifice;
 pub mod search;
 pub mod solver;

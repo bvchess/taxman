@@ -13,7 +13,7 @@ use crate::bits::Bits;
 use crate::bounds;
 use crate::engine;
 use crate::gf2::{Gf2Bound, Gf2Graph, MAX_WORDS};
-use crate::model::{FrameGraph, FrameSet};
+use crate::model::{FrameGraph, FrameSet, Scratch};
 use crate::numtheory::Tables;
 use std::path::Path;
 use std::sync::Arc;
@@ -47,6 +47,13 @@ impl<const W: usize> Prepared<W> {
     /// The search problem this setup poses (see [`Problem`]).
     pub fn problem(&self) -> Problem {
         Problem::of(&self.model, &self.root, &self.candidates, self.max_total)
+    }
+
+    /// Whether `set` is a set of candidates that can be promoted from the root: the check of an incumbent that no
+    /// step of this search made, a checkpoint's ([`resume_point`](super::resume_point)) or a finder's
+    /// ([`offer_found`](super::offer_found)).
+    pub fn can_promote(&self, set: &Bits<W>) -> bool {
+        set.is_subset(&self.candidates) && self.model.promote_all_using(&mut Scratch::new(), &self.root, set).is_some()
     }
 }
 
