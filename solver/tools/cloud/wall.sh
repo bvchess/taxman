@@ -51,7 +51,7 @@
 # release suite and, if it passes, stores the binaries; if it fails the run ends with RELEASE_TESTS_FAILED in $S3_DEST),
 # REQUIRE_CACHED=1 (a machine whose cache has none ends the run instead of building).
 # status reads the run's state in S3 and the group: the run, the ledger, the group, and from the last save to S3 (its
-# time, in UTC, and how long ago) the last game recorded and a line for each game in flight
+# time, in the local time zone (TZ), and how long ago) the last game recorded and a line for each game in flight
 # (solver/docs/runbook/wall.md, "Launch, watch, stop, clean up").
 # Other environment: RUN (the name of the run; its state is $S3_DEST = s3://BUCKET/wall-RUN; default run1 for launch,
 # and for status, stop and cleanup the one run in progress, the one whose prefix has a config and no ended object; with
