@@ -15,15 +15,17 @@ games or in general, is not a priority.  Nothing is published: `optimal.json` st
 
 * **Extending the chain past 5000.**  The committed chain ends at 4547
   ([results/README.md](../../results/README.md#strictjsonl)); the bounds store has proven 215 games of 4548..4783, which
-  the next run takes with no search (`--use-prev`).  A step of the search now costs 31-39% fewer cycles, with every tree
-  the same ([the entry](../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)), and a
-  second round of such savings is under way.  Smaller trees must come from the bound: branching has little headroom
-  ([branching in hindsight](../notebook/search/the-headroom-of-branching-in-hindsight-2026-10/README.md)) and the knot
-  learning is closed ([the
-  verdict](../notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)).
-  A study under way asks whether the bound's error sits in one home, where an exact local bound could remove it ([the
-  lead](../notebook/search/decomposing-across-the-frames-a5s-cheapest-experiment-2026-10/README.md)).  An idea that
-  changes the tree is judged on whole games, not units.  The next run, from 4548, needs the account owner's approval.
+  the next run takes with no search (`--use-prev`).  A step of the search costs about 47% fewer cycles than in the run
+  that reached 4547, with the same results ([the
+  entry](../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  Smaller trees would
+  have to come from the bound, and every avenue tried is closed: branching has little headroom ([branching in
+  hindsight](../notebook/search/the-headroom-of-branching-in-hindsight-2026-10/README.md)), the knot learning does not
+  pay on whole games ([the
+  verdict](../notebook/search/conflicts-closed-under-cheap-exchanges-2026-10/README.md#later-2026-10-20-closed-not-adopted)),
+  and the bound's error sits in frame 2, whose exact problem costs what the search does
+  ([frame 2](../notebook/search/the-exact-problem-of-frame-2-2026-10/README.md)).  An idea that changes the tree is
+  judged on whole games, not units.  Next: a run from 4548 past 5000, on a budget of $35, which needs the account
+  owner's approval.
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.
