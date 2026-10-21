@@ -1,0 +1,71 @@
+2026-10-21T01:51:37Z build cache key: 4974a7173e270edcba35ac75b449f088beaf9b11-aarch64-neoverse-v2
+2026-10-21T01:51:38Z build cache: no entry under 4974a7173e270edcba35ac75b449f088beaf9b11-aarch64-neoverse-v2 holds solver bin taxman
+2026-10-21T01:51:38Z building the solver (RUSTFLAGS='-C target-cpu=native'): cargo build --release --bin taxman
+[solver]    Compiling taxman v0.1.0 (/home/ec2-user/taxman/solver/frame)
+[solver]     Finished `release` profile [optimized + debuginfo] target(s) in 2m 35s
+2026-10-21T01:54:14Z build cache: packed 1 files, 11 MiB, in /home/ec2-user/taxman-work/build-cache/stage
+2026-10-21T01:54:14Z smoke: replay optimal.json
+verified 1300 games (n up to 1300, 367449 moves)
+load+parse 14.4 ms, replay 23.1 ms
+2026-10-21T01:54:14Z smoke: the committed results files, with the solver's verifier and the independent Python one
+/home/ec2-user/taxman/results/strict.jsonl: 4547 completed games, n = 1..=4547 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 596, cap 411, exhausted 1506, same_search 1854, known 167
+  assumptions: none in 4380 of 4547 games; 167 assume statement U at 129 boards in all
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1462, prime formula 615
+0 games are in more than one file, with equal scores in all
+checked in 2494.8 ms
+/home/ec2-user/taxman/results/strict.jsonl:
+  4547 completed games, n = 1..4547 (0 missing)
+  proof: cap 411, exhausted 1506, known 167, prime_formula 596, same_search 1854, trivial 13
+  assumed: (nothing) 4380, statement U at some boards 167
+  arithmetic certificates: n + score(n-1) 1462, prime formula 615
+0 games are in more than one file
+all checks passed
+2026-10-21T01:54:24Z smoke: games 1..400 against optimal.json
+  through n=100 after 0.0 s
+  through n=200 after 0.0 s
+  through n=300 after 0.1 s
+  through n=400 after 0.2 s
+solved 1..=400 (8 threads, tactics default) in 0.2 s
+by method: trivial 13, prime 78, repeat 151, search 158, known 0
+400 games match optimal.json, 0 are not in it
+2026-10-21T01:54:24Z smoke: none for the prover (not in this build)
+2026-10-21T01:54:25Z release suite: 64 CPUs, solver=/home/ec2-user/taxman/solver/frame
+2026-10-21T01:54:25Z tests: building the tests of solver: cargo test --release --no-run --message-format=json
+[solver]    Compiling taxman v0.1.0 (/home/ec2-user/taxman/solver/frame)
+[solver]     Finished `release` profile [optimized + debuginfo] target(s) in 4m 39s
+2026-10-21T01:59:05Z tests: built 25 test executables in 280 s; listing their tests
+2026-10-21T01:59:05Z tests: 723 tests (696 with a known time), 28 ignored; 64 at a time
+2026-10-21T02:00:23Z tests: 723 of 724 done, 0 failed, 1 running, 78 s
+2026-10-21T02:01:23Z tests: 723 of 724 done, 0 failed, 1 running, 138 s
+2026-10-21T02:02:23Z tests: 723 of 724 done, 0 failed, 1 running, 198 s
+2026-10-21T02:03:23Z tests: 723 of 724 done, 0 failed, 1 running, 258 s
+2026-10-21T02:04:10Z tests: 724 of 724 done, 0 failed, 0 running, 305 s
+2026-10-21T02:04:10Z tests: solver: 723 passed, 0 failed, 28 ignored
+2026-10-21T02:04:10Z tests: 305 s for the tests (585 s with the build), 64 at a time, 1976 CPU seconds
+2026-10-21T02:04:10Z tests: slowest: solver/example:ledger/store_tests::the_committed_bounds_pass_the_verifier 305.1 s, solver/test:results/the_committed_results_pass_the_verifier 77.5 s, solver/test:soundness/a_search_resumed_over_and_over_finds_the_optimum 31.6 s, solver/test:soundness/a_wide_search_resumed_over_and_over_finds_the_optimum 30.5 s, solver/test:wide/boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128 18.0 s, solver/lib:taxman/gf2::tests::levels_match_fresh_matroids_along_random_paths_in_the_extended_problem 15.6 s, solver/test:solver/big_boards_get_through_setup 15.6 s, solver/test:model_extended/theorem_m_plus_with_every_source_open_45_to_60 13.0 s
+2026-10-21T02:04:10Z tests: most CPU: solver/example:ledger/store_tests::the_committed_bounds_pass_the_verifier 1214.8 s, solver/test:results/the_committed_results_pass_the_verifier 77.5 s, solver/test:soundness/a_wide_search_resumed_over_and_over_finds_the_optimum 50.7 s, solver/test:soundness/a_search_resumed_over_and_over_finds_the_optimum 50.1 s, solver/test:solver/big_boards_get_through_setup 28.2 s, solver/example:ledger/tests::a_run_climbs_and_parks_and_turns_the_climbs_off 27.1 s, solver/test:wide/boards_past_2047_give_the_same_search_at_their_width_at_64_and_at_128 17.9 s, solver/lib:taxman/gf2::tests::levels_match_fresh_matroids_along_random_paths_in_the_extended_problem 15.6 s
+2026-10-21T02:04:11Z release suite: passed
+2026-10-21T02:04:12Z build cache: stored 4974a7173e270edcba35ac75b449f088beaf9b11-aarch64-neoverse-v2/solver-bin-taxman
+2026-10-21T02:04:12Z ready
+date:       2026-10-21T02:04:12Z
+host:       ip-172-31-12-166.ec2.internal Linux 6.18.54-121.166.amzn2023.aarch64 aarch64
+cpus:       64
+            Architecture:                            aarch64
+            CPU(s):                                  64
+            Thread(s) per core:                      1
+            Core(s) per socket:                      64
+            Socket(s):                               1
+            NUMA node(s):                            1
+memory:     124 GiB
+rustc:      rustc 1.99.1 (58cf8f9c3 2026-10-13)
+native cpu: native          - Select the CPU of the current host (currently neoverse-v2).
+RUSTFLAGS:  -C target-cpu=native
+commit:     4974a7173e270edcba35ac75b449f088beaf9b11
+work dir:   /home/ec2-user/taxman-work (36G free on /dev/nvme0n1p1)
+
+work directory: /home/ec2-user/taxman-work (results, ckpt, logs)
+solver:         /home/ec2-user/taxman/solver/frame/target/release/taxman
+note: /home/ec2-user/taxman/solver/tools/pgo.sh exists in this checkout; read its header for an optional profile-guided build
+prover:         /home/ec2-user/taxman/solver/noframe/target/release/exact
+next:           /home/ec2-user/taxman/solver/tools/cloud/scaling.sh (the solver) or /home/ec2-user/taxman/solver/tools/cloud/prover.sh A B (the prover's proofs); see RUNBOOK.md

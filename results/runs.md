@@ -2,7 +2,7 @@
 
 Part of [the results](README.md).
 
-It was made in four runs, each a continuation of the one before:
+It was made in five runs, each a continuation of the one before:
 
 | games | where | build | git has the file before the run as |
 |---|---|---|---|
@@ -10,6 +10,7 @@ It was made in four runs, each a continuation of the one before:
 | 2176–3440 | appended to a copy of those lines on a cloud machine | commit 55287ff | `git show 4f1c35b:rust/results/strict.jsonl`, whose 2175 lines are this file's first 2175, byte for byte |
 | 3441–3914 | appended from a run on a cloud machine of the same kind | commit eb84a6f | `git show b23f497:rust/results/strict.jsonl`, whose 3440 lines are this file's first 3440, byte for byte |
 | 3915–4547 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit ca357bf | `git show c7d81c2:rust/results/strict.jsonl`, whose 3914 lines are this file's first 3914, byte for byte |
+| 4548–4874 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit 4974a71 | `git show f48df13:results/strict.jsonl`, whose 4547 lines are this file's first 4547, byte for byte |
 
 Each build was of a clean tree, which every line records.  Every line records the `default` tactics: no tactic is
 unproven any more, so none is switched off.
@@ -121,6 +122,31 @@ entry](../solver/notebook/the-run-to-5000-2026-10/README.md) records the run.
   or more took 29.24 G of the nodes.  The dearest by nodes were 3940 (1.55 G nodes, 10,725 s or 2.98 h), 3930, 4225,
   3942 and 3936 (1.40, 1.37, 1.20 and 1.16 G); by time, 3942 (15,942 s or 4.43 h), 4433 (11,032 s), 3940 and 3939
   (9,033 s).  The queue of work units never held more than 7,380, and none spilled to disk.
+
+**The fifth run, games 4548–4874.**  The command was `taxman solve 1-8191 --use-prev`, with a window of 4 games in
+flight on 64 threads of one `c8g.16xlarge` at spot, with the build of commit 4974a71, launched by
+`solver/tools/cloud/wall.sh`.  It took games 1–4547 from this file and each game the bounds store had proven from the
+store, with no search, and searched the others, from 4548 on.  Its own file started with `known` copies of games
+1–4547.  The lines of games 4548–4874 were appended to this file, byte for byte, but for 14 lines of method `search`
+with no node (4644, 4785, 4794, 4797, 4810, 4816, 4818, 4824, 4833, 4842, 4844, 4845, 4850 and 4869), which the rule of
+commit 7987c86 names `start`, as for every line of a build before it.  Those copies and the run's incomplete line (of
+game 4875) were left out.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no
+`--time-limit` or `--node-limit`, the `default` tactics and the option `use_prev`.  The first line, 4548, records its
+game of 4547 as `known`, which both verifiers accept, as for 3915.
+
+*Details.*  The run was launched on 2026-10-20 at 18:50 PDT, and the account's owner stopped it with `wall.sh stop` on
+2026-10-21 at 13:42 PDT, in the middle of game 4875, which has a checkpoint and no completed line.  One instance ran the
+solver, with no interruption, for 18.86 instance-hours and $13.58 at the ledger's price.  [The notebook
+entry](../solver/notebook/the-run-past-5000-2026-10/README.md) records the run.
+
+* `prev.source` is `run` in every kept line.
+* The 327 games are 35 searches (all exhausted), 14 proofs at the ceiling (method `start`), 13 primes, 50 repeats and
+  215 games of the store: 4550–4640, 4650–4759 and 4770–4783, all that the store had proven in 4548–4783.  Each cites
+  its two lines of the store, from the runs `ledger-frontier-stage1` and `ledger-frontier-stage2`.
+* The searches took 9.18 G nodes and 14.9 hours of game time; the games overlap in the window.  Every search took 30 M
+  nodes or more.  The dearest by nodes were 4864 (1.13 G nodes, 4,636 s), 4865, 4872, 4860 and 4856 (1.01, 0.945, 0.857
+  and 0.532 G); by time, 4865 (8,995 s or 2.50 h), 4864, 4872 and 4860.  The queue of work units never held more than
+  5,617, and none spilled.
 
 **The earlier files.**  This is the fourth file of its name.  The earlier three were chains to 1300, and git has them:
 
