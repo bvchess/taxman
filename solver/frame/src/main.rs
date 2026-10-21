@@ -13,7 +13,7 @@ mod commands;
 use cli::{errln, outln, CliError, CliResult, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
-use taxman::search::SearchTactics;
+use taxman::search::{finder, SearchTactics};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -35,8 +35,9 @@ commands:
                                or topN.  Names: {tactics}
       --finder-after NODES     once a game's search has taken NODES steps (over all its runs), start a finder beside
                                it: a thread that looks for a better game than the incumbent, from the incumbent and
-                               from the game of n-1, and offers it to the search (default 0: none).  It changes no
-                               answer and is no part of a checkpoint, which resumes with any finder or none
+                               from the game of n-1, and offers it to the search (default {finder_after}; 0: none).
+                               It changes no answer and is no part of a checkpoint, which resumes with any finder or
+                               none
       --finder-seconds S       the finder thread's budget, from the moment it starts (default 60)
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
@@ -127,6 +128,7 @@ fn usage() -> String {
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
+        .replace("{finder_after}", &finder::AFTER.to_string())
 }
 
 fn main() -> ExitCode {

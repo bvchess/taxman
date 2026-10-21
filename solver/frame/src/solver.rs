@@ -179,9 +179,9 @@ pub struct SolveOptions {
     pub window: usize,
     /// The finder (`--finder-after`, `--finder-seconds`): once a game's search has taken `finder_after` steps, over
     /// every run of it, a thread of its own looks for a better game than the search's incumbent for `finder_budget`
-    /// and offers what it finds ([`search::finder`]); 0, the default: none.  It is no tactic and no part of what a
-    /// checkpoint records: a checkpoint resumes with any finder or none, and the finder changes no answer, only how
-    /// soon the incumbent is good.
+    /// and offers what it finds ([`search::finder`]); 0, the default here: none (`solve` takes [`finder::AFTER`] when
+    /// its flag does not say).  It is no tactic and no part of what a checkpoint records: a checkpoint resumes with any
+    /// finder or none, and the finder changes no answer, only how soon the incumbent is good.
     pub finder_after: u64,
     /// The finder thread's budget, from the moment it starts (it ends sooner if the game's search does).
     pub finder_budget: Duration,

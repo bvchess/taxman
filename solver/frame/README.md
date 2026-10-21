@@ -464,8 +464,8 @@ them.
   beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A finder beside a long search.**  `--finder-after NODES` starts a thread of its own, beside the workers, once a game's
-  search has taken NODES steps (over all its invocations), which looks for a better game than the incumbent and offers it
-  to the search; `--finder-seconds S` is its budget (default 60).  It changes no answer, and it is not part of a
+  search has taken NODES steps (over all its invocations; default 1000000, and 0 starts none), which looks for a better
+  game than the incumbent and offers it to the search; `--finder-seconds S` is its budget (default 60).  It changes no answer, and it is not part of a
   checkpoint: a checkpoint resumes with any finder or none.  The line records what it did (`engine.finder`, [the
   reference](../docs/REFERENCE.md#a-results-line---out-schema-5)); [the design](../docs/design/search.md#the-finder) says
   how it works.

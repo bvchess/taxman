@@ -275,10 +275,11 @@ floor](../../notebook/search/proving-an-upper-bound-part-of-the-way-searches-und
 ## The finder
 
 A search that starts well below its final best spends most of its steps before the incumbent catches up, and a finder
-catches it up sooner.  Almost every search of the chain ends within a minute of its final best, so a finder runs only
-once a search proves long: with `--finder-after NODES`, when a game's search has taken NODES steps (over every run of
-it, a resumed search counting the runs before), one thread of its own starts beside the workers, for the seconds of
-`--finder-seconds` (default 60), and ends sooner if the search does.  Each game of a window decides for itself.
+catches it up sooner.  A search that ends within a few seconds has little to gain, so a finder runs only once a search
+has taken some steps: with `--finder-after NODES` (default 1000000, a few seconds on many threads; 0 starts none),
+when a game's search has taken NODES steps (over every run of it, a resumed search counting the runs before), one
+thread of its own starts beside the workers, for the seconds of `--finder-seconds` (default 60), and ends sooner if
+the search does.  Each game of a window decides for itself.
 
 The thread runs *rounds* of large neighbourhood search ([glossary](../../../docs/GLOSSARY.md), the finder; `search::finder`).
 A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit of the engine on one

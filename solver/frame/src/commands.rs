@@ -44,6 +44,7 @@ use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
 use taxman::paths;
 use taxman::results::{build, verify_files_with, Build};
+use taxman::search::finder;
 use taxman::solver::{self, GameResult, Method, Prev, SolveOptions, Wall};
 
 fn failed(message: String) -> CliError {
@@ -175,7 +176,7 @@ pub fn solve(args: &[String]) -> CliResult {
         ));
     }
     opts.game_limit = args.positive_hours("--game-hours")?;
-    opts.finder_after = args.parsed("--finder-after")?.unwrap_or(0);
+    opts.finder_after = args.parsed("--finder-after")?.unwrap_or(finder::AFTER);
     if let Some(budget) = args.positive_seconds("--finder-seconds")? {
         opts.finder_budget = budget;
     }

@@ -18,7 +18,8 @@
 //! gets a finder, and one that ends first never pays for one.
 //!
 //! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
-//! finder thread (`--finder-seconds` is its budget; both are `SolveOptions`, no tactics); [`Plan`] carries the two, and
+//! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget; both are
+//! `SolveOptions`, no tactics); [`Plan`] carries the two, and
 //! the seed of the game of `n − 1` if the search has one.  The thread ([`beside`]) runs *rounds* of LNS, each with a
 //! random seed of its own
 //! ([`Plan::random`] plus the round's number) for [`ROUND`] at most: the odd rounds start from the survivors of the
@@ -187,6 +188,10 @@ impl<const W: usize> Lns<'_, W> {
 /// random seed of its own.  Game 4875's finder reached its final best in 1.2 to 10.6 seconds from the seed's start
 /// (solver/notebook/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).
 pub const ROUND: Duration = Duration::from_secs(15);
+
+/// The steps after which `solve` starts a finder beside a search when `--finder-after` does not say: a few seconds of
+/// a search on many threads, so that a search far below its final best gets one early.
+pub const AFTER: u64 = 1_000_000;
 
 /// How often the thread looks at the search's steps while it waits to start, and for the search's end.
 const POLL: Duration = Duration::from_millis(20);

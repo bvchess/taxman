@@ -262,12 +262,13 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "
   bounds on its word.
 
 **A finder beside the long searches.**  A search that starts far below its final best spends most of its steps before
-the incumbent catches up.  With `--extra-args "--use-prev --finder-after 100000000 --finder-seconds 60"`, a game whose
-search has taken 100 million steps in all gets a thread of its own, beside the workers, for 60 s: it looks for a better
-game than the incumbent, from the incumbent and from the game of n − 1, and offers it to the search ([the
-reference](../REFERENCE.md#1-the-flags-of-solve); [the design](../design/search.md#the-finder)).  A checkpoint resumes
-with any finder flags or none, the answers do not change, and a progress line `n=N finder: ...` says when it started
-and what it found.  A game that ends before the 100 million steps never starts one.
+the incumbent catches up.  So by default a game whose search has taken a million steps in all gets a thread of its
+own, beside the workers, for 60 s: it looks for a better game than the incumbent, from the incumbent and from the game
+of n − 1, and offers it to the search ([the reference](../REFERENCE.md#1-the-flags-of-solve); [the
+design](../design/search.md#the-finder)).  `--extra-args` can change the two with `--finder-after NODES` (0 starts
+none) and `--finder-seconds S`.  A checkpoint resumes with any finder flags or none, the answers do not change, and a
+progress line `n=N finder: ...` says when it started and what it found.  A game that ends before NODES steps never
+starts one.
 * **Bringing it home.**  [Verifying, and bringing the results home](chain.md#verifying-and-bringing-the-results-home)
   says how to append the run's lines to the committed chain.
 * **A resumed machine** passes the flag again (it is in `run/config`, which every machine reads), and the results file
