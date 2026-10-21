@@ -30,8 +30,8 @@ load on the machine moves wall times by up to 3×.  Five tools measure it:
     window's fingerprint leaves out the GF(2) bound's counts of solves and augmentations, which measure work.  The
     kernels and the windows search the forced members as `--tactic force_window` says (the default, `all`).
 
-  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, a58ade4629ab6186 with
-  `--tactic gf2=on`, and f3deaac0dbdc030a with `--tactic gf2=on --tactic force_window=80`.  It takes about 5 s in all;
+  The probe's fingerprint is 7e8e724717d26545, 5b83bbebf0bb2899 with `--tactic lagrange=off`, 38f7687db16be4a7 with
+  `--tactic gf2=on`, and 547eda4e1dc3967b with `--tactic gf2=on --tactic force_window=80`.  It takes about 5 s in all;
   `perf make-nodes` (with the arguments each `.nodes` file's header records) and `perf make-window` (as above) make the
   fixtures again, deterministically.  For whole searches,
   `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples in its

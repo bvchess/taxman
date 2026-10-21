@@ -41,7 +41,8 @@
 //! consumed becomes a loop (a zero vector) there.  (Checked against the matroids built from the state itself at
 //! every node of the probe's fixtures by `nodes` of the example `matroid`, removed from master: it builds at commit
 //! 8753189.)  Candidates dropped from a node are deleted:
-//! they leave its *live* set.
+//! they leave its *live* set, and so do the loops, for the node and every node below it: no common independent set
+//! holds a loop, and the searches, tableaux and splits of a level would only carry it.
 //!
 //! # Warm starts
 //!
@@ -546,7 +547,7 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     }
 
     /// Pushes the child of the top level made by promoting `added` (each a candidate of the top level, or removed
-    /// from them since), with the candidates `child_cands`.
+    /// from them since), with the candidates `child_cands` (among the top level's, less `added`).
     pub fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
         dispatch!(self, l => l.push_all(added, child_cands))
     }
@@ -874,17 +875,33 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             let n = self.graph.len();
             self.levels.push(Level::new(n));
         }
-        let child_live = self.live_of(child_cands);
         let (lower, upper) = self.levels.split_at_mut(d + 1);
         let child = &mut upper[0];
         child.copy_from(&lower[d]);
-        child.live = child_live;
+        // The child's candidates are among the top level's, so its live ones are the top level's that it keeps: the
+        // loops of the contractions above stay out of it (`contract` leaves those of its own).
+        child.live = child.live.intersect(child_cands);
         child.added = *added;
         // The child's problem is the top level's before it went on without the candidate the child promotes (the
         // same vectors), so it starts from that level's dominant sets.
         let parent = if from_prior { &self.prior } else { &lower[d] };
         for x in added.iter() {
             contract(self.graph, child, x);
+        }
+        #[cfg(debug_assertions)]
+        {
+            // The candidates that are elements and not loops of the child's matroids (a promoted candidate's vectors
+            // are zero too, and it is no candidate of the child).
+            let graph = self.graph;
+            let elements: Bits<W> = child_cands
+                .iter()
+                .filter(|&x| {
+                    graph
+                        .element(x)
+                        .is_some_and(|e| !is_zero(&child.vec[0][e as usize]) && !is_zero(&child.vec[1][e as usize]))
+                })
+                .collect();
+            assert_eq!(child.live, elements, "a child's live candidates are not the elements of its candidates");
         }
         // The parent's dominant sets that hold every promoted candidate and no other dropped one, less the
         // promoted (see the module docs, "Warm starts").
