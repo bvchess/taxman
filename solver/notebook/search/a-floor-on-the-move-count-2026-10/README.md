@@ -2,15 +2,18 @@
 
 Part of the [lab notebook](../../README.md).
 
-Started 2026-10-20.  Concluded 2026-10-20.
+Started 2026-10-20.  Concluded 2026-10-21.
 
 **Question.**  The move count of the committed chain's optimal games never shrinks from n − 1 to n.  If "some optimal
 game of n has at least as many moves as the game of n − 1" were a theorem, how many steps would a floor on the move
-count save the frame solver's search?  **Answer.**  On two whole games it saves 8.8% of the steps and 9.3% of the CPU,
-and the saving is all in one of them: 13.8% of the steps of 4176 (14.7% of its CPU) and none of 4050.  The floor has
-something to say at 747 of the 3.3 million bound checks of 4176 and at none of the 2.3 million of 4050: at every other
-check the bound's heaviest set has exactly the members that the floor leaves the node to add.  The statement is
-unproven, so nothing is built; the probe is a patch (`probe.patch`), and the entry measures what a proof would buy.
+count save the frame solver's search?  **Answer.**  Little: the floor cut nodes in 1 of 35 searches measured and saves
+no step in the other 34.  The one is 4176, where it takes 13.8% of the steps (14.7% of the CPU); on the five whole
+games together it saves 2.6% of the steps, and on 30 units of the dearest games (3940, 4225, 4416 and 4548), 8.9
+million steps, it saves none.  The floor has something to say only at a bound check where the heaviest set is short of
+it, 747 of the 3.3 million checks of 4176 and none elsewhere: at every other check the heaviest set has the members that
+the floor leaves the node to add, or one to spare.  The statement is unproven, so nothing is built; the probe is a patch
+(`probe.patch`), and the entry measures what a proof would buy.  [The later measurement](#later-2026-10-21-more-searches)
+adds the units and three more whole games.
 
 ## Method
 
@@ -141,7 +144,97 @@ set has that many members at nearly every node, so the floor repeats what the bo
 What would reopen it: a proof of the statement that comes with other work; whole games where the heaviest set is short
 of the floor more often (4176 has 747 checks of 3.3 million); or a use of the floor beyond the cut that the probe tried,
 such as the members without which the set of `r` members weighs less than `need` (forced members), which was not
-measured.
+measured.  [The later measurement](#later-2026-10-21-more-searches) found the same on 30 units and three more whole
+games: the decision stands.
+
+## Later (2026-10-21): more searches
+
+**Question.**  Is 4176 typical of the dear searches?  **Answer.**  No, it is the exception, and the floor does not save
+10% across the dear searches: it cut nodes in 1 of 35 items, 4176, and saved no step on 30 units of the dearest games
+and 2.6% of the steps of the five whole games.  Two more whole games, 4017 and 4060, were stopped unfinished by the
+owner's decision, as the floor had applied at no check of the 34 other items finished.
+
+**The items.**  Run as the whole games above, with the floor off and on:
+
+* *The units* of [the hardest searches](../the-hardest-searches-of-the-run-to-5000-2026-10/README.md): the 30 of
+  `suite-hard.jsonl`, the dearest games' (3940: 6 units, 4225: 5, 4416: 9, 4548: 10), of 104,080 to 1,048,736 steps in
+  the suite's probes.  A unit is solved with `wall images --suite ... --ids ID --count` from the game's known best set,
+  or for 4548, which has no line in the chain, from the incumbent of the suite's `game` line.
+* *Whole games* from the ranking's smallest searches: 4005, and 4004 and 3978.  The searches of 3 to 15 million nodes
+  all lie in 3978 to 4176, so the whole games cannot spread over 3915 to 4547; the dearest games, which a laptop
+  cannot run, are the units' games.  4017 and 4060 were planned too (below).
+* *The floor* of a game is F as above, from the chain: 206 for 3940, 223 for 4225, 234 for 4416, 210 for 4005, 211 for
+  4004, 208 for 3978.  The chain has no line for 4548, so its F is the moves of 4547 less the plain moves of 4548, 236,
+  which holds if the statement does.  `plan.py` makes the plan, `batch.py` runs it two runs at a time under `nice -n
+  10` and `/usr/bin/time -l`, each started with the one-minute load at most 8 (1.7 to 7.6 at the starts).
+
+**The check of `p`.**  The floor's `r = F − p` counts the promotions on a unit's path from the game's root, as built.  A
+unit's `promoted` is the set promoted on that path (the suite's `depth` is its size), the searcher's node starts from
+it, and `promoted.len()` in `check_gf2` counts all of it; the node's cap is `max_total` less the same count
+(`max_additional`).  To make sure, the probe gained two counters (`probe-first-check.patch`): the promotions and the
+cap of the first check the floor sees.  For all 30 units the first check has the unit's depth as its promotions, and
+`max_total − depth` as its cap (`check_units.py`, `check-units.txt`).  Nothing needed fixing.
+
+**The floor-off runs left out.**  A floor that applies at no check cuts nothing, so its search is the floor-off search.
+The units of 4548, and 4004 and 3978, were run with the floor on first; the floor applied at none of their checks, so
+no floor-off run was made, and their rows take the floor-on steps (CPU is compared only where both ran).  This holds in
+the 21 items of this section where both ran, the 20 units of the other three games and 4005: the floor-on steps, tree
+nodes and best are the floor-off ones, and the CPU differs by −0.3% to +0.4%, the laptop's noise.  For 4548's ten units
+the floor-on steps and best are also those of the suite's default probes.  So the ten units of 4548, 4004 and 3978 are
+one run each, and the other 20 units and 4005 two.
+
+**Results.**  A row of the units is their sum; `later-tables.txt` has a row for each unit, and `later_table.py` makes
+both (`python3 -I later_table.py all`).  The rows of 4176 and 4050 are the first table's.
+
+| items | n | floor | steps, off | steps, on | steps | CPU s, off | CPU s, on | CPU | open bound checks | checks where the floor applied | nodes cut |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| units of 3940 | 6 | 206 | 1,840,777 | 1,840,777 | 0.0% | 453 | 453 | 0.0% | 1,296,050 | 0 | 0 |
+| units of 4225 | 5 | 223 | 808,070 | 808,070 | 0.0% | 261 | 261 | 0.0% | 609,728 | 0 | 0 |
+| units of 4416 | 9 | 234 | 2,951,022 | 2,951,022 | 0.0% | 930 | 930 | 0.0% | 2,160,825 | 0 | 0 |
+| units of 4548 | 10 | 236 | 3,283,394 | 3,283,394 | 0.0% | | | | 2,587,985 | 0 | 0 |
+| 4176 whole | 1 | 222 | 5,342,669 | 4,604,053 | −13.8% | 1,679 | 1,432 | −14.7% | 3,310,234 | 747 | 545 |
+| 4050 whole | 1 | 215 | 3,086,223 | 3,086,223 | 0.0% | 989 | 987 | −0.2% | 2,342,964 | 0 | 0 |
+| 4005 whole | 1 | 210 | 5,723,023 | 5,723,023 | 0.0% | 1,796 | 1,796 | 0.0% | 4,242,818 | 0 | 0 |
+| 4004 whole | 1 | 211 | 6,721,978 | 6,721,978 | 0.0% | | | | 4,954,983 | 0 | 0 |
+| 3978 whole | 1 | 208 | 7,683,724 | 7,683,724 | 0.0% | | | | 5,455,197 | 0 | 0 |
+
+Every run completed with the committed score (the known best of its game, and for 4548's units the incumbent they
+start from, 454,465, as the default search ends).  The floor made no solve in these runs, so it cost nothing; its 747
+solves at 4176 took 0.24 s.
+
+**The three totals.**
+
+* *Steps saved over all the units together:* none, 0 of 8,883,263 (30 units, 4 games).
+* *Steps saved over all the whole games together:* 738,616 of 28,557,617, 2.6% (5 games).  Without 4176 it is none, 0 of
+  23,214,948.
+* *Items with any cut:* 1 of 35 (4176).
+
+**Why the units and most games save nothing.**  The counters of the floor-on runs split the games in two:
+
+* In the games that keep their move count from n − 1 (3940, 4050, 4004, 3978 and 4176 by the chain, 4548 by its
+  counters) the heaviest set `I*` has exactly the `r` members the floor leaves a node to add at every check:
+  `floor_tight` is `floor_open`, but for the 747 checks of 4176 where `I*` is one short.
+* In the games that gain a move (4225, 4416, 4005) the chain's game has F + 1 promotions, and `I*` has a member to spare
+  at nearly every check: `floor_tight` is 0 for 4225's units, 4005 and six of 4416's nine units, and 1,324, 6 and 102
+  of their 434,756, 248,167 and 122,588 checks for the other three.  The floor says nothing there, and a floor of F + 1,
+  which would, needs to know in advance that a game gains.
+
+So the floor can cut only in the games that keep their count.  They carry 59.6% of the nodes of the twenty dearest
+searches of 3915 to 4547 and 66.3% of all 150 (`check_floor.py keeps`, `keeps.txt`), and in them the floor cut in 1 of
+the 4 whole games and in none of the 16 units of 3940 and 4548.
+
+**Stopped.**  Two floor-on runs of whole games, 4017 (F = 211) and 4060 (F = 216), both of games that keep their count,
+were stopped before they finished, at 5,157 and 1,151 CPU s by the last look (`later-runs-stopped.jsonl`), on the
+owner's decision that the evidence was enough: the floor had applied at no check of the 34 other finished items.  4017
+had taken more than twice the 2,400 s that its 7.5 million nodes on 64 threads would cost at the 0.32 ms a step of these
+runs.  Neither has a line, and the verdict does not rest on them.  The finished runs took 11,932 CPU s.
+
+**Verdict.**  The floor does not save more than about 10% across the dear searches.  A proof of the statement would buy
+a cut that matters at 4176 (14% of its steps) and nowhere else in 35 items: 2.6% over the five whole games and nothing
+over the 30 units, which is not worth a proof by itself.  The sample is small (five whole games, the units of four
+games), and the cut happens only where the heaviest set is one short of the floor, which these searches show rarely: at
+20.3 million checks of whole games the floor applies at 747, all in one game.  What would reopen it is as in the
+Decision; the units, the nearest thing to the dear games that a laptop runs, are untouched.
 
 ## Files
 
@@ -149,11 +242,25 @@ measured.
 * `probe.patch`: the probe, against af1b0e9 (`git apply probe.patch`): `src/search/floor.rs` (the floor, `TAXMAN_FLOOR`,
   its counters), the cut in `check_gf2`, `Meet::solve_at_least` and `Levels::heaviest_at_least`, their two tests, and
   the example `floor_plain`.  The code stays off master.
-* `run.py`: one run of `wall images --root --count` with the floor set or not, waiting for a quiet machine.
+* `run.py`: one run of `wall images --count` on a whole game or a unit with the floor set or not, waiting for a quiet
+  machine.
 * `runs.jsonl`: the four runs of the table, one line each (`wall images`' line with the floor's counters, `time -l`'s
   numbers and the load).  `table.py` makes the table from it.
 * `identity.jsonl`: the build of af1b0e9 on 4176, by `run.py` with the master build's `wall`.
 * `small-games.jsonl`: the five small games, each with the floor off, at F and at F + 1.
-* `check_floor.py`: the data under the floor (`moves`, `plain`, `floor`, `every`); `chain-checks.txt` is the output of
-  `moves` and `every`.
+* `check_floor.py`: the data under the floor (`moves`, `plain`, `floor`, `every`, `keeps`); `chain-checks.txt` is the
+  output of `moves` and `every`, `keeps.txt` of `keeps`.
 * `rank_scan.py`, `rank-scan.txt`: the root cut at promotions + 1, for 60 sampled games.
+
+The later measurement's files:
+
+* `probe-first-check.patch`: the two counters of the first check (`floor_first_promoted`, `floor_first_cap`), on top of
+  `probe.patch`.
+* `plan.py`, `plan1.jsonl`, `plan2.jsonl`: the plan, as a line a run: `plan1.jsonl` has the units of 3940, 4225 and 4416
+  and 4005, each with the floor off and on (`plan.py PLAIN_BIN --units 3940,4225,4416 --wholes 4005`); `plan2.jsonl` has
+  the floor-on runs of the units of 4548 and of 4004, 4017, 3978 and 4060 (`--units 4548 --wholes 4004,4017,3978,4060
+  --labels on`).
+* `batch.py`: makes a plan's runs two at a time and appends their lines to `later-runs.jsonl`: 54 lines, with the
+  floor's counters, `time -l`'s numbers and the load.  `later-runs-stopped.jsonl` records the two runs stopped.
+* `check_units.py`, `check-units.txt`: the check that a unit's path counts toward `p`, for the 30 units.
+* `later_table.py`, `later-tables.txt`: the tables (`python3 -I later_table.py all`), with a row for each unit.

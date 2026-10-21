@@ -1,16 +1,19 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
-"""One run of the floor probe: `wall images --root --count` on a whole game from the committed chain's known best set,
-on one thread, as the whole games of the hardest searches' entry were run (solver/notebook/search/
-the-hardest-searches-of-the-run-to-5000-2026-10/README.md, "The runs"), with the floor set or not.
+"""One run of the floor probe: `wall images --count` on a whole game (`--root`) or, with `--suite` and `--ids`, on a
+unit of the hardest searches' suite, from the committed chain's known best set (or the suite's incumbent), on one
+thread, as the hardest searches' entry ran them (solver/notebook/search/the-hardest-searches-of-the-run-to-5000-2026-10/
+README.md, "The runs"), with the floor set or not.
 
 usage: python3 -I run.py WALL RESULTS.jsonl GAME [--floor F] [--max-load 8] [--nodes 20000000] [--label TEXT]
+                         [--suite SUITE.jsonl --ids ID]
 
 WALL is the `wall` example of the probe's build (`cargo build --profile test --features studies --example wall`).  The
 run waits until the machine's load average over one minute is at most `--max-load`, then starts `wall` under
-`nice -n 10` and `/usr/bin/time -l` (the floor in the environment variable TAXMAN_FLOOR if `--floor` is given), and appends a line
-to RESULTS.jsonl: `wall images`' own line (solver/frame/examples/wall/images.rs, with the floor and its counters, which
-the probe adds, src/search/floor.rs), the label, the load at the start, and from `time -l` the user and system CPU
-seconds, the wall seconds, the peak memory, and the instructions and cycles.
+`nice -n 10` and `/usr/bin/time -l` (the floor in the environment variable TAXMAN_FLOOR if `--floor` is given), and
+appends a line to RESULTS.jsonl: `wall images`' own line (solver/frame/examples/wall/images.rs, with the floor and its
+counters, which the probe adds, src/search/floor.rs), the label, the load at the start, and from `time -l` the user and
+system CPU seconds, the wall seconds, the peak memory, and the instructions and cycles.  `batch.py` makes many runs by
+`run_once`.
 """
 import argparse
 import json
@@ -45,6 +48,26 @@ def time_fields(text):
     return found
 
 
+def run_once(wall, game, floor=None, nodes=20_000_000, label="", max_load=8.0, suite=None, unit=None):
+    """Waits for a quiet machine, then runs `wall images --count` on the whole game or, with `suite` and `unit`, on that
+    unit of the suite, with the floor `floor` (promotions) or none.  Returns `wall images`' line with the label, the
+    load at the start, the wall seconds and `time -l`'s numbers; exits if the run fails."""
+    env = {key: value for key, value in os.environ.items() if key != "TAXMAN_FLOOR"}
+    if floor is not None:
+        env["TAXMAN_FLOOR"] = str(floor)
+    load = quiet(max_load)
+    where = ["--suite", str(suite), "--ids", unit] if suite else ["--root"]
+    command = ["nice", "-n", "10", "/usr/bin/time", "-l", str(wall), "images", "--known", str(KNOWN), *where,
+               "--count", "--nodes", str(nodes), str(game)]
+    began = time.time()
+    done = subprocess.run(command, env=env, capture_output=True, text=True)
+    if done.returncode != 0:
+        sys.exit(f"{' '.join(command)}\nexit {done.returncode}\n{done.stderr}")
+    line = json.loads(done.stdout.strip().splitlines()[-1])
+    line.update({"label": label, "load": load, "wall_s": round(time.time() - began, 1), **time_fields(done.stderr)})
+    return line
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("wall")
@@ -54,20 +77,10 @@ def main():
     parser.add_argument("--max-load", type=float, default=8.0)
     parser.add_argument("--nodes", type=int, default=20_000_000)
     parser.add_argument("--label", default="")
+    parser.add_argument("--suite")
+    parser.add_argument("--ids")
     args = parser.parse_args()
-    env = {key: value for key, value in os.environ.items() if key != "TAXMAN_FLOOR"}
-    if args.floor is not None:
-        env["TAXMAN_FLOOR"] = str(args.floor)
-    load = quiet(args.max_load)
-    command = ["nice", "-n", "10", "/usr/bin/time", "-l", args.wall, "images", "--known", str(KNOWN), "--root",
-               "--count", "--nodes", str(args.nodes), str(args.game)]
-    began = time.time()
-    done = subprocess.run(command, env=env, capture_output=True, text=True)
-    if done.returncode != 0:
-        sys.exit(f"{' '.join(command)}\nexit {done.returncode}\n{done.stderr}")
-    line = json.loads(done.stdout.strip().splitlines()[-1])
-    line.update({"label": args.label, "load": load, "wall_s": round(time.time() - began, 1),
-                 **time_fields(done.stderr)})
+    line = run_once(args.wall, args.game, args.floor, args.nodes, args.label, args.max_load, args.suite, args.ids)
     with open(args.results, "a") as out:
         out.write(json.dumps(line) + "\n")
     print(json.dumps(line))

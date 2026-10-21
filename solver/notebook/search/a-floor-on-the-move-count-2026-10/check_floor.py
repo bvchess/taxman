@@ -10,13 +10,20 @@ usage: python3 -I check_floor.py moves
            for each N: the floor F = len(moves(N - 1)) - len(plain(N)), and len(promotions(N)) against it
        python3 -I check_floor.py every PLAIN_BIN
            both checks for every game of the chain, in a line each for the summary
+       python3 -I check_floor.py keeps
+           of the searched games of 3915..4547 (the hardest searches' ranking), those that keep their move count, and
+           their share of the nodes: for all of them and for the dearest 5, 10, 20 and 40
 """
 import json
 import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[4]
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "the-hardest-searches-of-the-run-to-5000-2026-10"))  # not on the path under -I
+from ranking import searches  # noqa: E402
+
+REPO = HERE.parents[3]
 STRICT = REPO / "results" / "strict.jsonl"
 
 
@@ -88,6 +95,16 @@ def every(binary):
           f"{sum(len(rows[n]['promotions']) == floors[n] + 1 for n in floors)}")
 
 
+def keeps():
+    rows = chain()
+    found = sorted(searches(STRICT, 3915, 4547), key=lambda game: -game["nodes"])
+    for count in (5, 10, 20, 40, len(found)):
+        top = found[:count]
+        kept = [g for g in top if len(rows[g["n"]]["moves"]) == len(rows[g["n"] - 1]["moves"])]
+        print(f"the dearest {count} of {len(found)} searched games: {len(kept)} keep their move count, with "
+              f"{100 * sum(g['nodes'] for g in kept) / sum(g['nodes'] for g in top):.1f}% of the nodes")
+
+
 if __name__ == "__main__":
     command, rest = sys.argv[1], sys.argv[2:]
     if command == "moves":
@@ -98,5 +115,7 @@ if __name__ == "__main__":
         floor(rest[0], [int(n) for n in rest[1:]])
     elif command == "every":
         every(rest[0])
+    elif command == "keeps":
+        keeps()
     else:
         sys.exit(__doc__)

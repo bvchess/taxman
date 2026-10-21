@@ -1,0 +1,5 @@
+the dearest 5 of 150 searched games: 3 keep their move count, with 58.5% of the nodes
+the dearest 10 of 150 searched games: 7 keep their move count, with 65.1% of the nodes
+the dearest 20 of 150 searched games: 12 keep their move count, with 59.6% of the nodes
+the dearest 40 of 150 searched games: 27 keep their move count, with 63.7% of the nodes
+the dearest 150 of 150 searched games: 110 keep their move count, with 66.3% of the nodes
