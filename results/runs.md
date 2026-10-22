@@ -2,7 +2,7 @@
 
 Part of [the results](README.md).
 
-It was made in five runs, each a continuation of the one before:
+It was made in six runs, each a continuation of the one before:
 
 | games | where | build | git has the file before the run as |
 |---|---|---|---|
@@ -11,9 +11,10 @@ It was made in five runs, each a continuation of the one before:
 | 3441–3914 | appended from a run on a cloud machine of the same kind | commit eb84a6f | `git show b23f497:rust/results/strict.jsonl`, whose 3440 lines are this file's first 3440, byte for byte |
 | 3915–4547 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit ca357bf | `git show c7d81c2:rust/results/strict.jsonl`, whose 3914 lines are this file's first 3914, byte for byte |
 | 4548–4874 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit 4974a71 | `git show f48df13:results/strict.jsonl`, whose 4547 lines are this file's first 4547, byte for byte |
+| 4875–4900 | appended from a run on a friend's machine of 88 threads, which took the games before from this file and the bounds store (`--use-prev`) | commits a88dc7f, bcfde26 and 551f883 | `git show 18232de:results/strict.jsonl`, whose 4874 lines are this file's first 4874, byte for byte |
 
 Each build was of a clean tree, which every line records.  Every line records the `default` tactics: no tactic is
-unproven any more, so none is switched off.
+unproven any more, so none is switched off.  The sixth run had three builds, one for each stretch of its games.
 
 **The first run, games 1–2175.**  The command was, up to the paths, `taxman solve 1-2175 --threads 8 --out
 strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 0`, run once to the end on an Apple M1 Max
@@ -147,6 +148,51 @@ entry](../solver/notebook/the-run-past-5000-2026-10/README.md) records the run.
   nodes or more.  The dearest by nodes were 4864 (1.13 G nodes, 4,636 s), 4865, 4872, 4860 and 4856 (1.01, 0.945, 0.857
   and 0.532 G); by time, 4865 (8,995 s or 2.50 h), 4864, 4872 and 4860.  The queue of work units never held more than
   5,617, and none spilled.
+
+**The sixth run, games 4875–4900.**  The command was `solver/tools/cloud/chain.sh 8191`, which runs `taxman solve 1-8191
+--use-prev` with a window of 4 games in flight and [the wall](../docs/GLOSSARY.md#the-search) at 48 hours of a game's
+own search, on a friend's machine of 88 threads: two Intel Xeon E5-2699 v4 (x86_64, Ubuntu).  It continued the fifth
+run's results file and its checkpoints, which were copied from the cloud machine.  It took games 1–4874 from the file
+and each game the bounds store had proven from the store, with no search, and searched the others, from 4875 on.  Its
+own file started with `known` copies of games 1–4874.  The lines of games 4875–4900 were appended to this file, byte for
+byte.  Those copies and the run's incomplete lines (two of game 4875, and one each of 4879, 4880, 4895 and 4899) were
+left out.  No line was relabelled: every build is after commit 7987c86, so a search that took no step already says
+`start`.  Every kept line records that the tree was clean (`dirty` false), no `--time-limit` or `--node-limit`, the
+`default` tactics, with the tactic `conflict_branching` on, and the option `use_prev`; the lines of 4899 and 4900 record
+`background` and `finder_seconds` 900 too.  The first line, 4875, records its game of 4874 as the line of this file,
+with its proof, `same_search`, which both verifiers accept.
+
+*Details.*  `chain.sh` ran six times, from 2026-10-21 to 22 (times UTC).  Each stop was a SIGTERM to `chain.sh`: the
+solver wrote a final checkpoint, and the next invocation resumed from it.  The lines come from the second to the
+sixth:
+
+1. 21:41 to 01:54: build 88915fb, on every thread (88), with the default tactics of that build, which had no conflict
+   branching.  It resumed 4875 from the fifth run's checkpoint and was stopped with 4875 unfinished (the incomplete line
+   says 8.54 G nodes over two invocations, the cloud machine's and this one's).  Its checkpoint was set aside, and no
+   line of it is kept.
+2. 01:54 to 03:10: build a88dc7f, in which `conflict_branching` is on by default, on 88 threads.  It started 4875 afresh
+   and exhausted it in 186 M nodes and 3,383 s ([the notebook's
+   study](../solver/notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md)),
+   and did 4876–4878 too.
+3. 03:10 to 05:20: build a88dc7f on 72 threads: 4879.
+4. 05:20 to 12:35: build bcfde26 on 72 threads, with the lab's command folder and hook (`--lab-dir`, `--hook`; [the
+   lab's design](../solver/docs/design/lab.md)): 4880–4894.
+5. 12:35 to 14:10: build bcfde26 on 72 threads, with `--hook-after 600`: 4895–4898.
+6. From 14:13 on 2026-10-22: build 551f883, on every thread, with `--background` and `--finder-seconds 900`: 4899 and
+   4900, and it went on past them.
+
+* `invocations` is 1 in every kept line but 4879, 4880, 4895, 4899 and 4900, which a stop interrupted: 4880 records 3,
+  the others 2.  `prev.source` is `results` for 4875, 4879, 4880, 4895 and 4899, the first game of each of the five
+  invocations whose lines are kept, which read the game of n − 1 from the results file, and `run` for the other 21.
+  Threads: 88 in 4875–4878, 4899 and 4900, and 72 in 4879–4898.
+* The 26 games are 10 searches (all exhausted), 4 proofs at the ceiling (method `start`: 4876, 4878, 4887 and 4896),
+  2 primes (4877 and 4889) and 10 repeats.  No game came from the bounds store, which has proven none past 4783.
+* The searches took 2.63 G nodes and 22.97 hours of game time; the games overlap in the window.  Every search took 159 M
+  nodes or more.  The dearest by nodes were 4893 (614 M nodes, 17,593 s), 4880 (290 M), 4890 (283 M) and 4895 (272 M,
+  17,633 s).  The queue of work units never held more than 9,429, and none spilled.  The lines of 4899 and 4900 record
+  `seconds.own`, the game's own search time ([glossary](../docs/GLOSSARY.md#the-search)): 5,061 s and 4,974 s.
+* During the fourth to the sixth invocations the lab ran studies in a sandbox beside the chain, on 16 threads at nice
+  19.  Its command folder carried no command to the solver, and no line has a `lab` key, so the lab changed no search.
 
 **The earlier files.**  This is the fourth file of its name.  The earlier three were chains to 1300, and git has them:
 
