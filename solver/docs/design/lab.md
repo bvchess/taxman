@@ -46,26 +46,26 @@ step"](search.md#the-default-step), fact 4).
 
 **(c) The incumbent.**  An offer becomes the incumbent only through `search::offer_found`: the set must be a set of
 candidates that can be promoted from the root, worth what the offer claims, the same check as a checkpoint's incumbent
-on resuming.  A promotable set is a game, so its sum is at most the best, P\*.  The incumbent only prunes nodes whose
-bound is below it plus one, which hold no completion beating it, so the search still finds P\* and proves it.  The
-finder the lab may start offers its games the same way ([search.md, "The finder"](search.md#the-finder)).  A set the
-check refuses changes nothing, and the lab hears why.
+on resuming.  A promotable set is a game, so its sum is at most P\*, the game's best promotion sum.  The incumbent only
+prunes nodes whose bound is below it plus one, which hold no completion beating it, so the search still finds P\* and
+proves it.  The finder the lab may start offers its games the same way ([search.md, "The
+finder"](search.md#the-finder)).  A set the check refuses changes nothing, and the lab hears why.
 
-**(d) A fresh search.**  A restarted game is searched from nothing: its root, the run's seed and ceiling, and the tactics
-the lab names.  Every tactic is proven or sound ([tactics.md](tactics.md)), so any set of them gives a complete search,
-whose proof is its own tree, exhausted or stopped at the ceiling.  The abandoned search contributes nothing: its
+**(d) A fresh search.**  A restarted game is searched from nothing: its root, the run's seed and ceiling, and the
+tactics the lab names.  Every tactic is proven or sound ([tactics.md](tactics.md)), so any set of them gives a complete
+search, whose proof is its own tree, exhausted or stopped at the ceiling.  The abandoned search contributes nothing: its
 checkpoint is renamed aside in the checkpoint directory, never deleted, and never resumed by the new search.  Its line
 records the tactics it ran with and that the lab restarted it, and when.
 
-**(e) The build.**  A redeploy only stops the run, with a final checkpoint of every search, as SIGTERM does.  The chain's
-script then builds the commit only if it is `origin/master` or an ancestor of it, so a lab's own experimental builds
-never run in the chain, and the build resumes a checkpoint only if it sets up the same search ([trust.md](trust.md),
-the paragraph "What identifies a checkpoint").
+**(e) The build.**  A redeploy only stops the run, with a final checkpoint of every search, as SIGTERM does.  The
+chain's script then builds the commit only if it is `origin/master` or an ancestor of it, so a lab's own experimental
+builds never run in the chain, and the build resumes a checkpoint only if it sets up the same search
+([trust.md](trust.md), the paragraph "What identifies a checkpoint").
 
 **The solver is the only writer of results.**  The lab writes only to the folder's `in/`.  The driver concludes every
-game as it does without a lab: the referee replays it, `conclude` checks its arithmetic, its ceilings and `optimal.json`,
-and only then is its line appended.  What the lab did to a game is kept in `nNNNN.lab` beside its checkpoint, and sets
-nothing but the game's search tactics, any of which is sound, and the record its line carries.
+game as it does without a lab: the referee replays it, `conclude` checks its arithmetic, its ceilings and
+`optimal.json`, and only then is its line appended.  What the lab did to a game is kept in `nNNNN.lab` beside its
+checkpoint, and sets nothing but the game's search tactics, any of which is sound, and the record its line carries.
 
 ## Which tactics may change while a search runs
 
@@ -75,8 +75,8 @@ A tactic may change between a search's units only if it chooses how a node branc
 |---|---|---|
 | `conflict_branching` | branching: changeable | it chooses which true conflict a node branches on, and the children of any conflict cover the node's completions; a conflict all of whose members are forced closes the node, which is the same deduction branching on it would make |
 
-A checkpoint records `conflict_branching` (bit 9 of its tactics, `SearchTactics::BRANCHING_BITS`) as the search began with
-it, and does not compare it on resuming, so a checkpoint resumes with the tactic on or off.  The searchers read it
+A checkpoint records `conflict_branching` (bit 9 of its tactics, `SearchTactics::BRANCHING_BITS`) as the search began
+with it, and does not compare it on resuming, so a checkpoint resumes with the tactic on or off.  The searchers read it
 through `search::Branching`: a generation number, loaded when a searcher starts a unit, and the settings, read again
 only when the generation has changed.  A step reads the searcher's own copy.  So a checkpoint of a search begun with the
 tactic off, game 4875's among them, resumes with it on.  A result line records the setting the search ended with in
@@ -103,14 +103,14 @@ ceiling and its seed: a restart keeps the run's, and the lab names search tactic
 
 ## The hook
 
-`--hook PROGRAM` names a program the run starts when a game runs long.  The run starts it detached, in a process group of
-its own, with no input or output and the event as its one argument, a JSON object.  It never waits for the program and
-ignores its failure; each start, and each failure to start, is a line on stderr.  A thread of its own collects the
+`--hook PROGRAM` names a program the run starts when a game runs long.  The run starts it detached, in a process group
+of its own, with no input or output and the event as its one argument, a JSON object.  It never waits for the program
+and ignores its failure; each start, and each failure to start, is a line on stderr.  A thread of its own collects the
 program when it ends, so that none is left a zombie.
 
 * **`long`**, once a game: when the game's own search passes `--hook-after` seconds (3600 by default), as soon as its
-  engine runs.  A game's own search is the time it has been the head of the window with its search running, summed
-  over invocations, the clock of the wall ([engine.md, "The window: games in flight"](engine.md#the-window-games-in-flight),
+  engine runs.  A game's own search is the time it has been the head of the window with its search running, summed over
+  invocations, the clock of the wall ([engine.md, "The window: games in flight"](engine.md#the-window-games-in-flight),
   the item "The wall").
 * **`done`**, when a game that had `long` has its line.
 
@@ -158,12 +158,13 @@ command does not take is refused, so a misspelt one is not ignored.
 | `redeploy` | `commit` | ends the run, every search stopped with a final checkpoint: `solve` prints `redeploy to COMMIT` and exits with status 5 |
 
 *A restart.*  Game n's checkpoint becomes `nNNNN.ckpt.restartK` and its clock `nNNNN.clock.restartK`, for its K-th
-restart, names that no tool takes for a game's checkpoint or clock (`n*.ckpt`), and its record, `nNNNN.lab`, gets the restart: when, the game's own seconds then, the steps of the search
-abandoned, the tactics, and the name of the checkpoint put aside.  The game is then set up again, with those tactics,
-and searched whatever an earlier game settled, as a game with a checkpoint is; its clock starts again, as a fresh
-search's does.  A search that completes before it stops is not restarted, and neither is one that a stop signal ends.
-The record goes into the game's line as `lab`, with the tactics the search ran with in `tactics` and `tactic_switches`.
-A run without `--lab-dir` reads the record too, so it resumes a restarted game with its tactics.
+restart, names that no tool takes for a game's checkpoint or clock (`n*.ckpt`), and its record, `nNNNN.lab`, gets the
+restart: when, the game's own seconds then, the steps of the search abandoned, the tactics, and the name of the
+checkpoint put aside.  The game is then set up again, with those tactics, and searched whatever an earlier game settled,
+as a game with a checkpoint is; its clock starts again, as a fresh search's does.  A search that completes before it
+stops is not restarted, and neither is one that a stop signal ends.  The record goes into the game's line as `lab`, with
+the tactics the search ran with in `tactics` and `tactic_switches`.  A run without `--lab-dir` reads the record too, so
+it resumes a restarted game with its tactics.
 
 *A redeploy.*  `chain.sh`, seeing the status 5, reads the commit from the line, fetches `origin` and checks that the
 commit is `origin/master` or an ancestor of it.  If it is, the script makes a worktree of the commit under
