@@ -12,7 +12,7 @@
 //! ```text
 //! cargo run --release --example tune -- units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]
 //! cargo run --release --example tune -- solve GAME [--known FILE] [--units FILE] [--ids I,J,...]
-//!     [--tactic NAME=VALUE]... [--node-limit L]
+//!     [--tactic NAME=VALUE]... [--node-limit L] [--cpu-limit SECONDS]
 //! cargo run --release --example tune -- expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K]
 //!     [--out FILE]
 //! ```
@@ -38,7 +38,10 @@
 //! root unit with all candidates, for which no units file is needed (but the known optimum is: a whole game is a
 //! proof).  `--tactic` takes the names and values of `taxman solve --tactic` (the search tactics only), so a new
 //! tactic needs no change here, and `--node-limit L` stops a unit after about L nodes (the engine counts every 1,024),
-//! which then reports `completed: false`.
+//! which then reports `completed: false`.  `--cpu-limit SECONDS` stops a unit the same way after that much CPU time of
+//! the process (the unit's one thread; a decimal number), which, unlike the node limit, can cut a unit at different
+//! steps from one run to the next.  While a unit runs, a progress line goes to stderr every 30 seconds, headed by its id
+//! and ending with a line of its own at its end.
 //!
 //! `expand` makes more units from the units of a checkpoint.  A checkpoint of a game with billions of steps holds few
 //! units of the middle sizes: its workers stood at shallow nodes, whose loops are huge, or at deep ones, whose loops
@@ -51,7 +54,8 @@
 //! worker thread, from the start of the unit's searcher to the end of its run: the setup of the game, the same for
 //! every unit, is not in it), `wall_s`, `completed`, `best` (the best promotion sum found, the starting incumbent's if
 //! nothing beat it), `incumbent` (the starting one), `proved`, `opt` (the known optimum or null), `tactics` (the
-//! changes from the defaults) and `stats` (the searchers' counters, `search::stat`).
+//! changes from the defaults), `node_limit` and `cpu_limit` (the limits asked for, in steps and seconds, or null) and
+//! `stats` (the searchers' counters, `search::stat`).
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an
 //! optimal set: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree
@@ -68,11 +72,11 @@ mod known;
 use fixtures::{from_hex, to_hex};
 use known::{known_incumbent, survivors};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
+use taxman::engine::{self, Control, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
 use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
@@ -82,12 +86,11 @@ use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics
 use taxman::tactics::Tactics;
 
 // ---------------------------------------------------------------------------------------------------------
-// CPU time of a thread
+// CPU time of a thread and of the process
 
-/// The CPU time this thread has used so far, in nanoseconds: what the unit costs, whatever else the machine does.
-/// (Without a clock for it, the elapsed time since the first call.)
+/// The reading of the CPU clock `clock` in nanoseconds (`clock_gettime`).
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn thread_cpu_ns() -> u64 {
+fn cpu_clock_ns(clock: i32) -> u64 {
     #[repr(C)]
     struct Timespec {
         seconds: i64,
@@ -96,13 +99,27 @@ fn thread_cpu_ns() -> u64 {
     unsafe extern "C" {
         fn clock_gettime(clock: i32, time: *mut Timespec) -> i32;
     }
-    // CLOCK_THREAD_CPUTIME_ID: 3 on Linux, 16 on macOS.
-    const THREAD_CPUTIME: i32 = if cfg!(target_os = "linux") { 3 } else { 16 };
     let mut time = Timespec { seconds: 0, nanoseconds: 0 };
     // SAFETY: `time` is writable and has the layout of `struct timespec` (two `long`s) on 64-bit Linux and macOS.
-    let rc = unsafe { clock_gettime(THREAD_CPUTIME, &mut time) };
+    let rc = unsafe { clock_gettime(clock, &mut time) };
     assert_eq!(rc, 0, "clock_gettime failed");
     (time.seconds as u64) * 1_000_000_000 + time.nanoseconds as u64
+}
+
+/// The CPU time this thread has used so far, in nanoseconds: what the unit costs, whatever else the machine does.
+/// (Without a clock for it, the elapsed time since the first call.)
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn thread_cpu_ns() -> u64 {
+    // CLOCK_THREAD_CPUTIME_ID: 3 on Linux, 16 on macOS.
+    cpu_clock_ns(if cfg!(target_os = "linux") { 3 } else { 16 })
+}
+
+/// The CPU time all the threads of this process have used so far, in nanoseconds: the unit's one worker thread, and
+/// the few milliseconds of the thread that waits for it.  (Without a clock, as `thread_cpu_ns`.)
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn process_cpu_ns() -> u64 {
+    // CLOCK_PROCESS_CPUTIME_ID: 2 on Linux, 12 on macOS.
+    cpu_clock_ns(if cfg!(target_os = "linux") { 2 } else { 12 })
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -110,6 +127,11 @@ fn thread_cpu_ns() -> u64 {
     use std::sync::OnceLock;
     static START: OnceLock<Instant> = OnceLock::new();
     START.get_or_init(Instant::now).elapsed().as_nanos() as u64
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn process_cpu_ns() -> u64 {
+    thread_cpu_ns()
 }
 
 /// A searcher that adds the CPU time of its thread to `cpu`: its making, and each unit it runs.
@@ -149,21 +171,62 @@ struct Solved {
     stats: Stats,
 }
 
+/// What stops a unit before its end: about `nodes` steps (the engine counts every 1,024), or `cpu` of CPU time.  With
+/// neither, the unit runs to its end.  A unit stopped by a limit reports `completed: false`.
+#[derive(Clone, Copy, Default)]
+struct Limits {
+    nodes: Option<u64>,
+    cpu: Option<Duration>,
+}
+
+/// The time between the progress lines a unit writes to stderr.
+const PROGRESS_EVERY: Duration = Duration::from_secs(30);
+
+/// How often the CPU limit's watch reads the clock.
+const CPU_WATCH_EVERY: Duration = Duration::from_millis(100);
+
 /// Solves the subtree of `unit` on one thread, from the incumbent `start` (a promotion set, worth its sum), with a
-/// fresh searcher, so that the result is that of the unit alone: the same every time.  Stops after about `node_limit`
-/// nodes.
+/// fresh searcher, so that the result is that of the unit alone: the same every time.  Stops at `limits`, and writes a
+/// progress line to stderr, headed by `label`, every `PROGRESS_EVERY` and at the end.  The CPU limit counts the CPU of
+/// the process from the call, so it stops a unit at slightly different steps from one run to the next.
 fn solve_unit<const W: usize>(
     space: &SearchSpace<'_, W>,
     unit: TaxUnit<W>,
     start: &Bits<W>,
-    node_limit: Option<u64>,
+    limits: Limits,
+    label: &str,
 ) -> Result<Solved, String> {
-    let cfg = EngineConfig { threads: 1, node_limit, progress: None, ..EngineConfig::default() };
+    let control = Control::new();
+    let cfg = EngineConfig {
+        threads: 1,
+        node_limit: limits.nodes,
+        progress: Some(PROGRESS_EVERY),
+        label: label.to_owned(),
+        control: Some(control.clone()),
+        ..EngineConfig::default()
+    };
     let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: search::payload_of(start) };
     let cpu = AtomicU64::new(0);
     let t0 = Instant::now();
-    let outcome =
-        engine::run(&cfg, begin, b"tune", |_| Timed::new(space, &cpu)).map_err(|e| format!("the engine: {e}"))?;
+    let (watching, began) = (AtomicBool::new(true), process_cpu_ns());
+    let outcome = std::thread::scope(|scope| {
+        if let Some(limit) = limits.cpu {
+            let (control, watching) = (&control, &watching);
+            scope.spawn(move || {
+                while watching.load(Ordering::Relaxed) {
+                    if Duration::from_nanos(process_cpu_ns() - began) >= limit {
+                        control.stop();
+                        break;
+                    }
+                    std::thread::sleep(CPU_WATCH_EVERY);
+                }
+            });
+        }
+        let outcome = engine::run(&cfg, begin, b"tune", |_| Timed::new(space, &cpu));
+        watching.store(false, Ordering::Relaxed);
+        outcome
+    })
+    .map_err(|e| format!("the engine: {e}"))?;
     Ok(Solved {
         nodes: outcome.stats.nodes,
         cpu_ns: cpu.load(Ordering::Relaxed),
@@ -446,6 +509,7 @@ struct SolveOptions {
     ids: Option<Vec<String>>,
     tactics: SearchTactics,
     node_limit: Option<u64>,
+    cpu_limit: Option<Duration>,
 }
 
 /// The set the units of `game` are solved from, and the known optimum if there is one (then a solve proves): the known
@@ -508,7 +572,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
     let space = SearchSpace::new(&prepared, &graph);
     let description = Tactics { search: o.tactics, ..Tactics::default() }.description();
     for Row { id, depth, unit } in wanted {
-        let solved = solve_unit(&space, unit, &start, o.node_limit)?;
+        let solved = solve_unit(&space, unit, &start, Limits { nodes: o.node_limit, cpu: o.cpu_limit }, &id)?;
         let line = Json::object([
             ("game", Json::from(game)),
             ("id", Json::from(id)),
@@ -524,6 +588,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             ("opt", opt.map_or(Json::Null, Json::from)),
             ("tactics", Json::from(description.clone())),
             ("node_limit", o.node_limit.map_or(Json::Null, Json::from)),
+            ("cpu_limit", o.cpu_limit.map_or(Json::Null, |limit| Json::from(limit.as_secs_f64()))),
             ("stats", stats_json(&solved.stats)),
         ]);
         println!("{line}");
@@ -560,6 +625,7 @@ fn parse() -> Result<Command, String> {
     let command = args.next().ok_or("usage: tune units|solve GAME ... (see the top of examples/tune.rs)")?;
     let mut positional = Vec::new();
     let (mut known, mut units, mut ids, mut out, mut node_limit) = (None, None, None, None, None);
+    let mut cpu_limit = None;
     let (mut sample, mut seed) = (100usize, 1u64);
     let mut tactics = Tactics::default();
     while let Some(arg) = args.next() {
@@ -573,6 +639,14 @@ fn parse() -> Result<Command, String> {
             "--sample" => sample = number("--sample", value("--sample")?)? as usize,
             "--seed" => seed = number("--seed", value("--seed")?)?,
             "--node-limit" => node_limit = Some(number("--node-limit", value("--node-limit")?)?),
+            "--cpu-limit" => {
+                let text = value("--cpu-limit")?;
+                let seconds = text.parse::<f64>().map_err(|e| format!("--cpu-limit {text}: {e}"))?;
+                if !seconds.is_finite() || seconds < 0.0 {
+                    return Err(format!("--cpu-limit {text}: seconds, 0 or more"));
+                }
+                cpu_limit = Some(Duration::from_secs_f64(seconds));
+            }
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
@@ -594,20 +668,23 @@ fn parse() -> Result<Command, String> {
             Ok(Command::Units { game: game(Some(g))?, ckpt: ckpt.into(), sample, seed, out, known })
         }
         ("solve", [g]) => {
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit };
+            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit, cpu_limit };
             Ok(Command::Solve { game: game(Some(g))?, options })
         }
         ("expand", [g]) => {
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit };
+            if cpu_limit.is_some() {
+                return Err("expand stops at --node-limit K steps; --cpu-limit is for solve".into());
+            }
+            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit, cpu_limit };
             Ok(Command::Expand { game: game(Some(g))?, options, out })
         }
         ("units", _) => Err("usage: tune units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]".into()),
         ("expand", _) => Err("usage: tune expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K] \
                               [--out FILE]"
             .into()),
-        ("solve", _) => {
-            Err("usage: tune solve GAME [--known FILE] [--units FILE] [--ids I,J,...] [--tactic N=V]...".into())
-        }
+        ("solve", _) => Err("usage: tune solve GAME [--known FILE] [--units FILE] [--ids I,J,...] [--tactic N=V]... \
+                 [--node-limit L] [--cpu-limit SECONDS]"
+            .into()),
         (other, _) => Err(format!("unknown command {other:?}: units, solve or expand")),
     }
 }
@@ -698,8 +775,8 @@ mod tests {
             let w = world::<W>();
             let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
             let space = SearchSpace::new(&w.prepared, &graph);
-            let a = solve_unit(&space, root(&w), &w.start, None).unwrap();
-            let b = solve_unit(&space, root(&w), &w.start, None).unwrap();
+            let a = solve_unit(&space, root(&w), &w.start, Limits::default(), "test").unwrap();
+            let b = solve_unit(&space, root(&w), &w.start, Limits::default(), "test").unwrap();
             assert!(a.completed && a.nodes > 1_024, "{} nodes", a.nodes);
             assert_eq!((a.nodes, a.best, a.stats), (b.nodes, b.best, b.stats));
             assert_eq!(a.best, w.opt, "a proof from an optimal set finds nothing better");
@@ -718,7 +795,7 @@ mod tests {
             let w = world::<W>();
             let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
             let space = SearchSpace::new(&w.prepared, &graph);
-            let unit = solve_unit(&space, root(&w), &w.start, None).unwrap();
+            let unit = solve_unit(&space, root(&w), &w.start, Limits::default(), "test").unwrap();
             let seed = w.board.seed(Optimal::built_in().moves(GAME).expect("a game"));
             let cfg = EngineConfig { threads: 1, progress: None, ..EngineConfig::default() };
             let whole = search::search(&w.prepared, &cfg, Some(&seed), None, false).unwrap();
@@ -735,18 +812,37 @@ mod tests {
             let w = world::<W>();
             let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
             let space = SearchSpace::new(&w.prepared, &graph);
-            let full = solve_unit(&space, root(&w), &w.start, None).unwrap();
+            let full = solve_unit(&space, root(&w), &w.start, Limits::default(), "test").unwrap();
             let limit = full.nodes / 2;
-            let cut = solve_unit(&space, root(&w), &w.start, Some(limit)).unwrap();
+            let cut =
+                solve_unit(&space, root(&w), &w.start, Limits { nodes: Some(limit), ..Limits::default() }, "test")
+                    .unwrap();
             assert!(!cut.completed && cut.nodes >= limit && cut.nodes < full.nodes, "{} of {}", cut.nodes, full.nodes);
             // Another tactic is another tree; the answer is the same.
             let tactics = SearchTactics { symmetry: false, ..SearchTactics::default() };
             let other = w.board.prepare(tactics).unwrap();
             let other_graph = MatchGraph::new(&other.model, &other.root);
             let other_space = SearchSpace::new(&other, &other_graph);
-            let off = solve_unit(&other_space, root(&w), &w.start, None).unwrap();
+            let off = solve_unit(&other_space, root(&w), &w.start, Limits::default(), "test").unwrap();
             assert!(off.completed && off.nodes != full.nodes);
             assert_eq!(off.best, full.best);
+        }
+        taxman::with_width!(GAME, W => check::<W>());
+    }
+
+    #[test]
+    fn a_cpu_limit_stops_a_unit() {
+        fn check<const W: usize>() {
+            let w = world::<W>();
+            let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
+            let space = SearchSpace::new(&w.prepared, &graph);
+            let full = solve_unit(&space, root(&w), &w.start, Limits::default(), "test").unwrap();
+            let none = Limits { cpu: Some(Duration::from_secs(3600)), ..Limits::default() };
+            let roomy = solve_unit(&space, root(&w), &w.start, none, "test").unwrap();
+            assert!(roomy.completed && roomy.nodes == full.nodes, "a limit that is not reached changes nothing");
+            let zero = Limits { cpu: Some(Duration::ZERO), ..Limits::default() };
+            let cut = solve_unit(&space, root(&w), &w.start, zero, "test").unwrap();
+            assert!(!cut.completed && cut.nodes < full.nodes, "{} of {}", cut.nodes, full.nodes);
         }
         taxman::with_width!(GAME, W => check::<W>());
     }
@@ -767,7 +863,7 @@ mod tests {
             assert!(units.iter().all(|unit| !unit.cands.is_empty()));
             assert!(!ckpt.exists(), "the checkpoint is removed");
             for unit in &units {
-                let solved = solve_unit(&space, *unit, &w.start, None).unwrap();
+                let solved = solve_unit(&space, *unit, &w.start, Limits::default(), "test").unwrap();
                 assert!(solved.completed && solved.best == w.opt);
             }
             assert!(expand_unit(&space, root(&w), &w.start, 100_000, &ckpt).unwrap().is_empty(), "the game finishes");
@@ -783,6 +879,7 @@ mod tests {
                 ids: Some(vec![format!("{GAME}-0")]),
                 tactics: SearchTactics::default(),
                 node_limit: None,
+                cpu_limit: None,
             };
             let lines = expand::<W>(GAME, &options, 1_024, Optimal::built_in()).unwrap();
             assert_eq!(lines.len(), units.len());
@@ -870,12 +967,12 @@ mod tests {
                 assert_eq!(row.unit, all[index], "{} is that unit of the checkpoint", row.id);
                 assert_eq!(row.depth, row.unit.promoted.len());
                 // From an optimal set the subtree is proved, and solved the same every time.
-                let proof = solve_unit(&space, row.unit, &w.start, None).unwrap();
-                let again = solve_unit(&space, row.unit, &w.start, None).unwrap();
+                let proof = solve_unit(&space, row.unit, &w.start, Limits::default(), "test").unwrap();
+                let again = solve_unit(&space, row.unit, &w.start, Limits::default(), "test").unwrap();
                 assert!(proof.completed && proof.best == w.opt);
                 assert_eq!((proof.nodes, proof.stats), (again.nodes, again.stats));
                 // From the checkpoint's incumbent, which is no better than P*, it finds at most P*.
-                let search = solve_unit(&space, row.unit, &checkpoint_start, None).unwrap();
+                let search = solve_unit(&space, row.unit, &checkpoint_start, Limits::default(), "test").unwrap();
                 assert!(search.completed && (checkpoint_start.sum()..=w.opt).contains(&search.best));
             }
             std::fs::remove_dir_all(&dir).unwrap();

@@ -8,8 +8,10 @@
 #
 #   lab.sh [--local] setup [COMMIT]     clone the repository to src/ at COMMIT (default origin/master) and build taxman
 #                                       and the example tune there, at nice 19
-#   lab.sh [--local] snapshot [N]       copy the checkpoint and the clock of game N in flight (default: the game whose
-#                                       own search is the longest) to snap/N-STAMP/
+#   lab.sh [--local] snapshot [N] [--from DIR]
+#                                       copy the checkpoint and the clock of game N in flight (default: the game whose
+#                                       own search is the longest) to snap/N-STAMP/; DIR, an absolute path or from the
+#                                       home, is where to copy from, instead of LAB_CKPT_DIR
 #   lab.sh [--local] units SNAPDIR [TUNE ARGS]
 #                                       tune units on the snapshot, into SNAPDIR/units.jsonl: the summary, then the 20
 #                                       units with the largest gaps (the bound less what the incumbent needs)
@@ -17,6 +19,19 @@
 #                                       tune solve each unit of IDS (ids of units.jsonl, separated by commas) on one
 #                                       thread, at most LAB_THREADS at a time, at nice 19; each result line is added to
 #                                       SNAPDIR/runs.jsonl as the unit ends, and a row of a table is printed
+#   lab.sh [--local] reports [N]        the reports of the studies (work/reports), the newest of game N or of all, and
+#                                       the end of the journal (work/journal.md)
+#   lab.sh [--local] proof              prove the sandbox of the studies on the host (on-event.sh --proof: a few short
+#                                       agent sessions); every study needs it first
+#   lab.sh [--local] studies [on|off]   turn the studies on or off; without an argument, say how they stand
+#   lab.sh [--local] ask STUDY "QUESTION"
+#                                       put a question to a finished study (the name of its folder in studies/): its
+#                                       session goes on with its whole context; the answer is printed and kept
+#   lab.sh [--local] request ["TEXT"]   add a dated request to work/requests.md, which every study reads after the
+#                                       journal; without TEXT, print the file
+#
+# The studies themselves are started by `taxman solve --hook`, with the program on-event.sh of the chain's checkout on
+# the host (solver/docs/runbook/lab.md, "Studies"); proof and studies run that program.
 #
 # SNAPDIR is a name under snap/ (the last line of snapshot says it) or a path inside the lab.  TUNE ARGS go to tune as
 # they are, after the lab's own: for units --known, --sample and --seed, and for run --tactic NAME=VALUE and
@@ -29,10 +44,14 @@
 #   LAB_HOST       USER@HOST of the machine that runs the lab, reached by ssh with no password to type; not needed
 #                  with --local                                                                              no default
 #   LAB_THREADS    units that run solves at once, and jobs of the build in setup                              default 16
-#   LAB_DIR        the lab's directory on the host, relative to its home                           default taxman-lab
-#   LAB_CKPT_DIR   where snapshot copies from, relative to the host's home; only read       default taxman-work/ckpt
+#   LAB_HOME       the lab's directory on the host, relative to its home                              default taxman-lab
+#   LAB_CKPT_DIR   where snapshot copies from, relative to the host's home; only read         default taxman-work/ckpt
+#   LAB_TOOLS      the tools of the chain's checkout on the host, relative to its home: proof and studies
+#                  run LAB_TOOLS/lab/on-event.sh                                        default taxman/solver/tools
 #   SSH_CLI        ssh
-# The host needs git, a Rust toolchain (rustup's, in ~/.cargo) and jq.
+# The variables of the studies (LAB_MAX_PER_DAY, LAB_MAX_TURNS, LAB_ASK_TURNS, LAB_MODEL, LAB_MAX_HOURS,
+# LAB_PROOF_MODEL, CLAUDE_BIN) go to on-event.sh as they are; its top says what they mean.  The host needs git, a Rust
+# toolchain (rustup's, in ~/.cargo) and jq, and for the studies what on-event.sh lists.
 
 set -u
 set -o pipefail
@@ -53,8 +72,9 @@ LOCAL=0
 host_lib() {
     cat <<'EOF'
 REPO_URL=https://github.com/bvchess/taxman.git
-: "${LAB_DIR:=taxman-lab}" "${LAB_THREADS:=16}" "${LAB_CKPT_DIR:=taxman-work/ckpt}"
-LAB="$HOME/$LAB_DIR"
+: "${LAB_HOME:=taxman-lab}" "${LAB_THREADS:=16}" "${LAB_CKPT_DIR:=taxman-work/ckpt}" "${LAB_TOOLS:=taxman/solver/tools}"
+export LAB_HOME LAB_THREADS
+LAB="$HOME/$LAB_HOME"
 SRC="$LAB/src"
 CRATE="$SRC/solver/frame"
 TUNE="$CRATE/target/release/examples/tune"
@@ -155,7 +175,22 @@ lab_setup() {
 }
 
 lab_snapshot() {
-    local dir="$HOME/$LAB_CKPT_DIR" game="${1:-}" name ckpt clock stamp dest
+    local dir="$HOME/$LAB_CKPT_DIR" game="" name ckpt clock stamp dest
+    # [N] [--from DIR]: DIR is an absolute path, or from the home, and is only read.
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --from)
+                [ "$#" -ge 2 ] || die "usage: lab.sh snapshot [N] [--from DIR]"
+                case "$2" in /*) dir="$2" ;; "~/"*) dir="$HOME/${2#"~/"}" ;; *) dir="$HOME/$2" ;; esac
+                shift 2
+                ;;
+            *[!0-9]* | '') die "usage: lab.sh snapshot [N] [--from DIR]" ;;
+            *)
+                game="$1"
+                shift
+                ;;
+        esac
+    done
     if [ -z "$game" ]; then
         game="$(longest_search "$dir")"
         [ -n "$game" ] || die "no checkpoint in $dir: no game has run long enough to keep one"
@@ -288,6 +323,54 @@ lab_run() {
     printf 'results added to %s\n' "$RUNS"
 }
 
+# The reports of the studies, newest first, the newest (of game $1, if given) in full, and the end of the journal.
+lab_reports() {
+    local reports="$LAB/work/reports" game="${1:-}" newest
+    [ -d "$reports" ] && [ -n "$(ls -A "$reports")" ] || die "no reports yet in $reports"
+    printf 'reports (newest first):\n'
+    ls -t "$reports" | sed 's/^/  /'
+    # shellcheck disable=SC2012 # the names are ours: N-STAMP.md
+    newest="$(ls -t "$reports"/${game:+$game-}*.md 2>/dev/null | head -n 1)"
+    [ -n "$newest" ] || die "no report${game:+ of game $game}"
+    printf '\n== %s\n' "${newest##*/}"
+    cat "$newest"
+    if [ -f "$LAB/work/journal.md" ]; then
+        printf '\n== the end of work/journal.md\n'
+        tail -n 40 "$LAB/work/journal.md"
+    fi
+}
+
+# The program of the studies, in the chain's checkout.
+on_event() {
+    local program="$HOME/$LAB_TOOLS/lab/on-event.sh"
+    [ -x "$program" ] || die "no $program: the chain's checkout lacks the studies (LAB_TOOLS says where its tools are)"
+    "$program" "$@"
+}
+
+lab_proof() {
+    [ "$#" -eq 0 ] || die "usage: lab.sh proof"
+    on_event --proof
+}
+
+lab_studies() {
+    case "${1:-status}" in
+        on) on_event --on ;;
+        off) on_event --off ;;
+        status) on_event --status ;;
+        *) die "usage: lab.sh studies [on|off]" ;;
+    esac
+}
+
+lab_ask() {
+    [ "$#" -eq 2 ] || die 'usage: lab.sh ask STUDY "QUESTION"'
+    on_event --ask "$1" "$2"
+}
+
+lab_request() {
+    [ "$#" -le 1 ] || die 'usage: lab.sh request ["TEXT"]'
+    on_event --request "${1:-}"
+}
+
 EOF
 }
 
@@ -321,14 +404,15 @@ remote() {
         esac
     fi
     {
-        for var in LAB_DIR LAB_THREADS LAB_CKPT_DIR; do
-            [ -z "${!var:-}" ] || printf '%s=%q\n' "$var" "${!var}"
+        for var in LAB_HOME LAB_THREADS LAB_CKPT_DIR LAB_TOOLS LAB_MAX_PER_DAY LAB_MAX_TURNS LAB_ASK_TURNS LAB_MODEL \
+            LAB_MAX_HOURS LAB_PROOF_MODEL CLAUDE_BIN; do
+            [ -z "${!var:-}" ] || printf 'export %s=%q\n' "$var" "${!var}"
         done
         declare -p AWK_COMMAS
         declare -f commas
         host_lib
         printf 'lab_%s' "$command"
-        printf ' %q' "$@"
+        [ "$#" -eq 0 ] || printf ' %q' "$@"
         printf '\n'
     } | if runs_here; then
         bash -s
@@ -351,8 +435,7 @@ case "$command" in
         remote setup "$@"
         ;;
     snapshot)
-        [ "$#" -le 1 ] || usage
-        case "${1:-0}" in *[!0-9]*) die "N: \"$1\" is not a game" ;; esac
+        [ "$#" -le 3 ] || usage
         remote snapshot "$@"
         ;;
     units)
@@ -362,6 +445,28 @@ case "$command" in
     run)
         [ "$#" -ge 2 ] || usage
         remote run "$@"
+        ;;
+    reports)
+        [ "$#" -le 1 ] || usage
+        case "${1:-0}" in *[!0-9]*) die "N: \"$1\" is not a game" ;; esac
+        remote reports "$@"
+        ;;
+    proof)
+        [ "$#" -eq 0 ] || usage
+        remote proof
+        ;;
+    studies)
+        [ "$#" -le 1 ] || usage
+        case "${1:-status}" in on | off | status) ;; *) usage ;; esac
+        remote studies "$@"
+        ;;
+    ask)
+        [ "$#" -eq 2 ] || usage
+        remote ask "$@"
+        ;;
+    request)
+        [ "$#" -le 1 ] || usage
+        remote request "$@"
         ;;
     *) usage ;;
 esac

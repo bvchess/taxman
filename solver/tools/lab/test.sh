@@ -117,7 +117,7 @@ before="$(chain_state)"
 export HOME="$home" SSH_LOG="$tmp/ssh.log" CONC_LOG="$tmp/conc.log" SSH_CLI="$bin/ssh"
 : >"$SSH_LOG"
 : >"$CONC_LOG"
-unset LAB_HOST LAB_THREADS LAB_DIR LAB_CKPT_DIR
+unset LAB_HOST LAB_THREADS LAB_HOME LAB_CKPT_DIR
 
 echo "--- snapshot"
 out="$("$lab" --local snapshot 2>&1)"
@@ -128,6 +128,14 @@ check "it copies the clock" cmp -s "$ckpt/n4875.clock" "$home/taxman-lab/snap/$s
 check "it says the own search" contains "$out" "own search: 900.25 s"
 out="$("$lab" --local snapshot 4876 2>&1)"
 check "a game by number, with no clock" contains "$out" "snapshot 4876-"
+mkdir -p "$home/elsewhere"
+cp -p "$ckpt/n4874.ckpt" "$ckpt/n4874.clock" "$home/elsewhere/"
+sleep 1
+out="$("$lab" --local snapshot 4874 --from "$home/elsewhere" 2>&1)"
+check "a snapshot from another directory, by its absolute path" contains "$out" "snapshot 4874-"
+sleep 1
+out="$("$lab" --local snapshot --from elsewhere 2>&1)"
+check "or from the home, with the game chosen by the longest search there" contains "$out" "snapshot 4874-"
 out="$("$lab" --local snapshot 12 2>&1)"
 check "a game not in flight is refused" contains "$out" "game 12 is not in flight"
 check "no ssh was used with --local" test ! -s "$SSH_LOG"
@@ -192,6 +200,49 @@ sleep 0.5
 check "a run that is interrupted stops its units" test -z "$(ps -o pid= -p "$tune_pid")"
 check "and removes what they left in the snapshot" test -z "$(ls -A "$home/taxman-lab/snap/$snap" | grep '^\.')"
 
+echo "--- the commands of the studies"
+# lab.sh hands them to on-event.sh of the chain's checkout (tested by test-studies.sh): here a stand-in that says what
+# it was given.
+mkdir -p "$home/taxman/solver/tools/lab" "$home/taxman-lab/work/reports"
+cat >"$home/taxman/solver/tools/lab/on-event.sh" <<'EOF'
+#!/bin/sh
+printf 'on-event:' >>"$HOME/on-event.args"
+for a in "$@"; do printf ' [%s]' "$a" >>"$HOME/on-event.args"; done
+echo >>"$HOME/on-event.args"
+echo "stand-in answer to $1"
+EOF
+chmod +x "$home/taxman/solver/tools/lab/on-event.sh"
+given() { tail -n 1 "$home/on-event.args"; }
+out="$("$lab" --local ask 4875-20261022T035036Z 'what would you try next, and what would it cost?' 2>&1)"
+check "ask hands the study and the whole question on" test "$(given)" = \
+    "on-event: [--ask] [4875-20261022T035036Z] [what would you try next, and what would it cost?]"
+check "and prints the answer" contains "$out" "stand-in answer to --ask"
+"$lab" --local request 'look at depth, "quoted" and $HOME' >/dev/null 2>&1
+check "request hands the text on as it is" test "$(given)" = 'on-event: [--request] [look at depth, "quoted" and $HOME]'
+"$lab" --local request >/dev/null 2>&1
+check "request without text asks for the file" test "$(given)" = "on-event: [--request] []"
+"$lab" --local proof >/dev/null 2>&1
+check "proof runs the proof" test "$(given)" = "on-event: [--proof]"
+"$lab" --local studies off >/dev/null 2>&1
+check "studies off turns them off" test "$(given)" = "on-event: [--off]"
+"$lab" --local studies >/dev/null 2>&1
+check "studies alone says how they stand" test "$(given)" = "on-event: [--status]"
+check "ask needs a study and a question" contains "$("$lab" --local ask only-one 2>&1)" "lab.sh"
+check "studies takes on or off" contains "$("$lab" --local studies maybe 2>&1)" "lab.sh"
+printf '# a report\n' >"$home/taxman-lab/work/reports/4875-20261022T040000Z.md"
+printf '# another\n' >"$home/taxman-lab/work/reports/4880-20261022T050000Z.md"
+touch -t 202610220400 "$home/taxman-lab/work/reports/4875-20261022T040000Z.md"
+touch -t 202610220500 "$home/taxman-lab/work/reports/4880-20261022T050000Z.md"
+printf '# Journal\n\nprediction: soon\n' >"$home/taxman-lab/work/journal.md"
+out="$("$lab" --local reports 2>&1)"
+check "reports lists them, newest first, and prints the newest" contains "$out" "# another"
+check "with the end of the journal" contains "$out" "prediction: soon"
+check "reports N prints the newest of game N" contains "$("$lab" --local reports 4875 2>&1)" "# a report"
+export LAB_TOOLS=nowhere
+check "without the studies' program in the checkout the commands say so" \
+    contains "$("$lab" --local proof 2>&1)" "the chain's checkout lacks the studies"
+unset LAB_TOOLS
+
 echo "--- ssh"
 host="$(hostname -s 2>/dev/null || hostname)"
 sleep 1 # a snapshot of a game is named by the second
@@ -209,7 +260,7 @@ check "without LAB_HOST or --local it says what to set" contains "$out" "LAB_HOS
 out="$(LAB_HOST='-oProxyCommand=x' "$lab" snapshot 2>&1)"
 check "a LAB_HOST that is not USER@HOST is refused" contains "$out" "is not USER@HOST"
 out="$("$lab" --local snapshot 1x 2>&1)"
-check "N must be a number" contains "$out" "is not a game"
+check "N must be a number" contains "$out" "usage: lab.sh snapshot"
 
 echo "--- the chain"
 check "the chain's directory is as it was" test "$(chain_state)" = "$before"

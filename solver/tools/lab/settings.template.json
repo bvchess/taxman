@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read(@LAB@/**)",
+      "Read(~/taxman/**)",
+      "Read(~/taxman-work/**)",
+      "Read(~/taxman-archive/**)",
+      "Edit(@LAB@/work/**)",
+      "Edit(@LAB@/src/**)",
+      "Edit(@LAB@/snap/**)",
+      "Edit(@LAB@/channel/**)"
+    ],
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "Edit(~/taxman/**)",
+      "Edit(~/taxman-work/**)",
+      "Edit(~/taxman-archive/**)",
+      "Edit(@LAB@/ctl/**)",
+      "Edit(@LAB@/studies/**)",
+      "Edit(//**/.claude/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.netrc)",
+      "Read(~/.git-credentials)",
+      "Read(~/.claude/**)",
+      "Read(~/.claude.json)",
+      "Bash(git push *)",
+      "Bash(kill *)",
+      "Bash(pkill *)",
+      "Bash(killall *)",
+      "Bash(renice *)",
+      "Bash(sudo *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "allowWrite": ["@LAB@/src", "@LAB@/snap", "@LAB@/channel"],
+      "denyWrite": ["@LAB@/ctl", "@LAB@/studies", "~/taxman", "~/taxman-work", "~/taxman-archive"]
+    },
+    "network": {
+      "allowedDomains": ["github.com"],
+      "strictAllowlist": true
+    }
+  },
+  "disableAllHooks": true,
+  "enableAllProjectMcpServers": false
+}
