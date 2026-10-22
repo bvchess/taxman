@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall, the ledger (run.sh) and a lab's
-# redeploy, wall-node.sh and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a
-# file), for ssh (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run the chain
-# (chain, ledger, lab, node, sweep) need the release build of the solver
+# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall, the ledger and the lock (run.sh) and a
+# lab's redeploy, wall-node.sh and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the
+# group as a file), for ssh (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run
+# the chain (chain, ledger, lab, node, sweep) need the release build of the solver
 # (cd solver/frame && cargo build --release; or TAXMAN_BIN names another build of the same sources, say the debug build
-# that `cargo build` makes) and rsync; launch and status need neither.  sweep.sh's scenario also runs the real verify.sh
-# on the sweep's files, which replays the committed games three times.
+# that `cargo build` makes) and rsync; lock, launch and status need neither.  sweep.sh's scenario also runs the real
+# verify.sh on the sweep's files, which replays the committed games three times.
 #
-#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, lab, node, launch,
-#                                                  status, sweep)
+#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, lock, lab, node,
+#                                                  launch, status, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -19,7 +19,7 @@ real_cloud="$(cd "$here/.." && pwd)"
 crate="$(cd "$real_cloud/../../frame" && pwd)"
 export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
 selected=("$@")
-[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger lab node launch status sweep)
+[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger lock lab node launch status sweep)
 for s in "${selected[@]}"; do
     case "$s" in
         chain | ledger | lab | node | sweep)
@@ -251,6 +251,30 @@ scenario_ledger() {
     )
     check "a ledger with no numbers stops the machine" has_line "$tmp/m4.status" 1
     check "and says so" matches "$tmp/m4.out" 'has no number for'
+}
+
+# --- the lock of run.sh ------------------------------------------------------------------------------------------
+
+# run_begin keeps its lock on file descriptor 9 for as long as the script runs, and the lock is the script's alone: a
+# solver that held it, or a program the solver starts and that outlives it (the lab's hook), would keep a new chain.sh
+# out.  A stand-in solver records whether fd 9 is open in it.  Where there is no flock (macOS), a stand-in that takes no
+# lock is put in its place: run_begin opens fd 9 all the same.
+scenario_lock() {
+    echo "== run.sh: the lock is the script's alone"
+    local w="$tmp/lock" bin="$tmp/lock-bin"
+    mkdir -p "$bin"
+    printf '%s\n' '#!/usr/bin/env bash' \
+        '[ "${1:-}" != verify-results ] || { echo "n = 1..=5 (0 missing)"; exit 0; }' \
+        'if { true >&9; } 2>/dev/null; then echo open; else echo closed; fi >"$TAXMAN_WORK/solver.fd9"' >"$bin/solver"
+    command -v flock >/dev/null 2>&1 || printf '#!/bin/sh\nexit 0\n' >"$bin/flock"
+    chmod +x "$bin"/*
+    (
+        export TAXMAN_WORK="$w" TAXMAN_BIN="$bin/solver" PATH="$bin:$PATH" THREADS=1 PROGRESS=0
+        "$cloud/chain.sh" 5 >"$tmp/lock.out" 2>&1
+        echo $? >"$tmp/lock.status"
+    )
+    check "a chain with the stand-in solver completes" has_line "$tmp/lock.status" 0
+    check "the solver that run_launch starts does not hold fd 9, the lock" has_line "$w/solver.fd9" closed
 }
 
 # --- wall-node.sh ------------------------------------------------------------------------------------------------
@@ -1096,6 +1120,7 @@ for s in "${selected[@]}"; do
     case "$s" in
         chain) scenario_chain ;;
         ledger) scenario_ledger ;;
+        lock) scenario_lock ;;
         lab) scenario_lab ;;
         node) scenario_node ;;
         launch) scenario_launch ;;

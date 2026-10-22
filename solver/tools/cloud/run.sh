@@ -221,7 +221,7 @@ run_on_signal() {
 }
 
 run_nap() {
-    sleep "$1" &
+    sleep "$1" 9>&- &
     wait $!
 }
 
@@ -243,7 +243,11 @@ run_begin() {
         esac
     done
 
-    # One run of this name at a time.
+    # One run of this name at a time.  The lock, on fd 9, is this script's alone: every process it starts has fd 9
+    # closed (9>&-), so that a program that outlives its parent (the lab's hook of a solver, say) cannot hold the lock
+    # after the script has ended and keep the next run out.  What still guards against two solvers on one checkpoint
+    # directory is the solver's own lock on it (taxman.lock): a run that takes this lock while an orphaned solver goes
+    # on has its solver refused, and ends.
     if command -v flock >/dev/null 2>&1; then
         exec 9>"$TAXMAN_WORK/$RUN_NAME.lock"
         flock -n 9 || die "another $RUN_NAME run is going (it holds $TAXMAN_WORK/$RUN_NAME.lock)"
@@ -285,7 +289,7 @@ run_begin() {
             while sleep "$SAVE_EVERY"; do
                 quietly "$CLOUD_DIR/save.sh" >>"$LOGS/save.log" 2>&1
             done
-        ) &
+        ) 9>&- &
         saver=$!
         log "saving to $S3_DEST every ${SAVE_EVERY}s"
     fi
@@ -294,7 +298,7 @@ run_begin() {
             while sleep "$LEDGER_EVERY"; do
                 ledger_write || log "could not write the ledger"
             done
-        ) &
+        ) 9>&- &
         ledgerer=$!
         log "counting the hours in $S3_DEST/run/ledger every ${LEDGER_EVERY}s"
     fi
@@ -316,7 +320,7 @@ run_launch() {
         fi
         wrap=(timeout --signal=TERM --kill-after=120 "$left")
     fi
-    ${wrap[@]+"${wrap[@]}"} "$@" </dev/null >>"$out" 2>>"$err" &
+    ${wrap[@]+"${wrap[@]}"} "$@" </dev/null >>"$out" 2>>"$err" 9>&- &
     launched=$!
 }
 

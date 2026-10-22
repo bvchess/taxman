@@ -267,7 +267,7 @@ counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#wa
 
 | what you see | cause | remedy |
 |---|---|---|
-| `DIR is in use by another process (process N): DIR/... is locked` | another solver uses that checkpoint directory | find it with `pgrep -a taxman`; a lock is released when its process ends, however it ends |
+| `DIR is in use by another process (process N): DIR/... is locked` | another solver uses that checkpoint directory: a `chain.sh` started while the solver of a killed `chain.sh` goes on gets this error from its solver, and ends (the script's own lock, `chain.lock`, is held only by the script, never by a solver or a program the solver starts) | find it with `pgrep -a taxman`; a lock is released when its process ends, however it ends |
 | `FILE is in use by another process (another run appending to it?): it is locked` | another solver appends to that results file (`--out`) | the same |
 | `another chain run is going (it holds ~/taxman-work/chain.lock)` | a second `chain.sh`; `prover.sh` says `another prover run` | `~/taxman-work/chain.pid` (or `prover.pid`) names the first |
 | `FILE was made with different search tactics: ...; resume it with FLAGS, or delete it to start the game over` | the run's `--tactic` flags differ from the checkpoint's | resume with the flags it prints (`EXTRA_ARGS`), or delete the checkpoint to start that game over |
