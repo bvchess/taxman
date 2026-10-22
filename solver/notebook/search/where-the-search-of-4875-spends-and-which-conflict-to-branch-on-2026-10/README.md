@@ -333,6 +333,13 @@ rule's proof ran 7.0 times as fast and the default's 8.4 times.  The rule proves
 one thread and 3.1 times on eight.  Every run proved the committed score, 5160836 (`threads.jsonl`).  Many threads, as
 on the run's machine at 88, have not been measured.
 
+## 2026-10-22: the tripwires of game 1000
+
+Game 1000, solved from scratch as the tripwires solve it (`taxman solve 1000 --threads 1`), takes 3,360 steps with the
+rule and 2,026 without it (`--tactic conflict_branching=off`): the rule costs steps on a small game whose gaps pass 300.
+The note above that no tripwire's tree changed (the default since a88dc7f) held for the quick check only; `cargo test
+--release` found the six rows of game 1000 moved, and `tests/tripwires.rs` pins them at the counts with the rule.
+
 ## Files
 
 * `units-fresh.jsonl`: the 96 units of the fresh search's checkpoint at 3.0 million steps (`run-fresh.sh`, then
