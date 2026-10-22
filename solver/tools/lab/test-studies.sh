@@ -109,8 +109,11 @@ export HOME="$home" PATH="$bin:$PATH" CLAUDE_BIN="$home/.local/bin/claude"
 unset LAB_HOME LAB_THREADS LAB_MAX_PER_DAY LAB_MAX_TURNS LAB_MODEL LAB_MAX_HOURS LAB_PROOF_MODEL
 export SECRET_TOKEN=secret-one SERVICE_API_KEY=secret-two LAB_DIR=/not/for/us
 
+# event NAME N [COMPLETED]: an event as the solver sends it; a done event carries the game's line, which is complete
+# unless COMPLETED says false.
 event() {
     printf '{"event":"%s","n":%s,"nodes":1000,"best":5,"own_seconds":3700,' "$1" "$2"
+    if [ "$1" = done ]; then printf '"result":{"completed":%s,"method":"search"},' "${3:-true}"; fi
     printf '"checkpoint_dir":null,"lab_dir":null}'
 }
 
@@ -199,6 +202,18 @@ out="$("$program" "$(event done 4998)" 2>&1)"
 check "so is the done event of a game whose long event was skipped by the limit" \
     contains "$out" "no study of a long event of game 4998"
 check "and neither started a study" test "$(claude_runs)" = "$before"
+# A run that is stopped sends done for each game in flight, with an incomplete line: game 4879 has a study of its long
+# event, so only the line keeps the study from starting.
+out="$("$program" "$(event done 4879 false)" 2>&1)"
+check "a done event whose line is incomplete is skipped" \
+    contains "$out" "event=done n=4879: the game was stopped before it ended (its line is incomplete)"
+check "and the log says why" logged "event=done n=4879: the game was stopped before it ended"
+check "and it started no study" test "$(claude_runs)" = "$before"
+out="$("$program" '{"event":"done","n":4879,"nodes":1,"best":5,"own_seconds":3700}' 2>&1)"
+check "so is a done event with no result" contains "$out" "the game was stopped before it ended"
+out="$("$program" "$(event done 4996 false)" 2>&1)"
+check "an incomplete line is told before a missing long event" lacks "$out" "no study of a long event"
+check "(still no study)" test "$(claude_runs)" = "$before"
 "$program" --off >/dev/null 2>&1
 out="$("$program" "$(event long 4880)" 2>&1)"
 check "no study while studies are off" contains "$out" "studies are off"

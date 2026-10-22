@@ -25,8 +25,10 @@
 #     runs the proof again and goes on only if it passes (the log says "proof renewed")
 #   - no other study runs (a long event, or an ask, is skipped or refused), and fewer than LAB_MAX_PER_DAY long events
 #     and asks together have started today (UTC)
-#   - for a done event: studies/ holds a study of that game's long event, which it compares the outcome with (so the
-#     done studies are no more than the long ones, and the limit bounds both); it then waits for the study that runs
+#   - for a done event: the game's line is complete (a run that is stopped sends done for the games in flight, whose
+#     lines are incomplete), and studies/ holds a study of that game's long event, which it compares the outcome with
+#     (so the done studies are no more than the long ones, and the limit bounds both); it then waits for the study that
+#     runs
 # The proof is renewed only once the lock is held and the day's limit has allowed the study, so it never runs beside a
 # study, and never for an event that would be skipped.
 # The session runs in LAB/work, at nice 19, with a clean environment, the turn limit and the time limit below, and
@@ -334,6 +336,10 @@ handle_event() {
     case "$event" in long | done) ;; *) refuse "an event \"$event\" is not one that on-event.sh knows" ;; esac
     case "$n" in '' | *[!0-9]*) refuse "n is \"$n\", not a game" ;; esac
     if [ -e "$CTL/off" ]; then skip "studies are off ($CTL/off exists); on-event.sh --on turns them on"; fi
+    # A run that is stopped sends done for each game in flight, with an incomplete line: no outcome to compare with.
+    if [ "$event" = done ] && ! printf '%s' "$json" | jq -e '.result | objects | .completed == true' >/dev/null; then
+        skip "event=done n=$n: the game was stopped before it ended (its line is incomplete); the next run resumes it"
+    fi
     if [ "$event" = done ] && ! has_long_study "$n"; then
         skip "event=done n=$n: no study of a long event of game $n to compare with (it was skipped, or never sent)"
     fi
