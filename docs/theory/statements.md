@@ -59,6 +59,8 @@ of the committed chain reach.
 | Lemmas L1 to L4 | bounds pass between games: monotonicity, the ceiling, the prime formula both ways, repeats | proved (L4's inequality given U) | [The ledger](ledger.md) |
 | Lemma D | a stopped search bounds P\* by its incumbent and the bounds of its open units | proved | [The ledger](ledger.md) |
 | Lemma F | a search under a floor that completes with nothing found proves P\* at most the floor | proved | [The ledger](ledger.md) |
+| the state lemma | a node's completion can be promoted iff it can be promoted from the node's state | proved | [The near-repeat cut](ledger.md#the-near-repeat-cut) |
+| Lemma R | a node whose promotions leave, in a proven game M, frames no harder than in its own game wherever its candidates reach has no completion worth more than P\*(Π_M) | proved; a search that uses it rests on its bound of P\*(Π_M) | [The near-repeat cut](ledger.md#the-near-repeat-cut) |
 | Theorem 14 | a promotable set is independent in every signed frame matroid, over any field | proved | [Signed frame matroids](bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields) |
 | Theorem 15 | the GF(2) and signed matroids combine into one Lagrangian bound, valid for every multiplier | proved | [Signed frame matroids](bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields) |
 | the bridge | a payment scheme has a flat alternating cycle iff its precedence is cyclic iff another scheme has its payment set | proved | [Their Theorem 1 is Theorem 1](franklin-moniot.md#their-theorem-1-is-theorem-1) |
