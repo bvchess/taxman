@@ -103,7 +103,7 @@ use crate::results::{
 };
 use crate::search::{self, finder, stat, BranchSettings, Branching, Prepared, Problem, ProblemSize, SearchTactics};
 use crate::tactics::Tactics;
-use lab::GameLab;
+use lab::{GameLab, Policies};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -1177,17 +1177,25 @@ impl<const W: usize> Job for SearchJob<W> {
     }
 }
 
-type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known, Option<GameLab>) -> Result<SetUp, Failure>;
+type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known, Option<GameLab>, &Policies) -> Result<SetUp, Failure>;
 
 /// The setup of game `n` (its first phase, on the game's thread): the checks of a previous game not made by this run,
 /// the tables, and then the game a known source holds, the prime shortcut, the trivial game, or the search problem
 /// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the game.  `lab` is what the lab
 /// did to the game, as the driver knows it; without it, the setup reads it from beside the game's checkpoint.
-fn set_up(n: u32, before: &Before, opts: &SolveOptions, known: &Known, lab: Option<GameLab>) -> Result<SetUp, Failure> {
+/// `policies` are those the lab has given for the games to come.
+fn set_up(
+    n: u32,
+    before: &Before,
+    opts: &SolveOptions,
+    known: &Known,
+    lab: Option<GameLab>,
+    policies: &Policies,
+) -> Result<SetUp, Failure> {
     let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
     let set_up: SetUpWithWidth = crate::with_words!(words, W => set_up_with_width::<W>, else return Err(beyond()));
-    set_up(n, before, opts, known, lab).map_err(|failure| at(n, failure))
+    set_up(n, before, opts, known, lab, policies).map_err(|failure| at(n, failure))
 }
 
 fn set_up_with_width<const W: usize>(
@@ -1196,14 +1204,18 @@ fn set_up_with_width<const W: usize>(
     opts: &SolveOptions,
     known: &Known,
     lab: Option<GameLab>,
+    policies: &Policies,
 ) -> Result<SetUp, Failure> {
-    // What the lab did to the game: a restart searches it with the lab's tactics, and a resume of that search too; a
-    // setting of `conflict_branching` or `conflict_look` holds over them.  Read from beside its checkpoint, also by a
-    // run without a lab, since the search it resumes was made so; nothing, for a game no lab touched.
-    let lab = match lab {
+    // The game's search tactics are, in this order: the run's, changed by the policy the lab gave for the games to
+    // come, changed by what the lab did to the game itself.  What it did to the game: a restart searches it with the
+    // lab's tactics, which a policy does not change, and a resume of that search too; a setting of `conflict_branching`
+    // or `conflict_look` holds over them and over the policy.  Read from beside its checkpoint, also by a run without a
+    // lab, since the search it resumes was made so; nothing, for a game no lab touched.
+    let mut lab = match lab {
         Some(lab) => lab,
         None => GameLab::load(opts, n)?,
     };
+    lab.apply_policy(policies, n);
     let tactics = Tactics { search: lab.search_tactics(&opts.tactics.search), ..opts.tactics };
     if let Before::Given(prev) = before {
         // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.  Not for

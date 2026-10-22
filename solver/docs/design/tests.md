@@ -195,7 +195,11 @@ every second line of the Java fixtures), and the comment on each says what the w
   `conflict_branching` and `conflict_look` switched at every tick; a game held, checkpointed and restarted in the middle of its search; a
   redeploy at a commit off master) refuses every bad command with its reason, ends every game with the score of
   `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line, resumes it after the
-  redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.
+  redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.  The policy for the
+  games to come has three tests of its own: one gives policies to games in flight and games set up later (a `branching`
+  of a game's own holds over them, whichever comes first; a setting left out keeps the one before; the lines and
+  `run.lab` record them), one redeploys a run and starts it again, and one stops a search of game 1000 again and again
+  and resumes it under a policy that flips both settings each time.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the wall, the ledger and a lab's redeploy through `chain.sh`, `wall-node.sh` through each way a run
   ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What

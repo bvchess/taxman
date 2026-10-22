@@ -7,6 +7,10 @@
 //! its reason, every game ends with the score of `optimal.json`, and the file passes the verifier.  The game restarted
 //! records it, keeps its first checkpoint aside, and the hook hears of it twice, once when it runs long and once with
 //! its line.  Small games of the default search, two threads.
+//!
+//! The policy for the games to come (`policy`) has its tests below the hostile lab's: it reaches the games in flight
+//! and those set up later, yields to a game's own `branching`, survives a restart of the run, and reaches a search that
+//! resumes from a checkpoint made under other settings.
 
 mod common;
 
@@ -66,6 +70,19 @@ fn wait_for_line(out: &Path, n: u32) {
     }
 }
 
+/// Waits until game `n` is set up and its search not ended, which an `offer` of nothing tells (each probe is the command
+/// `tag-probe-K`).
+fn wait_until_set_up(lab: &Path, n: u32, tag: &str) {
+    let since = Instant::now();
+    for k in 0.. {
+        let probe = send(lab, &format!("{tag}-probe-{k:03}"), &format!(r#"{{"command":"offer","n":{n},"set":[]}}"#));
+        if said(&probe).0 == "applied" {
+            break;
+        }
+        assert!(since.elapsed() < PATIENCE, "game {n} is never set up: {probe}");
+    }
+}
+
 /// The lines of a results file.
 fn lines(path: &Path) -> Vec<Json> {
     fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
@@ -90,13 +107,7 @@ fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
     let _end = EndIfFailed(lab);
     // `G` waits, set up and held at no worker, until the lab lets it go.
     let since = Instant::now();
-    for k in 0.. {
-        let probe = send(lab, &format!("01-probe-{k:03}"), &format!(r#"{{"command":"offer","n":{G},"set":[]}}"#));
-        if said(&probe).0 == "applied" {
-            break;
-        }
-        assert!(since.elapsed() < PATIENCE, "game {G} is never set up: {probe}");
-    }
+    wait_until_set_up(lab, G, "01");
     wait_for_line(out, LO);
     let all: Vec<String> = (G / 2 + 1..=G).map(|x| x.to_string()).collect();
     let refused = [
@@ -283,4 +294,241 @@ fn a_hostile_lab_changes_no_result() {
     let best = result.get("promotions").and_then(Json::as_u32_vec).unwrap().iter().map(|&p| u64::from(p)).sum();
     assert_eq!(events[1].get("best").and_then(Json::as_u64), Some(best));
     assert_eq!(events[1].get("nodes"), result.get("nodes"));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The policy for the games to come
+
+/// The games of the policy tests, in the range `LO..=HI` as above: `P` searches, and `Q` ends at its ceiling when its
+/// search starts; the games between repeat the search of the game before them, and have no search of their own for a
+/// policy to steer (the line of a repeat has no `lab`).
+const P: u32 = 950;
+const Q: u32 = 952;
+
+/// The setting of the switch `key` in a `lab` record of a line, or in the policy in it: `"on"`, `"off"`, or null.
+fn setting<'a>(record: &'a Json, key: &str) -> Option<&'a str> {
+    record.get(key).and_then(Json::as_str)
+}
+
+/// The two switches of a `lab` record or a policy: `conflict_branching` and `conflict_look`.
+fn setting_pair(record: &Json) -> (Option<&str>, Option<&str>) {
+    (setting(record, "conflict_branching"), setting(record, "conflict_look"))
+}
+
+/// The two switches a line says its search ended with.
+fn ended_with(line: &Json) -> (Option<bool>, Option<bool>) {
+    let switches = line.get("tactic_switches").unwrap();
+    let switch = |key: &str| switches.get(key).and_then(Json::as_bool);
+    (switch("conflict_branching"), switch("conflict_look"))
+}
+
+/// The lab of the policy test: commands that are refused, a `branching` that comes before a policy and one that comes
+/// after, and the policies themselves, while `P` and `Q` are set up and held.
+fn give_policies(lab: &Path, out: &Path) {
+    let _end = EndIfFailed(lab);
+    wait_until_set_up(lab, P, "01");
+    wait_for_line(out, LO);
+    let refused = [
+        ("10-outside", r#"{"command":"policy","from":960,"conflict_look":"on"}"#, "not in the range"),
+        ("11-concluded", r#"{"command":"policy","from":948,"conflict_look":"on"}"#, "concluded"),
+        ("12-no-switch", r#"{"command":"policy","from":950}"#, "needs conflict_branching or conflict_look"),
+        ("13-bad-value", r#"{"command":"policy","from":950,"conflict_look":"maybe"}"#, "conflict_look is"),
+        ("14-no-from", r#"{"command":"policy","conflict_look":"on"}"#, "needs from"),
+        ("15-no-game", r#"{"command":"policy","n":950,"conflict_look":"on"}"#, "takes no field \"n\""),
+    ];
+    for (name, text, why) in refused {
+        let outcome = send(lab, name, text);
+        let (status, reason) = said(&outcome);
+        assert_eq!(status, "refused", "{name}: {outcome}");
+        assert!(reason.contains(why), "{name}: {reason}");
+    }
+    // A setting of the game's own comes first, and holds over the policy that follows it.
+    let own = send(lab, "20-own", &format!(r#"{{"command":"branching","n":{P},"conflict_branching":"on"}}"#));
+    assert_eq!(said(&own).0, "applied", "{own}");
+    let both = format!(r#"{{"command":"policy","from":{P},"conflict_branching":"off","conflict_look":"on"}}"#);
+    let outcome = send(lab, "21-policy", &both);
+    assert_eq!(said(&outcome).0, "applied", "{outcome}");
+    // It reaches the game that is set up, at once, and says so.
+    assert!(said(&outcome).1.contains("[950"), "{outcome}");
+    // A policy that leaves a setting out keeps what the one before it said; then a setting of the game's own, which
+    // comes after the policy and still holds over it.
+    wait_until_set_up(lab, Q, "22");
+    let look = send(lab, "23-policy-look", &format!(r#"{{"command":"policy","from":{Q},"conflict_look":"off"}}"#));
+    assert_eq!(said(&look).0, "applied", "{look}");
+    let own = send(lab, "24-own", &format!(r#"{{"command":"branching","n":{Q},"conflict_look":"on"}}"#));
+    assert_eq!(said(&own).0, "applied", "{own}");
+    for (name, n) in [("30-let-go-p", P), ("31-let-go-q", Q)] {
+        let outcome = send(lab, name, &format!(r#"{{"command":"threads","n":{n},"workers":null}}"#));
+        assert_eq!(said(&outcome).0, "applied", "{name}: {outcome}");
+    }
+}
+
+/// A policy given for the games to come reaches the games in flight at once and the games set up later when they are,
+/// holds under a `branching` of a game's own whichever comes first, leaves a setting out to keep the one before it, and
+/// is in the line of each game it reached.  `P` and `Q` are held at no worker, set up, until the lab has given its
+/// policies; `Q` may be set up before or after the first of them, which its line cannot tell.
+#[test]
+fn a_policy_reaches_the_games_in_flight_and_those_set_up_later() {
+    let dir = TempDir::new("lab-policy");
+    let (lab, out) = (dir.join("lab"), dir.join("r.jsonl"));
+    fs::create_dir_all(lab.join("in")).unwrap();
+    for (name, n) in [("00-hold-p", P), ("00-hold-q", Q)] {
+        fs::write(lab.join("in").join(name), format!(r#"{{"command":"threads","n":{n},"workers":0}}"#)).unwrap();
+    }
+    let opts = SolveOptions {
+        use_prev: true,
+        checkpoint_dir: Some(dir.join("ckpt")),
+        checkpoint_interval: Duration::from_secs(600),
+        progress: Some(Duration::from_millis(5)),
+        lab: LabOptions { dir: Some(lab.clone()), ..LabOptions::default() },
+        ..options(2)
+    };
+    std::thread::scope(|scope| {
+        let lab = scope.spawn(|| give_policies(&lab, &out));
+        solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
+        lab.join().unwrap();
+    });
+    let optimal = Optimal::built_in();
+    let lines = lines(&out);
+    for line in &lines {
+        let n = line.get("n").and_then(Json::as_u32).unwrap();
+        assert_eq!(line.get("score").and_then(Json::as_u64), optimal.score(n), "n={n}");
+    }
+    let line = |n: u32| &lines[(n - LO) as usize];
+    let record = |n: u32| line(n).get("lab").unwrap_or_else(|| panic!("n={n} has no lab"));
+    // No policy reaches the game before the first: it ran as the run's flags say, with nothing of a lab.
+    assert_eq!(line(LO).get("lab"), None);
+    assert_eq!(ended_with(line(LO)), (Some(true), Some(false)));
+    // `P`: the policy says branching off and the look on; its own setting of the branching holds over it.
+    let policy = record(P).get("policy").unwrap();
+    assert_eq!(policy.get("from").and_then(Json::as_u32), Some(P));
+    assert_eq!(setting_pair(policy), (Some("off"), Some("on")));
+    assert_eq!(setting_pair(record(P)), (Some("on"), None));
+    assert_eq!(ended_with(line(P)), (Some(true), Some(true)));
+    // `Q`: the second policy left the branching out, so it is off as the first said; the look is off by the second, and
+    // on by the game's own setting after it.
+    let policy = record(Q).get("policy").unwrap();
+    assert_eq!(policy.get("from").and_then(Json::as_u32), Some(Q));
+    assert_eq!(setting_pair(policy), (Some("off"), Some("off")));
+    assert_eq!(setting_pair(record(Q)), (None, Some("on")));
+    assert_eq!(ended_with(line(Q)), (Some(false), Some(true)));
+    // The policies, as the lab gave them, are in the file beside the checkpoints.
+    let file = Json::from_file(dir.join("ckpt/run.lab")).unwrap();
+    let entries = file.get("policies").and_then(Json::as_arr).unwrap();
+    assert_eq!(entries.len(), 2);
+    for (entry, (from, name, switches)) in
+        entries.iter().zip([(P, "21-policy", (Some("off"), Some("on"))), (Q, "23-policy-look", (None, Some("off")))])
+    {
+        assert_eq!(entry.get("from").and_then(Json::as_u32), Some(from));
+        assert_eq!(setting(entry, "file"), Some(name));
+        assert_eq!(setting_pair(entry), switches);
+        assert!(setting(entry, "at").is_some_and(|at| at.ends_with('Z')), "{entry}");
+    }
+    verify_files(&[PathBuf::from(&out)], optimal, 2).unwrap_or_else(|e| panic!("{e}"));
+}
+
+/// The policies outlive the run: a run that the lab ends to be redeployed, with its policies given and no game
+/// concluded, leaves them in `run.lab`, and the run that starts again sets the games up under them, with no lab
+/// folder to say so.
+#[test]
+fn a_policy_survives_a_restart_of_the_run() {
+    let dir = TempDir::new("lab-policy-restart");
+    let (lab, out) = (dir.join("lab"), dir.join("r.jsonl"));
+    fs::create_dir_all(lab.join("in")).unwrap();
+    // `LO` is held at no worker, so that no game after it is set up when the policies come.
+    let commands = [
+        ("00-hold", format!(r#"{{"command":"threads","n":{LO},"workers":0}}"#)),
+        ("01-policy", format!(r#"{{"command":"policy","from":{P},"conflict_branching":"off"}}"#)),
+        ("02-policy", format!(r#"{{"command":"policy","from":{P},"conflict_look":"on"}}"#)),
+        ("03-redeploy", r#"{"command":"redeploy","commit":"0123456789abcdef0123456789abcdef01234567"}"#.to_owned()),
+    ];
+    for (name, text) in &commands {
+        fs::write(lab.join("in").join(name), text).unwrap();
+    }
+    let opts = SolveOptions {
+        use_prev: true,
+        checkpoint_dir: Some(dir.join("ckpt")),
+        checkpoint_interval: Duration::from_secs(600),
+        progress: Some(Duration::from_millis(5)),
+        lab: LabOptions { dir: Some(lab.clone()), ..LabOptions::default() },
+        window: 1,
+        ..options(2)
+    };
+    let stopped = solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
+    assert!(stopped.redeploy.is_some());
+    for (name, _) in &commands {
+        let outcome = Json::from_file(lab.join("out").join(name)).unwrap();
+        assert_eq!(said(&outcome).0, "applied", "{name}: {outcome}");
+    }
+    let file = Json::from_file(dir.join("ckpt/run.lab")).unwrap();
+    assert_eq!(file.get("policies").and_then(Json::as_arr).map(<[_]>::len), Some(2));
+
+    // The run starts again, without a lab: the games set up now are set up under the policies.
+    let again = SolveOptions { lab: LabOptions::default(), ..opts };
+    let summary = solver::solve_range_each(LO, HI, &again, Some(&out), |_| {}).unwrap();
+    assert_eq!(summary.redeploy, None);
+    let optimal = Optimal::built_in();
+    let lines = lines(&out);
+    let ns: Vec<u32> = lines.iter().filter_map(|line| line.get("n").and_then(Json::as_u32)).collect();
+    assert_eq!(ns, (LO..=HI).collect::<Vec<_>>());
+    for line in &lines {
+        let n = line.get("n").and_then(Json::as_u32).unwrap();
+        assert_eq!(line.get("score").and_then(Json::as_u64), optimal.score(n), "n={n}");
+        if n < P {
+            assert_eq!((line.get("lab"), ended_with(line)), (None, (Some(true), Some(false))), "n={n}");
+        } else if n == P || n == Q {
+            let policy = line.get("lab").and_then(|lab| lab.get("policy")).unwrap();
+            assert_eq!(policy.get("from").and_then(Json::as_u32), Some(P), "n={n}");
+            assert_eq!(setting_pair(policy), (Some("off"), Some("on")), "n={n}");
+            assert_eq!(ended_with(line), (Some(false), Some(true)), "n={n}");
+        }
+    }
+    verify_files(&[PathBuf::from(&out)], optimal, 2).unwrap_or_else(|e| panic!("{e}"));
+}
+
+/// A checkpoint resumes under either setting of `conflict_branching` and of `conflict_look` (bits 9 and 10 of its
+/// tactics bind nothing), so a policy given between the pieces of a search reaches the piece that resumes it.  Game 1000,
+/// whose default search takes more than the 1,024 steps after which a node limit stops it, is stopped again and again
+/// and resumed: the first piece under the run's flags, each piece after it under a policy that differs from the one
+/// before it in both settings.  It finishes with its score in `optimal.json`.
+#[test]
+fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
+    let optimal = Optimal::built_in();
+    let dir = TempDir::new("lab-policy-resume");
+    let ckpt = dir.join("ckpt");
+    let opts =
+        SolveOptions { checkpoint_dir: Some(ckpt.clone()), node_limit: Some(1), force_search: true, ..options(1) };
+    // The first piece is the run's flags, the settings the checkpoint is made under.
+    let settings = [("on", "off"), ("off", "on"), ("on", "on"), ("off", "off")];
+    let mut pieces = 0;
+    let result = loop {
+        let (branching, look) = settings[pieces % settings.len()];
+        if pieces > 0 {
+            // The file as the command writes it.
+            let entry = format!(
+                r#"{{"from":1000,"at":"2026-10-22T00:00:00Z","file":"by-hand","conflict_branching":"{branching}","#
+            ) + &format!(r#""conflict_look":"{look}"}}"#);
+            fs::create_dir_all(&ckpt).unwrap();
+            fs::write(ckpt.join("run.lab"), format!(r#"{{"policies":[{entry}]}}"#)).unwrap();
+        }
+        let r = solver::solve_game_with(1000, None, &opts, optimal).unwrap_or_else(|e| panic!("piece {pieces}: {e}"));
+        let ran = &r.tactics.search;
+        assert_eq!((ran.conflict_branching, ran.conflict_look), (branching == "on", look == "on"), "piece {pieces}");
+        let policy = r.lab.as_ref().and_then(|lab| lab.get("policy")).filter(|policy| **policy != Json::Null);
+        if pieces == 0 {
+            assert_eq!(policy, None);
+        } else {
+            let policy = policy.unwrap_or_else(|| panic!("piece {pieces} has no policy in its line: {:?}", r.lab));
+            assert_eq!(policy.get("from").and_then(Json::as_u32), Some(1000), "piece {pieces}");
+            assert_eq!(setting_pair(policy), (Some(branching), Some(look)), "piece {pieces}");
+        }
+        pieces += 1;
+        if r.completed {
+            break r;
+        }
+        assert!(ckpt.join("n1000.ckpt").exists(), "an unfinished game keeps its checkpoint");
+        assert!(pieces < 50, "no progress");
+    };
+    assert!(pieces >= 2, "the policy never reached a resumed search");
+    assert_eq!((result.score, result.optimal_match), (optimal.score(1000).unwrap(), Some(true)));
 }

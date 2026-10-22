@@ -152,11 +152,13 @@
 //! when the head's own search, the clock of the wall, passes `--hook-after` ([`tell_long`](Window::tell_long)) and when
 //! such a game has its line, and at each progress tick takes the lab's commands from its folder and applies or refuses
 //! each ([`lab_tick`](Window::lab_tick)).  A command changes only how and when the games are searched: the threads (a
-//! budget, and games whose workers the lab set, which the policy leaves alone), the branching settings of a search, an
-//! incumbent offered through `search::offer_found`, a search started again from nothing (its checkpoint renamed aside)
-//! and the build, by ending the range as a stop signal does ([`RangeSummary::redeploy`]).  A restart of a running search
-//! stops it first, and the game goes back to its setup once it has stopped, unless it completed.  Without a lab, none of
-//! this runs: no clock is kept but the wall's, and the policy has every thread.
+//! budget, and games whose workers the lab set, which the policy leaves alone), the branching settings of a search and,
+//! by a policy, of the games to come ([`lab_policy`](Window::lab_policy)), an incumbent offered through
+//! `search::offer_found`, a search started again from nothing (its checkpoint renamed aside) and the build, by ending
+//! the range as a stop signal does ([`RangeSummary::redeploy`]).  A restart of a running search stops it first, and the
+//! game goes back to its setup once it has stopped, unless it completed.  Without a lab, none of this runs: no clock is
+//! kept but the wall's, and the policy has every thread; only the games' records and the policies for the games to come,
+//! kept beside the checkpoints, are read whether or not the run has a lab.
 //!
 //! # Tracing
 //!
@@ -172,7 +174,10 @@
 
 mod allot;
 
-use super::lab::{self, Command, Event as Told, Folder, GameLab, Progress, Restarted, Status as Answer, LAB_TICK};
+use super::lab::{
+    self, Command, Event as Told, Folder, GameLab, Policies, PolicyEntry, Progress, Restarted, Status as Answer,
+    LAB_TICK,
+};
 use super::{
     ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev,
     stored_unfinished, Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev,
@@ -217,10 +222,11 @@ pub(super) fn solve(
     on_game: &mut dyn FnMut(&GameResult),
 ) -> Result<RangeSummary, String> {
     let folder = opts.lab.dir.as_deref().map(Folder::open).transpose()?;
+    let policies = Policies::load(opts)?;
     let summary = thread::scope(|scope| {
         let (events, received) = mpsc::channel();
         // Dropped when the closure returns or unwinds, before the threads are joined: that ends the range (`Drop`).
-        let mut window = Window::new(range, opts, earlier, events, folder);
+        let mut window = Window::new(range, opts, earlier, events, folder, policies);
         window.run(scope, &received, on_game).map(|()| window.summary.clone())
     });
     // Only removes the directory if the engines left nothing in it; not before, since the games' engines may spill
@@ -243,18 +249,20 @@ enum Event {
 
 /// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is cancelled
 /// first (the driver drops the sender of the go).
+#[allow(clippy::too_many_arguments)]
 fn play(
     n: u32,
     before: &Before,
     opts: &SolveOptions,
     known: &KnownGames,
     lab: Option<GameLab>,
+    policies: &Policies,
     events: &Sender<Event>,
     go: &Receiver<Go>,
 ) {
     let _unwinding = Unwinding { n, events };
     let start = Instant::now();
-    let set_up = set_up(n, before, opts, known, lab).map_err(Failure::message);
+    let set_up = set_up(n, before, opts, known, lab, policies).map_err(Failure::message);
     let job = match &set_up {
         Ok(SetUp::Search(set, _)) => Some(Arc::clone(&set.job)),
         _ => None,
@@ -542,6 +550,8 @@ struct Window<'a> {
     pins: BTreeMap<u32, usize>,
     /// The finders the lab has started, for their random choices.
     finders: u64,
+    /// The policies the lab gave for the games to come (`policy`), which the file `run.lab` keeps.
+    policies: Policies,
 }
 
 impl<'a> Window<'a> {
@@ -551,6 +561,7 @@ impl<'a> Window<'a> {
         earlier: &'a mut Earlier,
         events: Sender<Event>,
         folder: Option<Folder>,
+        policies: Policies,
     ) -> Self {
         // With one thread there is none to run a second game on, and a range that keeps going past limits solves its
         // games one after another: a game cannot go on from a game in flight until it knows whether that game is
@@ -584,6 +595,7 @@ impl<'a> Window<'a> {
             lab_at: Instant::now(),
             pins: BTreeMap::new(),
             finders: 0,
+            policies,
         }
     }
 
@@ -1146,12 +1158,14 @@ impl<'a> Window<'a> {
         let (go, waits) = mpsc::channel();
         let (before, opts, known, events) = (game.before.clone(), self.opts, self.known, self.events.clone());
         let lab = game.relab.take();
+        // The policies as they are now: one given after this reaches the game when its setup is done (`sync_policy`).
+        let policies = self.policies.clone();
         // The setup and the search's start ran on the main thread when games were solved one at a time; the stack is
         // reserved address space, committed only as touched.
         let spawned = thread::Builder::new()
             .name(format!("game-{n}"))
             .stack_size(WORKER_STACK_SIZE)
-            .spawn_scoped(scope, move || play(n, &before, opts, known, lab, &events, &waits));
+            .spawn_scoped(scope, move || play(n, &before, opts, known, lab, &policies, &events, &waits));
         match spawned {
             Ok(_) => {
                 game.stage = Stage::SettingUp;
@@ -1243,6 +1257,8 @@ impl<'a> Window<'a> {
                     Stage::Derived(_) => "derived",
                     _ => "failed",
                 };
+                // A policy given while the game was set up reaches it now.
+                self.sync_policy(n);
                 self.trace(format_args!("setup-done n={n} took={took:?} kind={kind}"));
             }
             Event::Searched { n, outcome, took } => {
@@ -1427,6 +1443,9 @@ impl<'a> Window<'a> {
             Command::Branching { n, conflict_branching, conflict_look } => {
                 self.lab_branching(n, conflict_branching, conflict_look)
             }
+            Command::Policy { from, conflict_branching, conflict_look } => {
+                self.lab_policy(from, conflict_branching, conflict_look, name)
+            }
             Command::Restart { n, tactics } => return self.lab_restart(n, &tactics, name, json),
             Command::Threads { total } => self.lab_threads(total),
             Command::Workers { n, workers } => self.lab_workers(n, workers),
@@ -1518,13 +1537,6 @@ impl<'a> Window<'a> {
         set.lab.branching_changes += 1;
         set.lab.keep(opts, n);
         let tactics = set.job.tactics();
-        let setting = |on: bool| if on { "on" } else { "off" };
-        let given = |name: &str, on: Option<bool>| on.map(|on| format!("{name} {}", setting(on)));
-        let changed: Vec<String> =
-            [given("conflict_branching", conflict_branching), given("conflict_look", conflict_look)]
-                .into_iter()
-                .flatten()
-                .collect();
         let unused = if !tactics.gf2 {
             " (it acts only with gf2, which this search has off)"
         } else if tactics.conflict_look && !tactics.conflict_branching {
@@ -1532,7 +1544,59 @@ impl<'a> Window<'a> {
         } else {
             ""
         };
-        Ok(format!("game {n}'s searchers branch with {} from the next unit each starts{unused}", changed.join(" and ")))
+        let changed = switches_given(conflict_branching, conflict_look);
+        Ok(format!("game {n}'s searchers branch with {changed} from the next unit each starts{unused}"))
+    }
+
+    /// `policy`: every game from `from` on branches with `conflict_branching` and `conflict_look`, those given, on or
+    /// off, over what the policies given before say.  It is kept in `run.lab`, for the games set up from now on (and by
+    /// a run that starts again), and reaches the games in flight at once, as `branching` does ([`sync_policy`]).
+    ///
+    /// [`sync_policy`]: Window::sync_policy
+    fn lab_policy(
+        &mut self,
+        from: u32,
+        conflict_branching: Option<bool>,
+        conflict_look: Option<bool>,
+        name: &str,
+    ) -> Result<String, String> {
+        self.in_range(from)?;
+        self.policies.give(PolicyEntry {
+            from,
+            at: lab::utc(SystemTime::now()),
+            file: name.to_owned(),
+            conflict_branching,
+            conflict_look,
+        });
+        self.policies.keep(self.opts);
+        let flight: Vec<u32> = self.games.range(from..).map(|(&n, _)| n).collect();
+        let reached: Vec<u32> = flight.into_iter().filter(|&n| self.sync_policy(n)).collect();
+        let changed = switches_given(conflict_branching, conflict_look);
+        Ok(format!(
+            "from game {from} on, branch with {changed}, over the policies given before; it reaches the searches of \
+             {reached:?} at once, and any other game when it is set up"
+        ))
+    }
+
+    /// Makes game `n`'s searchers branch as the run's flags, the policy for `n` and the game's own record say, from the
+    /// next unit each starts; whether the game has a search to steer.  A policy given since the game's setup read the
+    /// policies reaches it so; so does one given to a game in flight, as a `branching` command would.  The game's own
+    /// settings (`branching`) and the tactics of a restart hold over the policy, here as in its setup.
+    fn sync_policy(&mut self, n: u32) -> bool {
+        let Some(Game { stage: Stage::Search(set, plan), .. }) = self.games.get_mut(&n) else { return false };
+        if matches!(plan, Plan::Repeat(_) | Plan::Search(Search::Done(_))) {
+            return false;
+        }
+        set.lab.apply_policy(&self.policies, n);
+        let wanted = set.lab.search_tactics(&self.opts.tactics.search);
+        let live = set.job.branching();
+        if live.settings().conflict_branching_on() != wanted.conflict_branching {
+            live.set_conflict_branching(wanted.conflict_branching);
+        }
+        if live.settings().conflict_look != wanted.conflict_look {
+            live.set_conflict_look(wanted.conflict_look);
+        }
+        true
     }
 
     /// `restart`: game `n`'s search is abandoned and started again from nothing, with the run's search tactics changed
@@ -1708,6 +1772,17 @@ impl<'a> Window<'a> {
         self.summary.redeploy = Some(commit);
         Ok(said)
     }
+}
+
+/// The switches a `branching` or `policy` command gave, for its outcome: `conflict_branching on and conflict_look off`.
+fn switches_given(conflict_branching: Option<bool>, conflict_look: Option<bool>) -> String {
+    let setting = |on: bool| if on { "on" } else { "off" };
+    let given = |name: &str, on: Option<bool>| on.map(|on| format!("{name} {}", setting(on)));
+    let given: Vec<String> = [given("conflict_branching", conflict_branching), given("conflict_look", conflict_look)]
+        .into_iter()
+        .flatten()
+        .collect();
+    given.join(" and ")
 }
 
 /// Ends the range, however it ends (with a panic of the driver unwinding too): stops every search in flight and

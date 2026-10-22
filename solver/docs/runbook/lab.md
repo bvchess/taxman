@@ -57,6 +57,10 @@ whether to steer the search through the command folder (`--lab-dir`, `~/taxman-l
 every command.  Then it studies what it judges most likely to make the searches faster, from the standing requests to
 ideas of its own, and writes a report, with its recommendations ranked, and an entry in a journal.
 
+To set the branching of the games to come as well as of the game in flight, send `{"command": "policy", "from": N,
+"conflict_branching": "on", "conflict_look": "on"}` in the same way, with either setting or both ([the lab
+channel](../design/lab.md#a-policy-for-the-games-to-come) has the rest).
+
 A study can steer a search only while the search runs, so start it early: `--hook-after 600` in `EXTRA_ARGS` starts one
 ten minutes into a game's search, after the chain has written a checkpoint for it to copy.  The default, an hour, suits
 a chain whose games take many hours.

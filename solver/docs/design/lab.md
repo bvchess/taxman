@@ -44,7 +44,8 @@ search's own conflict and the one `conflict_branching` chose, and leaves the nod
 two on or off, and a searcher reads the switches when it starts a unit.  A unit is a node with the candidates it has
 left, whose subtree its searcher explores to the end, so a search whose units branched differently is exhaustive unit by
 unit.  The nogoods learned on the way are conflicts whichever conflict a node chose, and they hold at every node
-([search.md, "The default step"](search.md#the-default-step), fact 4).
+([search.md, "The default step"](search.md#the-default-step), fact 4).  A policy for the games to come only moves this
+choice from one game to the games after it ([a policy](#a-policy-for-the-games-to-come)).
 
 **(c) The incumbent.**  An offer becomes the incumbent only through `search::offer_found`: the set must be a set of
 candidates that can be promoted from the root, worth what the offer claims, the same check as a checkpoint's incumbent
@@ -67,7 +68,8 @@ builds never run in the chain, and the build resumes a checkpoint only if it set
 **The solver is the only writer of results.**  The lab writes only to the folder's `in/`.  The driver concludes every
 game as it does without a lab: the referee replays it, `conclude` checks its arithmetic, its ceilings and
 `optimal.json`, and only then is its line appended.  What the lab did to a game is kept in `nNNNN.lab` beside its
-checkpoint, and sets nothing but the game's search tactics, any of which is sound, and the record its line carries.
+checkpoint, and what it gave for the games to come in `run.lab` beside them.  Both set nothing but the game's search
+tactics, any of which is sound, and the record its line carries.
 
 ## Which tactics may change while a search runs
 
@@ -83,8 +85,8 @@ A checkpoint records `conflict_branching` and `conflict_look` (bits 9 and 10 of 
 resumes with each tactic on or off.  The searchers read them through `search::Branching`: a generation number, loaded
 when a searcher starts a unit, and the settings, read again only when the generation has changed.  A step reads the
 searcher's own copy.  So a checkpoint of a search begun with conflict branching off, game 4875's among them, resumes
-with it on.  A result line records the settings the search ended with in `tactic_switches`, and the lab's changes in
-`lab`.
+with it on, and so does one that a policy given since reaches.  A result line records the settings the search ended with
+in `tactic_switches`, and the lab's changes in `lab`.
 
 The others stay fixed for the life of a search, each for its reason:
 
@@ -145,14 +147,15 @@ when the run prints no progress lines) the driver takes the files of `in/`, in t
 
 A file whose name starts with a dot is left alone, so a lab writes a command under such a name and renames it into
 `in/`.  The work is the driver's, on its own thread: no worker reads the folder, and with an empty folder a tick costs
-one read of a directory.  A command names a game by `n`, which must be in flight unless it says otherwise; a field the
-command does not take is refused, so a misspelt one is not ignored.
+one read of a directory.  A command names a game by `n`, which must be in flight unless it says otherwise (`policy`
+names its first game by `from`); a field the command does not take is refused, so a misspelt one is not ignored.
 
 | command | fields | what it does |
 |---|---|---|
 | `checkpoint` | | every running search writes its checkpoint at once (a pause, as at the interval) |
 | `offer` | `n`, `set`, `value` | offers the promotions `set`, claimed to be worth `value` (their sum when left out), through `offer_found`; applied whether or not the set beats the incumbent, and the reason says which |
 | `branching` | `n`, `conflict_branching`, `conflict_look` | `"on"` or `"off"` for either or both (at least one), for the units game n's searchers start from then on; kept in the game's record, so it holds over invocations; a field left out keeps its setting; `conflict_look` acts only where `conflict_branching` is on |
+| `policy` | `from`, `conflict_branching`, `conflict_look` | `"on"` or `"off"` for either or both (at least one), for every game from `from` on, a game of the range not yet concluded: the games set up later when they are, and the games in flight at once; a field left out keeps the value the policies before it gave; kept in `run.lab`, so it holds over invocations ([a policy](#a-policy-for-the-games-to-come)) |
 | `restart` | `n`, `tactics` | abandons game n's search and starts it fresh with the run's search tactics changed by `tactics`, `name=value` separated by commas; a running search is stopped first, with a final checkpoint, and the outcome is written once it has stopped |
 | `threads` | `total` | the run's budget of threads; a search above its share gives workers back, the youngest first |
 | `threads` | `n`, `workers` | game n's search keeps `workers` workers, outside the policy that shares the rest, until it is concluded or `workers` is `null`; 0 suspends it, or keeps it from starting; n may be any game of the range not yet concluded |
@@ -179,7 +182,39 @@ command; when its game is not in the range, is concluded, is not in flight, or h
 prime or trivial game, one still being set up); when an offer fails `offer_found` (a number off the board or twice, a
 set that cannot be promoted, a claimed value that is not its sum); when a restart names a tactic that is not a search
 tactic, or a value a tactic does not take; when the threads that games are given exceed the run's; and, for
-`checkpoint` and `redeploy`, when the run keeps no checkpoints.
+`checkpoint` and `redeploy`, when the run keeps no checkpoints.  A policy needs no game in flight: it is refused when
+its `from` is not in the range or is concluded, and when it gives no setting or a value other than `"on"` and `"off"`.
+
+## A policy for the games to come
+
+`policy` sets `conflict_branching` and `conflict_look` for every game from a given game on, so that a setting chosen on
+one game reaches the next without a command each game.
+
+* **The command** is `{"command": "policy", "from": 4905, "conflict_branching": "on", "conflict_look": "on"}`.  `from`
+  is the first game it applies to, any game of the range not yet concluded.  It takes at least one of the two settings,
+  and a setting it leaves out keeps the value the policies before it gave.
+* **Where it lives.**  The run keeps the policies in the file `run.lab` in the checkpoint directory, beside the games'
+  records.  The file is a JSON object whose list `policies` has an entry for each command, in the order given: its
+  `from`, the time `at` it was given, the `file` of `in/` that held it, and its two settings (`"on"`, `"off"`, or null
+  where it left one out).  The file is written whole, as a game's record is, and outlives the process.  A run that
+  starts again reads it, with or without a lab folder, and deleting it returns the run to its flags.  A run without a
+  checkpoint directory keeps its policies for its own life.
+* **The policy for a game** is made of the policies whose `from` is at most its number, in the order given, each
+  setting over the one before.
+* **The order of precedence.**  A game is searched with the run's tactics, changed by the policy for the game, changed
+  by the game's own record.  So a `branching` for a game holds over any policy, whichever was given first.  A `restart`
+  names its tactics outright, so no policy reaches a game that was restarted.
+* **How a game picks it up.**  The setup of a game reads the policy for it, and a game resumed from a checkpoint is set
+  up the same way (the checkpoint resumes under either setting of both tactics, as above).  A game in flight when the
+  policy is given takes it at once, by the means `branching` uses: the settings its searchers read when they start a
+  unit.  A game that is being set up when the policy is given takes it when its setup is done.
+* **The record.**  The line of a game that a policy reached has `lab.policy`: the `from` of the last policy that
+  reaches it, and the settings of the policy for it (null where none gave one).  `tactic_switches` has the settings the
+  search ended with, which differ from the policy's where the game's own record held over it.
+
+**Why it is exact.**  A policy sets what `branching` sets, the choice between true conflicts that (b) shows exact at any
+unit, and a searcher reads it only when it starts a unit.  It only moves that choice from one game to the games after
+it: the search of every game is exhaustive whichever way its units branched.
 
 ## Room for advice
 
