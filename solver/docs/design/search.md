@@ -197,7 +197,8 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
      the nogood table knows a conflict of I* all of whose members are in F or promoted
                                                    -> end the loop (cut)
      I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop
-     otherwise: a conflict K ⊆ I* (the nogood table's smallest, else computed and learned)
+     otherwise: a conflict K ⊆ I* (the nogood table's smallest, else computed and learned); where value − need is
+         at least 300, the one conflict branching chooses instead ("Conflict branching", below)
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
 4. if F is empty: the bound without each member of K, read off the exchange graph of I* or solved (exact strong
    branching); a member without which it is below need joins F; n = the member without which it is lowest
@@ -215,11 +216,12 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 ```
 
 The *matching path* (`SearchTactics::matching`, which is `--tactic gf2=off --tactic lagrange=on --tactic
-symmetry=off`) takes the matching bound in place of the GF(2) bound, and the rule of symmetric pairs only if asked.  Its
-step 2 looks at the heaviest matching `Q*` instead: its forced members from the potentials, then, where none is forced,
-refinement of its conflict `match_refine` levels deep (a cut if every branch is below `need`), then the Lagrangian bound
-over the nogoods (a cut, or more forced members).  Its step 4 chooses the member whose removal lowers the matching bound
-most, and its step 8 checks the child's matching bound, refinement and Lagrangian bound.
+symmetry=off --tactic conflict_branching=off`) takes the matching bound in place of the GF(2) bound, and the rule of
+symmetric pairs only if asked.  Its step 2 looks at the heaviest matching `Q*` instead: its forced members from the
+potentials, then, where none is forced, refinement of its conflict `match_refine` levels deep (a cut if every branch is
+below `need`), then the Lagrangian bound over the nogoods (a cut, or more forced members).  Its step 4 chooses the member
+whose removal lowers the matching bound most, and its step 8 checks the child's matching bound, refinement and
+Lagrangian bound.
 
 *Why the step is exact.*  Exactness rests on five facts:
 
@@ -240,12 +242,12 @@ facts ([testing.md](testing.md)).
 
 ## Conflict branching
 
-With the tactic `conflict_branching`, a node chooses the conflict it branches on for what its children leave of the
-gap; strong branching then chooses the member.  Each child of a conflict leaves out one member, and its gap is the
-node's less what leaving that member out costs the bound, the member's *price*.  The smallest conflict the search knows
-often has a member whose price is a few points, and the child that leaves it out keeps nearly the whole gap, so the
-subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is often a set
-of forced members, which closes the node at step 3.
+With the tactic `conflict_branching`, on by default, a node chooses the conflict it branches on for what its children
+leave of the gap; strong branching then chooses the member.  Each child of a conflict leaves out one member, and its
+gap is the node's less what leaving that member out costs the bound, the member's *price*.  The smallest conflict the
+search knows often has a member whose price is a few points, and the child that leaves it out keeps nearly the whole
+gap, so the subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is
+often a set of forced members, which closes the node at step 3.
 
 *The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300), the check
 weighs:

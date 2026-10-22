@@ -17,7 +17,7 @@ of the repository.
 |---|---|
 | `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
 | `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 4; 1 is one game after another, and it is always 1 with one thread) |
-| `--tactic NAME=VALUE` | set a tactic; repeatable ([design/tactics.md](design/tactics.md) lists them); `--tactic conflict_branching=on` chooses the conflict a node branches on where the gap is large ([design, "Conflict branching"](design/search.md#conflict-branching)), off by default |
+| `--tactic NAME=VALUE` | set a tactic; repeatable ([design/tactics.md](design/tactics.md) lists them); the tactic `conflict_branching`, on by default, chooses the conflict a node branches on where the gap is large ([design, "Conflict branching"](design/search.md#conflict-branching)); `--tactic conflict_branching=off` branches on the smallest conflict the search knows, as the builds before it did |
 | `--out FILE` | append result lines; skip the games the file completed; the game before the first comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
 | `--progress S` | seconds between progress lines on stderr (default 60; 0: none) |
@@ -170,7 +170,7 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
                     "forget_nogoods":true,"nogood_period":50000,"nogood_keep":"none","nogood_limit":0,
                     "lagrange":false,"gf2":true,"symmetry":true,"force_window":"all","branching":"exact",
                     "strong_limit":"all","strong_depth":"all","deep_branching":"split","more_forced":true,
-                    "conflict_branching":false,"prev_cap":true,"seed_incumbent":true},
+                    "conflict_branching":true,"prev_cap":true,"seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"e8c39cfac7e6...","dirty":false}}

@@ -154,7 +154,8 @@ impl FrameGraph {
     /// The conflicts of `set` in `state` that the tactic `conflict_branching` weighs: for each frame that `set` leaves
     /// unwinnable, the minimal conflict that [`conflict_using`](Self::conflict_using) makes, but trying to leave out
     /// the members in the order `order` (which must list every member of `set`) instead of from the smallest up.  A
-    /// member tried early tends to go, so an order from the cheapest member keeps the members that cost most to leave out.
+    /// member tried early tends to go, so an order from the cheapest member keeps the members that cost most to leave
+    /// out.
     ///
     /// Each is a conflict, so no completion holds all of it.  With its members alone applied, its frame keeps a stuck
     /// set of moves (each live factor listed by two of them or more), so the frame is not winnable

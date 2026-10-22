@@ -312,8 +312,8 @@ pub struct Config {
     pub gf2_branching: Gf2Branching,
     /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
-    /// Conflict branching from this gap on (tactic `conflict_branching`, whose gap is [`CONFLICT_BRANCHING_GAP`]; `Some(0)` chooses at
-    /// every check, which small games need to exercise it).
+    /// Conflict branching from this gap on (tactic `conflict_branching`, whose gap is [`CONFLICT_BRANCHING_GAP`];
+    /// `Some(0)` chooses at every check, which small games need to exercise it).
     pub conflict_branching: Option<u64>,
     /// The GF(2) graph padded to that many block words ([`Gf2Graph::padded`]), to run the engines of more words than
     /// the board needs; `None` for the words it needs.

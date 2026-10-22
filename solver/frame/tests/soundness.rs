@@ -35,18 +35,19 @@ use taxman::search::TaxUnit;
 use taxman::search::{search, Gf2Branching, SearchTactics};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
-/// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to
-/// 18), then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32),
-/// and the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what
-/// the searchers keep, however often they forget and however small the limit, changes no answer), then conflict
-/// branching (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42).  The matching path with the
-/// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
-/// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
-/// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
-/// bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches never
-/// take, so some configurations refit them after the first few steps and every few steps after that (with and
-/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2) bound
-/// without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
+/// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to 18),
+/// then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32), and
+/// the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what the
+/// searchers keep, however often they forget and however small the limit, changes no answer), then conflict branching
+/// (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42), and the
+/// search's own conflict everywhere (43; the default chooses from a gap of 300).  The matching path with the forgetting
+/// of nogoods at the production period, every step, every third, and never; on one thread and two; and the GF(2) bound
+/// with each way of choosing the branch, with and without the matching bound as a first check, forced members, nogoods
+/// and the Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after
+/// 2,000 steps, which most of these searches never take, so some configurations refit them after the first few steps
+/// and every few steps after that (with and without forgetting at the same time, refinement, and a second thread), and
+/// one turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with the nogoods forgotten at
+/// every step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -93,6 +94,7 @@ fn configs() -> Vec<Config> {
         Config { period: None, limit: Some(1), ..base },
         Config { conflict_branching: Some(0), ..g },
         Config { conflict_branching: Some(0), threads: 2, period: Some(3), ..g },
+        Config { conflict_branching: None, ..g },
     ]
 }
 

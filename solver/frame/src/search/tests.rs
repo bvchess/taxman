@@ -1029,8 +1029,8 @@ fn units_and_headers_round_trip() {
     assert_eq!(policy.encode(), header.encode());
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0x1B9, `symmetry` is bit 8, `conflict_branching` bit 9), and no higher bit is
-    // used.
+    // each switch that is on (the defaults: 0x3B9, `symmetry` is bit 8, `conflict_branching` bit 9), and no higher bit
+    // is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -1041,26 +1041,26 @@ fn units_and_headers_round_trip() {
                 lagrange: off,
                 gf2: on,
                 symmetry: off,
+                conflict_branching: off,
                 ..SearchTactics::legacy_tuning()
             };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             let t = SearchTactics { symmetry: on, ..t };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 8, u16::from(on));
+            assert_eq!(t.bits() >> 8 & 1, u16::from(on));
             let t = SearchTactics { conflict_branching: on, ..t };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             assert_eq!(t.bits() >> 9, u16::from(on));
         }
     }
-    assert_eq!(SearchTactics::default().bits(), 0x1B9);
-    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(SearchTactics::legacy_tuning()));
-    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..SearchTactics::legacy_tuning() }));
-    // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off; with it on, a
-    // header differs from the default's in the tactics, so neither resumes the other's search.
-    let branching = SearchTactics { conflict_branching: true, ..SearchTactics::legacy_tuning() };
-    assert_eq!(branching.bits(), 0x3B9);
-    assert_eq!(SearchTactics::from_bits(0x3B9), Ok(branching));
-    assert!(!branching.same_recorded(&SearchTactics::legacy_tuning()));
+    assert_eq!(SearchTactics::default().bits(), 0x3B9);
+    assert_eq!(SearchTactics::from_bits(0x3B9), Ok(SearchTactics::legacy_tuning()));
+    // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off, and the
+    // default's header differs from it in the tactics, so neither resumes the other's search.
+    let before = SearchTactics { conflict_branching: false, ..SearchTactics::legacy_tuning() };
+    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(before));
+    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..before }));
+    assert!(!before.same_recorded(&SearchTactics::legacy_tuning()));
     assert!(SearchTactics::from_bits(1 << 10).unwrap_err().contains("unknown tactics"));
 }
 

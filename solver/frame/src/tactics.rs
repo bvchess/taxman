@@ -293,7 +293,7 @@ mod tests {
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected = [
             "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "all", "exact", "all", "all",
-            "split", "on", "off", "on", "on",
+            "split", "on", "on", "on", "on",
         ];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
@@ -455,7 +455,7 @@ mod tests {
                 strong_depth: 0,
                 deep_branching: Gf2Branching::Largest,
                 more_forced: false,
-                conflict_branching: true,
+                conflict_branching: false,
             },
             prime_shortcut: false,
             same_search: false,

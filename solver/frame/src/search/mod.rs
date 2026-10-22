@@ -134,9 +134,10 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 /// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 
-/// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/`CONFLICT_BRANCHING_SLOPE`), a member's
-/// price being what leaving it out costs the GF(2) bound: the subtrees of its children against the node's, if a
-/// subtree grows tenfold for every `CONFLICT_BRANCHING_SLOPE` points of its gap, as the subtrees of 4875 did (the same entry).
+/// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/slope), with this
+/// slope, a member's price being what leaving it out costs the GF(2) bound: the subtrees of its children against the
+/// node's, if a subtree grows tenfold for every this many points of its gap, as the subtrees of 4875 did (the same
+/// entry).
 pub const CONFLICT_BRANCHING_SLOPE: f64 = 291.0;
 
 /// The outcome of [`search`].

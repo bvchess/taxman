@@ -127,9 +127,9 @@ pub struct SearchSpace<'a, const W: usize> {
     pub gf2_deep_branching: Gf2Branching,
     /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
-    /// With `gf2`: at a check whose gap is at least this, branch on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
-    /// `conflict_branching`, which sets it to [`CONFLICT_BRANCHING_GAP`]; see [`conflict_to_branch_on`]); `None`: the search's own conflict
-    /// everywhere.
+    /// With `gf2`: at a check whose gap is at least this, branch on the conflict of the heaviest set whose members cost
+    /// the bound most to leave out (tactic `conflict_branching`, which sets it to [`CONFLICT_BRANCHING_GAP`]; see
+    /// [`conflict_to_branch_on`]); `None`: the search's own conflict everywhere.
     pub conflict_branching: Option<u64>,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
@@ -1015,8 +1015,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         };
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
-        // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's gaps
-        // fall most.  Any conflict keeps the search exact.
+        // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
+        // gaps fall most.  Any conflict keeps the search exact.
         let found = match (space.conflict_branching, found) {
             (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
                 g,
@@ -1341,15 +1341,16 @@ impl<'a, const W: usize> Stepper<'a, W> {
     }
 }
 
-/// The conflict a node branches on with the tactic `conflict_branching`: of `k0` (the one the search found), the conflicts
-/// the nogood table knows within the heaviest set `eval.chosen`, and each failing frame's minimal conflict made by
-/// leaving out its cheapest members first ([`FrameGraph::conflicts_ordered`]), the one of least weight.  A member
-/// weighs 10^(−price/[`CONFLICT_BRANCHING_SLOPE`]), its price being what leaving it out costs the bound: exact (read off the exchange
-/// graph, as strong branching reads it) for the members that some failing frame's conflict can hold and those of `k0`,
-/// the weight split's estimate for the others.  The children of a conflict each leave out one member, with the node's
-/// gap less that member's price, so the weight is their subtrees against the node's if a subtree grows tenfold every
-/// [`CONFLICT_BRANCHING_SLOPE`] points of its gap.  A conflict whose members all cost much makes every child's gap fall, and is often a set of
-/// forced members, which closes the node.  A conflict made here is learned as a nogood, as the search learns its own.
+/// The conflict a node branches on with the tactic `conflict_branching`: of `k0` (the one the search found), the
+/// conflicts the nogood table knows within the heaviest set `eval.chosen`, and each failing frame's minimal conflict
+/// made by leaving out its cheapest members first ([`FrameGraph::conflicts_ordered`]), the one of least weight.  A
+/// member weighs 10^(−price/[`CONFLICT_BRANCHING_SLOPE`]), its price being what leaving it out costs the bound: exact
+/// (read off the exchange graph, as strong branching reads it) for the members that some failing frame's conflict can
+/// hold and those of `k0`, the weight split's estimate for the others.  The children of a conflict each leave out one
+/// member, with the node's gap less that member's price, so the weight is their subtrees against the node's if a
+/// subtree grows tenfold every [`CONFLICT_BRANCHING_SLOPE`] points of its gap.  A conflict whose members all cost much
+/// makes every child's gap fall, and is often a set of forced members, which closes the node.  A conflict made here is
+/// learned as a nogood, as the search learns its own.
 ///
 /// Any conflict keeps the search exact: every completion leaves out some member of it, so the children cover every
 /// completion.  The conflicts made here are conflicts, as [`FrameGraph::conflicts_ordered`] says.

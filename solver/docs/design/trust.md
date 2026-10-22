@@ -48,9 +48,9 @@ reads a checkpoint of version 6 as the search it is.  The tactics that set how t
 `nogood_keep` and `nogood_limit`) are in no version: they change the trees and never the answer, and a resumed search
 starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`, [search.md, "The
 finder"](search.md#the-finder)) is in none either: it only offers sets, each after the check below, so a checkpoint
-resumes with any finder or none.  The switch `conflict_branching` has a bit of its own among the search tactics, clear in
-every checkpoint of the builds before it, so those resume with it off, its default, and refuse a run with it on; a build
-before it refuses a checkpoint with it on, as unknown tactics.
+resumes with any finder or none.  The switch `conflict_branching` has a bit of its own among the search tactics, clear
+in every checkpoint of the builds before it, so those resume only with `--tactic conflict_branching=off`; a build before
+it refuses a checkpoint with it on, its default, as unknown tactics.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header

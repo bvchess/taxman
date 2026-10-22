@@ -231,6 +231,20 @@ settings, both by `taxman solve 4050 --use-prev --force-search --threads 1 --tac
 assertion in `conflicts_ordered` costs 0.5% of the CPU of that proof: 138.9 s against 138.1 s for a copy without it,
 side by side.
 
+## 2026-10-21: conflict branching by default
+
+The tactic is on by default from the commit after the one that added it.  The matching path keeps it off
+(`SearchTactics::matching`), since it acts only with the GF(2) bound, so the committed checkpoints of that path still
+resume; a checkpoint of the default search written before the tactic resumes only with `--tactic
+conflict_branching=off`.  The soundness tests keep a configuration with the search's own conflict everywhere
+(configuration 43), and the solver's variants test `conflict_branching=off`.  No tripwire's pinned tree changed: the
+games they pin never reach a gap of 300.
+
+`taxman regress --to 1300` on all ten CPUs, twice on each build, alternating: the build of master took 7.1 and 7.1 s
+(33.96 and 33.74 CPU s), this build with the tactic on by default 7.2 and 7.1 s (33.82 and 33.78 CPU s), and both
+matched `optimal.json` at all 1,300 games, 417 of them searched (`regress-master.txt`, `regress-branching.txt` and their
+second runs).  The games to 1300 never reach the gap of 300, so the default changes nothing there.
+
 ## Files
 
 * `units-fresh.jsonl`: the 96 units of the fresh search's checkpoint at 3.0 million steps (`run-fresh.sh`, then
@@ -250,7 +264,9 @@ side by side.
   `suite-rule.jsonl`, `whole-rule.jsonl`; residual prices `suite-resid.jsonl`, `whole-resid.jsonl`, `big-rule.jsonl`;
   estimates only `var-split.jsonl`; the gates `gate200.jsonl`, `gate300.jsonl`, `gate400.jsonl`, `whole-g300.jsonl`;
   the fit `fit-g300.jsonl`; the tactic `tactic-4050.jsonl` and `release-4050.jsonl` (a results line); and
-  `regress-rule.txt`, `regress-base.txt`.  `table.py LABEL=FILE...` sets runs side by side.
+  `regress-rule.txt`, `regress-base.txt`, and the full regress on both builds `regress-master.txt`,
+  `regress-master-2.txt`, `regress-branching.txt`, `regress-branching-2.txt` (`run-regress-both.sh`).  `table.py
+  LABEL=FILE...` sets runs side by side.
 * `project.py`: the projection, `project.py units-fresh.jsonl fit-g300.jsonl --steps-done 3000309`; its output
   `project-g300.txt`.
 
