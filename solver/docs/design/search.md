@@ -278,28 +278,40 @@ of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-
 
 ## The starting incumbent, the ceiling and the seed
 
-The search starts from the best of three promotable sets, and stops as soon as it reaches a proven ceiling.  The three
-sets:
+The search starts from the best start of its seeds, and stops as soon as it reaches a proven ceiling. A *seed* is a game
+to start from: the game of n − 1, and with `--use-prev` the bounds store's lower-bound game of n, if it has one. A
+seed's *survivors* are its promotions that are candidates here and still promotable, taken one by one from the largest
+down (all of the store's game survives, being a game of n). A seed's *start* is the best of three promotable sets:
 
 * the *greedy* set: promote every candidate that can be, from the largest down;
-* the *seed*: the promotions of the game of n − 1 that are candidates here and still promotable, taken one by one from
-  the largest;
+* the seed's survivors;
 * the *dive*: a rounding of the root's matching, which drops the smallest member of a conflict until the rest can be
-  promoted.
+  promoted;
 
-A local search then improves the best of them: it fills the set greedily, then drops one or two members and refills,
-until nothing improves.  The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching
-it ends the search (tactic `prev_cap`).  When the greedy set or the seed's survivors already reach the ceiling, the
-search skips the dive, and it skips the local search when the incumbent after the dive reaches it: nothing can beat a
-set at the ceiling, so neither would change it, and the result is the same.
+improved by a local search, which fills the set greedily, then drops one or two members and refills, until nothing
+improves. The greedy set and the dive are made once, and the local search runs once from each distinct set the seeds'
+starts have reached. The search starts from the heaviest result (of equals, the store's game or else the game of n − 1),
+or from the greedy set or the dive alone with no seed. A seed needs its own start because a local search climbs only as
+far as its start leads: the store's game can outweigh the survivors of the game of n − 1 and still be a local optimum,
+while those survivors climb higher.
 
-*Details.*  The local search runs on the search's threads, the refills of a pass in parallel, and keeps the first
-improvement in the order of the sequential pass, so its answer does not depend on the thread count.  It reads the
+The *ceiling* on the promotion sum, `n + score(n − 1) − in_the_bag`, is proven, and reaching it ends the search (tactic
+`prev_cap`). Nothing can beat a set at the ceiling, so the dive, the local search and the starts not yet made are
+skipped once a set reaches it, and the result is the same.
+
+*Why the start cannot make an answer wrong.* It only chooses the incumbent, a promotable set: the greedy set, the
+survivors, the dive and every move of the local search promote their members one after another ([trust.md](trust.md),
+"Past limits"). The search is exhaustive from any promotable incumbent, because a node is cut only when its bound is
+below its need, `best + 1 − sum(promoted)` ("Search state and order"): a heavier incumbent prunes only subtrees that
+cannot beat a set already held. A start at the ceiling proves the game by it, as no promotable set is heavier.
+
+*Details.* The local search runs on the search's threads, the refills of a pass in parallel, and keeps the first
+improvement in the order of the sequential pass, so neither it nor the start depends on the thread count. It reads the
 ceiling before each pass, so a ceiling given while it runs (through the control, [Engine](engine.md#engine)) ends it as
-soon as its set reaches it.  The start is offered to the run's control as it is made (after the greedy set and the seed,
-after the dive, after the local search), so whoever steers the search sees the best so far before the engine starts, and
-the engine's start is unchanged.  `board::Board` sets a board and its search up: it is the one place that knows the path
-from the tables to the frames, the prepared search, the ceiling and the seed.
+soon as its set reaches it. The start is offered to the run's control as it is made, so whoever steers the search sees
+the best so far before the engine starts, and the engine's start is unchanged. With one seed, or seeds that give the
+same start, the start and the tree are that seed's alone. `board::Board` sets a board and its search up: it is the one
+place that knows the path from the tables to the frames, the prepared search, the ceiling and the seeds.
 
 *A floor.*  A search can start instead from a *floor* (`search::search_above`): an incumbent worth a given promotion
 sum, with no set and no start made.  The search prunes nodes against the floor as against a set of that weight, and a
@@ -319,14 +331,14 @@ when a game's search has taken NODES steps (over every run of it, a resumed sear
 thread of its own starts beside the workers, for the seconds of `--finder-seconds` (default 60), and ends sooner if
 the search does.  Each game of a window decides for itself.
 
-The thread runs *rounds* of large neighbourhood search ([glossary](../../../docs/GLOSSARY.md), the finder; `search::finder`).
-A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit of the engine on one
-thread for at most 1,024 steps, takes a better set, and repeats; a round lasts 15 seconds and draws with a seed of its
-own, and the generator is seeded, so the same game and seed make the same rounds.  The first round and every odd one
-starts from what survives of the seed, the game of n − 1 that the search starts from (the survivors are offered as they
-are, being a game of their own); the others start from the search's incumbent as it is, and go on from a better one the
-search finds meanwhile.  A search without a seed has the second kind of round only.  A resumed search has no seed in its
-start, but its finder has the game of n − 1 all the same.
+The thread runs *rounds* of large neighbourhood search ([glossary](../../../docs/GLOSSARY.md), the finder;
+`search::finder`).  A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit
+of the engine on one thread for at most 1,024 steps, takes a better set, and repeats; a round lasts 15 seconds and draws
+with a seed of its own, and the generator is seeded, so the same game and seed make the same rounds.  The first round
+and every odd one starts from what survives of a seed of the search, the seeds in turn (the survivors are offered as
+they are, being a game of their own); the others start from the search's incumbent as it is, and go on from a better one
+the search finds meanwhile.  A search without a seed has the second kind of round only.  A resumed search has no seed in
+its start, but its finder has the game of n − 1 all the same.
 
 *Why it cannot make an answer wrong.*  The finder only offers sets.  A set it offers is checked as a checkpoint's
 incumbent is on resuming ([trust.md](trust.md), the paragraph "What identifies a checkpoint"): a set of candidates that can be promoted

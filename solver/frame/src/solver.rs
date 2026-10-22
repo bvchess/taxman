@@ -1037,10 +1037,19 @@ struct SearchJob<const W: usize> {
     resuming: bool,
     seeds: bool,
     /// The game of the bounds store's best lower bound of the board, replayed by the referee, if `--use-prev` is on and
-    /// the search takes a seed: a seed beside the game of `n − 1`, the better of the two used.
+    /// the search takes a seed: a seed beside the game of `n − 1`, each with a start of its own and the better start
+    /// used ([`search::start_incumbent`]).
     store_game: Option<Vec<u32>>,
     /// The branching settings the search starts with and the lab may change ([`search::search_steered`]).
     branching: Arc<Branching>,
+}
+
+impl<const W: usize> SearchJob<W> {
+    /// The seeds of a search, in the order the search tries them: the store's game of this board, then the game `prev`
+    /// of `n − 1`, as the sets of their promotions, whichever of the two there is.
+    fn seeds_of(&self, prev: Option<&[u32]>) -> Vec<Bits<W>> {
+        [self.store_game.as_deref(), prev].into_iter().flatten().map(|moves| self.board.seed(moves)).collect()
+    }
 }
 
 impl<const W: usize> Job for SearchJob<W> {
@@ -1096,8 +1105,8 @@ impl<const W: usize> Job for SearchJob<W> {
     }
 
     fn find(&self, budget: Duration, seed: Option<&[u32]>, random: u64, ended: &Receiver<()>) -> finder::Report {
-        let seed = seed.map(|moves| self.board.seed(moves));
-        let plan = finder::Plan { after: 0, budget, seed, random };
+        let seeds = seed.map(|moves| self.board.seed(moves)).into_iter().collect();
+        let plan = finder::Plan { after: 0, budget, seeds, random };
         let at_nodes = self.control.status().map_or(0, |status| status.nodes);
         finder::rounds(
             &self.prepared,
@@ -1111,19 +1120,12 @@ impl<const W: usize> Job for SearchJob<W> {
 
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String> {
         let n = self.board.n();
-        // The game of `n − 1` (what is left of it here) and the store's game of `n`: the one that keeps more is the seed
-        // (of equals, the game of `n − 1`, the last).
-        let seeds = [self.store_game.as_deref(), go.seed.as_deref()].into_iter().flatten();
-        let seed = seeds
-            .map(|moves| self.board.seed(moves))
-            .max_by_key(|seed| search::seed_survivors_sum(&self.prepared, seed));
-        // The finder starts from the same seed, or from the game of `n − 1` alone when the search takes none.
+        // The store's game of `n` and the game of `n − 1`: the search starts from the better start of the two.
+        let seeds = self.seeds_of(go.seed.as_deref());
+        // The finder starts from the same seeds, or from the game of `n − 1` alone when the search takes none.
         let finder = (opts.finder_after > 0).then(|| {
-            let seeds = [self.store_game.as_deref(), go.finder_seed.as_deref()].into_iter().flatten();
-            let seed = seeds
-                .map(|moves| self.board.seed(moves))
-                .max_by_key(|seed| search::seed_survivors_sum(&self.prepared, seed));
-            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seed, random: 0 }
+            let seeds = self.seeds_of(go.finder_seed.as_deref());
+            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seeds, random: 0 }
         });
         let (spill_dir, own) = spill_dir(opts, n);
         let cfg = EngineConfig {
@@ -1142,7 +1144,7 @@ impl<const W: usize> Job for SearchJob<W> {
             control: Some(Arc::clone(&self.control)),
         };
         let (prepared, resuming, branching) = (&self.prepared, self.resuming, &self.branching);
-        let found = search::search_steered(prepared, &cfg, seed.as_ref(), go.cap, resuming, finder.as_ref(), branching);
+        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, finder.as_ref(), branching);
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);

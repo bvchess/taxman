@@ -24,6 +24,7 @@
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::Control;
 use taxman::game::Optimal;
@@ -84,21 +85,21 @@ fn run<const W: usize>(options: &Options) -> Result<(), String> {
     let optimal = Optimal::built_in().with_results_files(&options.known)?;
     let board = Board::<W>::new(Tables::new(n));
     let p = board.prepare(SearchTactics::default())?;
-    let seed = match (options.seeded, optimal.moves(n - 1)) {
-        (true, Some(moves)) => Some(board.seed(moves)),
+    let seeds: Vec<Bits<W>> = match (options.seeded, optimal.moves(n - 1)) {
+        (true, Some(moves)) => vec![board.seed(moves)],
         (true, None) => return Err(format!("no known game of {} to seed with (--known, or --no-seed)", n - 1)),
-        (false, _) => None,
+        (false, _) => Vec::new(),
     };
     let began = Instant::now();
     let graph = MatchGraph::new(&p.model, &p.root);
-    let start = start_incumbent(&p, &graph, &Control::new(), 1, seed.as_ref());
+    let start = start_incumbent(&p, &graph, &Control::new(), 1, &seeds);
     let line = |fields: Vec<(&str, Json)>| println!("{}", Json::object(fields));
     line(vec![
         ("game", Json::from(n)),
         ("target", options.target.map_or(Json::Null, Json::from)),
         ("start", Json::from(start.sum())),
         ("start_s", Json::Num(began.elapsed().as_secs_f64())),
-        ("seeded", Json::Bool(seed.is_some())),
+        ("seeded", Json::Bool(!seeds.is_empty())),
     ]);
     if options.start_only {
         return Ok(());
@@ -108,7 +109,8 @@ fn run<const W: usize>(options: &Options) -> Result<(), String> {
             let control = Control::new();
             control.offer(start.sum(), &payload_of(&start));
             let (_alive, ended) = mpsc::channel::<()>();
-            let plan = Plan { after: 1, budget: Duration::from_secs_f64(seconds), seed, random };
+            let budget = Duration::from_secs_f64(seconds);
+            let plan = Plan { after: 1, budget, seeds: seeds.clone(), random };
             let report = finder::rounds(&p, &control, &plan, 0, &ended, None);
             line(vec![
                 ("game", Json::from(n)),
@@ -116,7 +118,7 @@ fn run<const W: usize>(options: &Options) -> Result<(), String> {
                 ("start", Json::from(start.sum())),
                 ("seconds", Json::Num(seconds)),
                 ("random", Json::from(random)),
-                ("seeded", Json::Bool(seed.is_some())),
+                ("seeded", Json::Bool(!seeds.is_empty())),
                 ("best", Json::from(report.best)),
                 ("reached", options.target.map_or(Json::Null, |target| Json::Bool(report.best >= target))),
                 ("found_s", Json::Num(report.found)),

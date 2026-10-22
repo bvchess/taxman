@@ -370,7 +370,7 @@ fn forgetting_nogoods_often_does_not_change_answers() {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
             let every = Forgetting::every(period);
-            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None, None, None).unwrap();
+            let r = search_forgetting(&p, &config(threads), &[], None, false, None, every, None, None, None).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -415,7 +415,7 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
-                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None, None, None)
+                let r = search_forgetting(&p, &config(threads), &[], None, false, None, forgetting, None, None, None)
                     .unwrap();
                 let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
                 assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
@@ -820,6 +820,69 @@ fn the_start_is_the_same_on_every_number_of_threads() {
             }
         }
     }
+}
+
+/// A search with two seeds starts from the better of their starts, not from the seed whose survivors weigh more.  The
+/// bounds store's lower-bound game of the board is a game of it, so all of it survives; here it is the start with no
+/// seed, S0, a local optimum.  In game 187 S0 weighs 751 and what survives of the game of 186 only 748, so the seed with
+/// more survivors is S0, but the start from the game of 186 reaches 762.  Starting from S0 alone leaves the search at
+/// 751; the best of the two starts is 762.
+#[test]
+fn the_start_is_the_best_of_the_starts_of_the_seeds() {
+    let n = 187;
+    let board = Board::<8>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let graph = MatchGraph::new(&p.model, &p.root);
+    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let prev = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
+    let start = |seeds: &[Bits<8>]| start_incumbent(&p, &graph, &Control::new(), 1, seeds);
+    let (s0, from_prev) = (start(&[]), start(&[prev]));
+
+    // The trap: S0 has the survivors that weigh more, and the start from the game of n − 1 climbs above it.
+    assert!(seed_survivors_sum(&p, &s0) > seed_survivors_sum(&p, &prev), "S0 survives heavier than the previous game");
+    assert_eq!((start(&[s0]), s0.sum(), from_prev.sum()), (s0, 751, 762), "the start from S0 alone stays at S0");
+
+    // Either order of the seeds starts from the better start.
+    for seeds in [[s0, prev], [prev, s0]] {
+        assert_eq!(start(&seeds), from_prev, "seeds in the order {:?}", seeds.map(|seed| seed.sum()));
+    }
+    // A search with the two seeds starts there: a ceiling at that start ends it at once, and the control has it.
+    let control = Control::new();
+    let cfg = EngineConfig { control: Some(Arc::clone(&control)), ..config(1) };
+    let r = search_beside(&p, &cfg, &[s0, prev], Some(from_prev.sum()), false, None).unwrap();
+    assert!(r.completed && r.reached_cap && r.stats.nodes == 0);
+    assert_eq!((r.start, r.promotions), (from_prev, from_prev));
+    assert_eq!(best_so_far::<8>(&control), Some(from_prev));
+
+    // With one seed, or two that give the same start, the start is that of the one: the steps of the start spelled
+    // out (the greedy set, the survivors, the dive, the local search), as a search with one seed has always made it.
+    let steps = |seed: Option<&Bits<8>>| {
+        let mut begun = p.greedy;
+        if let Some(kept) = seed.map(|seed| surviving(&p, seed)).filter(|kept| kept.sum() > begun.sum()) {
+            begun = kept;
+        }
+        let dived = dive(&p.model, &p.root, &graph, &p.candidates);
+        if dived.sum() > begun.sum() {
+            begun = dived;
+        }
+        hood.improve(&mut Scratch::new(), &begun, true)
+    };
+    assert_eq!((s0, from_prev), (steps(None), steps(Some(&prev))));
+    assert_eq!((start(&[prev, prev]), start(&[s0, s0])), (from_prev, s0));
+}
+
+/// A seed given twice is one seed: the search has the start and the tree of the search with it once.
+#[test]
+fn a_seed_given_twice_makes_the_search_of_one() {
+    let n = 300;
+    let board = Board::<8>::for_n(n);
+    let p = board.prepare(SearchTactics::default()).unwrap();
+    let seed = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
+    let once = search(&p, &config(1), Some(&seed), None, false).unwrap();
+    let twice = search_beside(&p, &config(1), &[seed, seed], None, false, None).unwrap();
+    assert!(once.completed && twice.completed && once.stats.nodes > 0);
+    assert_eq!((twice.start, twice.promotions, twice.sum), (once.start, once.promotions, once.sum));
+    assert_eq!(twice.stats.nodes, once.stats.nodes);
 }
 
 /// A ceiling given to the control of a search ends it when the incumbent reaches it, whether it is given before the

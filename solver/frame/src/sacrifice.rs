@@ -406,7 +406,7 @@ fn hunt_with_width<const W: usize>(n: u32, hole: u32, claim: u64, opts: &Punctur
     let mut start_score = None;
     if opts.start {
         let seed = opts.seed.as_deref().map(|moves| board.seed(moves));
-        let incumbent = search::start_incumbent(&prepared, &graph, &Control::new(), opts.threads, seed.as_ref());
+        let incumbent = search::start_incumbent(&prepared, &graph, &Control::new(), opts.threads, seed.as_slice());
         start_score = Some(in_the_bag + incumbent.sum());
         if in_the_bag + incumbent.sum() > claim {
             let (moves, score) = game_of(&board, hole, incumbent)?;

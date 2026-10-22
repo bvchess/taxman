@@ -200,7 +200,7 @@ impl<const W: usize> Case<'_, W> {
     pub fn start(&self) -> (Bits<W>, f64) {
         let clock = Clock::start();
         let graph = self.space.match_graph;
-        (start_incumbent(self.p, graph, &Control::new(), 1, None), clock.elapsed())
+        (start_incumbent(self.p, graph, &Control::new(), 1, &[]), clock.elapsed())
     }
 }
 

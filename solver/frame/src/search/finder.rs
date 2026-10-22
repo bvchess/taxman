@@ -19,14 +19,13 @@
 //!
 //! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
 //! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget; both are
-//! `SolveOptions`, no tactics); [`Plan`] carries the two, and
-//! the seed of the game of `n − 1` if the search has one.  The thread ([`beside`]) runs *rounds* of LNS, each with a
-//! random seed of its own
-//! ([`Plan::random`] plus the round's number) for [`ROUND`] at most: the odd rounds start from the survivors of the
-//! seed, if there is one, the others from the search's incumbent as it is when the round starts, and adopt a better
-//! incumbent that the search finds meanwhile.  A game better than the search's incumbent is offered to the search at
-//! once ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends
-//! when its budget is spent or the search ends, whichever comes first.
+//! `SolveOptions`, no tactics); [`Plan`] carries the two, and the seeds of the search, if it has any.  The thread
+//! ([`beside`]) runs *rounds* of LNS, each with a random seed of its own ([`Plan::random`] plus the round's number)
+//! for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after another, if there are
+//! any, the others from the search's incumbent as it is when the round starts, and adopt a better incumbent that the
+//! search finds meanwhile.  A game better than the search's incumbent is offered to the search at once
+//! ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends when
+//! its budget is spent or the search ends, whichever comes first.
 //!
 //! The finder only offers sets.  A set it offers becomes the incumbent after the check that a checkpoint's incumbent
 //! passes on resuming (a set of candidates that can be promoted from the root, worth what it claims), and the search
@@ -34,7 +33,7 @@
 //! and its proof is its own.  Nothing of the finder is in the header that a checkpoint is checked against, so a
 //! checkpoint resumes whatever the finder's settings are.  What it did is the [`Report`] in the result line.
 
-use super::incumbent::surviving;
+use super::incumbent::{distinct, surviving};
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::bits::Bits;
 use crate::engine::{self, Control, EngineConfig, Searcher, Start};
@@ -204,10 +203,11 @@ pub struct Plan<const W: usize> {
     pub after: u64,
     /// The thread's budget, from the moment it starts.
     pub budget: Duration,
-    /// The seed of the game of `n − 1` that the search starts from, if it has one: the finder's odd rounds start
-    /// from what survives of it (its candidates that can still be promoted, from the largest down, as a search
-    /// seeded with it starts).
-    pub seed: Option<Bits<W>>,
+    /// The seeds the search starts from, if it has any (the bounds store's game of the board, then the game of
+    /// `n − 1`): the finder's odd rounds start from what survives of them, in turn (each seed's candidates that can
+    /// still be promoted, from the largest down, as a search seeded with it starts), a set that survives of
+    /// several seeds once.
+    pub seeds: Vec<Bits<W>>,
     /// The base of the random seeds of the rounds: round `r` draws with `random + r`.
     pub random: u64,
 }
@@ -230,6 +230,16 @@ pub struct Report {
     pub seconds: f64,
     /// The seconds from its start at which it reached `best` (0 if it never passed `from`).
     pub found: f64,
+}
+
+/// The set that round `round` (counted from 1) starts from if it is a seed round: on the odd rounds, what survives of
+/// each seed in turn (the first odd round has the first, the next odd round the next, and after the last the first
+/// again).  None on the even rounds, which start from the search's incumbent, and when there are no seeds.
+fn seed_start<const W: usize>(survivors: &[Bits<W>], round: u64) -> Option<Bits<W>> {
+    if survivors.is_empty() || round.is_multiple_of(2) {
+        return None;
+    }
+    Some(survivors[(round / 2) as usize % survivors.len()])
 }
 
 /// Whether the search has ended (the sender of `ended` is gone, or has sent).
@@ -293,7 +303,7 @@ pub fn rounds<const W: usize>(
     let space = SearchSpace::new(prepared, &graph);
     let lns = Lns { p: prepared, space: &space, options: Options::default() };
     let units = Control::new();
-    let survivors = plan.seed.as_ref().map(|seed| surviving(prepared, seed));
+    let survivors = distinct(plan.seeds.iter().map(|seed| surviving(prepared, seed)));
     let over = |until: Instant| has_ended(ended) || Instant::now() >= until;
     // Offers a set to the search; false if it was refused, which ends the finder.
     let mut offer = |set: &Bits<W>, round: u64, from_seed: bool| -> bool {
@@ -320,8 +330,9 @@ pub fn rounds<const W: usize>(
     let mut round = 0u64;
     'rounds: while !over(deadline) {
         round += 1;
-        let from_seed = survivors.is_some() && round % 2 == 1;
-        let mut best = survivors.filter(|_| from_seed).unwrap_or_else(incumbent);
+        let seed_start = seed_start(&survivors, round);
+        let from_seed = seed_start.is_some();
+        let mut best = seed_start.unwrap_or_else(incumbent);
         // What survives of the seed is a game in itself, which the search may not have.
         if from_seed && !offer(&best, round, true) {
             break;
@@ -464,21 +475,21 @@ mod tests {
         assert_eq!(best_so_far::<W>(&control), Some(p.greedy));
     }
 
-    /// The finder's rounds on game `n` from the greedy set, for `budget`, with the seed `seed`: what it reports and
+    /// The finder's rounds on game `n` from the greedy set, for `budget`, with the seeds `seeds`: what it reports and
     /// the control it offered to.
-    fn rounds_for(n: u32, seed: Option<Bits<W>>, budget: Duration) -> (Report, Arc<Control>, Prepared<W>) {
+    fn rounds_for(n: u32, seeds: Vec<Bits<W>>, budget: Duration) -> (Report, Arc<Control>, Prepared<W>) {
         let p = board(n).prepare(SearchTactics::default()).unwrap();
         let control = Control::new();
         control.offer(p.greedy.sum(), &payload_of(&p.greedy));
         let (_alive, ended) = mpsc::channel::<()>();
-        let plan = Plan { after: 1, budget, seed, random: 0 };
+        let plan = Plan { after: 1, budget, seeds, random: 0 };
         let report = rounds(&p, &control, &plan, 4096, &ended, None);
         (report, control, p)
     }
 
     #[test]
     fn the_finder_improves_the_incumbent_and_offers_only_sets_that_can_be_promoted() {
-        let (report, control, p) = rounds_for(800, None, Duration::from_millis(400));
+        let (report, control, p) = rounds_for(800, Vec::new(), Duration::from_millis(400));
         let best = best_so_far::<W>(&control).unwrap();
         assert!(p.can_promote(&best));
         assert_eq!((report.at_nodes, report.from, report.refused), (4096, p.greedy.sum(), 0));
@@ -493,10 +504,21 @@ mod tests {
         // first round starts from what survives of the seed, so the finder reaches the best game at once.
         let board = board(800);
         let seed = board.seed(Optimal::built_in().moves(800).unwrap());
-        let (report, control, p) = rounds_for(800, Some(seed), Duration::from_millis(50));
+        let (report, control, p) = rounds_for(800, vec![seed], Duration::from_millis(50));
         assert_eq!(known(&board), report.best, "{report:?}");
         assert_eq!(best_so_far::<W>(&control).unwrap().sum(), known(&board));
         assert!(report.from < report.best && p.can_promote(&best_so_far::<W>(&control).unwrap()));
+    }
+
+    #[test]
+    fn the_odd_rounds_take_the_seeds_in_turn() {
+        let sets: Vec<Bits<W>> = (1..=3).map(|x| Bits::EMPTY.with(x)).collect();
+        let starts = |survivors: &[Bits<W>]| (1..=8).map(|round| seed_start(survivors, round)).collect::<Vec<_>>();
+        let (a, b, c) = (Some(sets[0]), Some(sets[1]), Some(sets[2]));
+        assert_eq!(starts(&sets[..1]), [a, None, a, None, a, None, a, None], "one seed has every odd round");
+        assert_eq!(starts(&sets[..2]), [a, None, b, None, a, None, b, None], "two seeds alternate");
+        assert_eq!(starts(&sets), [a, None, b, None, c, None, a, None], "three seeds come round");
+        assert_eq!(starts(&[]), [None; 8], "no seeds, no seed rounds");
     }
 
     #[test]
@@ -505,7 +527,7 @@ mod tests {
         let control = Control::new();
         control.offer(p.greedy.sum(), &payload_of(&p.greedy));
         let (alive, ended) = mpsc::channel::<()>();
-        let plan = Plan { after: 1, budget: Duration::from_secs(600), seed: None, random: 0 };
+        let plan = Plan { after: 1, budget: Duration::from_secs(600), seeds: Vec::new(), random: 0 };
         let began = Instant::now();
         let (prepared, steered, planned) = (&p, &control, &plan);
         let report = thread::scope(|scope| {
@@ -535,8 +557,8 @@ mod tests {
         assert!(plain.completed && plain.finder.is_none());
         assert_eq!(plain.sum, known(&board));
         let seed = board.seed(Optimal::built_in().moves(899).unwrap());
-        let plan = Plan { after: 1, budget: Duration::from_secs(30), seed: Some(seed), random: 0 };
-        let beside = search_beside(&p, &two_threads(), None, None, false, Some(&plan)).unwrap();
+        let plan = Plan { after: 1, budget: Duration::from_secs(30), seeds: vec![seed], random: 0 };
+        let beside = search_beside(&p, &two_threads(), &[], None, false, Some(&plan)).unwrap();
         assert!(beside.completed);
         assert_eq!(beside.sum, plain.sum);
         assert!(p.can_promote(&beside.promotions) && beside.promotions.sum() == beside.sum);

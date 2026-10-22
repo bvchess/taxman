@@ -142,13 +142,13 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   **best completion** is the heaviest.  At the root the best completion is worth P\*.
 * **incumbent**: the best promotion set found so far, shared by all threads.  A node's **need** is what its
   completions must reach to beat the incumbent: the incumbent's sum, less the node's own, plus one.
-* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best of the greedy
-  set, the seed and a rounding of the root's matching, which a local search improves ([solver/docs/design/search.md,
-  "The starting incumbent, the ceiling and the
+* **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best start of its
+  seeds, each the best of the greedy set, the seed and a rounding of the root's matching, which a local search improves
+  ([solver/docs/design/search.md, "The starting incumbent, the ceiling and the
   seed"](../solver/docs/design/search.md#the-starting-incumbent-the-ceiling-and-the-seed)).  A game whose start reaches
   the ceiling takes no step of the search, and has the method `start`.
-* **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, or the game of a lower
-  bound that the bounds store holds.
+* **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, and the game of a lower
+  bound that the bounds store holds, when it has one.
 * **finder**: a large neighbourhood search for a good game, which only offers sets: it fixes a random share of an
   incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.  It
   is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search as

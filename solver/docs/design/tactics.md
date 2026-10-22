@@ -37,7 +37,7 @@ not).
 | `more_forced` | on | sound (as `fix_forced`) | with `gf2`'s strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
 | `conflict_branching` | on | proven (every completion leaves out a member of any conflict; the conflicts it makes are conflicts by docs/THEORY.md's Theorems 3, 4 and M) | with `gf2`, where a check's gap is at least 300, branch on the conflict of the heaviest set whose members cost the bound most to leave out, instead of the smallest the search knows ([search.md, "Conflict branching"](search.md#conflict-branching)); on the whole games 4050 and 4176, on one thread, a fifth of the steps and a quarter of the CPU |
 | `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum |
-| `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of the game of n − 1 that are still promotable |
+| `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of each seed (the game of n − 1, the bounds store's game of n) that are still promotable |
 
 **The finder is not a tactic.**  `--finder-after` and `--finder-seconds` start a thread beside a long search that looks
 for a better incumbent ([search.md, "The finder"](search.md#the-finder)); they are flags of `solve`, in no checkpoint's

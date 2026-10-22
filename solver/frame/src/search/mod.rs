@@ -118,7 +118,7 @@ use crate::engine::{self, Control, Counters, EngineConfig, ProgressNote, Start, 
 use crate::matchbound::MatchGraph;
 use crate::model::NogoodStats;
 use header::Header;
-use incumbent::{dive, surviving};
+use incumbent::{distinct, dive, surviving};
 use searcher::{get_bits, put_bits};
 use std::io;
 use std::path::Path;
@@ -172,9 +172,10 @@ pub struct SearchResult<const W: usize> {
     pub found: Option<Found>,
     /// What the finder did, if it started ([`finder`]: a search is given a [`finder::Plan`] by [`search_beside`]).
     pub finder: Option<finder::Report>,
-    /// The incumbent the search started from: the best of the greedy set, the seed and the matching dive, improved
-    /// by the local search (the dive and the local search are skipped when the set before them reaches the
-    /// ceiling, and the local search ends when its set does).  Empty under a floor, which is a value and no set.
+    /// The incumbent the search started from: the best start of any seed ([`start_incumbent`]), each the best of the
+    /// greedy set, the seed's survivors and the matching dive, improved by the local search (the dive and the local
+    /// search are skipped when the set before them reaches the ceiling, and the local search ends when its set does).
+    /// Empty under a floor, which is a value and no set.
     pub start: Bits<W>,
 }
 
@@ -186,6 +187,8 @@ pub struct SearchResult<const W: usize> {
 /// control's workers, with the answer of [`Neighbourhood::improve`]).  The start is offered to the run's control as
 /// soon as it is known and each time it improves (after the best of the greedy set and the seed's survivors, after the
 /// dive and after the local search, where they improve it), so that [`best_so_far`] has it before the engine runs.
+/// A search with several seeds ([`search_beside`], [`search_steered`]) makes this start from each of them and begins
+/// from the best ([`start_incumbent`]).
 ///
 /// The ceiling is a proven upper bound on the sum; reaching it ends the search, also before it starts.  It is `cap`
 /// and any the run's control is given, before or while the search runs (the control is `cfg.control` if there is
@@ -233,7 +236,7 @@ pub fn search_above<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, None, cap, resume, None, prepared.tactics.forgetting(), Some(floor), None, None)
+    search_forgetting(prepared, cfg, &[], cap, resume, None, prepared.tactics.forgetting(), Some(floor), None, None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -245,22 +248,24 @@ pub fn search_with<const W: usize>(
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting(), None, None, None)
+    let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
+    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None)
 }
 
-/// [`search`] with the finder of `plan` beside it, if there is one: once the search has taken `plan.after` steps, a
-/// thread of its own looks for a better game than the incumbent and offers it ([`finder`]).  The finder only offers
-/// sets, each after the check of [`offer_found`], so the search stays exhaustive and its answer is the same as without
-/// it; it is not part of what a checkpoint is checked against, so a checkpoint resumes with any finder or none.
+/// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
+/// [`start_incumbent`]) and the finder of `plan` beside it, if there is one: once the search has taken `plan.after`
+/// steps, a thread of its own looks for a better game than the incumbent and offers it ([`finder`]).  The finder only
+/// offers sets, each after the check of [`offer_found`], so the search stays exhaustive and its answer is the same as
+/// without it; it is not part of what a checkpoint is checked against, so a checkpoint resumes with any finder or none.
 pub fn search_beside<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
-    seed: Option<&Bits<W>>,
+    seeds: &[Bits<W>],
     cap: Option<u64>,
     resume: bool,
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seed, cap, resume, None, prepared.tactics.forgetting(), None, plan, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, prepared.tactics.forgetting(), None, plan, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
@@ -271,24 +276,24 @@ pub fn search_beside<const W: usize>(
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
-    seed: Option<&Bits<W>>,
+    seeds: &[Bits<W>],
     cap: Option<u64>,
     resume: bool,
     plan: Option<&finder::Plan<W>>,
     branching: &Arc<Branching>,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seed, cap, resume, None, forgetting, None, plan, Some(branching))
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, Some(branching))
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
-/// so that tests can make them forget often, under `floor` if given (then without a `seed`), and with the branching
+/// so that tests can make them forget often, under `floor` if given (then without a seed), and with the branching
 /// settings `branching` if given (else those of the tactics).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
-    seed: Option<&Bits<W>>,
+    seeds: &[Bits<W>],
     cap: Option<u64>,
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
@@ -297,7 +302,7 @@ fn search_forgetting<const W: usize>(
     plan: Option<&finder::Plan<W>>,
     branching: Option<&Arc<Branching>>,
 ) -> io::Result<SearchResult<W>> {
-    debug_assert!(floor.is_none() || seed.is_none(), "a floor is the start: there is no seed");
+    debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
     let control = cfg.control.clone().unwrap_or_else(Control::new);
     if let Some(cap) = cap {
@@ -308,7 +313,7 @@ fn search_forgetting<const W: usize>(
     // The incumbent the search starts from, as a set and its value: the start incumbent, or the floor, a value above
     // the empty set that stands for no set at all.
     let incumbent = match floor {
-        None => start_incumbent(prepared, &match_graph, &control, cfg.threads, seed),
+        None => start_incumbent(prepared, &match_graph, &control, cfg.threads, seeds),
         Some(_) => Bits::EMPTY,
     };
     let from = (incumbent, floor.unwrap_or_else(|| incumbent.sum()));
@@ -409,54 +414,89 @@ fn search_forgetting<const W: usize>(
     })
 }
 
-/// The incumbent a search starts from, made as [`search`] makes it (its documentation has the steps): the best of the
-/// greedy set and what survives of `seed`, then the dive, then the local search on `threads` threads (the control's
-/// workers if it has them).  `graph` is the matching graph of `prepared`.
+/// The incumbent a search starts from, made as [`search`] makes it (its documentation has the steps): a start from
+/// each of `seeds` and the best of them.  A seed's start is the greedy set, or what survives of the seed if that is
+/// heavier, then the dive if that is heavier still, then the local search on `threads` threads (the control's workers
+/// if it has them).  With no seed there is one start, from the greedy set.  `graph` is the matching graph of `prepared`.
+///
+/// The dive is made once, and the local search runs once from each distinct set the starts have reached by then.  The
+/// best result wins, the first of equals, so the order of `seeds` decides a tie and nothing else does: the thread count
+/// does not.  With one seed the result is that seed's start alone.
 ///
 /// The incumbent is offered to `control` as soon as it is known and each time it improves, so that a caller reading the
 /// control ([`best_so_far`]) has it while the start is still being computed, not only once the engine runs.  The run
 /// starts from exactly what it started from without the offers: the engine takes the better of its `Start`'s incumbent
 /// and the best offered to the control, strictly better only, and the start's final incumbent is at least every one
 /// offered, so it keeps its own, and the trees do not change.  (A resumed run's `Start` is its checkpoint, whose
-/// incumbent is at least the start of the run that wrote it: the same, with the same seed, so it keeps its own too;
+/// incumbent is at least the start of the run that wrote it: the same, with the same seeds, so it keeps its own too;
 /// one that a start beats is replaced by it, as `best` in [`search`] counts it.)
 ///
-/// A start that reaches the control's ceiling cannot be beaten, so the dive and the local search are skipped: they could
-/// not change it if the ceiling holds, as the proof by the ceiling assumes (and `solver::conclude` rejects any game
-/// above it).  The dive is taken only when strictly heavier, and the local search keeps only strictly heavier sets,
-/// after a first fill that can only add candidates; no promotable set is heavier than the ceiling.  The ceiling is
-/// read when each is due, and by the local search before each pass: the control may be given a lower one meanwhile.
+/// A start that reaches the control's ceiling cannot be beaten, so the dive, the local search and the starts not yet
+/// made are skipped: they could not change it if the ceiling holds, as the proof by the ceiling assumes (and
+/// `solver::conclude` rejects any game above it).  The dive is taken only when strictly heavier, and the local search
+/// keeps only strictly heavier sets, after a first fill that can only add candidates; no promotable set is heavier
+/// than the ceiling.  The ceiling is read when each is due, and by the local search before each pass: the control may
+/// be given a lower one meanwhile.
 pub fn start_incumbent<const W: usize>(
     prepared: &Prepared<W>,
     graph: &MatchGraph,
     control: &Control,
     threads: usize,
-    seed: Option<&Bits<W>>,
+    seeds: &[Bits<W>],
 ) -> Bits<W> {
-    let mut incumbent = prepared.greedy;
-    if let Some(seed) = seed {
-        let kept = surviving(prepared, seed);
-        if kept.sum() > incumbent.sum() {
-            incumbent = kept;
-        }
+    // The greedy set, or the survivors of a seed if they are heavier: one start for each seed.
+    let mut starts: Vec<Bits<W>> = if seeds.is_empty() {
+        vec![prepared.greedy]
+    } else {
+        seeds.iter().map(|seed| heavier(prepared.greedy, surviving(prepared, seed))).collect()
+    };
+    for start in &starts {
+        offer_set(control, start);
     }
-    offer_set(control, &incumbent);
-    if !reaches(incumbent.sum(), control.ceiling()) {
-        let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
-        if dived.sum() > incumbent.sum() {
-            incumbent = dived;
-            offer_set(control, &incumbent);
-        }
+    let at_ceiling = |starts: &[Bits<W>]| {
+        let best = heaviest(starts.iter().copied());
+        reaches(best.sum(), control.ceiling()).then_some(best)
+    };
+    if let Some(best) = at_ceiling(&starts) {
+        return best;
     }
-    if !reaches(incumbent.sum(), control.ceiling()) {
-        let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-        let improved = hood.improve_on(|| control.workers().unwrap_or(threads), || control.ceiling(), &incumbent, true);
-        if improved.sum() > incumbent.sum() {
+    let dived = dive(&prepared.model, &prepared.root, graph, &prepared.candidates);
+    if dived.sum() > heaviest(starts.iter().copied()).sum() {
+        offer_set(control, &dived);
+    }
+    for start in &mut starts {
+        *start = heavier(*start, dived);
+    }
+    if let Some(best) = at_ceiling(&starts) {
+        return best;
+    }
+    let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+    let mut best = Bits::EMPTY;
+    for start in distinct(starts) {
+        let improved = hood.improve_on(|| control.workers().unwrap_or(threads), || control.ceiling(), &start, true);
+        if improved.sum() > start.sum() {
             offer_set(control, &improved);
         }
-        incumbent = improved;
+        best = heavier(best, improved);
+        if reaches(best.sum(), control.ceiling()) {
+            break;
+        }
     }
-    incumbent
+    best
+}
+
+/// `first` unless `second` is strictly heavier.
+fn heavier<const W: usize>(first: Bits<W>, second: Bits<W>) -> Bits<W> {
+    if second.sum() > first.sum() {
+        second
+    } else {
+        first
+    }
+}
+
+/// The first of the heaviest of `sets` (the empty set, worth nothing, if there are none).
+fn heaviest<const W: usize>(sets: impl IntoIterator<Item = Bits<W>>) -> Bits<W> {
+    sets.into_iter().fold(Bits::EMPTY, heavier)
 }
 
 /// Offers the candidates of `seed` that can still be promoted in `prepared`, the game searched, as an incumbent to the

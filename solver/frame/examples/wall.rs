@@ -1312,7 +1312,7 @@ fn set_up<const W: usize>(n: u32) -> (Board<W>, Option<Prepared<W>>) {
 /// improved by the local search), with no seed and no ceiling.
 fn start_of<const W: usize>(p: &Prepared<W>) -> Bits<W> {
     let graph = MatchGraph::new(&p.model, &p.root);
-    start_incumbent(p, &graph, &Control::new(), 1, None)
+    start_incumbent(p, &graph, &Control::new(), 1, &[])
 }
 
 /// A game standalone: the two ends of what its search has to close, and what finding them cost.  The sums are

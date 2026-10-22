@@ -124,9 +124,9 @@ The steps again, with the functions that take them:
 *The shortcuts.*  Step 2 needs the game of n − 1, and the repeat of step 4 an earlier game.  `force_search` skips both,
 and step 1a, and so does a checkpoint of the game: a search that was interrupted is resumed, never replaced by a
 derivation.  With `use_prev`, the search of step 4 takes two things from the bounds store for a game the store has not
-proven: the game of its best lower bound, a seed beside the game of n − 1 (the search takes the one that keeps more),
-and its best upper bound, a ceiling beside the one that the game of n − 1 gives (the lower of the two stops the
-search).  `force_search` leaves the store out.
+proven: the game of its best lower bound, a seed beside the game of n − 1 (the search starts from the better start of
+the two), and its best upper bound, a ceiling beside the one that the game of n − 1 gives (the lower of the two stops
+the search).  `force_search` leaves the store out.
 
 *The game of n − 1* is checked before anything uses it: it must replay legally to its recorded score, be over, and open
 with the largest prime (`conclude` has already checked a game that this run made).  The results whose proofs rest on it
