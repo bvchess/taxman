@@ -1,0 +1,197 @@
+diff --git a/solver/frame/examples/tune.rs b/solver/frame/examples/tune.rs
+index 13490bf..d157adf 100644
+--- a/solver/frame/examples/tune.rs
++++ b/solver/frame/examples/tune.rs
+@@ -551,6 +551,32 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
+         }
+     }
+     let (start, opt) = start_set(game, &board, &prepared, header.as_ref(), optimal)?;
++    // A study's cut for a near repeat: the previous game M of TAXMAN_CARRY_PREV, proven, whose P* is at most the
++    // incumbent here (see `search::set_carry_prev`).
++    #[cfg(feature = "studies")]
++    if let Some(m) = std::env::var("TAXMAN_CARRY_PREV").ok().and_then(|v| v.parse::<u32>().ok()) {
++        let board_m = Board::<W>::for_n(m);
++        let prepared_m = board_m.prepare(o.tactics)?;
++        let (_, opt_m) = known_incumbent(&board_m, &prepared_m, optimal)?.ok_or(format!("no known game of {m}"))?;
++        if opt_m > start.sum() {
++            return Err(format!("game {m}'s P* {opt_m} is above the incumbent {}", start.sum()));
++        }
++        // The cut needs every candidate to be paid for by the same factors, and to have the same home, in both games.
++        let differ = prepared
++            .candidates
++            .iter()
++            .filter(|&x| {
++                !prepared_m.candidates.contains(x)
++                    || prepared.model.home(x) != prepared_m.model.home(x)
++                    || prepared.model.graph().factors(x) != prepared_m.model.graph().factors(x)
++            })
++            .count();
++        if differ > 0 {
++            return Err(format!("{differ} candidates of {game} differ in game {m}"));
++        }
++        search::set_carry_prev(prepared_m.model.clone(), prepared_m.root);
++        eprintln!("carry: game {m}, P* {opt_m}, incumbent {}", start.sum());
++    }
+     let wanted: Vec<Row<W>> = match &o.ids {
+         None => rows,
+         Some(ids) => {
+@@ -592,6 +618,10 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
+             ("stats", stats_json(&solved.stats)),
+         ]);
+         println!("{line}");
++        #[cfg(feature = "studies")]
++        if std::env::var_os("TAXMAN_CARRY_PREV").is_some() {
++            eprintln!("carry: {} nodes cut so far", search::CARRY_PREV_CUTS.load(std::sync::atomic::Ordering::Relaxed));
++        }
+     }
+     Ok(())
+ }
+diff --git a/solver/frame/src/search/mod.rs b/solver/frame/src/search/mod.rs
+index b53f76b..6442740 100644
+--- a/solver/frame/src/search/mod.rs
++++ b/solver/frame/src/search/mod.rs
+@@ -107,6 +107,8 @@ pub use dual::{dual_bound, DualBound, NodeBound};
+ pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
+ pub use incumbent::Neighbourhood;
+ pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
++#[cfg(feature = "studies")]
++pub use searcher::{set_carry_prev, CARRY_PREV_CUTS};
+ pub use setup::{
+     extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
+     problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index 83ff1c5..fa921cc 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -1053,6 +1053,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         {
+             self.promotable = false;
+         }
++        // A study's cut: the node leaves the same frames in the previous game as here, so none of its completions is
++        // a promotion set of this game that the previous one lacks (see `carry_prev`).
++        #[cfg(feature = "studies")]
++        if carry_prev_cuts::<W>(space.model, state, promoted, cands) {
++            return Err(cut::REFINED);
++        }
+         if self.matching_on && self.matching.value() < need {
+             return Err(cut::MATCH);
+         }
+@@ -1079,7 +1085,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
+         // gaps fall most.  Any conflict keeps the search exact.
+         let found = match (self.conflict_branching, found) {
+-            (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
++            (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap && !far_from_reference(&promoted, cands) => {
++                Lookup::Conflict(conflict_to_branch_on(
+                 g,
+                 space.model,
+                 &mut self.scratch,
+@@ -1089,7 +1096,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
+                 cap,
+                 learning.as_mut(),
+                 &mut self.known,
+-            )),
++            ))
++            }
+             (_, found) => found,
+         };
+         #[cfg(feature = "studies")]
+@@ -1498,3 +1506,98 @@ fn conflict_to_branch_on<const W: usize>(
+     }
+     k
+ }
++
++/// With the feature `studies`, the rule of `TAXMAN_CARRY_EXCL` = `K` and `TAXMAN_CARRY_REF` = a file holding a set in
++/// hex (a game's optimal promotions, as a units file writes sets): a node that has left out at least K members of the
++/// set (neither promoted nor still candidates) branches on the search's own conflict, as without conflict branching.
++/// Any conflict keeps the search exact.  Without the feature, or the variables, never.
++#[allow(unused_variables)]
++fn far_from_reference<const W: usize>(promoted: &Bits<W>, cands: &Bits<W>) -> bool {
++    #[cfg(feature = "studies")]
++    {
++        static RULE: std::sync::OnceLock<Option<(usize, Vec<u32>)>> = std::sync::OnceLock::new();
++        let rule = RULE.get_or_init(|| {
++            let k: usize = std::env::var("TAXMAN_CARRY_EXCL").ok()?.parse().ok()?;
++            let text = std::fs::read_to_string(std::env::var("TAXMAN_CARRY_REF").ok()?).ok()?;
++            let mut set = Vec::new();
++            for (i, c) in text.trim().chars().enumerate() {
++                let nibble = c.to_digit(16)?;
++                set.extend((0..4).filter(|b| nibble >> b & 1 == 1).map(|b| 4 * i as u32 + b));
++            }
++            Some((k, set))
++        });
++        if let Some((k, set)) = rule {
++            return set.iter().filter(|&&x| !promoted.contains(x) && !cands.contains(x)).count() >= *k;
++        }
++    }
++    false
++}
++
++/// With the feature `studies`: the previous game's model and root (`TAXMAN_CARRY_PREV`, set by `tune`), for the
++/// study cut of a near repeat.  Game M proven with best promotion sum P\*_M, and the incumbent of this search at least
++/// P\*_M: a promotion set of this game worth more than the incumbent is not one of M.  A node whose promotions leave in
++/// M the same frames as here, but for factors that can pay for nothing (no move of the frame, no candidate left, and not
++/// candidates themselves), has the same completions in both games, each promoted from the same frames by the same
++/// candidates: none is a promotion set here and not in M, so the node holds nothing that beats the incumbent.
++#[cfg(feature = "studies")]
++static CARRY_PREV: std::sync::OnceLock<Box<dyn std::any::Any + Send + Sync>> = std::sync::OnceLock::new();
++
++/// With the feature `studies`: the nodes cut by [`carry_prev_cuts`], over every searcher.
++#[cfg(feature = "studies")]
++pub static CARRY_PREV_CUTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++
++/// With the feature `studies`: sets the previous game for the study cut (see [`CARRY_PREV`]); the caller checks that
++/// the search's incumbent is worth at least the previous game's P\*.
++#[cfg(feature = "studies")]
++pub fn set_carry_prev<const W: usize>(model: Arc<FrameGraph>, root: FrameSet<W>) {
++    let _ = CARRY_PREV.set(Box::new((model, root)));
++}
++
++#[cfg(feature = "studies")]
++thread_local! {
++    static CARRY_SCRATCH: std::cell::RefCell<Option<Box<dyn std::any::Any>>> = const { std::cell::RefCell::new(None) };
++}
++
++#[cfg(feature = "studies")]
++fn carry_prev_cuts<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, promoted: &Bits<W>, cands: &Bits<W>) -> bool {
++    let Some((prev_model, prev_root)) =
++        CARRY_PREV.get().and_then(|any| any.downcast_ref::<(Arc<FrameGraph>, FrameSet<W>)>())
++    else {
++        return false;
++    };
++    let prev_state = CARRY_SCRATCH.with(|cell| {
++        let mut cell = cell.borrow_mut();
++        let scratch = cell
++            .get_or_insert_with(|| Box::new(Scratch::<W>::new()))
++            .downcast_mut::<Scratch<W>>()
++            .expect("one width a thread");
++        prev_model.promote_all_using(scratch, prev_root, promoted)
++    });
++    let Some(prev_state) = prev_state else { return false };
++    let (a, b) = (prev_state.frames(), state.frames());
++    if a.len() != b.len() {
++        return false;
++    }
++    // A factor that can pay for nothing: no composite of it is a move of the frame or a candidate left, and it is no
++    // candidate itself.
++    let live = |m: &FrameGraph, f: &crate::model::Frame<W>| -> Bits<W> {
++        let mut live = Bits::EMPTY;
++        for y in f.factors.iter() {
++            if cands.contains(y)
++                || m.graph().composites(y).iter().any(|&z| f.moves.contains(u32::from(z)) || cands.contains(u32::from(z)))
++            {
++                live.insert(y);
++            }
++        }
++        live
++    };
++    let same = a.iter().zip(b).all(|(fa, fb)| {
++        fa.moves == fb.moves
++            && fa.freedoms == fb.freedoms
++            && (fa.factors == fb.factors || live(prev_model, fa) == live(model, fb))
++    });
++    if same {
++        CARRY_PREV_CUTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++    }
++    same
++}
