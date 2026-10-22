@@ -46,8 +46,8 @@ the design in outline.
   closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`), and the previous checkpoint
   stays valid, which is the property that matters.
 * **Control** (`engine::Control`).  Another thread steers a run through this handle while it goes: a ceiling (a proven
-  upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the number of
-  workers.  The number grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands
+  upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, a checkpoint now, and the
+  number of workers.  The number grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands
   all its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises
   again.  Requests made before the run apply when it starts (engine docs, "The control").
 * **Instrumentation** (`engine::Counters`, per invocation).  The engine measures each worker's time, split into busy,

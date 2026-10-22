@@ -56,3 +56,4 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
 | performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |
+| the lab channel | [lab.md](design/lab.md) | let a lab watch and steer a live chain (the hook, the command folder), and see why nothing it does can make a result wrong |

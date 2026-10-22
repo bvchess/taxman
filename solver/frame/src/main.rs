@@ -4,13 +4,13 @@
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
 //! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; a `solve` that a game
-//! passing the wall (`--game-hours`) ended exits with status 4; `certify` exits with status 2 when it finds a game that
-//! beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
+//! passing the wall (`--game-hours`) ended exits with status 4, and one that a lab's `redeploy` ended (`--lab-dir`)
+//! with status 5; `certify` exits with status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
 
 mod cli;
 mod commands;
 
-use cli::{errln, outln, CliError, CliResult, WALL_STATUS};
+use cli::{errln, outln, CliError, CliResult, REDEPLOY_STATUS, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, SearchTactics};
@@ -63,6 +63,16 @@ commands:
                                first of the window, summed over runs and kept in DIR/nNNNN.clock) passes H hours:
                                every search stops with a final checkpoint, nothing is recorded for that game, the
                                line `wall at N after H hours` is printed and the exit status is 4
+      --lab-dir DIR            the lab's command folder: at each progress tick the run takes the files of DIR/in
+                               (one JSON command each: checkpoint, offer, branching, restart, threads, finder,
+                               redeploy), applies or refuses each, writes the outcome to DIR/out and moves the
+                               command to DIR/done.  A lab changes how the games are searched, never their
+                               results.  A redeploy ends the run with every search checkpointed, the line
+                               `redeploy to COMMIT` and the exit status 5
+      --hook PROGRAM           run PROGRAM, detached, with one JSON argument: the event long when a game's own
+                               search passes --hook-after (once a game), and done, with its line, when such a game
+                               has its line
+      --hook-after S           seconds of a game's own search before the hook is told it runs long (default 3600)
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: optimal.json's, the committed chain's
@@ -150,6 +160,7 @@ fn main() -> ExitCode {
         }
         // `solve` has said where on stdout.
         Err(CliError::Wall) => ExitCode::from(WALL_STATUS),
+        Err(CliError::Redeploy) => ExitCode::from(REDEPLOY_STATUS),
     }
 }
 

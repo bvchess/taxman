@@ -267,7 +267,9 @@ split's estimate.  Below the gap of 300 the search's own `K` is kept, since a sm
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
 applied, its frame keeps a stuck set of moves, so it is not winnable (docs/theory/decision-procedure.md, Theorem 3), and
 a stuck set survives every larger set of promotions (Theorem 4 there), so no completion holding the whole conflict is
-promotable (docs/theory/frame-model.md, Theorem M).  `conflicts_ordered` checks each with the whole peel.
+promotable (docs/theory/frame-model.md, Theorem M).  `conflicts_ordered` checks each with the whole peel.  Since it
+only chooses among true conflicts, the tactic may change between a search's units: a checkpoint resumes with it on or
+off, and a lab may switch it while the search runs ([lab.md](lab.md)).
 
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
 default's steps and 0.26 and 0.27 of its CPU; a step costs three to five times a default one, mostly in the pricing.

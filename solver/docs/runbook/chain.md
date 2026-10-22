@@ -46,7 +46,8 @@ four games in flight at once (`WINDOW`), a checkpoint every 300 s and a progress
 documents its variables, all optional: `THREADS`, `WINDOW`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
 `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`, and the [cost guardrails](launch.md#cost-guardrails) (`GAME_HOURS`,
 `DEADLINE_HOURS`, `BUDGET_HOURS`, `RUN_UNTIL`, `POWEROFF`; the budget and the date outlive the machine,
-[wall.md](wall.md)).
+[wall.md](wall.md)), and `LAB_DIR` and `LAB_HOOK`, for a lab beside the chain ([the lab
+channel](../design/lab.md)).
 
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that

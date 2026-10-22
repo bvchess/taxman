@@ -10,7 +10,10 @@ policy), and the tactics that tune the GF(2) search, `force_window` to `more_for
 tactics that act inside the search are the fields of `search::SearchTactics`, and `examples/ladder.rs` takes the same
 names for them.  A checkpoint records the search tactics in its header ([trust.md](trust.md), and "Adding a tactic"
 below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
-tactics of `tactics::Tactics`, in order, with their defaults.
+tactics of `tactics::Tactics`, in order, with their defaults.  One of them, `conflict_branching`, only chooses how a
+node branches: a checkpoint records it but does not bind it, and a lab may switch it while a search runs
+([lab.md](lab.md#which-tactics-may-change-while-a-search-runs) lists which tactics may change, and why the others may
+not).
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -50,7 +53,8 @@ taking no part in the search; and a promoted number paying tax only from the fra
 **Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from
 the defaults (such as `lagrange=on,gf2=off`), and `tactic_switches`, every tactic's value.  A line of a build before
 `gf2` has no such key, and ran the matching path.  A checkpoint records the search tactics, and is refused when they
-differ: the error names each tactic that differs, and the `--tactic` flags that resume it.
+differ, but for `conflict_branching`: the error names each tactic that differs, and the `--tactic` flags that resume
+it.
 
 *The tactics removed.*  The [notebook](../../notebook/README.md) has what each tactic was worth and the order they were
 found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's

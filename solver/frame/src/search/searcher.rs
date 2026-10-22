@@ -16,6 +16,7 @@
 //! A study's hook (`StepHook`) is built only with the feature `studies`: every site of it is compiled out of a
 //! default build, whose steps have none.
 
+use super::branching::{BranchSettings, Branching};
 use super::diagnostics::{cut, Probe};
 #[cfg(feature = "studies")]
 use super::hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
@@ -24,7 +25,7 @@ use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
 use super::tactics::Gf2Branching;
-use super::{Diagnostics, Forgetting, CONFLICT_BRANCHING_GAP, CONFLICT_BRANCHING_SLOPE};
+use super::{Diagnostics, Forgetting, CONFLICT_BRANCHING_SLOPE};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
@@ -127,10 +128,11 @@ pub struct SearchSpace<'a, const W: usize> {
     pub gf2_deep_branching: Gf2Branching,
     /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
-    /// With `gf2`: at a check whose gap is at least this, branch on the conflict of the heaviest set whose members cost
-    /// the bound most to leave out (tactic `conflict_branching`, which sets it to [`CONFLICT_BRANCHING_GAP`]; see
-    /// [`conflict_to_branch_on`]); `None`: the search's own conflict everywhere.
-    pub conflict_branching: Option<u64>,
+    /// The branching settings, which a caller may change while the search runs; each searcher reads them when it
+    /// starts a unit ([`Branching`]).  With `gf2`, their `conflict_branching` is the gap from which a check branches on
+    /// the conflict of the heaviest set whose members cost the bound most to leave out (tactic `conflict_branching`;
+    /// see [`conflict_to_branch_on`]); `None`: the search's own conflict everywhere.
+    pub branching: Arc<Branching>,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
@@ -177,7 +179,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2_strong_depth: tactics.strong_depth,
             gf2_deep_branching: tactics.deep_branching,
             gf2_force_window: tactics.force_window,
-            conflict_branching: tactics.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
+            branching: Arc::new(Branching::new(BranchSettings::of(&tactics))),
             symmetry: tactics
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
@@ -351,6 +353,10 @@ struct Stepper<'a, const W: usize> {
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
+    /// The branching settings' `conflict_branching` as the searcher last read them, at the start of a unit, and the
+    /// generation it read them at ([`SearchSpace::branching`]).
+    conflict_branching: Option<u64>,
+    branching_seen: u64,
     probe: Option<Probe<'a>>,
     /// The GF(2) bound's counters as of the last flush.
     gf2_flushed: Gf2Stats,
@@ -395,6 +401,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
+                branching_seen: space.branching.generation(),
+                conflict_branching: space.branching.settings().conflict_branching,
                 probe: space.diagnostics.map(Probe::new),
                 gf2_flushed: Gf2Stats::default(),
                 #[cfg(feature = "studies")]
@@ -439,6 +447,13 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         }
         if let Some(lagrange) = &mut self.stepper.lagrange {
             lagrange.start();
+        }
+        // The branching settings, as they are when the unit starts: changed since the searcher last read them, they are
+        // read again.
+        let generation = space.branching.generation();
+        if generation != self.stepper.branching_seen {
+            self.stepper.conflict_branching = space.branching.settings().conflict_branching;
+            self.stepper.branching_seen = generation;
         }
     }
 
@@ -1017,7 +1032,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.counts.conflicts += u64::from(computed);
         // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
         // gaps fall most.  Any conflict keeps the search exact.
-        let found = match (space.conflict_branching, found) {
+        let found = match (self.conflict_branching, found) {
             (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
                 g,
                 space.model,

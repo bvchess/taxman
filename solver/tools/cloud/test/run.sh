@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall and the ledger (run.sh), wall-node.sh
-# and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a file), for ssh
-# (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run the chain (chain, ledger, node, sweep) need the release build of the solver
+# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall, the ledger (run.sh) and a lab's
+# redeploy, wall-node.sh and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the group as a
+# file), for ssh (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run the chain
+# (chain, ledger, lab, node, sweep) need the release build of the solver
 # (cd solver/frame && cargo build --release; or TAXMAN_BIN names another build of the same sources, say the debug build
 # that `cargo build` makes) and rsync; launch and status need neither.  sweep.sh's scenario also runs the real verify.sh
 # on the sweep's files, which replays the committed games three times.
 #
-#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, node, launch, status, sweep)
+#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, lab, node, launch,
+#                                                  status, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -17,10 +19,10 @@ real_cloud="$(cd "$here/.." && pwd)"
 crate="$(cd "$real_cloud/../../frame" && pwd)"
 export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
 selected=("$@")
-[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger node launch status sweep)
+[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger lab node launch status sweep)
 for s in "${selected[@]}"; do
     case "$s" in
-        chain | ledger | node | sweep)
+        chain | ledger | lab | node | sweep)
             [ -x "$TAXMAN_BIN" ] || {
                 echo "build the solver first: cd $crate && cargo build --release" >&2
                 exit 2
@@ -131,6 +133,51 @@ scenario_chain() {
     )
     check "a date within the margin ends the chain with the deadline's status 3" has_line "$tmp/chain3.status" 3
     check "and the outcome names the date" matches "$tmp/chain-date/chain.outcome" '^deadline: the date 20'
+}
+
+# --- chain.sh: a lab's redeploy ---------------------------------------------------------------------------------
+
+scenario_lab() {
+    echo "== chain.sh: a lab's redeploy"
+    local w="$tmp/lab" origin="$tmp/lab-origin" root="$tmp/lab-root" master side
+    # A checkout whose origin has a master and a branch beside it.  Its setup.sh, a stand-in, "builds" the solver of its
+    # checkout by copying the one under test there.
+    mkdir -p "$origin/solver/tools/cloud"
+    printf '%s\n' '#!/usr/bin/env bash' 'here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' \
+        'mkdir -p "$here/../../frame/target/release" && cp "$LAB_TEST_SOLVER" "$here/../../frame/target/release/taxman"' \
+        >"$origin/solver/tools/cloud/setup.sh"
+    chmod +x "$origin/solver/tools/cloud/setup.sh"
+    local git_as=(git -c user.name=test -c user.email=test@example.com)
+    git init -q "$origin" && git -C "$origin" checkout -q -b master
+    git -C "$origin" add . && "${git_as[@]}" -C "$origin" commit -q -m one
+    master="$(git -C "$origin" rev-parse HEAD)"
+    git -C "$origin" checkout -q -b side && "${git_as[@]}" -C "$origin" commit -q --allow-empty -m side
+    side="$(git -C "$origin" rev-parse HEAD)"
+    git -C "$origin" checkout -q master
+    git clone -q "$origin" "$root"
+    # A commit beside master: the script refuses it and runs the build it has, which completes the chain.
+    mkdir -p "$w/lab/in"
+    printf '{"command":"redeploy","commit":"%s"}\n' "$side" >"$w/lab/in/1-side"
+    (
+        export TAXMAN_WORK="$w" TAXMAN_ROOT="$root" LAB_DIR="$w/lab" LAB_TEST_SOLVER="$TAXMAN_BIN" THREADS=2 PROGRESS=1
+        "$cloud/chain.sh" 40 >"$tmp/lab.out" 2>&1
+        echo $? >"$tmp/lab.status"
+    )
+    check "the solver stops for a redeploy" matches "$w/logs/chain.out" "^redeploy to $side:"
+    check "a commit beside master is refused" matches "$w/logs/chain.log" "redeploy to $side refused: it is not"
+    check "and the build it has completes the chain" has_line "$tmp/lab.status" 0
+    check "with no build made" absent "$w/builds/$side"
+    # master: built in a worktree of its own, and run.
+    printf '{"command":"redeploy","commit":"%s"}\n' "$master" >"$w/lab/in/2-master"
+    (
+        export TAXMAN_WORK="$w" TAXMAN_ROOT="$root" LAB_DIR="$w/lab" LAB_TEST_SOLVER="$TAXMAN_BIN" THREADS=2 PROGRESS=1
+        "$cloud/chain.sh" 60 >"$tmp/lab2.out" 2>&1
+        echo $? >"$tmp/lab2.status"
+    )
+    check "master is built and run" matches "$w/logs/chain.log" \
+        "redeploy to $master: the solver is $w/builds/$master/solver/frame/target/release/taxman"
+    check "and it completes the chain" has_line "$tmp/lab2.status" 0
+    check "the lab has both outcomes" exists "$w/lab/out/2-master"
 }
 
 # --- the ledger: the budget across machines ----------------------------------------------------------------------
@@ -1042,6 +1089,7 @@ for s in "${selected[@]}"; do
     case "$s" in
         chain) scenario_chain ;;
         ledger) scenario_ledger ;;
+        lab) scenario_lab ;;
         node) scenario_node ;;
         launch) scenario_launch ;;
         status) scenario_status ;;

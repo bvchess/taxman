@@ -36,8 +36,8 @@ use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
-    search, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit,
-    CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
+    search, BranchSettings, Branching, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher,
+    TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
 };
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -462,7 +462,7 @@ impl<const W: usize> Game<W> {
             gf2_strong_depth: u32::MAX,
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
-            conflict_branching: cfg.conflict_branching,
+            branching: Arc::new(Branching::new(BranchSettings { conflict_branching: cfg.conflict_branching })),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
             #[cfg(feature = "studies")]
             hooks: None,

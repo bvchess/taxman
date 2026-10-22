@@ -184,11 +184,29 @@ impl SearchTactics {
         }
     }
 
+    /// The bits of [`bits`](Self::bits) that only choose how a node branches: `conflict_branching` (bit 9).  A
+    /// checkpoint records them, as the search began with them, but they do not bind its resumption: the children of any
+    /// true conflict cover every completion of their node, so a search whose branching changes from one unit to the
+    /// next is as exact as one that keeps it (solver/docs/design/lab.md has the list of the tactics, and why the others
+    /// are fixed).  So a checkpoint resumes under either setting, and a run may change them while it goes
+    /// ([`Branching`](super::Branching)).
+    pub const BRANCHING_BITS: u16 = 1 << 9;
+
     /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits) and
     /// [`tuning`](Self::tuning)): the tactics a checkpoint does not record, the policy of keeping and forgetting
-    /// nogoods, may differ (a resumed search starts with no nogoods whichever policy made the first run's).
+    /// nogoods, may differ (a resumed search starts with no nogoods whichever policy made the first run's), and so may
+    /// those it records but that only choose how a node branches ([`BRANCHING_BITS`](Self::BRANCHING_BITS)).
     pub fn same_recorded(&self, other: &SearchTactics) -> bool {
-        self.bits() == other.bits() && self.tuning() == other.tuning()
+        let bound = |t: &SearchTactics| t.bits() & !Self::BRANCHING_BITS;
+        bound(self) == bound(other) && self.tuning() == other.tuning()
+    }
+
+    /// These tactics with what of `run`'s a checkpoint does not bind ([`same_recorded`](Self::same_recorded)): its
+    /// policy of keeping and forgetting nogoods, and its branching switch `conflict_branching`.  The run that resumes a
+    /// search says both.
+    #[must_use]
+    pub fn with_unbound_of(self, run: &SearchTactics) -> SearchTactics {
+        SearchTactics { conflict_branching: run.conflict_branching, ..self.with_forgetting_of(run) }
     }
 
     /// These tactics with the policy of keeping and forgetting nogoods of `run`'s: a checkpoint does not record it,
@@ -252,9 +270,10 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8) and `conflict_branching` (9); the defaults are `0x3B9`.  (A checkpoint of a build before
-    /// `conflict_branching` has bit 9 clear, so it resumes only a search with the tactic off, `--tactic
-    /// conflict_branching=off`; a build before it refuses a checkpoint with the tactic on, as "unknown tactics".)  The
+    /// `symmetry` (8) and `conflict_branching` (9); the defaults are `0x3B9`.  (Bit 9 records the setting the search
+    /// began with and binds nothing ([`BRANCHING_BITS`](Self::BRANCHING_BITS)): a checkpoint of a build before
+    /// `conflict_branching` has it clear, and resumes with the tactic on or off.  A build before the tactic refuses a
+    /// checkpoint with it on, as "unknown tactics".)  The
     /// knobs of the nogood table's policy (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they
     /// change the tree, never the answer, and a resumed search starts with an empty table whichever policy made the
     /// first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes with `gf2` off.  One of a build

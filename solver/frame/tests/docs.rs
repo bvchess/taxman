@@ -650,8 +650,9 @@ fn top_level_keys(text: &str) -> BTreeSet<String> {
     keys
 }
 
-/// The keys of the result lines the code writes: those of a game that is searched and one that is not, and of one
-/// that a limit stopped (which has `best_so_far`).
+/// The keys of the result lines the code writes: those of a game that is searched and one that is not, of one
+/// that a limit stopped (which has `best_so_far`), of one taken from a known source (`known`), and of one whose search a
+/// lab changed (`lab`).
 fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let keys = |n: u32, opts: &SolveOptions| -> BTreeSet<String> {
         let line = solve_game(n, None, opts).expect("a game").to_json().to_string();
@@ -665,10 +666,19 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let stopped = keys(1000, &SolveOptions { node_limit: Some(1), ..opts.clone() });
     assert!(stopped.contains("best_so_far"), "a game that a limit stopped has best_so_far: {stopped:?}");
     // A game taken from a known source (`--use-prev`) cites it, in a key that only such a line has.
-    let known = SolveOptions { use_prev: true, known: KnownSources { boards: true, ..Default::default() }, ..opts };
+    let known =
+        SolveOptions { use_prev: true, known: KnownSources { boards: true, ..Default::default() }, ..opts.clone() };
     let cited = keys(85, &known);
     assert_eq!(cited.difference(&complete).cloned().collect::<Vec<_>>(), ["known"], "a known game has `known`");
-    (complete, stopped.union(&cited).cloned().collect())
+    // A game whose search a lab changed (`--lab-dir`) records what it did, in a key that only such a line has: here the
+    // lab's setting of `conflict_branching`, kept beside the game's checkpoint.
+    let dir = std::env::temp_dir().join(format!("taxman-test-docs-lab-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("a temporary directory");
+    std::fs::write(dir.join("n0085.lab"), r#"{"conflict_branching":false,"branching_changes":1}"#).expect("a record");
+    let steered = keys(85, &SolveOptions { checkpoint_dir: Some(dir.clone()), ..opts.clone() });
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(steered.difference(&complete).cloned().collect::<Vec<_>>(), ["lab"], "a steered game has `lab`");
+    (complete, stopped.union(&cited).chain(&steered).cloned().collect())
 }
 
 #[test]

@@ -471,6 +471,19 @@ impl Control {
         }
     }
 
+    /// Ask the run attached for a checkpoint now, as if its interval had passed: it is written once the workers run
+    /// (not while they resume from a pause), and the next periodic one is due an interval after it.  Without a
+    /// checkpoint file ([`EngineConfig::checkpoint`]) it does nothing, and so it does with no run attached: a
+    /// checkpoint is of a run, so the request is not kept for a later one.  Returns whether a run was attached.
+    pub fn checkpoint(&self) -> bool {
+        let state = lock(&self.state);
+        let run = Self::attached(&state);
+        if let Some(run) = &run {
+            run.checkpoint();
+        }
+        run.is_some()
+    }
+
     /// Whether a [`stop`](Control::stop) has been given (it holds for every run the control is attached to), for a
     /// caller that works beside a run and ends with it.
     #[must_use]
@@ -1348,6 +1361,9 @@ struct State<U> {
     done: bool,
     optimal: bool,
     stop_requested: bool,
+    /// A checkpoint asked for through the control ([`Control::checkpoint`]), due as soon as the workers run: taken by
+    /// the next pause.
+    checkpoint_asked: bool,
     panicked: bool,
     error: Option<io::Error>,
     counters: Counters,
@@ -1468,6 +1484,7 @@ impl<U: Unit> Shared<U> {
                 done: false,
                 optimal: false,
                 stop_requested: false,
+                checkpoint_asked: false,
                 panicked: false,
                 error: None,
                 counters: Counters::default(),
@@ -1938,7 +1955,10 @@ impl<U: Unit> Shared<U> {
             }
             let now = Instant::now();
             let stop = stopping(&guard);
-            if stop || (past(next_checkpoint) && !guard.resuming) {
+            // A checkpoint the control asked for is due at once; without a checkpoint file there is none to write.
+            let asked = guard.checkpoint_asked && plan.checkpoint.is_some();
+            if stop || ((past(next_checkpoint) || asked) && !guard.resuming) {
+                guard.checkpoint_asked = false;
                 self.begin_pause(&mut guard, stop);
                 while guard.running > 0 && !guard.exit {
                     guard = self.wait_coord(guard, None);
@@ -2167,6 +2187,8 @@ trait Remote: Send + Sync {
     fn incumbent(&self) -> (u64, Vec<u8>);
     /// Stop the run with a final checkpoint.
     fn stop(&self);
+    /// Write a checkpoint as soon as the workers run, as if the interval had passed.
+    fn checkpoint(&self);
     /// Set the target number of workers (0 suspends the search).
     fn set_workers(&self, workers: usize);
     fn status(&self) -> Status;
@@ -2216,6 +2238,14 @@ impl<U: Unit> Remote for Shared<U> {
 
     fn stop(&self) {
         self.request_stop();
+    }
+
+    fn checkpoint(&self) {
+        let mut st = self.lock();
+        if !st.exit {
+            st.checkpoint_asked = true;
+            self.coord_cv.notify_all();
+        }
     }
 
     fn set_workers(&self, workers: usize) {

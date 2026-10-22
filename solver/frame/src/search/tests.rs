@@ -370,7 +370,7 @@ fn forgetting_nogoods_often_does_not_change_answers() {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
             let every = Forgetting::every(period);
-            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None, None).unwrap();
+            let r = search_forgetting(&p, &config(threads), None, None, false, None, every, None, None, None).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -415,8 +415,8 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
-                let r =
-                    search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None, None).unwrap();
+                let r = search_forgetting(&p, &config(threads), None, None, false, None, forgetting, None, None, None)
+                    .unwrap();
                 let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
                 assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
                 assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -1027,6 +1027,12 @@ fn units_and_headers_round_trip() {
     policy.tactics = SearchTactics { nogood_period: 7, nogood_keep: Keep::Top(3), nogood_limit: 9, ..policy.tactics };
     assert_eq!(policy.mismatch(&header), None);
     assert_eq!(policy.encode(), header.encode());
+    // The branching switch is recorded, as the search began with it, but binds nothing: a header with it the other way
+    // is this search's too.
+    let mut branching = header;
+    branching.tactics.conflict_branching = !header.tactics.conflict_branching;
+    assert_eq!(branching.mismatch(&header), None);
+    assert_ne!(branching.encode(), header.encode());
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
     // each switch that is on (the defaults: 0x3B9, `symmetry` is bit 8, `conflict_branching` bit 9), and no higher bit
@@ -1055,12 +1061,18 @@ fn units_and_headers_round_trip() {
     }
     assert_eq!(SearchTactics::default().bits(), 0x3B9);
     assert_eq!(SearchTactics::from_bits(0x3B9), Ok(SearchTactics::legacy_tuning()));
-    // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off, and the
-    // default's header differs from it in the tactics, so neither resumes the other's search.
+    // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off.  The bit only
+    // chooses how nodes branch, and binds nothing: each search resumes the other's, under its own setting.  The other
+    // switches bind.
     let before = SearchTactics { conflict_branching: false, ..SearchTactics::legacy_tuning() };
     assert_eq!(SearchTactics::from_bits(0x1B9), Ok(before));
     assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..before }));
-    assert!(!before.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(before.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(SearchTactics::legacy_tuning().same_recorded(&before));
+    assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 9);
+    assert!(!before.same_recorded(&SearchTactics { symmetry: false, ..before }));
+    let resumed = before.with_unbound_of(&SearchTactics::default());
+    assert_eq!(resumed, SearchTactics { conflict_branching: true, ..before });
     assert!(SearchTactics::from_bits(1 << 10).unwrap_err().contains("unknown tactics"));
 }
 

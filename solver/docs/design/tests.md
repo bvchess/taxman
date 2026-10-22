@@ -184,8 +184,16 @@ every second line of the Java fixtures), and the comment on each says what the w
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.
+* **The lab channel** (`tests/lab.rs`; the commands, the folder and a game's record in the unit tests of
+  `src/solver/lab.rs`, the live branching settings in `src/search/branching.rs`, a checkpoint asked through the control
+  in `tests/engine.rs`): a range fed a hostile lab (sets off the board, twice, not promotable or claimed above their
+  worth; commands that are not commands; restarts with tactics a restart does not take; threads it cannot have;
+  `conflict_branching` switched at every tick; a game held, checkpointed and restarted in the middle of its search; a
+  redeploy at a commit off master) refuses every bad command with its reason, ends every game with the score of
+  `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line, resumes it after the
+  redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
-  (`solver/tools/cloud/test/run.sh`: the wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run
+  (`solver/tools/cloud/test/run.sh`: the wall, the ledger and a lab's redeploy through `chain.sh`, `wall-node.sh` through each way a run
   ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What
   was tested, and what can go wrong"](../runbook/wall.md#what-was-tested-and-what-can-go-wrong)), and the build cache
   and the release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`,

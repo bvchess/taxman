@@ -66,6 +66,7 @@
 //! # What is where
 //!
 //! * `tactics`: [`SearchTactics`], and how a checkpoint records them.
+//! * `branching`: [`Branching`], the branching settings a caller may change while a search runs.
 //! * `setup`: [`prepare`]: the root, the greedy incumbent, `max_total`; the [`Problem`] a setup poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
@@ -82,8 +83,9 @@
 //!   floor (an incumbent worth a given sum and no set) instead of a start incumbent; [`start_incumbent`], the incumbent
 //!   [`search`] starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`],
 //!   [`best_so_far`] and [`seed_survivors_sum`], for a caller that steers searches through their [`Control`]
-//!   (`EngineConfig::control`).
+//!   (`EngineConfig::control`), and [`search_steered`], whose branching settings the caller may change as it runs.
 
+mod branching;
 mod diagnostics;
 mod dual;
 pub mod finder;
@@ -98,6 +100,7 @@ mod setup;
 pub mod symmetry;
 mod tactics;
 
+pub use branching::{BranchSettings, Branching};
 pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use dual::{dual_bound, DualBound, NodeBound};
 #[cfg(feature = "studies")]
@@ -230,7 +233,7 @@ pub fn search_above<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, None, cap, resume, None, prepared.tactics.forgetting(), Some(floor), None)
+    search_forgetting(prepared, cfg, None, cap, resume, None, prepared.tactics.forgetting(), Some(floor), None, None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -242,7 +245,7 @@ pub fn search_with<const W: usize>(
     resume: bool,
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting(), None, None)
+    search_forgetting(prepared, cfg, seed, cap, resume, diagnostics, prepared.tactics.forgetting(), None, None, None)
 }
 
 /// [`search`] with the finder of `plan` beside it, if there is one: once the search has taken `plan.after` steps, a
@@ -257,11 +260,30 @@ pub fn search_beside<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seed, cap, resume, None, prepared.tactics.forgetting(), None, plan)
+    search_forgetting(prepared, cfg, seed, cap, resume, None, prepared.tactics.forgetting(), None, plan, None)
+}
+
+/// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
+/// searcher reads them when it starts a unit ([`Branching`]).  They start as the caller left them, whatever
+/// `prepared.tactics` says of them, and a fresh search's checkpoints record them as they were when it started.  A
+/// setting there chooses only which conflict a node branches on, so the search's answer is the same whatever they say
+/// and however often they change (solver/docs/design/lab.md).
+pub fn search_steered<const W: usize>(
+    prepared: &Prepared<W>,
+    cfg: &EngineConfig,
+    seed: Option<&Bits<W>>,
+    cap: Option<u64>,
+    resume: bool,
+    plan: Option<&finder::Plan<W>>,
+    branching: &Arc<Branching>,
+) -> io::Result<SearchResult<W>> {
+    let forgetting = prepared.tactics.forgetting();
+    search_forgetting(prepared, cfg, seed, cap, resume, None, forgetting, None, plan, Some(branching))
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
-/// so that tests can make them forget often, and under `floor` if given (then without a `seed`).
+/// so that tests can make them forget often, under `floor` if given (then without a `seed`), and with the branching
+/// settings `branching` if given (else those of the tactics).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -273,6 +295,7 @@ fn search_forgetting<const W: usize>(
     forgetting: Forgetting,
     floor: Option<u64>,
     plan: Option<&finder::Plan<W>>,
+    branching: Option<&Arc<Branching>>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seed.is_none(), "a floor is the start: there is no seed");
     let t0 = Instant::now();
@@ -325,6 +348,10 @@ fn search_forgetting<const W: usize>(
     }
 
     let space = SearchSpace { forgetting, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph) };
+    let space = match branching {
+        Some(branching) => SearchSpace { branching: Arc::clone(branching), ..space },
+        None => space,
+    };
     // The progress lines tell what the nogood tables have done.
     let totals = Arc::clone(&space.nogood_totals);
     let note = ProgressNote(Arc::new(move || totals.lock().unwrap_or_else(PoisonError::into_inner).summary()));
@@ -341,7 +368,12 @@ fn search_forgetting<const W: usize>(
     // search's without being this build's encoding of it.  So the checkpoints of a run keep its format.
     let header = match &resumed {
         Some((_, head)) => head.header.clone(),
-        None => Header::of(prepared).encode(),
+        None => {
+            // The branching settings as the search starts with them, which the caller may have changed.
+            let mut header = Header::of(prepared);
+            header.tactics.conflict_branching = space.branching.settings().conflict_branching_on();
+            header.encode()
+        }
     };
     let engine_start = Instant::now();
     let label = cfg.progress.map(|_| cfg.label.as_str());
