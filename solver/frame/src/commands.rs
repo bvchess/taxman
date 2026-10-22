@@ -71,8 +71,13 @@ fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
 const SEARCH_FLAGS: [&str; 6] =
     ["--checkpoint-dir", "--checkpoint-interval", "--progress", "--time-limit", "--node-limit", "--mem-cap"];
 
-/// Reads [`SEARCH_FLAGS`] into `opts`.
+/// The switch of a long search that `solve` and `certify` share, read by [`search_options`]: the workers run at the
+/// lowest priority ([`SolveOptions::background`]).
+const SEARCH_SWITCHES: [&str; 1] = ["--background"];
+
+/// Reads [`SEARCH_FLAGS`] and [`SEARCH_SWITCHES`] into `opts`.
 fn search_options(args: &Args, opts: &mut SolveOptions) -> Result<(), CliError> {
+    opts.background = args.has("--background");
     opts.checkpoint_dir = args.value("--checkpoint-dir").map(PathBuf::from);
     if let Some(interval) = args.positive_seconds("--checkpoint-interval")? {
         opts.checkpoint_interval = interval;
@@ -152,7 +157,11 @@ fn wall_line(wall: Wall, opts: &SolveOptions) -> String {
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
     let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
-    let switches = ["--force-search", "--use-prev", "--show", "--keep-going", "--retry", "--retry-improved"];
+    let switches = [
+        &["--force-search", "--use-prev", "--show", "--keep-going", "--retry", "--retry-improved"][..],
+        &SEARCH_SWITCHES[..],
+    ]
+    .concat();
     let args = Args::parse(args, &flags_with(&flags), &switches)?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
@@ -267,7 +276,11 @@ pub fn certify(args: &[String]) -> CliResult {
             "{why}\nusage: certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]"
         ))
     };
-    let args = Args::parse(args, &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(), &["--no-claims"])?;
+    let args = Args::parse(
+        args,
+        &[&CERTIFY_FLAGS[..], &SEARCH_FLAGS[..]].concat(),
+        &[&["--no-claims"][..], &SEARCH_SWITCHES[..]].concat(),
+    )?;
     let claims = !args.has("--no-claims");
     // The boards in the order to certify them, and how the tally names them.
     let lists = args.values("--list");

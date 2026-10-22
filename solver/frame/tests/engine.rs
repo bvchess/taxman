@@ -1403,6 +1403,84 @@ fn the_start_of_each_run_is_timed() {
 }
 
 // ------------------------------------------------------------------------------------------------------------
+// The idle scheduling policy (Linux)
+// ------------------------------------------------------------------------------------------------------------
+
+#[cfg(target_os = "linux")]
+mod idle_policy {
+    use super::*;
+    use std::ffi::c_int;
+    use std::sync::Mutex;
+
+    /// `SCHED_IDLE` of `<sched.h>`.
+    const SCHED_IDLE: c_int = 5;
+
+    extern "C" {
+        fn sched_getscheduler(pid: c_int) -> c_int;
+    }
+
+    /// The scheduling policy of the calling thread (pid 0).
+    fn policy() -> c_int {
+        // SAFETY: the call has no preconditions.
+        let policy = unsafe { sched_getscheduler(0) };
+        assert!(policy >= 0, "sched_getscheduler failed: {}", std::io::Error::last_os_error());
+        policy
+    }
+
+    /// A knapsack searcher that notes the policy of the thread it runs on.
+    struct Noting<'a> {
+        inner: Knapsack<'a>,
+        seen: &'a Mutex<Vec<c_int>>,
+    }
+
+    impl Searcher<Node> for Noting<'_> {
+        fn run(&mut self, unit: Node, ctx: &mut Ctx<'_, Node>) {
+            self.seen.lock().unwrap().push(policy());
+            self.inner.run(unit, ctx);
+        }
+    }
+
+    /// The policies the workers of a run of `cfg` had while they searched, and the policy of the thread that ran it
+    /// before and after.
+    fn policies_of(cfg: &EngineConfig) -> (Vec<c_int>, (c_int, c_int)) {
+        let (inst, seen) = (instance(), Mutex::new(Vec::new()));
+        let make = |_| Noting {
+            inner: Knapsack { inst: &inst, stack: Vec::new(), target: None, panic_when: None },
+            seen: &seen,
+        };
+        let before = policy();
+        let out = engine::run(cfg, fresh(), HEADER, make).expect("engine run");
+        assert!(out.completed);
+        assert_eq!(out.best, inst.dp());
+        (seen.into_inner().unwrap(), (before, policy()))
+    }
+
+    /// A thread that calls `background_priority` is under `SCHED_IDLE`; the others are as they were.
+    #[test]
+    fn background_priority_puts_the_calling_thread_under_the_idle_policy() {
+        let mine = policy();
+        let idle = thread::spawn(|| {
+            engine::background_priority();
+            policy()
+        });
+        assert_eq!(idle.join().unwrap(), SCHED_IDLE);
+        assert_eq!(policy(), mine);
+    }
+
+    /// With `EngineConfig::background` every worker is under `SCHED_IDLE` and the thread that runs the engine, which
+    /// coordinates and starts the threads of its own, keeps its policy; without it no worker is.
+    #[test]
+    fn background_workers_are_idle_and_the_thread_that_runs_them_is_not() {
+        let (seen, (before, after)) = policies_of(&EngineConfig { background: true, ..config(4) });
+        assert!(!seen.is_empty() && seen.iter().all(|&policy| policy == SCHED_IDLE), "{seen:?}");
+        assert_eq!(after, before);
+        let (seen, (before, after)) = policies_of(&config(4));
+        assert!(!seen.is_empty() && seen.iter().all(|&policy| policy == before), "{seen:?} against {before}");
+        assert_eq!(after, before);
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------------
 // Benchmark: cargo test --release --test engine -- --ignored --nocapture bench
 // ------------------------------------------------------------------------------------------------------------
 

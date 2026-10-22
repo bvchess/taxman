@@ -15,7 +15,8 @@ and reports ([Studies](#studies)).
 * **The chain's files are read-only.**  The lab copies from the chain's checkout and from `~/taxman-work`, writes
   nothing in them, and starts, stops and changes nothing of the chain.  It writes only in `~/taxman-lab`.
 * **The lab is light.**  Its processes run at `nice -n 19`, a unit takes one thread, and `LAB_THREADS` (default 16)
-  bounds the units at once.
+  bounds the units at once.  With a chain run under `--background` ([the chain](chain.md#run)), the lab's processes
+  at `nice -n 19` still run before the search's workers, and the search takes the threads the lab leaves.
 
 ## The commands
 

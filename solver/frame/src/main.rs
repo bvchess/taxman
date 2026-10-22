@@ -26,6 +26,8 @@ commands:
                           solved standalone, which costs more: no seed from the game before and no ceiling).
                           Every score is checked against optimal.json, which is built into this program
       --threads K              worker threads (default: all CPUs)
+      --background             run the workers at the lowest priority (Linux SCHED_IDLE): on a machine shared with
+                               other work, with every hardware thread, the search takes the CPU the rest leaves
       --window K               games of a range in flight at once, sharing the threads: game n+1 is set up, and
                                searched from n's best game so far, while n searches (default 4; 1 is one game after
                                another, and it is always 1 with one thread).  Scores and proofs are those of a
@@ -115,10 +117,10 @@ commands:
                           beats its score is also written to OUT.counterexample.jsonl and the run exits with
                           status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
-                          --time-limit S, --node-limit N, --mem-cap UNITS, as for solve; --no-claims, search the
-                          extended problem without the claims of `unzip` (the formulation of the certificates
-                          made before Lemma M5+; the default keeps the claims it allows).  A rerun skips the games
-                          --out has a verdict for and resumes a stopped search from its checkpoint
+                          --time-limit S, --node-limit N, --mem-cap UNITS, --background, as for solve; --no-claims,
+                          search the extended problem without the claims of `unzip` (the formulation of the
+                          certificates made before Lemma M5+; the default keeps the claims it allows).  A rerun
+                          skips the games --out has a verdict for and resumes a stopped search from its checkpoint
   verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]
                           check the files of certificates `certify --out` wrote, without changing them: every
                           line against the recorded games, the barred bounds and the extended problem set up

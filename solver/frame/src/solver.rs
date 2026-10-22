@@ -125,6 +125,10 @@ pub const MAX_N: u32 = 64 * crate::bits::WIDTHS[crate::bits::WIDTHS.len() - 1] a
 pub struct SolveOptions {
     pub tactics: Tactics,
     pub threads: usize,
+    /// The search's workers run under the kernel's idle scheduling policy (`--background`,
+    /// [`engine::background_priority`]), so that the search takes the CPU that nothing else on the machine wants.  It
+    /// changes only the speed, never a result.
+    pub background: bool,
     /// Directory of the per-game checkpoints `n<NNNN>.ckpt`; a game with a checkpoint there is resumed.
     pub checkpoint_dir: Option<PathBuf>,
     pub checkpoint_interval: Duration,
@@ -201,6 +205,7 @@ impl Default for SolveOptions {
         SolveOptions {
             tactics: Tactics::default(),
             threads: engine.threads,
+            background: false,
             checkpoint_dir: None,
             checkpoint_interval: Duration::from_secs(60),
             progress: None,
@@ -593,6 +598,7 @@ pub struct GameResult {
     pub retry: bool,
     pub retry_improved: bool,
     pub pass: Option<u32>,
+    pub background: bool,
     /// The finder's settings (`--finder-after`, in steps, and `--finder-seconds`): 0 for none.
     pub finder_after: u64,
     pub finder_budget: Duration,
@@ -642,6 +648,7 @@ impl GameResult {
             retry: opts.retry,
             retry_improved: opts.retry_improved,
             pass: opts.pass,
+            background: opts.background,
             finder_after: opts.finder_after,
             finder_budget: opts.finder_budget,
             finder: None,
@@ -715,6 +722,7 @@ impl GameResult {
         let retry = self.retry.then_some(("retry", Json::Bool(true)));
         let improved = self.retry_improved.then_some(("retry_improved", Json::Bool(true)));
         let pass = self.pass.map(|pass| ("pass", Json::from(pass)));
+        let background = self.background.then_some(("background", Json::Bool(true)));
         let finder_after = (self.finder_after > 0).then(|| ("finder_after", Json::from(self.finder_after)));
         let finder_seconds =
             (self.finder_after > 0).then_some(("finder_seconds", Json::Num(self.finder_budget.as_secs_f64())));
@@ -725,6 +733,7 @@ impl GameResult {
                 .chain(retry)
                 .chain(improved)
                 .chain(pass)
+                .chain(background)
                 .chain(finder_after)
                 .chain(finder_seconds),
         );
@@ -1142,6 +1151,7 @@ impl<const W: usize> Job for SearchJob<W> {
             progress_note: None,
             cores: None,
             control: Some(Arc::clone(&self.control)),
+            background: opts.background,
         };
         let (prepared, resuming, branching) = (&self.prepared, self.resuming, &self.branching);
         let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, finder.as_ref(), branching);

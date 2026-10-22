@@ -581,6 +581,7 @@ fn search_from<const W: usize>(
         progress_note: None,
         cores: None,
         control: None,
+        background: opts.background,
     };
     let found = search::search(prepared, &cfg, Some(start), cap, resuming);
     if own {

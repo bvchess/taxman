@@ -49,6 +49,12 @@ documents its variables, all optional: `THREADS`, `WINDOW`, `CHECKPOINT_INTERVAL
 [wall.md](wall.md)), and `LAB_DIR` and `LAB_HOOK`, for a lab beside the chain ([the lab
 channel](../design/lab.md)).
 
+On a machine shared with other work, such as a lab, leave `THREADS` unset (one worker per hardware thread) and give
+`EXTRA_ARGS="--background"`.  The workers then run under the idle scheduling policy, so that any other process, even
+one at `nice -n 19`, runs before them and the search takes the threads the rest leaves ([the
+flag](../REFERENCE.md#1-the-flags-of-solve)).  A fixed `THREADS` below the machine's leaves threads idle whenever the
+rest is quiet.
+
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that
 keep them busy, so one game's search does not leave a machine of many threads idle.  Games still conclude and record in

@@ -16,6 +16,7 @@ of the repository.
 | flag | meaning |
 |---|---|
 | `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
+| `--background` | run every search worker under the idle scheduling policy (Linux `SCHED_IDLE`), so that any other process, even one at `nice -n 19`, runs before the workers and the search takes the CPU the rest of the machine leaves.  Use it on a machine shared with other work, with every hardware thread (no `--threads`).  The policy is set on the worker threads, not the process: the thread that coordinates a search, the finder and the lab's hook keep normal priority.  Elsewhere than Linux it does nothing and says so once on stderr.  It changes only the speed; a line records it in `options` |
 | `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 4; 1 is one game after another, and it is always 1 with one thread) |
 | `--tactic NAME=VALUE` | set a tactic; repeatable ([design/tactics.md](design/tactics.md) lists them); the tactic `conflict_branching`, on by default, chooses the conflict a node branches on where the gap is large ([design, "Conflict branching"](design/search.md#conflict-branching)); `--tactic conflict_branching=off` branches on the smallest conflict the search knows, as the builds before it did |
 | `--out FILE` | append result lines; skip the games the file completed; the game before the first comes from it |
@@ -94,9 +95,9 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   `solver/noframe/data/upper_*.jsonl`) say needs it, it searches the extended problem, with the bounds' open members
   optional, from the recorded game.  The search ends `certified` (nothing beats the score) or `beaten`.  A game that
   beats the score is written to `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes
-  `--threads`, the checkpoint flags and the limits of `solve`, and resumes like it.  The extended problem keeps the
-  claims of `unzip` that Lemma M5⁺ allows, unless `--no-claims`, the formulation of the certificates made before it; a
-  line records which.
+  `--threads`, `--background`, the checkpoint flags and the limits of `solve`, and resumes like it.  The extended
+  problem keeps the claims of `unzip` that Lemma M5⁺ allows, unless `--no-claims`, the formulation of the certificates
+  made before it; a line records which.
 * **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
   that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
   the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they
@@ -210,7 +211,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game); and `own`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) over every invocation, the clock of the wall.  It is 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game), and for a search that ran only before its game was the oldest of the window.  A line written before 2026-10-22 lacks `own`; the readers ignore it, and the schema is 5 still |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `lab` | a key that only the line of a game whose search a lab changed has (`--lab-dir`, [design/lab.md](design/lab.md)): `restarts`, each restart's time `at`, the game's `own_seconds` then, the `nodes` of the search abandoned, its `tactics` and the checkpoint put `aside`; `conflict_branching`, the lab's last setting of it (`"on"`, `"off"` or null); and `branching_changes`, how many times the lab set it.  `tactics` and `tactic_switches` are then those the search ran with, its branching as it ended |
-| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `keep_going`, `retry`, `retry_improved` (true), `pass` (the number `--pass` was given), and `finder_after` and `finder_seconds` (the numbers of the finder flags) |
+| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `keep_going`, `retry`, `retry_improved`, `background` (true), `pass` (the number `--pass` was given), and `finder_after` and `finder_seconds` (the numbers of the finder flags) |
 | `optimal_match` | true: the score equals `optimal.json`'s (a score that differs is a hard error, never written); null if the table has no game of n |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 

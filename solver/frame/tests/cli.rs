@@ -589,6 +589,34 @@ fn solve_writes_its_results_skips_what_is_done_and_resumes_what_was_stopped() {
     assert!(!ckpt.join("n1000.ckpt").exists(), "a finished game removes its checkpoint");
 }
 
+/// `--background` is a switch that `solve` and `certify` take, which changes no score, which a line records in its
+/// `options` where it was given, and which says on stderr, once, that it does nothing where there is no idle policy.
+#[test]
+fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
+    assert_usage_error(&["solve", "12", "--background=1"], "--background takes no value");
+    assert_usage_error(&["certify", "12", "--background"], "certify needs --results FILE and --upper FILE");
+
+    let dir = TempDir::new("solve-background");
+    let line = |name: &str, extra: &[&str]| {
+        let file = dir.join(name);
+        let args = ["solve", "1000", "--force-search", "--threads", "3", "--progress", "0", "--out", path(&file)];
+        let run = taxman(&[&args[..], extra].concat());
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        let text = fs::read_to_string(&file).unwrap();
+        (Json::parse(text.trim()).unwrap(), run.stderr)
+    };
+    let (plain, said) = line("plain.jsonl", &[]);
+    let (background, note) = line("background.jsonl", &["--background"]);
+    assert_eq!(plain.get("score"), background.get("score"));
+    assert_eq!(plain.get("options").unwrap().get("background"), None, "a line without the flag has no record of it");
+    assert_eq!(background.get("options").unwrap().get("background"), Some(&Json::Bool(true)));
+    assert!(!said.contains("--background"), "{said}");
+    // Where there is no idle policy, each of the three workers would say so; the run says it once.
+    if cfg!(not(target_os = "linux")) {
+        assert_eq!(note.matches("--background does nothing on this system").count(), 1, "{note}");
+    }
+}
+
 /// A game that passes the wall (`--game-hours`) ends `solve` with exit status 4 and the line `wall at N after H
 /// hours` on stdout; nothing is recorded for the game, its checkpoint and clock are kept, and the same command with a
 /// larger limit finishes it (and removes the clock).  (A node limit stops the search before it can complete, and a

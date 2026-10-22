@@ -240,9 +240,11 @@
 //!
 //! # Platforms
 //!
-//! The engine uses only `std` (plus the POSIX `signal`, `kill` and `_exit`, declared in `sys`) and behaves
-//! the same on Linux and macOS.  Checkpoints are durable on both: the file is written, `sync_all`ed (`fsync`
-//! on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one, and the directory is then synced so the
+//! The engine uses only `std` (plus the POSIX `signal`, `kill` and `_exit`, declared in `sys`, and on Linux
+//! `sched_setscheduler`, declared in `idle`) and behaves the same on Linux and macOS, but for
+//! [`EngineConfig::background`], which does nothing on macOS.  Checkpoints are durable on both: the file is
+//! written, `sync_all`ed (`fsync` on Linux, `F_FULLFSYNC` on macOS) and renamed over the old one, and the directory
+//! is then synced so the
 //! rename itself survives a crash (needed on Linux; on platforms that cannot sync a directory this is skipped
 //! and the rename is still atomic).  Worker stacks reserve [`WORKER_STACK_SIZE`] of address space each,
 //! committed only as touched.  `EngineConfig::default` takes `available_parallelism`, which on Linux honours
@@ -258,7 +260,7 @@ use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Once, PoisonError, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -350,6 +352,10 @@ pub struct EngineConfig {
     /// number of workers) and watches it: see [`Control`] and "The control" in the module docs.  `None`, the default:
     /// the run goes as configured.
     pub control: Option<Arc<Control>>,
+    /// Each worker puts itself under the kernel's idle scheduling policy as it starts ([`background_priority`]), so
+    /// that the search takes the CPU that nothing else wants.  The thread that calls [`run`], which coordinates, keeps
+    /// its policy.  Off by default.
+    pub background: bool,
 }
 
 impl Default for EngineConfig {
@@ -367,6 +373,7 @@ impl Default for EngineConfig {
             progress_note: None,
             cores: None,
             control: None,
+            background: false,
         }
     }
 }
@@ -868,12 +875,18 @@ where
         shared.request_stop();
     }
     let make = &make;
+    let background = cfg.background;
     thread::scope(|scope| {
         let spawn = |i: usize| {
             thread::Builder::new()
                 .name(format!("engine-{i}"))
                 .stack_size(WORKER_STACK_SIZE)
-                .spawn_scoped(scope, move || shared.worker(i, make))
+                .spawn_scoped(scope, move || {
+                    if background {
+                        background_priority();
+                    }
+                    shared.worker(i, make);
+                })
                 .map(drop)
         };
         shared.grow(&spawn, true);
@@ -1036,6 +1049,26 @@ pub fn stop_signal() -> Option<i32> {
     match STOP_SIGNAL.load(Ordering::Relaxed) {
         0 => None,
         signal => Some(signal),
+    }
+}
+
+/// Puts the calling thread under the kernel's idle scheduling policy (Linux `SCHED_IDLE`): any other process, whatever
+/// its nice value, runs before it, so the thread takes exactly the CPU that nothing else wants.  A worker calls it as
+/// it starts when [`EngineConfig::background`] is set.  It is set for the thread, not the process: a thread cannot
+/// leave the policy without privilege, and the threads and processes it starts inherit it, which is why the thread that
+/// coordinates a run does not call it.
+///
+/// Where the policy cannot be set (another system than Linux, or a kernel that refuses), the search goes on at normal
+/// priority and this says so once, on stderr.
+pub fn background_priority() {
+    static SAID: Once = Once::new();
+    if let Err(e) = idle::set() {
+        SAID.call_once(|| match e.kind() {
+            io::ErrorKind::Unsupported => report("note: --background does nothing on this system"),
+            _ => {
+                report(&format!("warning: --background: cannot set the idle scheduling policy ({e}); going on without"))
+            }
+        });
     }
 }
 
@@ -2452,6 +2485,50 @@ mod sys {
 
     pub fn exit_now(status: c_int) -> ! {
         std::process::exit(status)
+    }
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// The idle scheduling policy: the one Linux function `std` does not wrap
+// ------------------------------------------------------------------------------------------------------------
+
+#[cfg(target_os = "linux")]
+mod idle {
+    use std::ffi::c_int;
+    use std::io;
+
+    /// `SCHED_IDLE` of `<sched.h>`.
+    const SCHED_IDLE: c_int = 5;
+
+    /// `struct sched_param`, whose one field the idle policy needs at 0.
+    #[repr(C)]
+    struct SchedParam {
+        sched_priority: c_int,
+    }
+
+    extern "C" {
+        fn sched_setscheduler(pid: c_int, policy: c_int, param: *const SchedParam) -> c_int;
+    }
+
+    /// Puts the calling thread under `SCHED_IDLE` (pid 0 is the calling thread on Linux, not the process).
+    pub fn set() -> io::Result<()> {
+        let param = SchedParam { sched_priority: 0 };
+        // SAFETY: `param` is a valid `struct sched_param` for the call's duration, and the call has no other
+        // preconditions.
+        if unsafe { sched_setscheduler(0, SCHED_IDLE, &param) } == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+mod idle {
+    use std::io;
+
+    pub fn set() -> io::Result<()> {
+        Err(io::ErrorKind::Unsupported.into())
     }
 }
 
