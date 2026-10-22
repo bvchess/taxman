@@ -17,8 +17,11 @@ games or in general, is not a priority.  Nothing is published: `optimal.json` st
   for the lab below.  Game 4875 was proven at 7,476,374 on 2026-10-22, in 186 million steps and 56 minutes with conflict
   branching, the default since a88dc7f ([the design](design/search.md#conflict-branching)); before it, the search of
   4875 took 8.5 billion steps over 12 hours and did not finish.
-* **The lab.**  The lab channel (`solve --lab-dir` and `--hook`; [the design](design/lab.md)) and the lab's tools
-  (`solver/tools/lab/lab.sh`; [the runbook page](runbook/lab.md)) are on master.  Automatic studies are being built.
+* **The lab.**  When a game's search passes an hour, the chain starts a study: an agent session in a sandbox that
+  measures the search's units, estimates the work left, works on the standing requests, and may steer the search
+  through the lab channel, which cannot change a result ([the runbook page](runbook/lab.md#studies), [the
+  design](design/lab.md)).  It runs beside the chain since 2026-10-22, at most four studies a day; what the studies find
+  is logged in [the live lab](../notebook/search/the-live-lab-2026-10/README.md).
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.
