@@ -89,7 +89,7 @@ renewed".
 the sandbox may write, and the daily limit is not reached.  One study runs at a time: a `long` event is skipped while
 one runs.  A `done` event starts a study only if `studies/` holds a study of that game's `long` event, which it compares
 the outcome with, so the studies for `done` events are no more than those for `long` events; it waits for the study
-that runs.  `LAB_MAX_PER_DAY` (default 4) bounds the studies for `long` events and the asks together per UTC day;
+that runs.  `LAB_MAX_PER_DAY` (default 8) bounds the studies for `long` events and the asks together per UTC day;
 `LAB_MAX_TURNS` (80), `LAB_ASK_TURNS` (30), `LAB_MODEL` (opus) and `LAB_MAX_HOURS` (3) bound a session, which ends
 shortly after its first result, with anything it left running in the sandbox.  One command of a session may run for an
 hour (`BASH_DEFAULT_TIMEOUT_MS`; a headless session stops a background command after ten minutes otherwise).

@@ -37,7 +37,7 @@
 # Environment:
 #   LAB_HOME           the lab's directory, relative to the home                                  default taxman-lab
 #   LAB_THREADS        threads the session may use (the study procedure says so)                  default 16
-#   LAB_MAX_PER_DAY    studies for a long event, and asks, a day                                  default 4
+#   LAB_MAX_PER_DAY    studies for a long event, and asks, a day                                  default 8
 #   LAB_MAX_TURNS      turns of the session (claude --max-turns)                                  default 80
 #   LAB_ASK_TURNS      turns of an ask                                                            default 30
 #   LAB_MODEL          model of the session                                                       default opus
@@ -58,7 +58,7 @@ CTL="$LAB/ctl"
 WORK="$LAB/work"
 STUDIES="$LAB/studies"
 LAB_THREADS="${LAB_THREADS:-16}"
-LAB_MAX_PER_DAY="${LAB_MAX_PER_DAY:-4}"
+LAB_MAX_PER_DAY="${LAB_MAX_PER_DAY:-8}"
 LAB_MAX_TURNS="${LAB_MAX_TURNS:-80}"
 LAB_ASK_TURNS="${LAB_ASK_TURNS:-30}"
 LAB_MODEL="${LAB_MODEL:-opus}"

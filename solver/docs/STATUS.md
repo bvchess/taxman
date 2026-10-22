@@ -20,7 +20,7 @@ games or in general, is not a priority.  Nothing is published: `optimal.json` st
 * **The lab.**  Ten minutes into a game's search, the chain starts a study: an agent session in a sandbox that may steer
   the search through the lab channel, which cannot change a result, and then studies what it judges most likely to make
   the searches faster ([the runbook page](runbook/lab.md#studies), [the design](design/lab.md)).  It runs beside the
-  chain since 2026-10-22, at most four studies a day; what the studies find is logged in [the live
+  chain since 2026-10-22, at most eight studies a day; what the studies find is logged in [the live
   lab](../notebook/search/the-live-lab-2026-10/README.md).
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
