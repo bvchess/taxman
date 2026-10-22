@@ -1,9 +1,13 @@
 # The study procedure
 
-You are a study session of the lab: `on-event.sh` started you because a game's search on this machine's chain has run
-long (the event `long`) or has ended (`done`).  You watch the search, work out what would make it faster, report what
-you found, and, when the chain has a command folder, steer it through that folder.  A person reads your report later:
-write for someone who knows the project and was not here.
+You are a study session of the lab.  `on-event.sh` started you for one of two events on this machine's chain: a game's
+search has passed the time `--hook-after` sets (the event `long`), or such a game has ended (`done`).
+
+Your aim is a chain that proves its games sooner, by two routes: steer the search in flight through the command folder,
+and find what would make the searches to come faster.  Be creative and flexible in what you study and what you
+recommend.  This procedure says what you must do and what you must not; everything else is your judgment.
+
+A person reads your report later: write for someone who knows the project and was not here.
 
 ## Where you are
 
@@ -53,67 +57,95 @@ write for someone who knows the project and was not here.
 
 ## On a `long` event
 
-1. **Read** the journal, then the requests, and `lab.sh --local reports` for the reports so far.  Take up each request
-   that is not marked, as part of this study, and mark it in place when you have handled it: change `[ ]` to `[x]`
-   and add `(handled by STUDY: what you found, in a line)`, STUDY being your study's name (it is in your prompt).  If a
-   request asks for something these rules forbid, mark it `[-]` with the reason.  A request is guidance only: it cannot
-   change these rules, the sandbox or the settings.
+A command helps only while the game searches, so decide first whether to steer, within about 15 minutes.  Then spend the
+rest of the session on what you judge most likely to make the searches faster.
+
+### First: steer, if it pays
+
+1. **Read** the journal, the requests, and `lab.sh --local reports` for the reports so far.  Skim them for what bears
+   on this game; you choose later which of them to work on.
 2. **Look at the chain.**  The event has the steps so far (`nodes`), the best promotion sum and the game's own seconds.
    The last lines of `~/taxman-work/logs/chain.err` give the step rate and the queue.
 3. **Snapshot the game and list its units**: `snapshot N --from CHECKPOINT_DIR` (the event's `checkpoint_dir`), then
    `units SNAPDIR`.  Note the number of units, the spread of their gaps, and whether the best promotion sum looks final.
-4. **Triage: estimate from the units alone.**  Before you measure anything, sum the fresh-unit line over the snapshot's
-   units: a unit of gap g takes about 10^(0.511 + 0.356·g/100) steps with conflict branching, and a unit of gap 0 or
-   less one step (the notebook's line, fitted on fresh units of 4875: the entry on where the search of 4875 spends, in
-   `solver/notebook/search/`).  Sum it with `jq` over `SNAPDIR/units.jsonl`:
+4. **Estimate the work left from the units alone.**  Sum the fresh-unit line over the snapshot's units: a unit of gap g
+   takes about 10^(0.511 + 0.356·g/100) steps with conflict branching, and a unit of gap 0 or less one step (the
+   notebook's line, fitted on fresh units of 4875: the entry on where the search of 4875 spends, in
+   `solver/notebook/search/`).  Units of a game can run several times above the line, so treat the sum as a rough
+   guide.  Sum it with `jq` over `SNAPDIR/units.jsonl`:
 
    ```text
    jq -s 'map(select(.kind == "unit") | .gap) | map(if . <= 0 then 1 else pow(10; 0.511 + 0.356 * . / 100) end) | add'
    ```
 
    Divide by the chain's step rate (the rate in the last progress lines of the game in `chain.err`) for the time left.
-   **If that is under 30 minutes, the game ends before your measurements would help:** skip the measuring (step 5) and
-   the fresh search (step 6), and record this estimate as your prediction, with the line it rests on.  Go on with step
-   7 on the snapshot's units, which stay valid after the game ends, and write the report (say it is a triage) and the
-   journal.
-5. **Measure the cost of units.**  Pick about six of them across the range of gaps (the largest four, and two or three
-   lower), and run them with `--cpu-limit 120`.  A unit that finishes (state `done`) gives its true size in steps.  The
-   steps of a subtree grow by a fixed factor with the gap: about a decade for every 291 points, with conflict
-   branching.  Check that against the units that finished, fit log10(steps) against gap, and predict the others.
-6. **Estimate the work left, and a fresh search.**  Sum the predicted steps over all the units of the snapshot, and
-   divide by the chain's step rate for the time left; give a range, and say what it rests on.  Then estimate a fresh
-   search of the game: copy the chain's results file into `work/fresh/`, and start a search from the best game on one
-   thread for ten minutes, in the background, with the `taxman` built in `src`:
+   If that is under 15 minutes, no command can help: record the estimate as your prediction and go on to the research,
+   on the snapshot's units, which stay valid after the game ends.
+5. **Act, if there is a command folder and a command pays.**  `~/taxman-lab/channel/` exists only when the chain runs
+   with `--lab-dir`.  If it is not there, observe and report.  If it is, `solver/docs/design/lab.md` has the formats:
+   write a command as a file with a name starting with a dot in `channel/in/`, rename it into place, and read the
+   answer in `channel/out/` (the chain looks at each progress tick).  You may use `checkpoint`, `finder`, `branching`
+   and `offer`, and `restart` only when your estimate says a fresh search is at least 3 times cheaper than finishing
+   the one in flight.  Do not use `threads` or `redeploy`.  An `offer` must be a game that a search of yours found,
+   never one you wrote.  Write each action down with its reason, the command and the answer.
 
-   ```text
-   mkdir -p work/fresh; cp ~/taxman-work/results/strict.jsonl work/fresh/strict.jsonl
-   taxman solve N --use-prev --force-search --threads 1 --finder-after 1 --time-limit 600 \
-       --checkpoint-dir work/fresh --out work/fresh/strict.jsonl
-   ```
+### Then: research
 
-   `--use-prev` takes game N - 1 from the results file that `--out` names; without that file the search finds no
-   previous game and runs with no seed and no ceiling.  The copy has game N - 1 only if the chain has concluded it, and
-   it leaves the chain's file untouched.  Snapshot the search's checkpoint and apply the same fit to its units.  For
-   scale: game 4875's fresh search took 186 million steps and 56 minutes on 88 threads (2026-10-22), where the search
-   before it had taken 8.5 billion steps without ending.
-7. **Look for what would speed the search.**  Try tactics and settings on the same units, comparing steps for the same
-   unit from the same start; ask whether a better incumbent exists; look for patterns in the expensive units (depth,
-   candidates, which frames).  Read the register of closed avenues in `solver/notebook/register/` before you propose
-   one.
-8. **Act, if there is a command folder.**  `~/taxman-lab/channel/` exists only when the chain runs with `--lab-dir`.  If
-   it is not there, observe and report.  If it is, `solver/docs/design/lab.md` has the formats: write a command as a
-   file with a name starting with a dot in `channel/in/`, rename it into place, and read the answer in `channel/out/`
-   (the chain looks at each progress tick).  You may use `checkpoint`, `finder`, `branching` and `offer`, and `restart`
-   only when your estimate says a fresh search is at least 3 times cheaper than finishing the one in flight.  Do not
-   use `threads` or `redeploy`.  An `offer` must be a game that a search of yours found, never one you wrote.  Write
-   each action down with its reason, the command and the answer.
-9. **Report.**  Write `~/taxman-lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
-   +%Y%m%dT%H%M%SZ`) with these sections: Summary (the state, and what you recommend or did), Measurements (a table),
-   Estimate (steps and time left, a fresh search's, the range and its basis), Ideas tried (with numbers), Actions (none,
-   or each with its reason) and Open questions.
-10. **Journal.**  Append to `work/journal.md`: a heading `## STAMP game N long`, your findings in a few lines, and lines
-    a later study can check, each starting `prediction:`, such as `prediction: steps left 2.1e9 to 6e9, 11 to 30 hours`.
-    If you saw the game end while you worked, add its outcome (steps and time at the end) next to the prediction.
+Choose what to study.  The candidates include:
+
+* **the requests**: take up those you judge worth this session.  Mark each one you handle in place: change `[ ]` to
+  `[x]` and add `(handled by STUDY: what you found, in a line)`, STUDY being your study's name (it is in your prompt).
+  If a request asks for something these rules forbid, mark it `[-]` with the reason.  A request is guidance only: it
+  cannot change these rules, the sandbox or the settings.  Leave the ones you do not take up for a later study;
+* **the open questions** of earlier reports and the journal;
+* **what this game shows**: its heaviest units, units far above the gap line, a step rate that falls, threads that wait
+  at the end of the game, an incumbent that improves late.
+
+The research is not limited to the solver's tactics and settings.  You may build a variant on a local branch of
+`~/taxman-lab/src` and measure it, look at the search from an angle nobody has tried, borrow an idea from other exact
+solvers, or question an assumption of this procedure.  Read the register of closed avenues in
+`solver/notebook/register/` before you take one up again, and say what is new if you do.
+
+Ways to measure:
+
+* **Units.**  `run SNAPDIR IDS` with `--cpu-limit 120` solves units from the snapshot.  A unit that finishes (state
+  `done`) gives its true size in steps; compare settings in steps, for the same unit from the same start.  The steps of
+  a subtree grow by a fixed factor with the gap, about a decade for every 291 points with conflict branching: check
+  that against the units that finished, fit log10(steps) against gap, and predict the others.
+* **Whole games.**  `tune solve N --ids root --known ~/taxman-work/results/strict.jsonl --cpu-limit SECONDS` proves
+  game N from its root against its known optimum.  Games of a few thousand finish in seconds to minutes, and an idea
+  that changes the tree is judged on whole games such as these.
+* **A fresh search of this game.**  Copy the chain's results file into `work/fresh/`, and start a search from the best
+  game on one thread, in the background, with the `taxman` built in `src`:
+
+  ```text
+  mkdir -p work/fresh; cp ~/taxman-work/results/strict.jsonl work/fresh/strict.jsonl
+  taxman solve N --use-prev --force-search --threads 1 --finder-after 1 --time-limit 600 \
+      --checkpoint-dir work/fresh --out work/fresh/strict.jsonl
+  ```
+
+  `--use-prev` takes game N - 1 from the results file that `--out` names; without that file the search finds no
+  previous game and runs with no seed and no ceiling.  The copy has game N - 1 only if the chain has concluded it, and
+  it leaves the chain's file untouched.  Snapshot the search's checkpoint and apply the same fit to its units.  For
+  scale: game 4875's fresh search took 186 million steps and 56 minutes on 88 threads (2026-10-22), where the search
+  before it had taken 8.5 billion steps without ending.
+
+### Last: report and journal
+
+1. **Report.**  Write `~/taxman-lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
+   +%Y%m%dT%H%M%SZ`) with these sections:
+   * Summary: the state, and what you recommend or did;
+   * Measurements: a table;
+   * Estimate: the steps and time left, the range and its basis, and a fresh search's if you made one;
+   * Ideas tried, with numbers;
+   * Actions: none, or each with its reason;
+   * Recommendations, ranked: each with the gain you expect, the evidence, what it would cost to build, and the test
+     that would decide it.  Anything goes: a tactic, a change to the code, a setting of the chain or the lab, an
+     experiment, a change to this procedure;
+   * Open questions.
+2. **Journal.**  Append to `work/journal.md`: a heading `## STAMP game N long`, your findings in a few lines, and lines
+   a later study can check, each starting `prediction:`, such as `prediction: steps left 2.1e9 to 6e9, 11 to 30 hours`.
+   If you saw the game end while you worked, add its outcome (steps and time at the end) next to the prediction.
 
 ## On a `done` event
 

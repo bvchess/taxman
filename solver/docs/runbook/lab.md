@@ -49,11 +49,16 @@ machine's home.
 
 ## Studies
 
-The chain tells a program when a game's search runs long, and when it ends (`--hook`, [the lab
-channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study: an agent
-session that follows `study.md`, snapshots the game, measures its units, estimates the work left and a fresh search's,
-looks for what would speed the search, and writes a report and an entry in a journal.  If the chain has a command
-folder (`--lab-dir`, `~/taxman-lab/channel`), the study may act through it: the solver validates every command.
+The chain tells a program when a game's search passes `--hook-after` seconds, and when that game ends (`--hook`,
+[the lab channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study:
+an agent session that follows `study.md`.  A study first estimates the work left from the game's units, and decides
+whether to steer the search through the command folder (`--lab-dir`, `~/taxman-lab/channel`); the solver validates
+every command.  Then it studies what it judges most likely to make the searches faster, from the standing requests to
+ideas of its own, and writes a report, with its recommendations ranked, and an entry in a journal.
+
+A study can steer a search only while the search runs, so start it early: `--hook-after 600` in `EXTRA_ARGS` starts one
+ten minutes into a game's search, after the chain has written a checkpoint for it to copy.  The default, an hour, suits
+a chain whose games take many hours.
 
 **What governs a study comes from the chain's checkout.**  The hook is `~/taxman/solver/tools/lab/on-event.sh`, reviewed
 code of the chain's checkout, never a copy in `~/taxman-lab/src`, whose files a study may change.  The settings are

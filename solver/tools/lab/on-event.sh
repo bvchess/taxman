@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The program that `taxman solve --hook` runs when a game's search passes an hour and when it ends: it starts a study,
-# an agent session in a sandbox that observes the search and reports on it (solver/docs/runbook/lab.md, "Studies").
+# The program that `taxman solve --hook` runs when a game's search passes `--hook-after` and when it ends: it starts
+# a study, an agent session in a sandbox that steers the search and studies it (solver/docs/runbook/lab.md, "Studies").
 # It is code of the chain's checkout, which the sandbox cannot write; so are the settings it hands to the session
 # (rendered fresh from settings.template.json at every start) and the procedure the session follows (study.md).  It
 # never runs from the lab's own checkout, whose files a study may change.
