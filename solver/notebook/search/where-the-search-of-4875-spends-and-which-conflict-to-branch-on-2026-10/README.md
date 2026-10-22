@@ -340,6 +340,14 @@ rule and 2,026 without it (`--tactic conflict_branching=off`): the rule costs st
 The note above that no tripwire's tree changed (the default since a88dc7f) held for the quick check only; `cargo test
 --release` found the six rows of game 1000 moved, and `tests/tripwires.rs` pins them at the counts with the rule.
 
+**2026-10-22, the lab.**  Whether the gate of 300 should depend on the game's size is answered no.  A study of game 4884
+swept the gate from 0 to 800 on that game's units and on whole games 1000 to 3000: by CPU the best gates are 150 and 300
+at every size, and gate 0 halves the steps but makes a step cost two to three times the CPU.  Game 1000 proved from its
+optimum takes 1,734 steps at every gate from 300 up, since no check reaches gap 300, so its 3,360 steps against 2,026
+from scratch lie, by inference, in a search with a weak incumbent; a chain game starts from the previous game's best.
+[The live lab](../the-live-lab-2026-10/README.md#2026-10-22-game-4884-a-triage-and-the-gate-of-conflict-branching) has
+the numbers.
+
 ## Files
 
 * `units-fresh.jsonl`: the 96 units of the fresh search's checkpoint at 3.0 million steps (`run-fresh.sh`, then

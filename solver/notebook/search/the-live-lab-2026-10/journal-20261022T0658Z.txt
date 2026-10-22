@@ -1,0 +1,53 @@
+# Journal of the studies
+
+
+## 20261022T044718Z game 4875 long
+
+Study 4875-20261022T040654Z, a replay on the archived default search (conflict branching off; 8.54e9 steps, best
+538080, 43,702 s).  The snapshot has 14,230 units, gaps -48 to 1,836 (median 563, 21 at 1,600 or more).  No unit of
+gap >= 1,200 finished in 250k (on) or 400k to 1.5M (off) steps.  Finished units (gap: on/off steps): 800: 1,576/3,819;
+900: 624/714; 1,000: 29,421/315,017; 1,100: 64,291/216,314; 1,300: 199,188/(not run).  The line through the finished
+units with conflict branching, -0.99 + 0.500 gap/100, is steeper than the notebook's fresh-unit line
+(0.511 + 0.356) and overshoots at large gaps.  `tune` has no --cpu-limit; I used step limits.  No command folder, no
+action.  The chain had already restarted 4875 fresh with conflict branching: 1.86e8 steps, 56 min.
+prediction: the old search, left as it was (off), had 7.7e9 to 2.5e10 steps left, 18 to 58 hours at 120k steps/s
+prediction: the old search switched to conflict branching would have needed 3e8 to 1.5e9 more steps, 1.5 to 8 hours at 55k steps/s
+prediction: a fresh search with conflict branching takes 5e7 to 2e8 steps, 0.3 to 1 hour at 55k steps/s (actual, known in the replay: 1.86e8, 56 min)
+Later: unit 4875-294 (gap 1,200, depth 18) did not finish with conflict branching in 1,000,447 steps (1,515 CPU s), nor without it in 1.5e6; the unit fit predicts 1e5 for it, so single deep-deque units can run ten or more times above any gap line.
+
+## 20261022T053931Z game 4880 long
+
+Study 4880-20261022T052051Z.  At the event the game had 2.58e8 steps, best 542420 and 5,523 s of own search, with
+conflict branching on.  The snapshot held 2,359 units, gaps 1 to 1,556 (median 428).  14 units finished (gaps 400 to
+1,203).  Their fit is log10 steps = 0.605 + 0.391 gap/100 (sd 0.42 decades), close to the notebook's 0.511 + 0.356.
+Conflict branching off took 5 to 19 times on's steps on 4 units of gaps 599 to 1,004.  It was better on one: 4880-241
+(gap 1,476), which off finished in 20,396 steps, where on had not finished at 49,957.  No command sent.  The fresh
+search's command needs `--out` with a copy of the chain's results to chain from 4879.  Background jobs in a session are
+stopped after 10 minutes of wall time.
+prediction: steps left 3e7 to 2e8 (point 4.0e7), 8 minutes to 1.3 hours at 42k to 64k steps/s (made at 05:39Z, just before I saw the result)
+prediction: a fresh search with conflict branching would take 1.6e8 to 3.5e9 steps (point 4e8)
+Outcome, seen at 05:39Z: proved exhausted at 289,485,607 steps, 3.13e7 after the snapshot (0.78 of the point estimate), about 11 minutes.
+
+## 20261022T054120Z game 4880 done
+
+Study 4880-20261022T054103Z.  Game 4880 proved exhausted at 289,485,607 steps and 6,139.9 s of own search; score
+7,492,916, best promotion sum 542,420 (unchanged since the `long` event; the finder at 258.2e6 steps improved nothing).
+comparison: steps after the long event 3.13e7 (289,485,607 - 258,200,571), against predicted 3e7 to 2e8, point 4.0e7: ratio 0.78 to the point, inside the range at its low end.
+comparison: own time after the long event 617 s (10.3 min, 6,139.9 - 5,523), against predicted 8 minutes to 1.3 hours; mean rate 50.7k steps/s, inside the assumed 42k to 64k.
+comparison: the fresh-search prediction (1.6e8 to 3.5e9 steps) cannot be checked; no fresh search was run.
+comparison: the gap fit (0.605 + 0.391 gap/100, sd 0.42 decades) summed over the snapshot's 2,359 units was 0.1 decade high, well inside its scatter.  Caveat: that prediction was written at 05:39Z, after the game had ended at 05:31Z, though from the snapshot alone and before the study saw the result.
+
+## 20261022T065716Z game 4884 long
+
+Study 4884-20261022T063108Z, a triage.  At the event 4884 had 1.726e8 steps, best 543308 and 3,600 s, conflict branching
+on, about 52k steps/s.  The snapshot (172,689,331 steps) held 1,880 units, gaps 1 to 1,080 (957 under 300).  Units of
+this game run 2 to 5 times above the notebook's line: 4884-443 (gap 1,023) took 44,424 steps and 4884-1560 (1,080) took
+45,202.  On the request (the gate of 300): on 17 units of gap 300 to 571, on took 0.31 of off's steps and 0.54 of its
+CPU, though it cost steps on 9 of them (median 1.4×).  Gate 0 halves the steps against 300 but doubles the CPU per
+step.  Gates 150 to 300 are best by CPU on 4884's units and on whole games 1000 to 3000 proved against the optimum
+(gate 150 was 12% cheaper on 3000).  Game 1000 proved shows no cost, since no check reaches gap 300 there.  The variant
+is on local branch study-4884-gate (TAXMAN_CB_GAP, feature studies), built in work/target-gate.  No command sent.
+prediction: steps left 5.8e5 (notebook line) to 1.4e6 (4880 fit), 11 to 26 s at 52k steps/s
+Outcome, seen at about 06:32Z: proved exhausted at 174,744,268 steps and 3,638 s own, 2.05e6 steps and about 38 s after the snapshot: 3.5 times the notebook line, 1.5 times the 4880 fit; best unchanged at 543308.
+prediction: on whole games of 3000 to 4000 proved against the optimum, gate 150 takes 0.85 to 1.0 of gate 300's CPU and gate 0 takes more than gate 300's
+comparison: done event (study 4884-20261022T065820Z): predicted 5.8e5 to 1.4e6 steps, 11 to 26 s left; the event gives 174,744,268 steps and 3,640 s (1.01 h) own, so 2.05e6 steps (from the snapshot at 172,689,331) and about 38 s after the prediction: 1.5 times the high end, 3.5 times the low end.  Units of this game ran 2 to 5 times above the notebook line, as the long study measured; result 543308 proved exhausted, unchanged.
