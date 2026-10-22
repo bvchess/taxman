@@ -108,10 +108,8 @@ of its own, with no input or output and the event as its one argument, a JSON ob
 and ignores its failure; each start, and each failure to start, is a line on stderr.  A thread of its own collects the
 program when it ends, so that none is left a zombie.
 
-* **`long`**, once a game: when the game's own search passes `--hook-after` seconds (3600 by default), as soon as its
-  engine runs.  A game's own search is the time it has been the head of the window with its search running, summed over
-  invocations, the clock of the wall ([engine.md, "The window: games in flight"](engine.md#the-window-games-in-flight),
-  the item "The wall").
+* **`long`**, once a game: when the game's own search ([glossary](../../../docs/GLOSSARY.md#the-search)) passes
+  `--hook-after` seconds (3600 by default), as soon as its engine runs.
 * **`done`**, when a game that had `long` has its line.
 
 The argument is one JSON object, with these fields; a program should ignore any other:

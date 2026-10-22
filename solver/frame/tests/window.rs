@@ -304,6 +304,10 @@ fn a_game_that_passes_the_wall_goes_on_from_its_clock(lo: u32, hi: u32) {
     assert_eq!(seen, (lo..=hi).collect::<Vec<_>>());
     assert_eq!(lines(&results).iter().map(n_of).collect::<Vec<_>>(), (lo..=hi).collect::<Vec<_>>());
     verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
+    // The game's line records its own search time over every invocation, which is no less than the clock it went on from.
+    let head = lines(&results).into_iter().find(|line| n_of(line) == lo).unwrap();
+    let own = head.get("seconds").and_then(|seconds| seconds.get("own")).and_then(Json::as_f64).expect("seconds.own");
+    assert!(own >= kept, "{own} {kept}");
     let left: Vec<String> = fs::read_dir(&checkpoints)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())

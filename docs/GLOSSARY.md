@@ -186,10 +186,15 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **checkpoint**: a periodic pause in which all workers stop and the engine writes the unexplored work, the incumbent
   and statistics to `nNNNN.ckpt`.  Its **header** identifies the search: n, the set width, digests of the candidates
   and frames, `max_total` and the tactics.
+* **own search**: the time a game's search has run while the game was the oldest of the window, summed over every run
+  of it.  The time it waited behind an older game, suspended while that game held the threads, is not in it, and
+  neither is the time a speculative search ran before the game became the oldest.  The driver keeps it as the game's
+  *clock*, in `nNNNN.clock` beside the checkpoint ([solver/docs/design/engine.md, "The window: games in
+  flight"](../solver/docs/design/engine.md#the-window-games-in-flight), the item "The wall").  A result line records it
+  as `seconds.own`, the summary line as `own=`, and `wall.sh status` shows it as the `own search` column.
 * **the wall**: the first game whose own search takes longer than a set number of hours.  `taxman solve --game-hours
-  H` ends a range there.  The project's limit (2026-10-16) is 24 hours of the game's own search, not time spent waiting
-  behind another game, on one `c8g.16xlarge` with the run's build and settings: `--game-hours 24`, the hours the game
-  has been the oldest of the window with its search running.
+  H` ends a range there.  The project's limit (2026-10-16) is 24 hours of the game's own search on one `c8g.16xlarge`
+  with the run's build and settings: `--game-hours 24`.
 
 ## Bounds
 

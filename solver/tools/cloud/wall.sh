@@ -552,6 +552,11 @@ launch() {
 
 # --- status ------------------------------------------------------------------------------------------------------
 
+# What the line of a game that is not recorded has (an extended regular expression, for grep -E): the solver prints one
+# for a game whose search a limit stopped, with `incomplete` where a recorded game has `optimal`, and the line ends
+# there or, from a solver that prints the own search time, goes on to `own=`.
+INCOMPLETE_LINE=' incomplete($|  own=)'
+
 # The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
 # (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
 # line of a game is the one that counts.
@@ -566,17 +571,19 @@ recorded_games() {
 
 # The games, a line each: the recorded games, then those in flight.  The text on stdin is the lines of the recorded
 # games (recorded_games), then the progress lines of the solver (logs/chain.err).  A recorded game's line, `n=4864
-# score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted`, gives its nodes and its
-# seconds: its setup, its search from the start (waits included) and its conclusion, in the run that recorded it, so
-# they go under `elapsed` (less the runs of a search before an interruption); it has no wall clock and no best sum of
-# promotions.  A game in flight whose search has started prints one progress line every PROGRESS seconds, `n=3930
-# 1h45m00s nodes 1086013550 (242.8k/s) best 341541 queue ...` (the time since the search began, waits included; the
-# nodes so far; the nodes a second in the last interval, or `done`, `optimal`, `stopped`, `failed` or `panicked` in the
-# last line; the best sum of promotions so far), and nothing else says where a game is: a game with no recent line has
-# no state to tell (a setup, a prime or repeated game, a search not started).  Arguments: the first game in flight, how
-# many games are in flight, and the games' wall clocks (ckpt/nNNNN.clock) as "n seconds n seconds ...".  A line is
-# recent unless three lines of another game in flight follow it (a game that still searches prints once an interval).
-# The state of a game in flight is told from its last line:
+# score=7437375   search  nodes=1133462769   4636.026 s  optimal unknown  proof=exhausted  own=3011.250 s  best=341541`,
+# gives the columns of the row: `nodes`; `own search`, the line's own search time (`own=`, the game's wall clock over
+# every run of it); and `best`, its best sum of promotions (`best=`, the score less `in_the_bag`, or `-`).  A line that an
+# older solver printed has neither field, and its row shows `-` for both.  The seconds of the line are not shown: they
+# count the time the game waited behind others.  A game in flight whose search has started prints one progress line
+# every PROGRESS seconds, `n=3930 1h45m00s nodes 1086013550 (242.8k/s) best 341541 queue ...` (the time since the search
+# began, which the table does not show; the nodes so far; the nodes a second in the last interval, or `done`,
+# `optimal`, `stopped`, `failed` or `panicked` in the last line; the best sum of promotions so far), and nothing else
+# says where a game is: a game with no recent line has no state to tell (a setup, a prime or repeated game, a search
+# not started).  Its `own search` is its wall clock (ckpt/nNNNN.clock).  Arguments: the first game in flight, how many
+# games are in flight, and the games' wall clocks as "n seconds n seconds ...".  A line is recent unless three lines of
+# another game in flight follow it (a game that still searches prints once an interval).  The state of a game in flight
+# is told from its last line:
 #   running      the nodes grow (1000 a second or more in the last interval)
 #   suspended    the search has started, but the threads are another game's, and the nodes do not grow
 #   search done  the search has ended (`done` or `optimal`) and the game is not recorded yet: the oldest game is being
@@ -598,19 +605,20 @@ games_table() {
         else if (unit == "G") text *= 1e9
         return text
     }
-    function row(n, own, elapsed, nodes, best, state) {
-        printf "  %5s  %-10s  %-10s  %14s  %9s  %s\n", n, own, elapsed, commas(nodes), commas(best), state
+    function row(n, own, nodes, best, state) {
+        printf "  %5s  %-10s  %14s  %9s  %s\n", n, own, commas(nodes), commas(best), state
     }
     BEGIN {
         first += 0
         last = first + flight - 1
         count = split(clocks, c, " ")
         for (i = 1; i < count; i += 2) held[c[i] + 0] = c[i + 1] + 0
-        row("n", "own search", "elapsed", "nodes", "best", "state")
+        row("n", "own search", "nodes", "best", "state")
     }
     # A recorded game, a row at once, so that the recorded games come above those in flight.  Its state is its score,
     # its method, its proof (the text after `proof=` up to the next two spaces) and `optimal ok`, if the solver found
-    # the game in its table of optimal games.
+    # the game in its table of optimal games.  Its own search time and its best sum are the last two fields of the line
+    # (`  own=3011.250 s  best=341541`), if the solver that printed it had them.
     $1 ~ /^n=[0-9]+$/ && $2 ~ /^score=[0-9]+$/ && $4 ~ /^nodes=[0-9]+$/ && $6 == "s" {
         detail = $3
         where = index($0, "  proof=")
@@ -620,7 +628,14 @@ games_table() {
             detail = detail ", " proof
         }
         if ($7 == "optimal" && $8 != "unknown") detail = detail ", optimal " $8
-        row(substr($1, 3), "-", duration($5 + 0), substr($4, 7), "-",
+        own_time = "-"
+        best_sum = "-"
+        if (match($0, /  own=[0-9]+([.][0-9]+)? s  best=([0-9]+|-)$/)) {
+            split(substr($0, RSTART + 2), ends, " ")
+            own_time = duration(substr(ends[1], 5) + 0)
+            best_sum = substr(ends[3], 6)
+        }
+        row(substr($1, 3), own_time, substr($4, 7), best_sum,
             "recorded, score " commas(substr($2, 7)) " (" detail ")")
     }
     $1 ~ /^n=[0-9]+$/ && $3 == "nodes" && $4 ~ /^[0-9]+$/ && $5 ~ /^\(.*\)$/ && $6 == "best" && $8 == "queue" {
@@ -630,7 +645,6 @@ games_table() {
         game[lines] = n
         finished[lines] = (how !~ /\/s$/)
         at[n] = lines
-        elapsed[n] = $2
         nodes[n] = $4
         best[n] = $7
         last_how[n] = how
@@ -649,7 +663,7 @@ games_table() {
                 }
             }
             if (!(g in at) || stale) {
-                row(g, own, "-", "-", "-", "no recent progress line")
+                row(g, own, "-", "-", "no recent progress line")
                 continue
             }
             if (!searching) {
@@ -665,7 +679,7 @@ games_table() {
                 sub("/s$", " nodes/s", state)
                 state = "running, " state
             }
-            row(g, own, elapsed[g], nodes[g], best[g], state)
+            row(g, own, nodes[g], best[g], state)
         }
     }'
 }
@@ -824,7 +838,7 @@ status() {
         printf '  nothing has been saved to S3 yet\n'
     fi
     # The solver prints a line to chain.out for each game it records: the last is the last game of the results.
-    lines="$(s3_text logs/chain.out | grep '^n=' | grep -v ' incomplete$')"
+    lines="$(s3_text logs/chain.out | grep '^n=' | grep -Ev "$INCOMPLETE_LINE")"
     out="$(printf '%s\n' "$lines" | tail -n 1)"
     recorded="$(printf '%s\n' "$out" | sed -n 's/^n=\([0-9]*\) .*/\1/p')"
     score="$(printf '%s\n' "$out" | sed -n 's/.* score=\([0-9]*\) .*/\1/p')"
@@ -841,6 +855,7 @@ status() {
 # @@NAME, of the state of a chain in ~/taxman-work.  The results file's last lines are enough to find the last game
 # completed, and the last 3000 lines of chain.err to tell the games in flight apart.
 host_script() {
+    printf 'incomplete_line=%q\n' "$INCOMPLETE_LINE"
     cat <<'EOF'
 work="$HOME/taxman-work"
 changed() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
@@ -864,7 +879,7 @@ echo @@result
 tail -n 100 "$work/results/strict.jsonl" 2>/dev/null | grep '"completed":true' | tail -n 1 |
     grep -o '"n":[0-9]*,"score":[0-9]*' | head -n 1
 echo @@out
-grep '^n=' "$work/logs/chain.out" 2>/dev/null | grep -v ' incomplete$'
+grep '^n=' "$work/logs/chain.out" 2>/dev/null | grep -Ev "$incomplete_line"
 echo @@clocks
 for f in "$work"/ckpt/n*.clock; do
     [ -f "$f" ] && echo "$(basename "$f") $(awk '{print $1; exit}' "$f")"

@@ -497,6 +497,10 @@ pub struct Phases {
     pub search: Duration,
     /// The branch and bound over every invocation of a resumed search (see `SearchResult::time_all_runs`).
     pub search_all_runs: Duration,
+    /// The game's own search time, over every invocation: the time its search ran while the game was the oldest of the
+    /// window, the clock of the wall (`window`, "The wall"), which leaves out the time a search waited behind an older
+    /// game.  Zero for a game with no search to run (a prime, trivial, repeated or known game).
+    pub own: Duration,
     /// The whole game (this invocation only).
     pub total: Duration,
 }
@@ -509,6 +513,7 @@ impl Phases {
             ("greedy", secs(self.greedy)),
             ("search", secs(self.search)),
             ("search_all_runs", secs(self.search_all_runs)),
+            ("own", secs(self.own)),
             ("total", secs(self.total)),
         ])
     }
@@ -761,7 +766,8 @@ impl GameResult {
     }
 
     /// One line for a person: n, score, method, nodes, time, the comparison with `optimal.json`, the proof,
-    /// and what it assumes, if anything.
+    /// and what it assumes, if anything; then the game's own search time and its best promotion sum (the score less
+    /// `in_the_bag`, or `-` for a game that has no `in_the_bag`).
     pub fn summary_line(&self) -> String {
         let optimal = match (self.completed, self.optimal_match) {
             (false, _) => "incomplete",
@@ -786,13 +792,18 @@ impl GameResult {
             }
             _ => String::new(),
         };
+        let best = self
+            .in_the_bag
+            .and_then(|bag| self.score.checked_sub(bag))
+            .map_or_else(|| "-".to_owned(), |sum| sum.to_string());
         format!(
-            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}{seeded}",
+            "n={:<5} score={:<9} {:<7} nodes={:<11} {:>9.3} s  {optimal}{proof}{assumes}{seeded}  own={:.3} s  best={best}",
             self.n,
             self.score,
             self.method.as_str(),
             self.nodes,
-            self.phases.total.as_secs_f64()
+            self.phases.total.as_secs_f64(),
+            self.phases.own.as_secs_f64()
         )
     }
 }
@@ -1395,6 +1406,8 @@ struct Context<'a> {
     /// The game's own time before its conclusion: its setup, its repeat lookup and its search, not the time it
     /// waited in the window.
     own: Duration,
+    /// The game's own search time over every invocation: its clock (`Phases::own`).
+    own_search: Duration,
     /// When its conclusion began.
     since: Instant,
 }
@@ -1411,6 +1424,7 @@ fn conclude(
     result.moves = moves;
     result.promotions = promotions;
     result.phases.total = context.own + context.since.elapsed();
+    result.phases.own = context.own_search;
     let method = result.method.as_str();
     // A completed game claims to be optimal, so it must be over and open with the largest prime.
     let refereed = if result.completed { replay_finished(n, &result.moves) } else { replay(n, &result.moves) };

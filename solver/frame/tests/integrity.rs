@@ -363,6 +363,31 @@ fn result_lines_carry_their_provenance() {
     assert_eq!(ResultsFile::open(&results, Optimal::built_in(), 1).unwrap().earlier_runs(600), 1);
 }
 
+/// A game's own search time, `seconds.own` of its line, and its best promotion sum end its summary line: a game with no
+/// search to run has no own search time, and a game with no `in_the_bag` (a prime one) has `-` for its best sum.
+#[test]
+fn a_summary_line_ends_with_the_games_own_search_time_and_its_best_promotion_sum() {
+    let games = solver::solve_range(1, 60, &options(1), None).unwrap();
+    let methods: Vec<&str> = games.iter().map(|g| g.method.as_str()).collect();
+    for kind in ["trivial", "prime", "repeat", "search"] {
+        assert!(methods.contains(&kind), "no {kind} game in 1..=60: {methods:?}");
+    }
+    for game in &games {
+        let line = game.to_json();
+        let own = line.get("seconds").and_then(|seconds| seconds.get("own")).and_then(Json::as_f64);
+        assert_eq!(own, Some(game.phases.own.as_secs_f64()), "n={}", game.n);
+        match game.method.as_str() {
+            "trivial" | "prime" | "repeat" => assert_eq!(game.phases.own, Duration::ZERO, "n={}", game.n),
+            "search" => assert!(game.phases.own > Duration::ZERO, "n={}", game.n),
+            _ => {}
+        }
+        let best = game.in_the_bag.map_or_else(|| "-".to_owned(), |bag| (game.score - bag).to_string());
+        let ends = format!("  own={:.3} s  best={best}", game.phases.own.as_secs_f64());
+        assert!(game.summary_line().ends_with(&ends), "n={}: {}", game.n, game.summary_line());
+        assert_eq!(best == "-", game.method.as_str() == "prime", "n={}", game.n);
+    }
+}
+
 #[test]
 fn a_resumed_game_counts_its_invocations_and_its_time() {
     let dir = TempDir::new("invocations");

@@ -1,5 +1,5 @@
-//! The wall clock of a game: how long its own search has run, kept between invocations (`--game-hours`; "The wall" in
-//! [`window`](super::window)).
+//! The wall clock of a game: how long its own search has run, kept between invocations (the wall `--game-hours` counts
+//! it, and a line records it as `seconds.own`; "The wall" in [`window`](super::window)).
 //!
 //! The clock is a file beside the game's checkpoint, `n<NNNN>.clock`, holding the seconds the game has been the head of
 //! the window with its search running, summed over every invocation that searched it.  The checkpoint holds the
@@ -65,8 +65,8 @@ pub(super) fn keep(opts: &SolveOptions, n: u32, held: Duration) {
 pub(super) fn forget(opts: &SolveOptions, n: u32) {
     let Some(path) = opts.clock_file(n) else { return };
     for file in [path.with_extension("clock.tmp"), path] {
-        // Absent is the usual case (no wall was asked for); a file that stays only keeps a reading that `resume`
-        // ignores without a checkpoint.
+        // Absent is the usual case (the game's search ended before its first interval); a file that stays only keeps a
+        // reading that `resume` ignores without a checkpoint.
         let _ = fs::remove_file(file);
     }
 }

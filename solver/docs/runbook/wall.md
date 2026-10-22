@@ -17,7 +17,7 @@ capacity 0 and powers off, and nothing starts a machine in place of the one that
 
 | end | what it is | the log says | status of `chain.sh` |
 |---|---|---|---|
-| **the wall** | a game's own search has passed `GAME_HOURS` (24): the hours it has been the oldest game of the window with its search running, over every run of it ([solver/docs/design/engine.md, "The window: games in flight"](../design/engine.md#the-window-games-in-flight)); waiting behind another game does not count | `wall at N after H hours` | 4 |
+| **the wall** | a game's own search ([glossary](../../../docs/GLOSSARY.md#the-search)) has passed `GAME_HOURS` (24) | `wall at N after H hours` | 4 |
 | **the budget** | `BUDGET_HOURS` (74) instance-hours over every machine of the run, counted in the ledger; the solver stops five minutes (`LEDGER_MARGIN`) before they are used up | `stopped by the budget of 74 instance-hours` | 3 |
 | **the date** | `RUN_UNTIL`, the hard date; the solver stops five minutes before it too | `stopped by the date ...` | 3 |
 | the range | the chain reached `CHAIN_TO` (8191, the largest board) | `the range 1-N is complete` | 0 |
@@ -157,17 +157,17 @@ the chain (as of the last save to S3)
   last save to S3: 2026-10-18 15:17 PDT, 5 min 24 s ago
   recorded through 4871 (score 7,461,794)
   the last 6 games recorded and the 4 in flight (window 4; "own search" counts toward the wall of 24 hours):
-      n  own search  elapsed              nodes       best  state
-   4866  -           0.2s                     0          -  recorded, score 7,446,689 (repeat, same_search of 4865)
-   4867  -           2m07s           34,218,766          -  recorded, score 7,449,976 (search, exhausted)
-   4868  -           1h17m16s     1,133,462,769          -  recorded, score 7,453,452 (search, exhausted)
-   4869  -           0.2s                     0          -  recorded, score 7,456,914 (start, cap)
-   4870  -           0.2s                     0          -  recorded, score 7,459,353 (repeat, same_search of 4868)
-   4871  -           0.1s                     0          -  recorded, score 7,461,794 (prime, prime_formula)
-   4872  1h15m00s    1h45m00s     1,086,013,550    341,541  running, 242.8k nodes/s
-   4873  -           -                        -          -  no recent progress line
-   4874  -           -                        -          -  no recent progress line
-   4875  -           1h10m00s                63    341,541  suspended
+      n  own search           nodes       best  state
+   4866  0.0s                     0    537,485  recorded, score 7,446,689 (repeat, same_search of 4865)
+   4867  1m49s           34,218,766    538,284  recorded, score 7,449,976 (search, exhausted)
+   4868  50m11s       1,133,462,769    538,760  recorded, score 7,453,452 (search, exhausted)
+   4869  0.0s                     0    538,745  recorded, score 7,456,914 (start, cap)
+   4870  0.0s                     0    538,760  recorded, score 7,459,353 (repeat, same_search of 4868)
+   4871  0.0s                     0          -  recorded, score 7,461,794 (prime, prime_formula)
+   4872  1h15m00s     1,086,013,550    341,541  running, 242.8k nodes/s
+   4873  -                        -          -  no recent progress line
+   4874  -                        -          -  no recent progress line
+   4875  -                       63    341,541  suspended
 ```
 
 The recorded games come first, in increasing n, and the games in flight follow.  Scores, nodes and best sums have
@@ -175,13 +175,13 @@ thousands separators; game numbers and times do not.  A recorded game's row come
 line in `logs/chain.out` ([the summary line](../REFERENCE.md#the-summary-line-stdout-one-per-game)), the last one if a
 replacement machine printed the game again after an interruption:
 
-* `elapsed` and `nodes`: the line's seconds and nodes.  The seconds are `elapsed` as a game in flight has it, the time
-  from the game's setup to its conclusion with the waits of its search included, but only in the run that recorded the
-  game: a search that an interruption split shows its last run;
+* `own search` and `best`: the line's `own=` and `best=`, the game's own search time over every run of it
+  ([glossary](../../../docs/GLOSSARY.md#the-search)) and its best promotion sum, the score less `in_the_bag`.  Both are
+  `-` where the solver that printed the line did not print them, and `best` is `-` for a prime or known game; a game that
+  ran no search has an own search of 0.0s;
+* `nodes`: the line's nodes;
 * `state`: `recorded`, the score, and in parentheses the line's method and proof, then `optimal ok` when the score is
-  the one in `optimal.json`;
-* `own search` and `best`: `-`.  A game's clock goes with its checkpoint when it is recorded, and `best` is the sum of
-  promotions of a progress line, not the score.
+  the one in `optimal.json`.
 
 `status` tells the state of a game in flight from its last progress line in `logs/chain.err`:
 
@@ -194,10 +194,9 @@ replacement machine printed the game again after an interruption:
   repeated game and a search not started look alike in the logs.
 
 For a game in flight, `own search` is the wall clock that the oldest game keeps in `ckpt/nNNNN.clock` (up to a
-checkpoint interval old; `-` for a game without one), `elapsed` the time since its search began, waits included, and
-`best` the progress line's sum of promotions so far.  Times are in the local time zone (`TZ`) with its abbreviation.
-`save.sh` copies the logs before the checkpoints, so the clock can be a minute or two ahead of `elapsed`, which comes
-from the last progress line of the logs.
+checkpoint interval old; `-` for a game without one), and `best` the progress line's sum of promotions so far.  Times are
+in the local time zone (`TZ`) with its abbreviation.  `save.sh` copies the logs before the checkpoints, so the clock can
+be a minute or two ahead of the nodes and the best sum, which come from the last progress line of the logs.
 
 `status --host USER@HOST` reports a chain that runs on a machine you reach by ssh (`chain.sh` in the tmux session `tx`,
 its state in `~/taxman-work`) instead of a spot instance: it reads that state in one ssh call (key authentication,

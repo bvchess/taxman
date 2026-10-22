@@ -293,8 +293,9 @@ struct Game {
     stage: Stage,
     /// Its own time so far: its setup, its repeat lookup and its search.
     own: Duration,
-    /// Its wall clock: the time it has been the head with its search running, over every invocation (see "The wall");
-    /// kept at zero unless `--game-hours` asks for a wall or a lab is attached (its hook's `long`, its restarts).
+    /// Its wall clock, its own search time: the time it has been the head with its search running, over every
+    /// invocation (see "The wall").  The wall (`--game-hours`), the lab (the hook's `long`, the record of a restart) and
+    /// the game's line (`seconds.own`) read it.
     headed: Duration,
     /// What was last written to its clock file.
     headed_kept: Duration,
@@ -825,6 +826,8 @@ impl<'a> Window<'a> {
             }
             self.tell(n + 1, &prev);
             self.last = Some(prev);
+            // The conclusion was the old head's: the next head's clock counts from here.
+            self.advance_clock(Instant::now());
             self.next += 1;
         }
     }
@@ -841,7 +844,13 @@ impl<'a> Window<'a> {
             _ => return Ok(None),
         };
         let earlier_runs = self.results.as_deref().map_or(0, |file| file.earlier_runs(n));
-        let context = Context { prev: self.last.as_ref(), optimal: self.optimal, own: game.own, since: Instant::now() };
+        let context = Context {
+            prev: self.last.as_ref(),
+            optimal: self.optimal,
+            own: game.own,
+            own_search: game.headed,
+            since: Instant::now(),
+        };
         let concluded = conclude_game(n, found, self.earlier, earlier_runs, self.opts, context);
         self.games.remove(&n);
         match (concluded, self.results.as_deref()) {
@@ -1182,13 +1191,14 @@ impl<'a> Window<'a> {
             }
         };
         self.trace(format_args!("start n={n} threads={threads} seed={} cap={cap:?}", seed.is_some()));
-        let clocked = self.clocked();
-        let Some(game) = self.games.get_mut(&n) else { return };
-        if clocked {
-            // A search that resumes from its checkpoint goes on from the clock the last invocation kept.
-            game.headed = clock::resume(self.opts, n);
-            game.headed_kept = game.headed;
+        // The head's own search begins here: the clock counts from now, not from its last look.
+        if n == self.next {
+            self.advance_clock(now);
         }
+        let Some(game) = self.games.get_mut(&n) else { return };
+        // A search that resumes from its checkpoint goes on from the clock the last invocation kept.
+        game.headed = clock::resume(self.opts, n);
+        game.headed_kept = game.headed;
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
             let _ = go.send(Go { seed, finder_seed, cap, threads });
@@ -1285,14 +1295,10 @@ impl<'a> Window<'a> {
     }
 
     /// Brings the head's wall clock up to `now` if its search runs (the time since the last look is its own search),
-    /// and keeps it in its file once a checkpoint interval has passed since it was last kept.  Does nothing without a
-    /// wall.
+    /// and keeps it in its file once a checkpoint interval has passed since it was last kept.
     fn advance_clock(&mut self, now: Instant) {
         let since = now.saturating_duration_since(self.clock_at);
-        self.clock_at = now;
-        if !self.clocked() {
-            return;
-        }
+        self.clock_at = self.clock_at.max(now);
         let n = self.next;
         let Some(game) = self.games.get_mut(&n) else { return };
         if !matches!(game.stage, Stage::Search(_, Plan::Search(Search::Running(_)))) {
@@ -1302,12 +1308,6 @@ impl<'a> Window<'a> {
         if game.headed >= game.headed_kept + self.opts.checkpoint_interval {
             self.keep_clock(n);
         }
-    }
-
-    /// Whether the driver keeps the head's clock: for the wall, and for a lab (the hook's `long`, and the record of a
-    /// restart).
-    fn clocked(&self) -> bool {
-        self.opts.game_limit.is_some() || self.opts.lab.any()
     }
 
     /// Writes game `n`'s wall clock to its file, if it has run since it was last written.

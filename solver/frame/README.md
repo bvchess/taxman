@@ -182,22 +182,22 @@ The games 1 to 22 show every way the solver finds and proves a game but one.  Fr
 
 ```
 $ taxman solve 1-22 --threads 1 --progress 0 --out first.jsonl
-n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial
-n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
-n=3     score=3         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
-n=4     score=7         trivial nodes=0               0.000 s  optimal ok  proof=trivial
+n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
+n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
+n=3     score=3         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
+n=4     score=7         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
 ...
-n=17    score=93        prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
-n=18    score=111       start   nodes=0               0.000 s  optimal ok  proof=cap
-n=19    score=113       prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
-n=20    score=124       search  nodes=1               0.007 s  optimal ok  proof=exhausted
-n=21    score=144       search  nodes=1               0.015 s  optimal ok  proof=exhausted
-n=22    score=166       repeat  nodes=0               0.000 s  optimal ok  proof=same_search of 21
+n=17    score=93        prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
+n=18    score=111       start   nodes=0               0.000 s  optimal ok  proof=cap  own=0.000 s  best=9
+n=19    score=113       prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
+n=20    score=124       search  nodes=1               0.007 s  optimal ok  proof=exhausted  own=0.006 s  best=10
+n=21    score=144       search  nodes=1               0.015 s  optimal ok  proof=exhausted  own=0.014 s  best=9
+n=22    score=166       repeat  nodes=0               0.000 s  optimal ok  proof=same_search of 21  own=0.000 s  best=9
 ```
 
 Each line is one game: n, its score, how the solver found it, the search's steps, the seconds, a check against the
-built-in table and the proof.  [The reference, section 3](../docs/REFERENCE.md#3-reading-the-output) reads a line field
-by field.  The methods:
+built-in table, the proof, the game's own search time and its best promotion sum.  [The reference, section
+3](../docs/REFERENCE.md#3-reading-the-output) reads a line field by field.  The methods:
 
 * `trivial` (games 1, 4, 6 and others): the game has no candidate to promote, so the game with no promotions is the
   only one.
@@ -217,7 +217,7 @@ ok" says that the score equals the table's: a check, not a proof.
 ```
 $ taxman solve 21 --show --progress 0
 note: no previous game for n=21 (the game of 20 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games, or --use-prev to take the known game of 20
-n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof=exhausted
+n=21    score=144       search  nodes=1               0.001 s  optimal ok  proof=exhausted  own=0.001 s  best=9
   promotions: [9]
   moves: [19, 9, 15, 21, 14, 18, 12, 20, 16]
 ```
@@ -275,11 +275,11 @@ changes the answer.  [The reference](../docs/REFERENCE.md#1-the-flags-of-solve) 
 
 ```
 $ taxman solve 480 --use-prev --force-search --show
-n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof=exhausted
+n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof=exhausted  own=0.004 s  best=5350
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 $ taxman solve 480 --use-prev
-n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain (strict.jsonl)
+n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain (strict.jsonl)  own=0.000 s  best=-
 ```
 
 `--use-prev` draws on the *known games*, the games the repository has already proven (below, "Known games").  The known
@@ -294,12 +294,12 @@ the table's, not that it is proven ([the reference, section 4](../docs/REFERENCE
 
 ```
 $ taxman solve 1-12 --show
-n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial
+n=1     score=0         trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
   promotions: []
   moves: []
-n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula
+n=2     score=2         prime   nodes=0               0.000 s  optimal ok  proof=prime_formula  own=0.000 s  best=-
   ...
-n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof=trivial
+n=12    score=50        trivial nodes=0               0.000 s  optimal ok  proof=trivial  own=0.000 s  best=0
 ```
 
 Each game of a range is built from the one before it.  Moving from one game to the next often leaves the search
@@ -332,10 +332,10 @@ range past the table does, `--force-search` leaves them to their searches:
 ```
 $ taxman solve 1301-1302 --use-prev --force-search --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
-n=1301 0.1s nodes 2979 (done) best 40800 queue 0 spilled 0 | eff 95.4% idle 4.4% lock 0.0% ...
-n=1301  score=532272    search  nodes=2979            0.191 s  optimal unknown  proof=exhausted
-n=1302 0.1s nodes 3723 (done) best 41436 queue 0 spilled 0 | eff 96.3% idle 3.6% lock 0.0% ...
-n=1302  score=533559    search  nodes=3723            0.178 s  optimal unknown  proof=exhausted
+n=1301 0.1s nodes 3251 (done) best 40800 queue 0 spilled 0 | eff 96.0% idle 3.8% lock 0.0% ...
+n=1301  score=532272    search  nodes=3251            0.151 s  optimal unknown  proof=exhausted  own=0.144 s  best=40800
+n=1302 0.1s nodes 3867 (done) best 41436 queue 0 spilled 0 | eff 97.0% idle 2.8% lock 0.0% ...
+n=1302  score=533559    search  nodes=3867            0.125 s  optimal unknown  proof=exhausted  own=0.118 s  best=41436
 ```
 
 Game 1301 is a prime, but `--force-search` also skips the prime formula.  Game 1302 started from 1301.  A node limit
@@ -432,15 +432,15 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 
 ```
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
-n=992 0.3s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% ... pauses 1 (5.6%) max 14.0ms park 0.0ms | nogoods learned 356 ...
-n=992   score=310675    search  nodes=4095            0.300 s  incomplete
+n=992 0.1s nodes 4095 (stopped) best 24158 queue 21 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 367 ...
+n=992   score=310658    search  nodes=4095            0.184 s  incomplete  own=0.180 s  best=24158
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
 $ taxman solve 992 --use-prev --force-search --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
-n=992   score=310690    search  nodes=14789           0.454 s  optimal ok  proof=exhausted
+n=992   score=310690    search  nodes=15783           0.316 s  optimal ok  proof=exhausted  own=0.681 s  best=24190
 ```
 
-The last line is the third invocation of the game: its `nodes` cover all three, its seconds only the last.  The results
+The last line is the third invocation of the game: its `nodes` and its `own` cover all three, its seconds only the last.  The results
 file then holds two incomplete lines and one completed line for game 992, and `taxman verify-results r992.jsonl` counts
 them.
 

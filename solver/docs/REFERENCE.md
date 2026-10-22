@@ -109,11 +109,11 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
 Five lines from different runs:
 
 ```
-n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted
-n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete
-n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298
-n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal
-n=4754  score=7106699   known   nodes=0               0.147 s  optimal unknown  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753
+n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted  own=0.003 s  best=1213
+n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete  own=8.151 s  best=35959
+n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298  own=0.000 s  best=40571
+n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal  own=0.000 s  best=-
+n=4754  score=7106699   known   nodes=0               0.147 s  optimal unknown  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753  own=0.000 s  best=-
 ```
 
 The fields, in order:
@@ -126,7 +126,15 @@ The fields, in order:
 6. how the score compares with `optimal.json`: `optimal ok`, equal; `optimal unknown`, the table has no game of n; or
    `incomplete`.  A score that differs is a hard error, which stops the run, naming the game;
 7. the proof, with the game whose search a `same_search` repeats and the source that a `known` cites;
-8. what the proof assumes, if anything (section 4).
+8. what the proof assumes, if anything (section 4);
+9. `own=`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) in seconds, over every invocation
+   of the game, where the fifth field counts this invocation only: the `seconds.own` of its results line, 0.000 for a
+   game with no search to run (a `trivial`, `prime`, `repeat` or `known` game);
+10. `best=`, the game's best promotion sum: the score less `in_the_bag`, which for an incomplete game is the best so far,
+    or `-` for a game that has no `in_the_bag` (a `prime` or `known` game).
+
+A line that a build before 2026-10-22 printed lacks the last two fields, so a program that reads the line takes them as
+optional.  The line of an incomplete game ends with them, after `incomplete`.
 
 ### The progress line (stderr, every `--progress` seconds and at the end)
 
@@ -165,7 +173,7 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
  "engine":{"splits":0,"checkpoints":0,"spilled_units":0,"max_queue":1},
  "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,
           "digest":"fe5e05eb67406e98"},
- "seconds":{"frames":0.0002,"greedy":0.00001,"search":0.0008,"search_all_runs":0.0008,"total":0.0015},
+ "seconds":{"frames":0.0002,"greedy":0.00001,"search":0.0008,"search_all_runs":0.0008,"own":0.0008,"total":0.0015},
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"match_refine":1,"fix_forced":true,"nogoods":true,
@@ -199,7 +207,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `nodes`, `stats` | the search's steps over all invocations, and the searcher's counters (`match_bounds` counts the node bounds computed, GF(2) or matching) |
 | `engine` | this invocation's splits, checkpoints written, units spilled and largest in-memory queue; and, only on a line whose search started a finder (`--finder-after`), `finder`: `at_nodes` (the search's steps then), `from` (the incumbent's promotion sum then), `best` (the best promotion sum the finder reached), `improved` (its sets that became the incumbent), `refused` (its sets the checks refused: 0), `seconds` (how long it ran) and `found_seconds` (when it reached `best`) |
 | `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (the ceiling as a promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (solver/docs/design/same-search.md), by which a later game finds this one to repeat |
-| `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game) |
+| `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game); and `own`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) over every invocation, the clock of the wall.  It is 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game), and for a search that ran only before its game was the oldest of the window.  A line written before 2026-10-22 lacks `own`; the readers ignore it, and the schema is 5 still |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `lab` | a key that only the line of a game whose search a lab changed has (`--lab-dir`, [design/lab.md](design/lab.md)): `restarts`, each restart's time `at`, the game's `own_seconds` then, the `nodes` of the search abandoned, its `tactics` and the checkpoint put `aside`; `conflict_branching`, the lab's last setting of it (`"on"`, `"off"` or null); and `branching_changes`, how many times the lab set it.  `tactics` and `tactic_switches` are then those the search ran with, its branching as it ended |
 | `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `keep_going`, `retry`, `retry_improved` (true), `pass` (the number `--pass` was given), and `finder_after` and `finder_seconds` (the numbers of the finder flags) |

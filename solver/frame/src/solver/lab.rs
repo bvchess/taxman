@@ -44,13 +44,6 @@ impl Default for LabOptions {
     }
 }
 
-impl LabOptions {
-    /// Whether a lab is attached: a folder, a hook, or both.
-    pub fn any(&self) -> bool {
-        self.dir.is_some() || self.hook.is_some()
-    }
-}
-
 // ---------------------------------------------------------------------------------------------------------
 // Commands
 
