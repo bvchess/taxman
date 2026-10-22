@@ -85,6 +85,13 @@ pub struct SearchTactics {
     /// conflict, so the branches cover them all, and the conflicts made there are conflicts by docs/THEORY.md's
     /// Theorems 3, 4 and M).
     pub conflict_branching: bool,
+    /// With `conflict_branching`, where it would branch on a conflict other than the search's own, look first at the
+    /// last child of the search's own conflict, the one that promotes every member but the cheapest and leaves the
+    /// cheapest out, and branch on the search's own conflict if that child is cut on sight
+    /// ([`CONFLICT_LOOK_PRICE`](super::CONFLICT_LOOK_PRICE), [`CONFLICT_LOOK_SLACK`](super::CONFLICT_LOOK_SLACK) and
+    /// `search::searcher`'s `conflict_to_branch_on` say where; sound: it only chooses between two true conflicts, and
+    /// leaves the node's state as it found it).  Off by default.
+    pub conflict_look: bool,
 }
 
 impl Default for SearchTactics {
@@ -107,6 +114,7 @@ impl Default for SearchTactics {
             deep_branching: Gf2Branching::Split,
             more_forced: true,
             conflict_branching: true,
+            conflict_look: false,
         }
     }
 }
@@ -184,13 +192,13 @@ impl SearchTactics {
         }
     }
 
-    /// The bits of [`bits`](Self::bits) that only choose how a node branches: `conflict_branching` (bit 9).  A
-    /// checkpoint records them, as the search began with them, but they do not bind its resumption: the children of any
-    /// true conflict cover every completion of their node, so a search whose branching changes from one unit to the
-    /// next is as exact as one that keeps it (solver/docs/design/lab.md has the list of the tactics, and why the others
-    /// are fixed).  So a checkpoint resumes under either setting, and a run may change them while it goes
-    /// ([`Branching`](super::Branching)).
-    pub const BRANCHING_BITS: u16 = 1 << 9;
+    /// The bits of [`bits`](Self::bits) that only choose how a node branches: `conflict_branching` (bit 9) and
+    /// `conflict_look` (bit 10).  A checkpoint records them, as the search began with them, but they do not bind its
+    /// resumption: the children of any true conflict cover every completion of their node, so a search whose branching
+    /// changes from one unit to the next is as exact as one that keeps it (solver/docs/design/lab.md has the list of
+    /// the tactics, and why the others are fixed).  So a checkpoint resumes under either setting, and a run may change
+    /// them while it goes ([`Branching`](super::Branching)).
+    pub const BRANCHING_BITS: u16 = 1 << 9 | 1 << 10;
 
     /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits) and
     /// [`tuning`](Self::tuning)): the tactics a checkpoint does not record, the policy of keeping and forgetting
@@ -202,11 +210,15 @@ impl SearchTactics {
     }
 
     /// These tactics with what of `run`'s a checkpoint does not bind ([`same_recorded`](Self::same_recorded)): its
-    /// policy of keeping and forgetting nogoods, and its branching switch `conflict_branching`.  The run that resumes a
-    /// search says both.
+    /// policy of keeping and forgetting nogoods, and its branching switches `conflict_branching` and `conflict_look`.
+    /// The run that resumes a search says both.
     #[must_use]
     pub fn with_unbound_of(self, run: &SearchTactics) -> SearchTactics {
-        SearchTactics { conflict_branching: run.conflict_branching, ..self.with_forgetting_of(run) }
+        SearchTactics {
+            conflict_branching: run.conflict_branching,
+            conflict_look: run.conflict_look,
+            ..self.with_forgetting_of(run)
+        }
     }
 
     /// These tactics with the policy of keeping and forgetting nogoods of `run`'s: a checkpoint does not record it,
@@ -270,10 +282,11 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8) and `conflict_branching` (9); the defaults are `0x3B9`.  (Bit 9 records the setting the search
-    /// began with and binds nothing ([`BRANCHING_BITS`](Self::BRANCHING_BITS)): a checkpoint of a build before
-    /// `conflict_branching` has it clear, and resumes with the tactic on or off.  A build before the tactic refuses a
-    /// checkpoint with it on, as "unknown tactics".)  The
+    /// `symmetry` (8), `conflict_branching` (9) and `conflict_look` (10); the defaults are `0x3B9`.  (Bits 9 and 10
+    /// record the settings the search began with and bind nothing ([`BRANCHING_BITS`](Self::BRANCHING_BITS)): a
+    /// checkpoint of a build before `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and
+    /// likewise bit 10 and `conflict_look`.  A build before a tactic refuses a checkpoint with its bit set, as "unknown
+    /// tactics".)  The
     /// knobs of the nogood table's policy (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they
     /// change the tree, never the answer, and a resumed search starts with an empty table whichever policy made the
     /// first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes with `gf2` off.  One of a build
@@ -289,6 +302,7 @@ impl SearchTactics {
             | u16::from(self.gf2) << 7
             | u16::from(self.symmetry) << 8
             | u16::from(self.conflict_branching) << 9
+            | u16::from(self.conflict_look) << 10
     }
 
     /// The length of [`tuning`](Self::tuning).
@@ -328,6 +342,7 @@ impl SearchTactics {
             gf2: other.gf2,
             symmetry: other.symmetry,
             conflict_branching: other.conflict_branching,
+            conflict_look: other.conflict_look,
             ..self.with_forgetting_of(other)
         }
     }
@@ -379,7 +394,7 @@ impl SearchTactics {
     /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
     /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 10 != 0 {
+        if bits >> 11 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -391,6 +406,7 @@ impl SearchTactics {
             gf2: bits & 1 << 7 != 0,
             symmetry: bits & 1 << 8 != 0,
             conflict_branching: bits & 1 << 9 != 0,
+            conflict_look: bits & 1 << 10 != 0,
             ..SearchTactics::legacy_tuning()
         })
     }

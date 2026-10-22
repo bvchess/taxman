@@ -47,7 +47,7 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 21;
+pub const TACTIC_COUNT: usize = 22;
 
 /// The value of a tactic: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the nogood
 /// table, or one of the settings that tune the GF(2) search.
@@ -204,6 +204,7 @@ impl Tactics {
             ("deep_branching", Slot::Branching(&mut self.search.deep_branching)),
             ("more_forced", Slot::Switch(&mut self.search.more_forced)),
             ("conflict_branching", Slot::Switch(&mut self.search.conflict_branching)),
+            ("conflict_look", Slot::Switch(&mut self.search.conflict_look)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
@@ -286,6 +287,7 @@ mod tests {
                 "deep_branching",
                 "more_forced",
                 "conflict_branching",
+                "conflict_look",
                 "prev_cap",
                 "seed_incumbent"
             ]
@@ -293,7 +295,7 @@ mod tests {
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected = [
             "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "all", "exact", "all", "all",
-            "split", "on", "on", "on", "on",
+            "split", "on", "on", "off", "on", "on",
         ];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
@@ -388,6 +390,19 @@ mod tests {
     }
 
     #[test]
+    fn the_conflict_look_is_off_by_default_and_set_by_name() {
+        let mut t = Tactics::default();
+        assert!(t.search.conflict_branching && !t.search.conflict_look);
+        t.set("conflict_look=on").unwrap();
+        assert!(t.search.conflict_look);
+        assert_eq!(t.description(), "conflict_look=on");
+        assert_eq!(t.to_json().get("conflict_look").and_then(Json::as_bool), Some(true));
+        assert!(t.set("conflict_look=1").unwrap_err().starts_with("tactic conflict_look: expected on or off"));
+        t.set("conflict_look=off").unwrap();
+        assert_eq!(t.description(), "default");
+    }
+
+    #[test]
     fn the_policy_of_keeping_nogoods_is_set_by_three_tactics() {
         // The defaults forget everything after each 50,000 steps, as before the knobs.
         assert_eq!(Tactics::default().search.forgetting(), Forgetting::DEFAULT);
@@ -456,6 +471,7 @@ mod tests {
                 deep_branching: Gf2Branching::Largest,
                 more_forced: false,
                 conflict_branching: false,
+                conflict_look: true,
             },
             prime_shortcut: false,
             same_search: false,

@@ -6,9 +6,10 @@ The search is a branch and bound over promotion sets.  It keeps the best promoti
 and explores the sets that could beat it, pruning every part of the tree that a bound shows cannot.  This section builds
 it up: the state and the order of the search, two bounds on a node (the matching bound and the Lagrangian bound over the
 nogoods), and the conflicts and nogoods that the branching rests on; the GF(2) bound, the default, and the rule of
-symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, and the last two parts
-are the search's start and its
-extended mode.  The [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
+symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
+changes which conflict a node branches on, and the last two parts are the search's start and its finder.  The search
+of a problem with one-sided candidates is in [extended-mode.md](extended-mode.md).  The
+[glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
 
 ## Search state and order
 
@@ -276,6 +277,35 @@ default's steps and 0.26 and 0.27 of its CPU; a step costs three to five times a
 The share of steps saved grows with the gap.  The measurements, and the gap and slope chosen, are in [where the search
 of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 
+*The look.*  With the tactic `conflict_look`, off by default, a check that would branch on a conflict other than `K`
+looks at one child of `K` first.  At some deep nodes the choice above avoids `K` although one child of `K` dies at
+once, and the node then drains its gap a member at a time.  The cause is a hub: a member that costs the bound almost
+nothing to leave out, because a substitute can take its place, but that every completion beating the incumbent holds.
+The weight rates the conflicts that hold the hub worst, so it overrates every child of `K`, not only the dead one.  The
+look is at the last child of `K`, the child that promotes every member but the cheapest, `c`, and leaves `c` out.  It
+looks only where no member is forced, and where:
+
+* `c` has a price of 10 or less (`CONFLICT_LOOK_PRICE`);
+* the weight of `K` less the term of `c` is below twice (`CONFLICT_LOOK_SLACK`) the weight of the conflict chosen.
+
+If that child is cut on sight, the node branches on `K`.  A child is cut on sight when its promotion fails, or its
+largest candidates, its GF(2) bound, or a conflict of its heaviest set all of whose members it forces put it below its
+need.  The look does not apply the rule of `symmetry`, the matching bound, the Lagrangian bound or the conflicts that
+the node knows, so a child that it lets through may still be cut when the search makes it.
+
+*Why the look is exact.*  It only chooses between two true conflicts of the node, `K` and the one conflict branching
+chose, so the second fact of [the default step's](#the-default-step) exactness holds for it as for the choice.  It must
+also leave the node's state as it found it.  The child is pushed on the GF(2) stack and popped before the node reads its
+own level again, which then resolves its level as it does after any child.  The conflict that cuts the child is learned
+as a nogood of the root, which holds at every node, as the search learns its own.  No node's list of known conflicts
+gains anything from it.  So the look may change between a search's units, as the choice may ([lab.md](lab.md)).
+
+*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the default's steps, and a step
+costs 12% more; on the whole games 3000, 3200, 3500 and 4050 it takes 0.975 of the default's steps together.  Whole
+games of that size have few deep nodes of large gap, so it is a test on a game of the chain that decides it.  The
+measurements are in [when a node should use conflict
+branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).
+
 ## The starting incumbent, the ceiling and the seed
 
 The search starts from the best start of its seeds, and stops as soon as it reaches a proven ceiling. A *seed* is a game
@@ -352,59 +382,3 @@ matroids, its symmetric pairs: a second of setup at n near 4,900), so its counte
 core beside the workers for its seconds.  The result line records it where it ran (`engine.finder`: the search's steps when
 it started, the incumbent then, the best it reached, how many of its sets became the incumbent, its seconds and when it
 reached its best), and `options` records the flags where given.
-
-## Extended mode: one-sided candidates
-
-The search can also take the *extended problem* Π⁺(O), the problem that a certificate of U searches
-([certificates.md](certificates.md)).  It is the frame model with a set O of the sources of three or more prime factors
-that setup keeps made optional (THEORY.md, ["The extended problem"](../../../docs/theory/extended-problem.md), and
-the corollary of Theorem M⁺; `frames::build_extended`).  Besides the candidates of the frame model, which are
-*two-sided* (out of one frame, into the one in front), it has *one-sided* candidates: the members of O and the sources
-that greedy rejected beside them, each a possible move of its *own* frame.  It is research code: the solver's own path
-never builds an extended problem, and with no one-sided candidate every piece below is what it is without them.
-
-*The claims of `unzip`* (THEORY.md, Lemma M5⁺).  The problem comes in two formulations, which have the same promotion
-sets (the lemma's corollary): without any claim, and, the default, with the claims of the frame model
-(`SearchFrames::claims`) that the lemma keeps.  `build_extended` gives each claim the frame, as setup forms it, of its
-source.  A frame keeps its claims if it holds no member of O ∪ R and the factor of each of its back claims passes the
-check (`frames::ClaimCheck`): it is no two-sided candidate, and no candidate has it among its maximal factors.  The
-pairs of a frame that keeps them leave the moves and the factors before the root is reduced; the freedoms and the
-candidates do not change.  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
-every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
-H).  `Board::extended(open, claims)` is the one place the board's claims are passed.
-
-The check matters.  A frame that holds an open source has more freedoms, and can take on composites of a claimed factor
-that Π_n could not.  At 24 with 16, 20 and 24 open, 12 becomes a candidate that lists 6, which 18 claims; taking the
-pair out anyway loses the promotion set {8, 12}, which the oracle catches.  The census counts, game by game, the
-claims that some O refuses (`m5_refused`).
-
-* **The model** (`model`, "One-sided candidates").  `FrameGraph::build_extended` gives each one-sided candidate its own
-  frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
-  that frame's moves if the frame stays winnable; it takes no factor, and spends one freedom of that frame only
-  (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing more: a
-  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted
-  two-sided candidate is no longer a factor of its home), so each is promoted once along a path, which the search's
-  candidates ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
-  `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
-* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺).  A one-sided candidate's element
-  has the vector of its maximal factors in its own frame's matroid, and is a coloop of the other: its own unit vector,
-  in a *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
-* **The search.**  `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the
-  search.  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header
-  (format 5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for
-  another.  A checkpoint of version 4 resumes only a search without them ([trust.md](trust.md)).
-* **What it refuses** (`SearchTactics::refusal_with_one_sided`).  With one-sided candidates the search needs `gf2`: the
-  matching bound gives a one-sided candidate no vertex, so it is no bound there (the dive, which rounds the root's
-  matching for a starting incumbent, still runs and never picks one).  It refuses `lagrange`, which is built on the
-  matching bound, and `symmetry`: Theorem 13 is proven for the frame model, and for Π⁺ each prime exchange would have
-  to map the one-sided candidates of each frame onto themselves, which nothing checks.  `SearchTactics::extended` is
-  the default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics, and its search is the
-  default engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
-* **Its frames.**  Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest: nine at most up to
-  4095 (layers 3 to 11), whatever O is.  From 4096 it has ten with every source open, which `build_extended` refuses
-  (`MAX_FRAMES`), naming the game and the layers.  The census of the frames records the count with every such source
-  open for every game to 8191 ([the claims of `unzip` in the extended
-  problem](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).  Opening a source also adds
-  one to its frame's rank, so a problem with many open sources can need more words of the GF(2) bound than the narrow
-  set widths compile (three, rank 192) or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so,
-  rather than fail in the search.

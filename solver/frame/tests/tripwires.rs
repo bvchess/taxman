@@ -42,12 +42,13 @@ use taxman::with_width;
 /// as it was).  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000 steps, so the games
 /// that take fewer (480, 640) do not see it; the matching path's rows `lagrange=off` are the trees of the build
 /// before it.
-const EXPECTED: [(u32, &str, u64, u64); 54] = [
+const EXPECTED: [(u32, &str, u64, u64); 55] = [
     // The default, the GF(2) bound with the rule of the root's symmetric pairs: trees of tens to thousands of nodes;
     // `lagrange=on` (which refits after 2,000 steps) changes none of them, and `symmetry=off` (the default before the
     // rule) makes them larger with the same answers.  Game 1000's rows count the tree with conflict branching, which
     // is on by default and acts where a node's gap passes 300; with `conflict_branching=off` its default row is
-    // smaller.
+    // smaller.  With `conflict_look=on` (off by default) it looks at the last child of the search's own conflict
+    // there, and the tree is another one.
     (480, "default", 5350, 37),
     (600, "default", 8507, 365),
     (600, "fix_forced=off", 8507, 530),
@@ -67,6 +68,7 @@ const EXPECTED: [(u32, &str, u64, u64); 54] = [
     (1000, "fix_forced=off", 24168, 4000),
     (1000, "nogoods=off", 24168, 6308),
     (1000, "lagrange=on", 24168, 3360),
+    (1000, "conflict_look=on", 24168, 3319),
     (1000, "symmetry=off", 24168, 4582),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),

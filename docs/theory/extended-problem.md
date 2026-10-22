@@ -72,7 +72,7 @@ without its lemma M5: the claims of `unzip` are needed for speed, not for exactn
 the frame model's problem (frames of Taxman Mini numbered so that a candidate of frame h is promoted into frame h − 1, a
 reduced root, candidates), so the search, its bounds and its tactics apply to it unchanged: Theorems 11 and 13, the
 reduction lemma, the conflicts and the nogoods use nothing else.  The search takes the one-sided candidates too, each as
-a possible move of its frame (solver/docs/design/search.md, "Extended mode: one-sided candidates"), and a reference
+a possible move of its frame (solver/docs/design/extended-mode.md, "Extended mode: one-sided candidates"), and a reference
 predicate (plain peels of the unreduced frames) decides the promotion sets of Π⁺(O) for the tests.
 
 *The claims of `unzip` in Π⁺(O).*  They cannot be reused as they are: a back claim (s, f) of Π_n is safe because no

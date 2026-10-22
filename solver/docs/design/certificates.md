@@ -11,8 +11,8 @@ games have one.
 *What `certify` does* (`taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`;
 `src/certify.rs`).  It certifies the games whose lines in the prover's barred parity bounds
 (`solver/noframe/data/upper_*.jsonl`) say they need a certificate.  For such a game it takes the line's open members O,
-and sets up the extended problem Π⁺(O) in extended mode ([search.md, "Extended mode: one-sided
-candidates"](search.md#extended-mode-one-sided-candidates)), with the other members of U\*_{≥3} fixed.  It searches that
+and sets up the extended problem Π⁺(O) in extended mode ([extended-mode.md, "Extended mode: one-sided
+candidates"](extended-mode.md)), with the other members of U\*_{≥3} fixed.  It searches that
 problem from the recorded game, as the promotion set (O, its moves up to n/2), with the ceiling n + score(n − 1) −
 in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\* above n/2, and is a promotion
 set of Π⁺(O) worth the score (Theorem M⁺ says that a playable one is).  The search ends with one of two verdicts:

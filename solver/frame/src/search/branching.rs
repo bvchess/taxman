@@ -17,12 +17,18 @@ pub struct BranchSettings {
     /// The gap from which a check branches on the conflict that the tactic `conflict_branching` chooses
     /// ([`CONFLICT_BRANCHING_GAP`] when the tactic is on); `None`: the search's own conflict everywhere.
     pub conflict_branching: Option<u64>,
+    /// Whether the tactic `conflict_look` is on: it acts only where `conflict_branching` is choosing.
+    pub conflict_look: bool,
 }
 
 impl BranchSettings {
-    /// The settings that `tactics` make: `conflict_branching` from [`CONFLICT_BRANCHING_GAP`] on, if it is on.
+    /// The settings that `tactics` make: `conflict_branching` from [`CONFLICT_BRANCHING_GAP`] on, if it is on, and
+    /// `conflict_look`.
     pub fn of(tactics: &SearchTactics) -> Self {
-        BranchSettings { conflict_branching: tactics.conflict_branching.then_some(CONFLICT_BRANCHING_GAP) }
+        BranchSettings {
+            conflict_branching: tactics.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
+            conflict_look: tactics.conflict_look,
+        }
     }
 
     /// Whether the tactic `conflict_branching` is on.
@@ -53,13 +59,23 @@ impl Branching {
 
     /// Changes the settings, for the units the searchers start from now on.
     pub fn set(&self, settings: BranchSettings) {
-        *self.settings.lock().unwrap_or_else(PoisonError::into_inner) = settings;
-        self.generation.fetch_add(1, Ordering::Release);
+        self.change(|now| *now = settings);
     }
 
-    /// Switches the tactic `conflict_branching` on (from [`CONFLICT_BRANCHING_GAP`]) or off.
+    /// Switches the tactic `conflict_branching` on (from [`CONFLICT_BRANCHING_GAP`]) or off, and leaves the others.
     pub fn set_conflict_branching(&self, on: bool) {
-        self.set(BranchSettings { conflict_branching: on.then_some(CONFLICT_BRANCHING_GAP) });
+        self.change(|now| now.conflict_branching = on.then_some(CONFLICT_BRANCHING_GAP));
+    }
+
+    /// Switches the tactic `conflict_look` on or off, and leaves the others.
+    pub fn set_conflict_look(&self, on: bool) {
+        self.change(|now| now.conflict_look = on);
+    }
+
+    /// Applies `edit` to the settings, and raises the generation after they are stored.
+    fn change(&self, edit: impl FnOnce(&mut BranchSettings)) {
+        edit(&mut self.settings.lock().unwrap_or_else(PoisonError::into_inner));
+        self.generation.fetch_add(1, Ordering::Release);
     }
 
     /// The generation of the settings: it changes with every [`set`](Self::set).  A searcher reads it at the start of
@@ -82,9 +98,29 @@ mod tests {
         let seen = live.generation();
         live.set_conflict_branching(false);
         assert_ne!(live.generation(), seen);
-        assert_eq!(live.settings(), BranchSettings { conflict_branching: None });
+        assert_eq!(live.settings(), BranchSettings { conflict_branching: None, conflict_look: false });
         assert!(!live.settings().conflict_branching_on());
         let off = SearchTactics { conflict_branching: false, ..tactics };
         assert_eq!(BranchSettings::of(&off), live.settings());
+    }
+
+    #[test]
+    fn each_switch_changes_itself_alone() {
+        let live = Branching::new(BranchSettings::of(&SearchTactics::default()));
+        assert!(!live.settings().conflict_look);
+        let seen = live.generation();
+        live.set_conflict_look(true);
+        assert_ne!(live.generation(), seen);
+        assert_eq!(
+            live.settings(),
+            BranchSettings { conflict_branching: Some(CONFLICT_BRANCHING_GAP), conflict_look: true }
+        );
+        live.set_conflict_branching(false);
+        assert_eq!(live.settings(), BranchSettings { conflict_branching: None, conflict_look: true });
+        live.set_conflict_branching(true);
+        live.set_conflict_look(false);
+        assert_eq!(live.settings(), BranchSettings::of(&SearchTactics::default()));
+        let looking = SearchTactics { conflict_look: true, ..SearchTactics::default() };
+        assert!(BranchSettings::of(&looking).conflict_look);
     }
 }

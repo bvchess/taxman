@@ -36,7 +36,7 @@ a checkpoint of another search.  It holds:
 
 * a format version, the set width and n;
 * digests of the root's candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the
-  one-sided candidates of the extended problem ([search.md](search.md#extended-mode-one-sided-candidates));
+  one-sided candidates of the extended problem ([extended-mode.md](extended-mode.md));
 * `max_total` and the search tactics, and from format version 6 the tactics that tune the GF(2) search (`force_window`
   to `more_forced`, [tactics.md](tactics.md)).
 
@@ -48,11 +48,11 @@ reads a checkpoint of version 6 as the search it is.  The tactics that set how t
 `nogood_keep` and `nogood_limit`) are in no version: they change the trees and never the answer, and a resumed search
 starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`, [search.md, "The
 finder"](search.md#the-finder)) is in none either: it only offers sets, each after the check below, so a checkpoint
-resumes with any finder or none.  The switch `conflict_branching` has a bit of its own among the search tactics, which
-records how the search began and binds nothing, since the switch only chooses which true conflict a node branches on
-([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with it on or off, those of the
-builds before it, whose bit is clear, included.  A build before it refuses a checkpoint with it on, its default, as
-unknown tactics.
+resumes with any finder or none.  The switches `conflict_branching` and `conflict_look` have a bit each among the search
+tactics, which records how the search began and binds nothing, since the switches only choose which true conflict a
+node branches on ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with them on or
+off, those of the builds before them, whose bits are clear, included.  A build before `conflict_branching` refuses a
+checkpoint with it on, its default, as unknown tactics, and a build before `conflict_look` refuses one with it on.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header

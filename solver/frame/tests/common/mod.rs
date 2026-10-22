@@ -315,6 +315,9 @@ pub struct Config {
     /// Conflict branching from this gap on (tactic `conflict_branching`, whose gap is [`CONFLICT_BRANCHING_GAP`];
     /// `Some(0)` chooses at every check, which small games need to exercise it).
     pub conflict_branching: Option<u64>,
+    /// The look at the last child of the search's own conflict (tactic `conflict_look`), where conflict branching
+    /// chooses.
+    pub conflict_look: bool,
     /// The GF(2) graph padded to that many block words ([`Gf2Graph::padded`]), to run the engines of more words than
     /// the board needs; `None` for the words it needs.
     pub gf2_words: Option<usize>,
@@ -346,6 +349,7 @@ impl Config {
             gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
             conflict_branching: t.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
+            conflict_look: t.conflict_look,
             gf2_words: None,
         }
     }
@@ -462,7 +466,10 @@ impl<const W: usize> Game<W> {
             gf2_strong_depth: u32::MAX,
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
-            branching: Arc::new(Branching::new(BranchSettings { conflict_branching: cfg.conflict_branching })),
+            branching: Arc::new(Branching::new(BranchSettings {
+                conflict_branching: cfg.conflict_branching,
+                conflict_look: cfg.conflict_look,
+            })),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
             #[cfg(feature = "studies")]
             hooks: None,

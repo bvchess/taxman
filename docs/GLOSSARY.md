@@ -171,6 +171,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 300 or
   more chooses so; otherwise it branches on the smallest conflict the search knows ([solver/docs/design/search.md,
   "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
+* **look**: with the tactic `conflict_look`, off by default, a node that conflict branching would send to another
+  conflict first looks at the last child of the search's own conflict, and branches on the search's own conflict if
+  that child is cut on sight ([solver/docs/design/search.md,
+  "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
 * **prime exchange**, **symmetric pair**: exchanging two primes p < q in every number.  The pair is symmetric when the
   exchange maps the root's frames and candidates onto themselves.  It then maps promotion sets to promotion sets
   worth (q − p)(c_p − c_q) more, where c_r is the sum of a set's cofactors x/r.  So every heaviest set keeps c_p ≤ c_q

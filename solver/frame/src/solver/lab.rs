@@ -56,8 +56,9 @@ pub(super) enum Command {
     /// Offer game `n`'s search the promotions `set`, claimed to be worth `value` (their sum if not given), through
     /// `search::offer_found`.
     Offer { n: u32, set: Vec<u32>, value: Option<u64> },
-    /// Switch `conflict_branching` on or off in game `n`'s search, for the units it starts from now on.
-    Branching { n: u32, conflict_branching: bool },
+    /// Switch `conflict_branching` and `conflict_look`, those given, on or off in game `n`'s search, for the units it
+    /// starts from now on.
+    Branching { n: u32, conflict_branching: Option<bool>, conflict_look: Option<bool> },
     /// Abandon game `n`'s search and start it fresh with the run's search tactics changed by `tactics` (`name=value`).
     Restart { n: u32, tactics: Vec<String> },
     /// The run's budget of threads.
@@ -85,7 +86,7 @@ impl Command {
         let takes: &[&str] = match name {
             "checkpoint" => &[],
             "offer" => &["n", "set", "value"],
-            "branching" => &["n", "conflict_branching"],
+            "branching" => &["n", "conflict_branching", "conflict_look"],
             "restart" => &["n", "tactics"],
             "threads" => &["total", "n", "workers"],
             "finder" => &["n", "seconds"],
@@ -108,12 +109,19 @@ impl Command {
                 Ok(Command::Offer { n: n()?, set, value })
             }
             "branching" => {
-                let conflict_branching = match json.get("conflict_branching").and_then(Json::as_str) {
-                    Some("on") => true,
-                    Some("off") => false,
-                    _ => return Err("branching needs conflict_branching, \"on\" or \"off\"".into()),
+                let switch = |key: &str| match json.get(key) {
+                    None => Ok(None),
+                    Some(value) => match value.as_str() {
+                        Some("on") => Ok(Some(true)),
+                        Some("off") => Ok(Some(false)),
+                        _ => Err(format!("{key} is \"on\" or \"off\"")),
+                    },
                 };
-                Ok(Command::Branching { n: n()?, conflict_branching })
+                let (conflict_branching, conflict_look) = (switch("conflict_branching")?, switch("conflict_look")?);
+                if conflict_branching.is_none() && conflict_look.is_none() {
+                    return Err("branching needs conflict_branching or conflict_look, \"on\" or \"off\"".into());
+                }
+                Ok(Command::Branching { n: n()?, conflict_branching, conflict_look })
             }
             "restart" => {
                 let tactics = match json.get("tactics") {
@@ -401,16 +409,18 @@ pub(super) struct Restarted {
 }
 
 /// What the lab did to a game, kept beside its checkpoint (`n<NNNN>.lab`) so that it outlives the process, and
-/// written into the game's line: its restarts, the search tactics of the last one, and its setting of
-/// `conflict_branching`.  It also keeps whether the hook was told that the game runs long, so that it is told once.
+/// written into the game's line: its restarts, the search tactics of the last one, and its settings of
+/// `conflict_branching` and `conflict_look`.  It also keeps whether the hook was told that the game runs long, so that
+/// it is told once.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct GameLab {
     /// The search tactics the lab restarted the game with, if it did: the game's search runs with them, and so does a
     /// resume of it.
     pub(super) tactics: Option<SearchTactics>,
-    /// The lab's setting of `conflict_branching`, if it gave one: it holds over the tactics.
+    /// The lab's settings of `conflict_branching` and `conflict_look`, if it gave one: each holds over the tactics.
     pub(super) conflict_branching: Option<bool>,
-    /// How many times the lab set `conflict_branching`.
+    pub(super) conflict_look: Option<bool>,
+    /// How many `branching` commands the lab gave.
     pub(super) branching_changes: u32,
     pub(super) restarts: Vec<Restarted>,
     /// Whether the hook was told that the game runs long.
@@ -450,15 +460,21 @@ impl GameLab {
         }
     }
 
-    /// Whether the lab changed how the game was searched: a restart, or a setting of `conflict_branching`.
+    /// Whether the lab changed how the game was searched: a restart, or a setting of `conflict_branching` or
+    /// `conflict_look`.
     pub(super) fn steered(&self) -> bool {
-        !self.restarts.is_empty() || self.conflict_branching.is_some()
+        !self.restarts.is_empty() || self.conflict_branching.is_some() || self.conflict_look.is_some()
     }
 
-    /// The search tactics of the game: the lab's, else `run`'s, with the lab's setting of `conflict_branching`.
+    /// The search tactics of the game: the lab's, else `run`'s, with the lab's settings of `conflict_branching` and
+    /// `conflict_look`.
     pub(super) fn search_tactics(&self, run: &SearchTactics) -> SearchTactics {
         let tactics = self.tactics.unwrap_or(*run);
-        SearchTactics { conflict_branching: self.conflict_branching.unwrap_or(tactics.conflict_branching), ..tactics }
+        SearchTactics {
+            conflict_branching: self.conflict_branching.unwrap_or(tactics.conflict_branching),
+            conflict_look: self.conflict_look.unwrap_or(tactics.conflict_look),
+            ..tactics
+        }
     }
 
     /// What a results line records of it (`lab`), if the lab changed how the game was searched.
@@ -472,11 +488,12 @@ impl GameLab {
                 ("aside", r.aside.as_deref().map_or(Json::Null, Json::from)),
             ])
         });
-        let setting = self.conflict_branching.map_or(Json::Null, |on| Json::from(if on { "on" } else { "off" }));
+        let setting = |on: Option<bool>| on.map_or(Json::Null, |on| Json::from(if on { "on" } else { "off" }));
         self.steered().then(|| {
             Json::object([
                 ("restarts", Json::Arr(restarts.collect())),
-                ("conflict_branching", setting),
+                ("conflict_branching", setting(self.conflict_branching)),
+                ("conflict_look", setting(self.conflict_look)),
                 ("branching_changes", Json::from(self.branching_changes)),
             ])
         })
@@ -500,6 +517,7 @@ impl GameLab {
         Json::object([
             ("tactics", tactics),
             ("conflict_branching", self.conflict_branching.map_or(Json::Null, Json::Bool)),
+            ("conflict_look", self.conflict_look.map_or(Json::Null, Json::Bool)),
             ("branching_changes", Json::from(self.branching_changes)),
             ("restarts", Json::Arr(restarts.collect())),
             ("long", Json::Bool(self.long)),
@@ -517,9 +535,9 @@ impl GameLab {
                 Some(all.search)
             }
         };
-        let conflict_branching = match json.get("conflict_branching") {
-            None | Some(Json::Null) => None,
-            Some(on) => Some(on.as_bool().ok_or("conflict_branching is not true, false or null")?),
+        let switch = |key: &str| match json.get(key) {
+            None | Some(Json::Null) => Ok(None),
+            Some(on) => on.as_bool().map(Some).ok_or(format!("{key} is not true, false or null")),
         };
         let mut restarts = Vec::new();
         for r in json.get("restarts").and_then(Json::as_arr).unwrap_or_default() {
@@ -534,7 +552,8 @@ impl GameLab {
         }
         Ok(GameLab {
             tactics,
-            conflict_branching,
+            conflict_branching: switch("conflict_branching")?,
+            conflict_look: switch("conflict_look")?,
             branching_changes: json.get("branching_changes").and_then(Json::as_u32).unwrap_or(0),
             restarts,
             long: json.get("long").and_then(Json::as_bool).unwrap_or(false),
@@ -577,7 +596,15 @@ mod tests {
         );
         assert_eq!(
             command(r#"{"command":"branching","n":9,"conflict_branching":"off"}"#),
-            Ok(Command::Branching { n: 9, conflict_branching: false })
+            Ok(Command::Branching { n: 9, conflict_branching: Some(false), conflict_look: None })
+        );
+        assert_eq!(
+            command(r#"{"command":"branching","n":9,"conflict_look":"on"}"#),
+            Ok(Command::Branching { n: 9, conflict_branching: None, conflict_look: Some(true) })
+        );
+        assert_eq!(
+            command(r#"{"command":"branching","n":9,"conflict_branching":"on","conflict_look":"off"}"#),
+            Ok(Command::Branching { n: 9, conflict_branching: Some(true), conflict_look: Some(false) })
         );
         assert_eq!(
             command(r#"{"command":"restart","n":9,"tactics":"symmetry=off, gf2=on"}"#),
@@ -612,6 +639,11 @@ mod tests {
             (r#"{"command":"offer","n":5,"set":[1,-2]}"#, "list of numbers"),
             (r#"{"command":"offer","n":5,"set":[1],"value":-1}"#, "whole number"),
             (r#"{"command":"branching","n":5,"conflict_branching":true}"#, "\"on\" or \"off\""),
+            (r#"{"command":"branching","n":5,"conflict_look":"maybe"}"#, "conflict_look is \"on\" or \"off\""),
+            (r#"{"command":"branching","n":5,"conflict_look":null}"#, "conflict_look is \"on\" or \"off\""),
+            (r#"{"command":"branching","n":5,"conflict_branching":"on","conflict_look":1}"#, "\"on\" or \"off\""),
+            (r#"{"command":"branching","n":5}"#, "needs conflict_branching or conflict_look"),
+            (r#"{"command":"branching","n":5,"look":"on"}"#, "takes no field \"look\""),
             (r#"{"command":"restart","n":5,"tactics":["gf2=off"]}"#, "string of name=value"),
             (r#"{"command":"threads","total":0}"#, "from 1 to"),
             (r#"{"command":"threads","total":4,"n":3}"#, "total, or n and workers"),
@@ -644,6 +676,7 @@ mod tests {
         let lab = GameLab {
             tactics: Some(SearchTactics { symmetry: false, ..SearchTactics::default() }),
             conflict_branching: Some(false),
+            conflict_look: Some(true),
             branching_changes: 3,
             restarts: vec![Restarted {
                 at: utc(SystemTime::now()),
@@ -657,9 +690,24 @@ mod tests {
         lab.keep(&opts, 77);
         assert_eq!(GameLab::load(&opts, 77), Ok(lab.clone()));
         let tactics = lab.search_tactics(&SearchTactics::default());
-        assert_eq!(tactics, SearchTactics { symmetry: false, conflict_branching: false, ..SearchTactics::default() });
+        let expected = SearchTactics {
+            symmetry: false,
+            conflict_branching: false,
+            conflict_look: true,
+            ..SearchTactics::default()
+        };
+        assert_eq!(tactics, expected);
         let record = lab.record().unwrap();
         assert_eq!(record.get("conflict_branching").and_then(Json::as_str), Some("off"));
+        assert_eq!(record.get("conflict_look").and_then(Json::as_str), Some("on"));
+        // A setting of the look alone steers the game, and leaves the branching to the tactics.
+        let looking = GameLab { conflict_look: Some(true), ..GameLab::default() };
+        assert!(looking.steered());
+        assert!(looking.search_tactics(&SearchTactics::default()).conflict_look);
+        assert_eq!(looking.record().unwrap().get("conflict_branching"), Some(&Json::Null));
+        // A record from before the look has no setting of it.
+        let old = Json::parse(r#"{"conflict_branching":false,"branching_changes":1}"#).unwrap();
+        assert_eq!(GameLab::from_json(&old).map(|lab| lab.conflict_look), Ok(None));
         assert_eq!(record.get("restarts").and_then(Json::as_arr).map(<[_]>::len), Some(1));
         GameLab::forget(&opts, 77);
         assert_eq!(GameLab::load(&opts, 77), Ok(GameLab::default()));

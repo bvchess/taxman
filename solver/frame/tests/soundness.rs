@@ -39,15 +39,16 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32), and
 /// the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what the
 /// searchers keep, however often they forget and however small the limit, changes no answer), then conflict branching
-/// (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42), and the
-/// search's own conflict everywhere (43; the default chooses from a gap of 300).  The matching path with the forgetting
-/// of nogoods at the production period, every step, every third, and never; on one thread and two; and the GF(2) bound
-/// with each way of choosing the branch, with and without the matching bound as a first check, forced members, nogoods
-/// and the Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after
-/// 2,000 steps, which most of these searches never take, so some configurations refit them after the first few steps
-/// and every few steps after that (with and without forgetting at the same time, refinement, and a second thread), and
-/// one turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with the nogoods forgotten at
-/// every step.
+/// (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42), the search's
+/// own conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
+/// look at the last child of the search's own conflict (tactic `conflict_look`, off by default), on one thread and on
+/// two (44 and 45).  The matching path with the forgetting of nogoods at the production period, every step, every
+/// third, and never; on one thread and two; and the GF(2) bound with each way of choosing the branch, with and without
+/// the matching bound as a first check, forced members, nogoods and the Lagrangian bound's early refits.  The
+/// Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches
+/// never take, so some configurations refit them after the first few steps and every few steps after that (with and
+/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2) bound
+/// without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -95,6 +96,8 @@ fn configs() -> Vec<Config> {
         Config { conflict_branching: Some(0), ..g },
         Config { conflict_branching: Some(0), threads: 2, period: Some(3), ..g },
         Config { conflict_branching: None, ..g },
+        Config { conflict_branching: Some(0), conflict_look: true, ..g },
+        Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
     ]
 }
 
@@ -149,6 +152,28 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() 
 )]
 fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
     searches_from_a_handicapped_incumbent(2..=300, 4000);
+}
+
+/// The look at the last child of the search's own conflict (tactic `conflict_look`) acts, and changes no answer: with
+/// conflict branching at every check, whatever its gap, it changes the tree of some of the games 301 to 500 (every
+/// tenth), and each search comes back with exactly the sum of `optimal.json`, from an incumbent worth 1 less.
+#[test]
+fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
+    let optimal = Optimal::built_in();
+    let branching = Config { conflict_branching: Some(0), ..Config::standard() };
+    let looking = Config { conflict_look: true, ..branching };
+    let mut changed = 0;
+    for n in (301..=500).step_by(10) {
+        let Some(game) = Game::<8>::of_board(n) else { continue };
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let [plain, looked] =
+            [branching, looking].map(|cfg| game.search(cfg, vec![game.root_unit()], truth - 1, None, None));
+        for out in [&plain, &looked] {
+            assert!(out.completed && out.best == truth && out.real, "n={n}: truth {truth}, got {out:?}");
+        }
+        changed += usize::from(plain.nodes != looked.nodes);
+    }
+    assert!(changed > 0, "the look changed no tree");
 }
 
 /// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent

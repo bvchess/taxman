@@ -143,6 +143,17 @@ pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 /// entry).
 pub const CONFLICT_BRANCHING_SLOPE: f64 = 291.0;
 
+/// With the tactic `conflict_look`, the look is made only where the cheapest member of the search's own conflict has a
+/// price of at most this (a member that costs the bound almost nothing to leave out is a hub of the heaviest set).  The
+/// setting of the study of when a node should use conflict branching (solver/notebook/search/
+/// when-a-node-should-use-conflict-branching-2026-10/README.md).
+pub const CONFLICT_LOOK_PRICE: f64 = 10.0;
+
+/// With the tactic `conflict_look`, the look is made only where the weight of the search's own conflict less the term
+/// of its cheapest member is below this many times the weight of the conflict that conflict branching chose (the same
+/// entry).
+pub const CONFLICT_LOOK_SLACK: f64 = 2.0;
+
 /// The outcome of [`search`].
 #[derive(Clone, Debug)]
 pub struct SearchResult<const W: usize> {
@@ -376,7 +387,9 @@ fn search_forgetting<const W: usize>(
         None => {
             // The branching settings as the search starts with them, which the caller may have changed.
             let mut header = Header::of(prepared);
-            header.tactics.conflict_branching = space.branching.settings().conflict_branching_on();
+            let settings = space.branching.settings();
+            header.tactics.conflict_branching = settings.conflict_branching_on();
+            header.tactics.conflict_look = settings.conflict_look;
             header.encode()
         }
     };

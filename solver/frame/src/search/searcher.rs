@@ -25,7 +25,7 @@ use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
 use super::tactics::Gf2Branching;
-use super::{Diagnostics, Forgetting, CONFLICT_BRANCHING_SLOPE};
+use super::{Diagnostics, Forgetting, CONFLICT_BRANCHING_SLOPE, CONFLICT_LOOK_PRICE, CONFLICT_LOOK_SLACK};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
@@ -353,9 +353,10 @@ struct Stepper<'a, const W: usize> {
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
-    /// The branching settings' `conflict_branching` as the searcher last read them, at the start of a unit, and the
-    /// generation it read them at ([`SearchSpace::branching`]).
+    /// The branching settings' `conflict_branching` and `conflict_look` as the searcher last read them, at the start of
+    /// a unit, and the generation it read them at ([`SearchSpace::branching`]).
     conflict_branching: Option<u64>,
+    conflict_look: bool,
     branching_seen: u64,
     probe: Option<Probe<'a>>,
     /// The GF(2) bound's counters as of the last flush.
@@ -374,6 +375,9 @@ struct Stepper<'a, const W: usize> {
 
 impl<'a, const W: usize> TaxSearcher<'a, W> {
     pub fn new(space: &'a SearchSpace<'a, W>) -> Self {
+        // The generation first: a change after it is read again at the first unit.
+        let branching_seen = space.branching.generation();
+        let branching = space.branching.settings();
         TaxSearcher {
             stack: Vec::new(),
             stepper: Stepper {
@@ -401,8 +405,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
-                branching_seen: space.branching.generation(),
-                conflict_branching: space.branching.settings().conflict_branching,
+                branching_seen,
+                conflict_branching: branching.conflict_branching,
+                conflict_look: branching.conflict_look,
                 probe: space.diagnostics.map(Probe::new),
                 gf2_flushed: Gf2Stats::default(),
                 #[cfg(feature = "studies")]
@@ -452,7 +457,9 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         // read again.
         let generation = space.branching.generation();
         if generation != self.stepper.branching_seen {
-            self.stepper.conflict_branching = space.branching.settings().conflict_branching;
+            let settings = space.branching.settings();
+            self.stepper.conflict_branching = settings.conflict_branching;
+            self.stepper.conflict_look = settings.conflict_look;
             self.stepper.branching_seen = generation;
         }
     }
@@ -1031,19 +1038,30 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
         // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
-        // gaps fall most.  Any conflict keeps the search exact.
+        // gaps fall most.  Any conflict keeps the search exact.  With the tactic `conflict_look`, it first looks at the
+        // last child of the search's own conflict.
         let found = match (self.conflict_branching, found) {
-            (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
-                g,
-                space.model,
-                &mut self.scratch,
-                state,
-                &eval,
-                k0,
-                cap,
-                learning.as_mut(),
-                &mut self.known,
-            )),
+            (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => {
+                let look = self.conflict_look.then_some(Look {
+                    cache: &mut self.conflict_cache,
+                    promoted,
+                    cands: *cands,
+                    need,
+                    max_total: space.max_total,
+                });
+                Lookup::Conflict(conflict_to_branch_on(
+                    g,
+                    space.model,
+                    &mut self.scratch,
+                    state,
+                    &eval,
+                    k0,
+                    cap,
+                    learning.as_mut(),
+                    &mut self.known,
+                    look,
+                ))
+            }
             (_, found) => found,
         };
         #[cfg(feature = "studies")]
@@ -1369,6 +1387,15 @@ impl<'a, const W: usize> Stepper<'a, W> {
 ///
 /// Any conflict keeps the search exact: every completion leaves out some member of it, so the children cover every
 /// completion.  The conflicts made here are conflicts, as [`FrameGraph::conflicts_ordered`] says.
+///
+/// With the tactic `conflict_look` (`look`), where another conflict than `k0` would be chosen and no member is forced,
+/// the last child of `k0` is looked at first: by strong branching's order (the dearest first) it promotes every member
+/// but the cheapest, `c`, and leaves `c` out.  Where `c` costs the bound at most [`CONFLICT_LOOK_PRICE`], `k0`'s weight
+/// less `c`'s term is below [`CONFLICT_LOOK_SLACK`] times the best weight, and that child is cut on sight
+/// ([`in_child_cut`]), the node branches on `k0`.  A child cut on sight is evidence of a hub, a member that costs the
+/// bound almost nothing to leave out and that the completions holding the others of `k0` must take, and at a hub the
+/// weight overrates every child of `k0`, not only the last.  `k0` and the conflict chosen are both true conflicts, so
+/// the search stays exact; the look leaves the node's state as it found it.
 #[allow(clippy::too_many_arguments)]
 fn conflict_to_branch_on<const W: usize>(
     g: &mut Gf2Bound<'_, W>,
@@ -1378,8 +1405,9 @@ fn conflict_to_branch_on<const W: usize>(
     eval: &Eval<W>,
     k0: Bits<W>,
     cap: u32,
-    learning: Option<&mut Learning<'_, W>>,
+    mut learning: Option<&mut Learning<'_, W>>,
     known: &mut Vec<Bits<W>>,
+    look: Option<Look<'_, W>>,
 ) -> Bits<W> {
     let members: Vec<u32> = eval.chosen.iter().collect();
     let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
@@ -1414,6 +1442,26 @@ fn conflict_to_branch_on<const W: usize>(
             best = (w, k, true);
         }
     }
+    if let Some(mut look) = look.filter(|_| best.1 != k0 && eval.forced.is_empty() && k0.len() >= 2) {
+        let by_price = |a: &u32, b: &u32| price[a].total_cmp(&price[b]).then(a.cmp(b));
+        let cheapest = k0.iter().min_by(by_price).expect("a conflict has members");
+        let without_cheapest = weight(&k0) - weight(&Bits::EMPTY.with(cheapest));
+        if price[&cheapest] <= CONFLICT_LOOK_PRICE
+            && without_cheapest < best.0 * CONFLICT_LOOK_SLACK
+            && in_child_cut(
+                g,
+                model,
+                scratch,
+                &mut look,
+                state,
+                k0.without(cheapest),
+                cheapest,
+                learning.as_deref_mut(),
+            )
+        {
+            best = (without_cheapest, k0, false);
+        }
+    }
     let (_, k, computed) = best;
     if k != k0 {
         if computed {
@@ -1426,4 +1474,89 @@ fn conflict_to_branch_on<const W: usize>(
         known.push(k);
     }
     k
+}
+
+/// What the look of the tactic `conflict_look` needs of the node beyond what [`conflict_to_branch_on`] has: the node's
+/// promotions and candidates, its need, the most promotions a completion can have, and the frames' last conflicts.
+struct Look<'r, const W: usize> {
+    cache: &'r mut ConflictCache<W>,
+    promoted: Bits<W>,
+    cands: Bits<W>,
+    need: u64,
+    max_total: u32,
+}
+
+/// Whether the child of the node on top of `g` (its state `state`) that promotes `added` and leaves out `m` is cut on
+/// sight: its promotion fails, or its largest candidates, its GF(2) bound, or a conflict of its heaviest set all of
+/// whose members it forces put it below its need (the checks of `check_child`, less the rule of `symmetry`, the
+/// matching bound, the Lagrangian bound and the propagation of the node's known conflicts, so a "no" may be a child the
+/// search would cut).  The child is pushed on `g` and popped.  The conflict found is learned as a nogood, as the search
+/// learns its own, and is known to no node.  Nothing else a node's step reads changes: the node's level in `g`
+/// resolves again at its next read, as after any child.
+#[allow(clippy::too_many_arguments)]
+fn in_child_cut<const W: usize>(
+    g: &mut Gf2Bound<'_, W>,
+    model: &FrameGraph,
+    scratch: &mut Scratch<W>,
+    look: &mut Look<'_, W>,
+    state: &FrameSet<W>,
+    added: Bits<W>,
+    m: u32,
+    learning: Option<&mut Learning<'_, W>>,
+) -> bool {
+    // As `make_child` promotes: one number in place, several together with every frame they touch left with freedoms.
+    let child = if added.len() == 1 {
+        let mut child = *state;
+        model.promote_in_place_using(scratch, &mut child, added.max().expect("one member")).then_some(child)
+    } else {
+        model.promote_all_using(scratch, state, &added).filter(|child| {
+            added.iter().all(|x| {
+                let (into, out) = model.frames_touched(x);
+                let frames = child.frames();
+                frames[into].freedoms >= 0 && out.is_none_or(|out| frames[out].freedoms >= 0)
+            })
+        })
+    };
+    let Some(child) = child else { return true };
+    let promoted = look.promoted | added;
+    let Some(need) = look.need.checked_sub(added.sum()) else { return false };
+    let rest = (look.cands - added).without(m);
+    let max_next = max_additional(model, look.max_total, &child, &promoted, &rest);
+    let mut cands = model.narrow(&child, &rest);
+    let mut learning = learning.map(|l| Learning { table: &mut *l.table, root: l.root, promoted });
+    if let Some(l) = learning.as_mut() {
+        cands -= l.table.ruled_out(&added, &promoted, &cands);
+    }
+    if cands.sum_largest(max_next) < need {
+        return true;
+    }
+    g.push_all(&added, &cands);
+    let eval = g.evaluate(max_next, Some(need));
+    let cut = eval.value < need || {
+        let mut known = Vec::new();
+        let mut seek =
+            Seek { model, scratch, cache: &mut *look.cache, state: &child, known: &mut known, learning: &mut learning };
+        match seek.conflict(&eval.chosen, eval.forced).0 {
+            Lookup::AllForced => true,
+            Lookup::None => false,
+            Lookup::Conflict(k) if k.is_subset(&eval.forced) => true,
+            // The table's conflict is not all forced, but the smallest a peel finds may be: learned as a nogood, it
+            // cuts the child when the search makes it (the table's lookup finds it all forced).
+            Lookup::Conflict(_) => {
+                match model.conflict_cached(scratch, Some(&mut *look.cache), &child, &eval.chosen, true) {
+                    Some(k) if k.is_subset(&eval.forced) => {
+                        if let Some(l) = learning.as_mut() {
+                            if let Some(nogood) = model.nogood(scratch, l.root, &promoted, &k) {
+                                l.table.insert(nogood);
+                            }
+                        }
+                        true
+                    }
+                    _ => false,
+                }
+            }
+        }
+    };
+    g.pop();
+    cut
 }

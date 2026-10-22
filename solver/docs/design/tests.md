@@ -72,12 +72,15 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Soundness harness** (`tests/soundness.rs`): the search starts from an incumbent worth 1 or 5 less than P\* with an
   empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place (which tests
   the `<` and `<=` boundaries too).  It runs:
-  * every game 2..=300 under each of 41 configurations: 19 of the matching path (every tactic; forgetting every step,
+  * every game 2..=300 under each of 46 configurations: 19 of the matching path (every tactic; forgetting every step,
     every third, never; the Lagrangian bound refitted every few steps; one thread and two), 11 of the default, the
     GF(2) bound with the rule of symmetric pairs (every way of choosing the branch; the matching bound as a first check;
     without forced members or nogoods; forgetting every step; two threads; the Lagrangian bound after it), the GF(2)
-    bound without the rule on one thread, two, and forgetting every step, the matching path with the rule, and 7
-    policies of keeping nogoods;
+    bound without the rule on one thread, two, and forgetting every step, the matching path with the rule, 7 policies
+    of keeping nogoods, and 5 of conflict branching (at every check, whatever its gap, on one thread and two; off;
+    and with the look at the last child of the search's own conflict, on one thread and two);
+  * the games 301..=500 (every tenth) with conflict branching at every check, with and without the look at the last
+    child of the search's own conflict: the look changes the tree of some of them, and no answer;
   * every game 2..=600 with symmetric pairs, with the rule over either bound (and the oracle without the frame model to
     40); units on the way to an optimal set (an optimal set less 30 to 70% of its members, games 600..1000) with the
     rule; and games 301..=600 (every tenth: searches of hundreds to thousands of steps) with the Lagrangian bound
@@ -117,7 +120,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   (the quick tests check only the rows of trees of 250 nodes or fewer): it prints the rows as observed, in the layout of
   the table at the top of the file.  Check that the promotion sums (the answers) have not moved, paste the rows in, and
   update any node counts quoted in the docs.
-* **Extended mode** ([Extended mode: one-sided candidates](search.md#extended-mode-one-sided-candidates)):
+* **Extended mode** ([Extended mode: one-sided candidates](extended-mode.md)):
   * the model with one-sided candidates against the extended problem's reference predicate on every game 2..=300, for
     nothing open, every source of three or more prime factors open (to 120) and five random sets of them
     (`tests/model_extended.rs`: sets promoted at once and one by one in random orders, their conflicts and nogoods, the
@@ -189,7 +192,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   `src/solver/lab.rs`, the live branching settings in `src/search/branching.rs`, a checkpoint asked through the control
   in `tests/engine.rs`): a range fed a hostile lab (sets off the board, twice, not promotable or claimed above their
   worth; commands that are not commands; restarts with tactics a restart does not take; threads it cannot have;
-  `conflict_branching` switched at every tick; a game held, checkpointed and restarted in the middle of its search; a
+  `conflict_branching` and `conflict_look` switched at every tick; a game held, checkpointed and restarted in the middle of its search; a
   redeploy at a commit off master) refuses every bad command with its reason, ends every game with the score of
   `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line, resumes it after the
   redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.

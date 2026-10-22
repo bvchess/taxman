@@ -614,8 +614,8 @@ pub struct GameResult {
     /// For a game taken from a known source (method [`Method::Known`]), or found by a search that an upper bound of the
     /// bounds store stopped (method [`Method::Search`] or [`Method::Start`]; both proof `known`), the source it cites.
     pub known: Option<Cited>,
-    /// What the lab did to the game's search (`--lab-dir`): its restarts, and its setting of `conflict_branching`; only
-    /// for a game whose search the lab changed.
+    /// What the lab did to the game's search (`--lab-dir`): its restarts, and its settings of `conflict_branching` and
+    /// `conflict_look`; only for a game whose search the lab changed.
     pub lab: Option<Json>,
 }
 
@@ -1097,8 +1097,12 @@ impl<const W: usize> Job for SearchJob<W> {
     }
 
     fn tactics(&self) -> SearchTactics {
-        let on = self.branching.settings().conflict_branching_on();
-        SearchTactics { conflict_branching: on, ..self.prepared.tactics }
+        let settings = self.branching.settings();
+        SearchTactics {
+            conflict_branching: settings.conflict_branching_on(),
+            conflict_look: settings.conflict_look,
+            ..self.prepared.tactics
+        }
     }
 
     fn offer(&self, set: &[u32], value: Option<u64>) -> Result<bool, String> {
@@ -1194,8 +1198,8 @@ fn set_up_with_width<const W: usize>(
     lab: Option<GameLab>,
 ) -> Result<SetUp, Failure> {
     // What the lab did to the game: a restart searches it with the lab's tactics, and a resume of that search too; a
-    // setting of `conflict_branching` holds over them.  Read from beside its checkpoint, also by a run without a lab,
-    // since the search it resumes was made so; nothing, for a game no lab touched.
+    // setting of `conflict_branching` or `conflict_look` holds over them.  Read from beside its checkpoint, also by a
+    // run without a lab, since the search it resumes was made so; nothing, for a game no lab touched.
     let lab = match lab {
         Some(lab) => lab,
         None => GameLab::load(opts, n)?,

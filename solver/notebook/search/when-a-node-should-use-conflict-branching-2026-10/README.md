@@ -445,3 +445,10 @@ a96ddf0 (`lookn`), v7 a8800dc (the filters and the trace of looks), v8 c2fe0f7 (
 
 The prototype's commits are on the local branch above and in `study-cb.patch`.  This entry and its register rows are
 the repository's only change.
+
+## Later (2026-10-22): built as the tactic `conflict_look`
+
+The rule `look=1,lookn,lookpc=10,lookslack=2` is built as the tactic `conflict_look`, off by default, which a lab
+switches per game through the `branching` command ([the design](../../../docs/design/search.md#conflict-branching)).
+Game 3000 proved from its root on one thread takes 117,197 steps with it on, as the prototype did.  Its whole-game test
+on the chain is pending.

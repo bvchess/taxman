@@ -1424,7 +1424,9 @@ impl<'a> Window<'a> {
         Some(match command {
             Command::Checkpoint => self.lab_checkpoint(),
             Command::Offer { n, set, value } => self.lab_offer(n, &set, value),
-            Command::Branching { n, conflict_branching } => self.lab_branching(n, conflict_branching),
+            Command::Branching { n, conflict_branching, conflict_look } => {
+                self.lab_branching(n, conflict_branching, conflict_look)
+            }
             Command::Restart { n, tactics } => return self.lab_restart(n, &tactics, name, json),
             Command::Threads { total } => self.lab_threads(total),
             Command::Workers { n, workers } => self.lab_workers(n, workers),
@@ -1494,20 +1496,43 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// `branching`: game `n`'s searchers branch with `conflict_branching` on or off from the next unit each starts.
-    fn lab_branching(&mut self, n: u32, on: bool) -> Result<String, String> {
+    /// `branching`: game `n`'s searchers branch with `conflict_branching` and `conflict_look`, those given, on or off
+    /// from the next unit each starts.
+    fn lab_branching(
+        &mut self,
+        n: u32,
+        conflict_branching: Option<bool>,
+        conflict_look: Option<bool>,
+    ) -> Result<String, String> {
         self.searching(n)?;
         let opts = self.opts;
         let Some(Game { stage: Stage::Search(set, _), .. }) = self.games.get_mut(&n) else { unreachable!("searching") };
-        set.job.branching().set_conflict_branching(on);
-        set.lab.conflict_branching = Some(on);
+        if let Some(on) = conflict_branching {
+            set.job.branching().set_conflict_branching(on);
+            set.lab.conflict_branching = Some(on);
+        }
+        if let Some(on) = conflict_look {
+            set.job.branching().set_conflict_look(on);
+            set.lab.conflict_look = Some(on);
+        }
         set.lab.branching_changes += 1;
         set.lab.keep(opts, n);
-        let unused = if set.job.tactics().gf2 { "" } else { " (it acts only with gf2, which this search has off)" };
-        let setting = if on { "on" } else { "off" };
-        Ok(format!(
-            "game {n}'s searchers branch with conflict_branching {setting} from the next unit each starts{unused}"
-        ))
+        let tactics = set.job.tactics();
+        let setting = |on: bool| if on { "on" } else { "off" };
+        let given = |name: &str, on: Option<bool>| on.map(|on| format!("{name} {}", setting(on)));
+        let changed: Vec<String> =
+            [given("conflict_branching", conflict_branching), given("conflict_look", conflict_look)]
+                .into_iter()
+                .flatten()
+                .collect();
+        let unused = if !tactics.gf2 {
+            " (it acts only with gf2, which this search has off)"
+        } else if tactics.conflict_look && !tactics.conflict_branching {
+            " (conflict_look acts only where conflict_branching is on, which this search has off)"
+        } else {
+            ""
+        };
+        Ok(format!("game {n}'s searchers branch with {} from the next unit each starts{unused}", changed.join(" and ")))
     }
 
     /// `restart`: game `n`'s search is abandoned and started again from nothing, with the run's search tactics changed
@@ -1589,6 +1614,7 @@ impl<'a> Window<'a> {
         record.tactics = Some(tactics);
         // The restart's tactics say how it branches, until the lab says otherwise.
         record.conflict_branching = None;
+        record.conflict_look = None;
         record.keep(opts, n);
         // A search started again starts its clock again ("The wall").
         (game.headed, game.headed_kept, game.stopped_at_wall) = (Duration::ZERO, Duration::ZERO, false);

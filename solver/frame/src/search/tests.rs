@@ -1096,10 +1096,17 @@ fn units_and_headers_round_trip() {
     branching.tactics.conflict_branching = !header.tactics.conflict_branching;
     assert_eq!(branching.mismatch(&header), None);
     assert_ne!(branching.encode(), header.encode());
+    // So is the look, and it is off by default, so that a default search's header is the one of the builds before it.
+    let mut looking = header;
+    looking.tactics.conflict_look = true;
+    assert_eq!(looking.mismatch(&header), None);
+    assert_ne!(looking.encode(), header.encode());
+    assert_eq!(Header::<8>::decode(&looking.encode()), Ok(looking));
+    assert!(!header.tactics.conflict_look);
 
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0x3B9, `symmetry` is bit 8, `conflict_branching` bit 9), and no higher bit
-    // is used.
+    // each switch that is on (the defaults: 0x3B9, `symmetry` is bit 8, `conflict_branching` bit 9 and `conflict_look`
+    // bit 10, which is off), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -1132,11 +1139,22 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..before }));
     assert!(before.same_recorded(&SearchTactics::legacy_tuning()));
     assert!(SearchTactics::legacy_tuning().same_recorded(&before));
-    assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 9);
+    assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 9 | 1 << 10);
     assert!(!before.same_recorded(&SearchTactics { symmetry: false, ..before }));
     let resumed = before.with_unbound_of(&SearchTactics::default());
     assert_eq!(resumed, SearchTactics { conflict_branching: true, ..before });
-    assert!(SearchTactics::from_bits(1 << 10).unwrap_err().contains("unknown tactics"));
+    // `conflict_look` is bit 10, off by default, so every checkpoint written before it reads with it off.  It binds
+    // nothing either, and a run that resumes a search says it.
+    let looking = SearchTactics { conflict_look: true, ..SearchTactics::legacy_tuning() };
+    assert_eq!(looking.bits(), 0x3B9 | 1 << 10);
+    assert_eq!(SearchTactics::from_bits(looking.bits()), Ok(looking));
+    assert!(looking.tuning_is_legacy());
+    assert!(looking.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(SearchTactics::legacy_tuning().same_recorded(&looking));
+    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&looking), looking);
+    assert_eq!(looking.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
+    assert!(!looking.same_recorded(&SearchTactics { symmetry: false, ..looking }));
+    assert!(SearchTactics::from_bits(1 << 11).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- the extended problem: one-sided candidates ----

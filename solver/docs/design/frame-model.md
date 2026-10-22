@@ -94,7 +94,7 @@ Second, a search settles the open members.  It is the search of the [extended
 problem](../../../docs/GLOSSARY.md#the-frame-model) Π⁺(O), with the set O of open members optional (THEORY.md, Theorem
 M⁺; `frames::build_extended`, research code).  The extended problem is exact like Π_n, so a search of it that finds
 nothing better, with the other members certified, proves opt(n) on the whole board.  The search takes the open members
-as one-sided candidates ([search.md](search.md#extended-mode-one-sided-candidates); `Board::prepare_extended_with`).
+as one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_extended_with`).
 
 Details of the extended problem: it keeps the claims of `unzip` that Lemma M5⁺ (THEORY.md) allows.  With nothing open
 that is all of them, so Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back

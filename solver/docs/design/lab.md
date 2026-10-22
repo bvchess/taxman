@@ -33,16 +33,18 @@ the scores and proofs of a window of 1 ([trust.md, "What a window changes in the
 results"](trust.md#what-a-window-changes-in-the-results)).
 
 **(b) Branching.**  The children of any true conflict cover every completion of their node, whatever the other nodes
-chose: every promotable completion leaves out some member of a conflict, so branching on its members, each child
-without one, explores every promotable set ([search.md, "The default step"](search.md#the-default-step), fact 2).  The
-conflicts that `conflict_branching` chooses among are true conflicts: the search's own, the nogoods within the heaviest
-set, and the minimal conflicts that `FrameGraph::conflicts_ordered` makes, each checked unwinnable by the whole peel
+chose: every promotable completion leaves out some member of a conflict, so branching on its members, each child without
+one, explores every promotable set ([search.md, "The default step"](search.md#the-default-step), fact 2).  The conflicts
+that `conflict_branching` chooses among are true conflicts: the search's own, the nogoods within the heaviest set, and
+the minimal conflicts that `FrameGraph::conflicts_ordered` makes, each checked unwinnable by the whole peel
 (docs/theory/decision-procedure.md, Theorems 3 and 4; docs/theory/frame-model.md, Theorem M; [search.md, "Conflict
-branching"](search.md#conflict-branching)).  The lab only switches that choice on or off, and a searcher reads the
-switch when it starts a unit.  A unit is a node with the candidates it has left, whose subtree its searcher explores to
-the end, so a search whose units branched differently is exhaustive unit by unit.  The nogoods learned on the way are
-conflicts whichever conflict a node chose, and they hold at every node ([search.md, "The default
-step"](search.md#the-default-step), fact 4).
+branching"](search.md#conflict-branching)).  The look that `conflict_look` makes chooses between two of them, the
+search's own conflict and the one `conflict_branching` chose, and leaves the node's state as it found it ([search.md,
+"Conflict branching"](search.md#conflict-branching), the paragraph "Why the look is exact").  The lab only switches the
+two on or off, and a searcher reads the switches when it starts a unit.  A unit is a node with the candidates it has
+left, whose subtree its searcher explores to the end, so a search whose units branched differently is exhaustive unit by
+unit.  The nogoods learned on the way are conflicts whichever conflict a node chose, and they hold at every node
+([search.md, "The default step"](search.md#the-default-step), fact 4).
 
 **(c) The incumbent.**  An offer becomes the incumbent only through `search::offer_found`: the set must be a set of
 candidates that can be promoted from the root, worth what the offer claims, the same check as a checkpoint's incumbent
@@ -69,18 +71,20 @@ checkpoint, and sets nothing but the game's search tactics, any of which is soun
 
 ## Which tactics may change while a search runs
 
-A tactic may change between a search's units only if it chooses how a node branches and prunes nothing.  One does:
+A tactic may change between a search's units only if it chooses how a node branches and prunes nothing.  Two do:
 
 | tactic | kind | why |
 |---|---|---|
 | `conflict_branching` | branching: changeable | it chooses which true conflict a node branches on, and the children of any conflict cover the node's completions; a conflict all of whose members are forced closes the node, which is the same deduction branching on it would make |
+| `conflict_look` | branching: changeable | where `conflict_branching` chooses, it chooses between the search's own conflict and the one chosen, both true conflicts; the child it looks at is made aside and unmade, and the conflict that cuts it is a nogood, which holds at every node |
 
-A checkpoint records `conflict_branching` (bit 9 of its tactics, `SearchTactics::BRANCHING_BITS`) as the search began
-with it, and does not compare it on resuming, so a checkpoint resumes with the tactic on or off.  The searchers read it
-through `search::Branching`: a generation number, loaded when a searcher starts a unit, and the settings, read again
-only when the generation has changed.  A step reads the searcher's own copy.  So a checkpoint of a search begun with the
-tactic off, game 4875's among them, resumes with it on.  A result line records the setting the search ended with in
-`tactic_switches`, and the lab's changes in `lab`.
+A checkpoint records `conflict_branching` and `conflict_look` (bits 9 and 10 of its tactics,
+`SearchTactics::BRANCHING_BITS`) as the search began with them, and does not compare them on resuming, so a checkpoint
+resumes with each tactic on or off.  The searchers read them through `search::Branching`: a generation number, loaded
+when a searcher starts a unit, and the settings, read again only when the generation has changed.  A step reads the
+searcher's own copy.  So a checkpoint of a search begun with conflict branching off, game 4875's among them, resumes
+with it on.  A result line records the settings the search ended with in `tactic_switches`, and the lab's changes in
+`lab`.
 
 The others stay fixed for the life of a search, each for its reason:
 
@@ -148,7 +152,7 @@ command does not take is refused, so a misspelt one is not ignored.
 |---|---|---|
 | `checkpoint` | | every running search writes its checkpoint at once (a pause, as at the interval) |
 | `offer` | `n`, `set`, `value` | offers the promotions `set`, claimed to be worth `value` (their sum when left out), through `offer_found`; applied whether or not the set beats the incumbent, and the reason says which |
-| `branching` | `n`, `conflict_branching` | `"on"` or `"off"`, for the units game n's searchers start from then on; kept in the game's record, so it holds over invocations |
+| `branching` | `n`, `conflict_branching`, `conflict_look` | `"on"` or `"off"` for either or both (at least one), for the units game n's searchers start from then on; kept in the game's record, so it holds over invocations; a field left out keeps its setting; `conflict_look` acts only where `conflict_branching` is on |
 | `restart` | `n`, `tactics` | abandons game n's search and starts it fresh with the run's search tactics changed by `tactics`, `name=value` separated by commas; a running search is stopped first, with a final checkpoint, and the outcome is written once it has stopped |
 | `threads` | `total` | the run's budget of threads; a search above its share gives workers back, the youngest first |
 | `threads` | `n`, `workers` | game n's search keeps `workers` workers, outside the policy that shares the rest, until it is concluded or `workers` is `null`; 0 suspends it, or keeps it from starting; n may be any game of the range not yet concluded |

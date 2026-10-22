@@ -1,8 +1,8 @@
 //! The lab channel (`SolveOptions::lab`: `--lab-dir`, `--hook`; solver/docs/design/lab.md): a hostile lab changes no
 //! result.  A range with a lab folder and a hook is fed offers of sets that are off the board, given twice, not
 //! promotable or claimed above their worth, commands that are not commands, restarts with tactics a restart does not
-//! take, threads it cannot have, `conflict_branching` switched at every tick, a restart of a game in the middle of its
-//! search, and a redeploy at a commit that is not on master (the solver does not judge commits: it stops, and the chain's
+//! take, threads it cannot have, `conflict_branching` and `conflict_look` switched at every tick, a restart of a game in
+//! the middle of its search, and a redeploy at a commit that is not on master (the solver does not judge commits: it stops, and the chain's
 //! script, which does, runs the build it has again, as the second run here does).  Every bad command is refused with
 //! its reason, every game ends with the score of `optimal.json`, and the file passes the verifier.  The game restarted
 //! records it, keeps its first checkpoint aside, and the hook hears of it twice, once when it runs long and once with
@@ -84,8 +84,9 @@ impl Drop for EndIfFailed<'_> {
 }
 
 /// The hostile lab: refused commands, each with the words its reason must hold, then the commands that are applied,
-/// the restart of `G` in the middle of its search, `conflict_branching` switched at every tick, and a redeploy.
-fn hostile(lab: &Path, out: &Path) {
+/// the restart of `G` in the middle of its search, `conflict_branching` and `conflict_look` switched at every tick, and
+/// a redeploy.  Returns the settings of the last switch that was applied while `G` searched, if one was.
+fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
     let _end = EndIfFailed(lab);
     // `G` waits, set up and held at no worker, until the lab lets it go.
     let since = Instant::now();
@@ -119,6 +120,9 @@ fn hostile(lab: &Path, out: &Path) {
         ("23-concluded", format!(r#"{{"command":"branching","n":{LO},"conflict_branching":"on"}}"#), "concluded"),
         ("24-not-running", format!(r#"{{"command":"finder","n":{G},"seconds":1}}"#), "not running"),
         ("25-commit", r#"{"command":"redeploy","commit":"HEAD"}"#.to_owned(), "hexadecimal"),
+        ("26-bad-look", format!(r#"{{"command":"branching","n":{G},"conflict_look":"maybe"}}"#), "conflict_look is"),
+        ("27-no-switch", format!(r#"{{"command":"branching","n":{G}}}"#), "needs conflict_branching or conflict_look"),
+        ("28-look-concluded", format!(r#"{{"command":"branching","n":{LO},"conflict_look":"on"}}"#), "concluded"),
     ];
     for (name, text, why) in &refused {
         let outcome = send(lab, name, text);
@@ -130,6 +134,8 @@ fn hostile(lab: &Path, out: &Path) {
         ("30-nothing-better", format!(r#"{{"command":"offer","n":{G},"set":[],"value":0}}"#)),
         ("31-on", format!(r#"{{"command":"branching","n":{G},"conflict_branching":"on"}}"#)),
         ("32-off", format!(r#"{{"command":"branching","n":{G},"conflict_branching":"off"}}"#)),
+        ("32-look-on", format!(r#"{{"command":"branching","n":{G},"conflict_look":"on"}}"#)),
+        ("32-both", format!(r#"{{"command":"branching","n":{G},"conflict_branching":"on","conflict_look":"off"}}"#)),
         ("33-more", r#"{"command":"threads","total":3}"#.to_owned()),
         ("34-fewer", r#"{"command":"threads","total":2}"#.to_owned()),
         ("35-checkpoint", r#"{"command":"checkpoint"}"#.to_owned()),
@@ -160,19 +166,26 @@ fn hostile(lab: &Path, out: &Path) {
     assert!(reason.contains("its checkpoint is n0950.ckpt.restart1"), "{reason}");
     let outcome = send(lab, "44-let-go", &format!(r#"{{"command":"threads","n":{G},"workers":null}}"#));
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
-    // At every tick while it runs: applied, or refused while it is set up again or once its search has ended.
+    // At every tick while it runs: applied, or refused while it is set up again or once its search has ended.  The
+    // look is switched the other way from the branching.
+    let mut last = None;
     for k in 0..6 {
-        let setting = if k % 2 == 0 { "on" } else { "off" };
+        let (setting, look) = if k % 2 == 0 { ("on", "off") } else { ("off", "on") };
         let name = format!("50-switch-{k}");
-        let outcome =
-            send(lab, &name, &format!(r#"{{"command":"branching","n":{G},"conflict_branching":"{setting}"}}"#));
+        let command =
+            format!(r#"{{"command":"branching","n":{G},"conflict_branching":"{setting}","conflict_look":"{look}"}}"#);
+        let outcome = send(lab, &name, &command);
         let (status, reason) = said(&outcome);
         let later = ["set up", "ended", "concluded"].iter().any(|why| reason.contains(why));
         assert!(status == "applied" || later, "{name}: {outcome}");
+        if status == "applied" {
+            last = Some((setting, look));
+        }
     }
     let outcome =
         send(lab, "60-redeploy", r#"{"command":"redeploy","commit":"0123456789abcdef0123456789abcdef01234567"}"#);
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
+    last
 }
 
 #[test]
@@ -199,9 +212,9 @@ fn a_hostile_lab_changes_no_result() {
     let summary = std::thread::scope(|scope| {
         let lab = scope.spawn(|| hostile(&lab, &out));
         let summary = solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
-        lab.join().unwrap();
-        summary
+        (summary, lab.join().unwrap())
     });
+    let (summary, last_switch) = summary;
     assert_eq!(summary.redeploy.as_deref(), Some("0123456789abcdef0123456789abcdef01234567"));
     for hold in ["00-hold", "00-hold-last"] {
         let outcome = Json::from_file(lab.join("out").join(hold)).unwrap();
@@ -225,6 +238,18 @@ fn a_hostile_lab_changes_no_result() {
     let game = &lines[(G - LO) as usize];
     let switches = game.get("tactic_switches").unwrap();
     assert_eq!(switches.get("strong_depth").and_then(Json::as_u32), Some(40), "{switches}");
+    // The line keeps the lab's last settings of the two switches, and the search ended with them.
+    let record = game.get("lab").unwrap();
+    let kept = |key: &str| record.get(key).and_then(Json::as_str);
+    let ended_with = |key: &str| switches.get(key).and_then(Json::as_bool);
+    match last_switch {
+        Some((branching, look)) => {
+            assert_eq!((kept("conflict_branching"), kept("conflict_look")), (Some(branching), Some(look)));
+            assert_eq!(ended_with("conflict_branching"), Some(branching == "on"));
+            assert_eq!(ended_with("conflict_look"), Some(look == "on"));
+        }
+        None => assert_eq!((kept("conflict_branching"), kept("conflict_look")), (None, None)),
+    }
     let restart = game.get("lab").and_then(|lab| lab.get("restarts")).and_then(|r| r.at(0)).unwrap();
     assert_eq!(restart.get("aside").and_then(Json::as_str), Some("n0950.ckpt.restart1"));
     assert!(dir.join("ckpt/n0950.ckpt.restart1").exists(), "the abandoned search's checkpoint is kept");
