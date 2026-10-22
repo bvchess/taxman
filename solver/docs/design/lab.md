@@ -108,15 +108,29 @@ its own, with no input or output and the event as its one argument, a JSON objec
 ignores its failure; each start, and each failure to start, is a line on stderr.  A thread of its own collects the
 program when it ends, so that none is left a zombie.
 
-* **`long`**, once a game: when the game's own search passes `--hook-after` seconds (3600 by default).  A game's own
-  search is the time it has been the head of the window with its search running, summed over invocations, the clock of
-  the wall ([engine.md, "The window: games in flight"](engine.md#the-window-games-in-flight), the item "The wall").  The
-  event carries `n`, `own_seconds`, the search's `nodes` in this invocation and its incumbent `best` (a promotion sum),
-  the `checkpoint` file, the `lab_dir`, the run's `pid` and `at`, the time in UTC.
-* **`done`**, when a game that had `long` has its line: `n`, `line`, the line as the results file has it, and `at`.
+* **`long`**, once a game: when the game's own search passes `--hook-after` seconds (3600 by default), as soon as its
+  engine runs.  A game's own search is the time it has been the head of the window with its search running, summed
+  over invocations, the clock of the wall ([engine.md, "The window: games in flight"](engine.md#the-window-games-in-flight),
+  the item "The wall").
+* **`done`**, when a game that had `long` has its line.
+
+The argument is one JSON object, with these fields; a program should ignore any other:
+
+| field | what it holds |
+|---|---|
+| `event` | `"long"` or `"done"` |
+| `n` | the game |
+| `nodes` | its search's steps so far, over every run of it (for `done`, the line's `nodes`) |
+| `best` | its best promotion sum so far (for `done`, the sum of the line's promotions) |
+| `own_seconds` | its own search time, in seconds |
+| `checkpoint_dir` | the checkpoint directory, an absolute path, or null without `--checkpoint-dir` |
+| `lab_dir` | the command folder, an absolute path, or null without `--lab-dir` |
+| `commit` | the commit the build was made from, or null if it is not known |
+| `result` | for `done` only: the game's line, as an object, as the results file has it |
+| `pid`, `at` | the run's process, and the time in UTC |
 
 Once a game holds over invocations: the game's record, `nNNNN.lab`, keeps that `long` was sent.  Without `--hook`, the
-driver makes one test a loop and starts nothing.
+driver makes one test a loop and starts nothing.  The lab's own tools are in [runbook/lab.md](../runbook/lab.md).
 
 ## The command folder
 

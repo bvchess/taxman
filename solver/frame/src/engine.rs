@@ -591,6 +591,9 @@ pub struct Status {
     pub best: u64,
     /// Nodes published in this invocation.
     pub nodes: u64,
+    /// Nodes over every run of the search: those of the runs before this one, from the checkpoint it resumed, and
+    /// `nodes`.
+    pub all_nodes: u64,
 }
 
 /// Where a run starts.
@@ -2263,6 +2266,7 @@ impl<U: Unit> Remote for Shared<U> {
 
     fn status(&self) -> Status {
         let st = self.lock();
+        let nodes = self.nodes.0.load(Ordering::Relaxed);
         let c = Self::counters_at(&st, Instant::now());
         Status {
             live: st.live,
@@ -2272,7 +2276,8 @@ impl<U: Unit> Remote for Shared<U> {
             idle_time: c.idle,
             capacity: c.capacity,
             best: self.best.0.load(Ordering::Relaxed),
-            nodes: self.nodes.0.load(Ordering::Relaxed),
+            nodes,
+            all_nodes: self.base.nodes + nodes,
         }
     }
 }

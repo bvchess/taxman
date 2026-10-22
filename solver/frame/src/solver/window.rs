@@ -172,7 +172,7 @@
 
 mod allot;
 
-use super::lab::{self, Command, Folder, GameLab, Restarted, Status as Answer, LAB_TICK};
+use super::lab::{self, Command, Event as Told, Folder, GameLab, Progress, Restarted, Status as Answer, LAB_TICK};
 use super::{
     ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev,
     stored_unfinished, Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev,
@@ -779,8 +779,11 @@ impl<'a> Window<'a> {
                 return Ok(true);
             }
             let n = self.next;
-            // Whether the hook was told that the game runs long: it is told of its line too.
-            let long = matches!(self.games.get(&n), Some(Game { stage: Stage::Search(set, _), .. }) if set.lab.long);
+            // Whether the hook was told that the game runs long, and the game's own search: it is told of its line too.
+            let long = match self.games.get(&n) {
+                Some(Game { stage: Stage::Search(set, _), headed, .. }) if set.lab.long => Some(*headed),
+                _ => None,
+            };
             let Some(result) = self.conclude_head(n)? else { return Ok(false) };
             self.pins.remove(&n);
             if !result.completed && self.opts.keep_going && engine::stop_signal().is_some() {
@@ -795,8 +798,10 @@ impl<'a> Window<'a> {
             }
             on_game(&result);
             self.trace(format_args!("concluded n={n}"));
-            if let (true, Some(hook)) = (long, &self.opts.lab.hook) {
-                lab::spawn_hook(hook, &lab::done_event(n, result.to_json()));
+            if let (Some(own), Some(hook)) = (long, &self.opts.lab.hook) {
+                let best = result.promotions.iter().map(|&p| u64::from(p)).sum();
+                let progress = Progress { nodes: Some(result.nodes), best: Some(best), own };
+                lab::spawn_hook(hook, &lab::hook_event(Told::Done, n, progress, self.opts, Some(result.to_json())));
             }
             self.summary.solved += 1;
             if !result.completed {
@@ -1352,8 +1357,9 @@ impl<'a> Window<'a> {
 /// the order and share of the threads, how nodes branch, the incumbent through `offer_found`, a search started again
 /// from nothing, and which build runs.
 impl<'a> Window<'a> {
-    /// Tells the hook that the head runs long, once its own search has passed `--hook-after`: once a game, over every
-    /// invocation (its record beside the checkpoint keeps that it was told).
+    /// Tells the hook that the head runs long, once its own search has passed `--hook-after` and its engine runs (so that
+    /// its steps are known): once a game, over every invocation (its record beside the checkpoint keeps that it was
+    /// told).
     fn tell_long(&mut self) {
         let Some(hook) = &self.opts.lab.hook else { return };
         let (n, opts) = (self.next, self.opts);
@@ -1362,11 +1368,12 @@ impl<'a> Window<'a> {
         if set.lab.long || game.headed < opts.lab.hook_after {
             return;
         }
+        // Not in the search's start, before its engine runs: then at the next look.
+        let Some(status) = set.job.control().status() else { return };
         set.lab.long = true;
         set.lab.keep(opts, n);
-        let status = set.job.control().status();
-        let (nodes, best) = (status.map(|s| s.nodes), status.map(|s| s.best));
-        lab::spawn_hook(hook, &lab::long_event(n, game.headed, nodes, best, opts));
+        let progress = Progress { nodes: Some(status.all_nodes), best: Some(status.best), own: game.headed };
+        lab::spawn_hook(hook, &lab::hook_event(Told::Long, n, progress, opts, None));
         self.trace(format_args!("long n={n}"));
     }
 
@@ -1707,7 +1714,7 @@ mod tests {
     /// which they waited `idle_time` ms.
     fn status(live: usize, idle: usize, capacity: u64, idle_time: u64) -> Status {
         let (capacity, idle_time) = (ms(capacity), ms(idle_time));
-        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0 }
+        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0, all_nodes: 0 }
     }
 
     fn game(score: u64, proven: bool) -> Prev {

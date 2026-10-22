@@ -10,6 +10,7 @@
 
 use super::SolveOptions;
 use crate::json::Json;
+use crate::results::build;
 use crate::search::SearchTactics;
 use crate::tactics::Tactics;
 use std::fs;
@@ -343,31 +344,49 @@ pub(super) fn spawn_hook(program: &Path, event: &Json) {
     }
 }
 
-/// The event `long`: game `n`'s own search has passed `--hook-after`, `own` so far, with `nodes` steps in this
-/// invocation and its incumbent worth `best` as a promotion sum.
-pub(super) fn long_event(n: u32, own: Duration, nodes: Option<u64>, best: Option<u64>, opts: &SolveOptions) -> Json {
-    let path = |p: Option<PathBuf>| p.map_or(Json::Null, |p| Json::from(p.display().to_string()));
-    Json::object([
-        ("event", Json::from("long")),
-        ("n", Json::from(n)),
-        ("own_seconds", Json::Num(own.as_secs_f64())),
-        ("nodes", nodes.map_or(Json::Null, Json::from)),
-        ("best", best.map_or(Json::Null, Json::from)),
-        ("checkpoint", path(opts.checkpoint_file(n))),
-        ("lab_dir", path(opts.lab.dir.clone())),
-        ("pid", Json::from(std::process::id())),
-        ("at", Json::from(utc(SystemTime::now()))),
-    ])
+/// What the hook is told, and when.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Event {
+    /// The game's own search has passed `--hook-after`.
+    Long,
+    /// The game, which had `Long`, has its line.
+    Done,
 }
 
-/// The event `done`: game `n`, which had a `long`, has its line, `line`.
-pub(super) fn done_event(n: u32, line: Json) -> Json {
-    Json::object([
-        ("event", Json::from("done")),
+/// A game's search as the hook is told of it: its steps over every run, its best promotion sum so far, and its own
+/// search time (the clock of the wall).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Progress {
+    pub(super) nodes: Option<u64>,
+    pub(super) best: Option<u64>,
+    pub(super) own: Duration,
+}
+
+/// The one argument of the hook (solver/docs/design/lab.md, "The hook"): `event`, `n`, `nodes`, `best`,
+/// `own_seconds`, `checkpoint_dir` and `lab_dir` (absolute paths, or null), `commit` (the build's), and for `done`
+/// `result`, the game's line; then `pid` and `at`, the time in UTC.
+pub(super) fn hook_event(event: Event, n: u32, progress: Progress, opts: &SolveOptions, result: Option<Json>) -> Json {
+    let path = |dir: Option<&PathBuf>| {
+        let dir = dir.map(|dir| std::path::absolute(dir).unwrap_or_else(|_| dir.clone()));
+        dir.map_or(Json::Null, |dir| Json::from(dir.display().to_string()))
+    };
+    let name = match event {
+        Event::Long => "long",
+        Event::Done => "done",
+    };
+    let fields = [
+        ("event", Json::from(name)),
         ("n", Json::from(n)),
-        ("line", line),
-        ("at", Json::from(utc(SystemTime::now()))),
-    ])
+        ("nodes", progress.nodes.map_or(Json::Null, Json::from)),
+        ("best", progress.best.map_or(Json::Null, Json::from)),
+        ("own_seconds", Json::Num(progress.own.as_secs_f64())),
+        ("checkpoint_dir", path(opts.checkpoint_dir.as_ref())),
+        ("lab_dir", path(opts.lab.dir.as_ref())),
+        ("commit", build().commit.map_or(Json::Null, Json::from)),
+    ];
+    let result = result.map(|line| ("result", line));
+    let more = [("pid", Json::from(std::process::id())), ("at", Json::from(utc(SystemTime::now())))];
+    Json::object(fields.into_iter().chain(result).chain(more))
 }
 
 // ---------------------------------------------------------------------------------------------------------

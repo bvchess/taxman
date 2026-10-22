@@ -71,14 +71,14 @@ fn lines(path: &Path) -> Vec<Json> {
     fs::read_to_string(path).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect()
 }
 
-/// Lets `G` go if the lab fails, so that the run ends and the test reports the failure instead of waiting for ever.
-struct LetGo<'a>(&'a Path);
+/// Ends the run if the lab fails, so that the test reports the failure instead of waiting for ever for the games it
+/// holds.
+struct EndIfFailed<'a>(&'a Path);
 
-impl Drop for LetGo<'_> {
+impl Drop for EndIfFailed<'_> {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            let _ =
-                fs::write(self.0.join("in/zz-let-go"), format!(r#"{{"command":"threads","n":{G},"workers":null}}"#));
+            let _ = fs::write(self.0.join("in/zz-end"), r#"{"command":"redeploy","commit":"0000000"}"#);
         }
     }
 }
@@ -86,7 +86,7 @@ impl Drop for LetGo<'_> {
 /// The hostile lab: refused commands, each with the words its reason must hold, then the commands that are applied,
 /// the restart of `G` in the middle of its search, `conflict_branching` switched at every tick, and a redeploy.
 fn hostile(lab: &Path, out: &Path) {
-    let _let_go = LetGo(lab);
+    let _end = EndIfFailed(lab);
     // `G` waits, set up and held at no worker, until the lab lets it go.
     let since = Instant::now();
     for k in 0.. {
@@ -184,8 +184,9 @@ fn a_hostile_lab_changes_no_result() {
     #[cfg(unix)]
     fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
     fs::create_dir_all(lab.join("in")).unwrap();
-    // Held from the start: `G` is set up, and waits.
+    // Held from the start: `G` is set up, and waits; so does `HI`, so that the range lasts until the lab is done.
     fs::write(lab.join("in/00-hold"), format!(r#"{{"command":"threads","n":{G},"workers":0}}"#)).unwrap();
+    fs::write(lab.join("in/00-hold-last"), format!(r#"{{"command":"threads","n":{HI},"workers":0}}"#)).unwrap();
     let opts = SolveOptions {
         use_prev: true,
         checkpoint_dir: Some(dir.join("ckpt")),
@@ -202,8 +203,10 @@ fn a_hostile_lab_changes_no_result() {
         summary
     });
     assert_eq!(summary.redeploy.as_deref(), Some("0123456789abcdef0123456789abcdef01234567"));
-    let outcome = Json::from_file(lab.join("out/00-hold")).unwrap();
-    assert_eq!(said(&outcome).0, "applied", "{outcome}");
+    for hold in ["00-hold", "00-hold-last"] {
+        let outcome = Json::from_file(lab.join("out").join(hold)).unwrap();
+        assert_eq!(said(&outcome).0, "applied", "{outcome}");
+    }
     // The chain's script runs the build it has again, with the same command.
     let again = solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
     assert_eq!(again.redeploy, None);
@@ -240,5 +243,19 @@ fn a_hostile_lab_changes_no_result() {
     let events = events();
     let kinds: Vec<&str> = events.iter().filter_map(|event| event.get("event").and_then(Json::as_str)).collect();
     assert_eq!(kinds, ["long", "done"], "{events:?}");
-    assert_eq!(events[1].get("line").and_then(|line| line.get("n")).and_then(Json::as_u32), Some(G));
+    // The format the hook's program reads (solver/docs/design/lab.md, "The hook").
+    let ckpt = dir.join("ckpt");
+    for event in &events {
+        let text = |key| event.get(key).and_then(Json::as_str);
+        assert_eq!(text("checkpoint_dir"), ckpt.to_str(), "{event}");
+        assert_eq!(text("lab_dir"), lab.to_str(), "{event}");
+        assert!(event.get("nodes").and_then(Json::as_u64).is_some() && event.get("own_seconds").is_some(), "{event}");
+        assert!(event.get("best").and_then(Json::as_u64).is_some() && event.get("commit").is_some(), "{event}");
+    }
+    assert_eq!(events[0].get("result"), None);
+    let result = events[1].get("result").unwrap();
+    assert_eq!(result.get("n").and_then(Json::as_u32), Some(G));
+    let best = result.get("promotions").and_then(Json::as_u32_vec).unwrap().iter().map(|&p| u64::from(p)).sum();
+    assert_eq!(events[1].get("best").and_then(Json::as_u64), Some(best));
+    assert_eq!(events[1].get("nodes"), result.get("nodes"));
 }
