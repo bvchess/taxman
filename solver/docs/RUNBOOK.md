@@ -30,3 +30,4 @@ launch.md, and ends with the campaigns that used it, whose notebook entries hold
 | the ledger (`ledger/cloud.sh`) | [ledger.md](runbook/ledger.md) | run the ledger over a stretch of games for a budget of CPU |
 | the prover (`prover.sh`) | [prover.md](runbook/prover.md) | prove opt(n) on the whole board with the prover |
 | certificates of U (`certify.sh`) | [certify.md](runbook/certify.md) | certify statement U game by game |
+| the lab (`lab/lab.sh`) | [lab.md](runbook/lab.md) | study the largest units of a live search on a machine's spare threads |

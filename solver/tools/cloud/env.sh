@@ -44,6 +44,26 @@ if ! command -v cargo >/dev/null 2>&1 && [ -r "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
+# The awk function commas(x) that the awk programs of wall.sh status and lab/lab.sh include (as "$AWK_COMMAS"): the
+# whole number x with a comma between each three digits, 6971841261 as 6,971,841,261; any other text (a `-`) as it is.
+# The one definition of it.
+AWK_COMMAS='
+    function commas(x,    s, out) {
+        s = x ""
+        if (s !~ /^[0-9]+$/) return s
+        while (length(s) > 3) {
+            out = "," substr(s, length(s) - 2) out
+            s = substr(s, 1, length(s) - 3)
+        }
+        return s out
+    }
+'
+
+# The whole number $1 with its thousands separators (AWK_COMMAS), not by printf's ' flag, which depends on the locale.
+commas() {
+    awk -v x="$1" "$AWK_COMMAS"'BEGIN { print commas(x) }'
+}
+
 # A message goes to the terminal (stderr) and, when LOG_FILE is set, to that file, written directly (not through a tee,
 # which would die with a Ctrl-C aimed at the whole foreground group and take the log with it).  run_begin (run.sh) sets
 # LOG_FILE to $LOGS/NAME.log; spot-watch.sh sets it to $LOGS/spot-watch.log.  Not an environment setting: it starts

@@ -552,26 +552,6 @@ launch() {
 
 # --- status ------------------------------------------------------------------------------------------------------
 
-# The awk function commas(x) that the awk programs of status include (as "$AWK_COMMAS"): the whole number x with a comma
-# between each three digits, 6971841261 as 6,971,841,261; any other text (a `-`) as it is.  The one definition of it:
-# commas, below, runs it for the shell.
-AWK_COMMAS='
-    function commas(x,    s, out) {
-        s = x ""
-        if (s !~ /^[0-9]+$/) return s
-        while (length(s) > 3) {
-            out = "," substr(s, length(s) - 2) out
-            s = substr(s, 1, length(s) - 3)
-        }
-        return s out
-    }
-'
-
-# The whole number $1 with its thousands separators (AWK_COMMAS), not by printf's ' flag, which depends on the locale.
-commas() {
-    awk -v x="$1" "$AWK_COMMAS"'BEGIN { print commas(x) }'
-}
-
 # The last line of each of the COUNT highest games up to THROUGH among the lines of recorded games on stdin
 # (logs/chain.out), the lowest game first.  A replacement machine may print a game again after an interruption: the last
 # line of a game is the one that counts.
