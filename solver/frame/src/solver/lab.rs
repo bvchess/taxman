@@ -657,7 +657,7 @@ mod tests {
                 own_seconds: 12.5,
                 nodes: Some(1234),
                 tactics: "symmetry=off".into(),
-                aside: Some("n0077.restart1.ckpt".into()),
+                aside: Some("n0077.ckpt.restart1".into()),
             }],
             long: true,
         };

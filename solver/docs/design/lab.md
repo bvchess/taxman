@@ -157,8 +157,8 @@ command does not take is refused, so a misspelt one is not ignored.
 | `finder` | `n`, `seconds` | a finder beside game n's running search for that long; it ends with the search, and its report goes to `out/report-NAME` |
 | `redeploy` | `commit` | ends the run, every search stopped with a final checkpoint: `solve` prints `redeploy to COMMIT` and exits with status 5 |
 
-*A restart.*  Game n's checkpoint becomes `nNNNN.restartK.ckpt` and its clock `nNNNN.restartK.clock`, for its K-th
-restart, and its record, `nNNNN.lab`, gets the restart: when, the game's own seconds then, the steps of the search
+*A restart.*  Game n's checkpoint becomes `nNNNN.ckpt.restartK` and its clock `nNNNN.clock.restartK`, for its K-th
+restart, names that no tool takes for a game's checkpoint or clock (`n*.ckpt`), and its record, `nNNNN.lab`, gets the restart: when, the game's own seconds then, the steps of the search
 abandoned, the tactics, and the name of the checkpoint put aside.  The game is then set up again, with those tactics,
 and searched whatever an earlier game settled, as a game with a checkpoint is; its clock starts again, as a fresh
 search's does.  A search that completes before it stops is not restarted, and neither is one that a stop signal ends.

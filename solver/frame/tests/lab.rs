@@ -157,7 +157,7 @@ fn hostile(lab: &Path, out: &Path) {
     let outcome = send(lab, "43-restart", &format!(r#"{{"command":"restart","n":{G},"tactics":"strong_depth=40"}}"#));
     let (status, reason) = said(&outcome);
     assert_eq!(status, "applied", "{outcome}");
-    assert!(reason.contains("its checkpoint is n0950.restart1.ckpt"), "{reason}");
+    assert!(reason.contains("its checkpoint is n0950.ckpt.restart1"), "{reason}");
     let outcome = send(lab, "44-let-go", &format!(r#"{{"command":"threads","n":{G},"workers":null}}"#));
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
     // At every tick while it runs: applied, or refused while it is set up again or once its search has ended.
@@ -226,8 +226,8 @@ fn a_hostile_lab_changes_no_result() {
     let switches = game.get("tactic_switches").unwrap();
     assert_eq!(switches.get("strong_depth").and_then(Json::as_u32), Some(40), "{switches}");
     let restart = game.get("lab").and_then(|lab| lab.get("restarts")).and_then(|r| r.at(0)).unwrap();
-    assert_eq!(restart.get("aside").and_then(Json::as_str), Some("n0950.restart1.ckpt"));
-    assert!(dir.join("ckpt/n0950.restart1.ckpt").exists(), "the abandoned search's checkpoint is kept");
+    assert_eq!(restart.get("aside").and_then(Json::as_str), Some("n0950.ckpt.restart1"));
+    assert!(dir.join("ckpt/n0950.ckpt.restart1").exists(), "the abandoned search's checkpoint is kept");
     verify_files(&[PathBuf::from(&out)], optimal, 2).unwrap_or_else(|e| panic!("{e}"));
 
     // The hook heard that `G` ran long, once, and of its line (the hook runs detached: its last event may come later).

@@ -1558,7 +1558,7 @@ impl<'a> Window<'a> {
         let k = record.restarts.len() + 1;
         let aside = |path: Option<PathBuf>, ext: &str| -> Result<Option<String>, String> {
             let Some(path) = path.filter(|path| path.exists()) else { return Ok(None) };
-            let name = format!("n{n:04}.restart{k}.{ext}");
+            let name = format!("n{n:04}.{ext}.restart{k}");
             fs::rename(&path, path.with_file_name(&name)).map_err(|e| format!("{}: {e}", path.display()))?;
             Ok(Some(name))
         };
