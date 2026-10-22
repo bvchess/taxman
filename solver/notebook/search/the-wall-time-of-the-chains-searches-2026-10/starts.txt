@@ -1,0 +1,23 @@
+# The prototype of both seeds (research-wall, local branch), one thread, --use-prev, the committed store, a step
+# limit of 1,000: the start the seed not chosen makes, its offer, and the search's first progress line.
+n=4875 the other seed's start: 537693 (Ok(true))
+n=4875 4.5s nodes 1023 (stopped) best 537927 queue 85 spille
+n=4879 the other seed's start: 540399 (Ok(true))
+n=4879 4.8s nodes 1023 (stopped) best 540552 queue 78 spille
+n=4893 the other seed's start: 543874 (Ok(true))
+n=4893 5.0s nodes 0 (0/s) best 543874 queue 0 spilled 0 | ef
+# examples/finder.rs N --known strict.jsonl --start-only: the start from the game of n - 1 alone, one thread, nice 19.
+{"game":4875,"target":null,"start":537693,"start_s":32.27752433,"seeded":true}
+{"game":4879,"target":null,"start":540552,"start_s":28.880230346,"seeded":true}
+{"game":4880,"target":null,"start":542420,"start_s":30.697594712,"seeded":true}
+{"game":4884,"target":null,"start":543308,"start_s":29.809154667,"seeded":true}
+{"game":4888,"target":null,"start":543860,"start_s":26.534237372,"seeded":true}
+{"game":4890,"target":null,"start":544107,"start_s":29.398677234,"seeded":true}
+{"game":4895,"target":null,"start":542539,"start_s":29.604305319,"seeded":true}
+# Master at fa6bfdc (both seeds), the same runs: the first progress line and the result line.
+n=4875 4.5s nodes 1023 (stopped) best 537927 queue 85 spille
+n=4875  score=7476221   search  nodes=1023           66.315 s  incomplete  own=65.556 s  best=537927
+n=4879 4.9s nodes 1023 (stopped) best 540552 queue 78 spille
+n=4879  score=7488608   search  nodes=1023           63.444 s  incomplete  own=62.690 s  best=540552
+n=4893 5.0s nodes 0 (0/s) best 543874 queue 0 spilled 0 | ef
+n=4893  score=7530940   search  nodes=1023           64.068 s  incomplete  own=63.310 s  best=543874

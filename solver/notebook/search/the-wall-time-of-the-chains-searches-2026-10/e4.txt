@@ -1,0 +1,6 @@
+n=4893 finder: started at 1023 nodes, from 543739, for 900 s
+n=4893 finder: 543789 after 193.7 s (round 13, from the seed)
+n=4893 finder: 543833 after 194.3 s (round 13, from the seed)
+n=4893 finder: 543862 after 606.6 s (round 40, from the incumbent)
+n=4893 finder: 543874 after 610.6 s (round 41, from the seed)
+n=4893 finder: ended after 900.0 s: best 543874, 4 sets accepted
