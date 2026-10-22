@@ -1,0 +1,651 @@
+diff --git a/solver/frame/src/search/branching.rs b/solver/frame/src/search/branching.rs
+index 2f20495..4f0da8c 100644
+--- a/solver/frame/src/search/branching.rs
++++ b/solver/frame/src/search/branching.rs
+@@ -11,6 +11,16 @@ use super::CONFLICT_BRANCHING_GAP;
+ use std::sync::atomic::{AtomicU64, Ordering};
+ use std::sync::{Mutex, PoisonError};
+ 
++/// The gate of `conflict_branching`: [`CONFLICT_BRANCHING_GAP`], or with the feature `studies` the value of the
++/// environment variable `TAXMAN_CB_GAP` where it is set.
++fn gate() -> u64 {
++    #[cfg(feature = "studies")]
++    if let Some(gap) = std::env::var("TAXMAN_CB_GAP").ok().and_then(|v| v.parse().ok()) {
++        return gap;
++    }
++    CONFLICT_BRANCHING_GAP
++}
++
+ /// What the branching settings say.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub struct BranchSettings {
+@@ -22,7 +32,7 @@ pub struct BranchSettings {
+ impl BranchSettings {
+     /// The settings that `tactics` make: `conflict_branching` from [`CONFLICT_BRANCHING_GAP`] on, if it is on.
+     pub fn of(tactics: &SearchTactics) -> Self {
+-        BranchSettings { conflict_branching: tactics.conflict_branching.then_some(CONFLICT_BRANCHING_GAP) }
++        BranchSettings { conflict_branching: tactics.conflict_branching.then_some(gate()) }
+     }
+ 
+     /// Whether the tactic `conflict_branching` is on.
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index 312b1be..f9d650b 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -35,6 +35,91 @@ use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nog
+ use std::sync::{Arc, Mutex, PoisonError};
+ use std::time::{Duration, Instant};
+ 
++// ---------------------------------------------------------------------------------------------------------
++// A study of when a node should use conflict branching (feature `studies`): switches read once from the environment
++
++/// What the study's environment says: `TAXMAN_CB_TRACE` (set: a line to stderr at every step, check and choice) and
++/// `TAXMAN_CB_POLICY`, a comma-separated list of the rules that decide where a node uses conflict branching.
++#[cfg(feature = "studies")]
++pub(crate) mod study {
++    use std::sync::OnceLock;
++
++    #[derive(Debug, Default)]
++    pub struct Study {
++        /// `TAXMAN_CB_TRACE`: 1 the short trace, 2 with every member's price.
++        pub trace: bool,
++        pub trace_prices: bool,
++        /// `TAXMAN_CB_TRACE_LOOKS` set: a line to stderr for each look of the rule `look`.
++        pub trace_looks: bool,
++        /// `maxdepth=D`: conflict branching only at nodes of fewer than D promotions.
++        pub max_depth: Option<u32>,
++        /// `keep1`: the search's own conflict where it has one member.
++        pub keep1: bool,
++        /// `look=M`: before branching on another conflict, look at the child that promotes the strong member of up
++        /// to M two-member conflicts that would weigh less than it with that child cut on sight; branch on the first
++        /// whose child is (lightest first).  `lookall`: every two-member conflict seen, not only the search's own.
++        pub look: usize,
++        pub look_all: bool,
++        /// `lookn`: `look` also at conflicts of three members or more.
++        pub look_n: bool,
++        /// `lookpc=P`: look only where the cheapest member's price is at most P; `lookk=K`: only at conflicts of at
++        /// most K members.
++        pub look_pc: Option<f64>,
++        pub look_k: Option<u32>,
++        /// `lookslack=A`: look at a conflict, and branch on it if its last child is cut, while its weight less its
++        /// cheapest member's is below A times the best weight (1 by default).
++        pub look_slack: f64,
++        /// `skipforced`: the search's own conflict where the weight split forces members (the node's one child
++        /// promotes them, whichever conflict it branches on).
++        pub skip_forced: bool,
++        /// `forced0`: a member whose price is at least the gap (forced: the child without it is empty) weighs 0.
++        pub forced0: bool,
++        /// `after=X`: conflict branching only at a node whose subtree has taken X steps or more so far (a node's
++        /// first check, made when it is made, never uses it unless X is 0).
++        pub after: Option<u64>,
++        /// `slope=S`: the weight's slope (`CONFLICT_BRANCHING_SLOPE`, 291, by default).
++        pub slope: Option<f64>,
++        /// `ema=T`: conflict branching only while the searcher's moving average (over the last 16 or so) of how
++        /// often the child of a two-member conflict with no member forced is cut on sight is below T.
++        pub ema: Option<f64>,
++    }
++
++    pub fn get() -> &'static Study {
++        static STUDY: OnceLock<Study> = OnceLock::new();
++        STUDY.get_or_init(|| {
++            let level = std::env::var("TAXMAN_CB_TRACE").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
++            let mut s = Study {
++                trace: level >= 1,
++                trace_prices: level >= 2,
++                trace_looks: std::env::var_os("TAXMAN_CB_TRACE_LOOKS").is_some(),
++                look_slack: 1.0,
++                ..Study::default()
++            };
++            let policy = std::env::var("TAXMAN_CB_POLICY").unwrap_or_default();
++            for part in policy.split(',').map(str::trim).filter(|p| !p.is_empty()) {
++                match part.split_once('=') {
++                    Some(("maxdepth", v)) => s.max_depth = Some(v.parse().expect("maxdepth=D")),
++                    Some(("look", v)) => s.look = v.parse().expect("look=M"),
++                    Some(("lookpc", v)) => s.look_pc = Some(v.parse().expect("lookpc=P")),
++                    Some(("lookk", v)) => s.look_k = Some(v.parse().expect("lookk=K")),
++                    Some(("lookslack", v)) => s.look_slack = v.parse().expect("lookslack=A"),
++                    Some(("after", v)) => s.after = Some(v.parse().expect("after=X")),
++                    Some(("slope", v)) => s.slope = Some(v.parse().expect("slope=S")),
++                    Some(("ema", v)) => s.ema = Some(v.parse().expect("ema=T")),
++                    None if part == "keep1" => s.keep1 = true,
++                    None if part == "lookall" => s.look_all = true,
++                    None if part == "lookn" => s.look_n = true,
++                    None if part == "skipforced" => s.skip_forced = true,
++                    None if part == "forced0" => s.forced0 = true,
++                    _ => panic!("TAXMAN_CB_POLICY: unknown rule {part}"),
++                }
++            }
++            eprintln!("study: {s:?}");
++            s
++        })
++    }
++}
++
+ // ---------------------------------------------------------------------------------------------------------
+ // Units
+ 
+@@ -247,6 +332,9 @@ pub(super) struct Node<const W: usize> {
+     pub(super) known_end: usize,
+     /// What the bound check of the node said when it was made, until its loop's first step takes it.
+     pub(super) checked: Option<Checked<W>>,
++    /// The study's count of the searcher's steps when the node was made (the rule `after`).
++    #[cfg(feature = "studies")]
++    pub(super) born: u64,
+ }
+ 
+ /// The verdict of a child's bound check that let it through, kept for the first step of its loop: at the
+@@ -370,6 +458,22 @@ struct Stepper<'a, const W: usize> {
+     /// The sets a study's hook proposed to learn ([`StepHook::propose`]), reused.
+     #[cfg(feature = "studies")]
+     proposals: Vec<Bits<W>>,
++    /// The study's counts of the rule `look`: checks that chose, children looked at, of them cut on sight, and
++    /// conflicts chosen for it.
++    #[cfg(feature = "studies")]
++    look_counts: [u64; 4],
++    /// The study's count of this searcher's steps, and the step at which the node being checked was made (the rule
++    /// `after`).
++    #[cfg(feature = "studies")]
++    steps: u64,
++    #[cfg(feature = "studies")]
++    born: u64,
++    /// The rule `ema`: whether this step branches on a two-member conflict with no member forced, and the moving
++    /// average of how often such a step's child is cut on sight.
++    #[cfg(feature = "studies")]
++    pair_branch: bool,
++    #[cfg(feature = "studies")]
++    ema: f64,
+ }
+ 
+ impl<'a, const W: usize> TaxSearcher<'a, W> {
+@@ -411,6 +515,16 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
+                 promotable: false,
+                 #[cfg(feature = "studies")]
+                 proposals: Vec::new(),
++                #[cfg(feature = "studies")]
++                look_counts: [0; 4],
++                #[cfg(feature = "studies")]
++                steps: 0,
++                #[cfg(feature = "studies")]
++                born: 0,
++                #[cfg(feature = "studies")]
++                pair_branch: false,
++                #[cfg(feature = "studies")]
++                ema: 0.0,
+             },
+         }
+     }
+@@ -432,7 +546,17 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
+         let max_add = max_additional(space.model, space.max_total, &state, &unit.promoted, &unit.cands);
+         let sum = unit.promoted.sum();
+         let node =
+-            Node { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0, checked: None };
++            Node {
++                state,
++                promoted: unit.promoted,
++                sum,
++                cands: unit.cands,
++                max_add,
++                known_end: 0,
++                checked: None,
++                #[cfg(feature = "studies")]
++                born: self.stepper.steps,
++            };
+         self.stepper.known.clear();
+         if self.stack.is_empty() {
+             self.stack.push(node);
+@@ -466,6 +590,10 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
+         let (path, below) = self.stack.split_at_mut(depth + 1);
+         let next = self.stepper.step(&mut path[depth], &mut below[0], depth > 0, ctx);
+         #[cfg(feature = "studies")]
++        if study::get().trace && matches!(next, Next::Child) {
++            eprintln!("E child d={}", below[0].promoted.len());
++        }
++        #[cfg(feature = "studies")]
+         if let Some((hook, record)) = &mut self.stepper.hook {
+             let made = !matches!(record.end, StepEnd::LoopEnd(_) | StepEnd::ChildFailed);
+             hook.step(record, &path[depth].state, made.then_some(&below[0].state));
+@@ -520,6 +648,21 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         let best = ctx.best();
+         let need = (best + 1).saturating_sub(node.sum); // what a completion must add to beat the incumbent
+         #[cfg(feature = "studies")]
++        {
++            self.steps += 1;
++            self.born = node.born;
++        }
++        #[cfg(feature = "studies")]
++        if study::get().trace {
++            eprintln!(
++                "S d={} c={} max_add={} need={need} inherited={}",
++                node.promoted.len(),
++                node.cands.len(),
++                node.max_add,
++                node.checked.as_ref().is_some_and(|c| c.need == need)
++            );
++        }
++        #[cfg(feature = "studies")]
+         if let Some((_, record)) = &mut self.hook {
+             *record = StepRecord { promoted: node.promoted, cands: node.cands, need, ..StepRecord::default() };
+         }
+@@ -566,9 +709,20 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         if let Some(p) = &mut self.probe {
+             p.child(child.promoted.len());
+         }
++        #[cfg(feature = "studies")]
++        self.pair_outcome(false);
+         Next::Child
+     }
+ 
++    /// The rule `ema`: after a step that branched on a two-member conflict with no member forced, whether its child
++    /// was cut on sight (its promotion failed, or its check cut it), into the searcher's moving average.
++    #[cfg(feature = "studies")]
++    fn pair_outcome(&mut self, dead: bool) {
++        if std::mem::take(&mut self.pair_branch) {
++            self.ema += (f64::from(u8::from(dead)) - self.ema) / 16.0;
++        }
++    }
++
+     /// Phase 1: whether `node`'s loop goes on, that is whether some completion can still add `need`.
+     /// `Err(reason)` if not, or if its best completion is known (then offered): the [`cut`] reason.  Else what
+     /// the bound check found for choosing the branch.
+@@ -804,6 +958,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
+             return None;
+         }
+         self.counts.promotions += u64::from(added.len());
++        // The child is made now, and its check (next) is of a node with no subtree yet.
++        #[cfg(feature = "studies")]
++        {
++            child.born = self.steps;
++            self.born = self.steps;
++        }
+         child.promoted = node.promoted | added;
+         child.sum = node.sum + added.sum();
+         let rest = branch.left - added;
+@@ -1012,6 +1172,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         }
+         let g = self.gf2.as_mut().expect("the tactic gf2");
+         let eval = g.evaluate(cap, space.fix_forced.then_some(need));
++        #[cfg(feature = "studies")]
++        if study::get().trace {
++            eprintln!(
++                "C d={} c={} cap={cap} gap={} I={} F={}",
++                promoted.len(),
++                cands.len(),
++                eval.value as i64 - need as i64,
++                eval.chosen.len(),
++                eval.forced.len()
++            );
++        }
+         if eval.value < need {
+             #[cfg(feature = "studies")]
+             self.tell_check(&eval, None);
+@@ -1032,7 +1203,52 @@ impl<'a, const W: usize> Stepper<'a, W> {
+         self.counts.conflicts += u64::from(computed);
+         // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
+         // gaps fall most.  Any conflict keeps the search exact.
+-        let found = match (self.conflict_branching, found) {
++        let gate = self.conflict_branching;
++        #[cfg(feature = "studies")]
++        let gate = {
++            let s = study::get();
++            let k0_len = match &found {
++                Lookup::Conflict(k0) => k0.len(),
++                _ => 0,
++            };
++            gate.filter(|_| {
++                s.max_depth.is_none_or(|d| promoted.len() < d)
++                    && !(s.keep1 && k0_len == 1)
++                    && !(s.skip_forced && !eval.forced.is_empty())
++                    && s.after.is_none_or(|x| self.steps - self.born >= x)
++                    && s.ema.is_none_or(|t| self.ema < t)
++            })
++        };
++        #[cfg(feature = "studies")]
++        if study::get().trace {
++            match &found {
++                Lookup::Conflict(k0) => {
++                    let xs: Vec<u32> = k0.iter().collect();
++                    let mut bounds = Vec::new();
++                    g.certified_excluding(&xs, cap, &mut bounds);
++                    let priced: Vec<String> = xs
++                        .iter()
++                        .zip(&bounds)
++                        .map(|(&x, b)| match b {
++                            Some(b) => format!("{x}:{}", eval.value as i64 - *b as i64),
++                            None => format!(
++                                "{x}:~{}",
++                                g.split_without(x).map_or(-1, |b| eval.value as i64 - b)
++                            ),
++                        })
++                        .collect();
++                    eprintln!(
++                        "K0 len={} computed={computed} forced_in={} [{}]",
++                        k0.len(),
++                        (*k0 & forced).len(),
++                        priced.join(" ")
++                    );
++                }
++                Lookup::None => eprintln!("K0 none (promotable)"),
++                Lookup::AllForced => eprintln!("K0 allforced"),
++            }
++        }
++        let found = match (gate, found) {
+             (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
+                 g,
+                 space.model,
+@@ -1043,6 +1259,15 @@ impl<'a, const W: usize> Stepper<'a, W> {
+                 cap,
+                 learning.as_mut(),
+                 &mut self.known,
++                #[cfg(feature = "studies")]
++                Look {
++                    cache: &mut self.conflict_cache,
++                    promoted,
++                    cands: *cands,
++                    need,
++                    max_total: space.max_total,
++                    counts: &mut self.look_counts,
++                },
+             )),
+             (_, found) => found,
+         };
+@@ -1182,6 +1407,21 @@ impl<'a, const W: usize> Stepper<'a, W> {
+             None => node.cands.max(),
+         }
+         .expect("not empty");
++        #[cfg(feature = "studies")]
++        {
++            self.pair_branch = conflict.is_some_and(|k| k.len() == 2) && !(space.fix_forced && !forced.is_empty());
++        }
++        #[cfg(feature = "studies")]
++        if study::get().trace {
++            eprintln!(
++                "B d={} n={n} k={} forced={} open_forced={} ends={}",
++                node.promoted.len(),
++                conflict.map_or(0, |k| k.len()),
++                forced.len(),
++                (open.forced & node.cands).len(),
++                space.fix_forced && !forced.is_empty()
++            );
++        }
+         if conflict.is_some_and(|k| k.is_subset(&forced)) {
+             // Every completion that reaches `need` promotes the whole conflict, so there is none.
+             #[cfg(not(feature = "studies"))]
+@@ -1251,6 +1491,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
+     #[cfg(feature = "studies")]
+     #[inline]
+     fn tell(&mut self, end: StepEnd) {
++        if study::get().trace {
++            eprintln!("E {end:?}");
++        }
++        match end {
++            StepEnd::ChildFailed | StepEnd::ChildCut(_) => self.pair_outcome(true),
++            StepEnd::Leaf => self.pair_outcome(false),
++            _ => self.pair_branch = false,
++        }
+         if let Some((_, record)) = &mut self.hook {
+             record.end = end;
+         }
+@@ -1332,6 +1580,11 @@ impl<'a, const W: usize> Stepper<'a, W> {
+     /// Adds this searcher's counts to the worker's statistics (and diagnostics) and resets them.
+     fn flush(&mut self, stats: &mut Stats) {
+         self.publish_nogood_stats();
++        #[cfg(feature = "studies")]
++        if study::get().look > 0 || study::get().trace {
++            let [checks, looked, died, chosen] = std::mem::take(&mut self.look_counts);
++            eprintln!("look: choices {checks} looked {looked} cut {died} chosen {chosen}");
++        }
+         let counts = std::mem::take(&mut self.counts);
+         let extra = [
+             (stat::PROMOTE_ATTEMPTS, counts.attempts),
+@@ -1378,8 +1631,9 @@ fn conflict_to_branch_on<const W: usize>(
+     eval: &Eval<W>,
+     k0: Bits<W>,
+     cap: u32,
+-    learning: Option<&mut Learning<'_, W>>,
++    #[cfg_attr(not(feature = "studies"), allow(unused_mut))] mut learning: Option<&mut Learning<'_, W>>,
+     known: &mut Vec<Bits<W>>,
++    #[cfg(feature = "studies")] mut look: Look<'_, W>,
+ ) -> Bits<W> {
+     let members: Vec<u32> = eval.chosen.iter().collect();
+     let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
+@@ -1394,13 +1648,55 @@ fn conflict_to_branch_on<const W: usize>(
+         };
+         price.insert(x, p);
+     }
++    #[cfg(feature = "studies")]
++    let s = study::get();
++    // With the rule `forced0`, a member that costs the whole gap or more weighs nothing.
++    #[cfg(feature = "studies")]
++    let empty_from = if s.forced0 { eval.value.saturating_sub(look.need) as f64 } else { f64::INFINITY };
++    #[cfg(not(feature = "studies"))]
++    let empty_from = f64::INFINITY;
++    // With the rule `slope=S`, the weight's slope is S.
++    #[cfg(feature = "studies")]
++    let slope = s.slope.unwrap_or(CONFLICT_BRANCHING_SLOPE);
++    #[cfg(not(feature = "studies"))]
++    let slope = CONFLICT_BRANCHING_SLOPE;
+     let weight = |k: &Bits<W>| {
+-        k.iter().map(|x| 10f64.powf(-price.get(&x).copied().unwrap_or(0.0) / CONFLICT_BRANCHING_SLOPE)).sum::<f64>()
++        k.iter()
++            .map(|x| {
++                let p = price.get(&x).copied().unwrap_or(0.0);
++                if p >= empty_from {
++                    0.0
++                } else {
++                    10f64.powf(-p / slope)
++                }
++            })
++            .sum::<f64>()
+     };
+     let mut best = (weight(&k0), k0, false);
++    #[cfg(feature = "studies")]
++    let mut seen: Vec<String> = Vec::new();
++    // The conflicts the rule `look` may look at (two members, or with `lookn` two or more), and whether each was made
++    // here.
++    #[cfg(feature = "studies")]
++    let lookable = |k: &Bits<W>| k.len() == 2 || (s.look_n && k.len() > 2);
++    #[cfg(feature = "studies")]
++    let mut pairs: Vec<(Bits<W>, bool)> = Vec::new();
++    #[cfg(feature = "studies")]
++    if lookable(&k0) {
++        pairs.push((k0, false));
++    }
+     if let Some(l) = learning.as_ref() {
+         for k in l.table.all_within(&l.promoted, &eval.chosen) {
+             let w = weight(&k);
++            #[cfg(feature = "studies")]
++            {
++                if s.trace {
++                    seen.push(format!("t{}:{w:.3}", k.len()));
++                }
++                if s.look_all && lookable(&k) && k != k0 {
++                    pairs.push((k, false));
++                }
++            }
+             if w < best.0 {
+                 best = (w, k, false);
+             }
+@@ -1410,10 +1706,91 @@ fn conflict_to_branch_on<const W: usize>(
+     order.sort_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b)));
+     for k in model.conflicts_ordered(scratch, state, &eval.chosen, &order) {
+         let w = weight(&k);
++        #[cfg(feature = "studies")]
++        {
++            if s.trace {
++                seen.push(format!("o{}:{w:.3}", k.len()));
++            }
++            if s.look_all && lookable(&k) && k != k0 && !pairs.iter().any(|p| p.0 == k) {
++                pairs.push((k, true));
++            }
++        }
+         if w < best.0 {
+             best = (w, k, true);
+         }
+     }
++    // The rule `look`: the children of a conflict each leave one member out, the others in; the last of them, by
++    // strong branching's order (the dearest first), promotes every member but the cheapest, c, and leaves c out.
++    // Where that child is cut on sight, the conflict weighs its weight less c's.  For a two-member conflict {n, c} the
++    // children are the node without n and the child that promotes n without c.  Any conflict keeps the search exact,
++    // so this choice does too.
++    #[cfg(feature = "studies")]
++    if s.look > 0 && eval.forced.is_empty() && best.1 != k0 {
++        look.counts[0] += 1;
++        let cheapest = |k: &Bits<W>| {
++            k.iter().min_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b))).expect("a conflict has members")
++        };
++        let mut tries: Vec<(f64, Bits<W>, bool, u32)> = pairs
++            .iter()
++            .map(|&(k, made)| {
++                let c = cheapest(&k);
++                (weight(&k) - weight(&Bits::EMPTY.with(c)), k, made, c)
++            })
++            .filter(|t| t.0 < best.0 * s.look_slack)
++            .filter(|t| s.look_pc.is_none_or(|p| price[&t.3] <= p))
++            .filter(|t| s.look_k.is_none_or(|n| t.1.len() <= n))
++            .collect();
++        tries.sort_by(|a, b| a.0.total_cmp(&b.0));
++        for &(w, k, made, c) in tries.iter().take(s.look) {
++            look.counts[1] += 1;
++            let cut = in_child_cut(g, model, scratch, &mut look, state, k.without(c), c, learning.as_deref_mut());
++            if s.trace_looks {
++                // One line a look: the node's depth and gap, the conflict's size, own or not, the cheapest member's
++                // price, the dearest's, the weights (the conflict's, less c's, the best's) and whether it died.
++                let dearest = k.iter().map(|x| price[&x]).fold(0.0, f64::max);
++                eprintln!(
++                    "LOOK d={} gap={} k={} own={} pc={} pmax={} w={:.3} eff={w:.3} best={:.3} cut={cut}",
++                    look.promoted.len(),
++                    eval.value as i64 - look.need as i64,
++                    k.len(),
++                    k == k0,
++                    price[&c],
++                    dearest,
++                    weight(&k),
++                    best.0,
++                );
++            }
++            if cut {
++                look.counts[2] += 1;
++                look.counts[3] += 1;
++                best = (w, k, made);
++                break;
++            }
++        }
++    }
++    #[cfg(feature = "studies")]
++    if s.trace {
++        let show = |k: &Bits<W>| {
++            k.iter().map(|x| format!("{x}:{}", price.get(&x).copied().unwrap_or(-1.0))).collect::<Vec<_>>().join(" ")
++        };
++        let prices = if s.trace_prices {
++            let mut prices: Vec<i64> = price.values().map(|&p| p as i64).collect();
++            prices.sort_unstable();
++            format!(" prices={prices:?}")
++        } else {
++            String::new()
++        };
++        eprintln!(
++            "CB w0={:.3} k0=[{}] chose w={:.3} computed={} same={} K=[{}] seen=[{}]{prices}",
++            weight(&k0),
++            show(&k0),
++            best.0,
++            best.2,
++            best.1 == k0,
++            show(&best.1),
++            seen.join(" "),
++        );
++    }
+     let (_, k, computed) = best;
+     if k != k0 {
+         if computed {
+@@ -1427,3 +1804,91 @@ fn conflict_to_branch_on<const W: usize>(
+     }
+     k
+ }
++
++/// What the rule `look` needs of the node beyond what [`conflict_to_branch_on`] has (feature `studies`).
++#[cfg(feature = "studies")]
++struct Look<'r, const W: usize> {
++    cache: &'r mut ConflictCache<W>,
++    promoted: Bits<W>,
++    cands: Bits<W>,
++    need: u64,
++    max_total: u32,
++    counts: &'r mut [u64; 4],
++}
++
++/// Whether the child of the node on top of `g` (its state `state`) that promotes `added` and leaves out `m` is cut on
++/// sight: its promotion fails, or its largest candidates, its GF(2) bound, or a conflict of its heaviest set all of
++/// whose members it forces put it below its need (the checks of `check_child`, less the matching bound, the
++/// Lagrangian bound and the propagation of the node's known conflicts, so a "no" may be a child the search would
++/// cut).  The child is pushed on `g` and popped; the conflict found is learned as a nogood, as the search learns its
++/// own, and known to no node.  Nothing else a node's step reads changes (a later read of the node's level resolves
++/// it, as after any child).
++#[cfg(feature = "studies")]
++#[allow(clippy::too_many_arguments)]
++fn in_child_cut<const W: usize>(
++    g: &mut Gf2Bound<'_, W>,
++    model: &FrameGraph,
++    scratch: &mut Scratch<W>,
++    look: &mut Look<'_, W>,
++    state: &FrameSet<W>,
++    added: Bits<W>,
++    m: u32,
++    learning: Option<&mut Learning<'_, W>>,
++) -> bool {
++    // As `make_child` promotes: one number in place, several together with every frame they touch left with
++    // freedoms.
++    let child = if added.len() == 1 {
++        let mut child = *state;
++        model.promote_in_place_using(scratch, &mut child, added.max().expect("one member")).then_some(child)
++    } else {
++        model.promote_all_using(scratch, state, &added).filter(|child| {
++            added.iter().all(|x| {
++                let (into, out) = model.frames_touched(x);
++                let frames = child.frames();
++                frames[into].freedoms >= 0 && out.is_none_or(|out| frames[out].freedoms >= 0)
++            })
++        })
++    };
++    let Some(child) = child else { return true };
++    let promoted = look.promoted | added;
++    let Some(need) = look.need.checked_sub(added.sum()) else { return false };
++    let rest = (look.cands - added).without(m);
++    let max_next = max_additional(model, look.max_total, &child, &promoted, &rest);
++    let mut cands = model.narrow(&child, &rest);
++    let mut learning = learning.map(|l| Learning { table: &mut *l.table, root: l.root, promoted });
++    if let Some(l) = learning.as_mut() {
++        cands -= l.table.ruled_out(&added, &promoted, &cands);
++    }
++    if cands.sum_largest(max_next) < need {
++        return true;
++    }
++    g.push_all(&added, &cands);
++    let eval = g.evaluate(max_next, Some(need));
++    let cut = eval.value < need || {
++        let mut known = Vec::new();
++        let mut seek =
++            Seek { model, scratch, cache: &mut *look.cache, state: &child, known: &mut known, learning: &mut learning };
++        match seek.conflict(&eval.chosen, eval.forced).0 {
++            Lookup::AllForced => true,
++            Lookup::None => false,
++            Lookup::Conflict(k) if k.is_subset(&eval.forced) => true,
++            // The table's conflict is not all forced, but the smallest a peel finds may be: learned as a nogood, it
++            // cuts the child when the search makes it (the table's lookup finds it all forced).
++            Lookup::Conflict(_) => {
++                match model.conflict_cached(scratch, Some(&mut *look.cache), &child, &eval.chosen, true) {
++                    Some(k) if k.is_subset(&eval.forced) => {
++                        if let Some(l) = learning.as_mut() {
++                            if let Some(nogood) = model.nogood(scratch, l.root, &promoted, &k) {
++                                l.table.insert(nogood);
++                            }
++                        }
++                        true
++                    }
++                    _ => false,
++                }
++            }
++        }
++    };
++    g.pop();
++    cut
++}
