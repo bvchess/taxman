@@ -171,6 +171,7 @@ check "with none of the caller's secrets" lacks "$envs" "secret-"
 check "and not the chain's LAB_DIR" lacks "$envs" "/not/for/us"
 check "with its own temp, cargo and thread settings" contains "$envs" "CLAUDE_CODE_TMPDIR=$lab/work/tmp"
 check "and the memory files off" contains "$envs" "CLAUDE_CODE_DISABLE_CLAUDE_MDS=1"
+check "and an hour for one command, background ones too" contains "$envs" "BASH_DEFAULT_TIMEOUT_MS=3600000"
 study="$(ls -d "$lab"/studies/4879-* | head -n 1)"
 check "the study keeps its event" test "$(jq -r .n "$study/event.json")" = 4879
 check "its prompt holds the event" grep -q '"own_seconds":3700' "$study/prompt.txt"

@@ -86,9 +86,10 @@ one runs.  A `done` event starts a study only if `studies/` holds a study of tha
 the outcome with, so the studies for `done` events are no more than those for `long` events; it waits for the study
 that runs.  `LAB_MAX_PER_DAY` (default 4) bounds the studies for `long` events and the asks together per UTC day;
 `LAB_MAX_TURNS` (80), `LAB_ASK_TURNS` (30), `LAB_MODEL` (opus) and `LAB_MAX_HOURS` (3) bound a session, which ends
-shortly after its first result, with anything it left running in the sandbox.  `ctl/on-event.log` records every start,
-skip, refusal and exit; `lab.sh studies` shows how things stand.  To turn studies off, run `lab.sh studies off` (`on`
-turns them on again), or start the chain without `LAB_HOOK`.
+shortly after its first result, with anything it left running in the sandbox.  One command of a session may run for an
+hour (`BASH_DEFAULT_TIMEOUT_MS`; a headless session stops a background command after ten minutes otherwise).
+`ctl/on-event.log` records every start, skip, refusal and exit; `lab.sh studies` shows how things stand.  To turn
+studies off, run `lab.sh studies off` (`on` turns them on again), or start the chain without `LAB_HOOK`.
 
 **Reports, requests and questions.**  `lab.sh reports [N]` lists the reports and prints the newest, with the end of the
 journal.  `lab.sh request "TEXT"` adds a dated line to `work/requests.md`, which every study reads after the journal and

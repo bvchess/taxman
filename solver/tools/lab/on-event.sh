@@ -254,13 +254,14 @@ run_claude() {
     (
         cd "$WORK" || exit 97
         # A clean environment, the lock's descriptor closed, nice 19 and a time limit; no credentials but claude's own
-        # login, which it reads from its files.
+        # login, which it reads from its files.  BASH_DEFAULT_TIMEOUT_MS is how long one command may run, an hour: in a
+        # headless run a background command is otherwise stopped after ten minutes.  LAB_MAX_HOURS bounds the session.
         exec env -i HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)" LANG=C.UTF-8 TERM=dumb \
             PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin" \
             LAB_HOME="$LAB_HOME" LAB_THREADS="$LAB_THREADS" CARGO_BUILD_JOBS="$LAB_THREADS" \
             CARGO_HOME="$WORK/cargo-home" RUSTUP_HOME="$HOME/.rustup" RUSTFLAGS="-C target-cpu=native" \
             CLAUDE_CODE_TMPDIR="$WORK/tmp" CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 \
-            DISABLE_AUTOUPDATER=1 \
+            DISABLE_AUTOUPDATER=1 BASH_DEFAULT_TIMEOUT_MS=3600000 \
             "$timeout_bin" --kill-after=120 "${LAB_MAX_HOURS}h" "$nice_bin" -n 19 "$CLAUDE" "${args[@]}" \
             <"$prompt" >"$out/session.jsonl" 2>"$out/stderr.txt" 9>&-
     ) &

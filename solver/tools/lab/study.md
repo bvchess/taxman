@@ -17,7 +17,11 @@ write for someone who knows the project and was not here.
   their shape, though the sandbox would contain them: those that begin with a variable assignment (`FOO=1 cmd`,
   `export FOO=1; cmd`, `S=$(date); ...`), and those with arguments of the form NAME=VALUE that the analysis cannot place
   (`lab.sh run ... --tactic conflict_branching=off`, `python3 x.py a=b`).  Put such a command in a file under `work/`
-  and run `bash FILE`; it runs in the sandbox like any other.
+  and run `bash FILE`; it runs in the sandbox like any other.  One command may run for up to an hour, in the foreground
+  or in the background (`run_in_background`).  A foreground command blocks you meanwhile, so start a run of more than a
+  few minutes in the background, send its output to a file under `work/`, and check on it with short commands.  A bare
+  `sleep N` is refused; to wait for a run, put a loop such as `until [ -s OUTPUT ]; do sleep 5; done` in a script file
+  and run `bash FILE`.
 * **The lab's tool.**  `lab.sh --local COMMAND` (its path is in your prompt): `snapshot [N]` copies the checkpoint of a
   game in flight, `units SNAPDIR` lists its units and the 20 with the largest gaps, `run SNAPDIR IDS [tune args]` solves
   units on one thread each, `reports [N]` shows reports.  Tune's arguments include `--node-limit L`,
@@ -58,41 +62,69 @@ write for someone who knows the project and was not here.
    The last lines of `~/taxman-work/logs/chain.err` give the step rate and the queue.
 3. **Snapshot the game and list its units**: `snapshot N --from CHECKPOINT_DIR` (the event's `checkpoint_dir`), then
    `units SNAPDIR`.  Note the number of units, the spread of their gaps, and whether the best promotion sum looks final.
-4. **Measure the cost of units.**  Pick about six of them across the range of gaps (the largest four, and two or three
+4. **Triage: estimate from the units alone.**  Before you measure anything, sum the fresh-unit line over the snapshot's
+   units: a unit of gap g takes about 10^(0.511 + 0.356·g/100) steps with conflict branching, and a unit of gap 0 or
+   less one step (the notebook's line, fitted on fresh units of 4875: the entry on where the search of 4875 spends, in
+   `solver/notebook/search/`).  Sum it with `jq` over `SNAPDIR/units.jsonl`:
+
+   ```text
+   jq -s 'map(select(.kind == "unit") | .gap) | map(if . <= 0 then 1 else pow(10; 0.511 + 0.356 * . / 100) end) | add'
+   ```
+
+   Divide by the chain's step rate (the rate in the last progress lines of the game in `chain.err`) for the time left.
+   **If that is under 30 minutes, the game ends before your measurements would help:** skip the measuring (step 5) and
+   the fresh search (step 6), and record this estimate as your prediction, with the line it rests on.  Go on with step
+   7 on the snapshot's units, which stay valid after the game ends, and write the report (say it is a triage) and the
+   journal.
+5. **Measure the cost of units.**  Pick about six of them across the range of gaps (the largest four, and two or three
    lower), and run them with `--cpu-limit 120`.  A unit that finishes (state `done`) gives its true size in steps.  The
    steps of a subtree grow by a fixed factor with the gap: about a decade for every 291 points, with conflict
    branching.  Check that against the units that finished, fit log10(steps) against gap, and predict the others.
-5. **Estimate the work left.**  Sum the predicted steps over all the units of the snapshot, and divide by the chain's
-   step rate for the time left; give a range, and say what it rests on.  Then estimate a fresh search of the game:
-   start one from the best game, on one thread, for ten minutes (`taxman solve N --use-prev --force-search --threads 1
-   --finder-after 1 --time-limit 600 --checkpoint-dir work/fresh`, with the `taxman` built in `src`), snapshot its
-   checkpoint, and apply the same fit to its units.  For scale: game 4875's fresh search took 186 million
-   steps and 56 minutes on 88 threads (2026-10-22), where the search before it had taken 8.5 billion steps without
-   ending.
-6. **Look for what would speed the search.**  Try tactics and settings on the same units, comparing steps for the same
+6. **Estimate the work left, and a fresh search.**  Sum the predicted steps over all the units of the snapshot, and
+   divide by the chain's step rate for the time left; give a range, and say what it rests on.  Then estimate a fresh
+   search of the game: copy the chain's results file into `work/fresh/`, and start a search from the best game on one
+   thread for ten minutes, in the background, with the `taxman` built in `src`:
+
+   ```text
+   mkdir -p work/fresh; cp ~/taxman-work/results/strict.jsonl work/fresh/strict.jsonl
+   taxman solve N --use-prev --force-search --threads 1 --finder-after 1 --time-limit 600 \
+       --checkpoint-dir work/fresh --out work/fresh/strict.jsonl
+   ```
+
+   `--use-prev` takes game N - 1 from the results file that `--out` names; without that file the search finds no
+   previous game and runs with no seed and no ceiling.  The copy has game N - 1 only if the chain has concluded it, and
+   it leaves the chain's file untouched.  Snapshot the search's checkpoint and apply the same fit to its units.  For
+   scale: game 4875's fresh search took 186 million steps and 56 minutes on 88 threads (2026-10-22), where the search
+   before it had taken 8.5 billion steps without ending.
+7. **Look for what would speed the search.**  Try tactics and settings on the same units, comparing steps for the same
    unit from the same start; ask whether a better incumbent exists; look for patterns in the expensive units (depth,
    candidates, which frames).  Read the register of closed avenues in `solver/notebook/register/` before you propose
    one.
-7. **Act, if there is a command folder.**  `~/taxman-lab/channel/` exists only when the chain runs with `--lab-dir`.  If
+8. **Act, if there is a command folder.**  `~/taxman-lab/channel/` exists only when the chain runs with `--lab-dir`.  If
    it is not there, observe and report.  If it is, `solver/docs/design/lab.md` has the formats: write a command as a
    file with a name starting with a dot in `channel/in/`, rename it into place, and read the answer in `channel/out/`
    (the chain looks at each progress tick).  You may use `checkpoint`, `finder`, `branching` and `offer`, and `restart`
    only when your estimate says a fresh search is at least 3 times cheaper than finishing the one in flight.  Do not
    use `threads` or `redeploy`.  An `offer` must be a game that a search of yours found, never one you wrote.  Write
    each action down with its reason, the command and the answer.
-8. **Report.**  Write `~/taxman-lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
+9. **Report.**  Write `~/taxman-lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
    +%Y%m%dT%H%M%SZ`) with these sections: Summary (the state, and what you recommend or did), Measurements (a table),
    Estimate (steps and time left, a fresh search's, the range and its basis), Ideas tried (with numbers), Actions (none,
    or each with its reason) and Open questions.
-9. **Journal.**  Append to `work/journal.md`: a heading `## STAMP game N long`, your findings in a few lines, and lines
-   a later study can check, each starting `prediction:`, such as `prediction: steps left 2.1e9 to 6e9, 11 to 30 hours`.
+10. **Journal.**  Append to `work/journal.md`: a heading `## STAMP game N long`, your findings in a few lines, and lines
+    a later study can check, each starting `prediction:`, such as `prediction: steps left 2.1e9 to 6e9, 11 to 30 hours`.
+    If you saw the game end while you worked, add its outcome (steps and time at the end) next to the prediction.
 
 ## On a `done` event
 
 Find the last `prediction:` lines for the game in the journal.  Compare them with the event (`result`, `nodes`,
 `own_seconds`): the steps and hours the game used after the prediction, the ratio, and what explains the difference.
-Append `## STAMP game N done` to the journal with lines starting `comparison:`, and write a short
-`work/reports/N-STAMP-done.md`.  Keep it brief.
+
+* **The journal already has the outcome:** the long study saw the game end, and its entry gives the outcome next to its
+  prediction.  Append one line starting `comparison:` (the prediction, the event's steps and hours, and the ratio) and
+  end.  Write no report and make no measurements.
+* **Otherwise:** append `## STAMP game N done` to the journal with lines starting `comparison:`, and write a short
+  `work/reports/N-STAMP-done.md`.  Keep it brief.
 
 ## Style
 
