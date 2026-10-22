@@ -196,12 +196,12 @@ Graviton has been measured.
 
 **Where this leaves the question.**  The cost of 4875 is the bound's error in frames 2 and 3, paid by exclusions, and
 the search paid it slowly because the conflicts it branched on had a cheap member: the child that left that member out
-kept nearly the whole gap.  Branching on a conflict whose members all cost much makes every child's gap fall, and often closes the
-node at once, since such a conflict is often all forced.  That is a branching rule, so it needs no new theorem: the
-conflicts it makes rest on Theorems 3, 4 and M, and each is checked by the whole peel in the study build.  Its gain
-grows with the gap (on 4875's units, a tenth of the default's steps at a gap of 900-1,000, a thirtieth to a fortieth at
-1,100-1,200), so it bends the cost curve rather than shifting it: the rule's trees grow a decade per 288 points of gap on
-4875's units, the default's a decade per 212 by the finder entry's line.
+kept nearly the whole gap.  Branching on a conflict whose members all cost much makes every child's gap fall, and often
+closes the node at once, since such a conflict is often all forced.  That is a branching rule, so it needs no new
+theorem: the conflicts it makes rest on Theorems 3, 4 and M, and each is checked by the whole peel in the study build.
+Its gain grows with the gap (on 4875's units, a tenth of the default's steps at a gap of 900-1,000, a thirtieth to a
+fortieth at 1,100-1,200), so it bends the cost curve rather than shifting it: the rule's trees grow a decade per 288
+points of gap on 4875's units, the default's a decade per 212 by the finder entry's line.
 
 What is not done:
 
@@ -245,6 +245,20 @@ games they pin never reach a gap of 300.
 matched `optimal.json` at all 1,300 games, 417 of them searched (`regress-master.txt`, `regress-branching.txt` and their
 second runs).  The games to 1300 never reach the gap of 300, so the default changes nothing there.
 
+## 2026-10-21: the projection checked on four of the largest units
+
+The tactic, at its settings, ran four of the fresh units of 4875 with gaps of 1,647 to 1,701, where the projection's
+line is extrapolated, each on one thread of its own, side by side (`run-big-tactic.sh`).  Two finished with best
+538080: 4875-12 (gap 1,647) in 5,135,709 steps and 2,342 CPU s, and 4875-18 (gap 1,652) in 4,718,391 steps and 2,038
+CPU s (`big-tactic-done.jsonl`), 2.5 and 2.2 times the line, within its residual spread of 0.40 decades but both above
+it.  The default's line puts these units at 8.6 × 10⁷ and 9.1 × 10⁷ steps, seventeen and nineteen times as many.  The
+other two, 4875-2 (gap 1,685) and 4875-3 (1,701), were stopped unfinished after 2,370 CPU s each, more than five million
+steps.  With the two finished units in the fit, the line is log10 steps = 0.511 + 0.356 · gap/100, and the sum over the
+96 units is 8.0 × 10⁷ steps on the line, a median of 1.0 × 10⁸ over the draws and 7.4 × 10⁷ to 1.6 × 10⁸ from p10 to
+p90, 10 to 20 CPU hours on one thread of this laptop (`project-g300-big.txt`).  If the largest units all run two to
+three times above the line, as these did, the total is about 2 × 10⁸ steps: still a fifteenth of the default's line,
+and under an hour on the run's machine at the rate guessed above.
+
 ## Files
 
 * `units-fresh.jsonl`: the 96 units of the fresh search's checkpoint at 3.0 million steps (`run-fresh.sh`, then
@@ -268,7 +282,8 @@ second runs).  The games to 1300 never reach the gap of 300, so the default chan
   `regress-master-2.txt`, `regress-branching.txt`, `regress-branching-2.txt` (`run-regress-both.sh`).  `table.py
   LABEL=FILE...` sets runs side by side.
 * `project.py`: the projection, `project.py units-fresh.jsonl fit-g300.jsonl --steps-done 3000309`; its output
-  `project-g300.txt`.
+  `project-g300.txt`, and with the two large units `project-g300-big.txt` (`... fit-g300.jsonl big-tactic-done.jsonl
+  ...`).
 
 The scripts name the scratch directory they ran in (`S=`); set it to run them again.  The runs before the tactic used the
 study patch, not kept, whose environment variables set the rule on, the pricing and the gap gate; the tactic
