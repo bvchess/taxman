@@ -70,7 +70,17 @@ if [ -f "$d/fake-claude.sleep" ]; then sleep "$(cat "$d/fake-claude.sleep")"; fi
 case "$prompt" in
     *"self-test of your sandbox"*)
         script="$(printf '%s\n' "$prompt" | sed -n 's/^bash //p' | head -n 1)"
+        if [ -f "$d/fake-claude.sandbox" ]; then
+            # A sandbox that holds: what the real one keeps read-only is made so for the probes.
+            eval "$(head -n 4 "$script")"
+            mkdir -p "$LAB/work/.claude"
+            locked="$CHAIN_HOME $LAB $LAB/ctl $LAB/studies $CHAIN_HOME/taxman-work $CHAIN_HOME/taxman"
+            locked="$locked $CHAIN_HOME/taxman-archive $LAB/work/.claude"
+            files="$HERE/on-event.sh $HERE/study.md $HERE/settings.template.json $HERE/lab.sh $LAB/ctl/settings.json"
+            chmod a-w $locked $files
+        fi
         bash "$script" >/dev/null 2>&1
+        if [ -f "$d/fake-claude.sandbox" ]; then chmod u+w $locked $files; fi
         ;;
 esac
 echo '{"type":"system","subtype":"init"}'
@@ -84,7 +94,7 @@ if [ "$1" = --version ]; then echo "bubblewrap 0.6.1"; exit 0; fi
 [ ! -f "$HOME/fake-bwrap.fail" ]
 EOF
 printf '#!/bin/sh\nexit 0\n' >"$bin/socat"
-printf '#!/bin/sh\nexit 7\n' >"$home/.local/bin/curl"
+printf '#!/bin/sh\ncase "$*" in *github.com*) exit 0 ;; esac\nexit 7\n' >"$home/.local/bin/curl"
 real_flock=yes
 if ! command -v flock >/dev/null 2>&1; then
     real_flock=no
@@ -131,6 +141,11 @@ out="$("$program" "$(event long 4879)" 2>&1)"
 check "and so does a study still refuse" contains "$out" "the proof of the sandbox failed"
 check "the probe in the home directory was removed" test ! -e "$home/lab-probe-outside"
 check "stage B (the chain's directories) was not run after a failure" test ! -e "$home/taxman-work/lab-probe"
+touch "$home/fake-claude.sandbox"
+out="$("$program" --proof 2>&1)"
+check "a sandbox that holds passes the proof" contains "$out" "0 failed: result=pass"
+check "and the proof file says pass" grep -qx 'result=pass' "$lab/ctl/proof"
+rm -f "$home/fake-claude.sandbox"
 
 echo "--- a study"
 make_proof
@@ -218,9 +233,6 @@ out="$(
 )"
 check "bwrap that cannot start refuses" contains "$out" "bwrap cannot start a sandbox"
 rm -f "$home/fake-bwrap.fail"
-echo 8.8.8 >"$home/fake-claude.version"
-out="$("$program" "$(event long 4879)" 2>&1)"
-check "a study refuses when claude is not the version proved" contains "$out" "other versions"
 make_proof
 touch "$home/fake-claude.fail"
 echo "sandbox dependencies are missing" >"$home/fake-claude.fail"
@@ -242,6 +254,74 @@ cp -R "$checkout" "$lab/src/solver/"
 out="$("$lab/src/solver/tools/lab/on-event.sh" "$(event long 4879)" 2>&1)"
 check "a copy in the lab's src is refused" contains "$out" "where the sandbox may write"
 rm -rf "$lab/src"
+
+echo "--- a proof that goes stale, as claude updates itself"
+rm -f "$lab/ctl/starts.log" "$home/fake-claude.fail"
+make_proof
+touch "$home/fake-claude.sandbox"
+echo 8.8.8 >"$home/fake-claude.version"
+"$program" "$(event long 4896)" >/dev/null 2>&1
+check "a study whose claude has changed runs the proof first" logged "proof renewed: settings="
+check "and the log has the old subject and the new" logged "claude=9.9.9 (stand-in) bwrap=bubblewrap 0.6.1 -> settings="
+check "it goes on to the study" test -f "$(ls -d "$lab"/studies/4896-* | head -n 1)/result.json"
+check "the proof file is for the new version" grep -qx 'claude=8.8.8 (stand-in)' "$lab/ctl/proof"
+check "and passed" grep -qx 'result=pass' "$lab/ctl/proof"
+renewals() { grep -c 'proof renewed' "$lab/ctl/on-event.log"; }
+before="$(renewals)"
+"$program" "$(event long 4897)" >/dev/null 2>&1
+check "a proof that holds is not run again" test "$(renewals)" = "$before"
+# A limit that is reached, or a study that runs, comes before any proof.
+echo 7.7.7 >"$home/fake-claude.version"
+before="$(claude_runs)"
+out="$(LAB_MAX_PER_DAY=0 "$program" "$(event long 4898)" 2>&1)"
+check "an event the limit skips does not run the proof" contains "$out" "the most is LAB_MAX_PER_DAY=0"
+check "(no session started)" test "$(claude_runs)" = "$before"
+check "(the proof file is the old one)" grep -qx 'claude=8.8.8 (stand-in)' "$lab/ctl/proof"
+if [ "$real_flock" = yes ]; then
+    echo 8.8.8 >"$home/fake-claude.version"
+    echo 3 >"$home/fake-claude.sleep"
+    "$program" "$(event long 4899)" >/dev/null 2>&1 &
+    for _ in $(seq 1 50); do
+        logged "start event=long n=4899" && break
+        sleep 0.1
+    done
+    sleep 1
+    echo 7.7.7 >"$home/fake-claude.version"
+    before="$(claude_runs)"
+    out="$("$program" "$(event long 4900)" 2>&1)"
+    check "an event skipped for a study that runs does not run the proof" contains "$out" "a study is running"
+    out="$("$program" --proof 2>&1)"
+    check "a proof on request refuses while a study runs" contains "$out" "a study is running"
+    check "(no session started)" test "$(claude_runs)" = "$before"
+    wait
+    rm -f "$home/fake-claude.sleep"
+fi
+# A sandbox that does not hold, with claude changed again: the renewed proof fails and the study is refused.
+rm -f "$home/fake-claude.sandbox"
+echo 6.6.6 >"$home/fake-claude.version"
+rm -f "$lab/ctl/starts.log"
+out="$("$program" "$(event long 4901)" 2>&1)"
+check "a renewed proof that fails refuses the study" contains "$out" "failed: see"
+check "no study of it was started" test -z "$(ls -d "$lab"/studies/4901-* 2>/dev/null)"
+check "and the proof file says fail" grep -qx 'result=fail' "$lab/ctl/proof"
+before="$(claude_runs)"
+out="$("$program" "$(event long 4902)" 2>&1)"
+check "after a failed proof a study refuses without a new proof" contains "$out" "the proof of the sandbox failed"
+check "(no session started)" test "$(claude_runs)" = "$before"
+rm -f "$lab/ctl/proof"
+out="$("$program" "$(event long 4903)" 2>&1)"
+check "with no proof at all a study refuses" contains "$out" "there is no proof of the sandbox yet"
+check "(no session started)" test "$(claude_runs)" = "$before"
+# An ask renews the proof too.
+touch "$home/fake-claude.sandbox"
+make_proof
+echo 5.5.5 >"$home/fake-claude.version"
+before="$(renewals)"
+out="$("$program" --ask "$(basename "$study")" "and now?" 2>&1)"
+check "an ask whose claude has changed renews the proof, and is answered" test "$out" = "the answer"
+check "(the proof was renewed)" test "$(renewals)" = $((before + 1))
+rm -f "$home/fake-claude.sandbox"
+make_proof
 
 echo "--- a session that does not end by itself"
 # claude stays alive while a process of the session runs in the background: the study ends shortly after its result.

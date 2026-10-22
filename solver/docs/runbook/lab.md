@@ -74,8 +74,11 @@ study does not.
 files and the exit statuses outside the sandbox: writes to the home directory, to `ctl/`, to the lab's top directory,
 to `~/taxman-work`, `~/taxman` and `~/taxman-archive`; appending to the program, `study.md`, the template and its own
 settings; planting a settings file in `work/.claude`; and, as controls, writes where it may write and the network.  It
-costs a few cents and takes under a minute.  Every study needs a passing proof for the current settings and the
-installed versions of `claude` and `bwrap`; run it again after changing either, or the template.
+costs a few cents and takes under a minute, and it refuses while a study runs.  Every study needs a passing proof for
+the current settings and the installed versions of `claude` and `bwrap`.  A person runs the first proof, and the next
+after a failure; when the proof passed for other settings or other versions, as `claude` updates itself, the next study
+or ask runs it again, once it holds the lock and the day's limit allows it, goes on if it passes, and logs "proof
+renewed".
 
 **Starting, limits and the log.**  A study starts if studies are on, the proof holds, nothing that governs it lies where
 the sandbox may write, and the daily limit is not reached.  One study runs at a time: a `long` event is skipped while

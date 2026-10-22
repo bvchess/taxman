@@ -6,7 +6,8 @@
 # never runs from the lab's own checkout, whose files a study may change.
 #
 #   on-event.sh EVENT_JSON   a study for the event {"event": "long"|"done", "n": N, ...} (the hook's one argument)
-#   on-event.sh --proof      prove the sandbox on this machine, which every study needs first (a few short sessions)
+#   on-event.sh --proof      prove the sandbox on this machine, which every study needs first (a few short sessions);
+#                            it takes the lock without waiting, and refuses while a study runs
 #   on-event.sh --ask STUDY QUESTION   put QUESTION to a finished study (its folder's name in studies/): its session
 #                            goes on with its whole context (claude --resume), and the answer is printed and added to
 #                            the study's folder (asks.md)
@@ -19,11 +20,15 @@
 #   - studies are on, and the tools are there (claude, jq, flock, timeout, nice, bwrap, socat)
 #   - this program, study.md and the settings are outside every place the sandbox may write
 #   - the settings still say what the sandbox needs (enabled, failIfUnavailable, no unsandboxed retry, ...)
-#   - a proof of the sandbox exists for these settings and this version of claude (--proof)
+#   - a proof of the sandbox exists that passed (--proof, run by a person for the first time and after a failure); if it
+#     passed for other settings or other versions of claude or bwrap, as claude updates itself, the study or ask first
+#     runs the proof again and goes on only if it passes (the log says "proof renewed")
 #   - no other study runs (a long event, or an ask, is skipped or refused), and fewer than LAB_MAX_PER_DAY long events
 #     and asks together have started today (UTC)
 #   - for a done event: studies/ holds a study of that game's long event, which it compares the outcome with (so the
 #     done studies are no more than the long ones, and the limit bounds both); it then waits for the study that runs
+# The proof is renewed only once the lock is held and the day's limit has allowed the study, so it never runs beside a
+# study, and never for an event that would be skipped.
 # The session runs in LAB/work, at nice 19, with a clean environment, the turn limit and the time limit below, and
 # without bypassing permission checks; its commands run in the sandbox or not at all.  Whoever runs the lab leaves
 # standing questions in LAB/work/requests.md (lab.sh request), which a study reads: guidance, nothing that can change
@@ -163,15 +168,43 @@ proof_subject() {
         "$("$CLAUDE" --version 2>&1 | head -n 1)" "$(bwrap --version 2>&1 | head -n 1)"
 }
 
-# Why the proof in ctl/proof does not hold for the settings, claude and bwrap now, or nothing if it does.
-proof_problem() {
+# How the proof in ctl/proof stands for the settings, claude and bwrap now: none (there is no proof), failed (the last
+# proof failed), stale (it passed for other settings or other versions of claude or bwrap) or ok.
+proof_state() {
     if [ ! -f "$CTL/proof" ]; then
-        echo "there is no proof of the sandbox yet: run on-event.sh --proof (lab.sh proof)"
+        echo none
     elif ! grep -qx 'result=pass' "$CTL/proof"; then
-        echo "the proof of the sandbox failed: run on-event.sh --proof again when its findings are fixed"
+        echo failed
     elif [ "$(proof_subject)" != "$(grep -E '^(settings|claude|bwrap)=' "$CTL/proof")" ]; then
-        echo "the proof is for other settings or other versions of claude or bwrap: run on-event.sh --proof again"
+        echo stale
+    else
+        echo ok
     fi
+}
+
+# Why the proof does not hold, or nothing if it does.
+proof_problem() {
+    case "$(proof_state)" in
+        none) echo "there is no proof of the sandbox yet: run on-event.sh --proof (lab.sh proof)" ;;
+        failed) echo "the proof of the sandbox failed: run on-event.sh --proof again when its findings are fixed" ;;
+        stale) echo "the proof is for other settings or other versions of claude or bwrap; a study renews it" ;;
+    esac
+}
+
+# A proof's subject (on stdin) in a line for the log, the hash of the settings cut short.
+subject_line() {
+    tr '\n' ' ' | sed 's/settings=\([0-9a-f]\{12\}\)[0-9a-f]*/settings=\1/; s/ *$//'
+}
+
+# Renews a proof that passed for other settings or other versions, as claude updates itself: runs the proof, and
+# refuses if it fails.  Called with the lock held, so that it never runs beside a study.
+renew_stale_proof() {
+    local old
+    [ "$(proof_state)" = stale ] || return 0
+    old="$(grep -E '^(settings|claude|bwrap)=' "$CTL/proof" | subject_line)"
+    run_proof >"$CTL/proof.out" 2>&1 ||
+        refuse "the proof, run again for other settings or versions, failed: see $CTL/proof.out"
+    log "proof renewed: $old -> $(proof_subject | subject_line)"
 }
 
 # Whether studies/ holds a study of a long event of the game $1.
@@ -294,7 +327,7 @@ ensure_notes() {
 }
 
 handle_event() {
-    local json="$1" event n stamp dir result count problem
+    local json="$1" event n stamp dir result count
     event="$(printf '%s' "$json" | jq -er '.event' 2>/dev/null)" || refuse 'the argument is not JSON with an "event"'
     n="$(printf '%s' "$json" | jq -er '.n' 2>/dev/null)" || refuse 'the argument has no "n"'
     case "$event" in long | done) ;; *) refuse "an event \"$event\" is not one that on-event.sh knows" ;; esac
@@ -304,8 +337,8 @@ handle_event() {
         skip "event=done n=$n: no study of a long event of game $n to compare with (it was skipped, or never sent)"
     fi
     preflight
-    problem="$(proof_problem)"
-    [ -z "$problem" ] || refuse "$problem"
+    # No proof, or a failed one, is for a person to deal with; a proof for other versions is renewed below.
+    case "$(proof_state)" in none | failed) refuse "$(proof_problem)" ;; esac
     exec 9>"$CTL/study.lock"
     if [ "$event" = long ]; then
         flock -n 9 || skip "event=$event n=$n: a study is running"
@@ -316,6 +349,7 @@ handle_event() {
         # A study of a game's end waits for the study that runs, which it follows up.
         flock -w $((LAB_MAX_HOURS * 3600 + 600)) 9 || skip "event=$event n=$n: a study is still running"
     fi
+    renew_stale_proof
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     dir="$STUDIES/$n-$stamp"
     mkdir -p "$dir" || refuse "cannot make $dir"
@@ -335,7 +369,7 @@ handle_event() {
 # whole context, under the same sandbox, settings and rules as a study; no ask while a study runs, and it counts toward
 # the day's limit.  Prints the answer, and adds the question and the answer to the study's folder.
 do_ask() {
-    local name="${1:-}" question="${2:-}" dir session count stamp out answer status problem
+    local name="${1:-}" question="${2:-}" dir session count stamp out answer status
     [ -n "$name" ] && [ -n "$question" ] || refuse "usage: on-event.sh --ask STUDY \"QUESTION\""
     dir="$STUDIES/${name##*/}"
     [ -f "$dir/event.json" ] && [ -f "$dir/session.jsonl" ] || refuse "no study ${name##*/} in $STUDIES"
@@ -343,13 +377,13 @@ do_ask() {
     [ -n "$session" ] || refuse "the study ${name##*/} left no session to go on with (did it finish?)"
     if [ -e "$CTL/off" ]; then refuse "studies are off ($CTL/off exists); on-event.sh --on turns them on"; fi
     preflight
-    problem="$(proof_problem)"
-    [ -z "$problem" ] || refuse "$problem"
+    case "$(proof_state)" in none | failed) refuse "$(proof_problem)" ;; esac
     exec 9>"$CTL/study.lock"
     flock -n 9 || refuse "a study is running: ask when it has ended"
     count="$(studies_on_day "$(date -u +%Y%m%d)")"
     [ "$count" -lt "$LAB_MAX_PER_DAY" ] ||
         refuse "$count studies and asks began today, the most is LAB_MAX_PER_DAY=$LAB_MAX_PER_DAY"
+    renew_stale_proof
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     out="$dir/ask-$stamp"
     mkdir -p "$out" || refuse "cannot make $out"
@@ -442,8 +476,17 @@ run_probe_session() {
     echo "  session of stage $name: exit $status, $(describe_session "$dir")"
 }
 
+# The proof on request: it takes the lock without waiting, and refuses while a study runs.
 do_proof() {
     preflight
+    exec 9>"$CTL/study.lock"
+    flock -n 9 || refuse "a study is running: prove the sandbox when it has ended"
+    run_proof
+}
+
+# The proof itself, with the lock held and the settings rendered (preflight): two short sessions try the writes a study
+# must not make, and ctl/proof says the outcome for the subject now.  Succeeds if every check passed.
+run_proof() {
     local stamp dir files before after chain_dir visible tmp_ok
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     dir="$STUDIES/proof-$stamp"
