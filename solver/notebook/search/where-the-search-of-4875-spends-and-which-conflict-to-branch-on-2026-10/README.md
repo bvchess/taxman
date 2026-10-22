@@ -259,6 +259,80 @@ p90, 10 to 20 CPU hours on one thread of this laptop (`project-g300-big.txt`).  
 three times above the line, as these did, the total is about 2 × 10⁸ steps: still a fifteenth of the default's line,
 and under an hour on the run's machine at the rate guessed above.
 
+## 2026-10-21: the cost of a step of conflict branching
+
+**No change pays: a step costs what its cycle searches and the bound's solves cost.**  Each member the rule prices
+exactly costs one cycle search of the exchange graph, and the ordered conflicts need those prices to choose well.  The
+work that the tree could share or skip is a few percent of a step.  Fewer cycle searches change the tree, and the ones
+tried lost as many steps as they saved CPU or saved nothing.  This round changed no code.
+
+**Where a step's CPU goes.**  At the default (the rule on, gap gate 300), a step of the whole game 4050 costs 212 µs and
+one of the unit 4875-10 703 µs, one thread each (`tune solve`, from the optimum).  A default step without the rule
+cost about 150 and 320 µs (the tables above).  Of 20 s of samples of each (`/usr/bin/sample`, read by `profile.py`):
+
+| share of the CPU | 4050 | 4875-10 |
+|---|---|---|
+| the GF(2) bound's solves (`Gf2Bound::evaluate`) | 62% | 39% |
+| the rule's prices: one cycle search a member (`certified_excluding` in the check) | 14% | 43% |
+| the peels that make conflicts, in the rule's choice (4050) or in the whole check (4875-10) | 2.6% | 5.5% |
+| strong branching's prices (`certified_excluding` outside the check) | 3.5% | 2.9% |
+| sorting the members by price | 1.8% | 0.4% |
+| the map of the prices (`HashMap`) | under 0.1% | under 0.1% |
+
+**The same tree for less CPU.**  An idea that keeps the tree saves at most the share of the work it removes:
+
+* *Strong branching reusing the rule's prices*: at most 3.5%, all of strong branching's pricing.
+* *Caching each frame's conflicts*: at most 2.6% on 4050 and 5.5% on 4875-10, all of the peels.
+* *A vector of prices in place of the map*, sorted directly: at most 1.8%.
+
+None was built.  The pricing code of the variants below, run with no variant set, gives master's trees (582,353,
+27,267 and 45,962 steps) at master's CPU within the noise of runs side by side: 126.6 and 125.4 s, 12.1 and 12.1 s,
+33.3 and 33.4 s, against 123.2, 11.9 and 32.3 s.
+
+**Fewer cycle searches.**  Three variants price fewer members or search less far.  Each changes the tree, and each is
+set by an environment variable on top of master (`cost-variants.patch`, `run-cost.sh`):
+
+* *A limit of 600*: each cycle search stopped at 600, and none made for a member whose estimate is 600 or more.
+* *Late pricing*: the ordered conflicts made in the order of the weight split's estimates, and only their members and
+  the search's own conflict's priced exactly.
+* *An early exit at P*: the search's own conflict kept, before any other member is priced, when each of its members
+  costs at least P.
+
+| variant | 4050: steps | CPU s | 4875-36: steps | CPU s | 4875-10: steps | CPU s |
+|---|---|---|---|---|---|---|
+| master | 582,353 | 123.2 | 27,267 | 11.9 | 45,962 | 32.3 |
+| a limit of 600 | 582,534 | 127.3 | 27,372 | 12.0 | 45,909 | 32.7 |
+| late pricing | 934,446 | 161.0 | 37,083 | 13.5 | 65,559 | 27.1 |
+| an early exit at 300 | 592,058 | 124.9 | 27,267 | 12.2 | 45,962 | 33.5 |
+| an early exit at 600 | 582,353 | 124.7 | 27,267 | 12.2 | 45,962 | 33.4 |
+
+Every run completed with best equal to the known optimum (`cost.jsonl`).  None is kept:
+
+* The limit saves nothing: the cycle searches that cost are those of the cheap members, which it does not touch.
+* Late pricing makes a step 17-41% cheaper, but its order makes worse conflicts: 1.36 to 1.60 times the steps, and more
+  CPU on 4050 and 4875-36.
+* The early exit almost never fires, because the search's own conflict nearly always has a cheap member.
+
+**The gap gate stands.**  Pricing did not get cheaper, so the gates of 200 and 0 were not measured again; the gate
+table above, where 300 is the best of the four on all three cases, still holds.
+
+**On eight threads, the rule's steps spread almost as well as the default's.**  The release build proved the whole game
+4050 from its committed optimum (`taxman solve 4050 --use-prev --force-search --finder-after 0`), one run at a time, on
+this laptop, an M1 Max with eight performance CPUs and two efficiency CPUs (`run-threads.sh`):
+
+| threads | rule | steps | search s | CPU s | steps a second | CPU µs a step |
+|---|---|---|---|---|---|---|
+| 1 | on | 582,353 | 126.4 | 126.0 | 4,607 | 216 |
+| 8 | on | 608,353 | 18.1 | 140.6 | 33,669 | 231 |
+| 1 | off | 3,086,223 | 465.6 | 463.4 | 6,629 | 150 |
+| 8 | off | 2,831,411 | 55.4 | 437.9 | 51,111 | 155 |
+
+On eight threads the rule takes 7.3 times its one-thread rate of steps, the default 7.7 times; a step of the rule costs
+7% more CPU there, a default step 3%.  The rule's tree grew 4% on eight threads and the default's shrank 8%, so the
+rule's proof ran 7.0 times as fast and the default's 8.4 times.  The rule proves 4050 3.7 times as fast as the default on
+one thread and 3.1 times on eight.  Every run proved the committed score, 5160836 (`threads.jsonl`).  Many threads, as
+on the run's machine at 88, have not been measured.
+
 ## Files
 
 * `units-fresh.jsonl`: the 96 units of the fresh search's checkpoint at 3.0 million steps (`run-fresh.sh`, then
@@ -284,6 +358,11 @@ and under an hour on the run's machine at the rate guessed above.
 * `project.py`: the projection, `project.py units-fresh.jsonl fit-g300.jsonl --steps-done 3000309`; its output
   `project-g300.txt`, and with the two large units `project-g300-big.txt` (`... fit-g300.jsonl big-tactic-done.jsonl
   ...`).
+* The cost of a step: `run-cost.sh` runs a build on the three cases, `cost-variants.patch` holds the variants, and
+  `cost.jsonl` has every run, each line labelled with its `variant` (`same` and `same2` are the patch with no variant
+  set).  `profile.py` reads a `sample` call graph; `run-profile.sh` wrote `profile-4050.txt` and `profile-4875-10.txt`
+  (the samples, 0.35 MB each, are not kept).  `run-threads.sh` ran the release build on one and eight threads, with
+  its result lines in `threads.jsonl`.
 
 The scripts name the scratch directory they ran in (`S=`); set it to run them again.  The runs before the tactic used the
 study patch, not kept, whose environment variables set the rule on, the pricing and the gap gate; the tactic

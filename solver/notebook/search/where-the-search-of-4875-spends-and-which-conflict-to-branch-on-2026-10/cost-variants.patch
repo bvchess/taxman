@@ -1,0 +1,148 @@
+diff --git a/solver/frame/src/gf2.rs b/solver/frame/src/gf2.rs
+index 153e5f3..f0484c7 100644
+--- a/solver/frame/src/gf2.rs
++++ b/solver/frame/src/gf2.rs
+@@ -584,6 +584,13 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
+         dispatch!(self, l => l.certified_excluding(xs, cap as usize, out))
+     }
+ 
++    /// [`certified_excluding`](Self::certified_excluding) with each cycle search given up past `limit`, so that a
++    /// member without which the bound falls by more than `limit` is `None`, as one not certified is: the tactic
++    /// `conflict_branching` needs no exact price past a point.
++    pub fn certified_within(&mut self, xs: &[u32], cap: u32, limit: i64, out: &mut Vec<Option<u64>>) {
++        dispatch!(self, l => l.certified_within(xs, cap as usize, limit, out))
++    }
++
+     /// Keeps the level of the top level without `x` that the last [`certified_excluding`](Self::certified_excluding)
+     /// certified (its heaviest set the one it found, of all sizes), as [`keep_excluded`](Self::keep_excluded) keeps
+     /// a solved one.
+@@ -1140,6 +1147,12 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+     }
+ 
+     fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>) {
++        self.certified_within(xs, cap, i64::MAX, out);
++    }
++
++    /// [`certified_excluding`](Self::certified_excluding) with each cycle search given up past `limit`: a member
++    /// whose shortest cycle is longer than that is `None`, as one not certified is.
++    fn certified_within(&mut self, xs: &[u32], cap: usize, limit: i64, out: &mut Vec<Option<u64>>) {
+         out.clear();
+         let graph = self.graph;
+         let level = &mut self.levels[self.depth];
+@@ -1160,7 +1173,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+         };
+         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
+         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
+-        let reach = losses.reach(&last);
++        let reach = losses.reach(&last).min(limit);
+         self.certified.clear();
+         for &x in xs {
+             let mut bound = None;
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index 9151f08..f2a542d 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -1367,36 +1367,60 @@ fn conflict_to_branch_on<const W: usize>(
+     known: &mut Vec<Bits<W>>,
+ ) -> Bits<W> {
+     let members: Vec<u32> = eval.chosen.iter().collect();
+-    let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
+-    let mut bounds = Vec::new();
+-    g.certified_excluding(&exact, cap, &mut bounds);
+-    let certified: std::collections::HashMap<u32, Option<u64>> = exact.into_iter().zip(bounds).collect();
++    let split = |g: &mut Gf2Bound<'_, W>, x: u32| g.split_without(x).map_or(0.0, |b| (eval.value as i64 - b).max(0) as f64);
++    let limit = price_limit();
++    let late = price_late();
+     let mut price = std::collections::HashMap::with_capacity(members.len());
+     for &x in &members {
+-        let p = match certified.get(&x).copied().flatten() {
+-            Some(b) => eval.value.saturating_sub(b) as f64,
+-            None => g.split_without(x).map_or(0.0, |b| (eval.value as i64 - b).max(0) as f64),
+-        };
+-        price.insert(x, p);
++        price.insert(x, split(g, x));
+     }
+-    let weight = |k: &Bits<W>| {
+-        k.iter().map(|x| 10f64.powf(-price.get(&x).copied().unwrap_or(0.0) / CONFLICT_BRANCHING_SLOPE)).sum::<f64>()
+-    };
+-    let mut best = (weight(&k0), k0, false);
+-    if let Some(l) = learning.as_ref() {
+-        for k in l.table.all_within(&l.promoted, &eval.chosen) {
+-            let w = weight(&k);
+-            if w < best.0 {
+-                best = (w, k, false);
++    let price_exactly = |g: &mut Gf2Bound<'_, W>, price: &mut std::collections::HashMap<u32, f64>, set: Bits<W>| {
++        let exact: Vec<u32> = set.iter().filter(|x| limit.is_none_or(|l| price[x] < l)).collect();
++        let mut bounds = Vec::new();
++        match limit {
++            None => g.certified_excluding(&exact, cap, &mut bounds),
++            Some(l) => g.certified_within(&exact, cap, l as i64, &mut bounds),
++        }
++        for (&x, b) in exact.iter().zip(&bounds) {
++            let p = price.get_mut(&x).expect("a member");
++            match (b, limit) {
++                (Some(b), _) => *p = eval.value.saturating_sub(*b) as f64,
++                (None, Some(l)) => *p = p.max(l),
++                (None, None) => {}
+             }
+         }
++    };
++    // Exploration: keep k0 with no other priced when each of its members costs at least `enough`.
++    if let Some(enough) = price_enough() {
++        price_exactly(g, &mut price, k0);
++        if k0.iter().all(|x| price[&x] >= enough) {
++            return k0;
++        }
++    }
++    // The members priced exactly before the choice: those a failing frame's conflict can hold, and k0's (exploration:
++    // with `late`, only the members of the conflicts weighed, after they are made by the split's estimates).
++    if !late {
++        price_exactly(g, &mut price, model.conflict_members(scratch, state, &eval.chosen) | k0);
++    }
++    let mut candidates: Vec<(Bits<W>, bool)> = vec![(k0, false)];
++    if let Some(l) = learning.as_ref() {
++        candidates.extend(l.table.all_within(&l.promoted, &eval.chosen).into_iter().map(|k| (k, false)));
+     }
+     let mut order = members;
+     order.sort_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b)));
+-    for k in model.conflicts_ordered(scratch, state, &eval.chosen, &order) {
++    candidates.extend(model.conflicts_ordered(scratch, state, &eval.chosen, &order).into_iter().map(|k| (k, true)));
++    if late {
++        let union = candidates.iter().fold(Bits::EMPTY, |all, (k, _)| all | *k);
++        price_exactly(g, &mut price, union);
++    }
++    let weight = |k: &Bits<W>| {
++        k.iter().map(|x| 10f64.powf(-price.get(&x).copied().unwrap_or(0.0) / CONFLICT_BRANCHING_SLOPE)).sum::<f64>()
++    };
++    let mut best = (weight(&k0), k0, false);
++    for &(k, computed) in &candidates[1..] {
+         let w = weight(&k);
+         if w < best.0 {
+-            best = (w, k, true);
++            best = (w, k, computed);
+         }
+     }
+     let (_, k, computed) = best;
+@@ -1412,3 +1436,22 @@ fn conflict_to_branch_on<const W: usize>(
+     }
+     k
+ }
++
++/// Exploration only: the price past which the tactic `conflict_branching` prices no member exactly
++/// (`TAXMAN_CB_LIMIT`), if set.
++fn price_limit() -> Option<f64> {
++    static LIMIT: std::sync::OnceLock<Option<f64>> = std::sync::OnceLock::new();
++    *LIMIT.get_or_init(|| std::env::var("TAXMAN_CB_LIMIT").ok().and_then(|v| v.parse().ok()))
++}
++
++/// Exploration only: price exactly only the members of the conflicts weighed (`TAXMAN_CB_LATE`).
++fn price_late() -> bool {
++    static LATE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *LATE.get_or_init(|| std::env::var("TAXMAN_CB_LATE").is_ok())
++}
++
++/// Exploration only: the price from which k0 is kept unweighed (`TAXMAN_CB_ENOUGH`).
++fn price_enough() -> Option<f64> {
++    static ENOUGH: std::sync::OnceLock<Option<f64>> = std::sync::OnceLock::new();
++    *ENOUGH.get_or_init(|| std::env::var("TAXMAN_CB_ENOUGH").ok().and_then(|v| v.parse().ok()))
++}
