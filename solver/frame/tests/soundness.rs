@@ -38,7 +38,8 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to
 /// 18), then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32),
 /// and the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what
-/// the searchers keep, however often they forget and however small the limit, changes no answer).  The matching path with the
+/// the searchers keep, however often they forget and however small the limit, changes no answer), then conflict
+/// branching (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42).  The matching path with the
 /// forgetting of nogoods at the production period, every step, every third, and never; on one thread and two; and
 /// the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
 /// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian
@@ -90,6 +91,8 @@ fn configs() -> Vec<Config> {
         Config { period: Some(7), keep: Keep::Used, limit: Some(3), threads: 2, ..g },
         Config { period: Some(3), keep: Keep::Used, ..base },
         Config { period: None, limit: Some(1), ..base },
+        Config { conflict_branching: Some(0), ..g },
+        Config { conflict_branching: Some(0), threads: 2, period: Some(3), ..g },
     ]
 }
 

@@ -361,6 +361,13 @@ impl<const W: usize> Nogoods<W> {
         }
     }
 
+    /// Every conflict the table knows within `set` at a node with the promotions `promoted` (each nogood within
+    /// `promoted ∪ set`, less `promoted`), with no use counted: the conflicts the tactic `conflict_branching` weighs.
+    pub fn all_within(&self, promoted: &Bits<W>, set: &Bits<W>) -> Vec<Bits<W>> {
+        let within = *promoted | *set;
+        self.sets.iter().filter(|n| n.is_subset(&within)).map(|n| *n - *promoted).filter(|k| !k.is_empty()).collect()
+    }
+
     /// [`conflict`](Self::conflict), unless one of the conflicts the table knows is a subset of `forced` (it then
     /// stops there and says [`Lookup::AllForced`]).  The search passes a node's forced members: every completion
     /// that can beat the incumbent promotes all of them, so if they contain a conflict there is no such

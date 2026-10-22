@@ -36,7 +36,8 @@ use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
-    search, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit, NOGOOD_PERIOD,
+    search, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit,
+    CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
 };
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -311,6 +312,9 @@ pub struct Config {
     pub gf2_branching: Gf2Branching,
     /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
+    /// Conflict branching from this gap on (tactic `conflict_branching`, whose gap is [`CONFLICT_BRANCHING_GAP`]; `Some(0)` chooses at
+    /// every check, which small games need to exercise it).
+    pub conflict_branching: Option<u64>,
     /// The GF(2) graph padded to that many block words ([`Gf2Graph::padded`]), to run the engines of more words than
     /// the board needs; `None` for the words it needs.
     pub gf2_words: Option<usize>,
@@ -341,6 +345,7 @@ impl Config {
             gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
+            conflict_branching: t.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
             gf2_words: None,
         }
     }
@@ -457,6 +462,7 @@ impl<const W: usize> Game<W> {
             gf2_strong_depth: u32::MAX,
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
+            conflict_branching: cfg.conflict_branching,
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
             #[cfg(feature = "studies")]
             hooks: None,

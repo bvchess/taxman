@@ -238,6 +238,40 @@ A node is cut only when its bound is below `need`, since a completion that merel
 a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs` attacks each of these
 facts ([testing.md](testing.md)).
 
+## Conflict branching
+
+With the tactic `conflict_branching`, a node chooses the conflict it branches on for what its children leave of the
+gap; strong branching then chooses the member.  Each child of a conflict leaves out one member, and its gap is the
+node's less what leaving that member out costs the bound, the member's *price*.  The smallest conflict the search knows
+often has a member whose price is a few points, and the child that leaves it out keeps nearly the whole gap, so the
+subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is often a set
+of forced members, which closes the node at step 3.
+
+*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300), the check
+weighs:
+
+* `K`, the conflict the search found;
+* every conflict the nogood table knows within `I*` (`Nogoods::all_within`);
+* in each frame that `I*` leaves unwinnable, the minimal conflict made by leaving out the cheapest members first
+  (`FrameGraph::conflicts_ordered`), learned as a nogood if it is chosen.
+
+A conflict weighs the sum over its members of 10^(−price/`CONFLICT_BRANCHING_SLOPE`), with the slope 291: its children's
+subtrees against the node's, if a subtree grows tenfold for every 291 points of its gap.  The node branches on the
+lightest.  Prices come off the exchange graph of `I*`, as strong branching reads them (`Gf2Bound::certified_excluding`),
+for the members that a failing frame's conflict can hold (`FrameGraph::conflict_members`); the others take the weight
+split's estimate.  Below the gap of 300 the search's own `K` is kept, since a small subtree does not repay the pricing.
+
+*Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
+step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
+applied, its frame keeps a stuck set of moves, so it is not winnable (docs/theory/decision-procedure.md, Theorem 3), and
+a stuck set survives every larger set of promotions (Theorem 4 there), so no completion holding the whole conflict is
+promotable (docs/theory/frame-model.md, Theorem M).  `conflicts_ordered` checks each with the whole peel.
+
+*What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
+default's steps and 0.26 and 0.27 of its CPU; a step costs three to five times a default one, mostly in the pricing.
+The share of steps saved grows with the gap.  The measurements, and the gap and slope chosen, are in [where the search
+of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
+
 ## The starting incumbent, the ceiling and the seed
 
 The search starts from the best of three promotable sets, and stops as soon as it reaches a proven ceiling.  The three

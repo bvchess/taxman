@@ -128,6 +128,17 @@ use std::time::{Duration, Instant};
 /// solver/notebook/search/forgetting-nogoods-2026-10/README.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
+/// With the tactic `conflict_branching`, a check chooses the conflict it branches on only where its gap, the GF(2) bound
+/// less the need, is at least this (below it the search's own conflict is kept): the best of 0, 200, 300 and 400 on
+/// the whole game 4050 and two units of 4548 and 4875 (solver/notebook/search/
+/// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
+pub const CONFLICT_BRANCHING_GAP: u64 = 300;
+
+/// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/`CONFLICT_BRANCHING_SLOPE`), a member's
+/// price being what leaving it out costs the GF(2) bound: the subtrees of its children against the node's, if a
+/// subtree grows tenfold for every `CONFLICT_BRANCHING_SLOPE` points of its gap, as the subtrees of 4875 did (the same entry).
+pub const CONFLICT_BRANCHING_SLOPE: f64 = 291.0;
+
 /// The outcome of [`search`].
 #[derive(Clone, Debug)]
 pub struct SearchResult<const W: usize> {

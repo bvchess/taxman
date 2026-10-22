@@ -1,0 +1,6 @@
+fit on 59 completed units of gap >= 600: log10 steps = 0.591 + 0.347 * gap/100, residual sd 0.40; 0.487 ms a step over the completed runs
+units run to the end: 59, their steps 6,070,413; predicted: 37 units (the largest gaps [1900, 1774, 1773, 1768, 1753])
+  central: 6.374e+07 steps, 8.6 CPU hours at 0.487 ms a step
+  p10: 5.987e+07 steps, 8.1 CPU hours at 0.487 ms a step
+  median: 8.599e+07 steps, 11.6 CPU hours at 0.487 ms a step
+  p90: 1.304e+08 steps, 17.6 CPU hours at 0.487 ms a step

@@ -1,0 +1,312 @@
+## 4875-root: depth 0, 1344 candidates, need 538,081, 2,000,895 steps, 477 CPU s
+
+### 1. Shape
+
+2,000,895 steps at 831,553 nodes (2.41 steps a node); 180,104 leaves (21.7%), 471,638 nodes with one child (56.7%); deepest stack 149.
+
+Nodes by their depth on the stack below the unit's node (rows every 4 past 11):
+
+| depth | nodes | steps | children a node | steps so far |
+|---|---|---|---|---|
+| 0 | 1 | 1 | 1.00 | 0.0% |
+| 1 | 1 | 1 | 1.00 | 0.0% |
+| 2 | 1 | 1 | 1.00 | 0.0% |
+| 3 | 1 | 1 | 1.00 | 0.0% |
+| 4 | 1 | 1 | 1.00 | 0.0% |
+| 5 | 1 | 1 | 1.00 | 0.0% |
+| 6 | 1 | 1 | 1.00 | 0.0% |
+| 7 | 1 | 1 | 1.00 | 0.0% |
+| 8 | 1 | 1 | 1.00 | 0.0% |
+| 9 | 1 | 1 | 1.00 | 0.0% |
+| 10 | 1 | 1 | 1.00 | 0.0% |
+| 11 | 1 | 1 | 1.00 | 0.0% |
+| 12 | 1 | 1 | 1.00 | 0.0% |
+| 16 | 1 | 1 | 1.00 | 0.0% |
+| 20 | 1 | 2 | 1.00 | 0.0% |
+| 24 | 1 | 1 | 1.00 | 0.0% |
+| 28 | 1 | 1 | 1.00 | 0.0% |
+| 32 | 1 | 1 | 1.00 | 0.0% |
+| 36 | 1 | 1 | 1.00 | 0.0% |
+| 40 | 1 | 1 | 1.00 | 0.0% |
+| 44 | 1 | 1 | 1.00 | 0.0% |
+| 48 | 1 | 1 | 1.00 | 0.0% |
+| 52 | 2 | 4 | 1.50 | 0.0% |
+| 56 | 9 | 23 | 1.67 | 0.0% |
+| 60 | 45 | 112 | 1.44 | 0.0% |
+| 64 | 195 | 485 | 1.32 | 0.1% |
+| 68 | 553 | 1,368 | 1.24 | 0.3% |
+| 72 | 1,348 | 3,335 | 1.22 | 0.8% |
+| 76 | 2,832 | 6,940 | 1.18 | 1.9% |
+| 80 | 5,319 | 12,978 | 1.16 | 3.9% |
+| 84 | 8,905 | 21,711 | 1.12 | 7.6% |
+| 88 | 13,981 | 33,962 | 1.10 | 13.4% |
+| 92 | 20,096 | 48,729 | 1.08 | 22.0% |
+| 96 | 26,084 | 63,056 | 1.05 | 33.6% |
+| 100 | 30,231 | 72,587 | 1.02 | 47.5% |
+| 104 | 30,108 | 71,842 | 0.98 | 62.0% |
+| 108 | 26,117 | 62,108 | 0.94 | 75.3% |
+| 112 | 19,035 | 45,187 | 0.90 | 85.7% |
+| 116 | 11,854 | 28,377 | 0.87 | 92.5% |
+| 120 | 6,388 | 15,518 | 0.84 | 96.5% |
+| 124 | 2,837 | 6,973 | 0.81 | 98.5% |
+| 128 | 1,223 | 3,080 | 0.82 | 99.4% |
+| 132 | 520 | 1,345 | 0.83 | 99.7% |
+| 136 | 222 | 574 | 0.82 | 99.9% |
+| 140 | 98 | 258 | 0.73 | 100.0% |
+| 144 | 26 | 70 | 0.81 | 100.0% |
+| 148 | 3 | 9 | 0.67 | 100.0% |
+| 149 | 2 | 6 | 0.00 | 100.0% |
+
+How the steps ended: child pushed 41.6%; loop end: empty 25.3%; loop end: refined 16.2%; promotion failed 9.4%; child cut: refined 3.9%; child cut: gf2 3.6%; loop end: gf2 0.0%.
+
+### 2. What is branched on
+
+1,169,438 branching steps; 487,533 of them promote two or more forced members at once.
+
+| home of the member | steps | share | share of the steps under the children |
+|---|---|---|---|
+| 1 | 300,582 | 25.7% | 15.5% |
+| 2 | 370,558 | 31.7% | 21.9% |
+| 3 | 362,059 | 31.0% | 26.0% |
+| 4 | 92,756 | 7.9% | 20.3% |
+| 5 | 12,434 | 1.1% | 11.9% |
+| 6 | 30,992 | 2.7% | 4.5% |
+| 7 | 24 | 0.0% | 0.0% |
+| 8 | 33 | 0.0% | 0.0% |
+
+| live factors of the member | steps | share | share of the steps under the children |
+|---|---|---|---|
+| 1 | 70,707 | 6.0% | 3.0% |
+| 2 | 335,009 | 28.6% | 15.9% |
+| 3 | 487,210 | 41.7% | 56.4% |
+| 4 | 276,412 | 23.6% | 23.8% |
+| 5 | 100 | 0.0% | 0.9% |
+
+The 15 members with the most steps under the children that promote them:
+
+| member | home | times branched on | share of the steps under |
+|---|---|---|---|
+| 2107 | 1 | 1 | 1.0% |
+| 2009 | 1 | 1 | 1.0% |
+| 2150 | 2 | 1 | 1.0% |
+| 2050 | 2 | 1 | 1.0% |
+| 1935 | 2 | 1 | 1.0% |
+| 2197 | 1 | 1 | 1.0% |
+| 2366 | 2 | 1 | 1.0% |
+| 2145 | 2 | 1 | 1.0% |
+| 2002 | 2 | 1 | 1.0% |
+| 1815 | 2 | 1 | 1.0% |
+| 2331 | 2 | 1 | 1.0% |
+| 1813 | 1 | 1 | 1.0% |
+| 1850 | 2 | 1 | 1.0% |
+| 2345 | 1 | 1 | 1.0% |
+| 2379 | 1 | 1 | 1.0% |
+
+The top levels by name: at each node, its loop's branches in order ("promote x", the steps under that child, the node's gap at that step), then the heaviest child's loop:
+
+* depth 0 (0 promotions, gap 2029, 2,000,895 steps, 1 steps of its own): promote 2107 (home 1, 2 live): 2,000,894
+* depth 1 (1 promotions, gap 2029, 2,000,894 steps, 1 steps of its own): promote 2009 (home 1, 2 live): 2,000,893
+* depth 2 (2 promotions, gap 2029, 2,000,893 steps, 1 steps of its own): promote 2150 (home 2, 3 live): 2,000,892
+* depth 3 (3 promotions, gap 2029, 2,000,892 steps, 1 steps of its own): promote 2050 (home 2, 3 live): 2,000,891
+
+### 3. The gap along the tree
+
+Nodes by their gap when they are made (bound less need), and the steps of their subtrees:
+
+| gap | nodes | subtree p10 | median | p90 | steps under all |
+|---|---|---|---|---|---|
+| 0-99 | 11,470 | 2 | 2 | 4 | 27,989 |
+| 100-199 | 138,187 | 2 | 3 | 8 | 601,760 |
+| 200-299 | 322,524 | 2 | 6 | 19 | 2,981,719 |
+| 300-399 | 184,615 | 4 | 17 | 53 | 4,600,783 |
+| 400-499 | 89,247 | 7 | 42 | 147 | 5,868,781 |
+| 500-599 | 45,927 | 9 | 87 | 388 | 7,595,104 |
+| 600-699 | 22,894 | 13 | 144 | 888 | 8,271,964 |
+| 700-799 | 9,895 | 30 | 243 | 2364 | 9,541,962 |
+| 800-899 | 4,209 | 66 | 512 | 5283 | 8,546,083 |
+| 900-999 | 1,537 | 220 | 1288 | 10423 | 7,244,010 |
+| 1000-1099 | 670 | 1135 | 4857 | 49572 | 12,047,868 |
+| 1100-1199 | 166 | 366 | 17489 | 65652 | 4,276,128 |
+| 1200-1299 | 119 | 14866 | 40056 | 149199 | 7,890,531 |
+| 1300-1399 | 2 | 2 | 2 | 2 | 4 |
+| 1400-1499 | 45 | 69183 | 471961 | 2000844 | 32,315,374 |
+| 1600-1699 | 25 | 2000851 | 2000861 | 2000871 | 50,021,525 |
+| 1800-1899 | 11 | 2000876 | 2000880 | 2000884 | 22,009,680 |
+| 1900-1999 | 5 | 2000886 | 2000888 | 2000890 | 10,004,440 |
+| 2000-2099 | 5 | 2000891 | 2000893 | 2000895 | 10,004,465 |
+
+log10(subtree) on the gap over the 831,553 nodes of two steps or more: a decade per 291 points.
+
+What a decision does to the gap, by the home of the member: promoting it (the child's gap less the node's) and going on without it (the node's next gap less this one):
+
+| home | promote: steps | median change | mean | without: steps | median change | mean |
+|---|---|---|---|---|---|---|
+| 1 | 192,442 | 0 | -55.5 | 7,277 | -66 | -133.5 |
+| 2 | 344,154 | 0 | -43.9 | 241,592 | -168 | -189.7 |
+| 3 | 334,708 | 0 | -135.4 | 317,318 | -159 | -185.9 |
+| 4 | 87,372 | 0 | -108.2 | 84,014 | -141 | -161.0 |
+| 5 | 12,387 | -32 | -42.0 | 12,188 | -175 | -138.3 |
+| 6 | 9,986 | 0 | -30.2 | 166 | -192 | -192.9 |
+| 7 | 23 | -16 | -12.8 | 11 | -64 | -64.0 |
+| 8 | 33 | 0 | 0.0 | 0 | - | - |
+
+Along the heaviest path (each node's heaviest child): depth, promotions, gap, subtree:
+
+  0/0/2029/2,000,895; 5/5/1906/2,000,890; 10/10/1895/2,000,885; 15/15/1832/2,000,880; 20/20/1814/2,000,875; 25/25/1631/2,000,869; 30/30/1631/2,000,864; 35/35/1631/2,000,859; 40/40/1631/2,000,854; 45/45/1631/2,000,849; 50/50/1427/2,000,844; 55/55/1411/1,050,420; 60/61/1169/109,037; 65/66/1161/75,042; 70/71/1161/69,785; 75/76/1144/43,342; 80/81/1144/42,678; 85/100/820/20,525; 90/105/820/14,182; 95/115/765/4,397; 100/134/620/2,956; 105/140/562/2,061; 110/145/562/1,209; 115/154/535/392; 120/170/481/202; 125/175/447/90; 130/182/378/53; 135/215/167/11
+
+Exclusions on the way to a leaf p10/median/p90 6/8/11; the root's gap over the median drop of an exclusion (162) is 12.5.  An exclusion lowers the bound by a median 8.9% of the member's value (p10/p90 3.6%/15.8%): the bound finds a substitute for the rest.  Exclusions that cost the bound under 25 points: 4.3%; under 50: 6.8%.
+
+Where subtrees close: the gap of a leaf (a node with no child) p10/median/p90 132/204/318; of a node of at most three steps 132/204/318.
+
+### 4. Repetition
+
+At the first steps of the 831,553 nodes: the distinct residues (a frame's state and the node's candidates touching it; all: every frame and every candidate) and the distinct states (a frame's moves, factors and freedoms; all: every frame's):
+
+| frame | residues | states |
+|---|---|---|
+| 0 | 5,405 | 2,217 |
+| 1 | 341,402 | 294,922 |
+| 2 | 723,537 | 665,388 |
+| 3 | 484,859 | 356,718 |
+| 4 | 39,061 | 8,725 |
+| 5 | 287 | 101 |
+| 6 | 16 | 12 |
+| 7 | 7 | 5 |
+| 8 | 2 | 2 |
+| all | 831,553 | 831,553 |
+
+Whole residues met again: 0 of 831,553 nodes; 0 outermost repeats at a need no smaller, whose subtrees hold 0 steps (0.0%).
+
+The distinct residues of the frames in front of a split and behind it, at the nodes' first steps, against their product and the pairs that occur:
+
+| frames | front | behind | product | pairs met |
+|---|---|---|---|---|
+| < 1 against >= 1 | 5,405 | 831,553 | 4,494,543,965 | 831,553 |
+| < 2 against >= 2 | 341,402 | 804,247 | 274,571,534,294 | 831,553 |
+| < 3 against >= 3 | 758,988 | 507,300 | 385,034,612,400 | 831,553 |
+| < 4 against >= 4 | 827,389 | 43,193 | 35,737,413,077 | 831,553 |
+| < 5 against >= 5 | 831,329 | 338 | 280,989,202 | 831,553 |
+| < 6 against >= 6 | 831,531 | 20 | 16,630,620 | 831,553 |
+| < 7 against >= 7 | 831,542 | 7 | 5,820,794 | 831,553 |
+| < 8 against >= 8 | 831,553 | 2 | 1,663,106 | 831,553 |
+
+The distinct states of the frames in front of a split and behind it, at the nodes' first steps, against their product and the pairs that occur:
+
+| frames | front | behind | product | pairs met |
+|---|---|---|---|---|
+| < 1 against >= 1 | 2,217 | 831,553 | 1,843,553,001 | 831,553 |
+| < 2 against >= 2 | 294,922 | 797,163 | 235,100,906,286 | 831,553 |
+| < 3 against >= 3 | 720,869 | 425,354 | 306,624,512,626 | 831,553 |
+| < 4 against >= 4 | 812,639 | 12,353 | 10,038,529,567 | 831,553 |
+| < 5 against >= 5 | 830,438 | 153 | 127,057,014 | 831,553 |
+| < 6 against >= 6 | 831,527 | 15 | 12,472,905 | 831,553 |
+| < 7 against >= 7 | 831,538 | 5 | 4,157,690 | 831,553 |
+| < 8 against >= 8 | 831,553 | 2 | 1,663,106 | 831,553 |
+
+### 5. The conflicts
+
+54,230 distinct conflicts for 2,000,895 steps; sizes p10/median/p90 3/6/10.
+
+The frame of the conflicts the branching steps resolved (the frame all members touch):
+
+| frame | branching steps | share |
+|---|---|---|
+| 3 | 314,722 | 26.9% |
+| 2 | 304,892 | 26.1% |
+| 2 and 3 | 291,251 | 24.9% |
+| 1 and 2 | 185,811 | 15.9% |
+| 4 | 36,661 | 3.1% |
+| 1 | 19,352 | 1.7% |
+| 3 and 4 | 14,499 | 1.2% |
+| 0 and 1 | 1,539 | 0.1% |
+| 5 | 388 | 0.0% |
+| 4 and 5 | 283 | 0.0% |
+| 6 | 29 | 0.0% |
+| 6 and 7 | 11 | 0.0% |
+
+The 315 numbers in the 54,134 distinct conflicts resolved, by home, and the distinct conflicts each is in:
+
+| home | numbers | conflicts each, median | p90 | most |
+|---|---|---|---|---|
+| 1 | 45 | 8 | 351 | 677 |
+| 2 | 117 | 169 | 5085 | 13175 |
+| 3 | 76 | 933 | 5783 | 10617 |
+| 4 | 50 | 12 | 2042 | 3986 |
+| 5 | 20 | 8 | 16 | 118 |
+| 6 | 5 | 8 | 14 | 14 |
+| 7 | 2 | 2 | 2 | 2 |
+
+The 10 conflicts resolved most often:
+
+| id | size | branching steps | members |
+|---|---|---|---|
+| 70 | 2 | 15,594 | 2328 2416 |
+| 581 | 2 | 13,600 | 1400 1568 |
+| 68 | 2 | 11,033 | 2416 2424 |
+| 3001 | 2 | 10,133 | 1624 2424 |
+| 450 | 2 | 8,367 | 1953 2133 |
+| 376 | 2 | 6,985 | 1715 1953 |
+| 1503 | 2 | 6,873 | 1840 2424 |
+| 136 | 2 | 6,498 | 1953 2046 |
+| 134 | 2 | 5,993 | 2120 2133 |
+| 989 | 2 | 5,951 | 1953 2120 |
+
+Whether a core costs the same wherever it is met: for the conflicts most often gone on without a member, that member's exclusion drop over its occurrences:
+
+| conflict | member left out | times | drop p10 | median | p90 |
+|---|---|---|---|---|---|
+| 2416 2424 | 2424 | 9,176 | 16 | 16 | 16 |
+| 1624 2424 | 1624 | 8,986 | 58 | 58 | 70 |
+| 1953 2133 | 2133 | 7,900 | 162 | 162 | 162 |
+| 2328 2416 | 2328 | 7,416 | 80 | 80 | 80 |
+| 1715 1953 | 1953 | 4,958 | 126 | 126 | 126 |
+| 1953 2046 | 2046 | 5,877 | 132 | 132 | 132 |
+| 1840 2424 | 1840 | 5,752 | 32 | 120 | 184 |
+| 1953 2120 | 1953 | 5,281 | 126 | 126 | 126 |
+| 2120 2133 | 2133 | 5,219 | 162 | 162 | 162 |
+| 1400 1568 | 1568 | 4,972 | 176 | 200 | 234 |
+
+Over the 3,639 pairs of a conflict and a member met 20 times or more, the spread of the drop (p90 less p10) is a median 0.14 times the median drop.
+
+### Siblings
+
+At the heaviest nodes with two children of 1,000 steps or more: the distinct conflicts (as sets of numbers) each of the two heaviest children's subtrees resolved, and the share of the lighter one's that the heavier one resolved too:
+
+| depth | heavier child | lighter child | its conflicts | the lighter's | shared |
+|---|---|---|---|---|---|
+| 51 | 1,050,423 | 950,418 | 37,556 | 24,073 | 31.4% |
+| 55 | 545,432 | 375,880 | 25,337 | 16,204 | 39.9% |
+| 55 | 907,911 | 42,270 | 23,611 | 901 | 51.1% |
+| 56 | 870,743 | 37,165 | 22,649 | 1,618 | 40.7% |
+| 57 | 830,730 | 40,010 | 21,659 | 2,370 | 58.3% |
+| 58 | 814,500 | 16,227 | 21,367 | 772 | 62.3% |
+| 59 | 761,191 | 53,306 | 20,571 | 1,486 | 46.5% |
+| 60 | 756,200 | 4,988 | 20,399 | 482 | 64.5% |
+
+### Substitutes
+
+662,566 exclusions with the bound checked again after them; 57.6% swap the member for one other candidate, of the same home in 77.8% of those; the drop (the members lost less those gained) p10/median/p90 59/162/318.  The shapes (lost, gained) most met: 1 for 1 57.6%, 2 for 2 27.0%, 3 for 3 9.3%, 4 for 4 5.2%, 5 for 5 0.8%.
+
+Of the one-for-one swaps, 37.1% put in a twin of the member: a number that shares a maximal factor with it (x = m·p, y = m·q, p and q prime), and 43.3% a twin or a kin (x = m·a, y = m·b with a and b at most 16); of all the members gained, 34% are a twin of a member lost.  After a twin came in, the node branched next on that twin in 0.2% of 141,531 cases: one rung down the ladder of its payer's composites.  The swaps that are one exchange of two primes, by their size: 1 for 1 37.1%, 2 for 2 15.6%, 3 for 3 0.0%, 4 for 4 35.7%; of all the swaps, 27.4%.
+
+The 12 one-for-one swaps met most often:
+
+| left out | home | its substitute | home | difference | times |
+|---|---|---|---|---|---|
+| 2133 = 3^3·79 | 2 | 1971 = 3^3·73 | 2 | 162 | 34,051 |
+| 1953 = 3^2·7·31 | 2 | 1827 = 3^2·7·29 | 2 | 126 | 22,251 |
+| 1725 = 3·5^2·23 | 2 | 1521 = 3^2·13^2 | 2 | 204 | 17,743 |
+| 2046 = 2·3·11·31 | 2 | 1914 = 2·3·11·29 | 2 | 132 | 14,038 |
+| 1938 = 2·3·17·19 | 2 | 1734 = 2·3·17^2 | 2 | 204 | 12,385 |
+| 1862 = 2·7^2·19 | 2 | 1666 = 2·7^2·17 | 2 | 196 | 11,950 |
+| 1624 = 2^3·7·29 | 3 | 1566 = 2·3^3·29 | 3 | 58 | 11,157 |
+| 2212 = 2^2·7·79 | 2 | 1971 = 3^3·73 | 2 | 241 | 10,039 |
+| 1974 = 2·3·7·47 | 2 | 1806 = 2·3·7·43 | 2 | 168 | 9,955 |
+| 1710 = 2·3^2·5·19 | 3 | 1554 = 2·3·7·37 | 2 | 156 | 6,953 |
+| 1862 = 2·7^2·19 | 2 | 1617 = 3·7^2·11 | 2 | 245 | 6,729 |
+| 1881 = 3^2·11·19 | 2 | 1617 = 3·7^2·11 | 2 | 264 | 6,299 |
+
+### 6. The heaviest set against the best completion
+
+(no `--best-cpu` in this run)
+

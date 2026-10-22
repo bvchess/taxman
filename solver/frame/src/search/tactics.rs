@@ -78,6 +78,12 @@ pub struct SearchTactics {
     /// With `gf2`'s strong branching and `fix_forced`: once a member is found forced, whether the bounds of the others
     /// are still found, to find more forced members (sound, as for `fix_forced`).
     pub more_forced: bool,
+    /// With `gf2`: at a check whose gap is at least [`CONFLICT_BRANCHING_GAP`](super::CONFLICT_BRANCHING_GAP), branch on the conflict of the
+    /// heaviest set whose members cost the bound most to leave out, of the one the search found, the nogoods within
+    /// the set and each failing frame's minimal conflict made by leaving out its cheapest members first
+    /// (`search::searcher`'s `conflict_to_branch_on`; sound: every completion leaves out a member of any conflict, so the
+    /// branches cover them all, and the conflicts made there are conflicts by docs/THEORY.md's Theorems 3, 4 and M).
+    pub conflict_branching: bool,
 }
 
 impl Default for SearchTactics {
@@ -99,6 +105,7 @@ impl Default for SearchTactics {
             strong_depth: u32::MAX,
             deep_branching: Gf2Branching::Split,
             more_forced: true,
+            conflict_branching: false,
         }
     }
 }
@@ -236,8 +243,10 @@ impl SearchTactics {
     }
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
-    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7) and
-    /// `symmetry` (8); the defaults are `0x1B9`.  The knobs of the nogood table's policy (`nogood_period`,
+    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
+    /// `symmetry` (8) and `conflict_branching` (9); the defaults are `0x1B9`.  (A checkpoint of a build before
+    /// `conflict_branching` has bit 9 clear, so it resumes with the tactic off, its default; a build before it refuses a
+    /// checkpoint with the tactic on, as "unknown tactics".)  The knobs of the nogood table's policy (`nogood_period`,
     /// `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a resumed search
     /// starts with an empty table whichever policy made the first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes
     /// with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which the
@@ -252,6 +261,7 @@ impl SearchTactics {
             | u16::from(self.lagrange) << 6
             | u16::from(self.gf2) << 7
             | u16::from(self.symmetry) << 8
+            | u16::from(self.conflict_branching) << 9
     }
 
     /// The length of [`tuning`](Self::tuning).
@@ -290,6 +300,7 @@ impl SearchTactics {
             lagrange: other.lagrange,
             gf2: other.gf2,
             symmetry: other.symmetry,
+            conflict_branching: other.conflict_branching,
             ..self.with_forgetting_of(other)
         }
     }
@@ -341,7 +352,7 @@ impl SearchTactics {
     /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
     /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 9 != 0 {
+        if bits >> 10 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -352,6 +363,7 @@ impl SearchTactics {
             lagrange: bits & 1 << 6 != 0,
             gf2: bits & 1 << 7 != 0,
             symmetry: bits & 1 << 8 != 0,
+            conflict_branching: bits & 1 << 9 != 0,
             ..SearchTactics::legacy_tuning()
         })
     }

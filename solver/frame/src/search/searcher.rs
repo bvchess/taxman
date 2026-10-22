@@ -24,13 +24,11 @@ use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
 use super::tactics::Gf2Branching;
-use super::{Diagnostics, Forgetting};
+use super::{Diagnostics, Forgetting, CONFLICT_BRANCHING_GAP, CONFLICT_BRANCHING_SLOPE};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
-#[cfg(feature = "studies")]
-use crate::gf2::Eval;
-use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
+use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -129,6 +127,10 @@ pub struct SearchSpace<'a, const W: usize> {
     pub gf2_deep_branching: Gf2Branching,
     /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
+    /// With `gf2`: at a check whose gap is at least this, branch on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
+    /// `conflict_branching`, which sets it to [`CONFLICT_BRANCHING_GAP`]; see [`conflict_to_branch_on`]); `None`: the search's own conflict
+    /// everywhere.
+    pub conflict_branching: Option<u64>,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
@@ -175,6 +177,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2_strong_depth: tactics.strong_depth,
             gf2_deep_branching: tactics.deep_branching,
             gf2_force_window: tactics.force_window,
+            conflict_branching: tactics.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
             symmetry: tactics
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
@@ -1012,6 +1015,22 @@ impl<'a, const W: usize> Stepper<'a, W> {
         };
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
+        // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's gaps
+        // fall most.  Any conflict keeps the search exact.
+        let found = match (space.conflict_branching, found) {
+            (Some(gap), Lookup::Conflict(k0)) if eval.value >= need + gap => Lookup::Conflict(conflict_to_branch_on(
+                g,
+                space.model,
+                &mut self.scratch,
+                state,
+                &eval,
+                k0,
+                cap,
+                learning.as_mut(),
+                &mut self.known,
+            )),
+            (_, found) => found,
+        };
         #[cfg(feature = "studies")]
         if let (true, Lookup::Conflict(k)) = (computed, &found) {
             self.learn_proposed(state, &promoted, cands, &eval.chosen, k);
@@ -1320,4 +1339,75 @@ impl<'a, const W: usize> Stepper<'a, W> {
             p.flush(&counts, &self.matching);
         }
     }
+}
+
+/// The conflict a node branches on with the tactic `conflict_branching`: of `k0` (the one the search found), the conflicts
+/// the nogood table knows within the heaviest set `eval.chosen`, and each failing frame's minimal conflict made by
+/// leaving out its cheapest members first ([`FrameGraph::conflicts_ordered`]), the one of least weight.  A member
+/// weighs 10^(−price/[`CONFLICT_BRANCHING_SLOPE`]), its price being what leaving it out costs the bound: exact (read off the exchange
+/// graph, as strong branching reads it) for the members that some failing frame's conflict can hold and those of `k0`,
+/// the weight split's estimate for the others.  The children of a conflict each leave out one member, with the node's
+/// gap less that member's price, so the weight is their subtrees against the node's if a subtree grows tenfold every
+/// [`CONFLICT_BRANCHING_SLOPE`] points of its gap.  A conflict whose members all cost much makes every child's gap fall, and is often a set of
+/// forced members, which closes the node.  A conflict made here is learned as a nogood, as the search learns its own.
+///
+/// Any conflict keeps the search exact: every completion leaves out some member of it, so the children cover every
+/// completion.  The conflicts made here are conflicts, as [`FrameGraph::conflicts_ordered`] says.
+#[allow(clippy::too_many_arguments)]
+fn conflict_to_branch_on<const W: usize>(
+    g: &mut Gf2Bound<'_, W>,
+    model: &FrameGraph,
+    scratch: &mut Scratch<W>,
+    state: &FrameSet<W>,
+    eval: &Eval<W>,
+    k0: Bits<W>,
+    cap: u32,
+    learning: Option<&mut Learning<'_, W>>,
+    known: &mut Vec<Bits<W>>,
+) -> Bits<W> {
+    let members: Vec<u32> = eval.chosen.iter().collect();
+    let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
+    let mut bounds = Vec::new();
+    g.certified_excluding(&exact, cap, &mut bounds);
+    let certified: std::collections::HashMap<u32, Option<u64>> = exact.into_iter().zip(bounds).collect();
+    let mut price = std::collections::HashMap::with_capacity(members.len());
+    for &x in &members {
+        let p = match certified.get(&x).copied().flatten() {
+            Some(b) => eval.value.saturating_sub(b) as f64,
+            None => g.split_without(x).map_or(0.0, |b| (eval.value as i64 - b).max(0) as f64),
+        };
+        price.insert(x, p);
+    }
+    let weight = |k: &Bits<W>| {
+        k.iter().map(|x| 10f64.powf(-price.get(&x).copied().unwrap_or(0.0) / CONFLICT_BRANCHING_SLOPE)).sum::<f64>()
+    };
+    let mut best = (weight(&k0), k0, false);
+    if let Some(l) = learning.as_ref() {
+        for k in l.table.all_within(&l.promoted, &eval.chosen) {
+            let w = weight(&k);
+            if w < best.0 {
+                best = (w, k, false);
+            }
+        }
+    }
+    let mut order = members;
+    order.sort_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b)));
+    for k in model.conflicts_ordered(scratch, state, &eval.chosen, &order) {
+        let w = weight(&k);
+        if w < best.0 {
+            best = (w, k, true);
+        }
+    }
+    let (_, k, computed) = best;
+    if k != k0 {
+        if computed {
+            if let Some(l) = learning {
+                if let Some(n) = model.nogood(scratch, l.root, &l.promoted, &k) {
+                    l.table.insert(n);
+                }
+            }
+        }
+        known.push(k);
+    }
+    k
 }

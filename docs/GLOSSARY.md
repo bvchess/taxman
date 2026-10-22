@@ -166,6 +166,11 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **strong branching**: how a node chooses the candidate to promote next: the member of the conflict whose removal
   lowers the bound the most.  With the GF(2) bound it is exact for each member, read off the exchange graph of the
   heaviest set where that certifies it and solved where not.
+* **conflict branching**: how a node chooses the conflict it branches on, before strong branching chooses the member:
+  of the conflicts within its heaviest set, the one whose members cost the bound most to leave out, so that every child
+  falls furthest below the node's gap.  With the tactic `conflict_branching` a node whose gap is 300 or more chooses so;
+  otherwise it branches on the smallest conflict the search knows ([solver/docs/design/search.md, "Conflict
+  branching"](../solver/docs/design/search.md#conflict-branching)).
 * **prime exchange**, **symmetric pair**: exchanging two primes p < q in every number.  The pair is symmetric when the
   exchange maps the root's frames and candidates onto themselves.  It then maps promotion sets to promotion sets
   worth (q − p)(c_p − c_q) more, where c_r is the sum of a set's cofactors x/r.  So every heaviest set keeps c_p ≤ c_q

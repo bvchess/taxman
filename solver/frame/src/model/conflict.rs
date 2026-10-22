@@ -118,6 +118,110 @@ impl FrameGraph {
         best
     }
 
+    /// For each frame that `set` leaves unwinnable in `state`, the members of `set` that its residual needs (those
+    /// promoted into it that are residual moves, and those promoted out of it that are factors of residual moves),
+    /// from which [`conflict_using`](Self::conflict_using) cuts its minimal conflict; their union.  The tactic
+    /// `conflict_branching` prices them.
+    pub fn conflict_members<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+    ) -> Bits<W> {
+        let (edits, not_a_factor) = self.edits(state, set);
+        if let Some(x) = not_a_factor {
+            return Bits::EMPTY.with(x);
+        }
+        let g = &self.graph;
+        let mut out = Bits::EMPTY;
+        for (i, frame) in state.frames().iter().enumerate() {
+            let (gained, lost) = (edits.gained[i], edits.lost[i]);
+            if (gained.is_empty() && lost.is_empty()) || !self.checks(i) {
+                continue;
+            }
+            let core = scratch.stuck(&(frame.moves | gained), &(frame.factors - lost), g);
+            let mut factors = Bits::EMPTY;
+            for m in core.iter() {
+                for &q in g.factors(m) {
+                    factors.insert(u32::from(q));
+                }
+            }
+            out |= (gained & core) | (lost & factors & frame.factors);
+        }
+        out
+    }
+
+    /// The conflicts of `set` in `state` that the tactic `conflict_branching` weighs: for each frame that `set` leaves
+    /// unwinnable, the minimal conflict that [`conflict_using`](Self::conflict_using) makes, but trying to leave out
+    /// the members in the order `order` (which must list every member of `set`) instead of from the smallest up.  A
+    /// member tried early tends to go, so an order from the cheapest member keeps the members that cost most to leave out.
+    ///
+    /// Each is a conflict, so no completion holds all of it.  With its members alone applied, its frame keeps a stuck
+    /// set of moves (each live factor listed by two of them or more), so the frame is not winnable
+    /// (docs/theory/decision-procedure.md, Theorem 3).  A stuck set survives any larger set of promotions, which only
+    /// adds moves and takes away factors (Theorem 4 there), so no set holding the whole conflict leaves the frame
+    /// winnable, and none can be promoted (docs/theory/frame-model.md, Theorem M).  Each is checked by the whole peel,
+    /// apart from the search that made it.
+    pub fn conflicts_ordered<const W: usize>(
+        &self,
+        scratch: &mut Scratch<W>,
+        state: &FrameSet<W>,
+        set: &Bits<W>,
+        order: &[u32],
+    ) -> Vec<Bits<W>> {
+        let (edits, not_a_factor) = self.edits(state, set);
+        if let Some(x) = not_a_factor {
+            return vec![Bits::EMPTY.with(x)];
+        }
+        let g = &self.graph;
+        let mut out = Vec::new();
+        for (i, frame) in state.frames().iter().enumerate() {
+            let (gained, lost) = (edits.gained[i], edits.lost[i]);
+            if (gained.is_empty() && lost.is_empty()) || !self.checks(i) {
+                continue;
+            }
+            let near = |core: &Bits<W>| -> Bits<W> {
+                let mut out = Bits::EMPTY;
+                for m in core.iter() {
+                    for &q in g.factors(m) {
+                        out.insert(u32::from(q));
+                    }
+                }
+                out & frame.factors
+            };
+            let mut core = scratch.stuck(&(frame.moves | gained), &(frame.factors - lost), g);
+            if core.is_empty() {
+                continue;
+            }
+            let mut factors = near(&core);
+            let mut conflict = (gained & core) | (lost & factors);
+            for &x in order {
+                if !conflict.contains(x) {
+                    continue;
+                }
+                let fewer = conflict.without(x);
+                let moves = (core & frame.moves) | (fewer & gained);
+                let left = scratch.stuck(&moves, &(factors - (fewer & lost)), g);
+                if !left.is_empty() {
+                    core = left;
+                    factors = near(&core);
+                    conflict = fewer & ((gained & core) | (lost & factors));
+                }
+            }
+            // A conflict (see above): the whole peel finds the frame unwinnable with its members alone applied.
+            assert!(
+                !self.winnable_using(
+                    scratch,
+                    &(frame.moves | (conflict & gained)),
+                    &(frame.factors - (conflict & lost))
+                ),
+                "an ordered conflict {conflict:?} of frame {i} leaves the frame winnable"
+            );
+            out.push(conflict);
+        }
+        out
+    }
+
     /// The conflict of [`conflict_using`](Self::conflict_using) for one frame with `gained` promoted into it and
     /// `lost` promoted out of it: `None` if it stays winnable.
     fn frame_conflict<const W: usize>(
