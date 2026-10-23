@@ -183,6 +183,76 @@ game above the seed, which is evidence for the seed, but weak: it ended 143 shor
 it could miss a game a few points better.  One seed on one thread; confidence medium-low.  The root gap's excess of
 4950 stays unexplained.
 
+## 2026-10-23: a cheaper choice of the conflict below the gate (Q4)
+
+**Question.**  A lower gate (the previous section) cuts steps and costs 1.7 to 2.3 times the CPU a step.  The choice only
+selects among true conflicts, so its prices need not be exact: does a cheaper choice at nodes of gap 150 to 299 keep
+most of C's step savings at nearly B's cost, and so beat B's CPU in hard and easy games?
+
+**Where C's extra CPU goes.**  The phase clock of the profile (one step in 64 timed) and timers in the choice, on 20 hard
+units (206,466 steps and 266 s in B, 115,782 steps and 315 s in C, one thread each, the same units in both):
+
+| seconds on the 20 units | bound | pricing | strong branching | the rest | total |
+|---|---|---|---|---|---|
+| B (gate 300, look) | 148 | 71 | 25 | 22 | 266 |
+| C (gate 150, look) | 132 | 164 | 21 | 12 | 315 |
+
+C saves 16 s in the bound and 4 s in strong branching, and the choice costs 93 s more.  Of the pricing's 164 s (B's 71
+s): the exact prices (`prices_excluding`) 99 s (38), the ordered conflicts (`conflicts_ordered`) 39 s (16), the look 10
+s (10), the members of the failing frames' conflicts 7 s (3).  The choice runs at 0.445 of C's steps against 0.096 of B's,
+and costs 3.2 ms a call in both (92 members priced exactly a call in C, 109 in B).  So the extra is the choice at the
+nodes between the gates, mostly the exact prices, and a cheaper estimate has something to cut: a free choice would put C at
+about 0.84 of B's CPU on these units.
+
+**Variants.**  Run as environment knobs of one build of `tune` (a temporary patch, since reverted, applying to nodes of gap
+under 300, with `conflict_look` on and gate 150 unless said), each solving the 315 units of the previous section on one
+thread:
+
+* M1: no exact prices below 300, the weight split's estimate for every member.
+* M2: exact prices only for the members whose split estimate of the price is under a threshold (60).
+* M3: M1 with no look below 300.  M5: the look off below 300 and nothing else.
+* M7: exact prices of the members of the search's own conflict `K` first; if the weight of `K` is under `W`, branch on `K`
+  at once, else the whole choice.  Measured with `W` from 0.75 to 2.5 and gates 150 and 200.
+
+**Result.**  Steps and CPU relative to B, rerun with the same build (hard: 116 units, 635,034 steps, 849 s; easy: 199
+units, 429,628 steps, 852 s).  B's rerun matches the previous section's (hard 0.76 and 0.71 of A, 0.44 and 0.81 for C).
+
+| setting | hard: steps, CPU | easy: steps, CPU |
+|---|---|---|
+| C: gate 150, full choice | 0.571, 1.152 | 0.730, 1.130 |
+| M1: split prices only | 0.737, 1.202 | 0.655, 1.030 |
+| M2: exact where split price under 60 | 0.573, 1.092 | 0.745, 1.114 |
+| M3: M1, no look | 0.741, 1.068 | 0.665, 0.941 |
+| M5: C, no look below 300 | 0.574, 1.118 | 0.774, 1.137 |
+| M7, W 0.75, gate 150 | 0.570, 1.112 | 0.732, 1.094 |
+| M7, W 1.0, gate 150 | 0.573, 1.085 | 0.735, 1.068 |
+| M7, W 1.5, gate 150 | 0.591, 0.990 | 0.754, 1.010 |
+| M7, W 1.5, gate 200 | 0.663, 0.963 | 0.778, 0.976 |
+| M7, W 2.0, gate 200 | 0.706, 0.942 | 0.796, 0.939 |
+| M7, W 2.5, gate 150 | 0.696, 0.964 | 0.811, 0.947 |
+
+1. **The split's estimate of a price is too loose to choose with.**  The weight split bounds the set without a member
+   from above, so its price is a lower bound, and it is under 60 for nearly every member (M2 prices 82 members exactly a
+   call against 92).  M1 and M3 lose most of the step savings in the hard games (0.74 against 0.57), and the bound costs
+   more where the pricing no longer prepares the children's levels: M3's bound takes 150 s on the 20 units for 150,000
+   steps, B's 148 s for 206,000.
+2. **The choice changes `K` at about half the nodes it runs at, and mostly where `K` is heavy.**  On the 20 units at gate
+   150, 31,019 calls below 300: of the calls with the weight of `K` under 0.5 (652) 19 chose another conflict, under 0.75
+   (4,224) 465, under 1 (9,091) 1,419, under 1.5 (18,904) 5,696, and of 12,115 calls at 1.5 or more 10,132 (84%).
+3. **Skipping the choice where `K` is already light gives back CPU a few percent at a time.**  M7 keeps the steps at W
+   up to 1.0 (0.573) and its CPU stays above B's; at W of 1.5 to 2.5 it falls to 0.94-0.99 of B's in both groups, with the
+   steps at 0.59 to 0.81.  The best, 0.94 of B's CPU in both groups (steps 0.71 and 0.80), is a gain of 6%, within the
+   noise of CPU on a machine with every other hyperthread busy.
+
+**Confidence.**  High that none of the variants beats B's CPU by more than 6% in either group, and that the extra of the
+lower gate is the exact pricing and the ordered conflicts of the nodes between the gates; medium on the 6% of the best
+(one run of each, CPU of a thread on a busy machine).  The variants are a few of many: a cheaper price from the parent's
+nodes or a cheaper `conflicts_ordered` are untried.
+
+**Decision.**  Not kept; no tactic or second gate is added, and the patch is not committed.  The gate stays 300.  If the
+levers are taken up again: carry a node's prices to its next step (the node's loop prices again at every step), and make
+`conflicts_ordered` cheaper, which is a quarter of the choice's cost.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -190,4 +260,5 @@ The scripts and their output are in the lab's work folder on the machine of the 
 top-of-tree runs.  `~/taxman_work/lab/work/hardgames/` has the study's scripts (`units.sh`, `solve-bands.sh`,
 `bands.py`, `drops.py`, `spine.py`, `deepdrops.py`, `fanout.py`), its runs (`units/`, `ckk/`, `solves/`, `solves2/`,
 `solves-all/`, `deep/`, `prof/`) and, in `gate/`, the gate experiment (`run.sh`, `analyze.py`, `analysis.txt`, `out/`
-with a file a solve) and the finder run (`finder-4950.jsonl`).
+with a file a solve) and the finder run (`finder-4950.jsonl`); `cheapchoice/` has the cheap-choice runs (`run.sh`, `phases2.sh`,
+`analyze.py`, `phase_table.py`, `analysis.txt`, `out/` and `ph/` with a file a solve).
