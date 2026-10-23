@@ -252,8 +252,8 @@ search knows often has a member whose price is a few points, and the child that 
 gap, so the subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is
 often a set of forced members, which closes the node at step 3.
 
-*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300), the check
-weighs:
+*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300; the *gate*,
+which a lab may set from 0 to `MAX_GATE`, 4,000), the check weighs:
 
 * `K`, the conflict the search found;
 * every conflict the nogood table knows within `I*` (`Nogoods::all_within`);

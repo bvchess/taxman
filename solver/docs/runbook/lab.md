@@ -31,8 +31,10 @@ git, a rustup toolchain and jq.
 * `run SNAPDIR IDS` solves the units IDS (ids as `units` printed them, separated by commas), `LAB_THREADS` at a time.
 * `reports [N]`, `proof`, `studies [on|off]`, `ask STUDY "QUESTION"` and `request ["TEXT"]` are for the studies.
 
-Arguments after `units` or `run` go to `tune` as they are: `--known FILE`, `--tactic NAME=VALUE`, `--node-limit L` and
-`--cpu-limit SECONDS` ([the top of `tune.rs`](../../frame/examples/tune.rs) lists them).  A leading `~/` in one is the
+Arguments after `units` or `run` go to `tune` as they are: `--known FILE`, `--tactic NAME=VALUE`, `--gate GAP`,
+`--node-limit L` and `--cpu-limit SECONDS` ([the top of `tune.rs`](../../frame/examples/tune.rs) lists them).  The gate
+is the gap from which conflict branching chooses ([the lab channel](../design/lab.md#the-command-folder) sets it for a
+search in flight), so a unit can be solved under another gate than the default.  A leading `~/` in one is the
 machine's home.
 
 ## Reading the results
@@ -50,16 +52,20 @@ machine's home.
 
 ## Studies
 
-The chain tells a program when a game's search passes `--hook-after` seconds, and when that game ends (`--hook`,
-[the lab channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study:
-an agent session that follows `study.md`.  A study first estimates the work left from the game's units, and decides
-whether to steer the search through the command folder (`--lab-dir`, `~/taxman-lab/channel`); the solver validates
-every command.  Then it studies what it judges most likely to make the searches faster, from the standing requests to
-ideas of its own, and writes a report, with its recommendations ranked, and an entry in a journal.
+The chain tells a program when a game's search passes `--hook-after` seconds, and when that game ends (`--hook`, [the
+lab channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study: an
+agent session that follows `study.md`.  A study first estimates the work left from the game's units, and decides whether
+to steer the search through the command folder (`--lab-dir`, `~/taxman-lab/channel`); the solver validates every
+command.  It steers on evidence: it solves about 40 of the game's units under the setting in force and under one or two
+candidates, and reads [the record of past searches](#the-record-of-past-searches).  Then it studies what it judges most
+likely to make the searches faster, from the standing requests to ideas of its own, and writes a report, with its
+recommendations ranked, and an entry in a journal.
 
 To set the branching of the games to come as well as of the game in flight, send `{"command": "policy", "from": N,
-"conflict_branching": "on", "conflict_look": "on"}` in the same way, with either setting or both ([the lab
-channel](../design/lab.md#a-policy-for-the-games-to-come) has the rest).
+"conflict_branching": "on", "conflict_look": "on", "gate": 150}` in the same way, with any of the three settings ([the
+lab channel](../design/lab.md#a-policy-for-the-games-to-come) has the rest).  A study sends a `policy` only when the
+history shows the setting winning on whole games, and none while a request says that an A/B test of the policy is
+running.
 
 A study can steer a search only while the search runs, so start it early: `--hook-after 600` in `EXTRA_ARGS` starts one
 ten minutes into a game's search, after the chain has written a checkpoint for it to copy.  The default, an hour, suits
@@ -113,3 +119,61 @@ program's own store, `~/.claude/projects`, on the machine.
 
 `solver/tools/lab/test.sh` and `test-studies.sh` test the scripts with no machine and no agent session; the second needs
 `flock` for its checks of the lock.
+
+## The record of past searches
+
+Two files in `~/taxman-lab/work/history/` keep what the searches did and what the studies measured, so that a study
+can read the games before its own.  Each holds JSON lines, an object a line, only appended to and never rewritten, and
+a reader skips a line that is not JSON.  The hook writes the first file outside the sandbox, and the studies write the
+second inside it (they may write in `work/`).
+
+**`games.jsonl`** has a line for each game that ended on the chain.  `on-event.sh` adds a `game` line for every `done`
+event whose game's line is complete, before any of the gates that may keep a study from starting (studies off, a study
+running, the day's limit, no study of the game's `long` event), so that the file has every game the hook hears of.  A
+run that is stopped sends `done` for each game in flight with an incomplete line; those are not recorded, and the next
+run sends `done` when the game ends.  A failure to add a line is logged in `ctl/on-event.log` and never stops the hook.
+
+| field of a `game` line | what it holds |
+|---|---|
+| `kind`, `n`, `at` | `game`; the game; the time of the event, in UTC |
+| `score`, `method`, `proof` | the game's line, as [the reference](../REFERENCE.md#a-results-line---out-schema-5) has them |
+| `nodes`, `own_seconds`, `threads` | the search's steps over every run of it; the game's own search time; its threads |
+| `tactics` | the tactics the search ran with, as the line describes them |
+| `lab` | the line's `lab` key: what the lab did to the game (its restarts, its last settings of `conflict_branching`, `conflict_look` and `gate`, the policy that reached it); null for a game the lab did not steer |
+| `near_repeat_cut` | the count of nodes that the cut of a near repeat closed, if the line has one; null |
+
+The setting a game ran under is its `tactics` (the run's flags), changed by `lab.policy`, changed by the `lab` settings
+of its own, as [the lab channel](../design/lab.md#a-policy-for-the-games-to-come) orders them; a gate that none of them
+gives is the default.
+
+The study of a game's end adds one line to the same file, with a single append: a `line_ratio` line, which says how the
+game's steps after its snapshot compare with the notebook's fit.  A study takes a *snapshot* of a game in flight
+(`lab.sh snapshot`), and the *snapshot line* is the sum, over the snapshot's units, of the steps that the fit gives each
+from its gap ([the study procedure](../../tools/lab/study.md) has the formula).  Both numbers are in the study's journal
+entry (`snapshot:`).
+
+| field of a `line_ratio` line | what it holds |
+|---|---|
+| `kind`, `n`, `study`, `at` | `line_ratio`; the game; the name of the study; the time, in UTC |
+| `steps_after` | the steps the game took after its snapshot: its steps at its end less its steps at the snapshot |
+| `line` | the snapshot line |
+| `line_ratio` | `steps_after` over `line`: 3.2 to 3.7 for games 4884 to 4901 |
+
+**`units.jsonl`** has a line for each unit that a study solved to compare settings, and for each whole game it solved to
+check a setting.  A study adds the lines after it weighs the settings, whether or not the run ended, under every setting
+it ran.  The fields come from the snapshot's `units.jsonl` and from the result lines of `runs.jsonl` that `lab.sh run`
+adds beside it.
+
+| field of a `unit` line | what it holds |
+|---|---|
+| `kind`, `n`, `study`, `at` | `unit`; the game; the name of the study; the time, in UTC |
+| `unit` | the unit's id in the snapshot (`4901-17`) |
+| `digest` | the first 16 hexadecimal digits of the SHA-256 of the unit's promotions, a colon and its candidates, both as hexadecimal as the snapshot's units file has them: two units with the same sets, as the units of a near repeat have, share it |
+| `gap`, `depth`, `cands` | the unit's gap (the bound less what the incumbent needs), the number of its promotions and the number of its candidates |
+| `left_out` | how many members of the snapshot's incumbent the unit has left out: in neither its promotions nor its candidates |
+| `setting` | the run's changes from the defaults as `name=value`, separated by commas: its tactics (`conflict_look=on`) and `gate=150`; `default` for none |
+| `steps`, `cpu_seconds` | the unit's steps and its CPU seconds under that setting |
+| `ended` | whether the run finished the unit (false: a limit stopped it, and `steps` is a lower bound) |
+
+A `whole` line is for a game solved from its root to check a setting (`tune solve N --ids root`).  It has `kind`, `n`,
+`study`, `at`, `setting`, `steps`, `cpu_seconds` and `ended` as above, and `threads`, the threads the run used.

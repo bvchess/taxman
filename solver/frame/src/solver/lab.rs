@@ -12,7 +12,7 @@
 use super::SolveOptions;
 use crate::json::Json;
 use crate::results::build;
-use crate::search::SearchTactics;
+use crate::search::{BranchSettings, SearchTactics, MAX_GATE};
 use crate::tactics::Tactics;
 use std::fs;
 use std::io::Write;
@@ -57,12 +57,12 @@ pub(super) enum Command {
     /// Offer game `n`'s search the promotions `set`, claimed to be worth `value` (their sum if not given), through
     /// `search::offer_found`.
     Offer { n: u32, set: Vec<u32>, value: Option<u64> },
-    /// Switch `conflict_branching` and `conflict_look`, those given, on or off in game `n`'s search, for the units it
-    /// starts from now on.
-    Branching { n: u32, conflict_branching: Option<bool>, conflict_look: Option<bool> },
-    /// Set `conflict_branching` and `conflict_look`, those given, for every game from `from` on: the games set up
-    /// later, when they are, and the games in flight, at once.
-    Policy { from: u32, conflict_branching: Option<bool>, conflict_look: Option<bool> },
+    /// Switch `conflict_branching` and `conflict_look`, those given, on or off in game `n`'s search, and set the
+    /// `gate`, the gap from which conflict branching chooses, for the units it starts from now on.
+    Branching { n: u32, conflict_branching: Option<bool>, conflict_look: Option<bool>, gate: Option<u64> },
+    /// Set `conflict_branching`, `conflict_look` and `gate`, those given, for every game from `from` on: the games set
+    /// up later, when they are, and the games in flight, at once.
+    Policy { from: u32, conflict_branching: Option<bool>, conflict_look: Option<bool>, gate: Option<u64> },
     /// Abandon game `n`'s search and start it fresh with the run's search tactics changed by `tactics` (`name=value`).
     Restart { n: u32, tactics: Vec<String> },
     /// The run's budget of threads.
@@ -90,8 +90,8 @@ impl Command {
         let takes: &[&str] = match name {
             "checkpoint" => &[],
             "offer" => &["n", "set", "value"],
-            "branching" => &["n", "conflict_branching", "conflict_look"],
-            "policy" => &["from", "conflict_branching", "conflict_look"],
+            "branching" => &["n", "conflict_branching", "conflict_look", "gate"],
+            "policy" => &["from", "conflict_branching", "conflict_look", "gate"],
             "restart" => &["n", "tactics"],
             "threads" => &["total", "n", "workers"],
             "finder" => &["n", "seconds"],
@@ -116,12 +116,12 @@ impl Command {
                 Ok(Command::Offer { n: game("n")?, set, value })
             }
             "branching" => {
-                let (conflict_branching, conflict_look) = switches(json, name)?;
-                Ok(Command::Branching { n: game("n")?, conflict_branching, conflict_look })
+                let Given { conflict_branching, conflict_look, gate } = switches(json, name)?;
+                Ok(Command::Branching { n: game("n")?, conflict_branching, conflict_look, gate })
             }
             "policy" => {
-                let (conflict_branching, conflict_look) = switches(json, name)?;
-                Ok(Command::Policy { from: game("from")?, conflict_branching, conflict_look })
+                let Given { conflict_branching, conflict_look, gate } = switches(json, name)?;
+                Ok(Command::Policy { from: game("from")?, conflict_branching, conflict_look, gate })
             }
             "restart" => {
                 let tactics = match json.get("tactics") {
@@ -185,20 +185,50 @@ fn on_off(value: &Json, key: &str) -> Result<bool, String> {
     }
 }
 
-/// The switches that the command `name` gives, `conflict_branching` and `conflict_look`, each `"on"` or `"off"`; at
-/// least one.
-fn switches(json: &Json, name: &str) -> Result<(Option<bool>, Option<bool>), String> {
+/// A gate as a command or a lab file gives it: a whole number from 0 to [`MAX_GATE`].
+fn gate_value(value: &Json) -> Result<u64, String> {
+    value.as_u64().filter(|&gate| gate <= MAX_GATE).ok_or(format!("gate is a whole number from 0 to {MAX_GATE}"))
+}
+
+/// The settings a `branching` or `policy` command gives; one it leaves out is `None`.
+struct Given {
+    conflict_branching: Option<bool>,
+    conflict_look: Option<bool>,
+    gate: Option<u64>,
+}
+
+/// The settings that the command `name` gives: `conflict_branching` and `conflict_look`, each `"on"` or `"off"`, and
+/// `gate`; at least one.  A gate is the gap from which conflict branching chooses, so a command that gives one cannot
+/// turn conflict branching off.
+fn switches(json: &Json, name: &str) -> Result<Given, String> {
     let given = |key: &str| json.get(key).map(|value| on_off(value, key)).transpose();
     let (conflict_branching, conflict_look) = (given("conflict_branching")?, given("conflict_look")?);
-    if conflict_branching.is_none() && conflict_look.is_none() {
-        return Err(format!("{name} needs conflict_branching or conflict_look, \"on\" or \"off\""));
+    let gate = json.get("gate").map(gate_value).transpose()?;
+    if conflict_branching.is_none() && conflict_look.is_none() && gate.is_none() {
+        return Err(format!("{name} needs conflict_branching, conflict_look or gate"));
     }
-    Ok((conflict_branching, conflict_look))
+    if gate.is_some() && conflict_branching == Some(false) {
+        return Err(format!("{name} gives a gate, the gap from which conflict branching chooses, and turns it off"));
+    }
+    Ok(Given { conflict_branching, conflict_look, gate })
 }
 
 /// A switch as the lab's files and a results line write it: `"on"`, `"off"`, or null where it was not given.
 fn setting_json(on: Option<bool>) -> Json {
     on.map_or(Json::Null, |on| Json::from(if on { "on" } else { "off" }))
+}
+
+/// A gate as the lab's files and a results line write it: the number, or null where it was not given.
+fn gate_json(gate: Option<u64>) -> Json {
+    gate.map_or(Json::Null, Json::from)
+}
+
+/// The gate in a lab file's object `json`: none where it is null or missing, as in a file from before the gate.
+fn gate_field(json: &Json) -> Result<Option<u64>, String> {
+    match json.get("gate") {
+        None | Some(Json::Null) => Ok(None),
+        Some(value) => gate_value(value).map(Some),
+    }
 }
 
 /// The assignments of a list `name=value,name=value` (blank pieces left out).
@@ -488,6 +518,7 @@ pub(super) struct PolicyEntry {
     /// The settings it gave; a setting it left out is `None`.
     pub(super) conflict_branching: Option<bool>,
     pub(super) conflict_look: Option<bool>,
+    pub(super) gate: Option<u64>,
 }
 
 impl PolicyEntry {
@@ -498,6 +529,7 @@ impl PolicyEntry {
             ("file", Json::from(self.file.as_str())),
             ("conflict_branching", setting_json(self.conflict_branching)),
             ("conflict_look", setting_json(self.conflict_look)),
+            ("gate", gate_json(self.gate)),
         ])
     }
 
@@ -514,6 +546,7 @@ impl PolicyEntry {
             file: text("file")?,
             conflict_branching: setting("conflict_branching")?,
             conflict_look: setting("conflict_look")?,
+            gate: gate_field(json)?,
         })
     }
 }
@@ -525,10 +558,11 @@ pub(super) struct Policy {
     pub(super) from: u32,
     pub(super) conflict_branching: Option<bool>,
     pub(super) conflict_look: Option<bool>,
+    pub(super) gate: Option<u64>,
 }
 
 impl Policy {
-    /// The tactics `run` with this policy's settings.
+    /// The tactics `run` with this policy's switches (its gate is no tactic: [`GameLab::gate`]).
     fn over(&self, run: &SearchTactics) -> SearchTactics {
         SearchTactics {
             conflict_branching: self.conflict_branching.unwrap_or(run.conflict_branching),
@@ -542,6 +576,7 @@ impl Policy {
             ("from", Json::from(self.from)),
             ("conflict_branching", setting_json(self.conflict_branching)),
             ("conflict_look", setting_json(self.conflict_look)),
+            ("gate", gate_json(self.gate)),
         ])
     }
 }
@@ -580,11 +615,17 @@ impl Policies {
     /// none if no policy reaches it.
     pub(super) fn for_game(&self, n: u32) -> Option<Policy> {
         self.entries.iter().filter(|entry| entry.from <= n).fold(None, |policy, entry| {
-            let before = policy.unwrap_or(Policy { from: entry.from, conflict_branching: None, conflict_look: None });
+            let before = policy.unwrap_or(Policy {
+                from: entry.from,
+                conflict_branching: None,
+                conflict_look: None,
+                gate: None,
+            });
             Some(Policy {
                 from: entry.from,
                 conflict_branching: entry.conflict_branching.or(before.conflict_branching),
                 conflict_look: entry.conflict_look.or(before.conflict_look),
+                gate: entry.gate.or(before.gate),
             })
         })
     }
@@ -592,17 +633,19 @@ impl Policies {
 
 /// What the lab did to a game, kept beside its checkpoint (`n<NNNN>.lab`) so that it outlives the process, and
 /// written into the game's line: its restarts, the search tactics of the last one, and its settings of
-/// `conflict_branching` and `conflict_look`.  It also keeps whether the hook was told that the game runs long, so that
-/// it is told once.  The policy the game is searched under is in it for the line, but not in its file: `run.lab` keeps
-/// the policies, and a game set up again looks its own up.
+/// `conflict_branching`, `conflict_look` and `gate`.  It also keeps whether the hook was told that the game runs long,
+/// so that it is told once.  The policy the game is searched under is in it for the line, but not in its file:
+/// `run.lab` keeps the policies, and a game set up again looks its own up.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct GameLab {
     /// The search tactics the lab restarted the game with, if it did: the game's search runs with them, and so does a
     /// resume of it.
     pub(super) tactics: Option<SearchTactics>,
-    /// The lab's settings of `conflict_branching` and `conflict_look`, if it gave one: each holds over the tactics.
+    /// The lab's settings of `conflict_branching`, `conflict_look` and `gate`, if it gave one: each holds over the
+    /// tactics, and over the policy.
     pub(super) conflict_branching: Option<bool>,
     pub(super) conflict_look: Option<bool>,
+    pub(super) gate: Option<u64>,
     /// How many `branching` commands the lab gave.
     pub(super) branching_changes: u32,
     pub(super) restarts: Vec<Restarted>,
@@ -639,12 +682,13 @@ impl GameLab {
     }
 
     /// Whether the lab changed how the game was searched: a restart, a policy for the games to come, or a setting of
-    /// `conflict_branching` or `conflict_look`.
+    /// `conflict_branching`, `conflict_look` or `gate`.
     pub(super) fn steered(&self) -> bool {
         !self.restarts.is_empty()
             || self.policy.is_some()
             || self.conflict_branching.is_some()
             || self.conflict_look.is_some()
+            || self.gate.is_some()
     }
 
     /// Takes the policy for game `n` from `policies`: none for a game that was restarted, which names its tactics
@@ -664,6 +708,21 @@ impl GameLab {
         }
     }
 
+    /// The gate of the game, the gap from which conflict branching chooses, if the lab set one: its own, else the
+    /// policy's.  The gate is no search tactic, so it reaches the searchers through [`branch_settings`].
+    ///
+    /// [`branch_settings`]: GameLab::branch_settings
+    pub(super) fn gate(&self) -> Option<u64> {
+        self.gate.or(self.policy.and_then(|policy| policy.gate))
+    }
+
+    /// The branching settings the game's searchers start with: those of [`search_tactics`] and the game's gate.
+    ///
+    /// [`search_tactics`]: GameLab::search_tactics
+    pub(super) fn branch_settings(&self, run: &SearchTactics) -> BranchSettings {
+        BranchSettings::of(&self.search_tactics(run)).with_gate(self.gate())
+    }
+
     /// What a results line records of it (`lab`), if the lab changed how the game was searched.
     pub(super) fn record(&self) -> Option<Json> {
         self.steered().then(|| {
@@ -671,6 +730,7 @@ impl GameLab {
                 ("restarts", Json::Arr(self.restarts.iter().map(Restarted::to_json).collect())),
                 ("conflict_branching", setting_json(self.conflict_branching)),
                 ("conflict_look", setting_json(self.conflict_look)),
+                ("gate", gate_json(self.gate)),
                 ("branching_changes", Json::from(self.branching_changes)),
                 ("policy", self.policy.map_or(Json::Null, Policy::to_json)),
             ])
@@ -687,6 +747,7 @@ impl GameLab {
             ("tactics", tactics),
             ("conflict_branching", self.conflict_branching.map_or(Json::Null, Json::Bool)),
             ("conflict_look", self.conflict_look.map_or(Json::Null, Json::Bool)),
+            ("gate", gate_json(self.gate)),
             ("branching_changes", Json::from(self.branching_changes)),
             ("restarts", Json::Arr(self.restarts.iter().map(Restarted::to_json).collect())),
             ("long", Json::Bool(self.long)),
@@ -723,6 +784,7 @@ impl GameLab {
             tactics,
             conflict_branching: switch("conflict_branching")?,
             conflict_look: switch("conflict_look")?,
+            gate: gate_field(json)?,
             branching_changes: json.get("branching_changes").and_then(Json::as_u32).unwrap_or(0),
             restarts,
             long: json.get("long").and_then(Json::as_bool).unwrap_or(false),
@@ -751,6 +813,7 @@ pub(super) fn utc(time: SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::search::CONFLICT_BRANCHING_GAP;
     use crate::test_support::TempDir;
 
     fn command(text: &str) -> Result<Command, String> {
@@ -766,23 +829,40 @@ mod tests {
         );
         assert_eq!(
             command(r#"{"command":"branching","n":9,"conflict_branching":"off"}"#),
-            Ok(Command::Branching { n: 9, conflict_branching: Some(false), conflict_look: None })
+            Ok(Command::Branching { n: 9, conflict_branching: Some(false), conflict_look: None, gate: None })
         );
         assert_eq!(
             command(r#"{"command":"branching","n":9,"conflict_look":"on"}"#),
-            Ok(Command::Branching { n: 9, conflict_branching: None, conflict_look: Some(true) })
+            Ok(Command::Branching { n: 9, conflict_branching: None, conflict_look: Some(true), gate: None })
         );
         assert_eq!(
             command(r#"{"command":"branching","n":9,"conflict_branching":"on","conflict_look":"off"}"#),
-            Ok(Command::Branching { n: 9, conflict_branching: Some(true), conflict_look: Some(false) })
+            Ok(Command::Branching { n: 9, conflict_branching: Some(true), conflict_look: Some(false), gate: None })
         );
         assert_eq!(
             command(r#"{"command":"policy","from":4905,"conflict_branching":"on","conflict_look":"on"}"#),
-            Ok(Command::Policy { from: 4905, conflict_branching: Some(true), conflict_look: Some(true) })
+            Ok(Command::Policy { from: 4905, conflict_branching: Some(true), conflict_look: Some(true), gate: None })
         );
         assert_eq!(
             command(r#"{"command":"policy","from":4905,"conflict_look":"off"}"#),
-            Ok(Command::Policy { from: 4905, conflict_branching: None, conflict_look: Some(false) })
+            Ok(Command::Policy { from: 4905, conflict_branching: None, conflict_look: Some(false), gate: None })
+        );
+        // The gate, alone or with the switches; 0 and 4,000 are the ends of its range.
+        assert_eq!(
+            command(r#"{"command":"branching","n":9,"gate":150}"#),
+            Ok(Command::Branching { n: 9, conflict_branching: None, conflict_look: None, gate: Some(150) })
+        );
+        assert_eq!(
+            command(r#"{"command":"branching","n":9,"conflict_branching":"on","conflict_look":"on","gate":0}"#),
+            Ok(Command::Branching { n: 9, conflict_branching: Some(true), conflict_look: Some(true), gate: Some(0) })
+        );
+        assert_eq!(
+            command(r#"{"command":"policy","from":4905,"gate":4000}"#),
+            Ok(Command::Policy { from: 4905, conflict_branching: None, conflict_look: None, gate: Some(4000) })
+        );
+        assert_eq!(
+            command(r#"{"command":"policy","from":4905,"conflict_branching":"on","gate":500}"#),
+            Ok(Command::Policy { from: 4905, conflict_branching: Some(true), conflict_look: None, gate: Some(500) })
         );
         assert_eq!(
             command(r#"{"command":"restart","n":9,"tactics":"symmetry=off, gf2=on"}"#),
@@ -820,12 +900,24 @@ mod tests {
             (r#"{"command":"branching","n":5,"conflict_look":"maybe"}"#, "conflict_look is \"on\" or \"off\""),
             (r#"{"command":"branching","n":5,"conflict_look":null}"#, "conflict_look is \"on\" or \"off\""),
             (r#"{"command":"branching","n":5,"conflict_branching":"on","conflict_look":1}"#, "\"on\" or \"off\""),
-            (r#"{"command":"branching","n":5}"#, "needs conflict_branching or conflict_look"),
+            (r#"{"command":"branching","n":5}"#, "needs conflict_branching, conflict_look or gate"),
+            (r#"{"command":"branching","n":5,"gate":-1}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"branching","n":5,"gate":4001}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"branching","n":5,"gate":300.5}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"branching","n":5,"gate":"300"}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"branching","n":5,"gate":null}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"branching","n":5,"gate":150,"conflict_branching":"off"}"#, "gate"),
+            (
+                r#"{"command":"branching","n":5,"gate":150,"conflict_branching":"off","conflict_look":"on"}"#,
+                "turns it off",
+            ),
+            (r#"{"command":"policy","from":5,"gate":99999}"#, "gate is a whole number from 0 to 4000"),
+            (r#"{"command":"policy","from":5,"gate":150,"conflict_branching":"off"}"#, "turns it off"),
             (r#"{"command":"branching","n":5,"look":"on"}"#, "takes no field \"look\""),
             (r#"{"command":"policy","conflict_look":"on"}"#, "policy needs from, a game"),
             (r#"{"command":"policy","from":0,"conflict_look":"on"}"#, "policy needs from, a game"),
             (r#"{"command":"policy","from":"next","conflict_look":"on"}"#, "policy needs from, a game"),
-            (r#"{"command":"policy","from":5}"#, "policy needs conflict_branching or conflict_look"),
+            (r#"{"command":"policy","from":5}"#, "policy needs conflict_branching, conflict_look or gate"),
             (r#"{"command":"policy","from":5,"conflict_branching":true}"#, "conflict_branching is \"on\" or \"off\""),
             (r#"{"command":"policy","from":5,"conflict_look":null}"#, "conflict_look is \"on\" or \"off\""),
             (r#"{"command":"policy","from":5,"conflict_look":"on","n":5}"#, "policy takes no field \"n\""),
@@ -863,6 +955,7 @@ mod tests {
             tactics: Some(SearchTactics { symmetry: false, ..SearchTactics::default() }),
             conflict_branching: Some(false),
             conflict_look: Some(true),
+            gate: Some(150),
             branching_changes: 3,
             restarts: vec![Restarted {
                 at: utc(SystemTime::now()),
@@ -887,14 +980,38 @@ mod tests {
         let record = lab.record().unwrap();
         assert_eq!(record.get("conflict_branching").and_then(Json::as_str), Some("off"));
         assert_eq!(record.get("conflict_look").and_then(Json::as_str), Some("on"));
-        // A setting of the look alone steers the game, and leaves the branching to the tactics.
+        assert_eq!(record.get("gate").and_then(Json::as_u64), Some(150));
+        // The gate is in the file, and reaches the branching settings of the game's searchers.
+        let file = Json::from_file(dir.join("ckpt/n0077.lab")).unwrap();
+        assert_eq!(file.get("gate").and_then(Json::as_u64), Some(150));
+        let settings = lab.branch_settings(&SearchTactics::default());
+        assert_eq!(settings, BranchSettings { conflict_branching: false, gate: 150, conflict_look: true });
+        // A setting of the look alone steers the game, and leaves the branching and the gate to the tactics.
         let looking = GameLab { conflict_look: Some(true), ..GameLab::default() };
         assert!(looking.steered());
         assert!(looking.search_tactics(&SearchTactics::default()).conflict_look);
         assert_eq!(looking.record().unwrap().get("conflict_branching"), Some(&Json::Null));
-        // A record from before the look has no setting of it.
+        assert_eq!(looking.record().unwrap().get("gate"), Some(&Json::Null));
+        assert_eq!(looking.branch_settings(&SearchTactics::default()).conflict_gap(), Some(CONFLICT_BRANCHING_GAP));
+        // A setting of the gate alone steers the game too, and changes the gap of the tactics and nothing else.
+        let gated = GameLab { gate: Some(500), ..GameLab::default() };
+        assert!(gated.steered());
+        let run = SearchTactics::default();
+        assert_eq!(gated.search_tactics(&run), run);
+        assert_eq!(gated.branch_settings(&run).conflict_gap(), Some(500));
+        let off = SearchTactics { conflict_branching: false, ..run };
+        assert_eq!(
+            gated.branch_settings(&off),
+            BranchSettings { conflict_branching: false, gate: 500, ..BranchSettings::of(&off) }
+        );
+        // A record from before the look and the gate has no setting of them.
         let old = Json::parse(r#"{"conflict_branching":false,"branching_changes":1}"#).unwrap();
-        assert_eq!(GameLab::from_json(&old).map(|lab| lab.conflict_look), Ok(None));
+        assert_eq!(GameLab::from_json(&old).map(|lab| (lab.conflict_look, lab.gate)), Ok((None, None)));
+        // A gate out of its range in a record is an error, whichever way it is written.
+        for gate in ["4001", "-3", "\"150\"", "1.5"] {
+            let bad = Json::parse(&format!(r#"{{"gate":{gate}}}"#)).unwrap();
+            assert!(GameLab::from_json(&bad).unwrap_err().contains("gate is a whole number"), "{gate}");
+        }
         assert_eq!(record.get("restarts").and_then(Json::as_arr).map(<[_]>::len), Some(1));
         GameLab::forget(&opts, 77);
         assert_eq!(GameLab::load(&opts, 77), Ok(GameLab::default()));
@@ -905,28 +1022,41 @@ mod tests {
         assert!(GameLab::load(&opts, 78).unwrap_err().contains("n0078.lab"));
     }
 
-    fn entry(from: u32, conflict_branching: Option<bool>, conflict_look: Option<bool>) -> PolicyEntry {
-        PolicyEntry { from, at: utc(UNIX_EPOCH), file: format!("{from}.json"), conflict_branching, conflict_look }
+    fn entry(
+        from: u32,
+        conflict_branching: Option<bool>,
+        conflict_look: Option<bool>,
+        gate: Option<u64>,
+    ) -> PolicyEntry {
+        PolicyEntry { from, at: utc(UNIX_EPOCH), file: format!("{from}.json"), conflict_branching, conflict_look, gate }
     }
 
     #[test]
     fn the_policy_for_a_game_is_the_policies_that_reach_it_each_over_the_last() {
         let mut policies = Policies::default();
         assert_eq!(policies.for_game(5000), None);
-        policies.give(entry(4905, Some(false), None));
-        policies.give(entry(4910, None, Some(true)));
+        policies.give(entry(4905, Some(false), None, Some(150)));
+        policies.give(entry(4910, None, Some(true), None));
         // Given later, but reaching the games before the one above: it comes after it in the order given.
-        policies.give(entry(4900, Some(true), None));
-        let policy = |from, conflict_branching, conflict_look| Some(Policy { from, conflict_branching, conflict_look });
+        policies.give(entry(4900, Some(true), None, None));
+        let policy = |from, conflict_branching, conflict_look, gate| {
+            Some(Policy { from, conflict_branching, conflict_look, gate })
+        };
         assert_eq!(policies.for_game(4899), None);
-        assert_eq!(policies.for_game(4900), policy(4900, Some(true), None));
-        assert_eq!(policies.for_game(4905), policy(4900, Some(true), None));
-        assert_eq!(policies.for_game(4910), policy(4900, Some(true), Some(true)));
-        // A policy over the run's tactics changes the settings it gives and nothing else.
+        assert_eq!(policies.for_game(4900), policy(4900, Some(true), None, None));
+        // The gate of the policy before it is kept by the one that leaves it out, as the switches are: the policy of
+        // 4900, given last, leaves it out and keeps the 150 that the policy of 4905 gave before it.
+        assert_eq!(policies.for_game(4905), policy(4900, Some(true), None, Some(150)));
+        assert_eq!(policies.for_game(4910), policy(4900, Some(true), Some(true), Some(150)));
+        policies.give(entry(4920, None, None, Some(500)));
+        policies.give(entry(4930, Some(false), None, None));
+        assert_eq!(policies.for_game(4920), policy(4920, Some(true), Some(true), Some(500)));
+        assert_eq!(policies.for_game(4930), policy(4930, Some(false), Some(true), Some(500)));
+        // A policy over the run's tactics changes the switches it gives and nothing else.
         let run = SearchTactics { symmetry: false, ..SearchTactics::default() };
-        let over = policy(4900, Some(false), None).unwrap().over(&run);
+        let over = policy(4900, Some(false), None, Some(150)).unwrap().over(&run);
         assert_eq!(over, SearchTactics { conflict_branching: false, ..run });
-        assert_eq!(policy(4900, None, None).unwrap().over(&run), run);
+        assert_eq!(policy(4900, None, None, None).unwrap().over(&run), run);
     }
 
     #[test]
@@ -935,8 +1065,8 @@ mod tests {
         let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..SolveOptions::default() };
         assert_eq!(Policies::load(&opts), Ok(Policies::default()));
         let mut policies = Policies::default();
-        policies.give(entry(4905, Some(false), None));
-        policies.give(entry(4910, Some(true), Some(false)));
+        policies.give(entry(4905, Some(false), None, Some(150)));
+        policies.give(entry(4910, Some(true), Some(false), None));
         policies.keep(&opts);
         assert_eq!(Policies::load(&opts), Ok(policies.clone()));
         // The file is a JSON object with the list, an entry with the command's name and the settings as it gave them.
@@ -949,7 +1079,16 @@ mod tests {
         assert_eq!(first.get("at").and_then(Json::as_str), Some("1970-01-01T00:00:00Z"));
         assert_eq!(first.get("conflict_branching").and_then(Json::as_str), Some("off"));
         assert_eq!(first.get("conflict_look"), Some(&Json::Null));
+        assert_eq!(first.get("gate").and_then(Json::as_u64), Some(150));
         assert_eq!(second.get("conflict_look").and_then(Json::as_str), Some("off"));
+        assert_eq!(second.get("gate"), Some(&Json::Null));
+        // A file from before the gate has none.
+        let old = r#"{"policies":[{"from":7,"at":"x","file":"y","conflict_look":"on"}]}"#;
+        fs::write(dir.join("ckpt/run.lab"), old).unwrap();
+        assert_eq!(
+            Policies::load(&opts).map(|policies| policies.for_game(7).map(|policy| policy.gate)),
+            Ok(Some(None))
+        );
         // A run without a checkpoint directory keeps nothing and reads nothing.
         let none = SolveOptions::default();
         policies.keep(&none);
@@ -959,6 +1098,8 @@ mod tests {
             r#"{"policies":[{"from":0,"at":"x","file":"y"}]}"#,
             r#"{"policies":3}"#,
             r#"{"policies":[{"from":7,"at":"x","file":"y","conflict_look":true}]}"#,
+            r#"{"policies":[{"from":7,"at":"x","file":"y","gate":4001}]}"#,
+            r#"{"policies":[{"from":7,"at":"x","file":"y","gate":"150"}]}"#,
         ] {
             fs::write(dir.join("ckpt/run.lab"), text).unwrap();
             let error = Policies::load(&opts).unwrap_err();
@@ -971,25 +1112,38 @@ mod tests {
         let run = SearchTactics::default();
         assert!(run.conflict_branching && !run.conflict_look);
         let mut policies = Policies::default();
-        policies.give(entry(10, Some(false), Some(true)));
+        policies.give(entry(10, Some(false), Some(true), Some(150)));
         let mut lab = GameLab::default();
         // No policy reaches game 9: it is searched as the run is, and its line says nothing of a lab.
         lab.apply_policy(&policies, 9);
         assert_eq!((lab.search_tactics(&run), lab.steered(), lab.record()), (run, false, None));
+        assert_eq!((lab.gate(), lab.branch_settings(&run)), (None, BranchSettings::of(&run)));
         // The policy changes the run's tactics for game 10, and its line records it.
         lab.apply_policy(&policies, 10);
-        let policy = Policy { from: 10, conflict_branching: Some(false), conflict_look: Some(true) };
+        let policy = Policy { from: 10, conflict_branching: Some(false), conflict_look: Some(true), gate: Some(150) };
         assert_eq!(lab.policy, Some(policy));
         assert_eq!(lab.search_tactics(&run), SearchTactics { conflict_branching: false, conflict_look: true, ..run });
+        // The gate is no tactic: it reaches the searchers through the branching settings, kept while conflict
+        // branching is off.
+        assert_eq!(lab.gate(), Some(150));
+        let settings = BranchSettings { conflict_branching: false, gate: 150, conflict_look: true };
+        assert_eq!(lab.branch_settings(&run), settings);
         let record = lab.record().unwrap();
         let recorded = record.get("policy").unwrap();
         assert_eq!(recorded.get("from").and_then(Json::as_u32), Some(10));
         assert_eq!(recorded.get("conflict_branching").and_then(Json::as_str), Some("off"));
         assert_eq!(recorded.get("conflict_look").and_then(Json::as_str), Some("on"));
+        assert_eq!(recorded.get("gate").and_then(Json::as_u64), Some(150));
         assert_eq!(record.get("conflict_branching"), Some(&Json::Null));
+        assert_eq!(record.get("gate"), Some(&Json::Null));
         // The game's own setting of a switch holds over the policy, whichever came first; the other switch keeps it.
         let own = GameLab { conflict_branching: Some(true), ..lab.clone() };
         assert_eq!(own.search_tactics(&run), SearchTactics { conflict_look: true, ..run });
+        // So does its own gate, and the policy's gate stays for a game that sets none.
+        let gated = GameLab { gate: Some(500), ..lab.clone() };
+        assert_eq!(gated.gate(), Some(500));
+        assert_eq!(gated.branch_settings(&run), BranchSettings { gate: 500, ..settings });
+        assert_eq!(own.gate(), Some(150));
         // The tactics of a restart are named outright: the policy does not reach the game, and its line has none.
         let again = Restarted {
             at: utc(UNIX_EPOCH),
@@ -1005,6 +1159,7 @@ mod tests {
         };
         restarted.apply_policy(&policies, 10);
         assert_eq!(restarted.policy, None);
+        assert_eq!(restarted.gate(), None);
         assert_eq!(restarted.search_tactics(&run), SearchTactics { symmetry: false, ..run });
         assert_eq!(restarted.record().unwrap().get("policy"), Some(&Json::Null));
         // The policy is not in the game's file: it is looked up again, by whoever sets the game up.

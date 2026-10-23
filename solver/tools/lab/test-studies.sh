@@ -117,6 +117,16 @@ event() {
     printf '"checkpoint_dir":null,"lab_dir":null}'
 }
 
+# full_event N: a done event whose line has the keys of the record of past searches, a lab's work on it and a cut.
+full_event() {
+    jq -nc --argjson n "$1" '{event: "done", n: $n, nodes: 123456, best: 5, own_seconds: 3700.5, checkpoint_dir: null,
+        lab_dir: null, commit: "abc1234", at: "2026-10-22T01:02:03Z",
+        result: {n: $n, score: 777, completed: true, method: "search", proof: "search", nodes: 123456, threads: 88,
+            tactics: "conflict_look=on", stats: {near_repeat_cut: 42},
+            lab: {restarts: [], conflict_branching: "on", conflict_look: null, gate: 150, branching_changes: 1,
+                policy: {from: 4900, conflict_branching: "on", conflict_look: "on", gate: 150}}}}'
+}
+
 sha256() { sha256sum "$@" 2>/dev/null || shasum -a 256 "$@"; }
 
 # A valid proof for the settings, claude and bwrap as they are now.
@@ -241,6 +251,72 @@ if [ "$real_flock" = yes ]; then
 else
     echo "skip  the checks of the lock: no flock on this machine"
 fi
+
+echo "--- the record of past searches"
+make_proof
+history="$lab/work/history/games.jsonl"
+rm -f "$history"
+games() { wc -l <"$history" 2>/dev/null | tr -d ' '; }
+before="$(claude_runs)"
+"$program" "$(full_event 4879)" >/dev/null 2>&1
+check "a done event with a complete line adds one line to games.jsonl" test "$(games)" = 1
+line="$(cat "$history")"
+check "the line is JSON" jq -e . <<<"$line"
+check "of the game" test "$(jq -r .n <<<"$line")" = 4879
+check "marked a game" test "$(jq -r .kind <<<"$line")" = game
+check "with the score, method and proof" test "$(jq -c '[.score, .method, .proof]' <<<"$line")" = '[777,"search","search"]'
+check "the steps, the own seconds and the threads" \
+    test "$(jq -c '[.nodes, .own_seconds, .threads]' <<<"$line")" = '[123456,3700.5,88]'
+check "the tactics" test "$(jq -r .tactics <<<"$line")" = conflict_look=on
+check "what the lab did, whole" \
+    test "$(jq -c '[.lab.gate, .lab.policy.from, .lab.policy.gate, .lab.branching_changes]' <<<"$line")" = '[150,4900,150,1]'
+check "the cut of a near repeat" test "$(jq -r .near_repeat_cut <<<"$line")" = 42
+check "and the time of the event" test "$(jq -r .at <<<"$line")" = 2026-10-22T01:02:03Z
+check "the study of the end still started" test "$(claude_runs)" = $((before + 1))
+"$program" "$(event done 4879)" >/dev/null 2>&1
+line="$(tail -n 1 "$history")"
+check "a line without a lab, a cut or a time has them null, and the time of the record" \
+    test "$(jq -c '[.lab, .near_repeat_cut, .score]' <<<"$line")" = '[null,null,null]'
+check "(the time is UTC)" jq -e '.at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$")' <<<"$line"
+before="$(games)"
+"$program" "$(event done 4879 false)" >/dev/null 2>&1
+check "a done event whose line is incomplete is not recorded" test "$(games)" = "$before"
+"$program" "$(event long 4879)" >/dev/null 2>&1
+check "nor is a long event" test "$(games)" = "$before"
+out="$("$program" "$(event done 4977)" 2>&1)"
+check "a done event with no study of its long event is skipped" contains "$out" "no study of a long event of game 4977"
+check "and recorded all the same" test "$(games)" = $((before + 1))
+"$program" --off >/dev/null 2>&1
+"$program" "$(event done 4977)" >/dev/null 2>&1
+check "with the studies off it is recorded" test "$(games)" = $((before + 2))
+"$program" --on >/dev/null 2>&1
+if [ "$real_flock" = yes ]; then
+    # A done event waits for the study that runs: its line is in the record by then.
+    echo 3 >"$home/fake-claude.sleep"
+    "$program" "$(event long 4893)" >/dev/null 2>&1 &
+    for _ in $(seq 1 50); do
+        logged "start event=long n=4893" && break
+        sleep 0.1
+    done
+    before="$(games)"
+    "$program" "$(full_event 4893)" >/dev/null 2>&1 &
+    for _ in $(seq 1 20); do
+        [ "$(games)" = $((before + 1)) ] && break
+        sleep 0.1
+    done
+    check "a done event is recorded before it waits for the study that runs" test "$(games)" = $((before + 1))
+    rm -f "$home/fake-claude.sleep"
+    wait
+fi
+# A record that cannot be added is logged, and the hook goes on to its study.
+make_proof
+rm -rf "$lab/work/history"
+: >"$lab/work/history"
+before="$(claude_runs)"
+"$program" "$(full_event 4879)" >/dev/null 2>&1
+check "a record that cannot be added is logged" logged "history: cannot add to"
+check "and the study of the game's end starts all the same" test "$(claude_runs)" = $((before + 1))
+rm -f "$lab/work/history"
 
 echo "--- refusals"
 out="$(

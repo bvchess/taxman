@@ -146,6 +146,11 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 /// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 
+/// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: the lab's `branching`
+/// and `policy` commands and `tune --gate` take whole numbers from 0 to this.  Any gate keeps the search exact: below
+/// it a check branches on the search's own conflict, from it on the conflict chosen, and both are true conflicts.
+pub const MAX_GATE: u64 = 4000;
+
 /// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/slope), with this
 /// slope, a member's price being what leaving it out costs the GF(2) bound: the subtrees of its children against the
 /// node's, if a subtree grows tenfold for every this many points of its gap, as the subtrees of 4875 did (the same
@@ -410,7 +415,7 @@ fn search_forgetting<const W: usize>(
             // The branching settings as the search starts with them, which the caller may have changed.
             let mut header = Header::of(prepared);
             let settings = space.branching.settings();
-            header.tactics.conflict_branching = settings.conflict_branching_on();
+            header.tactics.conflict_branching = settings.conflict_branching;
             header.tactics.conflict_look = settings.conflict_look;
             header.encode()
         }

@@ -1104,7 +1104,7 @@ impl<const W: usize> Job for SearchJob<W> {
     fn tactics(&self) -> SearchTactics {
         let settings = self.branching.settings();
         SearchTactics {
-            conflict_branching: settings.conflict_branching_on(),
+            conflict_branching: settings.conflict_branching,
             conflict_look: settings.conflict_look,
             ..self.prepared.tactics
         }
@@ -1311,7 +1311,9 @@ fn set_up_with_width<const W: usize>(
     let help = if opts.use_prev && !opts.force_search { known.open(n)? } else { Open::default() };
     let store_cap = help.upper.map(|bound| StoreCap { sum: bound.value.saturating_sub(in_the_bag), bound });
     let store_game = help.game.filter(|_| seeds);
-    let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics)));
+    // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
+    // is no tactic, from the lab's record or the policy.
+    let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.gate())));
     let job = Arc::new(SearchJob { board, prepared, control: Control::new(), resuming, seeds, store_game, branching });
     let lab = Box::new(lab);
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy, lab }, problem))

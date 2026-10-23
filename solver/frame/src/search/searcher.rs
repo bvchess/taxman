@@ -130,9 +130,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
     /// The branching settings, which a caller may change while the search runs; each searcher reads them when it
-    /// starts a unit ([`Branching`]).  With `gf2`, their `conflict_branching` is the gap from which a check branches on
-    /// the conflict of the heaviest set whose members cost the bound most to leave out (tactic `conflict_branching`;
-    /// see [`conflict_to_branch_on`]); `None`: the search's own conflict everywhere.
+    /// starts a unit ([`Branching`]).  With `gf2`, their `conflict_branching` and `gate` give the gap from which a
+    /// check branches on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
+    /// `conflict_branching`; see [`conflict_to_branch_on`]); with the tactic off, the search's own conflict everywhere.
     pub branching: Arc<Branching>,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
@@ -378,8 +378,9 @@ struct Stepper<'a, const W: usize> {
     counts: Counts,
     /// The incumbents offered, encoded.
     payload: Vec<u8>,
-    /// The branching settings' `conflict_branching` and `conflict_look` as the searcher last read them, at the start of
-    /// a unit, and the generation it read them at ([`SearchSpace::branching`]).
+    /// The branching settings as the searcher last read them, at the start of a unit, and the generation it read them
+    /// at ([`SearchSpace::branching`]): the gap from which `conflict_branching` chooses (`None`: it is off), and
+    /// `conflict_look`.
     conflict_branching: Option<u64>,
     conflict_look: bool,
     branching_seen: u64,
@@ -431,7 +432,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
                 branching_seen,
-                conflict_branching: branching.conflict_branching,
+                conflict_branching: branching.conflict_gap(),
                 conflict_look: branching.conflict_look,
                 probe: space.diagnostics.map(Probe::new),
                 gf2_flushed: Gf2Stats::default(),
@@ -492,7 +493,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         let generation = space.branching.generation();
         if generation != self.stepper.branching_seen {
             let settings = space.branching.settings();
-            self.stepper.conflict_branching = settings.conflict_branching;
+            self.stepper.conflict_branching = settings.conflict_gap();
             self.stepper.conflict_look = settings.conflict_look;
             self.stepper.branching_seen = generation;
         }

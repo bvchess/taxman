@@ -484,7 +484,8 @@ impl<const W: usize> Game<W> {
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
             branching: Arc::new(Branching::new(BranchSettings {
-                conflict_branching: cfg.conflict_branching,
+                conflict_branching: cfg.conflict_branching.is_some(),
+                gate: cfg.conflict_branching.unwrap_or(CONFLICT_BRANCHING_GAP),
                 conflict_look: cfg.conflict_look,
             })),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),

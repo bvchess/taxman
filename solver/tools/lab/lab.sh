@@ -34,7 +34,7 @@
 # the host (solver/docs/runbook/lab.md, "Studies"); proof and studies run that program.
 #
 # SNAPDIR is a name under snap/ (the last line of snapshot says it) or a path inside the lab.  TUNE ARGS go to tune as
-# they are, after the lab's own: for units --known, --sample and --seed, and for run --tactic NAME=VALUE and
+# they are, after the lab's own: for units --known, --sample and --seed, and for run --tactic NAME=VALUE, --gate GAP and
 # --node-limit L (the top of solver/frame/examples/tune.rs says what they mean).  In them, a leading ~/ is the host's
 # home.  A unit that the node limit stops has the state limit in the table.  If the connection to the host drops during
 # a run, or ssh is stopped, the units already started go on to their end and add their lines to runs.jsonl; with

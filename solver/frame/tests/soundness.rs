@@ -234,6 +234,27 @@ fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
     assert!(changed > 0, "the look changed no tree");
 }
 
+/// The gate, the gap from which conflict branching chooses (what the lab's `branching` and `policy` commands set), acts
+/// and changes no answer: with the gates 0, 100 and 4,000 (the most a command may set), each search of the games 301 to
+/// 500 (every tenth) comes back with exactly the sum of `optimal.json`, from an incumbent worth 1 less, and the gates
+/// change the tree of some of them.
+#[test]
+fn the_gate_changes_the_trees_of_the_small_games_and_not_their_answers() {
+    let optimal = Optimal::built_in();
+    let gated = |gate| Config { conflict_branching: Some(gate), ..Config::standard() };
+    let mut changed = 0;
+    for n in (301..=500).step_by(10) {
+        let Some(game) = Game::<8>::of_board(n) else { continue };
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let outs = [0, 100, 4000].map(|gate| game.search(gated(gate), vec![game.root_unit()], truth - 1, None, None));
+        for out in &outs {
+            assert!(out.completed && out.best == truth && out.real, "n={n}: truth {truth}, got {out:?}");
+        }
+        changed += usize::from(outs.iter().any(|out| out.nodes != outs[0].nodes));
+    }
+    assert!(changed > 0, "the gate changed no tree");
+}
+
 /// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent
 /// worth 1 or 5 less than `optimal.json`'s promotion sum, with the Lagrangian bound refitted early and often (with
 /// the nogoods forgotten at the same time, and on two threads): in the games above, few searches are long enough

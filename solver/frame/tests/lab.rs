@@ -1,16 +1,17 @@
 //! The lab channel (`SolveOptions::lab`: `--lab-dir`, `--hook`; solver/docs/design/lab.md): a hostile lab changes no
 //! result.  A range with a lab folder and a hook is fed offers of sets that are off the board, given twice, not
 //! promotable or claimed above their worth, commands that are not commands, restarts with tactics a restart does not
-//! take, threads it cannot have, `conflict_branching` and `conflict_look` switched at every tick, a restart of a game in
-//! the middle of its search, and a redeploy at a commit that is not on master (the solver does not judge commits: it stops, and the chain's
-//! script, which does, runs the build it has again, as the second run here does).  Every bad command is refused with
-//! its reason, every game ends with the score of `optimal.json`, and the file passes the verifier.  The game restarted
-//! records it, keeps its first checkpoint aside, and the hook hears of it twice, once when it runs long and once with
-//! its line.  Small games of the default search, two threads.
+//! take, threads it cannot have, `conflict_branching`, `conflict_look` and the gate switched at every tick, a restart
+//! of a game in the middle of its search, and a redeploy at a commit that is not on master (the solver does not judge
+//! commits: it stops, and the chain's script, which does, runs the build it has again, as the second run here does).
+//! Every bad command is refused with its reason, every game ends with the score of `optimal.json`, and the file passes
+//! the verifier.  The game restarted records it, keeps its first checkpoint aside, and the hook hears of it twice, once
+//! when it runs long and once with its line.  Small games of the default search, two threads.
 //!
 //! The policy for the games to come (`policy`) has its tests below the hostile lab's: it reaches the games in flight
 //! and those set up later, yields to a game's own `branching`, survives a restart of the run, and reaches a search that
-//! resumes from a checkpoint made under other settings.
+//! resumes from a checkpoint made under other settings.  The gate, the gap from which conflict branching chooses, is
+//! one of the settings of both commands, and a policy's gate changes the tree of a game and not its answer.
 
 mod common;
 
@@ -101,9 +102,10 @@ impl Drop for EndIfFailed<'_> {
 }
 
 /// The hostile lab: refused commands, each with the words its reason must hold, then the commands that are applied,
-/// the restart of `G` in the middle of its search, `conflict_branching` and `conflict_look` switched at every tick, and
-/// a redeploy.  Returns the settings of the last switch that was applied while `G` searched, if one was.
-fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
+/// the restart of `G` in the middle of its search, `conflict_branching`, `conflict_look` and the gate switched at every
+/// tick, and a redeploy.  Returns the settings of the last switch that was applied while `G` searched, if one was, and
+/// the last gate.
+fn hostile(lab: &Path, out: &Path) -> (Option<(&'static str, &'static str)>, Option<u64>) {
     let _end = EndIfFailed(lab);
     // `G` waits, set up and held at no worker, until the lab lets it go.
     let since = Instant::now();
@@ -132,8 +134,29 @@ fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
         ("24-not-running", format!(r#"{{"command":"finder","n":{G},"seconds":1}}"#), "not running"),
         ("25-commit", r#"{"command":"redeploy","commit":"HEAD"}"#.to_owned(), "hexadecimal"),
         ("26-bad-look", format!(r#"{{"command":"branching","n":{G},"conflict_look":"maybe"}}"#), "conflict_look is"),
-        ("27-no-switch", format!(r#"{{"command":"branching","n":{G}}}"#), "needs conflict_branching or conflict_look"),
+        (
+            "27-no-switch",
+            format!(r#"{{"command":"branching","n":{G}}}"#),
+            "needs conflict_branching, conflict_look or gate",
+        ),
         ("28-look-concluded", format!(r#"{{"command":"branching","n":{LO},"conflict_look":"on"}}"#), "concluded"),
+        (
+            "29-gate-high",
+            format!(r#"{{"command":"branching","n":{G},"gate":4001}}"#),
+            "gate is a whole number from 0 to",
+        ),
+        ("29-gate-low", format!(r#"{{"command":"branching","n":{G},"gate":-1}}"#), "gate is a whole number from 0 to"),
+        (
+            "29-gate-text",
+            format!(r#"{{"command":"branching","n":{G},"gate":"150"}}"#),
+            "gate is a whole number from 0 to",
+        ),
+        (
+            "29-gate-off",
+            format!(r#"{{"command":"branching","n":{G},"conflict_branching":"off","gate":150}}"#),
+            "turns it off",
+        ),
+        ("29-gate-concluded", format!(r#"{{"command":"branching","n":{LO},"gate":150}}"#), "concluded"),
     ];
     for (name, text, why) in &refused {
         let outcome = send(lab, name, text);
@@ -147,6 +170,11 @@ fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
         ("32-off", format!(r#"{{"command":"branching","n":{G},"conflict_branching":"off"}}"#)),
         ("32-look-on", format!(r#"{{"command":"branching","n":{G},"conflict_look":"on"}}"#)),
         ("32-both", format!(r#"{{"command":"branching","n":{G},"conflict_branching":"on","conflict_look":"off"}}"#)),
+        ("32-gate", format!(r#"{{"command":"branching","n":{G},"gate":150}}"#)),
+        (
+            "32-all",
+            format!(r#"{{"command":"branching","n":{G},"conflict_branching":"on","conflict_look":"on","gate":0}}"#),
+        ),
         ("33-more", r#"{"command":"threads","total":3}"#.to_owned()),
         ("34-fewer", r#"{"command":"threads","total":2}"#.to_owned()),
         ("35-checkpoint", r#"{"command":"checkpoint"}"#.to_owned()),
@@ -178,25 +206,30 @@ fn hostile(lab: &Path, out: &Path) -> Option<(&'static str, &'static str)> {
     let outcome = send(lab, "44-let-go", &format!(r#"{{"command":"threads","n":{G},"workers":null}}"#));
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
     // At every tick while it runs: applied, or refused while it is set up again or once its search has ended.  The
-    // look is switched the other way from the branching.
-    let mut last = None;
+    // look is switched the other way from the branching, and a gate comes with each switch on of the branching (a gate
+    // cannot come with a switch off).
+    let (mut last, mut gate) = (None, None);
     for k in 0..6 {
         let (setting, look) = if k % 2 == 0 { ("on", "off") } else { ("off", "on") };
+        let given = (setting == "on").then_some(100 * (k + 1));
         let name = format!("50-switch-{k}");
-        let command =
-            format!(r#"{{"command":"branching","n":{G},"conflict_branching":"{setting}","conflict_look":"{look}"}}"#);
+        let with_gate = given.map_or(String::new(), |gate| format!(r#","gate":{gate}"#));
+        let command = format!(
+            r#"{{"command":"branching","n":{G},"conflict_branching":"{setting}","conflict_look":"{look}"{with_gate}}}"#
+        );
         let outcome = send(lab, &name, &command);
         let (status, reason) = said(&outcome);
         let later = ["set up", "ended", "concluded"].iter().any(|why| reason.contains(why));
         assert!(status == "applied" || later, "{name}: {outcome}");
         if status == "applied" {
             last = Some((setting, look));
+            gate = given.or(gate);
         }
     }
     let outcome =
         send(lab, "60-redeploy", r#"{"command":"redeploy","commit":"0123456789abcdef0123456789abcdef01234567"}"#);
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
-    last
+    (last, gate)
 }
 
 #[test]
@@ -225,7 +258,7 @@ fn a_hostile_lab_changes_no_result() {
         let summary = solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
         (summary, lab.join().unwrap())
     });
-    let (summary, last_switch) = summary;
+    let (summary, (last_switch, last_gate)) = summary;
     assert_eq!(summary.redeploy.as_deref(), Some("0123456789abcdef0123456789abcdef01234567"));
     for hold in ["00-hold", "00-hold-last"] {
         let outcome = Json::from_file(lab.join("out").join(hold)).unwrap();
@@ -261,6 +294,8 @@ fn a_hostile_lab_changes_no_result() {
         }
         None => assert_eq!((kept("conflict_branching"), kept("conflict_look")), (None, None)),
     }
+    // The gate is the lab's last, or none (a restart returns it to the default): a number in the line, no tactic.
+    assert_eq!(record.get("gate").and_then(Json::as_u64), last_gate, "{record}");
     let restart = game.get("lab").and_then(|lab| lab.get("restarts")).and_then(|r| r.at(0)).unwrap();
     assert_eq!(restart.get("aside").and_then(Json::as_str), Some("n0950.ckpt.restart1"));
     assert!(dir.join("ckpt/n0950.ckpt.restart1").exists(), "the abandoned search's checkpoint is kept");
@@ -310,6 +345,11 @@ fn setting<'a>(record: &'a Json, key: &str) -> Option<&'a str> {
     record.get(key).and_then(Json::as_str)
 }
 
+/// The gate in a `lab` record of a line, or in the policy in it or in `run.lab`: a number, or null.
+fn gate(record: &Json) -> Option<u64> {
+    record.get("gate").and_then(Json::as_u64)
+}
+
 /// The two switches of a `lab` record or a policy: `conflict_branching` and `conflict_look`.
 fn setting_pair(record: &Json) -> (Option<&str>, Option<&str>) {
     (setting(record, "conflict_branching"), setting(record, "conflict_look"))
@@ -323,7 +363,7 @@ fn ended_with(line: &Json) -> (Option<bool>, Option<bool>) {
 }
 
 /// The lab of the policy test: commands that are refused, a `branching` that comes before a policy and one that comes
-/// after, and the policies themselves, while `P` and `Q` are set up and held.
+/// after, and the policies themselves (a gate among them), while `P` and `Q` are set up and held.
 fn give_policies(lab: &Path, out: &Path) {
     let _end = EndIfFailed(lab);
     wait_until_set_up(lab, P, "01");
@@ -331,8 +371,14 @@ fn give_policies(lab: &Path, out: &Path) {
     let refused = [
         ("10-outside", r#"{"command":"policy","from":960,"conflict_look":"on"}"#, "not in the range"),
         ("11-concluded", r#"{"command":"policy","from":948,"conflict_look":"on"}"#, "concluded"),
-        ("12-no-switch", r#"{"command":"policy","from":950}"#, "needs conflict_branching or conflict_look"),
+        ("12-no-switch", r#"{"command":"policy","from":950}"#, "needs conflict_branching, conflict_look or gate"),
         ("13-bad-value", r#"{"command":"policy","from":950,"conflict_look":"maybe"}"#, "conflict_look is"),
+        ("13-bad-gate", r#"{"command":"policy","from":950,"gate":4001}"#, "gate is a whole number from 0 to 4000"),
+        (
+            "13-gate-off",
+            r#"{"command":"policy","from":950,"conflict_branching":"off","gate":150}"#,
+            "gate, the gap from which conflict branching chooses, and turns it off",
+        ),
         ("14-no-from", r#"{"command":"policy","conflict_look":"on"}"#, "needs from"),
         ("15-no-game", r#"{"command":"policy","n":950,"conflict_look":"on"}"#, "takes no field \"n\""),
     ];
@@ -350,12 +396,18 @@ fn give_policies(lab: &Path, out: &Path) {
     assert_eq!(said(&outcome).0, "applied", "{outcome}");
     // It reaches the game that is set up, at once, and says so.
     assert!(said(&outcome).1.contains("[950"), "{outcome}");
+    // A gate comes in a policy of its own, since the policy above turns the branching off: it is kept while the
+    // branching is off.
+    let gate = format!(r#"{{"command":"policy","from":{P},"gate":150}}"#);
+    let outcome = send(lab, "21-policy-gate", &gate);
+    assert_eq!(said(&outcome).0, "applied", "{outcome}");
+    assert!(said(&outcome).1.contains("gate 150"), "{outcome}");
     // A policy that leaves a setting out keeps what the one before it said; then a setting of the game's own, which
-    // comes after the policy and still holds over it.
+    // comes after the policy and still holds over it, the gate among them.
     wait_until_set_up(lab, Q, "22");
     let look = send(lab, "23-policy-look", &format!(r#"{{"command":"policy","from":{Q},"conflict_look":"off"}}"#));
     assert_eq!(said(&look).0, "applied", "{look}");
-    let own = send(lab, "24-own", &format!(r#"{{"command":"branching","n":{Q},"conflict_look":"on"}}"#));
+    let own = send(lab, "24-own", &format!(r#"{{"command":"branching","n":{Q},"conflict_look":"on","gate":500}}"#));
     assert_eq!(said(&own).0, "applied", "{own}");
     for (name, n) in [("30-let-go-p", P), ("31-let-go-q", Q)] {
         let outcome = send(lab, name, &format!(r#"{{"command":"threads","n":{n},"workers":null}}"#));
@@ -405,6 +457,9 @@ fn a_policy_reaches_the_games_in_flight_and_those_set_up_later() {
     assert_eq!(setting_pair(policy), (Some("off"), Some("on")));
     assert_eq!(setting_pair(record(P)), (Some("on"), None));
     assert_eq!(ended_with(line(P)), (Some(true), Some(true)));
+    // The gate is the second policy's, which left the switches out and kept the first policy's; the game set none.
+    assert_eq!(gate(policy), Some(150));
+    assert_eq!(gate(record(P)), None);
     // `Q`: the second policy left the branching out, so it is off as the first said; the look is off by the second, and
     // on by the game's own setting after it.
     let policy = record(Q).get("policy").unwrap();
@@ -412,16 +467,24 @@ fn a_policy_reaches_the_games_in_flight_and_those_set_up_later() {
     assert_eq!(setting_pair(policy), (Some("off"), Some("off")));
     assert_eq!(setting_pair(record(Q)), (None, Some("on")));
     assert_eq!(ended_with(line(Q)), (Some(false), Some(true)));
+    // The policy gate reaches `Q` through the policy before; the game's own gate, given while its branching was off,
+    // was kept.
+    assert_eq!(gate(policy), Some(150));
+    assert_eq!(gate(record(Q)), Some(500));
     // The policies, as the lab gave them, are in the file beside the checkpoints.
     let file = Json::from_file(dir.join("ckpt/run.lab")).unwrap();
     let entries = file.get("policies").and_then(Json::as_arr).unwrap();
-    assert_eq!(entries.len(), 2);
-    for (entry, (from, name, switches)) in
-        entries.iter().zip([(P, "21-policy", (Some("off"), Some("on"))), (Q, "23-policy-look", (None, Some("off")))])
-    {
+    assert_eq!(entries.len(), 3);
+    let given = [
+        (P, "21-policy", (Some("off"), Some("on")), None),
+        (P, "21-policy-gate", (None, None), Some(150)),
+        (Q, "23-policy-look", (None, Some("off")), None),
+    ];
+    for (entry, (from, name, switches, gate_given)) in entries.iter().zip(given) {
         assert_eq!(entry.get("from").and_then(Json::as_u32), Some(from));
         assert_eq!(setting(entry, "file"), Some(name));
         assert_eq!(setting_pair(entry), switches);
+        assert_eq!(gate(entry), gate_given);
         assert!(setting(entry, "at").is_some_and(|at| at.ends_with('Z')), "{entry}");
     }
     verify_files(&[PathBuf::from(&out)], optimal, 2).unwrap_or_else(|e| panic!("{e}"));
@@ -440,6 +503,7 @@ fn a_policy_survives_a_restart_of_the_run() {
         ("00-hold", format!(r#"{{"command":"threads","n":{LO},"workers":0}}"#)),
         ("01-policy", format!(r#"{{"command":"policy","from":{P},"conflict_branching":"off"}}"#)),
         ("02-policy", format!(r#"{{"command":"policy","from":{P},"conflict_look":"on"}}"#)),
+        ("02-policy-gate", format!(r#"{{"command":"policy","from":{P},"gate":600}}"#)),
         ("03-redeploy", r#"{"command":"redeploy","commit":"0123456789abcdef0123456789abcdef01234567"}"#.to_owned()),
     ];
     for (name, text) in &commands {
@@ -461,7 +525,7 @@ fn a_policy_survives_a_restart_of_the_run() {
         assert_eq!(said(&outcome).0, "applied", "{name}: {outcome}");
     }
     let file = Json::from_file(dir.join("ckpt/run.lab")).unwrap();
-    assert_eq!(file.get("policies").and_then(Json::as_arr).map(<[_]>::len), Some(2));
+    assert_eq!(file.get("policies").and_then(Json::as_arr).map(<[_]>::len), Some(3));
 
     // The run starts again, without a lab: the games set up now are set up under the policies.
     let again = SolveOptions { lab: LabOptions::default(), ..opts };
@@ -480,6 +544,7 @@ fn a_policy_survives_a_restart_of_the_run() {
             let policy = line.get("lab").and_then(|lab| lab.get("policy")).unwrap();
             assert_eq!(policy.get("from").and_then(Json::as_u32), Some(P), "n={n}");
             assert_eq!(setting_pair(policy), (Some("off"), Some("on")), "n={n}");
+            assert_eq!(gate(policy), Some(600), "n={n}");
             assert_eq!(ended_with(line), (Some(false), Some(true)), "n={n}");
         }
     }
@@ -498,16 +563,19 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
     let ckpt = dir.join("ckpt");
     let opts =
         SolveOptions { checkpoint_dir: Some(ckpt.clone()), node_limit: Some(1), force_search: true, ..options(1) };
-    // The first piece is the run's flags, the settings the checkpoint is made under.
+    // The first piece is the run's flags, the settings the checkpoint is made under.  The gate is no part of a
+    // checkpoint, so it too differs from one piece to the next.
     let settings = [("on", "off"), ("off", "on"), ("on", "on"), ("off", "off")];
+    let gates = [300, 150, 4000, 600];
     let mut pieces = 0;
     let result = loop {
         let (branching, look) = settings[pieces % settings.len()];
+        let gate_given = gates[pieces % gates.len()];
         if pieces > 0 {
             // The file as the command writes it.
             let entry = format!(
                 r#"{{"from":1000,"at":"2026-10-22T00:00:00Z","file":"by-hand","conflict_branching":"{branching}","#
-            ) + &format!(r#""conflict_look":"{look}"}}"#);
+            ) + &format!(r#""conflict_look":"{look}","gate":{gate_given}}}"#);
             fs::create_dir_all(&ckpt).unwrap();
             fs::write(ckpt.join("run.lab"), format!(r#"{{"policies":[{entry}]}}"#)).unwrap();
         }
@@ -521,6 +589,7 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
             let policy = policy.unwrap_or_else(|| panic!("piece {pieces} has no policy in its line: {:?}", r.lab));
             assert_eq!(policy.get("from").and_then(Json::as_u32), Some(1000), "piece {pieces}");
             assert_eq!(setting_pair(policy), (Some(branching), Some(look)), "piece {pieces}");
+            assert_eq!(gate(policy), Some(gate_given), "piece {pieces}");
         }
         pieces += 1;
         if r.completed {
@@ -531,4 +600,33 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
     };
     assert!(pieces >= 2, "the policy never reached a resumed search");
     assert_eq!((result.score, result.optimal_match), (optimal.score(1000).unwrap(), Some(true)));
+}
+
+/// The gate of a policy reaches the searchers and changes the tree of a game, and not its answer.  Game 1000, searched
+/// from nothing on one thread, is solved with no policy and under a policy whose gate is 0, so that conflict branching
+/// chooses at every check, not only where the gap passes 300.  Each ends with its score in `optimal.json`, the trees
+/// differ, and the line of the second says which gate the policy gave.
+#[test]
+fn a_policys_gate_changes_the_tree_of_a_game_and_not_its_answer() {
+    let optimal = Optimal::built_in();
+    let solved = |tag: &str, policy: Option<&str>| {
+        let dir = TempDir::new(tag);
+        let ckpt = dir.join("ckpt");
+        if let Some(policy) = policy {
+            fs::create_dir_all(&ckpt).unwrap();
+            let entry = format!(r#"{{"from":1000,"at":"2026-10-22T00:00:00Z","file":"by-hand",{policy}}}"#);
+            fs::write(ckpt.join("run.lab"), format!(r#"{{"policies":[{entry}]}}"#)).unwrap();
+        }
+        let opts = SolveOptions { checkpoint_dir: Some(ckpt), force_search: true, ..options(1) };
+        let r = solver::solve_game_with(1000, None, &opts, optimal).unwrap_or_else(|e| panic!("{policy:?}: {e}"));
+        let answer = (r.score, r.completed, r.optimal_match);
+        assert_eq!(answer, (optimal.score(1000).unwrap(), true, Some(true)), "{policy:?}");
+        let given = r.lab.as_ref().and_then(|lab| lab.get("policy")).and_then(|policy| policy.get("gate"));
+        (r.nodes, given.and_then(Json::as_u64))
+    };
+    let (default, given) = solved("lab-gate-none", None);
+    assert_eq!(given, None);
+    let (gated, given) = solved("lab-gate-0", Some(r#""gate":0"#));
+    assert_eq!(given, Some(0));
+    assert_ne!(gated, default, "a gate of 0 took the steps of the default gate");
 }

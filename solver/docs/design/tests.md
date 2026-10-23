@@ -203,14 +203,17 @@ every second line of the Java fixtures), and the comment on each says what the w
   `src/solver/lab.rs`, the live branching settings in `src/search/branching.rs`, a checkpoint asked through the control
   in `tests/engine.rs`): a range fed a hostile lab (sets off the board, twice, not promotable or claimed above their
   worth; commands that are not commands; restarts with tactics a restart does not take; threads it cannot have;
-  `conflict_branching` and `conflict_look` switched at every tick; a game held, checkpointed and restarted in the middle of its search; a
-  redeploy at a commit off master) refuses every bad command with its reason, ends every game with the score of
-  `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line, resumes it after the
-  redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.  The policy for the
-  games to come has three tests of its own: one gives policies to games in flight and games set up later (a `branching`
-  of a game's own holds over them, whichever comes first; a setting left out keeps the one before; the lines and
-  `run.lab` record them), one redeploys a run and starts it again, and one stops a search of game 1000 again and again
-  and resumes it under a policy that flips both settings each time.
+  `conflict_branching`, `conflict_look` and the gate switched at every tick; a game held, checkpointed and restarted in
+  the middle of its search; a redeploy at a commit off master) refuses every bad command with its reason, ends every
+  game with the score of `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line,
+  resumes it after the redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.
+  The policy for the games to come has four tests of its own: one gives policies to games in flight and games set up
+  later (a `branching` of a game's own holds over them, whichever comes first; a setting left out keeps the one before;
+  the lines and `run.lab` record them, the gate among them), one redeploys a run and starts it again, one stops a search
+  of game 1000 again and again and resumes it under a policy that flips both switches and changes the gate each time,
+  and one solves game 1000 with and without a policy whose gate is 0, which changes the tree and not the answer.  The
+  gate also has a test of the small games (`tests/soundness.rs`: three gates, one answer, other trees) and one of a
+  unit solved by `tune --gate` (`examples/tune.rs`).
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the wall, the ledger and a lab's redeploy through `chain.sh`, `wall-node.sh` through each way a run
   ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What

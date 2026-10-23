@@ -1446,11 +1446,11 @@ impl<'a> Window<'a> {
         Some(match command {
             Command::Checkpoint => self.lab_checkpoint(),
             Command::Offer { n, set, value } => self.lab_offer(n, &set, value),
-            Command::Branching { n, conflict_branching, conflict_look } => {
-                self.lab_branching(n, conflict_branching, conflict_look)
+            Command::Branching { n, conflict_branching, conflict_look, gate } => {
+                self.lab_branching(n, conflict_branching, conflict_look, gate)
             }
-            Command::Policy { from, conflict_branching, conflict_look } => {
-                self.lab_policy(from, conflict_branching, conflict_look, name)
+            Command::Policy { from, conflict_branching, conflict_look, gate } => {
+                self.lab_policy(from, conflict_branching, conflict_look, gate, name)
             }
             Command::Restart { n, tactics } => return self.lab_restart(n, &tactics, name, json),
             Command::Threads { total } => self.lab_threads(total),
@@ -1521,13 +1521,14 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// `branching`: game `n`'s searchers branch with `conflict_branching` and `conflict_look`, those given, on or off
-    /// from the next unit each starts.
+    /// `branching`: game `n`'s searchers branch with `conflict_branching` and `conflict_look`, those given, on or off,
+    /// and from the `gate` given, from the next unit each starts.
     fn lab_branching(
         &mut self,
         n: u32,
         conflict_branching: Option<bool>,
         conflict_look: Option<bool>,
+        gate: Option<u64>,
     ) -> Result<String, String> {
         self.searching(n)?;
         let opts = self.opts;
@@ -1540,23 +1541,28 @@ impl<'a> Window<'a> {
             set.job.branching().set_conflict_look(on);
             set.lab.conflict_look = Some(on);
         }
+        if let Some(gate) = gate {
+            set.job.branching().set_gate(gate);
+            set.lab.gate = Some(gate);
+        }
         set.lab.branching_changes += 1;
         set.lab.keep(opts, n);
         let tactics = set.job.tactics();
         let unused = if !tactics.gf2 {
             " (it acts only with gf2, which this search has off)"
-        } else if tactics.conflict_look && !tactics.conflict_branching {
-            " (conflict_look acts only where conflict_branching is on, which this search has off)"
+        } else if !tactics.conflict_branching && (tactics.conflict_look || gate.is_some()) {
+            " (conflict_look and the gate act only where conflict_branching is on, which this search has off)"
         } else {
             ""
         };
-        let changed = switches_given(conflict_branching, conflict_look);
+        let changed = switches_given(conflict_branching, conflict_look, gate);
         Ok(format!("game {n}'s searchers branch with {changed} from the next unit each starts{unused}"))
     }
 
     /// `policy`: every game from `from` on branches with `conflict_branching` and `conflict_look`, those given, on or
-    /// off, over what the policies given before say.  It is kept in `run.lab`, for the games set up from now on (and by
-    /// a run that starts again), and reaches the games in flight at once, as `branching` does ([`sync_policy`]).
+    /// off, and from the `gate` given, over what the policies given before say.  It is kept in `run.lab`, for the games
+    /// set up from now on (and by a run that starts again), and reaches the games in flight at once, as `branching`
+    /// does ([`sync_policy`]).
     ///
     /// [`sync_policy`]: Window::sync_policy
     fn lab_policy(
@@ -1564,6 +1570,7 @@ impl<'a> Window<'a> {
         from: u32,
         conflict_branching: Option<bool>,
         conflict_look: Option<bool>,
+        gate: Option<u64>,
         name: &str,
     ) -> Result<String, String> {
         self.in_range(from)?;
@@ -1573,11 +1580,12 @@ impl<'a> Window<'a> {
             file: name.to_owned(),
             conflict_branching,
             conflict_look,
+            gate,
         });
         self.policies.keep(self.opts);
         let flight: Vec<u32> = self.games.range(from..).map(|(&n, _)| n).collect();
         let reached: Vec<u32> = flight.into_iter().filter(|&n| self.sync_policy(n)).collect();
-        let changed = switches_given(conflict_branching, conflict_look);
+        let changed = switches_given(conflict_branching, conflict_look, gate);
         Ok(format!(
             "from game {from} on, branch with {changed}, over the policies given before; it reaches the searches of \
              {reached:?} at once, and any other game when it is set up"
@@ -1594,13 +1602,10 @@ impl<'a> Window<'a> {
             return false;
         }
         set.lab.apply_policy(&self.policies, n);
-        let wanted = set.lab.search_tactics(&self.opts.tactics.search);
+        let wanted = set.lab.branch_settings(&self.opts.tactics.search);
         let live = set.job.branching();
-        if live.settings().conflict_branching_on() != wanted.conflict_branching {
-            live.set_conflict_branching(wanted.conflict_branching);
-        }
-        if live.settings().conflict_look != wanted.conflict_look {
-            live.set_conflict_look(wanted.conflict_look);
+        if live.settings() != wanted {
+            live.set(wanted);
         }
         true
     }
@@ -1685,6 +1690,7 @@ impl<'a> Window<'a> {
         // The restart's tactics say how it branches, until the lab says otherwise.
         record.conflict_branching = None;
         record.conflict_look = None;
+        record.gate = None;
         record.keep(opts, n);
         // A search started again starts its clock again ("The wall").
         (game.headed, game.headed_kept, game.stopped_at_wall) = (Duration::ZERO, Duration::ZERO, false);
@@ -1780,15 +1786,19 @@ impl<'a> Window<'a> {
     }
 }
 
-/// The switches a `branching` or `policy` command gave, for its outcome: `conflict_branching on and conflict_look off`.
-fn switches_given(conflict_branching: Option<bool>, conflict_look: Option<bool>) -> String {
+/// The settings a `branching` or `policy` command gave, for its outcome: `conflict_branching on, gate 150`.
+fn switches_given(conflict_branching: Option<bool>, conflict_look: Option<bool>, gate: Option<u64>) -> String {
     let setting = |on: bool| if on { "on" } else { "off" };
     let given = |name: &str, on: Option<bool>| on.map(|on| format!("{name} {}", setting(on)));
-    let given: Vec<String> = [given("conflict_branching", conflict_branching), given("conflict_look", conflict_look)]
-        .into_iter()
-        .flatten()
-        .collect();
-    given.join(" and ")
+    let given: Vec<String> = [
+        given("conflict_branching", conflict_branching),
+        given("conflict_look", conflict_look),
+        gate.map(|gate| format!("gate {gate}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    given.join(", ")
 }
 
 /// Ends the range, however it ends (with a panic of the driver unwinding too): stops every search in flight and

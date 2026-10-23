@@ -31,6 +31,10 @@
 #     runs
 # The proof is renewed only once the lock is held and the day's limit has allowed the study, so it never runs beside a
 # study, and never for an event that would be skipped.
+# Before any of these gates, every done event whose line is complete adds a line to LAB/work/history/games.jsonl, the
+# record of past searches that the studies read (solver/docs/runbook/lab.md, "The record of past searches"): whether a
+# study starts says nothing of whether the chain's history is kept.  A failure to add the line is logged, and never
+# stops the hook.
 # The session runs in LAB/work, at nice 19, with a clean environment, the turn limit and the time limit below, and
 # without bypassing permission checks; its commands run in the sandbox or not at all.  Whoever runs the lab leaves
 # standing questions in LAB/work/requests.md (lab.sh request), which a study reads: guidance, nothing that can change
@@ -58,6 +62,7 @@ LAB_HOME="${LAB_HOME:-taxman-lab}"
 LAB="$HOME/$LAB_HOME"
 CTL="$LAB/ctl"
 WORK="$LAB/work"
+HISTORY="$WORK/history"
 STUDIES="$LAB/studies"
 LAB_THREADS="${LAB_THREADS:-16}"
 LAB_MAX_PER_DAY="${LAB_MAX_PER_DAY:-8}"
@@ -305,6 +310,34 @@ describe_session() {
     fi
 }
 
+# --- the record of past searches ------------------------------------------------------------------------------------
+
+# Whether the done event $1 (JSON) carries its game's line complete.  A run that is stopped sends done for each game in
+# flight, with an incomplete line.
+line_is_complete() {
+    printf '%s' "$1" | jq -e '.result | objects | .completed == true' >/dev/null 2>&1
+}
+
+# Adds a line to history/games.jsonl for the done event $1 (JSON), whose game's line is complete: the game's n, score,
+# method, proof, steps, own seconds, threads, tactics, what the lab did to it (the line's `lab` key) and the cut of a
+# near repeat if the line counts one, and the time.  The line is made whole first, so that a failure leaves no half of
+# one.  A failure is logged, and the hook goes on.
+record_game() {
+    local line
+    if ! line="$(printf '%s' "$1" | jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{
+            kind: "game", n: .n, at: (.at // $now), score: .result.score, method: .result.method, proof: .result.proof,
+            nodes: .result.nodes, own_seconds: .own_seconds, threads: .result.threads, tactics: .result.tactics,
+            lab: (.result.lab // null),
+            near_repeat_cut: (.result.stats.near_repeat_cut // .result.near_repeat_cut // null)}' 2>&1)"; then
+        log "history: cannot make the line of a game: $line"
+        return 0
+    fi
+    if ! mkdir -p "$HISTORY" 2>/dev/null || ! printf '%s\n' "$line" >>"$HISTORY/games.jsonl" 2>/dev/null; then
+        log "history: cannot add to $HISTORY/games.jsonl: $line"
+    fi
+    return 0
+}
+
 # --- an event -------------------------------------------------------------------------------------------------------
 
 # The prompt of a study named $2 for the event $1 (JSON).
@@ -335,9 +368,11 @@ handle_event() {
     n="$(printf '%s' "$json" | jq -er '.n' 2>/dev/null)" || refuse 'the argument has no "n"'
     case "$event" in long | done) ;; *) refuse "an event \"$event\" is not one that on-event.sh knows" ;; esac
     case "$n" in '' | *[!0-9]*) refuse "n is \"$n\", not a game" ;; esac
+    # The record of past searches comes before every gate that may keep a study from starting.
+    if [ "$event" = done ] && line_is_complete "$json"; then record_game "$json"; fi
     if [ -e "$CTL/off" ]; then skip "studies are off ($CTL/off exists); on-event.sh --on turns them on"; fi
     # A run that is stopped sends done for each game in flight, with an incomplete line: no outcome to compare with.
-    if [ "$event" = done ] && ! printf '%s' "$json" | jq -e '.result | objects | .completed == true' >/dev/null; then
+    if [ "$event" = done ] && ! line_is_complete "$json"; then
         skip "event=done n=$n: the game was stopped before it ended (its line is incomplete); the next run resumes it"
     fi
     if [ "$event" = done ] && ! has_long_study "$n"; then

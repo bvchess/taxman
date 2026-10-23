@@ -12,9 +12,9 @@
 //! ```text
 //! cargo run --release --example tune -- units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]
 //! cargo run --release --example tune -- solve GAME [--known FILE] [--units FILE] [--ids I,J,...]
-//!     [--tactic NAME=VALUE]... [--node-limit L] [--cpu-limit SECONDS]
+//!     [--tactic NAME=VALUE]... [--gate GAP] [--node-limit L] [--cpu-limit SECONDS]
 //! cargo run --release --example tune -- expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K]
-//!     [--out FILE]
+//!     [--gate GAP] [--out FILE]
 //! ```
 //!
 //! `units` reads the units a checkpoint of game GAME holds (the engine's deque from its front, the shallowest and
@@ -37,7 +37,9 @@
 //! those of the file (all the game's units if there is no `--ids`); `root` (or `GAME-root`) is the whole game, the
 //! root unit with all candidates, for which no units file is needed (but the known optimum is: a whole game is a
 //! proof).  `--tactic` takes the names and values of `taxman solve --tactic` (the search tactics only), so a new
-//! tactic needs no change here, and `--node-limit L` stops a unit after about L nodes (the engine counts every 1,024),
+//! tactic needs no change here.  `--gate GAP`, a whole number from 0 to `search::MAX_GATE`, is the gap from which
+//! conflict branching chooses (the lab's `gate`, `search::CONFLICT_BRANCHING_GAP` unless given; it applies only where
+//! the tactic `conflict_branching` is on), and the result line records it.  `--node-limit L` stops a unit after about L nodes (the engine counts every 1,024),
 //! which then reports `completed: false`.  `--cpu-limit SECONDS` stops a unit the same way after that much CPU time of
 //! the process (the unit's one thread; a decimal number), which, unlike the node limit, can cut a unit at different
 //! steps from one run to the next.  While a unit runs, a progress line goes to stderr every 30 seconds, headed by its id
@@ -55,7 +57,7 @@
 //! every unit, is not in it), `wall_s`, `completed`, `best` (the best promotion sum found, the starting incumbent's if
 //! nothing beat it), `incumbent` (the starting one), `proved`, `opt` (the known optimum or null), `tactics` (the
 //! changes from the defaults), `node_limit` and `cpu_limit` (the limits asked for, in steps and seconds, or null) and
-//! `stats` (the searchers' counters, `search::stat`).
+//! `gate` (the gap from which conflict branching chooses) and `stats` (the searchers' counters, `search::stat`).
 //!
 //! With the tactic `near_repeat` (on by default), `solve` cuts by the known game of GAME − 1 if the known games have it
 //! (`taxman::board::near_repeat`: B is its score less its game with no promotions) and the starting incumbent reaches
@@ -489,7 +491,7 @@ fn expand<const W: usize>(game: u32, o: &SolveOptions, steps: u64, optimal: &Opt
     let prepared = board.prepare(o.tactics)?;
     let start = start_set(game, &board, &prepared, header.as_ref(), optimal)?.0;
     let graph = MatchGraph::new(&prepared.model, &prepared.root);
-    let space = SearchSpace::new(&prepared, &graph);
+    let space = search_space(&prepared, &graph, o);
     let gf2 = Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates);
     let mut bound = NodeBound::new(&prepared, &gf2);
     let ckpt = std::env::temp_dir().join(format!("tune-expand-{}.ckpt", std::process::id()));
@@ -513,8 +515,23 @@ struct SolveOptions {
     units: Option<PathBuf>,
     ids: Option<Vec<String>>,
     tactics: SearchTactics,
+    /// The gap from which conflict branching chooses, if not the default (`--gate`).
+    gate: Option<u64>,
     node_limit: Option<u64>,
     cpu_limit: Option<Duration>,
+}
+
+/// The search space of `prepared` as `o` asks for it: with the gate given, if there is one.
+fn search_space<'a, const W: usize>(
+    prepared: &'a Prepared<W>,
+    graph: &'a MatchGraph,
+    o: &SolveOptions,
+) -> SearchSpace<'a, W> {
+    let space = SearchSpace::new(prepared, graph);
+    if let Some(gate) = o.gate {
+        space.branching.set_gate(gate);
+    }
+    space
 }
 
 /// The set the units of `game` are solved from, and the known optimum if there is one (then a solve proves): the known
@@ -580,7 +597,8 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
         _ => None,
     };
     let near_repeat = near.as_ref().filter(|near| near.arms(&o.tactics, start.sum()));
-    let space = SearchSpace { near_repeat, ..SearchSpace::new(&prepared, &graph) };
+    let space = SearchSpace { near_repeat, ..search_space(&prepared, &graph, o) };
+    let gate = space.branching.settings().gate;
     let description = Tactics { search: o.tactics, ..Tactics::default() }.description();
     for Row { id, depth, unit } in wanted {
         let cut_before = near_repeat.map_or(0, |near| near.nodes_cut());
@@ -603,6 +621,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             ("node_limit", o.node_limit.map_or(Json::Null, Json::from)),
             ("cpu_limit", o.cpu_limit.map_or(Json::Null, |limit| Json::from(limit.as_secs_f64()))),
             ("near_repeat_cut", cut),
+            ("gate", Json::from(gate)),
             ("stats", stats_json(&solved.stats)),
         ]);
         println!("{line}");
@@ -639,7 +658,7 @@ fn parse() -> Result<Command, String> {
     let command = args.next().ok_or("usage: tune units|solve GAME ... (see the top of examples/tune.rs)")?;
     let mut positional = Vec::new();
     let (mut known, mut units, mut ids, mut out, mut node_limit) = (None, None, None, None, None);
-    let mut cpu_limit = None;
+    let (mut cpu_limit, mut gate) = (None, None);
     let (mut sample, mut seed) = (100usize, 1u64);
     let mut tactics = Tactics::default();
     while let Some(arg) = args.next() {
@@ -660,6 +679,12 @@ fn parse() -> Result<Command, String> {
                     return Err(format!("--cpu-limit {text}: seconds, 0 or more"));
                 }
                 cpu_limit = Some(Duration::from_secs_f64(seconds));
+            }
+            "--gate" => {
+                let text = value("--gate")?;
+                let in_range = |gap: &u64| *gap <= search::MAX_GATE;
+                let message = format!("--gate {text}: a whole number from 0 to {}", search::MAX_GATE);
+                gate = Some(text.parse::<u64>().ok().filter(in_range).ok_or(message)?);
             }
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
@@ -682,22 +707,22 @@ fn parse() -> Result<Command, String> {
             Ok(Command::Units { game: game(Some(g))?, ckpt: ckpt.into(), sample, seed, out, known })
         }
         ("solve", [g]) => {
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit, cpu_limit };
+            let options = SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit };
             Ok(Command::Solve { game: game(Some(g))?, options })
         }
         ("expand", [g]) => {
             if cpu_limit.is_some() {
                 return Err("expand stops at --node-limit K steps; --cpu-limit is for solve".into());
             }
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, node_limit, cpu_limit };
+            let options = SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit };
             Ok(Command::Expand { game: game(Some(g))?, options, out })
         }
         ("units", _) => Err("usage: tune units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]".into()),
         ("expand", _) => Err("usage: tune expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K] \
-                              [--out FILE]"
+                              [--gate GAP] [--out FILE]"
             .into()),
         ("solve", _) => Err("usage: tune solve GAME [--known FILE] [--units FILE] [--ids I,J,...] [--tactic N=V]... \
-                 [--node-limit L] [--cpu-limit SECONDS]"
+                 [--gate GAP] [--node-limit L] [--cpu-limit SECONDS]"
             .into()),
         (other, _) => Err(format!("unknown command {other:?}: units, solve or expand")),
     }
@@ -844,6 +869,39 @@ mod tests {
         taxman::with_width!(GAME, W => check::<W>());
     }
 
+    /// The gate is the gap from which conflict branching chooses: a unit solved with a gate of 0, so that every check
+    /// chooses, takes another tree than with the default gate, and finds the same best; the space `solve` builds takes
+    /// the gate it is given, and the default when it is given none.
+    #[test]
+    fn a_gate_changes_the_tree_of_a_unit_and_not_its_answer() {
+        fn check<const W: usize>() {
+            let w = world::<W>();
+            let graph = MatchGraph::new(&w.prepared.model, &w.prepared.root);
+            let options = |gate| SolveOptions {
+                known: None,
+                units: None,
+                ids: None,
+                tactics: SearchTactics::default(),
+                gate,
+                node_limit: None,
+                cpu_limit: None,
+            };
+            let solved = |gate| {
+                let space = search_space(&w.prepared, &graph, &options(gate));
+                (space.branching.settings().gate, solve_unit(&space, root(&w), &w.start, Limits::default(), "test"))
+            };
+            let (gate, plain) = solved(None);
+            assert_eq!(gate, search::CONFLICT_BRANCHING_GAP);
+            let (gate, every_check) = solved(Some(0));
+            assert_eq!(gate, 0);
+            let (plain, every_check) = (plain.unwrap(), every_check.unwrap());
+            assert!(plain.completed && every_check.completed);
+            assert_ne!(plain.nodes, every_check.nodes, "a gate of 0 took the steps of the default gate");
+            assert_eq!((plain.best, every_check.best), (w.opt, w.opt));
+        }
+        taxman::with_width!(GAME, W => check::<W>());
+    }
+
     #[test]
     fn a_cpu_limit_stops_a_unit() {
         fn check<const W: usize>() {
@@ -892,6 +950,7 @@ mod tests {
                 units: Some(path.clone()),
                 ids: Some(vec![format!("{GAME}-0")]),
                 tactics: SearchTactics::default(),
+                gate: None,
                 node_limit: None,
                 cpu_limit: None,
             };
