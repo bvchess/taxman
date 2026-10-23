@@ -53,8 +53,141 @@ folder `~/taxman_work/lab/work/rootgap/top/`.
 **Open hypothesis.**  In hard games, excluding a member leaves near-equal alternatives, so the bound barely falls at a
 side branch.  Nothing here tests it.
 
+## 2026-10-23: where the hard games spend their steps (Q1)
+
+The hard games are 4920-4929, which took 3 to 4 times the steps of their neighbors; the easy games are 4932-4949.  The
+study's runs are whole-game profiles of 4947, 4949 and 4950 and 1-thread deep profiles of 4921, 4925, 4929 (hard) and
+4941, 4945, 4949 (easy), in the lab's `hardgames/` folder (see Files).
+
+* **The top of the tree.**  Every node of the spine has two or three children.  `#0` promotes a member of the heaviest
+  set, and the bound does not move (drop 0 at 90% of such children).  `#1` goes on without that member, and its drop is
+  the price of leaving it out.  `#2` goes on without both and forces many members at once (drops of 960 to 1,700, tiny
+  subtrees).  So the spine's gap never falls by branching (4949: 1,855 from depth 9 to past 30; 4950: 2,049), and the
+  tree is the sum of the `#1` subtrees hung off the spine.  The same members are branched on in the same order in 4949
+  and 4950, at prices equal to a few points (544, 344, 309, 328 at depths 2, 3, 4, 6; 543, 439, 357, 235 at depths 16,
+  20, 24, 29 in 4949).  What differs is the gap they are taken from: 4950's root gap is 2,424 against 4949's 2,191,
+  every node of 4950 sits 200-230 points higher, and at a decade per 240 points that is the factor 5 to 8 between the
+  games' subtrees (4950's `#1` at depth 4 holds 120 × 10⁶ steps, 4949's 21 × 10⁶).
+* **Below the top** every side child is `forced`.  Its drop against its parent, by the parent's gap:
+
+  | parent gap | hard 4921 = 4925 | hard 4929 | easy 4941 | easy 4945 = 4949 |
+  |---|---|---|---|---|
+  | 0-299: median drop; share under 50 | 33; 0.86 | 33; 0.87 | 82; 0.28 | 48; 0.57 |
+  | 300-599: median | 181 | 194 | 176 | 176 |
+  | 600-899: median | 247 | 251 | 266 | 272 |
+  | 900 and up: median | 384 | 365 | 384 | 389 |
+
+  The growth weight of a node (the sum over its children of 10^(-drop/240)) at parent gaps 150-299 is 1.12 in the hard
+  game against 0.96 and 1.07 in the easy; at gaps of 300 and more it is the same (0.93-0.97).
+
+**Answer.**  The open hypothesis of the previous section is false at the top and in the middle of the tree: leaving a
+member out costs the bound the same in hard and easy games.  The difference is in nodes of gap under 300, where in hard
+games 86-87% of the exclusions cost under 50 points (28-57% in easy games).
+
+## 2026-10-23: a measure known in the first minutes (Q2)
+
+**What does not work.**  Gap measures of the top of the tree from a 60-second ladder run (37 games 4851-4949: the root
+gap, the spine's gap at depth 30, the mass sum 10^(gap/240) of the side branches made, and of the open units at the
+run's checkpoints) correlate negatively with log10 of the chain's steps (r -0.36 to -0.75).  A 60-second run sees only 4
+to 11 side branches of the top, and the games before 4875 ran with other tactics, so the 37 games are not one
+population.
+
+**What works: the frontier's mass times the size of a subtree at a fixed gap.**  For each of 14 games 4920-4949, a
+60-second 8-thread ladder run with `--seed-opt` keeps its final checkpoint, and `tune units` lists its 434-488 units with
+their gaps.  E is log10 of the sum over the units of 10^(gap/240), the frontier's mass.  Twelve units a game, 4 in each
+gap band 500-599, 700-799 and 900-999, are solved to the end on one thread, and a is the fit of log10 steps at gap 750
+(a line in the gap).
+
+| game | log10 steps (chain) | E | a(750) | E + a |
+|---|---|---|---|---|
+| 4920 | 8.51 | 8.23 | 3.47 | 11.70 |
+| 4921 | 8.59 | 8.23 | 3.53 | 11.76 |
+| 4925 | 8.60 | 8.23 | 3.26 | 11.49 |
+| 4928 | 8.58 | 8.23 | 3.26 | 11.49 |
+| 4929 | 8.60 | 8.23 | 3.41 | 11.64 |
+| 4932 | 8.41 | 8.06 | 3.43 | 11.49 |
+| 4935 | 8.11 | 7.86 | 3.28 | 11.14 |
+| 4936 | 8.02 | 7.86 | 3.29 | 11.15 |
+| 4940 | 7.92 | 8.07 | 3.15 | 11.22 |
+| 4941 | 7.99 | 8.10 | 2.97 | 11.07 |
+| 4944 | 7.91 | 8.10 | 3.20 | 11.30 |
+| 4945 | 8.02 | 8.10 | 3.12 | 11.22 |
+| 4947 | 8.02 | 8.10 | 3.07 | 11.17 |
+| 4949 | 7.92 | 8.10 | 2.90 | 11.00 |
+
+Against log10 steps, E has r 0.64, a 0.75, and E + a 0.89 (slope 1.07, rms residual 0.13 decades against a spread of
+0.29).  The slope near 1 is what the model "size = frontier mass × size of a subtree at a given gap" predicts.  The hard
+games' frontiers are only 0.13 decades heavier than the easy ones' (4920-4929 share E); their subtrees at the same gap
+are 0.3 decades (2 ×) bigger.  A second sample of 12 units a game gives a(750) with r 0.62 against the first and a mean
+difference of 0.12 decades, so 12 units are noisy; pooled (24 a game) a has r 0.78, E + a r 0.86, slope 1.07, rms
+residual 0.15, and the hard games have a 3.25-3.54 (mean 3.39), the easy 3.00-3.30 (mean 3.16).  Neighbors share the top
+of their trees, so the 14 games are about four independent clusters (4920-4929, 4932, 4935-4936, 4940-4949).  The
+measure costs one 8-thread minute and 1 to 3 CPU minutes of solves a game.
+
+**Is 4950's incumbent too low?**  Its root gap of 2,424 is 233 above any other game's, and its search has not improved the
+seed of 549,269 in over 145 × 10⁶ steps.  The profile cannot tell a low incumbent from a high bound, since both shift
+every node's gap alike.  The finder run at the end of this entry tests the first reading.
+
+## 2026-10-23: a lower gate for conflict branching in hard games (Q3)
+
+**Question.**  The hard games' excess sits in nodes of gap under 300, below the gate (`CONFLICT_BRANCHING_GAP` = 300),
+where the search branches on its own conflict and its cheapest members cost under 50.  Does choosing the conflict there
+too (a lower gate, with `conflict_look`) remove the excess?  A second lever, a bound that charges a twin ladder at once,
+needs a proof per rule and is untried.
+
+**Method.**  The pooled samples of the previous section, deduplicated: 315 distinct units of the 14 games (18 to 24 a
+game).  Each is solved to the end on one thread (`tune solve` of the lab's build at d45a513, which gives the same trees
+as afbc256) under four settings given explicitly, interleaved per unit, at most 8 solves at once at `nice -n 19`: A gate
+300 and `conflict_look` off, B gate 300 and look on, C gate 150 and look on, D gate 0 and look on.  All 1,260 solves
+completed.  Steps and CPU seconds are summed over a group and given relative to A; CPU is the solve's own thread time,
+which the chain's load does not change.
+
+| group | A: steps, CPU | B: steps, CPU | C: steps, CPU | D: steps, CPU | a(750): A, B, C, D |
+|---|---|---|---|---|---|
+| hard 4920-4929 (116 units) | 834,000; 1,197 s | 0.76, 0.71 | 0.44, 0.81 | 0.41, 0.94 | 3.39, 3.07, 2.91, 2.91 |
+| easy 4932-4949 (199 units) | 863,000; 1,545 s | 0.50, 0.54 | 0.36, 0.62 | 0.36, 0.70 | 3.17, 2.65, 2.64, 2.65 |
+
+The CPU a step costs, relative to A, is 0.93 (B), 1.85 (C) and 2.28 (D) in the hard games, and 1.09, 1.70 and 1.94 in
+the easy.  Per game, the steps relative to A run from 0.23 to 0.83 for B, 0.17 to 0.60 for C and 0.17 to 0.55 for D, and
+the CPU from 0.30 to 0.96, 0.33 to 0.98 and 0.36 to 1.05.  A unit of a hard game takes 10.3 s in A and 7.3 s in B, an
+easy one 7.8 s and 4.2 s, so the hard games' CPU a unit is 1.33 times the easy games' in A and 1.75, 1.74 and 1.79 times
+in B, C and D.  The a(750) excess, hard less easy, is 0.23 decades in A, 0.42 in B, 0.27 in C and 0.26 in D.
+
+1. **The look pays everywhere, and less in the hard games.**  B cuts the steps to 0.76 (hard) and 0.50 (easy) and the
+   CPU to 0.71 and 0.54, so the hard games' excess grows from 0.23 to 0.42 decades.  The whole games of the live lab
+   agree in direction: the look took 0.85 of its neighbor's steps (geometric mean).
+2. **A lower gate gives back steps and costs CPU.**  From B to C the hard games' steps fall by 0.32 of A's and the easy
+   ones' by 0.14, and the excess falls from 0.42 to 0.27, but a step costs 1.85 times as much (1.70 easy), so the CPU
+   rises from 0.71 to 0.81 of A (0.54 to 0.62).  D adds nothing in steps over C and costs more CPU (0.94, 0.70).  Neither
+   lower gate removes the excess: it stays at 0.26-0.27 decades against 0.23 in A, and the CPU excess stays at 1.7-1.8
+   against 1.33 in A.
+3. **B has the lowest CPU in every game.**  A gate set per game does not help.
+
+**Confidence.**  High that the look at gate 300 cuts CPU by a third to a half on these units and that lower gates cost
+1.7 to 2.3 times the CPU a step.  Medium that a lower gate does not remove the excess: a(750) rests on 18 to 24 units a
+game and the hard games are about two independent clusters.  The units are subtrees of 60-second checkpoints at gaps of
+500 to 999, so a whole game's gain differs: the live lab's whole games took 0.79 to 0.97 of the steps with the look on,
+less gain than these units' 0.50 to 0.76.
+
+**Decision.**  A lower gate is not adopted.  The look at gate 300 pays in all games (the lab turns it on from 4948; the
+code's default is left open).  The hard games' excess below the gate is not a matter of which conflict is chosen; the
+levers left are a bound that charges a twin ladder at once and a cheaper GF(2) solve.
+
+## 2026-10-23: the finder on 4950's start
+
+**Question.**  Is there a better game of 4950 that its seed missed?  **Method.**  `finder 4950 --target 549270 --known
+strict.jsonl --seconds 600 --seeds 0` (the lab's build, one thread, `nice -n 19`).  Its start incumbent, made from the game
+of 4949, has promotion sum 548,948 (41 s), and the finder runs from there for 600 s.  **Result.**  It reached 549,126
+at 30 s (one improvement) and nothing after: neither the target 549,270 nor the seed's 549,269.  The finder finds no
+game above the seed, which is evidence for the seed, but weak: it ended 143 short of the seed from its own start, so
+it could miss a game a few points better.  One seed on one thread; confidence medium-low.  The root gap's excess of
+4950 stays unexplained.
+
 ## Files
 
-The scripts and their output are in the lab's work folder on the machine of the chain, not copied here:
+The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
 `~/taxman_work/lab/work/rootgap/` has `gapfit.py` and the 35 ladder runs, and its `top/` has the scripts of the
-top-of-tree runs.
+top-of-tree runs.  `~/taxman_work/lab/work/hardgames/` has the study's scripts (`units.sh`, `solve-bands.sh`,
+`bands.py`, `drops.py`, `spine.py`, `deepdrops.py`, `fanout.py`), its runs (`units/`, `ckk/`, `solves/`, `solves2/`,
+`solves-all/`, `deep/`, `prof/`) and, in `gate/`, the gate experiment (`run.sh`, `analyze.py`, `analysis.txt`, `out/`
+with a file a solve) and the finder run (`finder-4950.jsonl`).
