@@ -25,6 +25,8 @@ machine itself, `--local` (or a `LAB_HOST` that names it) runs the commands in p
 git, a rustup toolchain and jq.
 
 * `setup [COMMIT]` clones the repository to `src/` at COMMIT (default origin/master) and builds `taxman` and `tune`.
+  Run it again with the chain's commit whenever the chain moves to a new build: `tune` refuses a checkpoint whose
+  tactics it does not know, and a study would spend its first quarter hour rebuilding.
 * `snapshot [N] [--from DIR]` copies the checkpoint and clock of game N in flight (default: the longest own search) to
   `snap/N-STAMP/`, whose name is SNAPDIR below.  DIR is where to copy from, read only; the default is the chain's.
 * `units SNAPDIR` writes `units.jsonl` in the snapshot, and prints the summary and the 20 units with the largest gaps.
