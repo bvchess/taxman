@@ -13,11 +13,12 @@ each line's proof and assumptions again, so that a hand edit cannot change them.
 * **`taxman verify-results FILE...`** reads results files without changing them.  It replays every game, confirms its
   score against `optimal.json`, and checks the chain from n − 1, each line's arithmetic and provenance, and that the
   files agree.  It checks that a line's fields agree with each other as the solver writes them, so that a hand edit
-  cannot drop an assumption or change a proof.  It counts the games by proof and by what they assume.  For a repeat it
-  sets the search problems of both games up again and compares them.  For a `known` line it checks the citation against
-  the sources ([the reference, "Citing a known source"](REFERENCE.md#citing-a-known-source)): the table, the committed
-  chain and the bounds store of the repository, read as they are, since their own verifiers check them.  Opening a
-  results file for `--out` runs the same checks, with the sources that `--use-prev` draws on.
+  cannot drop an assumption or change a proof.  It counts the games by proof and by what they assume, and the searches
+  that the near-repeat cut shortened (`stats.near_repeat_cut` above 0) by proof.  For a repeat it sets the search
+  problems of both games up again and compares them.  For a `known` line it checks the citation against the sources
+  ([the reference, "Citing a known source"](REFERENCE.md#citing-a-known-source)): the table, the committed chain and the
+  bounds store of the repository, read as they are, since their own verifiers check them.  Opening a results file for
+  `--out` runs the same checks, with the sources that `--use-prev` draws on.
 * **Both verifiers accept a file with holes**, such as a `--keep-going` run's or the sweep's `explore.jsonl`, whose
   games may have no line or only incomplete ones.  They check each line against what it rests on in the same file:
   * a ceiling (`setup.cap`), or a `cap` or `prime_formula` proof, needs the game of n − 1 completed in the file;
@@ -41,6 +42,10 @@ each line's proof and assumptions again, so that a hand edit cannot change them.
   does not check the digest of a game of n − 1 taken from the store.  It also asks that the method fits the nodes: a
   `start` line is completed with `nodes` 0 and a completed `search` line has more, which refuses a line of a build
   that called a `start` game a `search`.
+* **Both verifiers read `stats.near_repeat_cut` as a count and not as a proof.**  A search that the near-repeat cut
+  shortened is `exhausted` all the same, so the key changes no proof and no assumption.  Both refuse a value that is
+  no count, and the key on a line that ran no search.  Neither refuses a line for lacking the key, as every line made
+  before the cut does.
 
 On 2026-10-22, the committed chain gave, on four threads of the laptop:
 
@@ -50,6 +55,7 @@ results/strict.jsonl: 4900 completed games, n = 1..=4900 (0 missing), 0 incomple
   proof: trivial 13, prime_formula 611, cap 429, exhausted 1551, same_search 1914, known 382
   assumptions: none in 4518 of 4900 games; 382 assume statement U at 298 boards in all
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 1586, prime formula 653
+  searches shortened by the near-repeat cut, by proof: none
 0 games are in more than one file, with equal scores in all
 checked in 17756.4 ms
 ```

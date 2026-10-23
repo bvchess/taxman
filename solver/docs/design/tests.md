@@ -122,12 +122,13 @@ every second line of the Java fixtures), and the comment on each says what the w
   tactics: n = 480 to 1133, every tactic off or changed in turn, with the GF(2) bound and on the matching path, and the
   tree of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps.  The table
   `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the committed
-  game of n − 1, with the near-repeat cut and without it.  The matching
-  path's rows are the default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before
-  that tactic, and the rows `symmetry=off` the default's before the rule of symmetric pairs.  The table `EXTENDED` does
-  the same for the extended problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be
-  the default engine's on the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself
-  and reproduce every row of the default table, node for node.
+  game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes the cut
+  cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The matching path's rows are the
+  default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before that tactic, and the
+  rows `symmetry=off` the default's before the rule of symmetric pairs.  The table `EXTENDED` does the same for the
+  extended problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default
+  engine's on the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself and
+  reproduce every row of the default table, node for node.
 
   **A change that alters the tree on purpose fails them.**  Run `cargo test --release --test tripwires -- --nocapture`
   (the quick tests check only the rows of trees of 250 nodes or fewer): it prints the rows as observed, in the layout of
@@ -238,7 +239,11 @@ every second line of the Java fixtures), and the comment on each says what the w
   unfinished, after the repeat, or settling no search; its assumptions dropped), and `verify-results` refuses two more
   that only setting the problems up again can catch (the Python referee accepts them, as its docstring says).  A search
   that took no step is the method `start`: `verify-results` still reads the `search` line of an older build, and the
-  Python referee refuses it, and a `start` line that took a node or did not finish.
+  Python referee refuses it, and a `start` line that took a node or did not finish.  The line of a search armed with
+  the near-repeat cut counts the nodes it cut (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is
+  armed and cuts none, and the first game of a run and a run without the tactic have no such key), both verifiers
+  accept the files and count the shortened search, and both refuse the key on a prime game or with a value that is no
+  count; the committed chain has no search that the cut shortened.
 * **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tests/sweep.rs`,
   `solver/tools/test_sweep_plan.py`, `solver/tools/cloud/test/run.sh sweep`):
   * a range whose games all stop at a limit goes on, each game built on the best game of the one before it, with no

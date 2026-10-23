@@ -63,12 +63,16 @@ Its games, by proof, as `taxman verify-results` and `solver/tools/check_results.
 | games | 1300 | 875 | 1265 | 474 | 633 | 327 | 26 | 4900 |
 | proof `trivial` | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 13 |
 | proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 178 | 150 | 35 | 10 | 1551 |
+| of those, searches the [near-repeat cut](../solver/docs/design/search.md#the-near-repeat-cut) shortened (`stats.near_repeat_cut` above 0) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | proof `cap`: the search reached the [ceiling](../docs/GLOSSARY.md#the-game) | 115 | 77 | 119 | 43 | 57 | 14 | 4 | 429 |
 | proof `prime_formula` | 211 | 115 | 155 | 60 | 55 | 13 | 2 | 611 |
 | proof `same_search`: a repeat of an earlier game's search | 545 | 369 | 543 | 193 | 204 | 50 | 10 | 1914 |
 | proof `known`: a game of the bounds store, taken with no search | 0 | 0 | 0 | 0 | 167 | 215 | 0 | 382 |
 | score = n + score(n − 1) | 424 | 270 | 402 | 148 | 218 | 115 | 9 | 1586 |
 | score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 60 | 75 | 36 | 2 | 653 |
+
+The near-repeat cut shortens a search and leaves its proof `exhausted`, so a line counts the nodes it cut in
+`stats.near_repeat_cut`.  The six runs searched the games without the cut, and no line has the key.
 
 Of its 1980 searched games, 1551 are exhausted and 429 at the ceiling.  The proofs at the ceiling were all decided
 before the search explored a node (the method `start`) but six: 686's took 29 nodes, and 2695's, 3052's, 3306's, 3796's

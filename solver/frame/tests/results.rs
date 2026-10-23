@@ -17,6 +17,7 @@ use taxman::json::Json;
 use taxman::known::{Known, KnownSources};
 use taxman::results::{
     assumed_optimal, moves_digest, verify_files, verify_files_with, Assumptions, CeilingProof, FileReport, Proof,
+    StoredGame,
 };
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
@@ -156,8 +157,12 @@ fn lines_whose_fields_contradict_each_other_are_refused_by_both_verifiers() {
         // The prime formula proves only a prime n.
         (trivial, vec![("method", s("prime")), ("in_the_bag", Json::Null)], "is not prime"),
         (trivial, vec![("promotions", smallest_move)], "a trivial game with promotions"),
+        // Only a search counts the nodes its near-repeat cut cut, and in a number.
+        (prime, vec![("stats.near_repeat_cut", Json::from(0u64))], "which only a search has"),
+        (exhausted, vec![("stats.near_repeat_cut", s("many"))], "bad \"stats.near_repeat_cut\""),
+        (exhausted, vec![("stats.near_repeat_cut", Json::from(-1i64))], "bad \"stats.near_repeat_cut\""),
     ];
-    let accepted = [(lines.len() - 1, vec![])];
+    let accepted = [(lines.len() - 1, vec![]), (exhausted, vec![("stats.near_repeat_cut", Json::from(3u64))])];
     both_verifiers(&TempDir::new("contradictions"), &lines, &accepted, &refused);
 }
 
@@ -207,6 +212,50 @@ fn a_search_whose_starting_game_reaches_the_ceiling_is_a_start_game() {
     ] {
         assert!(report.contains(problem), "{problem}\n{report}");
     }
+}
+
+/// A search armed with the near-repeat cut counts the nodes it cut in its line, as `stats.near_repeat_cut`, and the
+/// proof stays `exhausted`: the search still explores its whole tree, with one more cut.  Game 256, searched after 255
+/// in the same run, has one node cut.  Game 21, searched after 20, is armed and cuts none.  The first game of each run
+/// follows no game of the run, so it is not armed and its line has no such key; nor has the line of 256 without the
+/// tactic.  Both verifiers accept the files, and both reports count the search that the cut shortened.
+#[test]
+fn the_line_of_a_search_armed_with_the_near_repeat_cut_counts_the_nodes_it_cut() {
+    let dir = TempDir::new("near-repeat-cut");
+    let count = |line: &Json| line.get("stats").and_then(|stats| stats.get("near_repeat_cut")).and_then(Json::as_u64);
+    let on = common::options(1);
+    let mut off = on.clone();
+    off.tactics.search.near_repeat = false;
+    // (the file's name, its first and last game, the options, the nodes cut in the last game's search)
+    let runs = [("cut", 255, 256, &on, Some(1)), ("armed", 20, 21, &on, Some(0)), ("off", 255, 256, &off, None)];
+    let mut paths = Vec::new();
+    for (name, first, last, opts, expected) in runs {
+        let path = dir.join(format!("{name}.jsonl"));
+        let games = solver::solve_range(first, last, opts, Some(&path)).unwrap();
+        for game in &games {
+            assert_eq!((game.method, game.proof), (Method::Search, Some(Proof::Exhausted)), "{name}: n={}", game.n);
+            assert!(game.nodes > 0, "{name}: n={}", game.n);
+        }
+        let text = fs::read_to_string(&path).unwrap();
+        let lines: Vec<Json> = text.lines().map(|line| Json::parse(line).unwrap()).collect();
+        let counted: Vec<Option<u64>> = lines.iter().map(count).collect();
+        assert_eq!(counted, [None, expected], "{name}: the key of each line of the file");
+        assert_eq!(games.iter().map(|game| game.near_repeat_cut).collect::<Vec<_>>(), [None, expected], "{name}");
+        // The key comes beside the counters, which every line has.
+        for line in &lines {
+            assert!(line.get("stats").and_then(|stats| stats.get("match_bounds")).is_some(), "{name}: {line}");
+        }
+        let report = verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap().to_string();
+        let shortened = if expected > Some(0) { "exhausted 1" } else { "none" };
+        let line = format!("searches shortened by the near-repeat cut, by proof: {shortened}\n");
+        assert!(report.contains(&line), "{name}: {report}");
+        paths.push(path);
+    }
+    let run = python_referee(&paths);
+    let report = String::from_utf8_lossy(&run.stdout);
+    assert_eq!(run.status.code(), Some(0), "{report}");
+    let said = |shortened: &str| report.matches(&format!("by proof: {shortened}\n")).count();
+    assert_eq!((said("exhausted 1"), said("none")), (1, 2), "{report}");
 }
 
 /// A proof assumes what the game it rests on assumes, and nothing else.  Games 33 to 50, the first built on
@@ -577,6 +626,13 @@ fn proofs(file: &FileReport, range: RangeInclusive<u32>, proof: Proof) -> usize 
     file.contents.games.range(range).filter(|(_, g)| g.proof == proof).count()
 }
 
+/// How many games of the report in `range` have the proof `exhausted` and were shortened by the near-repeat cut: their
+/// lines count nodes it cut (`stats.near_repeat_cut` above 0).
+fn shortened(file: &FileReport, range: RangeInclusive<u32>) -> usize {
+    let cut = |game: &StoredGame| game.near_repeat_cut.is_some_and(|nodes| nodes > 0);
+    file.contents.games.range(range).filter(|(_, game)| game.proof == Proof::Exhausted && cut(game)).count()
+}
+
 fn ceiling_proofs(file: &FileReport, ceiling_proof: CeilingProof) -> usize {
     file.contents.games.values().filter(|g| g.ceiling_proof == Some(ceiling_proof)).count()
 }
@@ -742,6 +798,9 @@ fn check_the_committed_results_to(last: u32) {
     assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");
     let from_store = by(1..=last)[5];
     assert_eq!(clean(strict), last as usize - from_store);
+    // The chain was made before the near-repeat cut, so the cut shortened none of its exhausted searches: the README's
+    // row of them is 0 in every range.
+    assert_eq!(shortened(strict, 1..=last), 0);
     if last == LAST {
         assert_eq!(by(1..=LAST), [13, 611, 429, 1551, 1914, 382]);
         assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545, 0]);

@@ -16,9 +16,11 @@ For every completed game:
               problem; every game but a prime or a known one records in_the_bag; only a search reaches its ceiling;
               a prime game's n is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the
               game it repeats (same_search), and its setup has no `cap`; a known game, and a search that the bounds
-              store's upper bound ended, and only those, cite a source (`known`); a start game (a search whose
-              starting game reached a ceiling, so that it took no step) is completed with nodes 0, and a completed
-              search has nodes above 0, so a line of an older build, which called a start game a search, is a problem
+              store's upper bound ended, and only those, cite a source (`known`); only a search counts the nodes its
+              near-repeat cut cut (`stats.near_repeat_cut`, a count the proof does not rest on); a start game (a
+              search whose starting game reached a ceiling, so that it took no step) is completed with nodes 0, and a
+              completed search has nodes above 0, so a line of an older build, which called a start game a search,
+              is a problem
   optimal     the score is optimal.json's, where the table has the game
   chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
@@ -69,6 +71,8 @@ than this referee reads is a problem.
 
 The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
 n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
+It also counts, by proof kind, the searches that the near-repeat cut shortened: those with a stats.near_repeat_cut
+above 0.
 
 usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--bounds PATH]
 Without FILEs it checks results/*.jsonl but the bounds store, which is not a file of results.  The exit status is 1
@@ -283,6 +287,18 @@ def read_lines(path, problems):
     return rows
 
 
+def near_repeat_cut(row):
+    """The nodes the near-repeat cut cut, as the line of a search armed with it records them (`stats.near_repeat_cut`),
+    else None: the lines made before the cut do not have the key."""
+    stats = row.get("stats")
+    return stats.get("near_repeat_cut") if isinstance(stats, dict) else None
+
+
+def is_count(value):
+    """Whether `value` is a count: a whole number, not a boolean, and not below 0."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def contradictions(n, row, reached):
     """What the fields of a line say against each other: combinations the solver never writes, through which a
     hand-edited line could change the proof or the assumptions derived from it."""
@@ -303,6 +319,11 @@ def contradictions(n, row, reached):
         found.append(f"a {method} game {'without' if method not in NO_BAG else 'with'} in_the_bag")
     if reached and method not in SEARCHED:
         found.append(f"a {method} game that reached a cap, which only a search does")
+    cut = near_repeat_cut(row)
+    if cut is not None and not is_count(cut):
+        found.append(f"stats.near_repeat_cut {cut!r} is not a count")
+    elif cut is not None and method not in SEARCHED:
+        found.append(f'a {method} game with "stats.near_repeat_cut", which only a search has')
     # A start game is a completed search that took no step: its starting game reached a ceiling.  A search with nodes
     # 0 is a line of an older build, which called it a search.
     nodes = row.get("nodes")
@@ -408,7 +429,8 @@ def check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
 
 def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
     """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
-    report's counters, and the games that only an unfinished search is recorded for."""
+    report's counters (including the searches the near-repeat cut shortened, by proof), and the games that only an
+    unfinished search is recorded for."""
     rows = read_lines(path, problems)
     games = {}
     unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their game
@@ -436,6 +458,7 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
     counts = Counter()
     certificates = Counter()
     assumed = Counter()
+    shortened = Counter()  # by proof: the searches the near-repeat cut shortened
     for n in sorted(games):
         number, row = games[n]
 
@@ -586,6 +609,9 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
 
         done[n] = (score, moves, proof, assumes, number, row)
         counts[proof] += 1
+        cut = near_repeat_cut(row)
+        if is_count(cut) and cut > 0:
+            shortened[proof] += 1
         # (Statement U at a board is one assumption of many: counted together, a game once.)
         assumed.update({s for s in assumes if not s.startswith(U_STATEMENT)})
         if any(s.startswith(U_STATEMENT) for s in assumes):
@@ -597,7 +623,7 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
                 certificates["n + score(n-1)"] += 1
             elif is_prime(n) and score == prev_score + n - replaced:
                 certificates["prime formula"] += 1
-    return done, counts, assumed, certificates, sorted(stopped - set(games))
+    return done, counts, assumed, certificates, shortened, sorted(stopped - set(games))
 
 
 def listing(counter):
@@ -635,7 +661,7 @@ def main():
     shared = set()
     for path in files:
         print(f"{path}:")
-        done, counts, assumed, certificates, unfinished = check_file(
+        done, counts, assumed, certificates, shortened, unfinished = check_file(
             path, optimal, fm, heuristic, divisors, problems, sources
         )
         if done:
@@ -647,6 +673,7 @@ def main():
         print("  proof: " + listing(counts))
         print("  assumed: " + listing(assumed))
         print("  arithmetic certificates: " + listing(certificates))
+        print("  searches shortened by the near-repeat cut, by proof: " + listing(shortened))
         for n, (score, *_rest) in done.items():
             if n in seen:
                 shared.add(n)

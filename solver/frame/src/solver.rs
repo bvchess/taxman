@@ -581,6 +581,10 @@ pub struct GameResult {
     pub nodes: u64,
     /// The search's counters (see [`search::stat`]) and the engine's activity.
     pub stats: Stats,
+    /// The nodes the near-repeat cut cut in the last invocation of the search, if the search was armed with it
+    /// ([`Job::arm`]); `None` for a search that was not, and for a game that ran no search.  The line writes it as
+    /// `stats.near_repeat_cut`, and only when it is there.
+    pub near_repeat_cut: Option<u64>,
     pub counters: Counters,
     pub setup: Option<SearchSetup>,
     pub phases: Phases,
@@ -636,6 +640,7 @@ impl GameResult {
             in_the_bag: None,
             nodes: 0,
             stats: Stats::default(),
+            near_repeat_cut: None,
             counters: Counters::default(),
             setup: None,
             phases: Phases::default(),
@@ -667,9 +672,11 @@ impl GameResult {
         self.prev.as_ref().map(|p| p.source)
     }
 
-    /// The search's counters by name.
+    /// The search's counters by name, and the nodes the near-repeat cut cut if the search was armed with it.
     pub fn stats_json(&self) -> Json {
-        Json::object(STAT_NAMES.map(|(name, i)| (name, Json::from(self.stats.extra[i]))))
+        let counters = STAT_NAMES.map(|(name, i)| (name, Json::from(self.stats.extra[i])));
+        let cut = self.near_repeat_cut.map(|nodes| ("near_repeat_cut", Json::from(nodes)));
+        Json::object(counters.into_iter().chain(cut))
     }
 
     /// The result as one JSON object (schema [`SCHEMA`]; [`crate::results`] describes the provenance fields).
@@ -1452,6 +1459,7 @@ fn conclude_game(
                 result.method = Method::Start;
             }
             result.stats = searched.stats;
+            result.near_repeat_cut = searched.near_repeat_cut;
             result.counters = searched.counters;
             result.finder = searched.finder;
             result.phases.search = searched.time;

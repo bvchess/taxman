@@ -50,7 +50,8 @@
 //!   `in_the_bag`, which a prime game and a known one do not; only a search reaches its ceiling (`reached_cap`); a
 //!   prime game's `n` is prime; a trivial game promotes nothing; a repeat, and only a repeat, records the game it
 //!   repeats, and its `setup` has no `cap` (it ran no search to stop); a known game, and a search that a bound of the
-//!   store stopped, and only those, cite a source (`known`);
+//!   store stopped, and only those, cite a source (`known`); only a search may count the nodes its near-repeat cut cut
+//!   (`stats.near_repeat_cut`, a number the proof does not rest on: the search still explores its whole tree);
 //! * against the game of `n − 1` (from the file, else from `optimal.json`):
 //!   `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`.  Both are theorems for optimal games, so a violation proves one
 //!   of the two games is not optimal;
@@ -304,6 +305,9 @@ pub struct StoredGame {
     pub size: Option<ProblemSize>,
     /// For such a game, the digest of its search problem (`setup.digest`).
     pub digest: Option<u64>,
+    /// For a searched game armed with the near-repeat cut, the nodes it cut (`stats.near_repeat_cut`); none for a game
+    /// whose line has no such key, such as every line made before the cut.
+    pub near_repeat_cut: Option<u64>,
 }
 
 /// A score that equals a proven ceiling, given that the game of `n − 1` is optimal: this proves the game optimal
@@ -435,6 +439,8 @@ struct Entry {
     same_search: Option<SameSearch>,
     /// The known source the line's game, or its proof, comes from.
     known: Option<Cite>,
+    /// The nodes the near-repeat cut cut (`stats.near_repeat_cut`), on a line of a search armed with it.
+    near_repeat_cut: Option<u64>,
 }
 
 /// A line of a results file.
@@ -615,6 +621,11 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
         None | Some(Json::Null) => None,
         Some(cite) => Some(Cite::from_json(cite).map_err(|e| format!("bad \"known\": {e}"))?),
     };
+    // A key only the line of a search armed with the near-repeat cut has: lines made before it do not.
+    let near_repeat_cut = match f.0.get("stats").and_then(|stats| stats.get("near_repeat_cut")) {
+        None | Some(Json::Null) => None,
+        Some(count) => Some(count.as_u64().ok_or("bad \"stats.near_repeat_cut\"")?),
+    };
     let named = match f.get("prev")? {
         Json::Null => None,
         prev => {
@@ -645,6 +656,7 @@ fn parse_line(json: &Json, line: usize) -> Result<Line, String> {
         recorded: (proof, f.assumptions("assumes")?),
         same_search,
         known,
+        near_repeat_cut,
     })))
 }
 
@@ -881,6 +893,9 @@ fn contradiction(e: &Entry) -> Option<String> {
     }
     if e.reached_cap && !searched {
         return Some(format!("a {method} game that reached a cap, which only a search does"));
+    }
+    if e.near_repeat_cut.is_some() && !searched {
+        return Some(format!("a {method} game with \"stats.near_repeat_cut\", which only a search has"));
     }
     // A citation of a known source: a known game has one; a search has one only when the store's bound, not the chain's
     // ceiling, ended it, so it did not reach that ceiling, and the bound is the store's, with no game of the store's.
@@ -1231,6 +1246,7 @@ fn check_entry(
         ceiling_proof,
         size: e.setup.map(|s| s.size),
         digest: e.setup.map(|s| s.digest),
+        near_repeat_cut: e.near_repeat_cut,
     })
 }
 
@@ -1328,6 +1344,7 @@ impl ResultsFile {
                     ceiling_proof: result.prev.as_ref().and_then(|p| CeilingProof::of(result.n, result.score, p.score)),
                     size: result.setup.map(|s| s.size()),
                     digest: result.setup.map(|s| s.digest),
+                    near_repeat_cut: result.near_repeat_cut,
                 };
                 self.contents.games.insert(result.n, game);
                 self.contents.runs.remove(&result.n);
@@ -1532,7 +1549,13 @@ impl fmt::Display for FileReport {
             write!(f, "; {u_games} {verb} statement U at {} boards in all", u_boards.len())?;
         }
         let ceiling_proofs = counts(games.values().filter_map(|g| g.ceiling_proof), |c| c.as_str().to_owned());
-        write!(f, "\n  scores at a proven ceiling, given the game of n-1: {ceiling_proofs}")
+        write!(f, "\n  scores at a proven ceiling, given the game of n-1: {ceiling_proofs}")?;
+        let shortened = games.values().filter(|g| g.near_repeat_cut.is_some_and(|nodes| nodes > 0));
+        write!(
+            f,
+            "\n  searches shortened by the near-repeat cut, by proof: {}",
+            counts(shortened.map(|g| g.proof), |p| p.as_str().to_owned())
+        )
     }
 }
 

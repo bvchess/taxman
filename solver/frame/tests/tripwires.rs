@@ -33,6 +33,7 @@ use common::{options, prev_of, search_at_width, stored_games, Config, Game};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
+use taxman::json::Json;
 use taxman::search::{prepare, search, Prepared, SearchTactics};
 use taxman::solver::{self, Method};
 use taxman::tactics::Tactics;
@@ -441,7 +442,8 @@ fn the_tree_with_frequent_forgetting_has_not_changed() {
 
 /// (game, nodes with the near-repeat cut, nodes without it): the game solved by the solver on one thread from the
 /// committed chain's game of n − 1, which is the cut's game proven before (tactic `near_repeat`).  The cut ends the
-/// search of 1101 at its first step, and shortens those of 768 and 1083.
+/// search of 1101 at its first step, and shortens those of 768 and 1083.  The line of each game counts the nodes the
+/// cut cut.
 const NEAR_REPEATS: [(u32, u64, u64); 3] = [(768, 62, 85), (1083, 18, 70), (1101, 1, 548)];
 
 #[test]
@@ -455,6 +457,12 @@ fn the_trees_that_the_near_repeat_cut_shortens_have_not_changed() {
             opts.tactics.search.near_repeat = near_repeat;
             let r = solver::solve_game(n, Some(&prev), &opts).unwrap();
             assert_eq!((r.method, r.score), (Method::Search, games[&n].0), "n={n}, near_repeat {near_repeat}");
+            // Its line counts the nodes the cut cut (`stats.near_repeat_cut`) if it was armed, and has no such key if
+            // it was not.
+            let line = r.to_json();
+            let counted = line.get("stats").and_then(|stats| stats.get("near_repeat_cut")).and_then(Json::as_u64);
+            assert_eq!(counted, r.near_repeat_cut, "n={n}, near_repeat {near_repeat}");
+            assert_eq!(counted.is_some_and(|nodes| nodes > 0), near_repeat, "n={n}, near_repeat {near_repeat}");
             r.nodes
         });
         observed.push((n, with, without));

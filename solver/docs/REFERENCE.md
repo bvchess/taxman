@@ -170,7 +170,7 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
  "in_the_bag":18320,                      # score = in_the_bag + sum(promotions): 18320 + 1213 = 19533
  "prev":{"n":249,"score":19382,"source":"run","moves_digest":"44877b44d9bbf51a","proof":"same_search","assumes":[]},
  "same_search":null,                      # a repeat names the game it repeats here
- "nodes":2, "stats":{"promote_attempts":1,"promotions":10,"children":0,"match_bounds":2},
+ "nodes":2, "stats":{"promote_attempts":1,"promotions":10,"children":0,"match_bounds":2,"near_repeat_cut":0},
  "engine":{"splits":0,"checkpoints":0,"spilled_units":0,"max_queue":1},
  "setup":{"frames":4,"candidates":48,"max_total":11,"greedy_sum":1194,"cap":1312,
           "digest":"fe5e05eb67406e98"},
@@ -206,7 +206,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `prev` | the game of n − 1 this one was built from: its score, where it came from (`run`, `results`, `optimal`, `strict`, `bounds`), a digest of its moves, its proof and what it assumes; null if there was none.  A `run` or `results` game with no proof is the best game of an unfinished search (`--keep-going`): a seed, proven by nothing (section 4, "What a game had from n − 1") |
 | `same_search` | for a repeat, the earlier game of the file whose search it repeats: its n, the digest of the search problem they share, the problem's best promotion sum, that game's proof and what it assumes; null otherwise |
 | `known` | a key that only a line citing a known source has (section 4, "Citing a known source"): `{"source":"optimal"}` or `{"source":"strict"}` for a game taken from `optimal.json` or the committed chain, or `{"source":"bounds","lower":{"rule":..,"source":..},"upper":{"rule":..,"source":..}}` for the lines of the bounds store whose bound of n is the score (`lower` null when a search found the game and the upper bound stopped it) |
-| `nodes`, `stats` | the search's steps over all invocations, and the searcher's counters (`match_bounds` counts the node bounds computed, GF(2) or matching) |
+| `nodes`, `stats` | the search's steps over all invocations, and the searcher's counters (`match_bounds` counts the node bounds computed, GF(2) or matching); `stats.near_repeat_cut`, a key that only the line of a search armed with the [near-repeat cut](design/search.md#the-near-repeat-cut) has, counts the nodes the cut cut in the last invocation, 0 if it was armed and cut none |
 | `engine` | this invocation's splits, checkpoints written, units spilled and largest in-memory queue; and, only on a line whose search started a finder (`--finder-after`), `finder`: `at_nodes` (the search's steps then), `from` (the incumbent's promotion sum then), `best` (the best promotion sum the finder reached), `improved` (its sets that became the incumbent), `refused` (its sets the checks refused: 0), `seconds` (how long it ran) and `found_seconds` (when it reached `best`) |
 | `setup` | null on a `trivial`, `prime` or `known` line, which set up no search; otherwise the frames and candidates found, `max_total` (the most promotions the freedoms allow), the greedy start, `cap` (the ceiling as a promotion sum, `n + score(n-1) - in_the_bag`; null on a repeat, which ran no search to stop), and `digest`, a digest of the search problem the setup poses (solver/docs/design/same-search.md), by which a later game finds this one to repeat |
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game); and `own`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) over every invocation, the clock of the wall.  It is 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game), and for a search that ran only before its game was the oldest of the window.  A line written before 2026-10-22 lacks `own`; the readers ignore it, and the schema is 5 still |
@@ -235,6 +235,10 @@ check every results file ([verifiers.md](verifiers.md) says what each checks).
 | `prime_formula` | the [prime formula](../../docs/GLOSSARY.md#the-game), optimal if the game of n − 1 is | yes |
 | `same_search` | the game's [search problem](../../docs/GLOSSARY.md#the-frame-model) is the one an earlier game m of the file posed, and m's proof (`exhausted`, `cap`, `same_search`, or `known` where an upper bound ended its search) settled its best promotion sum; the game is m's promotions on this board (tactic `same_search`; [design/same-search.md](design/same-search.md) has the argument) | no: on the game m it repeats |
 | `known` | a known source (`--use-prev`) holds the game, or an upper bound of it ended the search; the line's `known` field cites the source, and what the proof assumes follows from it (below) | no: on the source |
+
+A search that the near-repeat cut shortened is `exhausted` all the same: it explores its whole tree, with one more cut,
+and the cut rests on the game that the line's `prev` names, which is proven and assumes nothing.  The line says that the
+cut shortened the search with `stats.near_repeat_cut` above 0.
 
 ### Citing a known source
 

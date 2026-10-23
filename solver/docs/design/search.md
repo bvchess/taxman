@@ -378,6 +378,10 @@ search makes exactly those (tactic `near_repeat`, on by default; `search::NearRe
   both problems.  The promotions must be promotable in Π_M.  On every frame the candidates touch, every move of Π_M's
   state must be a move of Π_n's, and every factor of Π_n's state that Π_M's lacks must be no candidate and pay for no
   move of Π_M's frame and no candidate.  The check comes after the rule of symmetric pairs, before the bound.
+* **The record.**  A search armed with the cut counts the nodes it cuts, and its results line gives the count as
+  `stats.near_repeat_cut` ([the reference](../REFERENCE.md#a-results-line---out-schema-5)): above 0 for a search that
+  the cut shortened, 0 for one it was armed for and never cut.  The proof stays `exhausted`.  The count is of the last
+  invocation, since each invocation sets its cut up again.
 * **Cost.**  Below B the cut costs one comparison.  Where the first check fails, it costs a few set operations.  A
   node's state in Π_M is found only where it passes, once, from its parent's (one promotion) or from Π_M's root, and
   kept beside the node's own.
