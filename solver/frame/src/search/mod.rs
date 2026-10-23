@@ -86,6 +86,8 @@
 //!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
 //! * `near_repeat`: [`NearRepeat`], the setup of the near-repeat cut and its checks at a node.
+//! * `profile`: [`SearchProfile`], the profile of a search (`taxman solve --profile`): its tree of tagged nodes, the
+//!   searchers' counts, its file.
 //! * here: [`search`], which starts or resumes the engine on a prepared game, and [`search_above`], the same from a
 //!   floor (an incumbent worth a given sum and no set) instead of a start incumbent; [`start_incumbent`], the incumbent
 //!   [`search`] starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`],
@@ -102,6 +104,7 @@ mod hooks;
 mod incumbent;
 pub mod lagrange;
 mod near_repeat;
+mod profile;
 mod refine;
 mod searcher;
 mod setup;
@@ -115,6 +118,7 @@ pub use dual::{dual_bound, DualBound, NodeBound};
 pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 pub use incumbent::Neighbourhood;
 pub use near_repeat::NearRepeat;
+pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
     extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
@@ -123,15 +127,17 @@ pub use setup::{
 pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
 
 use crate::bits::Bits;
-use crate::engine::{self, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
+use crate::engine::{self, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
 use crate::matchbound::MatchGraph;
 use crate::model::NogoodStats;
 use header::Header;
 use incumbent::{distinct, dive, surviving};
+use profile::Begin;
 use searcher::{get_bits, put_bits};
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::thread;
 use std::time::{Duration, Instant};
 
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
@@ -262,7 +268,7 @@ pub fn search_above<const W: usize>(
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None)
+    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None, None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -275,7 +281,7 @@ pub fn search_with<const W: usize>(
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
     let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
-    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None, None)
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -291,7 +297,8 @@ pub fn search_beside<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, prepared.tactics.forgetting(), None, plan, None, None)
+    let forgetting = prepared.tactics.forgetting();
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
@@ -304,6 +311,9 @@ pub fn search_beside<const W: usize>(
 /// once it holds one: the caller may set it before the search or while it runs, once, and each searcher picks it up
 /// when it next starts a unit.  A node is cut only where the incumbent reaches the cut's bound
 /// ([`NearRepeat::reached`]), so a cut armed below it waits for the incumbent.
+///
+/// With `profile`, the search keeps the profile that it asks for in its file ([`SearchProfile`]), which observes the
+/// search and changes nothing of it: a profile that cannot be written is said on stderr, and the search goes on.
 #[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
@@ -314,15 +324,16 @@ pub fn search_steered<const W: usize>(
     plan: Option<&finder::Plan<W>>,
     branching: &Arc<Branching>,
     near_repeat: &OnceLock<NearRepeat<W>>,
+    profile: Option<&ProfilePlan>,
 ) -> io::Result<SearchResult<W>> {
-    let (forgetting, near_repeat) = (prepared.tactics.forgetting(), Some(near_repeat));
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, Some(branching), near_repeat)
+    let (forgetting, near_repeat, branching) = (prepared.tactics.forgetting(), Some(near_repeat), Some(branching));
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, branching, near_repeat, profile)
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
 /// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
-/// settings `branching` if given (else those of the tactics), and with the near-repeat cut that `near_repeat` holds or
-/// comes to hold, if given ([`search_steered`]).
+/// settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
+/// comes to hold, if given, and keeping the profile `profile` asks for, if given ([`search_steered`]).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -336,6 +347,7 @@ fn search_forgetting<const W: usize>(
     plan: Option<&finder::Plan<W>>,
     branching: Option<&Arc<Branching>>,
     near_repeat: Option<&OnceLock<NearRepeat<W>>>,
+    profile: Option<&ProfilePlan>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
@@ -396,10 +408,37 @@ fn search_forgetting<const W: usize>(
         Some(branching) => SearchSpace { branching: Arc::clone(branching), ..space },
         None => space,
     };
+    let profile = profile.and_then(|plan| {
+        let begin = match &resumed {
+            Some((_, head)) => Begin::Resumed { nodes: head.stats.nodes, elapsed: head.elapsed },
+            None => Begin::Fresh {
+                bound: space.gf2.as_ref().and_then(|graph| {
+                    let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
+                    NodeBound::new(prepared, graph).completions(&root)
+                }),
+                need: best.1 + 1,
+                candidates: prepared.candidates.len(),
+            },
+        };
+        let threads = control.workers().unwrap_or(cfg.threads);
+        match SearchProfile::open(plan, prepared, &begin, threads, best.1) {
+            Ok(profile) => Some(Arc::new(profile)),
+            Err(e) => {
+                eprintln!("warning: no profile of the search of {}: {e}", prepared.n);
+                None
+            }
+        }
+    });
+    let space = SearchSpace { profile: profile.as_deref(), ..space };
     // The progress lines tell what the nogood tables have done.
     let totals = Arc::clone(&space.nogood_totals);
     let note = ProgressNote(Arc::new(move || totals.lock().unwrap_or_else(PoisonError::into_inner).summary()));
-    let cfg = &EngineConfig { progress_note: Some(note), ..cfg.clone() };
+    // A profile is written at each checkpoint, before the engine writes it.
+    let hook = profile.as_ref().map(|profile| {
+        let profile = Arc::clone(profile);
+        CheckpointHook(Arc::new(move |event| profile.checkpoint(event)))
+    });
+    let cfg = &EngineConfig { progress_note: Some(note), checkpoint_hook: hook, ..cfg.clone() };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
         None => {
@@ -423,9 +462,32 @@ fn search_forgetting<const W: usize>(
     };
     let engine_start = Instant::now();
     let label = cfg.progress.map(|_| cfg.label.as_str());
-    let (outcome, finder) = finder::run_beside(prepared, &control, plan, before.nodes, label, || {
-        engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))
-    });
+    let run = || {
+        finder::run_beside(prepared, &control, plan, before.nodes, label, || {
+            engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))
+        })
+    };
+    let (outcome, finder) = match profile.as_deref() {
+        None => run(),
+        // Beside the search, a thread summarizes the open units of each checkpoint; the profile ends with the run.
+        Some(profile) => thread::scope(|scope| {
+            let (graph, background) = (space.gf2.as_ref(), cfg.background);
+            let jobs = profile.jobs().expect("a profile's checkpoints are taken once");
+            let summary = scope.spawn(move || profile::open_work(profile, prepared, graph, jobs, background));
+            let ending = profile::Ending(profile);
+            let ran = run();
+            match &ran.0 {
+                Ok(o) => profile.finish(Some(o.stats.nodes), o.completed, o.best, o.elapsed, None),
+                Err(e) => {
+                    let elapsed = earlier + engine_start.elapsed();
+                    profile.finish(None, false, best.1, elapsed, Some(&e.to_string()));
+                }
+            }
+            drop(ending);
+            summary.join().expect("the profile's summary of the open work");
+            ran
+        }),
+    };
     let outcome = outcome?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
     let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());

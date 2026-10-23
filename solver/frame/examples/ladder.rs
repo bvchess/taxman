@@ -3,7 +3,8 @@
 //!
 //! ```text
 //! cargo run --release --example ladder -- [--threads T[,T...] | --scaling] [--seconds S] [--diag] [--no-cap]
-//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--node-limit N] [--cores C] N...
+//!     [--no-seed] [--seed-opt] [--known FILE] [--tactic NAME=VALUE]... [--node-limit N] [--cores C]
+//!     [--checkpoint-dir DIR [--checkpoint-interval S]] [--profile DIR [--profile-depth D]] N...
 //! ```
 //!
 //! Each game is set up from the frame builder (no golden data) as `taxman solve` sets it up (`taxman::board::Board`,
@@ -23,6 +24,13 @@
 //! `--tactic` sets a search tactic with the names and values of `taxman solve --tactic` (`nogoods=off`,
 //! `match_refine=0`, `nogood_keep=top64`, ...).  `--node-limit N` stops each search after N nodes (steps), for
 //! measuring a prefix of a search too long to finish.
+//!
+//! `--checkpoint-dir DIR` checkpoints each search in DIR every `--checkpoint-interval` seconds (60 by default), as
+//! `taxman solve` does; the checkpoint of a search that completes is deleted, and none is resumed.  `--profile DIR`
+//! keeps the profile of each search (`search::SearchProfile`, as `taxman solve --profile` does) in
+//! `DIR/nNNNN-tT.profile.jsonl`, T the thread count, at the depth `--profile-depth` (`search::PROFILE_DEPTH` by
+//! default); it is written at each checkpoint and at the end.  With neither `--diag` nor `--profile` a search is the same
+//! as with `--profile`, but for the profile, so that the two measure what the profile costs.
 //!
 //! Scaling: `--threads` takes a list of thread counts, and `--scaling` is 1, 2, 4, ... up to the available
 //! parallelism (which is included).  Each game is searched with each count in turn, and a table per game (and
@@ -61,12 +69,15 @@
 //! workers would do, though not in time, which the turns inflate.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use taxman::board::Board;
 use taxman::engine::{Counters, EngineConfig};
 use taxman::game::Optimal;
-use taxman::search::{cut, search_with, Diagnostics, SearchTactics};
+use taxman::search::{
+    cut, search_steered, search_with, BranchSettings, Branching, Diagnostics, ProfilePlan, SearchTactics,
+    PROFILE_DEPTH, PROFILE_MOST_IDS,
+};
 use taxman::tactics::Tactics;
 
 #[path = "common/counters.rs"]
@@ -88,6 +99,12 @@ struct Options {
     /// At most this many threads search at once (`EngineConfig::cores`).
     cores: Option<usize>,
     node_limit: Option<u64>,
+    /// Where to checkpoint each search, and how often.
+    checkpoint: Option<PathBuf>,
+    checkpoint_interval: Duration,
+    /// Where to keep each search's profile, and its depth.
+    profile: Option<PathBuf>,
+    profile_depth: u32,
 }
 
 fn parse() -> Result<Options, String> {
@@ -103,6 +120,10 @@ fn parse() -> Result<Options, String> {
         games: Vec::new(),
         cores: None,
         node_limit: None,
+        checkpoint: None,
+        checkpoint_interval: Duration::from_secs(60),
+        profile: None,
+        profile_depth: PROFILE_DEPTH,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -131,6 +152,17 @@ fn parse() -> Result<Options, String> {
             "--node-limit" => {
                 o.node_limit = Some(value("--node-limit")?.parse().map_err(|e| format!("--node-limit: {e}"))?)
             }
+            "--checkpoint-dir" => o.checkpoint = Some(value("--checkpoint-dir")?.into()),
+            "--checkpoint-interval" => {
+                let seconds: f64 =
+                    value("--checkpoint-interval")?.parse().map_err(|e| format!("--checkpoint-interval: {e}"))?;
+                o.checkpoint_interval =
+                    Duration::try_from_secs_f64(seconds).map_err(|e| format!("--checkpoint-interval: {e}"))?;
+            }
+            "--profile" => o.profile = Some(value("--profile")?.into()),
+            "--profile-depth" => {
+                o.profile_depth = value("--profile-depth")?.parse().map_err(|e| format!("--profile-depth: {e}"))?
+            }
             "--tactic" => {
                 // The solver's parser, so that the names and values are the same as for `taxman solve --tactic`.
                 let spec = value("--tactic")?;
@@ -146,6 +178,9 @@ fn parse() -> Result<Options, String> {
     }
     if o.games.is_empty() {
         o.games = vec![760, 800, 840, 880, 900, 960, 992, 1000];
+    }
+    if o.diag && o.profile.is_some() {
+        return Err("--diag and --profile do not go together".into());
     }
     Ok(o)
 }
@@ -303,11 +338,28 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             time_limit: Some(Duration::from_secs(o.seconds)),
             cores: o.cores,
             node_limit: o.node_limit,
+            checkpoint: o.checkpoint.as_ref().map(|dir| (dir.join(format!("n{n:04}.ckpt")), o.checkpoint_interval)),
             ..EngineConfig::default()
         };
+        if let Some(dir) = &o.checkpoint {
+            std::fs::create_dir_all(dir).expect("the checkpoint directory");
+        }
         let diag = o.diag.then(|| Mutex::new(Diagnostics::default()));
+        let profile = o.profile.as_ref().map(|dir| ProfilePlan {
+            file: dir.join(format!("n{n:04}-t{threads}.profile.jsonl")),
+            depth: o.profile_depth,
+            most_ids: PROFILE_MOST_IDS,
+        });
         let (cpu_before, cycles_before) = (counters::cpu_seconds(), counters::now());
-        let r = search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref()).expect("search");
+        let r = if o.diag {
+            search_with(&p, &cfg, seed.as_ref(), cap, false, diag.as_ref())
+        } else {
+            // As `search_with` without diagnostics, but for the profile.
+            let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
+            let seeds: Vec<_> = seed.into_iter().collect();
+            search_steered(&p, &cfg, &seeds, cap, false, None, &branching, &OnceLock::new(), profile.as_ref())
+        }
+        .expect("search");
         let (cpu_after, cycles_after) = (counters::cpu_seconds(), counters::now());
         let cpu = cpu_before.zip(cpu_after).map_or("?".into(), |(a, b)| format!("{:.2}", b - a));
         let gigacycles = cycles_before

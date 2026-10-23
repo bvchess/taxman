@@ -36,7 +36,9 @@ the design in outline.
   duplicating nothing beyond partly explored nodes.  Any interval works, zero included.  The caller's header identifies
   the search, so that a checkpoint of another game, width, frames, candidates or tactics refuses to resume
   ([trust.md](trust.md)); a build that sets up the same search resumes it.  A
-  run that completes deletes its checkpoint, unless the caller asks to keep it until it has recorded the result.
+  run that completes deletes its checkpoint, unless the caller asks to keep it until it has recorded the result.  A
+  caller's hook (`EngineConfig::checkpoint_hook`) is told of each checkpoint while the workers are parked, before the
+  file is written and after: [the profile of a search](#the-profile-of-a-search) is written then.
 * **Stopping and sharing.**  Time and node limits, and SIGINT and SIGTERM (after `stop_on_signals`), stop a run with a
   final checkpoint; a second signal kills the process.  A stop that already holds when a run starts (a time limit of
   zero, a signal received before) does no search work, however the threads are scheduled: the run checks before it
@@ -213,3 +215,78 @@ changes.  The solver confirms every completed game's score against it, and a sco
 names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
 against anything else (`verify-optimal FILE` and `extend-optimal --table FILE` take one); the library takes
 another table where a test needs one (`solver::solve_range_each_with`, `results::read_results`).
+
+## The profile of a search
+
+The profile of a search records where the search's steps go, while it runs, so that the shape of a tree is measured
+rather than estimated from one checkpoint.  `taxman solve --profile DIR` keeps one for every game it searches, in
+`DIR/nNNNN.profile.jsonl`, and `solver/tools/read_profile.py` prints it: the depth histogram, the largest subtrees at
+the depths where the tree branches with what was known when each was made, how much of the game the largest hold, how
+their size follows their gap, and the timeline.  The profile observes the search and changes nothing of it: the same
+game gives the same tree and the same answer with it and without, and it is no tactic, no part of a checkpoint's
+header and no part of a results line.
+
+**What it records.**  A node's *depth* is the number of branchings from the root to it, not its number of promotions
+(a child that promotes forced members adds several).  Every node at depth D or less (`--profile-depth`) is *tagged*
+with an id when it is made, up to the most ids a game may have (`search::PROFILE_MOST_IDS`).  Past them a new node
+counts to its nearest tagged ancestor, and the profile says it is full.  The default depth (`search::PROFILE_DEPTH`) is
+deep because the top of a tree is a spine: each node near the root makes one or two children, of which one holds
+nearly all of the steps, and the steps spread over many subtrees only some twenty branchings down (the constant's
+comment has the measurement).
+
+The *own steps* of a tagged node are the steps taken at the node and, at depth D, in its whole subtree; a subtree's
+steps are the own steps summed over it, which the reader does.  Each searcher keeps the ids of the nodes on its stack,
+counts its steps by id and by the number of promotions of the node, and hands its counts to the profile when its run
+ends (`search::profile`, `Tags`).
+
+**The file** is JSON lines, appended, and synced at each checkpoint before the engine writes it:
+
+| line | when | what |
+|---|---|---|
+| `profile` | first | n, the set width, the depth D and the most ids |
+| `start` | each run | whether it resumed, whether the file has the tree from the root (`rooted`), the steps before, the threads, the incumbent, `unplaced` (steps the profile did not see), `frozen` (see "Resuming") |
+| `node` | at the checkpoint after the node is made | `id`, `parent`, `depth`, `child` (its index among its parent's tagged children), `branch` (`default`: the search's own conflict; `conflict`: the conflict that conflict branching chose; `forced`: the parent's forced members), `added` (the promotions it added to its parent's), `promotions`, `sum`, `cands`, `bound`, `need`, `gap`, `t` (the search's time) |
+| `steps` | each checkpoint, and the end of a run | `seq`, `nodes` (the search's steps, as the checkpoint records them), `counted`, `elapsed`, `ids` (each id's own steps in the interval), `unplaced`, `promotions` (the steps by number of promotions in the interval), `made` (ids so far), `full` |
+| `open` | after each checkpoint | its units by id, the spread of the gaps of a sample of them (at most `OPEN_BOUNDED` of `src/search/profile.rs`), and the seconds the summary took |
+| `end` | the end of a run | `nodes`, `completed`, `best`, `elapsed`, `made`, `full` |
+
+A node's `bound`, `need` and `gap` are those of the units file of `examples/tune.rs`: the GF(2) bound of what the node's
+completions add (the matching bound on the matching path), the incumbent's sum less the node's plus one, and the
+difference.  The bound is the one the node's own check found when it was made, whose limit on the number of promotions
+counts the candidates before the child's were narrowed, so it can exceed the units file's.  The need is at the
+incumbent of that moment; the reader also gives the gap at the final best.  The open units' gaps are computed after
+each checkpoint by a thread beside the search, at the checkpoint's incumbent, as the units file computes them.
+
+**Placing a unit by its promotions.**  A unit carries only its node's promotions and candidates (`search::TaxUnit`),
+and the checkpoints keep that format, so a searcher that starts a unit finds the unit's id from its promotions
+(`SearchProfile::locate`): from the root, it goes to the first child, in the order they were made, whose added
+promotions the unit's node holds, for as long as there is one.  The walk is exact because sibling subtrees are
+disjoint:
+
+* A node v branches on a member x of a conflict (`choose_branch`): the child promotes x, alone or with the other
+  forced members, and v takes x out of its candidates before its loop makes another child.
+* A node's candidates are among its parent's when it is made (`make_child` narrows them, and a rule only drops more),
+  so no later child of v, and no node below one, can promote x.
+* So a node below v holds the added promotions of v's child c only if it is in c's subtree, and the first child whose
+  added promotions it holds is the one whose subtree holds it.  v's own loop, the unit v leaves when its worker
+  yields, holds no child's: the walk stops at v, as it should.
+
+The unit's node is the tagged node the walk stops at when it has as many promotions as that node.  Debug builds check
+the placement each time a searcher yields: every unit it hands over is placed where its node stands.  The profile
+keeps of a tagged node only its depth, its added promotions and its children in order, a few words, where its promotion
+and candidate sets would take 2 KB each at 128 words, and a unit is placed with a few bit tests a level.
+
+**Resuming.**  The profile is synced before the engine writes a checkpoint, so it is never behind a checkpoint on disk.
+A resumed search reads its profile up to the last `steps` line whose `nodes` are the checkpoint's, cuts the file
+there (a crash between the two writes leaves the profile a block ahead), and goes on with its tree, its ids and its
+counts.  A profile behind its checkpoint, after a failed write, counts the steps it lacks as unplaced and is *frozen*:
+it tags no more nodes, since a unit below a node it lost is placed at that node's nearest ancestor in the file, which a
+new child of that ancestor could take from it.  A search resumed with no profile, as from a checkpoint of a build
+without it, gets one that cannot place its units: its steps are unplaced, and its counts by number of promotions and
+its open units are recorded.  A resumed profile keeps its depth and its most ids.  A fresh search sets an earlier
+file of its game aside, as `nNNNN.profile.jsonl.K`: a restart or a rerun does not lose it.
+
+**Cost.**  A step costs the profile a comparison and an increment; a tagged node, a lock and a line; a checkpoint, a
+block written and synced while the workers are parked; and the thread beside the search, one GF(2) solve for each open
+unit of its sample after each checkpoint (it takes the idle policy with `--background`).  A write that fails says so
+on stderr and ends the profile; the search goes on.

@@ -582,6 +582,7 @@ fn search_from<const W: usize>(
         cores: None,
         control: None,
         background: opts.background,
+        checkpoint_hook: None,
     };
     let found = search::search(prepared, &cfg, Some(start), cap, resuming);
     if own {

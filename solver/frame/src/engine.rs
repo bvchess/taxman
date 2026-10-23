@@ -99,6 +99,12 @@
 //! then the write and its fsync; then each unit pushed in it costs a rebuild when it runs.  [`Counters`] records the
 //! longest wait for the workers to park and the longest pause.
 //!
+//! A caller's [`CheckpointHook`] is told of the checkpoint twice in the pause, with the lock held: before the file is
+//! written, with the nodes and the time it will record, and after it is written, with its path.  Every run has ended
+//! by then, so whatever a searcher counts and hands over when its run ends adds up to the checkpoint's nodes.  A caller
+//! that makes its own record durable when told of the first never has a record behind a checkpoint on disk (a crash
+//! between the two leaves it one checkpoint ahead, which it can tell from the nodes).
+//!
 //! The next periodic checkpoint is due one interval after a pause ends, but never sooner than that pause
 //! lasted, and its pause begins only once the released workers are all running again (`resuming` is clear:
 //! no held unit is left, and the deque is empty or every live worker runs, as every one does when none is
@@ -356,6 +362,9 @@ pub struct EngineConfig {
     /// that the search takes the CPU that nothing else wants.  The thread that calls [`run`], which coordinates, keeps
     /// its policy.  Off by default.
     pub background: bool,
+    /// Told of each checkpoint, with every worker parked: once before the file is written and once after
+    /// ([`CheckpointEvent`]; "Checkpoint" in the module docs).  `None`, the default: nobody is told.
+    pub checkpoint_hook: Option<CheckpointHook>,
 }
 
 impl Default for EngineConfig {
@@ -374,7 +383,30 @@ impl Default for EngineConfig {
             cores: None,
             control: None,
             background: false,
+            checkpoint_hook: None,
         }
+    }
+}
+
+/// What a [`CheckpointHook`] is told, with every worker parked, so that the search stands still: `nodes` is the steps of
+/// every run of the search so far, as the checkpoint records them, and `elapsed` its time.
+#[derive(Clone, Copy, Debug)]
+pub enum CheckpointEvent<'a> {
+    /// The checkpoint is about to be written: what the caller records of the search can be made durable first, so that
+    /// it is never behind a checkpoint on disk.
+    Writing { nodes: u64, elapsed: Duration },
+    /// The checkpoint has been written to `path`, which the caller may open and read (the next checkpoint replaces it).
+    Written { path: &'a Path, nodes: u64, elapsed: Duration },
+}
+
+/// A caller's hook on the checkpoints ([`EngineConfig::checkpoint_hook`]), called by the coordinator with the engine's
+/// lock held and every worker parked: it must be quick, must not wait for a worker, and cannot fail the run.
+#[derive(Clone)]
+pub struct CheckpointHook(pub Arc<dyn Fn(CheckpointEvent<'_>) + Send + Sync>);
+
+impl std::fmt::Debug for CheckpointHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CheckpointHook")
     }
 }
 
@@ -868,6 +900,7 @@ where
         label: &cfg.label,
         note: cfg.progress_note.as_ref(),
         header,
+        hook: cfg.checkpoint_hook.as_ref(),
     };
     // See "Starting stopped": a stop that already holds is asked for before any worker exists to take a unit, so that
     // none is started, and the coordinator carries it out as it does every stop.
@@ -1280,6 +1313,7 @@ struct Plan<'p> {
     label: &'p str,
     note: Option<&'p ProgressNote>,
     header: &'p [u8],
+    hook: Option<&'p CheckpointHook>,
 }
 
 impl Plan<'_> {
@@ -2013,8 +2047,18 @@ impl<U: Unit> Shared<U> {
                     continue;
                 }
                 if let Some((path, _)) = plan.checkpoint {
+                    let (nodes, elapsed) = (self.total_stats(st).nodes, self.prior + self.t0.elapsed());
+                    let tell = |event| {
+                        if let Some(hook) = plan.hook {
+                            (hook.0)(event);
+                        }
+                    };
+                    tell(CheckpointEvent::Writing { nodes, elapsed });
                     match self.write_checkpoint(st, path, plan.header) {
-                        Ok(()) => st.counters.checkpoints += 1,
+                        Ok(()) => {
+                            st.counters.checkpoints += 1;
+                            tell(CheckpointEvent::Written { path, nodes, elapsed });
+                        }
                         Err(e) => {
                             st.error.get_or_insert(e);
                             st.stop_requested = true;
@@ -2553,8 +2597,18 @@ const MAX_BLOB: u64 = 1 << 32;
 /// # Errors
 ///
 /// As [`read_checkpoint`], and the first error `unit` returns.
-pub fn scan_checkpoint(path: &Path, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
-    let mut r = HashReader { inner: BufReader::with_capacity(1 << 20, File::open(path)?), hash: Hash64::new() };
+pub fn scan_checkpoint(path: &Path, unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
+    scan_checkpoint_file(File::open(path)?, unit)
+}
+
+/// [`scan_checkpoint`] of a checkpoint already open: for a caller that opens the file as soon as it is written
+/// ([`CheckpointEvent::Written`]) and reads it later, after the next checkpoint may have replaced it.
+///
+/// # Errors
+///
+/// As [`scan_checkpoint`].
+pub fn scan_checkpoint_file(file: File, mut unit: impl FnMut(&[u8]) -> io::Result<()>) -> io::Result<CheckpointHead> {
+    let mut r = HashReader { inner: BufReader::with_capacity(1 << 20, file), hash: Hash64::new() };
     let mut scan = || -> io::Result<CheckpointHead> {
         let header = get_prefix(&mut r)?;
         let best = get_u64(&mut r)?;

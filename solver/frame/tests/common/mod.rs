@@ -493,6 +493,7 @@ impl<const W: usize> Game<W> {
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
             // As a search has it: with the tactic, and cutting where the incumbent reaches the bound.
             near_repeat: cfg.near_repeat.then_some(&self.near),
+            profile: None,
             #[cfg(feature = "studies")]
             hooks: None,
         };

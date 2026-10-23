@@ -186,6 +186,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     workers every millisecond or so while the run checkpoints, spills and resumes;
   * the counters: capacity is wall × threads when the workers do not change, and a searcher that sleeps before its
     first and second polls shows in the rebuild and first-step times.
+* **The profile of a search** (`src/search/profile.rs`, games 800 and 1020): the same steps, counters and answer with
+  it and without; every step counted once, on four threads with a checkpoint every millisecond and all the ids made,
+  and through a resume past a block a crash left, behind a lost block, or with no profile.  Debug builds place every
+  unit a searcher hands over.
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
   * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions,
     repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a window, by

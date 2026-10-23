@@ -44,9 +44,10 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
     (`Refiner`: conflicts, refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where it
     applies, its forced members, its refits), `symmetry.rs` (the rule of symmetric pairs), `dual.rs` (the dual bound of
     a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, which a lab may
-    change while a search runs), `incumbent.rs`, and `header.rs` (the checkpoint header).
-    The `if let Some(p) = &mut self.probe` lines in `searcher.rs` are instrumentation (`diagnostics.rs`), and a first
-    read can skip them.
+    change while a search runs), `incumbent.rs`, `header.rs` (the checkpoint header), and `profile.rs` (the profile of
+    a search, [engine.md](engine.md#the-profile-of-a-search)).  The `if let Some(p) = &mut self.probe` lines in
+    `searcher.rs` are instrumentation (`diagnostics.rs`), and so are those of `tags`, the profile's; a first read can
+    skip them.
 11. `src/bounds.rs`: two small functions, the limit on a node's further promotions (`max_additional`) and the greedy
     incumbent.
 

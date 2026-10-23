@@ -13,7 +13,7 @@ mod commands;
 use cli::{errln, outln, CliError, CliResult, REDEPLOY_STATUS, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
-use taxman::search::{finder, SearchTactics};
+use taxman::search::{finder, SearchTactics, PROFILE_DEPTH};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -75,6 +75,12 @@ commands:
                                search passes --hook-after (once a game), and done, with its line, when such a game
                                has its line
       --hook-after S           seconds of a game's own search before the hook is told it runs long (default 3600)
+      --profile DIR            keep a profile of each game's search in DIR/nNNNN.profile.jsonl: where its steps
+                               go, by node near the root, by number of promotions and by checkpoint interval, and
+                               its open units at each checkpoint (solver/tools/read_profile.py reads it).  It
+                               changes no search and no result, and is no part of a checkpoint
+      --profile-depth D        the nodes a profile names: those at most D branchings below the root (default
+                               {profile_depth})
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: optimal.json's, the committed chain's
@@ -141,6 +147,7 @@ fn usage() -> String {
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
         .replace("{finder_after}", &finder::AFTER.to_string())
+        .replace("{profile_depth}", &PROFILE_DEPTH.to_string())
 }
 
 fn main() -> ExitCode {

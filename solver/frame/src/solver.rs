@@ -102,7 +102,8 @@ use crate::results::{
     SCHEMA,
 };
 use crate::search::{
-    self, finder, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, SearchTactics,
+    self, finder, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
+    SearchTactics,
 };
 use crate::tactics::Tactics;
 use lab::{GameLab, Policies};
@@ -199,6 +200,11 @@ pub struct SolveOptions {
     /// The lab channel (`--lab-dir`, `--hook`, `--hook-after`): a lab that watches and steers the games in flight,
     /// never their results (`lab`, and solver/docs/design/lab.md).  None by default, and then nothing of it runs.
     pub lab: LabOptions,
+    /// The directory of the searches' profiles (`--profile`): each game's search keeps one, `nNNNN.profile.jsonl`, at
+    /// the depth `profile_depth` (`--profile-depth`; [`search::SearchProfile`]).  A profile observes a search and
+    /// changes nothing of it: it is no tactic, no part of a checkpoint and no part of a result.  None by default.
+    pub profile: Option<PathBuf>,
+    pub profile_depth: u32,
 }
 
 impl Default for SolveOptions {
@@ -227,6 +233,8 @@ impl Default for SolveOptions {
             finder_after: 0,
             finder_budget: Duration::from_secs(60),
             lab: LabOptions::default(),
+            profile: None,
+            profile_depth: search::PROFILE_DEPTH,
         }
     }
 }
@@ -1190,12 +1198,17 @@ impl<const W: usize> Job for SearchJob<W> {
             cores: None,
             control: Some(Arc::clone(&self.control)),
             background: opts.background,
+            // The search's own, if it keeps a profile.
+            checkpoint_hook: None,
         };
         if let Some(prev) = &go.proven {
             self.arm(prev)?;
         }
         let (prepared, resuming, branching, plan) = (&self.prepared, self.resuming, &self.branching, finder.as_ref());
-        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, &self.near);
+        let profile = opts.profile.as_deref().map(|dir| ProfilePlan::in_dir(dir, n, opts.profile_depth));
+        let near = &self.near;
+        let found =
+            search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile.as_ref());
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);

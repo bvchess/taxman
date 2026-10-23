@@ -123,7 +123,7 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 9] = [
+const SOLVE_FLAGS: [&str; 11] = [
     "--out",
     WINDOW_FLAG,
     "--game-hours",
@@ -133,6 +133,8 @@ const SOLVE_FLAGS: [&str; 9] = [
     "--lab-dir",
     "--hook",
     "--hook-after",
+    "--profile",
+    "--profile-depth",
 ];
 
 /// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
@@ -203,6 +205,15 @@ pub fn solve(args: &[String]) -> CliResult {
     opts.lab.hook = args.value("--hook").map(PathBuf::from);
     if let Some(after) = args.seconds("--hook-after")? {
         opts.lab.hook_after = after;
+    }
+    opts.profile = args.value("--profile").map(PathBuf::from);
+    if let Some(depth) = args.parsed("--profile-depth")? {
+        if opts.profile.is_none() {
+            return Err(CliError::Usage(
+                "--profile-depth is the depth of the profiles of --profile: give it too".into(),
+            ));
+        }
+        opts.profile_depth = depth;
     }
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);
