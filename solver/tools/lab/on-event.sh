@@ -41,7 +41,8 @@
 # the settings or the sandbox, which come from this checkout.
 #
 # Environment:
-#   LAB_HOME           the lab's directory, relative to the home                                  default taxman-lab
+#   TAXMAN_HOME        the root of the chain's and the lab's folders, relative to the home     see layout.sh
+#   LAB_HOME           the lab's directory, relative to the home                               see layout.sh
 #   LAB_THREADS        threads the session may use (the study procedure says so)                  default 16
 #   LAB_MAX_PER_DAY    studies for a long event, and asks, a day                                  default 8
 #   LAB_MAX_TURNS      turns of the session (claude --max-turns)                                  default 80
@@ -58,7 +59,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 TOOLS="$(dirname "$HERE")"
 STUDY="$HERE/study.md"
 TEMPLATE="$HERE/settings.template.json"
-LAB_HOME="${LAB_HOME:-taxman-lab}"
+# The files that govern a study, by name in HERE: the study sees none of them writable (the check and the proof).
+GOVERNING_NAMES=(on-event.sh study.md settings.template.json lab.sh layout.sh)
+GOVERNING=()
+for name in "${GOVERNING_NAMES[@]}"; do GOVERNING+=("$HERE/$name"); done
+# shellcheck source=layout.sh
+. "$HERE/layout.sh"
 LAB="$HOME/$LAB_HOME"
 CTL="$LAB/ctl"
 WORK="$LAB/work"
@@ -112,9 +118,11 @@ expand_home() {
 
 # --- the settings, and what has to hold before any session ----------------------------------------------------------
 
-# The settings of the sandbox, from the template with the lab's directory in place of @LAB@.
+# The settings of the sandbox, from the template with the folders of layout.sh in place of @LAB@, @CHAIN@, @CHAIN_DATA@,
+# @ARCHIVE@ and @RESEARCH@.
 render_settings() {
-    sed "s|@LAB@|~/$LAB_HOME|g" "$TEMPLATE"
+    sed -e "s|@LAB@|~/$LAB_HOME|g" -e "s|@CHAIN@|~/$CHAIN_CHECKOUT|g" -e "s|@CHAIN_DATA@|~/$CHAIN_DATA|g" \
+        -e "s|@ARCHIVE@|~/$ARCHIVE_DIR|g" -e "s|@RESEARCH@|~/$RESEARCH_DIR|g" "$TEMPLATE"
 }
 
 # What the sandbox needs of the settings, whatever the template says.
@@ -135,7 +143,7 @@ writable_roots() {
 # Refuses unless every file that governs a study, and the lab's controls, are outside the places the sandbox writes.
 check_nothing_governing_is_writable() {
     local file path root
-    for file in "$HERE/on-event.sh" "$STUDY" "$TEMPLATE" "$HERE/lab.sh" "$TOOLS/cloud/env.sh" "$CTL" "$STUDIES"; do
+    for file in "${GOVERNING[@]}" "$TOOLS/cloud/env.sh" "$CTL" "$STUDIES"; do
         path="$(real "$file")"
         while IFS= read -r root; do
             case "$path/" in
@@ -265,7 +273,7 @@ run_claude() {
         # headless run a background command is otherwise stopped after ten minutes.  LAB_MAX_HOURS bounds the session.
         exec env -i HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)" LANG=C.UTF-8 TERM=dumb \
             PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin" \
-            LAB_HOME="$LAB_HOME" LAB_THREADS="$LAB_THREADS" CARGO_BUILD_JOBS="$LAB_THREADS" \
+            TAXMAN_HOME="$TAXMAN_HOME" LAB_HOME="$LAB_HOME" LAB_THREADS="$LAB_THREADS" CARGO_BUILD_JOBS="$LAB_THREADS" \
             CARGO_HOME="$WORK/cargo-home" RUSTUP_HOME="$HOME/.rustup" RUSTFLAGS="-C target-cpu=native" \
             CLAUDE_CODE_TMPDIR="$WORK/tmp" CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 \
             DISABLE_AUTOUPDATER=1 BASH_DEFAULT_TIMEOUT_MS=3600000 \
@@ -529,22 +537,23 @@ do_proof() {
 # The proof itself, with the lock held and the settings rendered (preflight): two short sessions try the writes a study
 # must not make, and ctl/proof says the outcome for the subject now.  Succeeds if every check passed.
 run_proof() {
-    local stamp dir files before after chain_dir visible tmp_ok
+    local stamp dir files before after chain_dir name visible tmp_ok
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     dir="$STUDIES/proof-$stamp"
     mkdir -p "$dir" "$WORK/proof" "$LAB/src" "$LAB/snap"
     log "proof start dir=$dir model=$LAB_PROOF_MODEL"
     echo "proof of the sandbox: settings $CTL/settings.json, $("$CLAUDE" --version 2>&1 | head -n 1)"
-    files=("$HERE/on-event.sh" "$STUDY" "$TEMPLATE" "$HERE/lab.sh" "$CTL/settings.json")
+    files=("${GOVERNING[@]}" "$CTL/settings.json")
     before="$(sha256 "${files[@]}")"
 
     echo "stage A: writes outside the writable places, and the controls"
     run_probe_session a "$dir/a" <<EOF
 try outside touch "\$CHAIN_HOME/lab-probe-outside"
+try root touch "\$CHAIN_HOME/$TAXMAN_HOME/lab-probe"
 try lab-top touch "\$LAB/lab-probe"
 try ctl-new touch "\$LAB/ctl/lab-probe"
 try studies-new touch "\$LAB/studies/lab-probe"
-for f in on-event.sh study.md settings.template.json lab.sh; do
+for f in ${GOVERNING_NAMES[*]}; do
     try "append-\$f" bash -c ': >> "\$1"' _ "\$HERE/\$f"
 done
 try append-settings bash -c ': >> "\$1"' _ "\$LAB/ctl/settings.json"
@@ -561,11 +570,13 @@ ps -eo args | grep -c '[t]axman solve' >"\$PROOF/chain-visible.out"
 EOF
     check outside "a write to the home directory fails" probe_failed outside
     check outside-file "and creates nothing" absent "$HOME/lab-probe-outside"
+    check root "a write to ~/$TAXMAN_HOME, which holds the lab and the chain's folders, fails" probe_failed root
+    check root-file "and creates nothing" absent "$HOME/$TAXMAN_HOME/lab-probe"
     check lab-top "a write to the lab's top directory fails" probe_failed lab-top
     check ctl-new "a write to ctl/ fails" probe_failed ctl-new
     check studies-new "a write to studies/ fails" probe_failed studies-new
     local f
-    for f in on-event.sh study.md settings.template.json lab.sh; do
+    for f in "${GOVERNING_NAMES[@]}"; do
         check "append-$f" "appending to $f of the chain's checkout fails" probe_failed "append-$f"
     done
     check append-settings "appending to its own settings fails" probe_failed append-settings
@@ -584,22 +595,24 @@ EOF
     tmp_ok=no
     probe_worked tmp && tmp_ok=yes
     echo "  info  chain processes visible to a sandboxed command: ${visible:-unknown}; /tmp writable: $tmp_ok"
-    rm -f "$LAB/work/lab-probe" "$LAB/src/lab-probe" "$LAB/snap/lab-probe" "$HOME/lab-probe-outside" /tmp/lab-probe-tmp
+    rm -f "$LAB/work/lab-probe" "$LAB/src/lab-probe" "$LAB/snap/lab-probe" "$HOME/lab-probe-outside" \
+        "$HOME/$TAXMAN_HOME/lab-probe" /tmp/lab-probe-tmp
     rm -f "$LAB/lab-probe" "$LAB/ctl/lab-probe" "$LAB/studies/lab-probe"
 
     if [ "$FAIL" -eq 0 ]; then
-        echo "stage B: writes to the chain's own directories"
+        echo "stage B: writes to the chain's folders and the research checkout"
         local probes=""
-        for chain_dir in taxman-work taxman taxman-archive; do
+        for chain_dir in "${CHAIN_DIRS[@]}"; do
             [ -d "$HOME/$chain_dir" ] || continue
             probes="$probes
-try chain-$chain_dir touch \"\$CHAIN_HOME/$chain_dir/lab-probe\""
+try deny-${chain_dir##*/} touch \"\$CHAIN_HOME/$chain_dir/lab-probe\""
         done
         run_probe_session b "$dir/b" <<<"$probes"
-        for chain_dir in taxman-work taxman taxman-archive; do
+        for chain_dir in "${CHAIN_DIRS[@]}"; do
             [ -d "$HOME/$chain_dir" ] || continue
-            check "chain-$chain_dir" "a write to ~/$chain_dir fails" probe_failed "chain-$chain_dir"
-            check "chain-$chain_dir-file" "and creates nothing (a file there would be the proof failing: remove it)" \
+            name="deny-${chain_dir##*/}"
+            check "$name" "a write to ~/$chain_dir fails" probe_failed "$name"
+            check "$name-file" "and creates nothing (a file there would be the proof failing: remove it)" \
                 absent "$HOME/$chain_dir/lab-probe"
         done
     fi

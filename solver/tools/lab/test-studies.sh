@@ -24,8 +24,10 @@ trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
 home="$tmp/home"
 bin="$tmp/bin"
 checkout="$tmp/checkout/solver/tools"
-lab="$home/taxman-lab"
-mkdir -p "$home/.local/bin" "$bin" "$home/taxman-work" "$home/taxman" "$home/taxman-archive" "$checkout"
+# The layout of a machine that runs the chain and the lab, as the runbook gives it (layout.sh).
+root="$home/taxman_work"
+lab="$root/lab"
+mkdir -p "$home/.local/bin" "$bin" "$root/chain" "$root/chain-data" "$root/archive" "$root/research" "$checkout"
 cp -R "$here" "$checkout/lab"
 cp -R "$here/../cloud" "$checkout/cloud"
 program="$checkout/lab/on-event.sh"
@@ -74,9 +76,11 @@ case "$prompt" in
             # A sandbox that holds: what the real one keeps read-only is made so for the probes.
             eval "$(head -n 4 "$script")"
             mkdir -p "$LAB/work/.claude"
-            locked="$CHAIN_HOME $LAB $LAB/ctl $LAB/studies $CHAIN_HOME/taxman-work $CHAIN_HOME/taxman"
-            locked="$locked $CHAIN_HOME/taxman-archive $LAB/work/.claude"
-            files="$HERE/on-event.sh $HERE/study.md $HERE/settings.template.json $HERE/lab.sh $LAB/ctl/settings.json"
+            locked="$CHAIN_HOME $CHAIN_HOME/taxman_work $LAB $LAB/ctl $LAB/studies $LAB/work/.claude"
+            locked="$locked $CHAIN_HOME/taxman_work/chain $CHAIN_HOME/taxman_work/chain-data"
+            locked="$locked $CHAIN_HOME/taxman_work/archive $CHAIN_HOME/taxman_work/research"
+            files="$HERE/on-event.sh $HERE/study.md $HERE/settings.template.json $HERE/lab.sh $HERE/layout.sh"
+            files="$files $LAB/ctl/settings.json"
             chmod a-w $locked $files
         fi
         bash "$script" >/dev/null 2>&1
@@ -149,11 +153,14 @@ check "no study without a proof" contains "$out" "refused: there is no proof"
 check "and claude was not run" test "$(claude_runs)" = 0
 out="$("$program" --proof 2>&1)"
 check "a sandbox that lets the probes write fails the proof" contains "$out" "FAIL  outside"
+check "and so does a write to the root of the folders, which holds the lab and the chain" contains "$out" "FAIL  root"
+check "and an append to layout.sh, which the program sources" contains "$out" "FAIL  append-layout.sh"
 check "and the proof file says fail" grep -qx 'result=fail' "$lab/ctl/proof"
 out="$("$program" "$(event long 4879)" 2>&1)"
 check "and so does a study still refuse" contains "$out" "the proof of the sandbox failed"
 check "the probe in the home directory was removed" test ! -e "$home/lab-probe-outside"
-check "stage B (the chain's directories) was not run after a failure" test ! -e "$home/taxman-work/lab-probe"
+check "the probe in the root of the folders was removed" test ! -e "$root/lab-probe"
+check "stage B (the chain's directories) was not run after a failure" test ! -e "$root/chain-data/lab-probe"
 touch "$home/fake-claude.sandbox"
 out="$("$program" --proof 2>&1)"
 check "a sandbox that holds passes the proof" contains "$out" "0 failed: result=pass"
@@ -177,7 +184,7 @@ check "a proof session does not" contains "$(cat "$lab"/studies/proof-*/a/argv.t
 check "and never bypasses permission checks" lacks "$args" "dangerously"
 check "and never bypassPermissions" lacks "$args" "bypassPermissions"
 cwd="$(grep '^cwd: ' "$home/fake-claude.log")"
-check "it runs in the working directory of the sandbox" contains "$cwd" "/taxman-lab/work"
+check "it runs in the working directory of the sandbox" contains "$cwd" "/taxman_work/lab/work"
 check "at nice 19" contains "$(grep '^nice: ' "$home/fake-claude.log")" "nice: 19"
 envs="$(grep '^env: ' "$home/fake-claude.log")"
 check "with none of the caller's secrets" lacks "$envs" "secret-"
@@ -192,7 +199,29 @@ check "its session" test -s "$study/session.jsonl"
 check "its result" test "$(jq -r .num_turns "$study/result.json")" = 3
 check "the log has the start" logged "start event=long n=4879"
 check "and the end with the turns" logged "turns=3"
-check "the settings were rendered for this lab" grep -q '"~/taxman-lab/channel"' "$lab/ctl/settings.json"
+check "the settings were rendered for this lab" grep -q '"~/taxman_work/lab/channel"' "$lab/ctl/settings.json"
+check "with no placeholder left" test -z "$(grep -o '@[A-Z_]*@' "$lab/ctl/settings.json")"
+# The rules the settings render to, against the folders of the layout: the lab's own folders are writable, the chain's,
+# its data, the archive and the research checkout are not, and no rule reaches the root, which holds them all.
+settings="$lab/ctl/settings.json"
+t='~/taxman_work'
+json_list() { printf '%s\n' "$@" | jq -R . | jq -sc .; }
+rendered() { jq -c "$1" "$settings"; }
+check "the sandbox writes only in the lab's folders" \
+    test "$(rendered '.sandbox.filesystem.allowWrite')" = "$(json_list "$t/lab/src" "$t/lab/snap" "$t/lab/channel")"
+check "and may not write in ctl/, studies/, the chain, its data, the archive or the research checkout" \
+    test "$(rendered '.sandbox.filesystem.denyWrite')" = "$(json_list "$t/lab/ctl" "$t/lab/studies" "$t/chain" \
+        "$t/chain-data" "$t/archive" "$t/research")"
+check "the Edit tool is denied in the same folders, and in any .claude" \
+    test "$(rendered '[.permissions.deny[] | select(startswith("Edit("))]')" = \
+    "$(json_list "Edit($t/chain/**)" "Edit($t/chain-data/**)" "Edit($t/archive/**)" "Edit($t/research/**)" \
+        "Edit($t/lab/ctl/**)" "Edit($t/lab/studies/**)" "Edit(//**/.claude/**)")"
+check "and the Read tool may read the lab and those folders" \
+    test "$(rendered '[.permissions.allow[] | select(startswith("Read("))]')" = \
+    "$(json_list "Read($t/lab/**)" "Read($t/chain/**)" "Read($t/chain-data/**)" "Read($t/archive/**)" \
+        "Read($t/research/**)")"
+check "nothing denies the root of the folders, which holds the lab" test "$(rendered '[.sandbox.filesystem.denyWrite[],
+    .permissions.deny[]] | map(select(. == "~/taxman_work" or . == "Edit(~/taxman_work/**)")) | length')" = 0
 check "work/.claude does not outlive the session" test ! -e "$lab/work/.claude"
 check "the journal exists for the session to append to" test -f "$lab/work/journal.md"
 

@@ -2,9 +2,10 @@
 # The lab: studies of the largest subtrees of a live search, on spare threads of the machine that runs it
 # (solver/docs/runbook/lab.md).  Run it from your machine, and each command is one ssh call that runs on the host and
 # prints the result back; run it on the host itself, with --local or with LAB_HOST naming that machine, and the same
-# commands run in place, with no ssh.  The lab's files are in ~/taxman-lab on the host.  The lab only reads and copies
-# from the chain's directories there (its checkout and ~/taxman-work), writes nothing in them, and starts, stops and
-# changes nothing of the chain: its processes are its own.
+# commands run in place, with no ssh.  The lab's files are in its own folder on the host, beside the chain's (layout.sh
+# has them all; solver/docs/runbook/lab.md, "The machine's folders", has the table).  The lab only reads and copies from
+# the chain's folders there (its checkout and its data folder), writes nothing in them, and starts, stops and changes
+# nothing of the chain: its processes are its own.
 #
 #   lab.sh [--local] setup [COMMIT]     clone the repository to src/ at COMMIT (default origin/master) and build taxman
 #                                       and the example tune there, at nice 19
@@ -44,10 +45,11 @@
 #   LAB_HOST       USER@HOST of the machine that runs the lab, reached by ssh with no password to type; not needed
 #                  with --local                                                                              no default
 #   LAB_THREADS    units that run solves at once, and jobs of the build in setup                              default 16
-#   LAB_HOME       the lab's directory on the host, relative to its home                              default taxman-lab
-#   LAB_CKPT_DIR   where snapshot copies from, relative to the host's home; only read         default taxman-work/ckpt
+#   TAXMAN_HOME    the root of the chain's and the lab's folders on the host, relative to its home         see layout.sh
+#   LAB_HOME       the lab's directory on the host, relative to its home                                   see layout.sh
+#   LAB_CKPT_DIR   where snapshot copies from, relative to the host's home; only read                      see layout.sh
 #   LAB_TOOLS      the tools of the chain's checkout on the host, relative to its home: proof and studies
-#                  run LAB_TOOLS/lab/on-event.sh                                        default taxman/solver/tools
+#                  run LAB_TOOLS/lab/on-event.sh                                                           see layout.sh
 #   SSH_CLI        ssh
 # The variables of the studies (LAB_MAX_PER_DAY, LAB_MAX_TURNS, LAB_ASK_TURNS, LAB_MODEL, LAB_MAX_HOURS,
 # LAB_PROOF_MODEL, CLAUDE_BIN) go to on-event.sh as they are; its top says what they mean.  The host needs git, a Rust
@@ -68,12 +70,13 @@ LOCAL=0
 
 # What the host runs (bash -s), after its settings: the commands as functions, then the call as the last line it reads,
 # so that no program the call starts can read the rest of the script off stdin.  Everything the host writes is below
-# $LAB; ~/taxman-work and the chain's checkout are only read.
+# $LAB; the chain's data folder and its checkout are only read.  The layout of the host's folders (layout.sh) comes
+# before this, in the same stream.
 host_lib() {
     cat <<'EOF'
 REPO_URL=https://github.com/bvchess/taxman.git
-: "${LAB_HOME:=taxman-lab}" "${LAB_THREADS:=16}" "${LAB_CKPT_DIR:=taxman-work/ckpt}" "${LAB_TOOLS:=taxman/solver/tools}"
-export LAB_HOME LAB_THREADS
+: "${LAB_THREADS:=16}"
+export TAXMAN_HOME LAB_HOME LAB_THREADS
 LAB="$HOME/$LAB_HOME"
 SRC="$LAB/src"
 CRATE="$SRC/solver/frame"
@@ -389,8 +392,8 @@ runs_here() {
     [ -n "$LAB_HOST" ] && [ "${host%%.*}" = "$(hostname -s 2>/dev/null || hostname)" ]
 }
 
-# Runs lab_COMMAND ARGS on the host: the settings, the commas function that its tables use, its functions, and the call,
-# to a bash here or, over one ssh call, to a bash there.
+# Runs lab_COMMAND ARGS on the host: the settings, the layout of the folders, the commas function that its tables use,
+# its functions, and the call, to a bash here or, over one ssh call, to a bash there.
 remote() {
     local command="$1" var
     shift
@@ -404,10 +407,11 @@ remote() {
         esac
     fi
     {
-        for var in LAB_HOME LAB_THREADS LAB_CKPT_DIR LAB_TOOLS LAB_MAX_PER_DAY LAB_MAX_TURNS LAB_ASK_TURNS LAB_MODEL \
-            LAB_MAX_HOURS LAB_PROOF_MODEL CLAUDE_BIN; do
+        for var in TAXMAN_HOME LAB_HOME LAB_THREADS LAB_CKPT_DIR LAB_TOOLS LAB_MAX_PER_DAY LAB_MAX_TURNS LAB_ASK_TURNS \
+            LAB_MODEL LAB_MAX_HOURS LAB_PROOF_MODEL CLAUDE_BIN; do
             [ -z "${!var:-}" ] || printf 'export %s=%q\n' "$var" "${!var}"
         done
+        cat "$here/layout.sh"
         declare -p AWK_COMMAS
         declare -f commas
         host_lib

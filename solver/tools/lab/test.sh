@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Tests of lab.sh that need no remote machine and no build of the solver: a fake home with a chain's checkpoints in
-# taxman-work/ckpt, a stand-in for tune that writes the lines tune writes, and a stand-in for ssh that runs the command
-# here.  They check what the lab promises: it copies and never changes the chain's files, it picks the game with the
-# longest search, it ranks units by gap alone, it runs at most LAB_THREADS units at once at nice 19 and passes the
-# extra arguments on, and it runs in place with --local or when LAB_HOST names the machine.  Needs jq.
+# taxman_work/chain-data/ckpt, a stand-in for tune that writes the lines tune writes, and a stand-in for ssh that runs
+# the command here.  They check what the lab promises: it copies and never changes the chain's files, it picks the game
+# with the longest search, it ranks units by gap alone, it runs at most LAB_THREADS units at once at nice 19 and passes
+# the extra arguments on, it runs in place with --local or when LAB_HOST names the machine, and it finds the chain's and
+# its own folders under the root that TAXMAN_HOME names (taxman_work by default).  Needs jq.
 #
 #   solver/tools/lab/test.sh
 #
@@ -22,8 +23,10 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 home="$tmp/home"
 bin="$tmp/bin"
-fakes="$home/taxman-lab/src/solver/frame/target/release/examples"
-ckpt="$home/taxman-work/ckpt"
+# The layout of a machine that runs the chain and the lab, as the runbook gives it (layout.sh).
+root="$home/taxman_work"
+fakes="$root/lab/src/solver/frame/target/release/examples"
+ckpt="$root/chain-data/ckpt"
 mkdir -p "$bin" "$fakes" "$ckpt"
 
 failures=0
@@ -101,8 +104,8 @@ solve)
 esac
 EOF
 chmod +x "$bin/ssh" "$fakes/tune"
-mkdir -p "$home/taxman-lab/src"
-git init -q "$home/taxman-lab/src" && git -C "$home/taxman-lab/src" -c user.name=t -c user.email=t@t \
+mkdir -p "$root/lab/src"
+git init -q "$root/lab/src" && git -C "$root/lab/src" -c user.name=t -c user.email=t@t \
     commit -q --allow-empty -m "a commit"
 
 # The chain's checkpoints: games 4874 (clock 100.5 s), 4875 (900.25 s) and 4876 (no clock).
@@ -111,20 +114,20 @@ for n in 4874 4875 4876; do
 done
 echo 100.5 >"$ckpt/n4874.clock"
 echo 900.25 >"$ckpt/n4875.clock"
-chain_state() { (cd "$home/taxman-work" && find . -type f | sort | while read -r f; do cksum "$f"; ls -l "$f"; done); }
+chain_state() { (cd "$root/chain-data" && find . -type f | sort | while read -r f; do cksum "$f"; ls -l "$f"; done); }
 before="$(chain_state)"
 
 export HOME="$home" SSH_LOG="$tmp/ssh.log" CONC_LOG="$tmp/conc.log" SSH_CLI="$bin/ssh"
 : >"$SSH_LOG"
 : >"$CONC_LOG"
-unset LAB_HOST LAB_THREADS LAB_HOME LAB_CKPT_DIR
+unset LAB_HOST LAB_THREADS TAXMAN_HOME LAB_HOME LAB_CKPT_DIR LAB_TOOLS
 
 echo "--- snapshot"
 out="$("$lab" --local snapshot 2>&1)"
 check "the default snapshot is the game with the longest own search" contains "$out" "snapshot 4875-"
-snap="$(ls "$home/taxman-lab/snap" | grep '^4875-' | head -n 1)"
-check "it copies the checkpoint" cmp -s "$ckpt/n4875.ckpt" "$home/taxman-lab/snap/$snap/n4875.ckpt"
-check "it copies the clock" cmp -s "$ckpt/n4875.clock" "$home/taxman-lab/snap/$snap/n4875.clock"
+snap="$(ls "$root/lab/snap" | grep '^4875-' | head -n 1)"
+check "it copies the checkpoint" cmp -s "$ckpt/n4875.ckpt" "$root/lab/snap/$snap/n4875.ckpt"
+check "it copies the clock" cmp -s "$ckpt/n4875.clock" "$root/lab/snap/$snap/n4875.clock"
 check "it says the own search" contains "$out" "own search: 900.25 s"
 out="$("$lab" --local snapshot 4876 2>&1)"
 check "a game by number, with no clock" contains "$out" "snapshot 4876-"
@@ -149,8 +152,8 @@ check "the units are counted" contains "$out" "5 units, 4 with a gap"
 rows="$(grep -E '^4875-' <<<"$out" | awk '{print $1}' | tr '\n' ' ')"
 check "ranked by gap alone, the unit without a gap left out" test "$rows" = "4875-1 4875-3 4875-9 4875-0 "
 check "the gap of the first is shown" contains "$out" "$(printf '%-14s %6s %6s %9s %9s %9s' 4875-1 1 7 2,000 1,100 900)"
-check "units.jsonl is in the snapshot" test -s "$home/taxman-lab/snap/$snap/units.jsonl"
-out="$("$lab" --local units ../../taxman-work/ckpt 2>&1)"
+check "units.jsonl is in the snapshot" test -s "$root/lab/snap/$snap/units.jsonl"
+out="$("$lab" --local units ../../chain-data/ckpt 2>&1)"
 check "a directory outside the lab is refused" contains "$out" "outside"
 
 echo "--- run"
@@ -160,11 +163,11 @@ out="$(FAKE_SLEEP=1 LAB_THREADS=2 "$lab" --local run "$snap" 4875-1,4875-3,4875-
 check "a row for each unit" test "$(grep -c '^4875-' <<<"$out")" -eq 4
 check "a unit stopped by the node limit says limit" contains "$out" "limit"
 check "steps have their commas" contains "$out" "5,000"
-runs="$home/taxman-lab/snap/$snap/runs.jsonl"
+runs="$root/lab/snap/$snap/runs.jsonl"
 check "a line each in runs.jsonl" test "$(wc -l <"$runs" | tr -d ' ')" -eq 4
 check "the extra arguments reach tune" test "$(jq -r '.tactics' "$runs" | sort -u)" = conflict_branching=off
 check "each line has the commit of the build" test "$(jq -r '.commit' "$runs" | sort -u | wc -l | tr -d ' ')" -eq 1
-clone_commit="$(git -C "$home/taxman-lab/src" rev-parse --short HEAD)"
+clone_commit="$(git -C "$root/lab/src" rev-parse --short HEAD)"
 check "the commit is the clone's" test "$(jq -r '.commit' "$runs" | head -n 1)" = "$clone_commit"
 check "every solve ran at nice 19" test "$(grep '^start' "$CONC_LOG" | awk '{print $3}' | sort -u)" = 19
 most="$(awk '/^start/ {n++; if (n > m) m = n} /^end/ {n--} END {print m}' "$CONC_LOG")"
@@ -175,7 +178,7 @@ status=$?
 check "a unit that fails is reported, and the others still run" contains "$out" "4875-9         FAILED: error: no such"
 check "its siblings' rows are there" contains "$out" "4875-3"
 check "the failure is the exit status" test "$status" -ne 0
-check "temporary files are removed" test -z "$(ls -A "$home/taxman-lab/snap/$snap" | grep '^\.')"
+check "temporary files are removed" test -z "$(ls -A "$root/lab/snap/$snap" | grep '^\.')"
 out="$("$lab" --local run "$snap" 4875-77 2>&1)"
 check "an unknown unit is refused before anything runs" contains "$out" "no unit 4875-77"
 out="$(LAB_THREADS=0 "$lab" --local run "$snap" 4875-1 2>&1)"
@@ -198,20 +201,20 @@ kill -INT "$(ps -o ppid= -p "$unit_pid" | tr -d ' ')"
 wait "$lab_pid"
 sleep 0.5
 check "a run that is interrupted stops its units" test -z "$(ps -o pid= -p "$tune_pid")"
-check "and removes what they left in the snapshot" test -z "$(ls -A "$home/taxman-lab/snap/$snap" | grep '^\.')"
+check "and removes what they left in the snapshot" test -z "$(ls -A "$root/lab/snap/$snap" | grep '^\.')"
 
 echo "--- the commands of the studies"
 # lab.sh hands them to on-event.sh of the chain's checkout (tested by test-studies.sh): here a stand-in that says what
 # it was given.
-mkdir -p "$home/taxman/solver/tools/lab" "$home/taxman-lab/work/reports"
-cat >"$home/taxman/solver/tools/lab/on-event.sh" <<'EOF'
+mkdir -p "$root/chain/solver/tools/lab" "$root/lab/work/reports"
+cat >"$root/chain/solver/tools/lab/on-event.sh" <<'EOF'
 #!/bin/sh
 printf 'on-event:' >>"$HOME/on-event.args"
 for a in "$@"; do printf ' [%s]' "$a" >>"$HOME/on-event.args"; done
 echo >>"$HOME/on-event.args"
 echo "stand-in answer to $1"
 EOF
-chmod +x "$home/taxman/solver/tools/lab/on-event.sh"
+chmod +x "$root/chain/solver/tools/lab/on-event.sh"
 given() { tail -n 1 "$home/on-event.args"; }
 out="$("$lab" --local ask 4875-20261022T035036Z 'what would you try next, and what would it cost?' 2>&1)"
 check "ask hands the study and the whole question on" test "$(given)" = \
@@ -229,11 +232,11 @@ check "studies off turns them off" test "$(given)" = "on-event: [--off]"
 check "studies alone says how they stand" test "$(given)" = "on-event: [--status]"
 check "ask needs a study and a question" contains "$("$lab" --local ask only-one 2>&1)" "lab.sh"
 check "studies takes on or off" contains "$("$lab" --local studies maybe 2>&1)" "lab.sh"
-printf '# a report\n' >"$home/taxman-lab/work/reports/4875-20261022T040000Z.md"
-printf '# another\n' >"$home/taxman-lab/work/reports/4880-20261022T050000Z.md"
-touch -t 202610220400 "$home/taxman-lab/work/reports/4875-20261022T040000Z.md"
-touch -t 202610220500 "$home/taxman-lab/work/reports/4880-20261022T050000Z.md"
-printf '# Journal\n\nprediction: soon\n' >"$home/taxman-lab/work/journal.md"
+printf '# a report\n' >"$root/lab/work/reports/4875-20261022T040000Z.md"
+printf '# another\n' >"$root/lab/work/reports/4880-20261022T050000Z.md"
+touch -t 202610220400 "$root/lab/work/reports/4875-20261022T040000Z.md"
+touch -t 202610220500 "$root/lab/work/reports/4880-20261022T050000Z.md"
+printf '# Journal\n\nprediction: soon\n' >"$root/lab/work/journal.md"
 out="$("$lab" --local reports 2>&1)"
 check "reports lists them, newest first, and prints the newest" contains "$out" "# another"
 check "with the end of the journal" contains "$out" "prediction: soon"
@@ -261,6 +264,23 @@ out="$(LAB_HOST='-oProxyCommand=x' "$lab" snapshot 2>&1)"
 check "a LAB_HOST that is not USER@HOST is refused" contains "$out" "is not USER@HOST"
 out="$("$lab" --local snapshot 1x 2>&1)"
 check "N must be a number" contains "$out" "usage: lab.sh snapshot"
+
+echo "--- another root"
+# TAXMAN_HOME moves every folder: the chain's checkpoints are read from, and the snapshot written to, the folders under
+# it, here and over ssh (the layout goes to the host with the commands).
+other="$home/elsewhere/chain-data/ckpt"
+mkdir -p "$other"
+cp -p "$ckpt/n4874.ckpt" "$ckpt/n4874.clock" "$other/"
+sleep 1
+out="$(TAXMAN_HOME=elsewhere "$lab" --local snapshot 2>&1)"
+check "TAXMAN_HOME names the root of the chain's checkpoints" contains "$out" "snapshot 4874-"
+check "and of the lab, which writes its snapshot there" test -f "$home/elsewhere/lab/snap/"4874-*/n4874.ckpt
+sleep 1
+out="$(TAXMAN_HOME=elsewhere LAB_HOST="u@elsewhere.example.net" "$lab" snapshot 2>&1)"
+check "the same over ssh" contains "$out" "snapshot 4874-"
+check "(the root goes to the host)" test "$(ls "$home/elsewhere/lab/snap" | wc -l | tr -d ' ')" -eq 2
+out="$(TAXMAN_HOME=elsewhere LAB_CKPT_DIR=taxman_work/chain-data/ckpt "$lab" --local snapshot 2>&1)"
+check "LAB_CKPT_DIR still names another place for the checkpoints" contains "$out" "snapshot 4875-"
 
 echo "--- the chain"
 check "the chain's directory is as it was" test "$(chain_state)" = "$before"

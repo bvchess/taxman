@@ -42,6 +42,9 @@ trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
 cloud="$tmp/cloud"
 mkdir -p "$cloud"
 cp "$real_cloud"/*.sh "$real_cloud/wall-policy.json" "$cloud/"
+# ... with the layout that wall.sh status --host reads, which sits beside the directory (lab/layout.sh).
+mkdir -p "$tmp/lab"
+cp "$real_cloud/../lab/layout.sh" "$tmp/lab/"
 printf '#!/usr/bin/env bash\necho "verify.sh (a stand-in): $*"\n' >"$cloud/verify.sh"
 cp "$cloud/verify.sh" "$tmp/verify.sh.stub"
 # ... and setup.sh, which installs and builds: the stand-in records how it was called and may sleep a while.
@@ -908,7 +911,7 @@ scenario_status() {
 # run), the window is 3 and game 4 has a clock.
 check_status_host() {
     echo "== wall.sh status --host: a chain on another machine, over ssh"
-    local wall="$cloud/wall.sh" work="$tmp/home/taxman-work" calls
+    local wall="$cloud/wall.sh" work="$tmp/home/taxman_work/chain-data" calls
     export FAKE_HOME="$tmp/home"
     mkdir -p "$work/results" "$work/logs" "$work/ckpt"
     printf '%s\n' '{"schema":5,"n":2,"score":20,"moves":[2],"completed":true}' \

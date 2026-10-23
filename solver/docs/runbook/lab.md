@@ -10,10 +10,32 @@ noise.  A rule that shrinks the largest units is a candidate for the search; who
 the lab with the commands below, or the chain starts a *study*, an agent session in a sandbox that does the same work
 and reports ([Studies](#studies)).
 
+## The machine's folders
+
+A machine that runs the chain and the lab keeps all of it in one folder of the home directory, `taxman_work`.  Its name
+is `TAXMAN_HOME`, relative to the home; [`layout.sh`](../../tools/lab/layout.sh) derives every other folder from it for
+the lab's scripts and for `wall.sh status --host`, and no script names them anywhere else.
+
+| folder | what it is |
+|---|---|
+| `~/taxman_work/chain` | the chain's checkout, which it builds and runs from |
+| `~/taxman_work/chain-data` | the chain's results, checkpoints (`ckpt/`), logs, profiles and redeploy builds |
+| `~/taxman_work/lab` | the lab: `channel/`, `ctl/`, `snap/`, `src/`, `studies/` and `work/` |
+| `~/taxman_work/archive` | archived data, read only |
+| `~/taxman_work/research` | a second checkout, for work on the repository beside the chain |
+| `~/taxman_work/run.sh` | the script that starts the chain: a local file, not in the repository |
+
+`run.sh` starts `chain/solver/tools/cloud/chain.sh` ([chain.md](chain.md)) with `TAXMAN_WORK` set to the chain's data
+folder, `$HOME/taxman_work/chain-data`.  `chain.sh` takes its results file, checkpoints, logs and the worktrees of a
+redeploy (`builds/COMMIT`) from `TAXMAN_WORK`, and needs no other variable for the layout.  For the lab, `run.sh` also
+sets `LAB_DIR` to the lab's `channel`, `$HOME/taxman_work/lab/channel`, and `LAB_HOOK` to the checkout's
+`$HOME/taxman_work/chain/solver/tools/lab/on-event.sh` ([Studies](#studies)); a profile directory in `EXTRA_ARGS`
+(`--profile`) goes in `chain-data` too.
+
 ## Rules
 
-* **The chain's files are read-only.**  The lab copies from the chain's checkout and from `~/taxman-work`, writes
-  nothing in them, and starts, stops and changes nothing of the chain.  It writes only in `~/taxman-lab`.
+* **The chain's files are read-only.**  The lab copies from the chain's checkout and from its data folder, writes
+  nothing in them, and starts, stops and changes nothing of the chain.  It writes only in its own folder, `lab`.
 * **The lab is light.**  Its processes run at `nice -n 19`, a unit takes one thread, and `LAB_THREADS` (default 16)
   bounds the units at once.  With a chain run under `--background` ([the chain](chain.md#run)), the lab's processes
   at `nice -n 19` still run before the search's workers, and the search takes the threads the lab leaves.
@@ -47,8 +69,8 @@ machine's home.
   compare settings: a node limit stops at the same step every time, a CPU limit does not.  `tune` writes a progress
   line to stderr every 30 seconds.
 * `runs.jsonl` in the snapshot gets the result line of each unit, with the `commit` of the build, and only grows.  If
-  the connection drops, the units started go on to their end and add their lines; `pkill -f 'taxman-lab/.*/[t]une'` on
-  the machine stops them.
+  the connection drops, the units started go on to their end and add their lines; `pkill -f
+  'taxman_work/lab/.*/[t]une'` on the machine stops them.
 * A unit starts from the checkpoint's incumbent; `--known` with a results file that holds the game starts it from the
   optimum, which makes the unit a proof.
 
@@ -57,7 +79,7 @@ machine's home.
 The chain tells a program when a game's search passes `--hook-after` seconds, and when that game ends (`--hook`, [the
 lab channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study: an
 agent session that follows `study.md`.  A study first estimates the work left from the game's units, and decides whether
-to steer the search through the command folder (`--lab-dir`, `~/taxman-lab/channel`); the solver validates every
+to steer the search through the command folder (`--lab-dir`, the lab's `channel`); the solver validates every
 command.  It steers on evidence: it solves about 40 of the game's units under the setting in force and under one or two
 candidates, and reads [the record of past searches](#the-record-of-past-searches).  Then it studies what it judges most
 likely to make the searches faster, from the standing requests to ideas of its own, and writes a report, with its
@@ -73,25 +95,27 @@ A study can steer a search only while the search runs, so start it early: `--hoo
 ten minutes into a game's search, after the chain has written a checkpoint for it to copy.  The default, an hour, suits
 a chain whose games take many hours.
 
-**What governs a study comes from the chain's checkout.**  The hook is `~/taxman/solver/tools/lab/on-event.sh`, reviewed
-code of the chain's checkout, never a copy in `~/taxman-lab/src`, whose files a study may change.  The settings are
-rendered from `settings.template.json` beside it at every start, and the procedure, `study.md`, is read from there at
-every start.  Start the chain with `LAB_HOOK` and `LAB_DIR` ([chain.md](chain.md)) naming them.
+**What governs a study comes from the chain's checkout.**  The hook is `solver/tools/lab/on-event.sh` of the chain's
+checkout, reviewed code, never a copy in the lab's `src/`, whose files a study may change.  The settings are rendered
+from `settings.template.json` beside it at every start, with the folders of `layout.sh`, and the procedure, `study.md`,
+is read from there at every start.  Start the chain with `LAB_HOOK` and `LAB_DIR` ([the machine's
+folders](#the-machines-folders)) naming them.
 
 **The sandbox.**  A study's commands run in the agent program's sandbox, and in nothing else: if it cannot start, the
 study does not.
 
 | | |
 |---|---|
-| may write | `~/taxman-lab/work` (where it starts: the journal, the requests, the reports), `src`, `snap`, `channel` |
-| may only read | everything else: the chain's checkout, `~/taxman-work`, `~/taxman-archive`, `ctl/` (the settings, the log, the proof) and `studies/` (the record of each session) |
+| may write | the lab's `work/` (where it starts: the journal, the requests, the reports), `src/`, `snap/` and `channel/` |
+| may only read | everything else: the chain's checkout, its data folder, the archive, the research checkout, and the lab's `ctl/` (the settings, the log, the proof) and `studies/` (the record of each session) |
 | network | github.com, for `git fetch` |
 | session | the tools Bash, Read, Edit, Write, Glob and Grep; no settings read from any directory it can write; no hooks, MCP servers, memory files or web; a clean environment; permission checks never bypassed |
 
 **The proof.**  `lab.sh proof` runs two short sessions that try what a study must not be able to do, and checks the
 files and the exit statuses outside the sandbox: writes to the home directory, to `ctl/`, to the lab's top directory,
-to `~/taxman-work`, `~/taxman` and `~/taxman-archive`; appending to the program, `study.md`, the template and its own
-settings; planting a settings file in `work/.claude`; and, as controls, writes where it may write and the network.  It
+to the root of the machine's folders and to each of the chain's checkout, its data folder, the archive and the research
+checkout; appending to the program, `layout.sh`, `study.md`, the template and its own settings; planting a settings
+file in `work/.claude`; and, as controls, writes where it may write and the network.  It
 costs a few cents and takes under a minute, and it refuses while a study runs.  Every study needs a passing proof for
 the current settings and the installed versions of `claude` and `bwrap`.  A person runs the first proof, and the next
 after a failure; when the proof passed for other settings or other versions, as `claude` updates itself, the next study
@@ -124,7 +148,7 @@ program's own store, `~/.claude/projects`, on the machine.
 
 ## The record of past searches
 
-Two files in `~/taxman-lab/work/history/` keep what the searches did and what the studies measured, so that a study
+Two files in the lab's `work/history/` keep what the searches did and what the studies measured, so that a study
 can read the games before its own.  Each holds JSON lines, an object a line, only appended to and never rewritten, and
 a reader skips a line that is not JSON.  The hook writes the first file outside the sandbox, and the studies write the
 second inside it (they may write in `work/`).

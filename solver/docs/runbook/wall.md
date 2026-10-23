@@ -199,8 +199,9 @@ in the local time zone (`TZ`) with its abbreviation.  `save.sh` copies the logs 
 be a minute or two ahead of the nodes and the best sum, which come from the last progress line of the logs.
 
 `status --host USER@HOST` reports a chain that runs on a machine you reach by ssh (`chain.sh` in the tmux session `tx`,
-its state in `~/taxman-work`) instead of a spot instance: it reads that state in one ssh call (key authentication,
-`BatchMode`) and needs no AWS profile and makes no aws call.  It prints the host and its `uptime` line; whether the chain
+its state in the chain's data folder of [the machine's folders](lab.md#the-machines-folders)) instead of a spot
+instance: it reads that state in one ssh call (key authentication, `BatchMode`) and needs no AWS profile and makes no
+aws call.  It prints the host and its `uptime` line; whether the chain
 runs (the session exists and a `taxman solve` process is alive); `ENDED:` and the line of `chain.outcome`, if there is
 one; the window and the wall, from the last line of `logs/chain.log` that starts the chain; when `logs/chain.err` last
 changed, as `last progress line`; and `recorded through`, taken from the last completed game of the results file; then

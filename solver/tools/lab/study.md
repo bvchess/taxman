@@ -11,12 +11,12 @@ A person reads your report later: write for someone who knows the project and wa
 
 ## Where you are
 
-* **A sandbox.**  Your shell commands may write only in `~/taxman-lab/work` (where you start), `~/taxman-lab/src`,
-  `~/taxman-lab/snap` and `~/taxman-lab/channel`.  Everything else is read-only to you: the chain's checkout
-  `~/taxman`, its work directory `~/taxman-work`, `~/taxman-archive`, and the lab's `ctl/` and `studies/`, where the
-  settings and the record of your own session are.  The network reaches github.com and nothing else.  A command that
-  fails with "Read-only file system" or "host not allowed" has met the boundary: do not look for a way round it; say so
-  in the report.
+* **A sandbox.**  Your shell commands may write only in `~/taxman_work/lab/work` (where you start),
+  `~/taxman_work/lab/src`, `~/taxman_work/lab/snap` and `~/taxman_work/lab/channel`.  Everything else is read-only to
+  you: the chain's checkout `~/taxman_work/chain`, its data folder `~/taxman_work/chain-data`, `~/taxman_work/archive`,
+  `~/taxman_work/research`, and the lab's `ctl/` and `studies/`, where the settings and the record of your own session
+  are.  The network reaches github.com and nothing else.  A command that fails with "Read-only file system" or "host
+  not allowed" has met the boundary: do not look for a way round it; say so in the report.
 * **Tools.**  Bash, Read, Edit, Write, Glob and Grep.  No web, no other agents.  Bash refuses some command lines for
   their shape, though the sandbox would contain them: those that begin with a variable assignment (`FOO=1 cmd`,
   `export FOO=1; cmd`, `S=$(date); ...`), and those with arguments of the form NAME=VALUE that the analysis cannot place
@@ -30,17 +30,17 @@ A person reads your report later: write for someone who knows the project and wa
   game in flight, `units SNAPDIR` lists its units and the 20 with the largest gaps, `run SNAPDIR IDS [tune args]` solves
   units on one thread each, `reports [N]` shows reports.  Tune's arguments include `--node-limit L`,
   `--cpu-limit SECONDS`, `--tactic NAME=VALUE` and `--gate GAP`, the gap from which conflict branching chooses.
-* **The project.**  `~/taxman-lab/src` is a clone of the repository: its docs, notebook and sources are there, and
+* **The project.**  `~/taxman_work/lab/src` is a clone of the repository: its docs, notebook and sources are there, and
   `git fetch origin` brings it up to date.  `solver/docs/STATUS.md` says what matters now, and
   `solver/docs/design/lab.md` describes the command folder.  The programs `taxman` and `tune` are built in
   `src/solver/frame/target/release` (`tune` in `examples/`); build other variants there with `cargo build --release
   --features studies --example tune` in `src/solver/frame`.  Cargo's files are in `work/cargo-home`.
-* **The journal**, `~/taxman-lab/work/journal.md`: what earlier studies found and predicted.
-* **The record of past searches**, `~/taxman-lab/work/history/`: `games.jsonl`, a line for each game that ended on this
-  chain, and `units.jsonl`, a line for each unit or game that a study solved to compare settings.  The hook adds the
-  first; you add to both ("First: steer, if it pays" says when).
-* **The requests**, `~/taxman-lab/work/requests.md`: standing questions and things to try, which whoever runs the lab
-  leaves for the studies.
+* **The journal**, `~/taxman_work/lab/work/journal.md`: what earlier studies found and predicted.
+* **The record of past searches**, `~/taxman_work/lab/work/history/`: `games.jsonl`, a line for each game that ended
+  on this chain, and `units.jsonl`, a line for each unit or game that a study solved to compare settings.  The hook adds
+  the first; you add to both ("First: steer, if it pays" says when).
+* **The requests**, `~/taxman_work/lab/work/requests.md`: standing questions and things to try, which whoever runs the
+  lab leaves for the studies.
 
 ## Rules
 
@@ -49,7 +49,7 @@ A person reads your report later: write for someone who knows the project and wa
    `nice -n 19`.
 2. **The chain is not yours.**  Never signal, stop, renice or restart its processes, and never write in its files.  The
    chain changes only through the command folder, which validates every command.
-3. **Never push.**  Experiment code goes on a local branch of `~/taxman-lab/src`; its builds stay there.  A commit
+3. **Never push.**  Experiment code goes on a local branch of `~/taxman_work/lab/src`; its builds stay there.  A commit
    message has no mention of any tool or assistant, and no `Co-Authored-By` line.
 4. **Limits.**  Measure with `--cpu-limit` or `--node-limit`, never with an unbounded run, and plan for the turns you
    have.
@@ -81,16 +81,16 @@ Take the steps in order.
    * *The history.*  `games.jsonl` has a line for each game that ended on this chain, with the setting it ran under (its
      `lab` key) and its steps, and a `line_ratio` line for each game whose end a study compared with its snapshot.
      `units.jsonl` has the units that earlier studies solved, under which setting, and in how many steps.  Both are
-     in `~/taxman-lab/work/history/`, and the fields are in `solver/docs/runbook/lab.md`, "The record of past searches"
-     (in the chain's checkout, `~/taxman`).  A line that is not JSON is skipped.  For example, the settings and line
-     ratios of the latest games:
+     in `~/taxman_work/lab/work/history/`, and the fields are in `solver/docs/runbook/lab.md`, "The record of past
+     searches" (in the chain's checkout, `~/taxman_work/chain`).  A line that is not JSON is skipped.  For example, the
+     settings and line ratios of the latest games:
 
      ```text
-     jq -c 'select(.kind == "game") | {n, nodes, tactics, lab}' ~/taxman-lab/work/history/games.jsonl | tail -n 20
-     jq -c 'select(.kind == "line_ratio")' ~/taxman-lab/work/history/games.jsonl | tail -n 20
+     jq -c 'select(.kind == "game") | {n, nodes, tactics, lab}' ~/taxman_work/lab/work/history/games.jsonl | tail -n 20
+     jq -c 'select(.kind == "line_ratio")' ~/taxman_work/lab/work/history/games.jsonl | tail -n 20
      ```
 2. **Look at the chain.**  The event has the steps so far (`nodes`), the best promotion sum and the game's own seconds.
-   The last lines of `~/taxman-work/logs/chain.err` give the step rate and the queue.
+   The last lines of `~/taxman_work/chain-data/logs/chain.err` give the step rate and the queue.
 3. **Snapshot the game and list its units**: `snapshot N --from CHECKPOINT_DIR` (the event's `checkpoint_dir`), then
    `units SNAPDIR`.  Note the number of units, the spread of their gaps, and whether the best promotion sum looks final.
 4. **Estimate the work left from the units alone.**  The *line* of a unit of gap g is the steps it takes by the
@@ -117,7 +117,7 @@ Take the steps in order.
       its stack leaves, smaller subtrees with gaps of their own:
 
       ```text
-      ~/taxman-lab/src/solver/frame/target/release/examples/tune expand N --units SNAPDIR/units.jsonl \
+      ~/taxman_work/lab/src/solver/frame/target/release/examples/tune expand N --units SNAPDIR/units.jsonl \
           --ids ID,... --node-limit 8192 --out FILE
       ```
 
@@ -132,9 +132,9 @@ Take the steps in order.
       force, and the weighted step ratio is the sum of the strata's step ratios times their shares, over the strata
       that have units.  Give its 95% interval by bootstrap: resample the units of each stratum with replacement a
       thousand times.
-   5. Append a line to `~/taxman-lab/work/history/units.jsonl` for each unit run, under every setting and whether it
-      ended or not, in the fields of the runbook.  Append with one `>>`; never rewrite the file, for another study reads
-      it.
+   5. Append a line to `~/taxman_work/lab/work/history/units.jsonl` for each unit run, under every setting and whether
+      it ended or not, in the fields of the runbook.  Append with one `>>`; never rewrite the file, for another study
+      reads it.
 6. **Decide.**  A result on units is a lead, not a finding (rule 5): `conflict_look` took 0.61 to 0.87 of the steps on
    units of 4875 to 4901, and 0.975 on whole games 3000 to 4050.  So:
    * **A `branching` for the game in flight** is yours to send when the 95% interval of a candidate's weighted step
@@ -154,7 +154,8 @@ Take the steps in order.
 
    The formats are in `solver/docs/design/lab.md`: write a command as a file with a name starting with a dot in
    `channel/in/`, rename it into place, and read the answer in `channel/out/` (the chain looks at each progress tick).
-   `~/taxman-lab/channel/` exists only when the chain runs with `--lab-dir`.  If it is not there, observe and report.
+   `~/taxman_work/lab/channel/` exists only when the chain runs with `--lab-dir`.  If it is not there, observe and
+   report.
    A gate comes with `conflict_branching` on or left out, never off, and `conflict_look` acts only where
    `conflict_branching` is on.  You may use `checkpoint`, `finder`, `branching`, `offer` and `policy` (on the condition
    above), and `restart` only when your estimate says a fresh search is at least 3 times cheaper than finishing the
@@ -174,8 +175,8 @@ Choose what to study.  The candidates include:
   at the end of the game, an incumbent that improves late.
 
 The research is not limited to the solver's tactics and settings.  You may build a variant on a local branch of
-`~/taxman-lab/src` and measure it, look at the search from an angle nobody has tried, borrow an idea from other exact
-solvers, or question an assumption of this procedure.  Read the register of closed avenues in
+`~/taxman_work/lab/src` and measure it, look at the search from an angle nobody has tried, borrow an idea from other
+exact solvers, or question an assumption of this procedure.  Read the register of closed avenues in
 `solver/notebook/register/` before you take one up again, and say what is new if you do.
 
 Ways to measure:
@@ -184,14 +185,14 @@ Ways to measure:
   `done`) gives its true size in steps; compare settings in steps, for the same unit from the same start.  The steps of
   a subtree grow by a fixed factor with the gap, about a decade for every 291 points with conflict branching: check
   that against the units that finished, fit log10(steps) against gap, and predict the others.
-* **Whole games.**  `tune solve N --ids root --known ~/taxman-work/results/strict.jsonl --cpu-limit SECONDS` proves
-  game N from its root against its known optimum.  Games of a few thousand finish in seconds to minutes, and an idea
-  that changes the tree is judged on whole games such as these.
+* **Whole games.**  `tune solve N --ids root --known ~/taxman_work/chain-data/results/strict.jsonl --cpu-limit
+  SECONDS` proves game N from its root against its known optimum.  Games of a few thousand finish in seconds to
+  minutes, and an idea that changes the tree is judged on whole games such as these.
 * **A fresh search of this game.**  Copy the chain's results file into `work/fresh/`, and start a search from the best
   game on one thread, in the background, with the `taxman` built in `src`:
 
   ```text
-  mkdir -p work/fresh; cp ~/taxman-work/results/strict.jsonl work/fresh/strict.jsonl
+  mkdir -p work/fresh; cp ~/taxman_work/chain-data/results/strict.jsonl work/fresh/strict.jsonl
   taxman solve N --use-prev --force-search --threads 1 --finder-after 1 --time-limit 600 \
       --checkpoint-dir work/fresh --out work/fresh/strict.jsonl
   ```
@@ -204,7 +205,7 @@ Ways to measure:
 
 ### Last: report and journal
 
-1. **Report.**  Write `~/taxman-lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
+1. **Report.**  Write `~/taxman_work/lab/work/reports/N-STAMP.md` (N the game, STAMP the UTC time as `date -u
    +%Y%m%dT%H%M%SZ`) with these sections:
    * Summary: the state, and what you recommend or did;
    * Measurements: a table;
@@ -229,8 +230,8 @@ difference.
 
 Find the last `snapshot:` line too.  The game's *line ratio* is the steps it took after the snapshot (the event's
 `nodes` less the line's `nodes=`) over the line's `line=`; give it in the `comparison:` lines as `line_ratio=R`.  Record
-it in the history as well, by appending one line to `~/taxman-lab/work/history/games.jsonl` with a single `printf` and
-`>>`, never by rewriting the file, since the hook adds lines to it:
+it in the history as well, by appending one line to `~/taxman_work/lab/work/history/games.jsonl` with a single
+`printf` and `>>`, never by rewriting the file, since the hook adds lines to it:
 
 ```text
 {"kind":"line_ratio","n":N,"study":"STUDY","at":"UTC","steps_after":STEPS,"line":LINE,"line_ratio":R}

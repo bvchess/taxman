@@ -53,7 +53,9 @@ On a machine shared with other work, such as a lab, leave `THREADS` unset (one w
 `EXTRA_ARGS="--background"`.  The workers then run under the idle scheduling policy, so that any other process, even
 one at `nice -n 19`, runs before them and the search takes the threads the rest leaves ([the
 flag](../REFERENCE.md#1-the-flags-of-solve)).  A fixed `THREADS` below the machine's leaves threads idle whenever the
-rest is quiet.
+rest is quiet.  Such a machine keeps the chain's checkout and data in [the machine's
+folders](lab.md#the-machines-folders), and `chain.sh` runs there with `TAXMAN_WORK` set to the chain's data folder
+instead of `~/taxman-work`.
 
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that

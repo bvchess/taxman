@@ -57,7 +57,8 @@
 # options go before the command or after it, as --verbose does:
 #   --recorded N          the games recorded that the table shows: the last N (0: none)               default 6
 #   --host USER@HOST      read the state of a chain that runs on that machine (chain.sh in the tmux session tx, its
-#                         state in ~/taxman-work) in one ssh call, instead of S3 and the group: no AWS profile, no aws
+#                         state in its data folder, solver/tools/lab/layout.sh) in one ssh call, instead of S3 and the
+#                         group: no AWS profile, no aws
 #                         call.  It shows the machine's uptime, whether the chain runs, how it ended (chain.outcome),
 #                         the window and the wall (chain.log), when logs/chain.err last changed, the game the results
 #                         file is recorded through, and the same table.  ssh runs with BatchMode: the key must need no
@@ -76,6 +77,9 @@ set -o pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$here/env.sh"
+# The folders of a machine that is not a cloud machine, which status --host reads.
+# shellcheck source=../lab/layout.sh
+. "$here/../lab/layout.sh"
 
 AWS_CLI="${AWS_CLI:-aws}"
 SSH_CLI="${SSH_CLI:-ssh}"
@@ -852,12 +856,11 @@ status() {
 }
 
 # The script that the host runs (bash -s), one ssh call for all that status --host shows: sections, each after a line
-# @@NAME, of the state of a chain in ~/taxman-work.  The results file's last lines are enough to find the last game
+# @@NAME, of the state of a chain in its data folder.  The results file's last lines are enough to find the last game
 # completed, and the last 3000 lines of chain.err to tell the games in flight apart.
 host_script() {
-    printf 'incomplete_line=%q\n' "$INCOMPLETE_LINE"
+    printf 'incomplete_line=%q\nwork="$HOME"/%q\n' "$INCOMPLETE_LINE" "$CHAIN_DATA"
     cat <<'EOF'
-work="$HOME/taxman-work"
 changed() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 echo @@now
 date +%s
@@ -904,7 +907,7 @@ host_progress() {
     host_section err
 }
 
-# status for a chain on another machine: what it shows is in ~/taxman-work there, read over ssh, and no AWS.
+# status for a chain on another machine: what it shows is in the chain's data folder there, read over ssh, and no AWS.
 status_host() {
     local now session solver running outcome start window chain_to wall_hours changed result recorded score
     local progress_fn=""
