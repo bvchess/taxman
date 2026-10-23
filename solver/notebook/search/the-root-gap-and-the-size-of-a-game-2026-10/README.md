@@ -253,6 +253,109 @@ nodes or a cheaper `conflicts_ordered` are untried.
 levers are taken up again: carry a node's prices to its next step (the node's loop prices again at every step), and make
 `conflicts_ordered` cheaper, which is a quarter of the choice's cost.
 
+## 2026-10-23: a postmortem of the game before as a guide to the choice (Q5)
+
+**Question.**  Can a postmortem of game n − 1 tell game n which conflict to branch on, so that n skips the pricing of
+the previous section?  Any true conflict keeps the proof exact, so a hint only has to be checked as a conflict at n's
+node.  Stage 1 asks how often the conflict n's search chooses was also chosen in n − 1's search.  Stage 2, a hint patch,
+was not built.
+
+**Answer.**  Raw recurrence is high, 75-87% in the hard pairs, but it is not information a hint can use.  Most of it is
+a conflict used again within the same search (59-71% of the choices); a game far from n shares 36-70% of them; and the
+earlier game's choices inside a node's heaviest set number in the hundreds, among which the most often chosen one is the
+right one under 2% of the time.  A table keyed by the node serves 31-35% of the choices in two hard adjacent pairs and
+none in the other pairs.  The idea is dropped.
+
+**Method.**  A temporary logging patch (`postmortem/logging.patch`, not committed, steps identical to the unpatched
+build on all 630 solves) writes, at every choice made by `conflict_to_branch_on`, the conflict chosen `k` and the
+search's own `K`, the node's gap, the node's heaviest set, and the steps of the subtree below the call.  A conflict is
+named by the sorted list of its members' numbers: a member is the number promoted, the same number in every game, and a
+candidate keeps its home frame in both games ([Lemma R](../../../../docs/theory/ledger.md#the-near-repeat-cut)), so the
+list names the same set of moves in n and in n − 1.  The 315 units of the section on the lower gate (14 games, 18 to 24
+units a game) were solved under B (gate 300, `conflict_look` on) and C (gate 150, look on), one thread each, 8 at once,
+with the known games of the chain's file as the near-repeat cut's reference.  The logs hold 125,000 choices (B) and
+305,000 (C).  A game's reference is the union of the conflicts chosen in the units of the earlier game, which is a
+sample of a twentieth of that game's units, so every share below is a lower bound on what the whole earlier game gives.
+Games 4924 and 4927 have no units, so the pairs are the ones the units allow.
+
+**Recurrence.**  The share of the choices of n whose conflict was chosen anywhere in the units of the reference game,
+for B and C.  "Own search" is the same share against the other units of the same game: the mean over the 14 games with
+12 reference units is 0.54 (B), and with 2, 4 and 8 units 0.23, 0.35 and 0.45, so the twenty or so units of the earlier
+game, which give 0.75 for the hard pairs, hold more than the own search's twelve do.
+
+| n | reference | kind | B | C |
+|---|---|---|---|---|
+| 4921 | 4920 (n − 1) | hard | 0.774 | 0.870 |
+| 4929 | 4928 (n − 1) | hard | 0.747 | 0.812 |
+| 4936 | 4935 (n − 1) | easy | 0.749 | 0.800 |
+| 4941 | 4940 (n − 1) | easy | 0.493 | 0.619 |
+| 4945 | 4944 (n − 1) | easy | 0.576 | 0.649 |
+| 4949 | 4947 (n − 2) | easy | 0.554 | 0.622 |
+| 4928 | 4925 (n − 3) | hard | 0.585 | 0.720 |
+| 4929 | 4925 (n − 4) | hard | 0.658 | 0.770 |
+| 4936 | 4932 (n − 4) | easy | 0.721 | 0.780 |
+| 4945 | 4941 (n − 4) | easy | 0.537 | 0.687 |
+| 4949 | 4945 (n − 4) | easy | 0.739 | 0.790 |
+| 4949 | 4929 (far) | easy against hard | 0.572 | 0.697 |
+| 4945 | 4929 (far) | easy against hard | 0.521 | 0.663 |
+| 4929 | 4949 (far) | hard against easy | 0.381 | 0.522 |
+| 4921 | 4949 (far) | hard against easy | 0.355 | 0.522 |
+
+Weighted by the steps below each choice the shares are lower, 0.43-0.71 (B) in the near pairs and 0.27-0.38 in the far
+controls.  Of the choices where the search's own conflict `K` was not kept, the share is 0.65-0.68 (B) for the hard n −
+1 pairs, 0.20-0.44 for the far controls.  Counting each distinct conflict once, the shares for the hard n − 1 pairs are
+0.57 (B) and 0.57-0.62 (C), and for the far controls 0.14-0.30 (B).  Pairs of near-repeat nodes are not separated: the
+log does not tell them from other nodes, and the cut ends them before the choice, so they are not among the choices.
+
+**What the recurrence is.**  Three cuts of the same logs:
+
+1. **Most of it is the search's own memory.**  59-71% of the choices of the hard games repeat a conflict chosen earlier
+   in the same unit, and 54-74% in the easy.  The earlier game is needed only for the others, the novel choices (27-46%
+   of the calls).  Of those, the share found in the earlier game is 0.665-0.736 for the hard n − 1 pairs, 0.375-0.680
+   for the easy n − 1 pairs and 0.230-0.384 (B) for the far controls.
+2. **There is nothing to pick the right one with.**  A hint must be a conflict of the earlier game that lies inside the
+   node's heaviest set.  The median node has 160 to 960 such conflicts in B (270 to 1,300 in C).  Offering the one
+   chosen most often in the earlier game, on a sample of 4,000 novel choices a pair, gives the right conflict in
+   0.2-1.6% of them (B) and 0.1-0.6% (C), and within the three most often chosen 0.6-3.6% and 0.4-1.3%.  Choosing among
+   hundreds of conflicts is the pricing the hint was to save.
+3. **A table keyed by the node does better, in two pairs.**  Keyed by the node's heaviest set (the log has no other name
+   for a node), a table of the earlier game's choices serves 0.31 (B) and 0.35 (C) of the choices of 4921, and 0.34 and
+   0.34 of 4929, with the same conflict in 99-100% of the nodes it finds.  In the other pairs (the easy n − 1 pairs, n −
+   2 to n − 5, the far controls, and 4925 against 4920 and 4921) it finds at most 0.3% of the choices.  The two pairs
+   that match are hard games whose units overlap in nodes; why only they do was not checked.  The units sampled for each
+   game differ, so the two matches are not a measure of a whole game's.
+
+**The ceiling.**  The choices cost 3.2 ms each (the figure of the previous section), which is 0.227 of the CPU of the
+hard units in B and 0.237 of the easy, 0.507 in C and 0.474 (the logs give 0.097 and 0.148 choices a step in B, 0.437
+and 0.466 in C, as the previous section's 0.096 and 0.445).  A share X of the choices taken from a hint at no cost saves
+X times that:
+
+| X | B hard | B easy | C hard | C easy |
+|---|---|---|---|---|
+| 0.1 | 0.023 | 0.024 | 0.051 | 0.047 |
+| 0.3 | 0.068 | 0.071 | 0.152 | 0.142 |
+| 0.5 | 0.113 | 0.119 | 0.253 | 0.237 |
+| 0.75 | 0.170 | 0.178 | 0.380 | 0.355 |
+
+(shares of the CPU of the 315 units: B 869 s hard and 860 s easy, C 1,003 s and 988 s, the logged runs; C costs 1.154 of
+B in the hard games.)  C needs X above 0.26 of its choices to match B on CPU.  A node table at the 0.33 of the two
+matching pairs puts C at 0.96 of B's CPU and B at 0.93 of itself; a hint that is always the best conflict, X of 0.8,
+puts C at 0.69 of B and B at 0.82 of itself, the most this idea can give.  Both leave out the cost of checking a hint as
+a conflict and the steps lost when the hint is not the best, so they are ceilings.
+
+**Confidence.**  High that raw recurrence is over 50% in the hard pairs and that it is no guide to the choice: the
+memory inside the search, the far controls and the selector's 2% say so from the same logs.  Medium that a node table
+does not generalize: two pairs match and the rest do not, in samples of a twentieth of each game, and the heaviest set
+is only a name for a node.  Not measured: a table from the whole earlier game (every node, not a sample of units), whose
+hit rate in the hard adjacent games could be above the 0.33 seen here; it would need the log of a whole game, about 10⁸
+choices.
+
+**Decision.**  Drop the conflict-keyed hint: the share it could take is mostly the search's own memory, and nothing
+cheap picks the right conflict among the hundreds it could offer.  If the idea is taken up again, the form to try is a
+table keyed by the node, built from the earlier game's whole log, for the hard games' adjacent pairs, and its ceiling at
+the 0.33 seen takes C to 0.96 of B's CPU and saves 7% in B.  The rule of this stage (under 30% drop, over 50% go on) was
+written for a hint that could be picked; the raw share passes it and the pick fails.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -262,3 +365,7 @@ top-of-tree runs.  `~/taxman_work/lab/work/hardgames/` has the study's scripts (
 `solves-all/`, `deep/`, `prof/`) and, in `gate/`, the gate experiment (`run.sh`, `analyze.py`, `analysis.txt`, `out/`
 with a file a solve) and the finder run (`finder-4950.jsonl`); `cheapchoice/` has the cheap-choice runs (`run.sh`, `phases2.sh`,
 `analyze.py`, `phase_table.py`, `analysis.txt`, `out/` and `ph/` with a file a solve).
+`postmortem/` has the postmortem runs (Q5): the logging patch (`logging.patch`, against master at 3407bd4), `build.sh`,
+`run.sh`, `check.sh` (steps with and without the log), `compare.py` (steps against the gate runs), `analyze.py` to
+`analyze4.py` with their output (`analysis*.txt`), `out/` with a result file a solve and `pm/` with the choice log of
+each.
