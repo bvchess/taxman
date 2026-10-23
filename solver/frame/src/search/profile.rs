@@ -15,6 +15,8 @@
 //!   id and by number of promotions, which is the mark that a resume finds ([`Resumed`]).  After the checkpoint is
 //!   written, a thread beside the search reads it and appends a summary of the open units ([`open_work`]).  The end of
 //!   each run appends a last `steps` line and an `end` line ([`SearchProfile::finish`]).
+//! * The phases.  Each searcher times one step in [`PHASE_EVERY`] phase by phase ([`Phases`], read by the searcher as
+//!   each phase ends), and a `steps` line has the time of each phase in its interval.
 
 use super::dual::NodeBound;
 use super::setup::Prepared;
@@ -49,8 +51,91 @@ pub const MOST_IDS: u32 = 100_000;
 /// the checkpoint holds more.  A unit's bound takes about 20 ms at n = 4899.
 pub const OPEN_BOUNDED: usize = 1_000;
 
+/// With a profile, each searcher times one step in this many phase by phase ([`Phases`]).
+pub const PHASE_EVERY: u32 = 64;
+
 /// The format of the file, in its first line.
 const VERSION: u64 = 1;
+
+/// The phases of a step that the profile times, in the order of [`PHASE_NAMES`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Phase {
+    /// The bound of the node or of the child: the GF(2) bound's solve (and the child's level pushed), or the matching
+    /// bound and its refinement on the matching path.
+    Bound,
+    /// The conflict of the heaviest set: the nogood table's lookup, and a peel where the table has none.
+    Conflict,
+    /// Conflict branching's choice of the conflict: the prices, the ordered conflicts and the look.
+    Pricing,
+    /// The Lagrangian bound: its check, and its refits after the step.
+    Lagrange,
+    /// The member to branch on: strong branching's solves.
+    Branching,
+    /// The child's promotion.
+    Promotion,
+    /// The child's candidates: narrowed, and ruled out by the known conflicts, the nogoods and the rule of symmetry.
+    Children,
+    /// The rest: the cheap checks, the rule of symmetry and the near-repeat cut, the offers, the bookkeeping.
+    Other,
+}
+
+/// The names of the phases in a `steps` line, in the order of [`Phase`].
+const PHASE_NAMES: [&str; 8] =
+    ["bound", "conflict", "pricing", "lagrange", "branching", "promotion", "children", "other"];
+
+/// A searcher's clock of the phases of its steps: it times one step in [`PHASE_EVERY`], reading the clock as each
+/// phase ends ([`mark`](Phases::mark)), and the others cost it a test.  The times are those of the thread's clock on the
+/// wall, the CPU's while the thread runs.
+pub(super) struct Phases {
+    countdown: u32,
+    timing: bool,
+    last: Instant,
+    /// Nanoseconds by phase, and the steps timed, since the counts were last handed over.
+    spent: [u64; 8],
+    steps: u64,
+}
+
+impl Phases {
+    pub(super) fn new() -> Self {
+        Phases { countdown: PHASE_EVERY, timing: false, last: Instant::now(), spent: [0; 8], steps: 0 }
+    }
+
+    /// A step begins, timed if it is due.
+    #[inline]
+    pub(super) fn begin(&mut self) {
+        self.countdown -= 1;
+        if self.countdown == 0 {
+            self.countdown = PHASE_EVERY;
+            self.timing = true;
+            self.last = Instant::now();
+        }
+    }
+
+    /// The phase `phase` of the step ends here.
+    #[inline]
+    pub(super) fn mark(&mut self, phase: Phase) {
+        if self.timing {
+            self.lap(phase);
+        }
+    }
+
+    /// The step ends: what is left of it is [`Phase::Other`].
+    #[inline]
+    pub(super) fn end(&mut self) {
+        if self.timing {
+            self.lap(Phase::Other);
+            self.timing = false;
+            self.steps += 1;
+        }
+    }
+
+    #[cold]
+    fn lap(&mut self, phase: Phase) {
+        let now = Instant::now();
+        self.spent[phase as usize] += u64::try_from(now.saturating_duration_since(self.last).as_nanos()).unwrap_or(0);
+        self.last = now;
+    }
+}
 
 /// The id of the steps of a unit that the profile cannot place in its tree: the units of a search that it joined after
 /// the search began, without a profile of its start.
@@ -176,6 +261,9 @@ struct Pending {
     unplaced: u64,
     /// Steps by the number of promotions of the node that took them.
     promotions: Vec<u64>,
+    /// The phases of the steps timed: nanoseconds by phase, and the steps.
+    phases: [u64; 8],
+    timed: u64,
 }
 
 /// The file, and what has been written to it.
@@ -448,9 +536,16 @@ impl SearchProfile {
         Some(id)
     }
 
-    /// Adds a searcher's counts, and empties them: its steps by id and by number of promotions.
-    fn add(&self, steps: &mut HashMap<u32, u64>, promotions: &mut [u64]) {
+    /// Adds a searcher's counts, and empties them: its steps by id and by number of promotions, and the phases of the
+    /// steps it timed.
+    fn add(&self, steps: &mut HashMap<u32, u64>, promotions: &mut [u64], phases: Option<&mut Phases>) {
         let mut pending = lock(&self.pending);
+        if let Some(phases) = phases {
+            for (total, spent) in pending.phases.iter_mut().zip(&mut phases.spent) {
+                *total += std::mem::take(spent);
+            }
+            pending.timed += std::mem::take(&mut phases.steps);
+        }
         for (id, count) in steps.drain() {
             if id == UNPLACED {
                 pending.unplaced += count;
@@ -520,6 +615,15 @@ impl SearchProfile {
             ),
             ("made", Json::from(made)),
             ("full", Json::from(full)),
+            (
+                "phases",
+                Json::object(
+                    [("timed", pending.timed)]
+                        .into_iter()
+                        .chain(PHASE_NAMES.into_iter().zip(pending.phases))
+                        .map(|(name, x)| (name, Json::from(x))),
+                ),
+            ),
         ]);
         let written = (|| -> io::Result<()> {
             for node in &pending.nodes {
@@ -686,13 +790,13 @@ impl<'a> Tags<'a> {
         self.levels.push(level);
     }
 
-    /// Hands the counts over to the profile (the end of a run).
-    pub(super) fn flush(&mut self) {
+    /// Hands the counts over to the profile (the end of a run), with the phases of the steps timed.
+    pub(super) fn flush(&mut self, phases: Option<&mut Phases>) {
         if self.run > 0 {
             *self.steps.entry(self.current).or_default() += self.run;
             self.run = 0;
         }
-        self.profile.add(&mut self.steps, &mut self.promotions);
+        self.profile.add(&mut self.steps, &mut self.promotions, phases);
     }
 
     /// Whether the node at `depth`, with the promotions `promoted`, is where the profile places it: what a unit made
@@ -1014,6 +1118,12 @@ mod tests {
             let (bound, need) = (number(line, "bound"), number(line, "need"));
             assert!(bound >= need, "a node is pushed only if its bound reaches its need: {line}");
         }
+        // The one searcher timed one step in `PHASE_EVERY`, each in some phases.
+        let phases = |key: &str| -> u64 {
+            of_kind(&lines, "steps").filter_map(|line| line.get("phases")?.get(key)?.as_u64()).sum()
+        };
+        assert_eq!(phases("timed"), with.stats.nodes / u64::from(PHASE_EVERY));
+        assert!(phases("bound") > 0 && PHASE_NAMES.iter().map(|name| phases(name)).sum::<u64>() > 0);
     }
 
     /// Several threads, a checkpoint every millisecond: every steps line counts the steps of its checkpoint, every step

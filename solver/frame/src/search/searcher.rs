@@ -22,7 +22,7 @@ use super::diagnostics::{cut, Probe};
 use super::hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 use super::lagrange::{Lagrangian, Refits};
 use super::near_repeat::NearRepeat;
-use super::profile::{Branched, Made, SearchProfile, Tags};
+use super::profile::{Branched, Made, Phase, Phases, SearchProfile, Tags};
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
@@ -412,6 +412,8 @@ struct Stepper<'a, const W: usize> {
     /// step that pushed a child knew of the child: for the profile, which records them, and nothing else.
     bound: u64,
     made: Made,
+    /// With a profile, the clock of the phases of one step in [`PHASE_EVERY`](super::profile::PHASE_EVERY).
+    phases: Option<Phases>,
     /// A study's hook, and the record of the step in progress that it is told of ([`SearchSpace::hooks`]).
     #[cfg(feature = "studies")]
     hook: Option<(Box<dyn StepHook<W>>, StepRecord<W>)>,
@@ -465,6 +467,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 gf2_flushed: Gf2Stats::default(),
                 bound: 0,
                 made: Made::default(),
+                phases: space.profile.map(|_| Phases::new()),
                 #[cfg(feature = "studies")]
                 hook: space.hooks.map(|make| (make(), StepRecord::default())),
                 #[cfg(feature = "studies")]
@@ -582,8 +585,14 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
             if let Some(tags) = &mut self.tags {
                 tags.step(depth);
             }
+            if let Some(phases) = &mut self.stepper.phases {
+                phases.begin();
+            }
             let next = self.step(depth, ctx);
             self.stepper.forget_nogoods_when_due(ctx);
+            if let Some(phases) = &mut self.stepper.phases {
+                phases.end();
+            }
             match next {
                 Next::Child => {
                     if let Some(tags) = &mut self.tags {
@@ -602,7 +611,7 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
         }
         self.stepper.flush(ctx.stats());
         if let Some(tags) = &mut self.tags {
-            tags.flush();
+            tags.flush(self.stepper.phases.as_mut());
         }
     }
 }
@@ -644,10 +653,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let (Some(p), None) = (&mut self.probe, &self.gf2) {
             p.open(&mut self.scratch, &mut self.matching, self.space.model, node, need);
         }
-        let Some(branch) = self.choose_branch(node, open, need) else {
+        let branch = self.choose_branch(node, open, need);
+        self.mark(Phase::Branching);
+        let Some(branch) = branch else {
             return self.end_loop(cut::FORCED, &node.promoted, pushed);
         };
-        let Some(max_next) = self.make_child(node, child, &branch) else {
+        let made = self.make_child(node, child, &branch);
+        self.mark(Phase::Children);
+        let Some(max_next) = made else {
             if let Some(p) = &mut self.probe {
                 p.failed(branch.added.len() == 1);
             }
@@ -729,6 +742,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if self.near_repeat_cuts(node, parent, best) {
             return Err(cut::NEAR_REPEAT);
         }
+        self.mark(Phase::Other);
         let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
@@ -976,6 +990,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 None => false,
             }
         };
+        self.mark(Phase::Promotion);
         if !promoted {
             return None;
         }
@@ -1054,6 +1069,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if self.near_repeat_cuts(child, Some(node), best) {
             return Err(cut::NEAR_REPEAT);
         }
+        self.mark(Phase::Other);
         if self.matching_on {
             self.matching.push_all(added, &cands);
         }
@@ -1151,6 +1167,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.counts.refinements += 1;
         self.counts.evaluations += refiner.evaluations;
         self.counts.conflicts += refiner.computed;
+        self.mark(Phase::Bound);
         if !exact.is_empty() {
             self.offer(ctx, &(promoted | exact));
         }
@@ -1162,10 +1179,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
             Verdict::Open(conflict) => match &mut self.lagrange {
                 None => Ok(Open::of(conflict, forced)),
-                Some(l) => match l.check(&promoted, cands, need, space.fix_forced, &forced) {
-                    None => Err(cut::LAGRANGE),
-                    Some(more) => Ok(Open::of(conflict, forced | more)),
-                },
+                Some(l) => {
+                    let checked = l.check(&promoted, cands, need, space.fix_forced, &forced);
+                    self.mark(Phase::Lagrange);
+                    match checked {
+                        None => Err(cut::LAGRANGE),
+                        Some(more) => Ok(Open::of(conflict, forced | more)),
+                    }
+                }
             },
         }
     }
@@ -1199,6 +1220,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let g = self.gf2.as_mut().expect("the tactic gf2");
         let eval = g.evaluate(cap, space.fix_forced.then_some(need));
         self.bound = eval.value;
+        if let Some(phases) = &mut self.phases {
+            phases.mark(Phase::Bound);
+        }
         if eval.value < need {
             #[cfg(feature = "studies")]
             self.tell_check(&eval, None);
@@ -1217,6 +1241,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         };
         let (found, computed) = seek.conflict(&eval.chosen, forced);
         self.counts.conflicts += u64::from(computed);
+        if let Some(phases) = &mut self.phases {
+            phases.mark(Phase::Conflict);
+        }
         // Tactic `conflict_branching`: where the gap is large, the conflict within the heaviest set whose children's
         // gaps fall most.  Any conflict keeps the search exact.  With the tactic `conflict_look`, it first looks at the
         // last child of the search's own conflict.
@@ -1246,6 +1273,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
             }
             (_, found) => found,
         };
+        if let Some(phases) = &mut self.phases {
+            phases.mark(Phase::Pricing);
+        }
         #[cfg(feature = "studies")]
         if let (true, Lookup::Conflict(k)) = (computed, &found) {
             self.learn_proposed(state, &promoted, cands, &eval.chosen, k);
@@ -1280,10 +1310,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         let forced = match &mut self.lagrange {
             None => forced,
-            Some(l) => match l.check(&promoted, cands, need, space.fix_forced, &forced) {
-                None => return Err(cut::LAGRANGE),
-                Some(more) => forced | more,
-            },
+            Some(l) => {
+                let checked = l.check(&promoted, cands, need, space.fix_forced, &forced);
+                self.mark(Phase::Lagrange);
+                match checked {
+                    None => return Err(cut::LAGRANGE),
+                    Some(more) => forced | more,
+                }
+            }
         };
         Ok(Open { conflict: Some(conflict), forced, branched })
     }
@@ -1419,6 +1453,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
         Some(Branch { n, added, left, forced: space.fix_forced && !forced.is_empty() })
     }
 
+    /// With a profile, the phase `phase` of a step it times ends here ([`Phases`]).
+    #[inline]
+    fn mark(&mut self, phase: Phase) {
+        if let Some(phases) = &mut self.phases {
+            phases.mark(phase);
+        }
+    }
+
     /// Ends the loop of the node with the promotions `promoted` for `reason`: the search goes back to the parent,
     /// whose matching level is then on top again (`pushed`: the node had one of its own).
     #[inline]
@@ -1507,7 +1549,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
     #[inline]
     fn forget_nogoods_when_due(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>) {
         if let (Some(l), Some(table)) = (&mut self.lagrange, &self.nogoods) {
+            if let Some(phases) = &mut self.phases {
+                phases.mark(Phase::Other);
+            }
             l.step(table, &self.space.candidates, ctx.best());
+            if let Some(phases) = &mut self.phases {
+                phases.mark(Phase::Lagrange);
+            }
         }
         if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forgetting.period) {
             self.steps_since_clear += 1;

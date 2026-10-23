@@ -15,8 +15,9 @@ It prints:
   * how a subtree's size follows its gap at those depths: the decades of steps for each 100 of gap (a least-squares
     slope of log10 of the size), and the rank correlation;
   * the timeline at the first depth shown: each checkpoint interval's steps in its largest subtrees;
-  * the steps by number of promotions, and the open units at each checkpoint (their number in the largest subtrees
-    of the first depth shown, and the spread of their gaps).
+  * the steps by number of promotions, the time of the phases of a step (from the steps the searchers timed, one in
+    PHASE_EVERY of solver/frame/src/search/profile.rs), and the open units at each checkpoint (their number in the
+    largest subtrees of the first depth shown, and the spread of their gaps).
 
 The top of a search tree is often a spine, each node making one or two children of which one holds nearly all the
 steps, so the depths shown by default are those where the tree branches: the first depth whose largest subtree holds
@@ -250,6 +251,21 @@ def by_promotions(p):
             print(f'  {lo:>4}-{lo + width - 1:<4} {si(steps):>8} {percent(steps, counted):>6} {bar}')
 
 
+def phases(p):
+    """The time of the phases of the steps timed, summed over the file."""
+    spent = defaultdict(int)
+    for line in p.steps:
+        for name, value in line.get('phases', {}).items():
+            spent[name] += value
+    timed = spent.pop('timed', 0)
+    if not timed:
+        return
+    total = sum(spent.values())
+    print(f'\nthe phases of a step ({timed} steps timed, {total / timed / 1e3:.1f} µs a step):')
+    for name, ns in sorted(spent.items(), key=lambda item: -item[1]):
+        print(f'  {name:>10} {ns / timed / 1e3:>9.1f} µs {percent(ns, total):>6}')
+
+
 def open_work(p, depth, top):
     if not p.opens:
         return
@@ -287,6 +303,7 @@ def main():
     size_and_gap(p, depths)
     timeline(p, depths[0], min(args.top, 8))
     by_promotions(p)
+    phases(p)
     open_work(p, depths[0], min(args.top, 8))
 
 

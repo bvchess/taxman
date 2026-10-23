@@ -246,7 +246,7 @@ ends (`search::profile`, `Tags`).
 | `profile` | first | n, the set width, the depth D and the most ids |
 | `start` | each run | whether it resumed, whether the file has the tree from the root (`rooted`), the steps before, the threads, the incumbent, `unplaced` (steps the profile did not see), `frozen` (see "Resuming") |
 | `node` | at the checkpoint after the node is made | `id`, `parent`, `depth`, `child` (its index among its parent's tagged children), `branch` (`default`: the search's own conflict; `conflict`: the conflict that conflict branching chose; `forced`: the parent's forced members), `added` (the promotions it added to its parent's), `promotions`, `sum`, `cands`, `bound`, `need`, `gap`, `t` (the search's time) |
-| `steps` | each checkpoint, and the end of a run | `seq`, `nodes` (the search's steps, as the checkpoint records them), `counted`, `elapsed`, `ids` (each id's own steps in the interval), `unplaced`, `promotions` (the steps by number of promotions in the interval), `made` (ids so far), `full` |
+| `steps` | each checkpoint, and the end of a run | `seq`, `nodes` (the search's steps, as the checkpoint records them), `counted`, `elapsed`, `ids` (each id's own steps in the interval), `unplaced`, `promotions` (the steps by number of promotions in the interval), `made` (ids so far), `full`, `phases` (see "The phases of a step") |
 | `open` | after each checkpoint | its units by id, the spread of the gaps of a sample of them (at most `OPEN_BOUNDED` of `src/search/profile.rs`), and the seconds the summary took |
 | `end` | the end of a run | `nodes`, `completed`, `best`, `elapsed`, `made`, `full` |
 
@@ -285,6 +285,15 @@ new child of that ancestor could take from it.  A search resumed with no profile
 without it, gets one that cannot place its units: its steps are unplaced, and its counts by number of promotions and
 its open units are recorded.  A resumed profile keeps its depth and its most ids.  A fresh search sets an earlier
 file of its game aside, as `nNNNN.profile.jsonl.K`: a restart or a rerun does not lose it.
+
+**The phases of a step.**  Each searcher times one step in `PHASE_EVERY` (`src/search/profile.rs`), reading the clock
+as each phase of it ends, and a `steps` line has the nanoseconds of each phase in its interval, with the steps timed:
+`bound` (the GF(2) bound's solve, with the child's level pushed, or the matching bound and its refinement),
+`conflict` (the conflict of the heaviest set: the nogood table's lookup, and a peel where it has none), `pricing`
+(conflict branching's choice), `lagrange` (the Lagrangian bound's check and refits), `branching` (strong branching's
+solves), `promotion` (the child's), `children` (the child's candidates: narrowed, and ruled out by the known
+conflicts, the nogoods and the rule of symmetry) and `other` (the cheap checks, the rule of symmetry and the
+near-repeat cut at a node, the offers).  The time is the thread's on the wall, which is its CPU time while it runs.
 
 **Cost.**  A step costs the profile a comparison and an increment; a tagged node, a lock and a line; a checkpoint, a
 block written and synced while the workers are parked; and the thread beside the search, one GF(2) solve for each open
