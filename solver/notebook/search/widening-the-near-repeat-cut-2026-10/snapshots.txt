@@ -1,0 +1,117 @@
+out/units-4901-from-4900.jsonl: 6590 units, line 6.67e+07 steps, bound ok: True
+  mode  0: holds at 6296 units (95.5%), 74.8% of the line; holds 74.8%, moves 25.2%
+           breaking numbers (share of the line): 2783 25%
+  mode  1: holds at 6296 units (95.5%), 74.8% of the line; holds 74.8%, moves 25.2%
+           breaking numbers (share of the line): 2783 25%
+  mode 15: holds at 6296 units (95.5%), 74.8% of the line; holds 74.8%, moves 25.2%
+           breaking numbers (share of the line): 2783 25%
+  mode 16: holds at 6296 units (95.5%), 74.8% of the line; holds 74.8%, moves 25.2%
+           breaking numbers (share of the line): 2783 25%
+  mode 31: holds at 6296 units (95.5%), 74.8% of the line; holds 74.8%, moves 25.2%
+           breaking numbers (share of the line): 2783 25%
+out/units-4899-from-4898.jsonl: 4928 units, line 6.3e+07 steps, bound ok: True
+  mode  0: holds at 4 units (0.1%), 0.0% of the line; moves 100.0%, holds 0.0%
+           breaking numbers (share of the line): 2546 100%, 3819 100%
+  mode  1: holds at 4 units (0.1%), 0.0% of the line; moves 100.0%, holds 0.0%
+           breaking numbers (share of the line): 2546 100%, 3819 100%
+  mode 15: holds at 4 units (0.1%), 0.0% of the line; moves 100.0%, holds 0.0%
+           breaking numbers (share of the line): 2546 100%, 3819 100%
+  mode 16: holds at 4 units (0.1%), 0.0% of the line; moves 100.0%, holds 0.0%
+           breaking numbers (share of the line): 2546 100%, 3819 100%
+  mode 31: holds at 4 units (0.1%), 0.0% of the line; moves 100.0%, holds 0.0%
+           breaking numbers (share of the line): 2546 100%, 3819 100%
+out/units-4900-from-4899.jsonl: 6275 units, line 6.01e+07 steps, bound ok: True
+  mode  0: holds at 0 units (0.0%), 0.0% of the line; cands 96.3%, promoted 3.7%, moves 0.0%
+           breaking numbers (share of the line): 2450 100%
+  mode  1: holds at 0 units (0.0%), 0.0% of the line; cands 96.3%, promoted 3.7%, moves 0.0%
+           breaking numbers (share of the line): 2450 100%
+  mode 15: holds at 0 units (0.0%), 0.0% of the line; cands 96.3%, promoted 3.7%, moves 0.0%
+           breaking numbers (share of the line): 2450 100%
+  mode 16: holds at 0 units (0.0%), 0.0% of the line; cands 96.3%, promoted 3.7%, moves 0.0%
+           breaking numbers (share of the line): 2450 100%
+  mode 31: holds at 0 units (0.0%), 0.0% of the line; cands 96.3%, promoted 3.7%, moves 0.0%
+           breaking numbers (share of the line): 2450 100%
+out/units-4880-from-4879.jsonl: 2359 units, line 1.15e+07 steps, bound ok: True
+  mode  0: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%, moves 0.0%
+           breaking numbers (share of the line): 2440 100%
+  mode  1: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%, moves 0.0%
+           breaking numbers (share of the line): 2440 100%
+  mode 15: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%, moves 0.0%
+           breaking numbers (share of the line): 2440 100%
+  mode 16: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%, moves 0.0%
+           breaking numbers (share of the line): 2440 100%
+  mode 31: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%, moves 0.0%
+           breaking numbers (share of the line): 2440 100%
+out/units-4884-from-4883.jsonl: 1880 units, line 5.82e+05 steps, bound ok: True
+  mode  0: holds at 0 units (0.0%), 0.0% of the line; cands 78.0%, promoted 21.9%, moves 0.0%
+           breaking numbers (share of the line): 2442 100%
+  mode  1: holds at 0 units (0.0%), 0.0% of the line; cands 78.0%, promoted 21.9%, moves 0.0%
+           breaking numbers (share of the line): 2442 100%
+  mode 15: holds at 0 units (0.0%), 0.0% of the line; cands 78.0%, promoted 21.9%, moves 0.0%
+           breaking numbers (share of the line): 2442 100%
+  mode 16: holds at 0 units (0.0%), 0.0% of the line; cands 78.0%, promoted 21.9%, moves 0.0%
+           breaking numbers (share of the line): 2442 100%
+  mode 31: holds at 0 units (0.0%), 0.0% of the line; cands 78.0%, promoted 21.9%, moves 0.0%
+           breaking numbers (share of the line): 2442 100%
+out/units-4875-from-4874.jsonl: 14230 units, line 2.96e+08 steps, bound ok: False
+  mode  0: holds at 14230 units (100.0%), 100.0% of the line; holds 100.0%
+  mode  1: holds at 14230 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 15: holds at 14230 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 16: holds at 14230 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 31: holds at 14230 units (100.0%), 100.0% of the line; holds 100.0%
+out/units-4893-from-4892.jsonl: 2270 units, line 2.55e+06 steps, bound ok: False
+  mode  0: holds at 2270 units (100.0%), 100.0% of the line; holds 100.0%
+  mode  1: holds at 2270 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 15: holds at 2270 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 16: holds at 2270 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 31: holds at 2270 units (100.0%), 100.0% of the line; holds 100.0%
+out/units-4895-from-4894.jsonl: 5459 units, line 6.31e+07 steps, bound ok: False
+  mode  0: holds at 5459 units (100.0%), 100.0% of the line; holds 100.0%
+  mode  1: holds at 5459 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 15: holds at 5459 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 16: holds at 5459 units (100.0%), 100.0% of the line; holds 100.0%
+  mode 31: holds at 5459 units (100.0%), 100.0% of the line; holds 100.0%
+out/units-4893-from-4888.jsonl: 2270 units, line 2.55e+06 steps, bound ok: True
+  mode  0: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%
+           breaking numbers (share of the line): 2445 100%
+  mode  1: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%
+           breaking numbers (share of the line): 2445 100%
+  mode 15: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%
+           breaking numbers (share of the line): 2445 100%
+  mode 16: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%
+           breaking numbers (share of the line): 2445 100%
+  mode 31: holds at 0 units (0.0%), 0.0% of the line; cands 100.0%, promoted 0.0%
+           breaking numbers (share of the line): 2445 100%
+out/greedy-4875-from-4874.jsonl: P*_M 539895, P*_N 538080 (-1815); 14230 units
+  greedy completion above P*_M: 0 units (0.0%), 0.0% of the line
+  greedy completion at P*_N: 0 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4880-from-4879.jsonl: P*_M 540552, P*_N 542420 (+1868); 2359 units
+  greedy completion above P*_M: 421 units (17.8%), 50.1% of the line
+  greedy completion at P*_N: 0 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4884-from-4883.jsonl: P*_M 542420, P*_N 543308 (+888); 1880 units
+  greedy completion above P*_M: 112 units (6.0%), 17.8% of the line
+  greedy completion at P*_N: 0 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4893-from-4892.jsonl: P*_M 544107, P*_N 543874 (-233); 2270 units
+  greedy completion above P*_M: 0 units (0.0%), 0.0% of the line
+  greedy completion at P*_N: 0 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4895-from-4894.jsonl: P*_M 543874, P*_N 542539 (-1335); 5459 units
+  greedy completion above P*_M: 0 units (0.0%), 0.0% of the line
+  greedy completion at P*_N: 1 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4899-from-4898.jsonl: P*_M 544987, P*_N 544987 (+0); 4928 units
+  greedy completion above P*_M: 0 units (0.0%), 0.0% of the line
+  greedy completion at P*_N: 1 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 3107 units (63.0%), 50.9% of the line
+out/greedy-4900-from-4899.jsonl: P*_M 544987, P*_N 547431 (+2444); 6275 units
+  greedy completion above P*_M: 2138 units (34.1%), 41.8% of the line
+  greedy completion at P*_N: 0 units (0.0%), 0.0% of the line
+  greedy completion no set of M: 0 units (0.0%), 0.0% of the line
+out/greedy-4901-from-4900.jsonl: P*_M 547431, P*_N 547431 (+0); 6590 units
+  greedy completion above P*_M: 0 units (0.0%), 0.0% of the line
+  greedy completion at P*_N: 1 units (0.0%), 0.1% of the line
+  greedy completion no set of M: 18 units (0.3%), 2.7% of the line
+cover 4899 from 4898: 4928 units; 4924 with no set K found
