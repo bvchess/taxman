@@ -281,7 +281,7 @@ default's steps and 0.26 and 0.27 of its CPU; a step costs more than a default o
 The share of steps saved grows with the gap.  The measurements, and the gap and slope chosen, are in [where the search
 of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 
-*The look.*  With the tactic `conflict_look`, off by default, a check that would branch on a conflict other than `K`
+*The look.*  With the tactic `conflict_look`, on by default, a check that would branch on a conflict other than `K`
 looks at one child of `K` first.  At some deep nodes the choice above avoids `K` although one child of `K` dies at
 once, and the node then drains its gap a member at a time.  The cause is a hub: a member that costs the bound almost
 nothing to leave out, because a substitute can take its place, but that every completion beating the incumbent holds.
@@ -312,12 +312,15 @@ conflict that cuts the child is learned as a nogood of the root, which holds at 
 own.  No node's list of known conflicts gains anything from it.  So the look may change between a search's units, as the
 choice may ([lab.md](lab.md)).
 
-*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the default's steps; on the whole
-games 3000, 3200, 3500 and 4050 it takes 0.975 of the default's steps together.  Whole games of that size have few deep
-nodes of large gap, so it is a test on a game of the chain that decides it.  The measurements are in [when a node
-should use conflict branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).
-With the split's bound, units of games 4875 and 4950 take 0.79 to 0.95 of the CPU that they took with a look that
-solves every child, with the same trees ([cheaper steps of conflict
+*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it; on the whole
+games 3000, 3200, 3500 and 4050 it takes 0.975 of them together.  Whole games of that size have few deep nodes of large
+gap, so games of the chain decided it: on the chain, a game of 4918 to 4948 with the look took 0.79 to 0.97 of its
+neighbor's steps without it, 0.85 in geometric mean ([the live
+lab](../../notebook/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).  The measurements
+on units are in [when a node should use conflict
+branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).  With the split's bound,
+units of games 4875 and 4950 take 0.79 to 0.95 of the CPU that they took with a look that solves every child, with the
+same trees ([cheaper steps of conflict
 branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
 
 ## The starting incumbent, the ceiling and the seed

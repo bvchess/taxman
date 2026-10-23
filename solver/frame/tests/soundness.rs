@@ -39,18 +39,19 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32), and
 /// the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what the
 /// searchers keep, however often they forget and however small the limit, changes no answer), then conflict branching
-/// (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42), the search's
-/// own conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
-/// look at the last child of the search's own conflict (tactic `conflict_look`, off by default), on one thread and on
-/// two (44 and 45), then the GF(2) bound and the matching path without the near-repeat cut (46 and 47; tactic
-/// `near_repeat`, which the others have, and which acts where a game has the cut of a game before it, [`game_after`],
-/// and the incumbent reaches its bound).  The matching path with the forgetting of nogoods at the production period,
-/// every step, every third, and never; on one thread and two; and the GF(2) bound with each way of choosing the branch,
-/// with and without the matching bound as a first check, forced members, nogoods and the Lagrangian bound's early
-/// refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these
-/// searches never take, so some configurations refit them after the first few steps and every few steps after that
-/// (with and without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2)
-/// bound without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
+/// (tactic `conflict_branching`) at every check, whatever its gap, without the look at the last child of the search's
+/// own conflict (tactic `conflict_look`, on by default), on one thread and on two (41 and 42), the search's own
+/// conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
+/// look, on one thread and on two (44 and 45), then the GF(2) bound and the matching path without the near-repeat cut
+/// (46 and 47; tactic `near_repeat`, which the others have, and which acts where a game has the cut of a game before
+/// it, [`game_after`], and the incumbent reaches its bound).  The matching path with the forgetting of nogoods at the
+/// production period, every step, every third, and never; on one thread and two; and the GF(2) bound with each way of
+/// choosing the branch, with and without the matching bound as a first check, forced members, nogoods and the
+/// Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000
+/// steps, which most of these searches never take, so some configurations refit them after the first few steps and
+/// every few steps after that (with and without forgetting at the same time, refinement, and a second thread), and one
+/// turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with the nogoods forgotten at every
+/// step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -95,8 +96,8 @@ fn configs() -> Vec<Config> {
         Config { period: Some(7), keep: Keep::Used, limit: Some(3), threads: 2, ..g },
         Config { period: Some(3), keep: Keep::Used, ..base },
         Config { period: None, limit: Some(1), ..base },
-        Config { conflict_branching: Some(0), ..g },
-        Config { conflict_branching: Some(0), threads: 2, period: Some(3), ..g },
+        Config { conflict_branching: Some(0), conflict_look: false, ..g },
+        Config { conflict_branching: Some(0), conflict_look: false, threads: 2, period: Some(3), ..g },
         Config { conflict_branching: None, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
@@ -249,11 +250,12 @@ fn the_near_repeat_cut_cuts_nothing_while_the_incumbent_is_below_its_bound() {
 
 /// The look at the last child of the search's own conflict (tactic `conflict_look`) acts, and changes no answer: with
 /// conflict branching at every check, whatever its gap, it changes the tree of some of the games 301 to 500 (every
-/// tenth), and each search comes back with exactly the sum of `optimal.json`, from an incumbent worth 1 less.
+/// tenth) from the tree without it, and each search comes back with exactly the sum of `optimal.json`, from an
+/// incumbent worth 1 less.
 #[test]
 fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
     let optimal = Optimal::built_in();
-    let branching = Config { conflict_branching: Some(0), ..Config::standard() };
+    let branching = Config { conflict_branching: Some(0), conflict_look: false, ..Config::standard() };
     let looking = Config { conflict_look: true, ..branching };
     let mut changed = 0;
     for n in (301..=500).step_by(10) {

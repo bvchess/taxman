@@ -90,7 +90,7 @@ pub struct SearchTactics {
     /// cheapest out, and branch on the search's own conflict if that child is cut on sight
     /// ([`CONFLICT_LOOK_PRICE`](super::CONFLICT_LOOK_PRICE), [`CONFLICT_LOOK_SLACK`](super::CONFLICT_LOOK_SLACK) and
     /// `search::searcher`'s `conflict_to_branch_on` say where; sound: it only chooses between two true conflicts, and
-    /// leaves the node's state as it found it).  Off by default.
+    /// leaves the node's state as it found it).  On by default.
     pub conflict_look: bool,
     /// Cut a node whose completions are promotion sets of a game M proven before, once the incumbent reaches a proven
     /// bound of M's best promotion sum ([`NearRepeat`](super::NearRepeat); proven: docs/theory/ledger.md, Lemma R).  It
@@ -119,7 +119,7 @@ impl Default for SearchTactics {
             deep_branching: Gf2Branching::Split,
             more_forced: true,
             conflict_branching: true,
-            conflict_look: false,
+            conflict_look: true,
             near_repeat: true,
         }
     }
@@ -303,7 +303,7 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10) and `near_repeat` (11); the defaults are `0xBB9`.
+    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10) and `near_repeat` (11); the defaults are `0xFB9`.
     /// (Bits 9 to 11 record the settings the search began with and bind nothing
     /// ([`BRANCHING_BITS`](Self::BRANCHING_BITS) and [`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT)): a checkpoint of a
     /// build before `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and likewise bit 10

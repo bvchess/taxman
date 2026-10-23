@@ -1109,8 +1109,9 @@ mod tests {
 
     #[test]
     fn a_games_tactics_are_the_runs_then_the_policy_then_its_own() {
-        let run = SearchTactics::default();
-        assert!(run.conflict_branching && !run.conflict_look);
+        // A run with the look off (it is on by default), so that the policy's look changes its tactics.
+        let run = SearchTactics { conflict_look: false, ..SearchTactics::default() };
+        assert!(run.conflict_branching);
         let mut policies = Policies::default();
         policies.give(entry(10, Some(false), Some(true), Some(150)));
         let mut lab = GameLab::default();

@@ -197,7 +197,7 @@ adds beside it.
 | `digest` | the first 16 hexadecimal digits of the SHA-256 of the unit's promotions, a colon and its candidates, both as hexadecimal as the snapshot's units file has them: two units with the same sets, as the units of a near repeat have, share it |
 | `gap`, `depth`, `cands` | the unit's gap (the bound less what the incumbent needs), the number of its promotions and the number of its candidates |
 | `left_out` | how many members of the snapshot's incumbent the unit has left out: in neither its promotions nor its candidates |
-| `setting` | the run's changes from the defaults as `name=value`, separated by commas: its tactics (`conflict_look=on`) and `gate=150`; `default` for none |
+| `setting` | the run's changes from the defaults as `name=value`, separated by commas: its tactics (`conflict_look=off`) and `gate=150`; `default` for none |
 | `steps`, `cpu_seconds` | the unit's steps and its CPU seconds under that setting |
 | `ended` | whether the run finished the unit (false: a limit stopped it, and `steps` is a lower bound) |
 

@@ -117,7 +117,7 @@ mod tests {
         assert_ne!(live.generation(), seen);
         assert_eq!(
             live.settings(),
-            BranchSettings { conflict_branching: false, gate: CONFLICT_BRANCHING_GAP, conflict_look: false }
+            BranchSettings { conflict_branching: false, gate: CONFLICT_BRANCHING_GAP, conflict_look: true }
         );
         assert_eq!(live.settings().conflict_gap(), None);
         let off = SearchTactics { conflict_branching: false, ..tactics };
@@ -127,24 +127,24 @@ mod tests {
     #[test]
     fn each_switch_changes_itself_alone() {
         let live = Branching::new(BranchSettings::of(&SearchTactics::default()));
-        assert!(!live.settings().conflict_look);
+        assert!(live.settings().conflict_look);
         let seen = live.generation();
-        live.set_conflict_look(true);
+        live.set_conflict_look(false);
         assert_ne!(live.generation(), seen);
         assert_eq!(
             live.settings(),
-            BranchSettings { conflict_branching: true, gate: CONFLICT_BRANCHING_GAP, conflict_look: true }
+            BranchSettings { conflict_branching: true, gate: CONFLICT_BRANCHING_GAP, conflict_look: false }
         );
         live.set_conflict_branching(false);
         assert_eq!(
             live.settings(),
-            BranchSettings { conflict_branching: false, gate: CONFLICT_BRANCHING_GAP, conflict_look: true }
+            BranchSettings { conflict_branching: false, gate: CONFLICT_BRANCHING_GAP, conflict_look: false }
         );
         live.set_conflict_branching(true);
-        live.set_conflict_look(false);
+        live.set_conflict_look(true);
         assert_eq!(live.settings(), BranchSettings::of(&SearchTactics::default()));
-        let looking = SearchTactics { conflict_look: true, ..SearchTactics::default() };
-        assert!(BranchSettings::of(&looking).conflict_look);
+        let unlooking = SearchTactics { conflict_look: false, ..SearchTactics::default() };
+        assert!(!BranchSettings::of(&unlooking).conflict_look);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
         live.set_conflict_branching(true);
         assert_eq!(live.settings().conflict_gap(), Some(0));
         // The other switches do not touch it.
-        live.set_conflict_look(true);
+        live.set_conflict_look(false);
         assert_eq!(live.settings().gate, 0);
         // `with_gate` keeps the gate when none is given.
         let settings = BranchSettings::of(&SearchTactics::default());

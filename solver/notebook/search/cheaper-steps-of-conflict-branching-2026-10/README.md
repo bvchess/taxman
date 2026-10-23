@@ -310,4 +310,5 @@ children that lost a member of their parent's set) about a sixth, the ordered co
 
 The change, its docs (`gf2-bound.md`, `search.md`) and this entry are one commit on master, its message opening "A
 child carries its parent's prices".  The cheaper look is a commit of its own, its message opening "The look of
-conflict_look bounds its child from the node's weight split".
+conflict_look bounds its child from the node's weight split", and the commit after it, opening "conflict_look is on
+by default", makes the look the default.

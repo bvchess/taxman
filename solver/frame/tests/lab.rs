@@ -355,6 +355,14 @@ fn setting_pair(record: &Json) -> (Option<&str>, Option<&str>) {
     (setting(record, "conflict_branching"), setting(record, "conflict_look"))
 }
 
+/// The run's flags of the tests of policies: the default with the look off (tactic `conflict_look`, on by default), so
+/// that a policy that turns it on changes the games it reaches.
+fn run_options(threads: usize) -> SolveOptions {
+    let mut opts = options(threads);
+    opts.tactics.search.conflict_look = false;
+    opts
+}
+
 /// The two switches a line says its search ended with.
 fn ended_with(line: &Json) -> (Option<bool>, Option<bool>) {
     let switches = line.get("tactic_switches").unwrap();
@@ -433,7 +441,7 @@ fn a_policy_reaches_the_games_in_flight_and_those_set_up_later() {
         checkpoint_interval: Duration::from_secs(600),
         progress: Some(Duration::from_millis(5)),
         lab: LabOptions { dir: Some(lab.clone()), ..LabOptions::default() },
-        ..options(2)
+        ..run_options(2)
     };
     std::thread::scope(|scope| {
         let lab = scope.spawn(|| give_policies(&lab, &out));
@@ -516,7 +524,7 @@ fn a_policy_survives_a_restart_of_the_run() {
         progress: Some(Duration::from_millis(5)),
         lab: LabOptions { dir: Some(lab.clone()), ..LabOptions::default() },
         window: 1,
-        ..options(2)
+        ..run_options(2)
     };
     let stopped = solver::solve_range_each(LO, HI, &opts, Some(&out), |_| {}).unwrap();
     assert!(stopped.redeploy.is_some());
@@ -562,7 +570,7 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
     let dir = TempDir::new("lab-policy-resume");
     let ckpt = dir.join("ckpt");
     let opts =
-        SolveOptions { checkpoint_dir: Some(ckpt.clone()), node_limit: Some(1), force_search: true, ..options(1) };
+        SolveOptions { checkpoint_dir: Some(ckpt.clone()), node_limit: Some(1), force_search: true, ..run_options(1) };
     // The first piece is the run's flags, the settings the checkpoint is made under.  The gate is no part of a
     // checkpoint, so it too differs from one piece to the next.
     let settings = [("on", "off"), ("off", "on"), ("on", "on"), ("off", "off")];

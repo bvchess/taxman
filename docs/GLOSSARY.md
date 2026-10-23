@@ -171,7 +171,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 300 or
   more chooses so; otherwise it branches on the smallest conflict the search knows ([solver/docs/design/search.md,
   "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
-* **look**: with the tactic `conflict_look`, off by default, a node that conflict branching would send to another
+* **look**: with the tactic `conflict_look`, on by default, a node that conflict branching would send to another
   conflict first looks at the last child of the search's own conflict, and branches on the search's own conflict if
   that child is cut on sight ([solver/docs/design/search.md,
   "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).

@@ -50,8 +50,8 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
     // `lagrange=on` (which refits after 2,000 steps) changes none of them, and `symmetry=off` (the default before the
     // rule) makes them larger with the same answers.  Game 1000's rows count the tree with conflict branching, which
     // is on by default and acts where a node's gap passes 300; with `conflict_branching=off` its default row is
-    // smaller.  With `conflict_look=on` (off by default) it looks at the last child of the search's own conflict
-    // there, and the tree is another one.
+    // smaller.  With `conflict_look`, on by default, it looks at the last child of the search's own conflict there;
+    // `conflict_look=off` gives another tree.
     (480, "default", 5350, 37),
     (600, "default", 8507, 365),
     (600, "fix_forced=off", 8507, 530),
@@ -67,12 +67,12 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
     (936, "nogoods=off", 20507, 345),
     (936, "lagrange=on", 20507, 449),
     (936, "symmetry=off", 20507, 652),
-    (1000, "default", 24168, 3360),
+    (1000, "default", 24168, 3319),
     (1000, "fix_forced=off", 24168, 4000),
     (1000, "nogoods=off", 24168, 6308),
-    (1000, "lagrange=on", 24168, 3360),
-    (1000, "conflict_look=on", 24168, 3319),
-    (1000, "symmetry=off", 24168, 4582),
+    (1000, "lagrange=on", 24168, 3319),
+    (1000, "conflict_look=off", 24168, 3360),
+    (1000, "symmetry=off", 24168, 4591),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),
     // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.
@@ -123,7 +123,7 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
 /// [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is the answer.  The rows `extended` are the
 /// frame model's trees, node for node, where [`EXPECTED`] has the same tactics (its rows `symmetry=off` for 600, 936
 /// and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against 365 nodes at 600, 366 against 449 at
-/// 936, 3,553 against 3,360 at 1000), so what differs is what the rule of the symmetric pairs reads from the two
+/// 936, 3,507 against 3,319 at 1000), so what differs is what the rule of the symmetric pairs reads from the two
 /// models, not the search.  Both are also held to the default engine's search of the same frames and candidates
 /// ([`extended_searches`]), whatever the table says.
 const EXTENDED: [(u32, &str, u64, u64); 16] = [
@@ -139,8 +139,8 @@ const EXTENDED: [(u32, &str, u64, u64); 16] = [
     (760, "extended", 14170, 184),
     (936, "default", 20507, 366),
     (936, "extended", 20507, 652),
-    (1000, "default", 24168, 3553),
-    (1000, "extended", 24168, 4582),
+    (1000, "default", 24168, 3507),
+    (1000, "extended", 24168, 4591),
     (1133, "default", 28690, 41),
     (1133, "extended", 28690, 41),
 ];

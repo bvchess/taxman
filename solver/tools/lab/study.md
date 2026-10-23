@@ -123,7 +123,7 @@ Take the steps in order.
 
       Draw from those units, after you have added their lines to a copy of the units file (SNAPDIR is a path here).
    3. Solve the drawn units once under each setting, with `lab.sh --local run SNAPDIR IDS --cpu-limit 60` and the
-      setting's arguments: `--tactic conflict_look=on`, `--tactic conflict_branching=off` or `--gate 150` (put the
+      setting's arguments: `--tactic conflict_look=off`, `--tactic conflict_branching=off` or `--gate 150` (put the
       command in a file, as the Tools bullet says).  A unit stops at the limit and is marked `limit`.  Each run prints a
       row for each unit and adds its result line to `SNAPDIR/runs.jsonl`.
    4. A unit's *step ratio* is its steps under the candidate over its steps under the setting in force, for the units
