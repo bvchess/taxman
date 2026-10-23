@@ -895,6 +895,7 @@ const REWRITTEN: &[&str] = &[
     "solver/noframe/README.md",
     "solver/noframe/docs/",
     "solver/docs/agenda-ideas.md",
+    "solver/docs/agenda-after-5000.md",
     "results/runs.md",
     "solver/notebook/README.md",
     "solver/notebook/register/",

@@ -9,6 +9,7 @@ are the entry [Measurements made for the research
 agenda](../notebook/search/measurements-made-for-the-research-agenda-2026-10/README.md), cited below as "measurements
 7.1" to "7.4".
 
+* [Next, once the chain passes 5000](agenda-after-5000.md), in a file of its own
 * [1. Where we are](#1-where-we-are)
 * [2. The diagnosis of the wall](#2-the-diagnosis-of-the-wall)
 * [3. Ranked avenues](#3-ranked-avenues)
