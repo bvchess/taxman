@@ -33,7 +33,7 @@ use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -137,10 +137,12 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
-    /// With the tactic `near_repeat`: the game proven before whose problem cuts the nodes ([`NearRepeat`]), if the
-    /// search was given one and its incumbent or floor reached its bound when it was set up ([`NearRepeat::arms`]);
-    /// `None` otherwise.
-    pub near_repeat: Option<&'a NearRepeat<W>>,
+    /// With the tactic `near_repeat`: where the search's near-repeat cut is put once it has one ([`NearRepeat`], the
+    /// game proven before whose problem cuts the nodes), at its setup or while it runs (a lock is set once, so the cut
+    /// is armed at most once); `None` for a search without the cut.  Each searcher picks the cut up when it starts a
+    /// unit, as it reads the branching settings, and cuts by it only where the incumbent its step read reaches the
+    /// cut's bound ([`NearRepeat::reached`]).
+    pub near_repeat: Option<&'a OnceLock<NearRepeat<W>>>,
     /// A study's hook, which each searcher makes for itself (see [`StepHook`]; `None` in the solver's searches, and
     /// absent from a build without the feature `studies`).
     #[cfg(feature = "studies")]
@@ -384,6 +386,8 @@ struct Stepper<'a, const W: usize> {
     conflict_branching: Option<u64>,
     conflict_look: bool,
     branching_seen: u64,
+    /// The near-repeat cut, once the searcher has picked it up at the start of a unit ([`SearchSpace::near_repeat`]).
+    near_repeat: Option<&'a NearRepeat<W>>,
     probe: Option<Probe<'a>>,
     /// The GF(2) bound's counters as of the last flush.
     gf2_flushed: Gf2Stats,
@@ -434,6 +438,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 branching_seen,
                 conflict_branching: branching.conflict_gap(),
                 conflict_look: branching.conflict_look,
+                // Picked up when the searcher starts a unit (`start`), before any step.
+                near_repeat: None,
                 probe: space.diagnostics.map(Probe::new),
                 gf2_flushed: Gf2Stats::default(),
                 #[cfg(feature = "studies")]
@@ -496,6 +502,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             self.stepper.conflict_branching = settings.conflict_gap();
             self.stepper.conflict_look = settings.conflict_look;
             self.stepper.branching_seen = generation;
+        }
+        // The near-repeat cut, if it was armed since the searcher last looked: a lock's state is one atomic load.  The
+        // unit's node finds its state in Π_M from Π_M's root, and its children from it, as any unit's does; the nodes
+        // searched before are only not cut.
+        if self.stepper.near_repeat.is_none() {
+            self.stepper.near_repeat = space.near_repeat.and_then(OnceLock::get);
         }
     }
 
@@ -575,7 +587,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             *record = StepRecord { promoted: node.promoted, cands: node.cands, need, ..StepRecord::default() };
         }
 
-        let open = match self.check_node(node, parent, need, ctx) {
+        let open = match self.check_node(node, parent, best, need, ctx) {
             Ok(open) => open,
             Err(reason) => return self.end_loop(reason, &node.promoted, pushed),
         };
@@ -628,13 +640,14 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// larger ones: a bound of its own); then, unless the node kept its verdict from when it was made at this
     /// `need`, the rule of the tactic `symmetry` (a function of the node's promotions and candidates alone, and
     /// cheaper than the bounds), then the near-repeat cut ([`near_repeat_cuts`](Self::near_repeat_cuts); `parent`: the
-    /// node's parent on the stack, if it has one), then the bound check (the GF(2) bound; the matching bound without
-    /// `gf2`).
+    /// node's parent on the stack, if it has one; `best`: the incumbent the step read, of which `need` is made), then
+    /// the bound check (the GF(2) bound; the matching bound without `gf2`).
     #[inline]
     fn check_node(
         &mut self,
         node: &mut Node<W>,
         parent: Option<&Node<W>>,
+        best: u64,
         need: u64,
         ctx: &mut Ctx<'_, TaxUnit<W>>,
     ) -> Result<Open<W>, usize> {
@@ -661,7 +674,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         #[cfg(feature = "studies")]
         self.apply_hook_rule(node, need)?;
-        if self.near_repeat_cuts(node, parent) {
+        if self.near_repeat_cuts(node, parent, best) {
             return Err(cut::NEAR_REPEAT);
         }
         let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
@@ -780,15 +793,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.proposals = proposals;
     }
 
-    /// The near-repeat cut at `node` ([`NearRepeat`], tactic `near_repeat`): whether its three checks hold, so that no
-    /// completion of the node is worth more than the cut's bound, which the incumbent reached when the search was set
-    /// up ([`SearchSpace::near_repeat`]).  Check 1 for the candidates first, a few set operations; then σ_M(P), found
-    /// once for the node ([`near_state`](Self::near_state)) and kept in it for its later steps and its children; then
-    /// check 3, on the frames that its candidates touch.  `parent`: the node's parent on the stack, if it has one.
+    /// The near-repeat cut at `node` ([`NearRepeat`], tactic `near_repeat`): whether `best`, the incumbent the step
+    /// read, reaches the cut's bound, and the cut's three checks hold, so that no completion of the node is worth more
+    /// than that bound ([`SearchSpace::near_repeat`]).  First the incumbent, one comparison, so that a search armed
+    /// below the bound does nothing for the cut until the incumbent reaches it; then check 1 for the candidates, a few
+    /// set operations; then σ_M(P), found once for the node ([`near_state`](Self::near_state)) and kept in it for its
+    /// later steps and its children; then check 3, on the frames that its candidates touch.  `parent`: the node's
+    /// parent on the stack, if it has one.
     #[inline]
-    fn near_repeat_cuts(&mut self, node: &mut Node<W>, parent: Option<&Node<W>>) -> bool {
-        let Some(near) = self.space.near_repeat else { return false };
-        if node.near == Near::Off || !near.candidates_marked(&node.cands) {
+    fn near_repeat_cuts(&mut self, node: &mut Node<W>, parent: Option<&Node<W>>, best: u64) -> bool {
+        let Some(near) = self.near_repeat else { return false };
+        if !near.reached(best) || node.near == Near::Off || !near.candidates_marked(&node.cands) {
             return false;
         }
         if node.near == Near::Unknown && !self.near_state(near, node, parent) {
@@ -984,7 +999,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
                 return Err(cut::SYMMETRY);
             }
         }
-        if self.near_repeat_cuts(child, Some(node)) {
+        if self.near_repeat_cuts(child, Some(node), best) {
             return Err(cut::NEAR_REPEAT);
         }
         if self.matching_on {
@@ -1466,7 +1481,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         for (i, count) in extra {
             stats.extra[i] += count;
         }
-        if let Some(near) = self.space.near_repeat {
+        if let Some(near) = self.near_repeat {
             near.add_cut(counts.near_repeat);
         }
         if let Some(g) = &self.gf2 {

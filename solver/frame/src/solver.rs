@@ -113,7 +113,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Receiver;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 /// The largest board the set widths cover: 8191, at the widest of [`crate::bits::WIDTHS`] (128 words).
@@ -985,7 +985,7 @@ struct Go {
     /// The workers the search starts with.
     threads: usize,
     /// The game of `n − 1`, if it is concluded and proven when the search starts: the game of the near-repeat cut
-    /// ([`near_repeat`]).
+    /// ([`Job::arm`]).  A search that starts before then is armed when that game is concluded, if it still runs.
     proven: Option<Prev>,
 }
 
@@ -1003,6 +1003,8 @@ struct Outcome {
     time_all_runs: Duration,
     /// What the finder did, if it started.
     finder: Option<finder::Report>,
+    /// The nodes the near-repeat cut cut, if the search was armed with it ([`Job::arm`]).
+    near_repeat_cut: Option<u64>,
 }
 
 /// A game set up for a search, whatever its set width: what the game's thread and the driver of the range need of it.
@@ -1032,6 +1034,15 @@ trait Job: Send + Sync {
     fn branching(&self) -> &Branching;
     /// The search tactics, with the branching settings as they are now.
     fn tactics(&self) -> SearchTactics;
+    /// Arms the search's near-repeat cut by `prev`, the game of `n − 1` once it is concluded ([`near_repeat`]): with
+    /// the tactic `near_repeat`, where `prev` is proven and assumes nothing.  The cut is set up here, on the caller's
+    /// thread, and the searchers pick it up as each starts a unit, so the search may run or not have started.  It is
+    /// armed once: a later call does nothing.  Returns the cut's bound B if this call armed it.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`near_repeat`], and then the cut is not armed.
+    fn arm(&self, prev: &Prev) -> Result<Option<u64>, String>;
     /// Offers the search the promotions `set`, claimed to be worth `value` (their sum if not given), through
     /// [`search::offer_found`]: whether it became the incumbent, or why it was refused.
     fn offer(&self, set: &[u32], value: Option<u64>) -> Result<bool, String>;
@@ -1056,6 +1067,8 @@ struct SearchJob<const W: usize> {
     store_game: Option<Vec<u32>>,
     /// The branching settings the search starts with and the lab may change ([`search::search_steered`]).
     branching: Arc<Branching>,
+    /// The near-repeat cut, once it is armed ([`Job::arm`]): the search reads it from here.
+    near: OnceLock<NearRepeat<W>>,
 }
 
 impl<const W: usize> SearchJob<W> {
@@ -1110,6 +1123,15 @@ impl<const W: usize> Job for SearchJob<W> {
         }
     }
 
+    fn arm(&self, prev: &Prev) -> Result<Option<u64>, String> {
+        if !self.prepared.tactics.near_repeat || self.near.get().is_some() {
+            return Ok(None);
+        }
+        let Some(near) = near_repeat(&self.prepared, prev)? else { return Ok(None) };
+        let bound = near.bound();
+        Ok(self.near.set(near).is_ok().then_some(bound))
+    }
+
     fn offer(&self, set: &[u32], value: Option<u64>) -> Result<bool, String> {
         let n = self.board.n();
         if let Some(bad) = set.iter().find(|&&x| x == 0 || x > n) {
@@ -1162,13 +1184,11 @@ impl<const W: usize> Job for SearchJob<W> {
             control: Some(Arc::clone(&self.control)),
             background: opts.background,
         };
-        let (prepared, resuming, branching) = (&self.prepared, self.resuming, &self.branching);
-        let near = match &go.proven {
-            Some(prev) if prepared.tactics.near_repeat => near_repeat(prepared, prev)?,
-            _ => None,
-        };
-        let plan = finder.as_ref();
-        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near.as_ref());
+        if let Some(prev) = &go.proven {
+            self.arm(prev)?;
+        }
+        let (prepared, resuming, branching, plan) = (&self.prepared, self.resuming, &self.branching, finder.as_ref());
+        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, &self.near);
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);
@@ -1183,22 +1203,23 @@ impl<const W: usize> Job for SearchJob<W> {
             time: found.time,
             time_all_runs: found.time_all_runs,
             finder: found.finder,
+            near_repeat_cut: self.near.get().map(NearRepeat::nodes_cut),
         })
     }
 }
 
 /// The near-repeat cut of the search of `prepared`, game `n`, by `prev`, the game of `n − 1` concluded and proven
-/// before the search starts ([`crate::board::near_repeat`]; docs/theory/ledger.md, "The near-repeat cut").  `None`
-/// where `prev` is not proven, or its proof assumes anything.
+/// ([`crate::board::near_repeat`]; docs/theory/ledger.md, "The near-repeat cut").  `None` where `prev` is not proven,
+/// or its proof assumes anything.
 ///
 /// B, `prev`'s score less the `in_the_bag` of `n − 1`, bounds P\*(Π_M) where that score is opt(n − 1)
 /// (docs/theory/ledger.md, the paragraph "Standing"): a proven game that assumes nothing is optimal within the frame
 /// model, so the cut adds nothing to what the search's answer rests on, and a result that the cut helped assumes what
 /// it assumed without it.  A game that assumes something (one of `optimal.json`, or one whose bound rests on statement
 /// U) would make the answer rest on that, which a result line has no way to say, so it carries no cut.  Nor does a
-/// provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: a search started before `n − 1`
-/// is concluded does not cut (`window`'s driver gives a search the game of `n − 1` with its go only once that game is
-/// concluded).
+/// provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: `window`'s driver gives a
+/// search the game of `n − 1` only once that game is concluded, with the search's go or, for a search started before,
+/// at the conclusion ([`Job::arm`]).
 fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Option<NearRepeat<W>>, String> {
     if !prev.proven || !prev.assumes.is_empty() {
         return Ok(None);
@@ -1314,7 +1335,8 @@ fn set_up_with_width<const W: usize>(
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
     // is no tactic, from the lab's record or the policy.
     let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.gate())));
-    let job = Arc::new(SearchJob { board, prepared, control: Control::new(), resuming, seeds, store_game, branching });
+    let (control, near) = (Control::new(), OnceLock::new());
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, near });
     let lab = Box::new(lab);
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy, lab }, problem))
 }

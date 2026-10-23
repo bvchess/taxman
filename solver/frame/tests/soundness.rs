@@ -120,13 +120,19 @@ fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
 /// reaches few bounds of n − 1.
 fn game_after<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<Game<W>> {
     let game = Game::<W>::of_board(n)?;
-    let before = |m: u32| Some((Game::<W>::of_board(m)?, optimal_sum::<W>(optimal, m)?));
-    let earlier: Vec<_> = (n.saturating_sub(4).max(1)..n).rev().filter_map(before).collect();
-    let chosen = earlier.iter().find(|(_, bound)| *bound <= reach).or(earlier.first());
-    Some(match chosen {
-        Some((m, bound)) => game.with_near_repeat(m, *bound),
+    Some(match game_before::<W>(optimal, n, reach) {
+        Some((m, bound)) => game.with_near_repeat(&m, bound),
         None => game,
     })
+}
+
+/// The game before `n` whose cut [`game_after`] gives game `n` for an incumbent of `reach`, and its bound, the best
+/// promotion sum of `optimal.json`'s game.
+fn game_before<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<(Game<W>, u64)> {
+    let before = |m: u32| Some((Game::<W>::of_board(m)?, optimal_sum::<W>(optimal, m)?));
+    let mut earlier: Vec<_> = (n.saturating_sub(4).max(1)..n).rev().filter_map(before).collect();
+    let chosen = earlier.iter().position(|(_, bound)| *bound <= reach).unwrap_or(0);
+    (chosen < earlier.len()).then(|| earlier.swap_remove(chosen))
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -210,6 +216,35 @@ fn the_near_repeat_cut_acts_and_changes_no_answer() {
         }
     }
     assert!(cut > 0 && changed > 0, "the cut cut {cut} nodes and changed {changed} trees");
+}
+
+/// The near-repeat cut waits for the incumbent to reach its bound.  On the games 232, 344 and 376 on the matching path,
+/// whose trees it changes, by the games before them that [`game_after`] chooses: a search whose incumbent never reaches
+/// the bound (one above the game's P*, which bounds the earlier game's P* as its own does) cuts nothing, and
+/// searches the tree of the search without the cut, node for node, where the same search with the earlier game's own
+/// bound cuts; and searches from an incumbent below the bound, just below and from nothing, armed from the start as a
+/// search armed by a provisional game is, find P*, and cut once their incumbent has reached the bound.
+#[test]
+fn the_near_repeat_cut_cuts_nothing_while_the_incumbent_is_below_its_bound() {
+    let (optimal, cfg) = (Optimal::built_in(), Config::matching());
+    let (mut cut_at_the_bound, mut cut_on_the_way) = (0, 0);
+    for n in [232, 344, 376] {
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let (m, bound) = game_before::<8>(optimal, n, truth - 5).unwrap();
+        let cut_by = |bound: u64| Game::<8>::of_board(n).unwrap().with_near_repeat(&m, bound);
+        let search = |game: &Game<8>, near_repeat: bool, from: u64| {
+            let out = game.search(Config { near_repeat, ..cfg }, vec![game.root_unit()], from, None, None);
+            assert!(out.completed && out.best == truth && out.real, "n={n} from {from}: {out:?}");
+            out
+        };
+        let (at_the_bound, above) = (cut_by(bound), cut_by(bound.max(truth + 1)));
+        let uncut = search(&at_the_bound, false, truth - 1);
+        let never = search(&above, true, truth - 1);
+        assert_eq!((never.near_cuts, never.nodes), (0, uncut.nodes), "n={n}: the cut acted below its bound");
+        cut_at_the_bound += search(&at_the_bound, true, truth - 1).near_cuts;
+        cut_on_the_way += [bound - 1, 0].map(|from| search(&at_the_bound, true, from).near_cuts).iter().sum::<u64>();
+    }
+    assert!(cut_at_the_bound > 0 && cut_on_the_way > 0, "cut {cut_at_the_bound} and {cut_on_the_way} nodes");
 }
 
 /// The look at the last child of the search's own conflict (tactic `conflict_look`) acts, and changes no answer: with

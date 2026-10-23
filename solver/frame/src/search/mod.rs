@@ -38,7 +38,7 @@
 //! over the nogoods and the forced members it finds follow (`lagrange::Lagrangian::check`).  The tactics that switch
 //! these pieces are the fields of [`SearchTactics`].  Before the bound check of a node or a child, with the tactic
 //! `near_repeat`, comes the near-repeat cut (`Stepper::near_repeat_cuts`, [`NearRepeat`]), where the search was given a
-//! game proven before.
+//! game proven before, at its setup or while it runs, and the incumbent reaches the cut's bound.
 //!
 //! # Where the arguments are
 //!
@@ -131,7 +131,7 @@ use incumbent::{distinct, dive, surviving};
 use searcher::{get_bits, put_bits};
 use std::io;
 use std::path::Path;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
@@ -300,9 +300,10 @@ pub fn search_beside<const W: usize>(
 /// setting there chooses only which conflict a node branches on, so the search's answer is the same whatever they say
 /// and however often they change (solver/docs/design/lab.md).
 ///
-/// With `near_repeat`, a game proven before, the search cuts by it ([`NearRepeat`]) if the tactic `near_repeat` is on
-/// and the incumbent it starts from (that of its start or of its checkpoint, the better) reaches the cut's bound
-/// ([`NearRepeat::arms`]).
+/// With the tactic `near_repeat` on, the search cuts by the game proven before ([`NearRepeat`]) that `near_repeat` holds,
+/// once it holds one: the caller may set it before the search or while it runs, once, and each searcher picks it up
+/// when it next starts a unit.  A node is cut only where the incumbent reaches the cut's bound
+/// ([`NearRepeat::reached`]), so a cut armed below it waits for the incumbent.
 #[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
@@ -312,16 +313,16 @@ pub fn search_steered<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
     branching: &Arc<Branching>,
-    near_repeat: Option<&NearRepeat<W>>,
+    near_repeat: &OnceLock<NearRepeat<W>>,
 ) -> io::Result<SearchResult<W>> {
-    let forgetting = prepared.tactics.forgetting();
+    let (forgetting, near_repeat) = (prepared.tactics.forgetting(), Some(near_repeat));
     search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, Some(branching), near_repeat)
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
 /// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
-/// settings `branching` if given (else those of the tactics), and with the near-repeat cut of `near_repeat` if given
-/// ([`search_steered`]).
+/// settings `branching` if given (else those of the tactics), and with the near-repeat cut that `near_repeat` holds or
+/// comes to hold, if given ([`search_steered`]).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -334,7 +335,7 @@ fn search_forgetting<const W: usize>(
     floor: Option<u64>,
     plan: Option<&finder::Plan<W>>,
     branching: Option<&Arc<Branching>>,
-    near_repeat: Option<&NearRepeat<W>>,
+    near_repeat: Option<&OnceLock<NearRepeat<W>>>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
@@ -386,9 +387,9 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    // The near-repeat cut, if the incumbent the search starts from reaches its bound (the setup's last check): the
-    // incumbent only rises.
-    let near_repeat = near_repeat.filter(|near| near.arms(&prepared.tactics, best.1));
+    // The near-repeat cut, with the tactic: a node is cut only where the incumbent reaches its bound (the setup's last
+    // check), which the searchers compare at each node, since the cut may be armed when it is below.
+    let near_repeat = near_repeat.filter(|_| prepared.tactics.near_repeat);
     let space =
         SearchSpace { forgetting, diagnostics, began: t0, near_repeat, ..SearchSpace::new(prepared, &match_graph) };
     let space = match branching {

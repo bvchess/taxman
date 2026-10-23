@@ -87,7 +87,9 @@ every second line of the Java fixtures), and the comment on each says what the w
     near-repeat cut;
   * the near-repeat cut in every search of the harness on real games, by one of the four games before (the latest whose
     optimum the handicapped incumbent reaches), and the games 232, 344 and 376, whose trees it changes, under every
-    configuration with the cut and without it;
+    configuration with the cut and without it; on those three, a cut whose bound the incumbent never reaches cuts
+    nothing and leaves the tree as it is without the cut, and a search that starts below the bound cuts once its
+    incumbent has reached it;
   * the games 301..=500 (every tenth) with conflict branching at every check, with and without the look at the last
     child of the search's own conflict: the look changes the tree of some of them, and no answer;
   * every game 2..=600 with symmetric pairs, with the rule over either bound (and the oracle without the frame model to
@@ -196,6 +198,11 @@ every second line of the Java fixtures), and the comment on each says what the w
     whose `seconds.own` is no less than the clock it went on from (the command through the binary is in `tests/cli.rs`,
     the clock file's unit tests in `src/solver/clock.rs`);
   * a score that is not the table's fails the range at that game, with the lines before it, as a window of one does;
+  * the near-repeat cut of a search that runs when the game before it is concluded (unit tests in
+    `src/solver/window.rs`): game 1083, held at no worker beside 1082, is armed by the conclusion of 1082, picks the cut
+    up at its first unit, cuts, and ends with the table's score, in fewer steps than without the tactic, which arms
+    nothing; the cut is armed once, by a proven game that assumes nothing, never by a provisional game or one assumed
+    optimal;
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.

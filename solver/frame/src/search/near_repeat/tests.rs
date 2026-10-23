@@ -6,6 +6,7 @@ use super::*;
 use crate::board::Board;
 use crate::model::test_support::{best_completion, Draws, Rng};
 use crate::numtheory::Tables;
+use crate::search::SearchTactics;
 
 const W: usize = 8;
 

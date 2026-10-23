@@ -7,14 +7,17 @@
 //! The words: a node has the promotions P, the candidates C its loop has still to try, and the state σ_N(P) in Π_N, the
 //! problem searched; σ_M(P) is the state of P in Π_M, the problem of game M.  B is a proven bound of P\*(Π_M).
 //!
-//! At setup ([`NearRepeat::new`] and [`NearRepeat::arms`]):
+//! At setup ([`NearRepeat::new`] and [`NearRepeat::reached`]):
 //!
 //! * M is proven, and B is read from M's result, which the caller sees to: `crate::board::near_repeat` takes M = n − 1
-//!   and B = score(M) − in_the_bag(M), and `crate::solver` gives it the game of n − 1 only if that game is concluded
-//!   before the search starts, is proven, and assumes nothing.
+//!   and B = score(M) − in_the_bag(M), and `crate::solver` gives it the game of n − 1 only once that game is concluded,
+//!   is proven, and assumes nothing: with the search's go, or, for a search that runs by then, at the conclusion (it
+//!   arms the search's cut, which the searchers pick up as each starts a unit).
 //! * Π_M is set up as Π_N is.  The candidates of Π_N that are candidates of Π_M are marked, and among them those with
 //!   the same home in both.
-//! * The incumbent, or the floor, is worth at least B.  The incumbent only rises, so this holds at every later node.
+//! * The incumbent, or the floor, is worth at least B.  A search armed below it, from a provisional game of n − 1 that
+//!   the game improved on, say, cuts nothing until the incumbent reaches B: the searcher compares the incumbent its
+//!   step read with B before it checks a node.  The incumbent only rises, so this holds at every later node.
 //!
 //! At a node:
 //!
@@ -35,7 +38,6 @@
 //! candidates of the extended problem, and is never set up for a problem that has them.
 
 use super::setup::Prepared;
-use super::tactics::SearchTactics;
 use crate::bits::Bits;
 use crate::model::{FactorProvider, FrameGraph, FrameSet, Scratch, MAX_FRAMES};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -102,10 +104,11 @@ impl<const W: usize> NearRepeat<W> {
         self.bound
     }
 
-    /// Whether a search with `tactics`, whose incumbent or floor is worth `incumbent` when it is set up, may cut by
-    /// this: the tactic `near_repeat` is on, and the incumbent is worth at least B (the setup's third check).
-    pub fn arms(&self, tactics: &SearchTactics, incumbent: u64) -> bool {
-        tactics.near_repeat && incumbent >= self.bound
+    /// Whether a search whose incumbent or floor is worth `incumbent` may cut by this: the incumbent is worth at least
+    /// B (the setup's third check).  Until it is, the search cuts nothing.
+    #[inline]
+    pub fn reached(&self, incumbent: u64) -> bool {
+        incumbent >= self.bound
     }
 
     /// The nodes cut by this setup so far, over every searcher that has flushed its counters.

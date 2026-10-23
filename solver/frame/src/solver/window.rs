@@ -28,8 +28,14 @@
 //!    caller, the checkpoint of a completed game is deleted, and the game becomes the previous game of the next.  A
 //!    conclusion can make the next head concludable at once (a repeat, a prime or trivial game, a search already
 //!    done), so heads are concluded as long as they can be.
-//! 5. After a conclusion, the next game, if its search runs, is given its ceiling ([`Control::set_ceiling`]) and the
-//!    seed of the final game ([`Job::hint`]); one not started yet gets both with its go.
+//! 5. After a conclusion, the next game, if its search runs, is given its ceiling ([`Control::set_ceiling`]), the seed
+//!    of the final game ([`Job::hint`]), and, if the game concluded is proven and assumes nothing, the near-repeat cut
+//!    by it ([`Job::arm`]; the three in [`told`]); one not started yet gets all three with its go.  The cut is set up
+//!    on the driver's thread, and each searcher picks it up when it next starts a unit, as it reads the branching
+//!    settings; the nodes searched before are only not cut, which changes no answer.  The cut acts only where the
+//!    incumbent reaches its bound B, the best promotion sum of the game concluded.  A search seeded with a provisional
+//!    game of that game may be below B when it is armed; the seed of the final game, for a search that takes a seed,
+//!    or the search's own finds raise it.
 //!
 //! A game's `phases.total` is its own work: its setup, its repeat lookup, its search with its start and moves, and its
 //! conclusion up to the replay; not the time it waited in the window.
@@ -79,10 +85,11 @@
 //!   the ceiling exactly when that best reaches the ceiling, however the search ran: a search started before its
 //!   ceiling was known and stopped (by a limit or a signal) with its best at the ceiling is proven by it, as it would
 //!   have stopped there with the ceiling given from the start.
-//! * Seeds and hints from a provisional game, offers at a conclusion, ceilings given late and deferrals change how or
-//!   when a search runs, never the promotion sum it proves best: every set offered is promotable (the seed's
-//!   survivors), and the ceiling is proven given the game of `n − 1` optimal, which a proof by the ceiling rests on
-//!   anyway.
+//! * Seeds and hints from a provisional game, offers at a conclusion, ceilings given late, near-repeat cuts armed late
+//!   and deferrals change how or when a search runs, never the promotion sum it proves best: every set offered is
+//!   promotable (the seed's survivors), the ceiling is proven given the game of `n − 1` optimal, which a proof by the
+//!   ceiling rests on anyway, and the cut drops only nodes with nothing better than the incumbent, by a game that is
+//!   proven and assumes nothing (docs/theory/ledger.md, Lemma R and its standing).
 //! * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts),
 //!   and so the next line's digest of the previous game's moves; nodes, the searches' counters, the engines' counters
 //!   and the times.
@@ -165,7 +172,9 @@
 //! With the environment variable `TAXMAN_WINDOW_TRACE` set, the driver prints a line on stderr for each of its events,
 //! the seconds since the range began first: a setup started and done, a repeat found, a search started (its threads,
 //! whether it has a seed, its ceiling), a search's workers changed (`workers n=N a->b`: given, given back, reclaimed,
-//! or suspended at 0), a hint, a deferral, a search done, a ceiling told, a game concluded, the wall reached.  It is
+//! or suspended at 0), a hint, a deferral, a search done (with the nodes its near-repeat cut cut, if it had one), what
+//! a conclusion told the next game's running search (its ceiling, the bound of the near-repeat cut if it was armed,
+//! and how long that took), a game concluded, the wall reached.  It is
 //! how the policy's decisions were followed on the laptop, and how they are to be followed on a machine of many
 //! threads.
 //!
@@ -194,6 +203,7 @@ use crate::tactics::Tactics;
 use allot::{allot, Grant, Load, Need, TICK};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write as _;
 use std::mem;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -875,17 +885,20 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Gives game `n`, if its search runs, what the conclusion of its previous game `prev` gives: its ceiling, and
-    /// the seed of the final game.  (A search not started gets them with its go.)
+    /// Gives game `n`, if its search runs, what the conclusion of its previous game `prev` gives ([`told`]).  (A search
+    /// not started gets it with its go.)  A cut that cannot be set up is said on stderr, and the search goes on
+    /// without it.
     fn tell(&self, n: u32, prev: &Prev) {
         let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(_))), .. }) = self.games.get(&n) else {
             return;
         };
-        if let Some(ceiling) = search_cap(set, n, prev.cap_score(), self.opts) {
-            set.job.control().set_ceiling(ceiling);
-            self.trace(format_args!("told n={n}"));
-        }
-        set.job.hint(&prev.moves);
+        let start = Instant::now();
+        let (cap, armed) = told(set, n, prev, self.opts);
+        let bound = armed.unwrap_or_else(|e| {
+            let _ = writeln!(std::io::stderr(), "warning: n={n}: the near-repeat cut is not armed: {e}");
+            None
+        });
+        self.trace(format_args!("told n={n} cap={cap:?} near_repeat={bound:?} took={:?}", start.elapsed()));
     }
 
     /// What the driver knows now of the game before game `n` of the window.
@@ -1301,12 +1314,13 @@ impl<'a> Window<'a> {
                 }
                 let Some(game) = self.games.get_mut(&n) else { return };
                 game.own += took;
+                let cut = outcome.as_ref().ok().and_then(|outcome| outcome.near_repeat_cut);
                 match (outcome, &mut game.stage) {
                     (Ok(outcome), Stage::Search(_, plan)) => *plan = Plan::Search(Search::Done(outcome)),
                     (Ok(_), _) => {}
                     (Err(message), stage) => *stage = Stage::Failed(message),
                 }
-                self.trace(format_args!("searched n={n} took={took:?}"));
+                self.trace(format_args!("searched n={n} took={took:?} near_repeat_cut={cut:?}"));
             }
             Event::Panicked { n } => {
                 let Some(game) = self.games.get_mut(&n) else { return };
@@ -1786,6 +1800,20 @@ impl<'a> Window<'a> {
     }
 }
 
+/// What the conclusion of game `n − 1`, as `prev`, gives the search of game `n`, set up as `set`, whether it runs or
+/// waits for its go (step 5 of the module docs): its ceiling ([`search_cap`]), the seed of the final game as a hint
+/// ([`Job::hint`]), and the near-repeat cut by `prev`, where the search has the tactic and `prev` is proven and assumes
+/// nothing ([`Job::arm`]).  Returns the ceiling given, if any, and the cut's bound if this armed the cut, or why it could
+/// not be set up.
+fn told(set: &SearchSetUp, n: u32, prev: &Prev, opts: &SolveOptions) -> (Option<u64>, Result<Option<u64>, String>) {
+    let cap = search_cap(set, n, prev.cap_score(), opts);
+    if let Some(cap) = cap {
+        set.job.control().set_ceiling(cap);
+    }
+    set.job.hint(&prev.moves);
+    (cap, set.job.arm(prev))
+}
+
 /// The settings a `branching` or `policy` command gave, for its outcome: `conflict_branching on, gate 150`.
 fn switches_given(conflict_branching: Option<bool>, conflict_look: Option<bool>, gate: Option<u64>) -> String {
     let setting = |on: bool| if on { "on" } else { "off" };
@@ -1858,6 +1886,123 @@ mod tests {
         assert!(improved(Some(&game(5, true)), on(5, false)));
         assert!(improved(Some(&game(6, false)), on(5, false)));
         assert!(!improved(Some(&game(5, false)), on(5, false)) && !improved(Some(&game(4, false)), on(5, false)));
+    }
+
+    /// A near repeat: game 1083 poses nearly the problem of 1082, and the near-repeat cut by 1082 shortens its search
+    /// (`tests/tripwires.rs`, `NEAR_REPEATS`).
+    const NEAR: u32 = 1083;
+
+    /// Game `n` as the run concludes a search of it: `optimal.json`'s game, proven, and assuming nothing.
+    fn concluded(n: u32) -> Prev {
+        let optimal = Optimal::built_in();
+        Prev {
+            moves: optimal.moves(n).expect("a game of optimal.json").to_vec(),
+            score: optimal.score(n).expect("a game of optimal.json"),
+            source: super::super::PrevSource::Run,
+            proof: Some(crate::results::Proof::Exhausted),
+            assumes: Default::default(),
+            proven: true,
+        }
+    }
+
+    /// Game `n` set up for its search as the window sets it up, with the game before it `prev`, under `opts`.
+    fn search_set_up(n: u32, prev: &Prev, opts: &SolveOptions) -> SearchSetUp {
+        let known = KnownGames::table(Optimal::built_in());
+        match set_up(n, &Before::Given(prev.clone()), opts, &known, None, &Policies::default()) {
+            Ok(SetUp::Search(set, _)) => set,
+            Ok(SetUp::Derived(_)) => panic!("n={n} needs no search"),
+            Err(failure) => panic!("n={n}: {}", failure.message()),
+        }
+    }
+
+    /// The search of game `n`, set up as `set`, as the window runs it beside the game before it: started from `prev` as
+    /// a provisional game, without a ceiling and without the near-repeat cut, and held at no worker once its engine runs
+    /// until it has been told of the conclusion of that game, as `prev` ([`told`]); then let go on one worker.  What it
+    /// was told, and its outcome.
+    fn searched_beside(set: &SearchSetUp, n: u32, prev: &Prev, opts: &SolveOptions) -> (Told, Outcome) {
+        let control = set.job.control();
+        control.set_workers(0);
+        thread::scope(|scope| {
+            let go = Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: None };
+            let search = scope.spawn(|| set.job.search(go, opts));
+            // Its engine runs, with no worker: nothing of the tree has been searched.
+            let since = Instant::now();
+            while control.status().is_none() {
+                assert!(since.elapsed() < Duration::from_secs(30), "n={n}: the search's engine never runs");
+                thread::sleep(ms(1));
+            }
+            let told = told(set, n, prev, opts);
+            control.set_workers(1);
+            (told, search.join().expect("the search").expect("an outcome"))
+        })
+    }
+
+    /// What [`told`] says it gave a search: the ceiling, and the near-repeat cut's bound if it armed the cut.
+    type Told = (Option<u64>, Result<Option<u64>, String>);
+
+    /// A search that runs when the game before it is concluded is armed with the near-repeat cut by that game, then
+    /// (step 5 of the module docs): game 1083, searched beside 1082, held before its first step until the conclusion of
+    /// 1082 has armed it, cuts, and comes back with `optimal.json`'s score, as it does without the tactic, which arms
+    /// nothing, in more steps.  B is the score of 1082 less its `in_the_bag`, and the cut is armed once.
+    #[test]
+    fn a_running_search_is_armed_with_the_near_repeat_cut_when_the_game_before_it_is_concluded() {
+        let (prev, optimal) = (concluded(NEAR - 1), Optimal::built_in());
+        let bound = prev.score - crate::board::search_problem(NEAR - 1).unwrap().1;
+        let on = SolveOptions { threads: 1, ..SolveOptions::default() };
+        let mut off = on.clone();
+        off.tactics.search.near_repeat = false;
+        let mut outcomes = Vec::new();
+        for (opts, armed) in [(&on, Some(bound)), (&off, None)] {
+            let set = search_set_up(NEAR, &prev, opts);
+            let ((cap, told), outcome) = searched_beside(&set, NEAR, &prev, opts);
+            assert!(cap.is_some(), "the ceiling is told");
+            assert_eq!(told, Ok(armed), "near_repeat {}", opts.tactics.search.near_repeat);
+            // Armed once: the go of a search, or a second conclusion, arms nothing more.
+            assert_eq!(set.job.arm(&prev), Ok(None));
+            assert!(outcome.completed);
+            assert_eq!(Some(outcome.moves.iter().map(|&x| u64::from(x)).sum()), optimal.score(NEAR));
+            outcomes.push(outcome);
+        }
+        let (cut, uncut) = (&outcomes[0], &outcomes[1]);
+        assert!(cut.near_repeat_cut.is_some_and(|nodes| nodes > 0), "the cut cut nothing: {:?}", cut.near_repeat_cut);
+        assert_eq!(uncut.near_repeat_cut, None, "a search without the tactic is never armed");
+        assert!(cut.stats.nodes < uncut.stats.nodes, "{} steps with the cut, {}", cut.stats.nodes, uncut.stats.nodes);
+    }
+
+    /// The near-repeat cut is armed only by a game that is proven and assumes nothing, only with the tactic, and only
+    /// once: not by the best game of an unfinished search (a provisional game bounds nothing), nor by a game assumed
+    /// optimal; a search armed with its go is not armed again by a conclusion.
+    #[test]
+    fn the_near_repeat_cut_is_armed_once_by_a_proven_game_that_assumes_nothing() {
+        let prev = concluded(NEAR - 1);
+        let bound = prev.score - crate::board::search_problem(NEAR - 1).unwrap().1;
+        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+        let set = search_set_up(NEAR, &prev, &opts);
+        let unfinished = Prev { proven: false, proof: None, ..prev.clone() };
+        let assumed = Prev { assumes: [crate::results::assumed_optimal(NEAR - 1)].into(), ..prev.clone() };
+        assert_eq!(set.job.arm(&unfinished), Ok(None));
+        assert_eq!(set.job.arm(&assumed), Ok(None));
+        assert_eq!(set.job.arm(&prev), Ok(Some(bound)));
+        assert_eq!(set.job.arm(&prev), Ok(None));
+        // Armed with its go, as a search that starts once the game before it is concluded is, then told of that game.
+        let set = search_set_up(NEAR, &prev, &opts);
+        let go =
+            Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: Some(prev.clone()) };
+        let outcome = set.job.search(go, &opts).unwrap();
+        assert!(
+            outcome.completed && outcome.near_repeat_cut.is_some_and(|nodes| nodes > 0),
+            "{:?}",
+            outcome.near_repeat_cut
+        );
+        assert_eq!(told(&set, NEAR, &prev, &opts).1, Ok(None));
+        // Without the tactic, neither the go nor the conclusion arms it.
+        let mut off = opts.clone();
+        off.tactics.search.near_repeat = false;
+        let set = search_set_up(NEAR, &prev, &off);
+        assert_eq!(set.job.arm(&prev), Ok(None));
+        let go =
+            Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: Some(prev.clone()) };
+        assert_eq!(set.job.search(go, &off).unwrap().near_repeat_cut, None);
     }
 
     #[test]

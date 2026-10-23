@@ -60,9 +60,9 @@
 //! `gate` (the gap from which conflict branching chooses) and `stats` (the searchers' counters, `search::stat`).
 //!
 //! With the tactic `near_repeat` (on by default), `solve` cuts by the known game of GAME − 1 if the known games have it
-//! (`taxman::board::near_repeat`: B is its score less its game with no promotions) and the starting incumbent reaches
-//! B, as the solver cuts by a proven game of n − 1; a known game of `optimal.json` is taken as optimal, as the known
-//! optimum of GAME is.  A unit's line then has `near_repeat_cut`, the nodes the cut cut (null without the cut).
+//! (`taxman::board::near_repeat`: B is its score less its game with no promotions), at the nodes where the incumbent
+//! reaches B, as the solver cuts by a proven game of n − 1; a known game of `optimal.json` is taken as optimal, as the
+//! known optimum of GAME is.  A unit's line then has `near_repeat_cut`, the nodes the cut cut (null without the cut).
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an
 //! optimal set: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree
@@ -80,6 +80,7 @@ use fixtures::{from_hex, to_hex};
 use known::{known_incumbent, survivors};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use taxman::bits::Bits;
 use taxman::board::{near_repeat, Board};
@@ -593,12 +594,12 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
     let graph = MatchGraph::new(&prepared.model, &prepared.root);
     // The near-repeat cut by the known game of `game − 1`, armed as the solver arms it.
     let near = match (o.tactics.near_repeat, game.checked_sub(1).and_then(|m| optimal.score(m))) {
-        (true, Some(score)) => near_repeat(&prepared, score)?,
-        _ => None,
+        (true, Some(score)) => near_repeat(&prepared, score)?.map_or_else(OnceLock::new, OnceLock::from),
+        _ => OnceLock::new(),
     };
-    let near_repeat = near.as_ref().filter(|near| near.arms(&o.tactics, start.sum()));
-    let space = SearchSpace { near_repeat, ..search_space(&prepared, &graph, o) };
+    let space = SearchSpace { near_repeat: Some(&near), ..search_space(&prepared, &graph, o) };
     let gate = space.branching.settings().gate;
+    let near_repeat = near.get();
     let description = Tactics { search: o.tactics, ..Tactics::default() }.description();
     for Row { id, depth, unit } in wanted {
         let cut_before = near_repeat.map_or(0, |near| near.nodes_cut());

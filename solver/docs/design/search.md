@@ -362,16 +362,25 @@ incumbent is worth at least a proven bound B of M's best promotion sum: none of 
 [Lemma R](../../../docs/theory/ledger.md#the-near-repeat-cut) proves it and lists the checks a node must pass, and the
 search makes exactly those (tactic `near_repeat`, on by default; `search::NearRepeat`).
 
-* **Setup.**  The solver takes as M the game of n − 1, if that game is concluded before the search starts, is proven,
-  and assumes nothing (`solver::near_repeat`; [the reference](../REFERENCE.md#assumptions) has what a game assumes).
-  Π_M is set up as Π_n is, and B is score(n − 1) less its `in_the_bag`.  The cut acts only if the incumbent or floor
-  the search starts from reaches B.  A search that starts while the game of n − 1 is still in the window does not cut.
+* **Setup.**  The solver takes as M the game of n − 1, once that game is concluded, if it is proven and assumes nothing
+  (`solver::near_repeat`; [the reference](../REFERENCE.md#assumptions) has what a game assumes).  Π_M is set up as Π_n
+  is, and B is score(n − 1) less its `in_the_bag`.
+* **Arming.**  A search that starts after the game of n − 1 is concluded is armed with its go.  One that starts while
+  that game is still in the window is armed when it is concluded, beside its ceiling (`Job::arm`, from the window's
+  driver).  The search keeps its cut in a lock that is set once, so it is armed at most once, and never by a
+  provisional game.  Each searcher picks the cut up when it next starts a unit, as it reads the branching settings,
+  and the nodes it searched before are only not cut.
+* **The incumbent.**  A node is cut only where the incumbent, as its step read it, reaches B.  A search armed late may
+  be below B, if it was seeded with a provisional game of n − 1 that the game then improved on.  Its cut then waits for
+  the incumbent to rise: through the seed of the final game, which a search that takes a seed is offered with its
+  ceiling, or through its own finds.  The incumbent only rises, so once it reaches B it does at every later node.
 * **At a node.**  Every promotion must be a candidate of Π_M, and every candidate left one with the same home frame in
   both problems.  The promotions must be promotable in Π_M.  On every frame the candidates touch, every move of Π_M's
   state must be a move of Π_n's, and every factor of Π_n's state that Π_M's lacks must be no candidate and pay for no
   move of Π_M's frame and no candidate.  The check comes after the rule of symmetric pairs, before the bound.
-* **Cost.**  Where the first check fails, the cut costs a few set operations.  A node's state in Π_M is found only
-  where it passes, once, from its parent's (one promotion) or from Π_M's root, and kept beside the node's own.
+* **Cost.**  Below B the cut costs one comparison.  Where the first check fails, it costs a few set operations.  A
+  node's state in Π_M is found only where it passes, once, from its parent's (one promotion) or from Π_M's root, and
+  kept beside the node's own.
 
 The cut drops only nodes none of whose completions beats the incumbent, as a bound does, and learns nothing, so the
 search stays exact.  It does not treat the one-sided candidates of extended mode.  A checkpoint records the tactic in
