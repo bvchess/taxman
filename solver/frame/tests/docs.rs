@@ -32,8 +32,9 @@
 //!
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use taxman::json::Json;
 use taxman::known::KnownSources;
 use taxman::solver::{solve_game, SolveOptions};
@@ -2556,15 +2557,51 @@ fn british_words() -> Vec<(String, String)> {
     words
 }
 
-/// The British words in `lines` (prose: code blanked): `(line number, word, American spelling)`.
+/// The British words of [`british_words`] made of one word, by spelling, each with its place in the list and its American
+/// spelling; and those made of several (`per cent`), which a line is searched for.
+struct BritishLookup {
+    single: HashMap<String, (usize, String)>,
+    phrases: Vec<(usize, String, String)>,
+}
+
+fn british_lookup() -> &'static BritishLookup {
+    static LOOKUP: OnceLock<BritishLookup> = OnceLock::new();
+    LOOKUP.get_or_init(|| {
+        let mut lookup = BritishLookup { single: HashMap::new(), phrases: Vec::new() };
+        for (i, (british, american)) in british_words().into_iter().enumerate() {
+            if british.contains(' ') {
+                lookup.phrases.push((i, british, american));
+            } else {
+                lookup.single.entry(british).or_insert((i, american));
+            }
+        }
+        lookup
+    })
+}
+
+/// The British words in `lines` (prose: code blanked): `(line number, word, American spelling)`.  A word is whole (its
+/// neighbors are not letters, digits or `_`) and not quoted (`"neighbour"`), as for [`has_word`]; the words of a line
+/// come in the order of [`british_words`].  Each line is split into words once and the words are looked up.
 fn british_in(lines: &[String]) -> Vec<(usize, String, String)> {
-    let words = british_words();
+    let lookup = british_lookup();
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
     let mut found = Vec::new();
     for (i, line) in lines.iter().enumerate() {
         let lower = without_link_targets(line).to_lowercase();
-        for (british, american) in words.iter().filter(|(british, _)| has_word(&lower, british)) {
-            found.push((i + 1, british.clone(), american.clone()));
+        let mut hits: Vec<(usize, &str, &str)> = Vec::new();
+        let mut quoted = false;
+        for token in lower.split_inclusive(|c: char| !is_word(c)) {
+            let word = token.trim_end_matches(|c: char| !is_word(c));
+            if let Some((place, american)) = lookup.single.get(word).filter(|_| !quoted) {
+                hits.push((*place, word, american));
+            }
+            quoted = token.ends_with('"');
         }
+        let phrases = lookup.phrases.iter().filter(|(_, british, _)| has_word(&lower, british));
+        hits.extend(phrases.map(|(place, british, american)| (*place, british.as_str(), american.as_str())));
+        hits.sort();
+        hits.dedup();
+        found.extend(hits.into_iter().map(|(_, british, american)| (i + 1, british.to_owned(), american.to_owned())));
     }
     found
 }
@@ -2602,11 +2639,13 @@ fn the_spelling_check_finds_what_it_should() {
     let text =
         "the neighbour's game, neighbouring games, a labelled graph, optimised and optimisation, to analyse it\n\
                 the field `neighbours_cpu_s`, the key cover_relabelled, the seed \"neighbour\" and the analyses of it\n\
-                an analysis, optimistic, a promise, the center, [a neighbour](neighbours.md) and it behaves";
+                an analysis, optimistic, a promise, the center, [a neighbour](neighbours.md) and it behaves\n\
+                ten per cent, Optimisers and \"grey\"";
     let found: Vec<(usize, String)> =
         british_in(&without_code(text)).into_iter().map(|(at, word, _)| (at, word)).collect();
     let words = ["neighbour", "neighbouring", "labelled", "analyse", "optimised", "optimisation"];
     let mut expected: Vec<(usize, String)> = words.iter().map(|word| (1, word.to_string())).collect();
     expected.push((3, "neighbour".to_string()));
+    expected.extend([(4, "per cent".to_string()), (4, "optimisers".to_string())]);
     assert_eq!(found, expected);
 }
