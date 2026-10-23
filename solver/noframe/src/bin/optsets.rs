@@ -16,7 +16,7 @@
 //! branch and bound of `game.rs` in enumeration mode with target V(n) − 1 lists every playable set beating it (one
 //! beating V(n) would refute the recorded optimum and stops the run), up to `--limit` sets (default unlimited) within
 //! `--budget` nodes.  The predecessors a derivation needs come from earlier lines of the output file, or are
-//! worked out on the spot.  Threads working on neighbouring games would work out the same predecessors, so a
+//! worked out on the spot.  Threads working on neighboring games would work out the same predecessors, so a
 //! long range is best run in two passes: `--searched-only 1` (only the games that need a search, in parallel),
 //! then the whole range (the derivations, instantly, from the first pass's lines).
 //!

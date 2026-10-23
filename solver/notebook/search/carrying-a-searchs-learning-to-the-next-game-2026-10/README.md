@@ -263,7 +263,7 @@ built:
 * **Not built.**  The replay of the previous tree, a joint search of a run, the branching order carried, forced members
   or weight splits carried, a nogood table carried or shared between the window's games, a wider `same_search` by
   replaying near repeats (2.1% of the nodes), and the gap as an aspiration value (a few percent at best).  Proving a run
-  of neighbours that share a gap in one search is closed by sections 2, 3 and 5: the trees of neighbours are disjoint,
+  of neighbors that share a gap in one search is closed by sections 2, 3 and 5: the trees of neighbors are disjoint,
   and a run costs at least its dearest member.
 * **The bound is the lever.**  A bad patch needs a bound that closes a share of the gap at the crest of the wave, and
   carrying only helps such a bound along.

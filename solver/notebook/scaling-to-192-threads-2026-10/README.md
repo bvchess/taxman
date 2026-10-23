@@ -15,7 +15,7 @@ time, not games: the run stays on a `c8g.16xlarge`, with a window of 4, the best
 
 One `c8g.48xlarge` on spot in us-east-1b on 2026-10-15: Graviton4 (Neoverse V2), 192 vCPUs on two sockets of 96, two
 NUMA nodes (CPUs 0-95 and 96-191), 371 GiB, Amazon Linux 2023, rustc 1.99.0, `-C target-cpu=native`.  The code was that
-of 55287ff (the renames merged after it change no behaviour), built by `solver/tools/cloud/setup.sh` with its smoke
+of 55287ff (the renames merged after it change no behavior), built by `solver/tools/cloud/setup.sh` with its smoke
 checks and without the tests, with an instance role and SSM as in
 [launch.md](../../docs/runbook/launch.md#steps-through-ssm-or-ssh).  One script ran the items in order, one process at a
 time, and two more ran after it (the files below).  The 64-thread runs of the window and of the next games were bound
@@ -96,7 +96,7 @@ if 16 is still gaining on 8, 32 is to be tried in (b) first.
 | 192 | 1.16, 1.24 | 127.0, 118.8 | 176.24, 176.82 | 164.27, 164.35 | 88.3, 87.3 | 10.4, 11.7 | 6.4, 6.8 | 6.6, 6.4 | 3.4, 4.8 | 0.00, 0.01 |
 | 192, after one thread | 1.88, 1.89 | 78.2, 78.1 | 286.62, 303.91 | 268.15, 284.52 | 90.8, 90.8 | 8.4, 8.5 | 6.5, 6.3 | 4.9, 4.8 | 3.1, 3.2 | 0.01, 0.00 |
 
-The rows of 1 to 96 threads are one ladder's (a second gave the same to a few per cent; a ladder bound to node 0 gave
+The rows of 1 to 96 threads are one ladder's (a second gave the same to a few percent; a ladder bound to node 0 gave
 the same step at 64 and 96 threads: 155.1 and 155.5 µs/tree).  The 192-thread row is the two 192-thread runs of a
 process that ran 64, 192, 64 and 192 threads; the last row is the 192-thread runs of the two processes that ran 1, 16,
 64 and 96 threads first.  A longer proof, 2184 (3.7 million nodes; the c8g chain's search of it took 25.6 million nodes
@@ -264,4 +264,4 @@ no results file.
 
 ## Commits
 
-* 55287ff (2026-10-14): the code the run built; the renames merged after it change no behaviour.
+* 55287ff (2026-10-14): the code the run built; the renames merged after it change no behavior.

@@ -93,7 +93,7 @@ def stage2(name):
             return
         print(f"\n  {label}: {len(subset)} games; the shortfall (the optimum less the game's score)")
         print(f"    {'':<11} {'median':>7} {'mean':>7} {'p90':>6} {'exact':>6} {'<control':>8} {'>control':>8} "
-              f"{'cpu s':>6} {'+neighbours':>11}")
+              f"{'cpu s':>6} {'+neighbors':>11}")
         for m in METHODS:
             short = [d["short"][m] for d in subset]
             exact = sum(s == 0 for s in short) / len(short)
@@ -113,7 +113,7 @@ def stage2(name):
     print("\n  the best of the four (ties count for each): " + ", ".join(f"{m} {best[m]}" for m in METHODS))
     both = sum(d["short"]["lns"] == 0 and d["short"]["restricted"] == 0 for d in searched)
     print(f"  games both finders have exactly: {both}; neither: {sum(d['short']['lns'] > 0 and d['short']['restricted'] > 0 for d in searched)}")
-    print(f"  CPU of a game: start {mean([d['start_cpu_s'] for d in searched]):.2f} s, neighbours' starts "
+    print(f"  CPU of a game: start {mean([d['start_cpu_s'] for d in searched]):.2f} s, neighbors' starts "
           f"{mean([d['neighbours_cpu_s'] for d in searched]):.2f} s, each method "
           f"{mean([d['lns_cpu_s'] for d in searched]):.2f} s; the run in all "
           f"{sum(d['start_cpu_s'] + d['neighbours_cpu_s'] + d['lns_cpu_s'] + d['restricted_cpu_s'] + d['control_cpu_s'] for d in searched) / 3600:.2f} core-hours")
@@ -191,7 +191,7 @@ def budgets():
 
 
 def cpu_spent():
-    """The CPU each file cost, from the lines' own CPU fields (the neighbours' starts of a tuning line of `restricted`
+    """The CPU each file cost, from the lines' own CPU fields (the neighbors' starts of a tuning line of `restricted`
     are not in it)."""
     fields = ("start_cpu_s", "neighbours_cpu_s", "lns_cpu_s", "restricted_cpu_s", "control_cpu_s", "search_cpu_s")
     print("\nCPU SPENT (core-hours, from the CPU fields of the lines)")

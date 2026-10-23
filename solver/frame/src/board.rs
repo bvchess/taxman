@@ -1,4 +1,4 @@
-//! A board `1..=n` analysed for the search: its number-theory tables, its frames, and the numbers the per-game
+//! A board `1..=n` analyzed for the search: its number-theory tables, its frames, and the numbers the per-game
 //! pipeline derives from them before it decides how to solve the game.
 //!
 //! This is the one path from n to a search that is ready to run (tables → frames → [`prepare`] → ceiling and seed →
@@ -29,7 +29,7 @@ use crate::search::{self, NearRepeat, Prepared, Problem, SearchTactics};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-/// The board `1..=n`, analysed.
+/// The board `1..=n`, analyzed.
 pub struct Board<const W: usize> {
     /// The maximal factors and composites of the numbers on the board.
     pub tables: Tables,

@@ -15,7 +15,7 @@
 #   CLIMB       the ways of the climbs, the searches of a board next to a proven one: up, down, both or off (the
 #               program's default, both)
 #   CLIMB_LIMIT the limit of a climb in seconds (the program's default, 60; 0: no climbs)
-#   LNS_SECONDS the seconds of one thread the finder (large neighbourhood search) gets after a board's map and before a
+#   LNS_SECONDS the seconds of one thread the finder (large neighborhood search) gets after a board's map and before a
 #               search whose best seed has changed (the program's default, 1; 0: no finder)
 #   FLOOR_STEP  the points a floor step goes down below a board's upper bound, at the median slope of the cost of a search
 #               under a floor (the program's default, 150; 0: no floor steps, the ordinary searches whose limit doubles)

@@ -336,11 +336,11 @@ def sampled(trials: int, boards: range, max_size: int, seed: int) -> bool:
             picks = {rng.choice(hubs)}
             size = rng.randint(2, max_size)
             while len(picks) < size:
-                neighbours = sorted({c for s in picks for f in board.mf[s] for c in listers[f]} - picks)
-                neighbours = [c for c in neighbours if has_scheme(board, frozenset(picks | {c}))]
-                if not neighbours:
+                neighbors = sorted({c for s in picks for f in board.mf[s] for c in listers[f]} - picks)
+                neighbors = [c for c in neighbors if has_scheme(board, frozenset(picks | {c}))]
+                if not neighbors:
                     break
-                picks.add(rng.choice(neighbours))
+                picks.add(rng.choice(neighbors))
             frozen = frozenset(picks)
             ok &= tally(counts, frozen, verdict(board, frozen, playable(board, frozen)))
     print(f"sampled dense sets on the boards {boards.start}..{boards.stop - 1} ({time.time() - started:.0f} s): "

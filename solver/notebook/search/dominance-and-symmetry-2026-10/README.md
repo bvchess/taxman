@@ -30,7 +30,7 @@ never pruned.  The completions that could beat the incumbent are within the node
 can be promoted and with which the matching bound, plus themselves, still reaches what the node needs.  `P'`'s state
 *covers* the node's when, frame by frame, its core has no move the node's core lacks and every factor of the node's
 core that its moves or the incoming candidates can use (the proof is the comment of `covers` in
-`examples/dominance.rs`); the cover is also tried with moves relabelled and up to an exchange of two primes
+`examples/dominance.rs`); the cover is also tried with moves relabeled and up to an exchange of two primes
 (`covers_mapped`).  A *sampled* estimate replaces the proof by 64 random maximal completions within the relevant
 candidates: an upper estimate of what any cover could prove (1,024 samples gave the same counts within two nodes in a
 hundred).
@@ -61,7 +61,7 @@ as a value, `P*` or `P*` + δ, as `slope prove` does.
   conflict branching's siblings, the same `P` with fewer candidates.  **Twins**: none at any node of any sample.
 * **Adding an excluded candidate** (`P + a`): proved at no node.  At 57% of the fixtures' nodes some excluded candidate
   can be added and no single relevant candidate blocks it, yet some random maximal completion always does.
-* **Literal covers** (one for one, two for one or two, with or without relabelled moves) at the solver's nodes: 0-1%
+* **Literal covers** (one for one, two for one or two, with or without relabeled moves) at the solver's nodes: 0-1%
   of the fixtures' nodes and 0-5% of the sampled proof nodes; the sampled estimates are far higher (up to 53%).  For
   example, at a node of 936 the swap 426 → 438 (6·71 → 6·73) passes every sample: the families {284, 426, 568, 852} and
   {292, 438, 584, 876} are the same graph in the node's frames, which a literal cover cannot see because the numbers

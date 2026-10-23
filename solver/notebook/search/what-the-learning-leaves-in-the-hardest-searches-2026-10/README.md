@@ -303,8 +303,8 @@ that catches more than the 8% of computed conflicts that exchanges outside it ex
 * [residual.py](residual.py): `profile` and `misses`, the tables of stage 1; `windows` and `branched` of the follow-ups;
   `knots` of stage 2, and `profile`'s row of the cheap exclusions of conflicts of two members.  Its module comment has
   the usage.
-* [runs.jsonl](runs.jsonl): the lines of `wall anatomy` (the four traced searches of stage 1 and those labelled
-  `stage 2`) and of `wall images` (the tests of keeping; the lines labelled `witness` and `base`, `test-default` and
+* [runs.jsonl](runs.jsonl): the lines of `wall anatomy` (the four traced searches of stage 1 and those labeled
+  `stage 2`) and of `wall images` (the tests of keeping; the lines labeled `witness` and `base`, `test-default` and
   `test-keep`, `knots` and `knots-wide`).
 * [witness.patch](witness.patch): the witness's prototype, against commit 60976f3.
 * [knots.patch](knots.patch): the knot's prototype, against commit 752071f.
@@ -324,14 +324,14 @@ commands, from `solver/frame`, after `cargo build -j 2 --profile test --example 
   `python3 -I residual.py profile DIR_DEFAULT DIR_LEARNING 3300-14 3441-5459` and
   `python3 -I residual.py misses DIR 3300-14 3441-5459`.  The tests of keeping are `wall images` with
   `--learn --closure` or `--count`, and `--tactic nogood_keep=hit`.
-* **The witness:** `wall images --learn --closure [--witness]` (the lines labelled `witness` and `base`).
+* **The witness:** `wall images --learn --closure [--witness]` (the lines labeled `witness` and `base`).
 * **A whole game:** `wall anatomy --root --learn --closure --trace DIR 3128`, then `residual.py windows DIR 3128-root`
   and `misses`.
 * **The branched conflicts:** `wall images --ids 3300-14 [--tactic nogood_keep=hit] --trace DIR 3300` (the lines
-  labelled `test-default` and `test-keep`), then `residual.py branched DIR_DEFAULT DIR_KEEP 3300-14`.
+  labeled `test-default` and `test-keep`), then `residual.py branched DIR_DEFAULT DIR_KEEP 3300-14`.
 * **Stage 2:** `wall anatomy --suite SUITE --ids ID --learn --closure --trace DIR 4416`, SUITE the suite of the run to
   5000; and, for the knot, `wall images --suite SUITE --ids ID --count --knots 10 [--wide] --trace DIR GAME` (the lines
-  labelled `knots` and `knots-wide`), then `residual.py knots DIR/ID.knots.tsv STEPS ...`.
+  labeled `knots` and `knots-wide`), then `residual.py knots DIR/ID.knots.tsv STEPS ...`.
 
 ## Commits
 

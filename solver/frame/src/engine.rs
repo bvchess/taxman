@@ -253,7 +253,7 @@
 //! is then synced so the
 //! rename itself survives a crash (needed on Linux; on platforms that cannot sync a directory this is skipped
 //! and the rename is still atomic).  Worker stacks reserve [`WORKER_STACK_SIZE`] of address space each,
-//! committed only as touched.  `EngineConfig::default` takes `available_parallelism`, which on Linux honours
+//! committed only as touched.  `EngineConfig::default` takes `available_parallelism`, which on Linux honors
 //! the CPU affinity mask and cgroup quotas.  A run stopped by SIGINT or SIGTERM (after [`stop_on_signals`])
 //! loses nothing; one killed otherwise loses at most one checkpoint interval.  Telling whether the owner of a
 //! spill segment is alive uses process ids, so processes in different PID namespaces (containers) must not

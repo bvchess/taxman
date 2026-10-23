@@ -223,7 +223,7 @@ def treewidth_upper(g, rule="minfill"):
 
 
 def treewidth_lower(g):
-    """The minor-min-width lower bound: contract a vertex of least degree into its neighbour of least degree."""
+    """The minor-min-width lower bound: contract a vertex of least degree into its neighbor of least degree."""
     g = {v: set(ns) for v, ns in g.items()}
     lower = 0
     while len(g) > 1:

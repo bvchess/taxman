@@ -177,7 +177,7 @@ What that evidence amounts to:
      another run of the same search.  The GF(2) study's chain was made from `optimal.json`'s game of 1300 (`--use-prev`)
      by the build of commit 716ebd9, on 2 threads in three invocations, and reached 2175 from 1301 in 92 minutes of game
      time.  Its 875 games have this file's scores and proofs in every game, and its moves in all but 1560–1563 (above).
-     Its methods are this file's too, except that a game whose search took no step was labelled `search` then and is
+     Its methods are this file's too, except that a game whose search took no step was labeled `search` then and is
      `start` here.  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
      `taxman verify-results results/strict.jsonl solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
      (93 s) accepts them and finds 875 games in both files, with equal scores in all.  `solver/tools/check_results.py`

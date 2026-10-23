@@ -131,7 +131,7 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher
   keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.
   Three research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose
-  defaults are the behaviour above, with the same trees.  The table counts what it does (nogoods learned, lookups and
+  defaults are the behavior above, with the same trees.  The table counts what it does (nogoods learned, lookups and
   the share they answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and
   the ladder and the progress lines print the counts.  A checkpoint does not record the policies, since the answer does
   not depend on them and a resumed search starts with empty tables; the run that resumes says which it uses.

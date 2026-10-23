@@ -1,4 +1,4 @@
-//! The finder: large neighbourhood search (LNS) for a good game, and the thread that runs it beside a long search.
+//! The finder: large neighborhood search (LNS) for a good game, and the thread that runs it beside a long search.
 //!
 //! # The search for a good game
 //!
@@ -129,9 +129,9 @@ pub struct Lns<'a, const W: usize> {
 }
 
 impl<const W: usize> Lns<'_, W> {
-    /// The unit that searches a neighbourhood of the incumbent `best`: a random share of its promotions (drawn from
+    /// The unit that searches a neighborhood of the incumbent `best`: a random share of its promotions (drawn from
     /// `options.fix`) fixed, and every other candidate free.
-    pub fn neighbourhood(&self, best: &Bits<W>, rng: &mut Rng) -> TaxUnit<W> {
+    pub fn neighborhood(&self, best: &Bits<W>, rng: &mut Rng) -> TaxUnit<W> {
         let Options { fix, .. } = self.options;
         let mut members = best.to_vec();
         rng.shuffle(&mut members);
@@ -170,7 +170,7 @@ impl<const W: usize> Lns<'_, W> {
         let (mut best, mut nodes) = (*start, 0);
         let (mut units, mut finished, mut improved, mut found) = (0, 0, 0, 0.0);
         while !over() {
-            let ran = run(self.neighbourhood(&best, rng), &best);
+            let ran = run(self.neighborhood(&best, rng), &best);
             (units, nodes, finished) = (units + 1, nodes + ran.nodes, finished + u64::from(ran.completed));
             if ran.set.sum() > best.sum() {
                 (best, improved, found) = (ran.set, improved + 1, clock());
@@ -348,7 +348,7 @@ pub fn rounds<const W: usize>(
                     best = theirs;
                 }
             }
-            let ran = run_unit(&space, &units, lns.neighbourhood(&best, &mut rng), &best, Some(lns.options.unit_nodes));
+            let ran = run_unit(&space, &units, lns.neighborhood(&best, &mut rng), &best, Some(lns.options.unit_nodes));
             if ran.set.sum() <= best.sum() {
                 continue;
             }

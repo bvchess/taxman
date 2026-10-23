@@ -406,7 +406,7 @@ scenario_node() {
     check "a signal in the setup does not end the run" absent "$(obj $name/run/ended)"
     check "and leaves the group alone" has_line "$FAKE_STATE/desired" 1
     check "and the machine does not power itself off" lacks "$FAKE_LOG" '^shutdown'
-    check "the node says it was signalled" matches "$tmp/n-$name/logs/wall-node.log" 'signalled: leaving the run'
+    check "the node says it was signaled" matches "$tmp/n-$name/logs/wall-node.log" 'signaled: leaving the run'
 
     # A node that cannot read its config ends the run with the error.
     name=noconfig

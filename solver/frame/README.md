@@ -166,7 +166,7 @@ of this size because the search is compiled once for every set width
 bench` finds its two
 files in the repository: above the working directory and, if they are not there, above the binary.
 
-*Build options.*  The release profile uses fat LTO and `panic = "abort"`.  The `test` profile is optimised
+*Build options.*  The release profile uses fat LTO and `panic = "abort"`.  The `test` profile is optimized
 (`opt-level = 2`) because the tests replay real games.  A build is generic for its target architecture, so its binary
 runs on any machine of that architecture.  Tuning for the build machine's CPU is opt-in, for a machine that will run
 only that binary: `RUSTFLAGS="-C target-cpu=native" cargo build --release`, as the cloud scripts do
@@ -519,7 +519,7 @@ meet.  It tightens them where a proof looks cheapest (its *forecast*), in three 
   and giving the game a line that forecasts its proof;
 * the relations between games, both ways: the ceiling, the prime formula, repeats and monotonicity.
 
-A finder of good games, a large neighbourhood search, adds lower bounds.  It is not sound, so its games count only once
+A finder of good games, a large neighborhood search, adds lower bounds.  It is not sound, so its games count only once
 the referee has replayed them.  The ledger never reads the known optima unless it is given proven games (`--proven
 FILE`), so a run on a stretch that the chain has proven is a fair test, which `report --known` checks.
 

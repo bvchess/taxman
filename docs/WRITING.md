@@ -94,13 +94,18 @@ Not "This project finds optimal games of Taxman, a number game, and proves that 
 finds optimal games of Taxman, a number game."  Not "The committed chain, `results/strict.jsonl`, holds an optimal game
 for every n" but "The file `results/strict.jsonl` holds a chain of optimal games for every n."
 
+## 10. Spell the American way
+
+Docs, comments and the names of code use American spelling: neighbor, labeled, analyze, behavior, center, color,
+catalog, optimize.  The committed data keeps the names it was written with, and quoted titles keep theirs.
+
 ## The check
 
 The docs test, `solver/frame/tests/docs.rs`, runs in `solver/tools/quick_check.py`.  It checks that every relative link
 resolves, that every heading cited by name or by number exists (and every paragraph or list item cited by the bold or
 italic words it opens with), and that every document but the notebook's entries keeps rule 8's limits.  It also checks
 that neither the guides nor the comments of the code and the scripts use the words the project has retired, or a
-person's name where a role belongs.
+person's name where a role belongs, and that the prose and the comments are spelled the American way (rule 10).
 
 ## Sources
 

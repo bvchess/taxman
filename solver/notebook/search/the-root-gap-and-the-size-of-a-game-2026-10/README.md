@@ -47,7 +47,7 @@ folder `~/taxman_work/lab/work/rootgap/top/`.
   2,191 to 1,855 by depth 10 in the easy games 4941 and 4945.
 * **Across the nodes made** the p90 of the gaps at depths 12, 15, 18 and 21 is 1,631, 1,620, 1,620 and 1,175 in the hard
   games, and 996, 766, 671 and 578 in the easy ones.
-* **Neighbouring games share the top of their tree**: 4921 and 4929 have the same gaps at every depth, as do 4941 and
+* **Neighboring games share the top of their tree**: 4921 and 4929 have the same gaps at every depth, as do 4941 and
   4945, which is why hard and easy games come in runs.
 
 **Open hypothesis.**  In hard games, excluding a member leaves near-equal alternatives, so the bound barely falls at a

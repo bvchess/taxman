@@ -21,7 +21,7 @@ On a board, the [sources](../../../docs/GLOSSARY.md#the-frame-model) are the num
 [factors](../../../docs/GLOSSARY.md#the-frame-model) the rest.  A move is paid for by one of its [maximal
 factors](../../../docs/GLOSSARY.md#the-game), and a factor pays for one move.  Although a move takes every divisor of
 it, maximal factors are enough: see the lifting argument of `numtheory` and [THEORY.md](../../../docs/THEORY.md)
-(Theorem 1), which the [README](../../frame/README.md#how-the-solver-sees-the-game-the-frame-model) summarises.
+(Theorem 1), which the [README](../../frame/README.md#how-the-solver-sees-the-game-the-frame-model) summarizes.
 
 `frames::BoardFrames` forms the [frames](../../../docs/GLOSSARY.md#the-frame-model) of a board, in playing order: the
 frames [in front of](../../../docs/GLOSSARY.md#the-frame-model) a frame are played before it.  Setup simplifies each

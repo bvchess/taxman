@@ -1,6 +1,6 @@
 #!/Users/brian/dev/taxman_work/taxman/.venv/bin/python
 """The seeding study: how much closer a game's start incumbent gets to the optimum when it is seeded from a
-neighbour's start incumbent (never proven), as a chain seeds from the proven game of n - 1.
+neighbor's start incumbent (never proven), as a chain seeds from the proven game of n - 1.
 
 Reads the variants' files in this directory (README.md has the commands that made them, and each line has its game's
 `opt` from the committed chain) and ../cal.jsonl, the standalone bounds of the cloud run.
@@ -122,7 +122,7 @@ for name in ("A64", "A256"):
               f"{name} {st.mean(short[name][n] for n in ns):6.1f}, R1 {st.mean(short['R1'][n] for n in ns):6.1f}")
 
 print("\nInherited errors: a seeded game's shortfall against the shortfall of the game it was seeded from (its "
-      "neighbour in the chain, not restarted), over the games with a seed; R1 has none, its neighbour is n - 1")
+      "neighbor in the chain, not restarted), over the games with a seed; R1 has none, its neighbor is n - 1")
 for name in ("R1", "A", "A256", "B"):
     if name not in runs:
         continue
@@ -130,7 +130,7 @@ for name in ("R1", "A", "A256", "B"):
              for n, d in runs[name].items() if d["seed"] == "neighbour" or (name == "R1" and n > GAMES.start)]
     mine, theirs = zip(*pairs)
     print(f"  {name:<5} {len(pairs):>5} games: correlation {st.correlation(mine, theirs):.2f}; "
-          f"lower than the neighbour's {100 * sum(a < b for a, b in pairs) / len(pairs):.1f}%, "
+          f"lower than the neighbor's {100 * sum(a < b for a, b in pairs) / len(pairs):.1f}%, "
           f"equal {100 * sum(a == b for a, b in pairs) / len(pairs):.1f}%, "
           f"higher {100 * sum(a > b for a, b in pairs) / len(pairs):.1f}%; "
           f"mean change {st.mean(a - b for a, b in pairs):+.1f}")

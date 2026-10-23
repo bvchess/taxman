@@ -258,7 +258,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     proof, a changed score, moves or assumptions, or a later line, for a game built on one;
   * the sweep's planner tiles a range into blocks of equal work and cuts the excerpts of the passes, and `sweep.sh` over
     1301..1340 and 1411..1416 completes with both referees accepting the file, is stopped by a SIGTERM and resumed, and
-    settles a block's first game by the ceiling its neighbour gives in pass 2.
+    settles a block's first game by the ceiling its neighbor gives in pass 2.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and a
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
   file that a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game it

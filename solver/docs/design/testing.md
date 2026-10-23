@@ -4,7 +4,7 @@ Part of the [design](../DESIGN.md).
 
 The tests check correctness on games that finish in seconds.  Two runs use them: the quick check, which every change
 passes, and the full suite.  A reviewer of a change runs what the checklist "Before a change is merged" says, and
-[tests.md](tests.md) is the catalogue of the tests, by subject.
+[tests.md](tests.md) is the catalog of the tests, by subject.
 
 **Why the tests run on small games.**  The large games cannot run in a test, so the fast fixtures and the small games
 stand in for them, and the tripwires and soundness tests catch the failures that no assertion on an answer sees.  The

@@ -99,7 +99,7 @@
 //!   back claims that pass, its front claims) are not.  Every pair listed is at risk, which the census checks.
 //!
 //! **The summary** is computed from the lines of `FROM..=TO` (with `--out`, read again from FILE at the end, so a
-//! resumed run summarises everything; without it, from memory) and written as plain text to stdout (to stderr when the
+//! resumed run summarizes everything; without it, from memory) and written as plain text to stdout (to stderr when the
 //! lines went to stdout): the boards checked; for each of A, C, D, E, F, G and H the boards that fail it, with the
 //! first items of the first 5; the sets of layers that frame 0 had, with the number of boards of each, and the boards
 //! where frame 0 includes a frame of layer 2, as ranges; the boards whose `layer_numbering` is false, those where a
@@ -118,7 +118,7 @@
 //! But check H did not run on them, so the run is a `FAIL` while any exists: run the range again into a new file.
 //!
 //! **Exit status**: 0 if every board of the range has a line with the Lemma M5⁺ fields and passes A, C, D, E, F, G and
-//! H; 1 if one does not, or a board could not be analysed (the message goes to stderr); 2 for a usage error.
+//! H; 1 if one does not, or a board could not be analyzed (the message goes to stderr); 2 for a usage error.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
@@ -918,9 +918,9 @@ fn read_lines(path: &Path, from: u32, to: u32, repair: bool) -> Result<BTreeMap<
     Ok(lines)
 }
 
-/// Analyses the boards `todo` (ascending) on `threads` threads and writes their lines to `sink` in that order, each as
+/// Analyzes the boards `todo` (ascending) on `threads` threads and writes their lines to `sink` in that order, each as
 /// soon as it and all before it are done; returns the lines, in that order, if `keep`.
-fn analyse(todo: &[u32], threads: usize, sink: &mut Sink, keep: bool) -> Result<Vec<Json>, String> {
+fn analyze(todo: &[u32], threads: usize, sink: &mut Sink, keep: bool) -> Result<Vec<Json>, String> {
     let (next, stop) = (AtomicUsize::new(0), AtomicBool::new(false));
     let (sender, receiver) = mpsc::channel::<(usize, Result<Json, String>)>();
     let start = Instant::now();
@@ -989,7 +989,7 @@ fn run(args: &Args) -> Result<bool, String> {
         }
         None => Sink::Stdout,
     };
-    let in_memory = analyse(&todo, args.threads, &mut sink, to_stdout)?;
+    let in_memory = analyze(&todo, args.threads, &mut sink, to_stdout)?;
 
     let lines: Vec<Json> = match &args.out {
         Some(path) => read_lines(path, args.from, args.to, false)?.into_values().collect(),

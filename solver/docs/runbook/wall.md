@@ -310,7 +310,7 @@ The tests run on the laptop (macOS, bash 3.2):
 * the arguments of every aws command, checked by the CLI's own parameter validation against an endpoint that refuses
   connections, so that nothing reaches AWS.
 
-Nothing tests what needs AWS to answer: the behaviour of the group (the replacement, `lowest-price` across zones,
+Nothing tests what needs AWS to answer: the behavior of the group (the replacement, `lowest-price` across zones,
 `resolve:ssm` as the image of a template that a group uses), the user data on Amazon Linux, and `tmux` with the options
 used there.  The instances of the earlier runs exercised all of these but the group.
 

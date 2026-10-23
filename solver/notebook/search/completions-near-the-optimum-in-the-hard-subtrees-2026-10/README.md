@@ -45,7 +45,7 @@ was replaced.
 suite](../the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md), and two more pairs, each a hard problem and an
 easy one at the same gap: 3300-14 and 3441-1262, the big units, against 3441-5459, the anatomy's contrast, of about the
 same gap and a twentieth of the size; 3425-149 and 3425-150, two units of one game at gaps of 872 and 879 (253,336 steps
-against 48,615); and whole games that cost far more per point of gap than their neighbours in the chain's cost model
+against 48,615); and whole games that cost far more per point of gap than their neighbors in the chain's cost model
 ([the gap past 2175](../the-gap-past-2175-2026-10/README.md), A4), 3020 against 3024 (both at a gap of 766) and 2255
 against 2220 (642 and 633), whose one-thread proof from the optimum is `wall nodes --mode opt`.
 

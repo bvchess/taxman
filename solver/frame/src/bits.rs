@@ -661,7 +661,7 @@ mod tests {
             assert_eq!(desc.get(k as usize).copied(), bits.nth_largest(k), "nth_largest({k})");
         }
 
-        // Neighbour queries, including values beyond the capacity.
+        // Neighbor queries, including values beyond the capacity.
         for x in 0..=Bits::<W>::CAPACITY + 2 {
             assert_eq!(model.contains(&x), bits.contains(x), "contains({x})");
             assert_eq!(model.range(..x).next_back().copied(), bits.max_below(x), "max_below({x})");
@@ -759,7 +759,7 @@ mod tests {
         random_agreement_rounds::<128>(0x3C3C_A5A5_5A5A_C3C3, 8 / divisor);
     }
 
-    /// Every word holds numbers, including its first and last bit: the sums, counts, extremes and neighbours across
+    /// Every word holds numbers, including its first and last bit: the sums, counts, extremes and neighbors across
     /// each word boundary, at the large widths.
     fn every_word_is_used<const W: usize>() {
         let edge = [0u32, 1, 62, 63];

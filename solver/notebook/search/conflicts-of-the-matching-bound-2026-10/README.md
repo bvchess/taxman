@@ -34,7 +34,7 @@ out; … a few levels deep); conflict branching (`branching`); exact matchings (
 is the node's best completion, offered as incumbent); propagation (a known conflict of which a child promotes all but
 one member rules that member out of the child's candidates, since otherwise the child's matching bound equals the
 node's); the starting incumbent (`dive` rounds the root's matching by dropping the smallest member of a conflict until
-feasible; the local search `Neighbourhood::improve` fills greedily, then drops one or two members and refills); and
+feasible; the local search `Neighborhood::improve` fills greedily, then drops one or two members and refills); and
 cheaper nodes.
 
 ## Results

@@ -117,7 +117,7 @@ the fixed time was 57 s of the 769 s of 101 games, plus 43 s of start-up.
 
 Where it goes (60 s of `sample` of `setup` at 4000, `profile_4000_setup.txt`): peels 60% and reductions 12%, nearly all
 in the local search; the board layer's own peel (`Apiary::count_freedoms`) 20%; promotions 4%; copies 2.5%.  The local
-search (`Neighbourhood::improve`) refills the incumbent without each member and then without each pair of members, until
+search (`Neighborhood::improve`) refills the incumbent without each member and then without each pair of members, until
 nothing improves: its last pass alone is |I|²/2 refills of the whole state (26,000 at 4000).  On 175 games of 1301..2175
 (`start.jsonl`, from the better of greedy and the seed's survivors) the singles take 2 to 5 ms and the pairs 0.09 to
 0.37 s (70 to 80 times as long).  Of the 63 searched games among them, 16 start at the ceiling (the local search cannot

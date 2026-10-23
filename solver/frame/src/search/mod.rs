@@ -116,7 +116,7 @@ pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use dual::{dual_bound, DualBound, NodeBound};
 #[cfg(feature = "studies")]
 pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
-pub use incumbent::Neighbourhood;
+pub use incumbent::Neighborhood;
 pub use near_repeat::NearRepeat;
 pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
@@ -214,8 +214,8 @@ pub struct SearchResult<const W: usize> {
 ///
 /// The incumbent starts as the best of the greedy set, what survives of `seed` (its candidates that can still
 /// be promoted, from the largest down) and the dive (the root's matching rounded to a set that can be
-/// promoted), improved by a local search ([`Neighbourhood::improve_on`] on the run's threads, `cfg.threads` or the
-/// control's workers, with the answer of [`Neighbourhood::improve`]).  The start is offered to the run's control as
+/// promoted), improved by a local search ([`Neighborhood::improve_on`] on the run's threads, `cfg.threads` or the
+/// control's workers, with the answer of [`Neighborhood::improve`]).  The start is offered to the run's control as
 /// soon as it is known and each time it improves (after the best of the greedy set and the seed's survivors, after the
 /// dive and after the local search, where they improve it), so that [`best_so_far`] has it before the engine runs.
 /// A search with several seeds ([`search_beside`], [`search_steered`]) makes this start from each of them and begins
@@ -573,7 +573,7 @@ pub fn start_incumbent<const W: usize>(
     if let Some(best) = at_ceiling(&starts) {
         return best;
     }
-    let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+    let hood = Neighborhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
     let mut best = Bits::EMPTY;
     for start in distinct(starts) {
         let improved = hood.improve_on(|| control.workers().unwrap_or(threads), || control.ceiling(), &start, true);

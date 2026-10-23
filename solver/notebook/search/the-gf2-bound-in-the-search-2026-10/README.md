@@ -156,7 +156,7 @@ search 545); `verify-results` accepts it, and it took 88 s of wall time and 395 
    | 2101-2150 | 182 | 19 (2140) | 829,229 | 385 | 473 |
    | 2151-2175 | 847 | 290 (2170) | 4,286,865 | 389 | 612 |
 
-   The cost comes in waves (up to ×8 between neighbouring bands of 25 n, ×75 between the cheapest and the dearest,
+   The cost comes in waves (up to ×8 between neighboring bands of 25 n, ×75 between the cheapest and the dearest,
    2151-2175, which holds 2170 at 290 s), and over 1301-2175 there is no growth a fit resolves: log10 of a band's time
    changes by −0.012 ± 0.033 per 100 n (residual sd 0.49).  The waves follow the root's GF(2) gap: an exhausted search's
    nodes grow ×10 per 236 of gap (314 searches, residual sd 0.44), and the gap grows only 6.9 ± 1.7 per 100 n (sd 115
@@ -211,7 +211,7 @@ search 545); `verify-results` accepts it, and it took 88 s of wall time and 395 
   strong branching) stays: it is the tests' independent second search (the probe-node test, the plumbing tests' long
   searches, the tripwires), and the setup's dive rounds the root's matching into the starting incumbent.
 * **Strong branching's solves** (70% of the augmentations) restart far below their answer, and the study proposed
-  cancelling the negative cycles of the optimum's exchange graph to start each from an extreme set one smaller.  That
+  canceling the negative cycles of the optimum's exchange graph to start each from an extreme set one smaller.  That
   was not needed: [the inner loop of the GF(2) search](../the-inner-loop-of-the-gf2-search-2026-10/README.md), the round
   after this one, did without most of the solves, since the heaviest set without a member is the heaviest set flipped
   along one cycle of its exchange graph, read off with no solve and certified by what the sets of other sizes lose (the

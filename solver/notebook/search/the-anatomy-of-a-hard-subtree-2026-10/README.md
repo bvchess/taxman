@@ -40,7 +40,7 @@ trace of every step: the biggest, another big one, and a small subtree of the sa
   units take exactly the suite's steps, and the test of `wall anatomy` runs a whole search with and without the hook.
 * **`wall anatomy`** ([examples/wall/anatomy.rs](../../../frame/examples/wall/anatomy.rs), with a test) solves units as
   `tune solve` does: one thread, fresh tables, from the known optimum.  `--trace` writes a line a step; `--prefer FILE`
-  branches in an order of its own; `--best-cpu S` looks for the unit's best completion by large neighbourhood search
+  branches in an order of its own; `--best-cpu S` looks for the unit's best completion by large neighborhood search
   below the node (not sound) and lists the heaviest set's minimal conflicts.
 * **The units,** each solved fully with the trace on 2026-10-18, on the laptop, one thread: 3300-14, the suite's biggest
   (17 promotions, 856 candidates, gap 998, 1,248,609 steps); 3441-1262 (10 promotions, 911 candidates, gap 970,

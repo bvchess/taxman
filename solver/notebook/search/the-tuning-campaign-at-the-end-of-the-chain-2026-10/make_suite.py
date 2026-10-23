@@ -212,11 +212,11 @@ def select(candidates, count, lo, hi, bins=8):
         # The range with the fewest picks (the earlier on a tie) that has a candidate left.
         b = min((i for i in range(bins) if ranges[i]), key=lambda i: (len(picked[i]), i))
         game = min({c[0] for c in ranges[b]}, key=lambda g: (per_game[g], g))
-        centre = lo * math.exp(span * (b + 0.5) / bins)
+        center = lo * math.exp(span * (b + 0.5) / bins)
 
         def apart(candidate):
             logs = [abs(math.log(candidate[2] / other[2])) for other in picked[b]]
-            return (min(logs, default=math.inf), -abs(math.log(candidate[2] / centre)))
+            return (min(logs, default=math.inf), -abs(math.log(candidate[2] / center)))
 
         best = max((c for c in ranges[b] if c[0] == game), key=apart)
         ranges[b].remove(best)

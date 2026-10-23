@@ -168,7 +168,7 @@ def by_gap(e1, main):
     print("Least squares, share = a + b (n / 100) + c (gap / 100) over those roots: "
           f"a = {beta[0]:.3f} ± {se[0]:.3f}, b = {beta[1]:+.4f} ± {se[1]:.4f} (n), "
           f"c = {beta[2]:+.4f} ± {se[2]:.4f} (gap); the standard errors take the roots as independent, which they "
-          "are not quite (neighbouring games share their structure).\n")
+          "are not quite (neighboring games share their structure).\n")
 
 
 def cap(e2, dear):

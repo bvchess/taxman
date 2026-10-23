@@ -106,7 +106,7 @@ def functions(chain, frame):
     return list(reversed(ours)) if ours else [frame_name(frame)]
 
 
-def analyse(binary, path, top):
+def analyze(binary, path, top):
     load, leaves = attribute.parse(path)
     leaf_addresses = {attribute.address(stack[-1]) for _, stack in leaves} - {None}
     # A caller's address is a return address: the call is the byte before it, which the inline chain is about.
@@ -170,7 +170,7 @@ def show(result):
 def main():
     args = sys.argv[1:]
     top = int(args[args.index("--top") + 1]) if "--top" in args else 30
-    result = analyse(args[0], args[1], top)
+    result = analyze(args[0], args[1], top)
     if "--json" in args:
         print(json.dumps(result))
     else:

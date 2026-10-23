@@ -49,13 +49,13 @@ steps, its own search, its start and its best:
 60 s at a million steps and found nothing.  The search itself raised the best to 543,747 at 145 million steps, then to
 543,787, 543,796, 543,849 and 543,868 between 418 and 474 million, and to 543,874 at 589 million; it ended at 614
 million steps.  The other searches of this machine took 157 to 289 million steps; five of the six started at their
-best, and 4875 reached its best in 4 minutes.  4893's search took two to four times the steps of its neighbours.
+best, and 4875 reached its best in 4 minutes.  4893's search took two to four times the steps of its neighbors.
 
 ## 2026-10-22: the start of 4893 came from the bounds store
 
 **The bounds store's game of 4893 displaced the game of 4892 as the seed, and its start lay 135 below the best.**  With
 `--use-prev`, a search has two seeds: the game of n − 1, and the game of n that the bounds store's lower bound holds
-(`results/bounds.jsonl`, made by the ledger's large neighbourhood search on 2026-10-18).  `SearchJob::search` in
+(`results/bounds.jsonl`, made by the ledger's large neighborhood search on 2026-10-18).  `SearchJob::search` in
 `src/solver.rs` keeps the one whose survivors, its candidates still promotable here, sum to more, and the start (the
 dive and the local search) and the finder's seed rounds both use that one alone.  At 4893 the store's game is worth
 543,739, every member of it survives, and it beat what survives of 4892's game.  Its start stayed at 543,739.
@@ -145,7 +145,7 @@ that fails without the rule, and the builder has them.
 
 **Boards ahead of the chain** (`examples/seeds.rs 4895 5000 --proxy`, `seeds-ahead.jsonl`).  Past 4895 the chain has
 no game of n − 1 yet, so the store's game of n − 1 stands in for it.  The ledger made the store's games one from
-another, so neighbouring games are often the same set and the stand-in is weak: the chain's own game of n − 1 can do
+another, so neighboring games are often the same set and the stand-in is weak: the chain's own game of n − 1 can do
 better or worse.  Of 106 boards, the store's game of n keeps more survivors on 25, and on 5 of those its start is lower
 than the start from the stand-in: 4920 by 128 (552,041 against 552,169), 4940 by 182 (554,052 against 554,234), 4944 by
 17, 4968 by 33 and 4983 by 29.  At 4895, the one board with the chain's game of n − 1, the game of 4894 keeps 542,539

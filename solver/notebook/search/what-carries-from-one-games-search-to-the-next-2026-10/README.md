@@ -81,7 +81,7 @@ its whole cost, 18% of the steps from 4880 to 4901.  The obstacle is the argumen
 problems differ in frame 0, and the obligation above gives no cheap check of which subtrees the swap cannot reach.  The
 section on a cut below finds one.
 
-**The hard region is the optimum's neighbourhood.**  A unit's promotions lie 96-97% inside the incumbent (the game's
+**The hard region is the optimum's neighborhood.**  A unit's promotions lie 96-97% inside the incumbent (the game's
 optimal set, the previous game's lifted), at every gap; 4900's and 4901's optimal sets are the same 265 candidates.
 
 **Whether off wins is a property of a region.**  Of the probed deep units of two studies (4900: off for 256 steps then

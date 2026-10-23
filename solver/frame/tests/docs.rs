@@ -18,6 +18,8 @@
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
 //!   for the ceiling, ...) or the old names of the prover's directory and script, but for the note that lists them,
 //!   `solver/notebook/terms-changed.md`;
+//! * the prose of the Markdown files and the comments of the Rust, Python and shell files, the notebook's entries
+//!   included, are spelled the American way (`BRITISH_STEMS`), as docs/WRITING.md, rule 10, says;
 //! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
 //!   and the scripts of the tools: `CODE_DIRS`, `SCRIPT_DIRS`), do not use the names that docs/GLOSSARY.md replaced
 //!   (board size, the optimum, strong bound, checker, EXPERIMENTS, ...);
@@ -2448,4 +2450,163 @@ fn the_limits_are_read_from_the_rule_and_words_are_counted_as_wc_does() {
     assert_eq!(limit_after(rule, "stays as its table, under "), None, "a sentence that is gone");
     assert_eq!(limit_after("under 750, with a line", "under "), Some(750));
     assert_eq!(word_count("a  b\n\tc—d \n"), 3);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// American spelling
+
+/// British words that the guides and comments spell the American way (docs/WRITING.md, rule 10), each with its
+/// American spelling and the endings that both take.  A word is matched whole and in lower case, and only in prose (a
+/// markdown file's text, a source file's comments, with code spans and fenced blocks blanked), so the field names of
+/// committed data (`neighbours_cpu_s`, `cover_relabelled`), which have no word boundary inside, and a string quoted
+/// from data (`"neighbour"`), which `has_word` passes over, stand.  "Analyses" is no entry: it is the plural of
+/// "analysis" as well.
+const BRITISH_STEMS: &[(&str, &str, &[&str])] = &[
+    ("neighbour", "neighbor", &["", "s", "ing", "hood", "hoods"]),
+    ("behaviour", "behavior", &["", "s", "al"]),
+    ("colour", "color", &["", "s", "ed", "ing"]),
+    ("favour", "favor", &["", "s", "ed", "ing", "able", "ably", "ite"]),
+    ("honour", "honor", &["", "s", "ed", "ing", "able"]),
+    ("centre", "center", &["", "s", "d"]),
+    ("catalogue", "catalog", &["", "s", "d"]),
+    ("programme", "program", &["", "s", "d"]),
+    ("judgement", "judgment", &["", "s"]),
+    ("grey", "gray", &["", "s"]),
+    ("labelled", "labeled", &[""]),
+    ("relabelled", "relabeled", &[""]),
+    ("modelled", "modeled", &[""]),
+    ("modelling", "modeling", &[""]),
+    ("signalled", "signaled", &[""]),
+    ("signalling", "signaling", &[""]),
+    ("cancelled", "canceled", &[""]),
+    ("cancelling", "canceling", &[""]),
+    ("travelled", "traveled", &[""]),
+    ("travelling", "traveling", &[""]),
+    ("per cent", "percent", &[""]),
+    ("analyse", "analyze", &["", "d"]),
+    ("analysing", "analyzing", &[""]),
+];
+
+/// The stems of British verbs in -ise (`optimise`), which the American spelling writes -ize (`optimize`).
+const BRITISH_ISE_STEMS: &[&str] = &[
+    "optim",
+    "summar",
+    "organ",
+    "recogn",
+    "normal",
+    "minim",
+    "maxim",
+    "initial",
+    "serial",
+    "util",
+    "general",
+    "special",
+    "real",
+    "visual",
+    "character",
+    "parametr",
+    "random",
+    "priorit",
+    "standard",
+    "final",
+    "categor",
+    "synchron",
+    "stabil",
+    "custom",
+    "parallel",
+    "central",
+    "local",
+    "sanit",
+    "formal",
+    "rational",
+    "capital",
+    "author",
+    "linear",
+    "symmetr",
+    "canonical",
+    "discret",
+    "token",
+    "quant",
+    "memo",
+    "vector",
+    "apolog",
+    "critic",
+    "harmon",
+    "material",
+    "mobil",
+    "neutral",
+    "personal",
+    "popular",
+    "scrutin",
+    "theor",
+];
+
+/// The endings of a verb in -ise (`optimise`) and its derived words.
+const ISE_ENDINGS: &[&str] = &["e", "es", "ed", "ing", "ation", "ations", "er", "ers"];
+
+/// The British words of `BRITISH_STEMS` and `BRITISH_ISE_STEMS` with their American spellings, in lower case.
+fn british_words() -> Vec<(String, String)> {
+    let mut words = Vec::new();
+    for &(british, american, endings) in BRITISH_STEMS {
+        words.extend(endings.iter().map(|end| (format!("{british}{end}"), format!("{american}{end}"))));
+    }
+    for stem in BRITISH_ISE_STEMS {
+        words.extend(ISE_ENDINGS.iter().map(|end| (format!("{stem}is{end}"), format!("{stem}iz{end}"))));
+    }
+    words
+}
+
+/// The British words in `lines` (prose: code blanked): `(line number, word, American spelling)`.
+fn british_in(lines: &[String]) -> Vec<(usize, String, String)> {
+    let words = british_words();
+    let mut found = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let lower = without_link_targets(line).to_lowercase();
+        for (british, american) in words.iter().filter(|(british, _)| has_word(&lower, british)) {
+            found.push((i + 1, british.clone(), american.clone()));
+        }
+    }
+    found
+}
+
+/// The files whose prose is spelled the American way: the Markdown files, the Rust and Python sources and the shell
+/// scripts of the repository, with the notebook's entries and their scripts, but for `moniot/` (another person's code),
+/// the files that list the old words (`SKIPPED`, `TERMS_CHANGED`) and the files that a study's script wrote
+/// (`*_output.md`).
+fn spelling_files() -> Vec<PathBuf> {
+    let keep = |path: &Path| {
+        let shown = from_repo(path);
+        let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        let spelled = matches!(path.extension().and_then(|ext| ext.to_str()), Some("md" | "rs" | "py" | "sh"));
+        let listed = shown == SKIPPED || shown == TERMS_CHANGED;
+        spelled && !shown.starts_with("moniot/") && !name.ends_with("_output.md") && !listed
+    };
+    files_where(&repo_dir(), &keep)
+}
+
+#[test]
+fn the_guides_and_comments_are_spelled_the_american_way() {
+    let files = spelling_files();
+    assert!(files.len() > 400, "the check found only {} files: has the layout changed?", files.len());
+    let mut found = Vec::new();
+    for path in files {
+        for (at, british, american) in british_in(&prose_lines(&path, &read(&path))) {
+            found.push(format!("{}:{at}: {british:?}, spell it {american:?}", from_repo(&path)));
+        }
+    }
+    assert!(found.is_empty(), "British spellings (docs/WRITING.md, rule 10; {TERMS_CHANGED}):\n{}", found.join("\n"));
+}
+
+#[test]
+fn the_spelling_check_finds_what_it_should() {
+    let text =
+        "the neighbour's game, neighbouring games, a labelled graph, optimised and optimisation, to analyse it\n\
+                the field `neighbours_cpu_s`, the key cover_relabelled, the seed \"neighbour\" and the analyses of it\n\
+                an analysis, optimistic, a promise, the center, [a neighbour](neighbours.md) and it behaves";
+    let found: Vec<(usize, String)> =
+        british_in(&without_code(text)).into_iter().map(|(at, word, _)| (at, word)).collect();
+    let words = ["neighbour", "neighbouring", "labelled", "analyse", "optimised", "optimisation"];
+    let mut expected: Vec<(usize, String)> = words.iter().map(|word| (1, word.to_string())).collect();
+    expected.push((3, "neighbour".to_string()));
+    assert_eq!(found, expected);
 }

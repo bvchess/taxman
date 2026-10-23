@@ -1,16 +1,16 @@
-# Seeding the start from a neighbour's heuristic game (2026-10)
+# Seeding the start from a neighbor's heuristic game (2026-10)
 
 Part of the [lab notebook](../../README.md).
 
 Started 2026-10-17.  Concluded 2026-10-17.
 
 **Question.**  The project's owner asked, for games no chain has proven: how much better a lower bound do we get if each
-game's start incumbent is seeded from a neighbour's start incumbent (a heuristic game, never proven), the way a chain
+game's start incumbent is seeded from a neighbor's start incumbent (a heuristic game, never proven), the way a chain
 seeds from the proven game of n − 1?  [The landscape past the
 chain](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md) took every game standalone,
 with no seed: the heuristic fell short of the optimum by a median 227 on 2176-3440.  Seeded from the proven game of n −
 1 (`wall start --known`) the start is exact in 88% of games, with a mean shortfall of 11: the floor for any seeding.
-**Answer.**  A neighbour's heuristic game closes about 40% of the standalone start's mean shortfall (330 standalone to
+**Answer.**  A neighbor's heuristic game closes about 40% of the standalone start's mean shortfall (330 standalone to
 199 seeding upward and 204 downward) and the better of the two directions 55% (147), at 0.41 of the standalone start's
 time per direction.  No unproven variant gets any game of 3176-3440 exact.
 
@@ -50,8 +50,8 @@ the 1,265 games of 2176-3440 against the committed chain:
 | max(A,B) | 111 | 146.6 | 367 | 16.8% | 60.7% | 8.9% | two threads |
 | C, the proven game of n − 1 | 0 | 12.2 | 19 | 87.6% | 85.8% | 1.1% | (not the same work) |
 
-A neighbour's heuristic game closes about 40% of the standalone start's mean shortfall and the better of the two
-directions 55%; the proven game closes 96% (12).  The heuristic neighbour leaves a mean shortfall 12 to 17 times the
+A neighbor's heuristic game closes about 40% of the standalone start's mean shortfall and the better of the two
+directions 55%; the proven game closes 96% (12).  The heuristic neighbor leaves a mean shortfall 12 to 17 times the
 proven one's, and is exact in 14% of games, not 88%.  The seed leaves some games worse than standalone: 20.5% of A's,
 28.5% of A64's, 22.0% of A256's, 25.5% of B's and 8.9% of the better of two.
 
@@ -66,7 +66,7 @@ By band of 250 n, the median and the mean of the shortfall (the last band is 15 
 | 3176-3425 | 523 / 553 | 429 / 427 | 506 / 523 | 447 / 444 | 343 / 302 | 212 / 262 | 0 / 11.6 |
 | 3426-3440 | 757 / 595 | 692 / 632 | 373 / 392 | 692 / 632 | 813 / 711 | 692 / 605 | 0 / 19 |
 
-Where the standalone start is worst, the heuristic neighbour helps least.  On 3176-3425, the end of the chain and the
+Where the standalone start is worst, the heuristic neighbor helps least.  On 3176-3425, the end of the chain and the
 nearest to the games past it, no game of any unproven variant is exact, the median is 429 for A and 343 for B against
 523 standalone, and only the better of the two gets to 212; the proven game gets all of them to a median 0 (exact in
 86%).  B is the better direction there (mean 302 against A's 427), and A the better one up to 3175, except on 2676-2925,
@@ -95,13 +95,13 @@ within 15 after a restart of A64 at which A had gone on for 64 games or more, A'
 while A64 (282) keeps about a third of A's gain over R1.  What a long chain buys is the accumulation over the first 64
 to 255 games, and no more beyond.
 
-### 3. Why only 40%: neighbours have nearly the same shortfall, seeded or not
+### 3. Why only 40%: neighbors have nearly the same shortfall, seeded or not
 
 Without any seed, R1's shortfall at n equals the one at n − 1 in 78.5% of games (correlation 0.91).  Seeded, A's equals
 its seed game's in 81.2% (0.96), A256's in 81.3% and B's in 80.5% (0.96), and it is lower in 8.9%, 9.0% and 9.5% (R1:
-10.6%) and higher in 10.0%, 9.8% and 10.0% (R1: 10.9%).  So the seeded start is no more likely to repair its neighbour's
+10.6%) and higher in 10.0%, 9.8% and 10.0% (R1: 10.9%).  So the seeded start is no more likely to repair its neighbor's
 shortfall than a standalone start is to differ from it, and the gain of A over R1 is not made step by step; it shows in
-the level over stretches of n.  An inference from these facts, not a test: a heuristic game of the neighbour is a start
+the level over stretches of n.  An inference from these facts, not a test: a heuristic game of the neighbor is a start
 no better than what the game's own heuristic finds, plus what the chain has accumulated.  The proven game of n − 1 is an
 optimal game, and its start is exact in 88%.
 
@@ -116,7 +116,7 @@ s is the seed's survivors and the local search only, and not comparable.
 
 ## Decision
 
-The finding stands as measured, and no code was kept: a start seeded from a neighbour's heuristic game is 40% better in
+The finding stands as measured, and no code was kept: a start seeded from a neighbor's heuristic game is 40% better in
 mean shortfall than a standalone start, 55% with the better of two directions, and nowhere near the proven game's 96%.
 
 * The seed's worth shows after about 15 games, is largest after 64-255, and restarting throws it away; a chain of 256
@@ -129,7 +129,7 @@ mean shortfall than a standalone start, 55% with the better of two directions, a
 finishes (the fit of the chain's nodes to the standalone gap, a decade per 579, would put an average 183 less of gap at
 about a factor of two in nodes, but a fit across games is not a measurement of one game's search).  Games past 3440,
 where no optimum is known to compare with, and whose shortfall stood at a median 523 on 3176-3440 and may rise.  A
-second heuristic, or a longer local search, for the neighbour's games.  The proven game of n + 1 as a seed going down.
+second heuristic, or a longer local search, for the neighbor's games.  The proven game of n + 1 as a seed going down.
 The times on the cloud's CPUs.
 
 ## Files

@@ -26,7 +26,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   game 21 is Taxman on 1 to 21.  (2) A play of it: a legal sequence of moves, as in "an optimal game of 21".  Where a
   run has solved game n, "the game of n" also names the optimal game it recorded.  Say "game n", never "board size".
 * **board**: the numbers 1 to n of game n.  On the board of 21 the sources are 11 to 21.  In the code, `board::Board`
-  is a board analysed for the search: its tables, frames, candidates and `in_the_bag`.
+  is a board analyzed for the search: its tables, frames, candidates and `in_the_bag`.
 * **pot**: the numbers still in play during a game.  It starts as the whole board.
 * **move**: a number the player takes, which must still have a proper divisor in the pot.  The player scores it.  The
   prover's README and the heuristics say *pick*.
@@ -149,7 +149,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   the ceiling takes no step of the search, and has the method `start`.
 * **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, and the game of a lower
   bound that the bounds store holds, when it has one.
-* **finder**: a large neighbourhood search for a good game, which only offers sets: it fixes a random share of an
+* **finder**: a large neighborhood search for a good game, which only offers sets: it fixes a random share of an
   incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.
   It is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search
   as an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps (a

@@ -175,7 +175,7 @@ past 1300, on the eleven games sampled, has not gone on rising.  Neither pilot w
   every node, not only at the root.
 * **Reuse of n − 1's proof:** no evidence for it.  No part of the cost scales with the size of the problem at a given
   gap, so there is no size-driven work for a proof of n − 1 to save.  Games with the same problem are repeats already
-  (`same_search`), and the costs of the others follow their own gaps, which move by hundreds between neighbours.  It
+  (`same_search`), and the costs of the others follow their own gaps, which move by hundreds between neighbors.  It
   could save a constant at best.
 * **Dominance among interchangeable alternatives** would act on c, the nodes per unit of gap, not on the gap.  Since the
   slope is c × dG/dn, lowering c by a share would lower the slope by the same share.  But nothing here shows that

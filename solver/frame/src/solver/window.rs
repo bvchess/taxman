@@ -100,7 +100,7 @@
 //! the head, and a search that did not complete ends the range only then, after its line, so a run fails or stops at
 //! the game where the range solved in order would, with the same lines before it.  When the range ends, every search
 //! still in flight is stopped ([`Control::stop`]: it writes its final checkpoint, if checkpointing, so that the next
-//! run resumes it, and what it found is not recorded), nothing new starts, a game that waits for its go is cancelled,
+//! run resumes it, and what it found is not recorded), nothing new starts, a game that waits for its go is canceled,
 //! the setups that run finish, and every thread is joined before [`solve`] returns.  After a stop signal every engine
 //! stops on its own, and no search starts but the head's: started, it stops at once with its starting units in its
 //! checkpoint, the incomplete line a search started after the signal gives in the range solved in order, and the
@@ -257,7 +257,7 @@ enum Event {
     Panicked { n: u32 },
 }
 
-/// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is cancelled
+/// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is canceled
 /// first (the driver drops the sender of the go).
 #[allow(clippy::too_many_arguments)]
 fn play(

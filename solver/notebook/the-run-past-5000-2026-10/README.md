@@ -148,7 +148,7 @@ The stretch table, the dearest games and the clock above come from [run_stats.py
 run](../the-run-to-5000-2026-10/run_stats.py).  The script reads the committed chain at a range and a list of stretches
 written in its constants, so it could not take this run's as it stands.  We ran a copy of it over the logs and run files
 of this folder, with the range 4548..4874, stretches of 50 games, the run's own results file (the committed lines of
-these games are the same, but for the 14 relabelled) and a line that names `start` a completed search of 0 nodes, as the
+these games are the same, but for the 14 relabeled) and a line that names `start` a completed search of 0 nodes, as the
 committed file does.  The copy is not kept.  The waits, the queue and the incumbent of 4875 come from the progress lines
 of `logs/chain.err.gz`.
 
@@ -156,7 +156,7 @@ of `logs/chain.err.gz`.
 
 * 4974a71: the build the run pinned.
 * 7987c86: the method `start`, the rule that relabels 14 of the run's lines.
-* c1c1a2a, af1b0e9 and b6fa5e5: `wall.sh status` gained, during the run, an exit 0 before the first save with labelled
+* c1c1a2a, af1b0e9 and b6fa5e5: `wall.sh status` gained, during the run, an exit 0 before the first save with labeled
   group lines, the local time zone in its header comment, and a table of the last 6 games recorded above the games in
   flight (`--recorded N`).
 * 738465d: the finder beside a long search; f48df13, its entry.

@@ -264,7 +264,7 @@ pub struct MatchGraph {
     num: Vec<u32>,
     /// The vertex of each number, `NONE` for numbers not in the root.
     vertex: Vec<u16>,
-    /// The neighbours of vertex `v` are `adj[start[v]..start[v + 1]]`: first, up to `split[v]`, the factors it
+    /// The neighbors of vertex `v` are `adj[start[v]..start[v + 1]]`: first, up to `split[v]`, the factors it
     /// can pay with as a mover; then the movers it can pay for as a factor.
     start: Vec<u32>,
     split: Vec<u32>,
@@ -880,7 +880,7 @@ impl Search {
         false
     }
 
-    /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbours over unmatched edges.
+    /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbors over unmatched edges.
     #[inline(always)]
     fn add_inner<const W: usize, K: Weighing>(&mut self, g: &MatchGraph, lv: &Level<W, K>, a: usize, d: i64) {
         // The fields taken apart, so that the compiler knows that pushing an event changes neither the slots'
@@ -1631,7 +1631,7 @@ mod tests {
                     }
                 }
             }
-            assert!(mate == NONE || usize::from(mate) > v || paid, "{} matched to a non-neighbour", g.num[v]);
+            assert!(mate == NONE || usize::from(mate) > v || paid, "{} matched to a non-neighbor", g.num[v]);
         }
         assert_eq!(cands, lv.cands);
         assert_eq!(chosen, lv.chosen);

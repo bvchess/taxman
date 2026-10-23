@@ -111,7 +111,7 @@ impl<const W: usize> Worklist<W> {
 
 /// How many members of `list` are in `live`, counting no further than 2, and the last one found.
 #[inline]
-fn live_neighbours<const W: usize>(list: &[u16], live: &Bits<W>) -> (u32, u32) {
+fn live_neighbors<const W: usize>(list: &[u16], live: &Bits<W>) -> (u32, u32) {
     let mut count = 0;
     let mut last = 0;
     for &x in list {
@@ -309,7 +309,7 @@ pub(super) fn reduce_from<const W: usize>(
         if !moves.contains(m) {
             continue;
         }
-        let (count, q) = live_neighbours(g.factors(m), factors);
+        let (count, q) = live_neighbors(g.factors(m), factors);
         if count < 2 {
             moves.remove(m);
             if count == 1 {

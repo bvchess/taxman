@@ -67,7 +67,7 @@ it the patches.  The gaps had projected a decade per about 1,050-1,250 in n.  Th
 best: 3441 at 202 to 209 thousand nodes a second on 64 threads, `eff` 100%, `idle` and `lock` 0.0%, 71 pauses for
 checkpoints (the longest 29.9 ms) and none spilled.
 
-**Against the projection.**  The projection gave 4,088 for a day of the whole chain from 2176 in its centre model (10th
+**Against the projection.**  The projection gave 4,088 for a day of the whole chain from 2176 in its center model (10th
 to 90th percentile 3,726 to 4,740) and 3,720 to 4,613 across the others.  The day reached 3440, under the 10th
 percentile of five of the seven scenarios (all but the two that use the gap alone, whose 10th percentiles are 3,427 and
 3,420), with 3441 unfinished at 626 million nodes after 5.9 hours (best so far 3,729,369, the ceiling being 3,731,167).

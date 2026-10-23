@@ -12,7 +12,7 @@ the rest are deferred, so the entry is still a log.  Game 4875 itself was still 
 
 **What was built.**  `taxman solve --finder-after NODES --finder-seconds S` starts one finder thread for a game once its
 search has taken NODES steps (counted over every run of the search), for S seconds (default 60) or until the search
-ends.  The finder is a large neighbourhood search on one thread, moved from `examples/common/lns.rs` into the library
+ends.  The finder is a large neighborhood search on one thread, moved from `examples/common/lns.rs` into the library
 (`src/search/finder.rs`, the generator in `src/rng.rs`).  It runs rounds of 15 s from the seed of the game of n − 1 and
 from the search's incumbent, and offers each better game to the search after the checks of a checkpoint's incumbent
 (`search::offer_found`).  The search stays exhaustive, and its proof is its own.  The two settings are flags of `solve`,

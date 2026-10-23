@@ -61,7 +61,7 @@ its section of the entry:
   `CLIMB` is their ways (`up`, `down`, `both` or `off`; unset, the program's `both`), and `CLIMB_LIMIT` their limit in
   seconds (unset, the program's 60).  `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs.  The events and the report say
   what each way cost and proved.
-* **The finder**, large neighbourhood search ([the finder in the
+* **The finder**, large neighborhood search ([the finder in the
   ledger](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
   runs on a worker after a board's map and before a search whose best seed has changed.  It finds a legal game, not a
   proof, and its game is a lower bound once the referee has replayed it.  `LNS_SECONDS` is the seconds of one thread it

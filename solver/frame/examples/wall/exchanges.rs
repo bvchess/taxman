@@ -318,7 +318,7 @@ impl<const W: usize> View<'_, W> {
     /// The numbers adjacent to `x`, at `at`: as a mover, its maximal factors among the frame's factors; as a factor,
     /// the frame's movers it is a maximal factor of; a candidate is both.  With `reduce`, without the edges of the inert
     /// movers and the private factors.
-    fn neighbours(&self, x: u32, at: Place, reduce: bool, out: &mut Vec<u32>) {
+    fn neighbors(&self, x: u32, at: Place, reduce: bool, out: &mut Vec<u32>) {
         if let Some(f) = at.mover_frame().filter(|&f| !(reduce && self.inert(f, x))) {
             out.extend(self.factors_in(f, x).filter(|&y| !(reduce && self.private(f, y))));
         }
@@ -353,7 +353,7 @@ impl<const W: usize> View<'_, W> {
             moved.insert(y);
             for z in [x, y] {
                 near.clear();
-                self.neighbours(z, at, reduce, near);
+                self.neighbors(z, at, reduce, near);
                 queue.extend(near.iter().filter(|&&w| !moved.contains(w) && swap_primes(w, p, q) != w));
             }
         }

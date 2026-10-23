@@ -45,7 +45,7 @@ pub struct Settings {
     /// The ways climbs go from a proven board: to the board above (up) and to the board below (down).
     pub climb_up: bool,
     pub climb_down: bool,
-    /// The seconds of one thread that the finder (large neighbourhood search, `search/finder.rs`) is given after a board's
+    /// The seconds of one thread that the finder (large neighborhood search, `search/finder.rs`) is given after a board's
     /// map and before a search whose best seed has changed since it last ran on the board (0: none).  Its game is
     /// offered as the board's lower bound and seeds the search if it is the better.  1 s: from the finders'
     /// measurements (solver/notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md) it has most of
@@ -253,7 +253,7 @@ impl SeedFrom {
     }
 }
 
-/// What the finder (large neighbourhood search) is asked to do in a job.
+/// What the finder (large neighborhood search) is asked to do in a job.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LnsPlan {
     /// Seconds of one thread (0: it does not run).
@@ -414,7 +414,7 @@ fn attempt_at<const W: usize>(
             None => p.greedy,
         };
         let score = board.in_the_bag + start.sum();
-        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (a proven neighbour's game).
+        // Nothing to find if the seed reaches the ceiling; a climb always has a new seed (a proven neighbor's game).
         let changed = matches!(job.kind, Kind::Climb(_)) || job.lns.last != Some(score);
         if changed && !cap.is_some_and(|cap| start.sum() >= cap) {
             let (found, run) = find(job, &board, &p, &start, control)?;
@@ -966,7 +966,7 @@ impl Scheduler {
 
     /// The next search to start, if any: a board to set up first (the map's bounds), and only when every map is in and
     /// the relations have carried them (`settle`) a climb (`next_climb`), else the boards whose bounds a proven
-    /// neighbour has just changed, smallest gap first, else the board whose proof is forecast to cost the least
+    /// neighbor has just changed, smallest gap first, else the board whose proof is forecast to cost the least
     /// (`cost`).  Only one board of a repeat class is searched, and no prime whose board before it the ledger has.  A
     /// board next to the class of one that is being climbed to waits (`held`).  The job of an ordinary board is a step
     /// down to a floor (`cost::plan`) unless its gap is within two steps, and then it is the proof, the ordinary search
@@ -994,7 +994,7 @@ impl Scheduler {
         if !self.pending.is_empty() || self.maps_running() {
             return None;
         }
-        // The hold keeps ordinary searches off a board; a climb to it has its proven neighbour.
+        // The hold keeps ordinary searches off a board; a climb to it has its proven neighbor.
         let (kind, entry, limit, floor) = match self.next_climb() {
             Some((way, entry)) => (Kind::Climb(way), entry, s.climb_limit, None),
             None => match cost::plan(ordinary, s.floor_step, self.pooled.rate()) {
@@ -1026,8 +1026,8 @@ impl Scheduler {
         Some(self.job(entry, kind, limit, seeds, entry.upper.map(|u| u.value), floor))
     }
 
-    /// The job of `kind` on the board of `entry`: what it is asked, and what the events say of its neighbours and the
-    /// finder (the neighbours are proven or not as the job starts).
+    /// The job of `kind` on the board of `entry`: what it is asked, and what the events say of its neighbors and the
+    /// finder (the neighbors are proven or not as the job starts).
     fn job(
         &self,
         entry: &Entry,
@@ -1305,7 +1305,7 @@ impl Scheduler {
         self.flush_events()
     }
 
-    /// What follows changes of bounds: boards changed through a proven neighbour go first; a board that is proven is
+    /// What follows changes of bounds: boards changed through a proven neighbor go first; a board that is proven is
     /// recorded, its search stopped and its checkpoint deleted; a search whose ceiling fell is told.
     fn after_changes(&mut self, changes: &[Change]) -> Result<(), String> {
         let cpu = self.cpu();

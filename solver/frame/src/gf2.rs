@@ -311,7 +311,7 @@ impl Gf2Graph {
     /// search's (a Lagrangian bound, whose multipliers lower the weights of the members of nogoods); with the labels,
     /// because the solver wants its elements by increasing weight and the numbers it is asked about to be those
     /// elements.  An element whose weight is not positive is left out (a heaviest common independent set never needs
-    /// one), and the others are relabelled `1, 2, …` by increasing weight (ties by number): the graph is of those
+    /// one), and the others are relabeled `1, 2, …` by increasing weight (ties by number): the graph is of those
     /// labels, and `labels[k - 1]` is the number of label `k`.  Run [`Gf2Bound`] on it with the candidates
     /// `1..=labels.len()`, and map the sets it chooses back through `labels`.
     pub fn reweighted(&self, weight: impl Fn(u32) -> i64) -> (Gf2Graph, Vec<u32>) {

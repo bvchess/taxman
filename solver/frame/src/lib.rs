@@ -56,7 +56,7 @@
 //! | | [`playable`] | whether a set of numbers can all be played on the whole board, with nothing of the frame model |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | | [`rng`] | a seeded generator, for the finder's random neighbourhoods and the tuning benchmark's samples |
+//! | | [`rng`] | a seeded generator, for the finder's random neighborhoods and the tuning benchmark's samples |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
@@ -66,7 +66,7 @@
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |
 //! | solving | [`tactics`] | the switchable pieces of the algorithm, by name and value |
-//! | | [`board`] | a board analysed and prepared for a search: tables, frames, ceiling and seed |
+//! | | [`board`] | a board analyzed and prepared for a search: tables, frames, ceiling and seed |
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
 //! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |

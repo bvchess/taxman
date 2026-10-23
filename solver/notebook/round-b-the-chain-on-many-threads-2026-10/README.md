@@ -18,7 +18,7 @@ second, so their ramp-up and tail idle most of 64 threads.  The proof of 2172 ha
 of the loss a node rate a thread of 93-94%.  The round has the three parts of [the inner loop's
 design](../search/the-inner-loop-of-the-gf2-search-2026-10/README.md): pipeline the chain, run short games side by side
 moving threads between their searches, and report what a thread loses at many threads.  All runs were on the M1 Max at
-up to 4 threads (`nice -n 10`, other jobs keeping the load at 3 to 6, so a few per cent of noise); the many-thread
+up to 4 threads (`nice -n 10`, other jobs keeping the load at 3 to 6, so a few percent of noise); the many-thread
 measurements are commands for the cloud (items 7 and 8 of ["For a cloud
 machine"](../scaling-to-192-threads-2026-10/README.md#for-a-cloud-machine)).  [The
 window](../../docs/design/engine.md#the-window-games-in-flight) in the design document says how it works.

@@ -112,7 +112,7 @@ fail_run() {
     exit 0
 }
 
-# However this script ends without having ended the run or been signalled, the run ends with the error.
+# However this script ends without having ended the run or been signaled, the run ends with the error.
 node_exit() {
     local code=$?
     trap - EXIT
@@ -125,7 +125,7 @@ node_exit() {
 # process) or someone at the keyboard: not the run's end.  The group replaces the machine, or the timer ends it.
 on_signal() {
     interrupted=1
-    log "signalled: leaving the run as it is"
+    log "signaled: leaving the run as it is"
     exit 143
 }
 

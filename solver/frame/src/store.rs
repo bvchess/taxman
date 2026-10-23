@@ -49,7 +49,7 @@ pub enum Rule {
     /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
     /// (U): the removed `wall nogoods` made it; the store takes it on record.
     Nogoods,
-    /// The game the finder found (L): large neighbourhood search, which is not sound and proves nothing; its game is a
+    /// The game the finder found (L): large neighborhood search, which is not sound and proves nothing; its game is a
     /// lower bound because the referee replays it.
     Lns,
     /// A proven game given to the ledger: both bounds.

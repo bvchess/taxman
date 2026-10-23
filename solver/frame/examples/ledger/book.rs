@@ -134,7 +134,7 @@ pub struct Entry {
     pub lns_score: Option<u64>,
     /// The board's own map is made (`start` and `root`), which every board searched has first.
     pub mapped: bool,
-    /// The bounds changed through a proven neighbour since the last search: the board goes before the others.
+    /// The bounds changed through a proven neighbor since the last search: the board goes before the others.
     pub boosted: bool,
     /// A climb to the board stopped at its limit: it goes by the ordinary order from now on, and is not climbed to again.
     pub parked: bool,

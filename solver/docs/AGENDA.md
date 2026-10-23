@@ -48,7 +48,7 @@ whose size grows with n ([the anatomy of the gap](../notebook/search/the-anatomy
   learning gains on units and not on whole games; the knot's bound would save under 4% of the steps, and ladder
   branching has nothing to impose.
 * *Reuse along the chain*: the ceiling, the prime formula and same search are in.  Carrying nogoods or a search's tree
-  to the next game, a chain that comes back down, ceilings from neighbouring problems and equivalent problems gave
+  to the next game, a chain that comes back down, ceilings from neighboring problems and equivalent problems gave
   nothing more ([going higher](../notebook/search/going-higher-and-coming-back-down-2026-10/README.md),
   [carrying](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * *The node and the engine*: the inner-loop round, set widths, PGO, round A.  Constant factors.
@@ -78,7 +78,7 @@ larger board has the smaller tree: the second model gives a decade per 230 of ga
 6000, which G alone reads as an intercept that falls about 0.4 to 0.5 decades per 1,000 n.  On one build, G alone
 overpredicts every later stretch by 0.2 to 0.6 decades, and the gap scaled by n^p with p = 0.3 predicts best (worst bias
 0.27 over five origins).  The two chains disagree about p (0 to 0.2 across 2175, 0.4 to 0.5 within 2176-3312), so G
-alone is the conservative end of every projection, p = 0.5 the optimistic one, and 0.3 the centre.
+alone is the conservative end of every projection, p = 0.5 the optimistic one, and 0.3 the center.
 
 *Details.*  The first model was fitted to the 314 exhausted searches of 1301-2175 in `results/strict.jsonl` (8 threads,
 the build of feba6d0), against the root GF(2) gaps of
@@ -128,7 +128,7 @@ valleys cost seconds.
 models, −400 to +700 for a single run's luck), 4000 at 13 to 20 hours past 3313, 5000 at four to ten days and 6000 at a
 month or more; a `c8g.48xlarge`, 1.9 to 2.7 times as fast, adds 300 to 500 n to a day ([the gap past
 2175](../notebook/search/the-gap-past-2175-2026-10/README.md) has the derivation).  The day that ran reached 3440, under
-the 10th percentile of the centre model ([the cloud run to
+the 10th percentile of the center model ([the cloud run to
 3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).  At that run's own trend, tenfold for about every
 1,040 in n, one `c8g.16xlarge` at spot ($0.68 an hour) reaches about (projected on 2026-10-16, from the run to 3440):
 
@@ -273,14 +273,14 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
 * **Boards past 4095**, built: a width of 128, `MAX_FRAMES` 9 and the GF(2) vectors to 5 words ([the wall regime,
   4](../notebook/search/the-wall-regime-2026-10/README.md)) take the boards to 8191 ([boards past
   4095](../notebook/boards-past-4095-2026-10/README.md)).
-* **Proving runs of neighbours that share a gap in one search**, closed, not worth building: the trees of consecutive
+* **Proving runs of neighbors that share a gap in one search**, closed, not worth building: the trees of consecutive
   games share 0.15% of their steps (median of 14 pairs), and a run costs at least its dearest game, which limits the
   saving to 18-29% of the nodes past 2175
   ([carrying](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).
 * **Strong branching's solves**, done: the bound without each member of the conflict is read off the heaviest set's
   exchange graph, its shortest cycle through the member, with no solve where the other sizes certify it, which they
   nearly always do ([the inner loop](../notebook/search/the-inner-loop-of-the-gf2-search-2026-10/README.md)); the
-  cancelling of negative cycles proposed in [the GF(2) bound in the
+  canceling of negative cycles proposed in [the GF(2) bound in the
   search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md) was not needed.  Where a step's cycles go
   since: [what a GF(2) step carries from the
   last](../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md).
@@ -371,7 +371,7 @@ upper-half conjecture in general.  It is not on the critical path of the wall; C
 ## 5. What the cloud runs should measure
 
 The chain past 2175 and the prover's proofs of 1301-2175 were to decide C5 and A2's premise: C5 is decided, and A2's
-premise needs a rerun (below).  Most of what follows needs only the runs' output files, analysed afterwards on one
+premise needs a rerun (below).  Most of what follows needs only the runs' output files, analyzed afterwards on one
 thread; what needs the machine is marked.
 
 * **The true root gap of every searched game** past 2175, from the chain's own scores

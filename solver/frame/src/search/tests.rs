@@ -749,7 +749,7 @@ fn a_start_at_the_ceiling_is_neither_dived_nor_improved() {
     let p = prepare_golden::<8>(&g, SearchTactics::default());
     let optimum = search_checked(&p, 1, "plain");
     let graph = MatchGraph::new(&p.model, &p.root);
-    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let hood = Neighborhood { model: &p.model, root: &p.root, candidates: &p.candidates };
 
     // The seed (an optimal set, plus a non-candidate) reaches the ceiling, which P* is: the start is the better of
     // the greedy set and the seed's survivors, and the dive and the local search leave it as it is.
@@ -781,7 +781,7 @@ fn the_start_is_offered_to_the_control_as_it_is_made() {
     let board = crate::board::Board::<16>::for_n(n);
     let p = board.prepare(SearchTactics::default()).unwrap();
     let graph = MatchGraph::new(&p.model, &p.root);
-    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let hood = Neighborhood { model: &p.model, root: &p.root, candidates: &p.candidates };
     let dived = dive(&p.model, &p.root, &graph, &p.candidates);
     let improved = hood.improve(&mut Scratch::new(), &dived, true);
     let seed = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
@@ -835,7 +835,7 @@ fn the_start_is_the_best_of_the_starts_of_the_seeds() {
     let board = Board::<8>::for_n(n);
     let p = board.prepare(SearchTactics::default()).unwrap();
     let graph = MatchGraph::new(&p.model, &p.root);
-    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let hood = Neighborhood { model: &p.model, root: &p.root, candidates: &p.candidates };
     let prev = board.seed(crate::game::Optimal::built_in().moves(n - 1).unwrap());
     let start = |seeds: &[Bits<8>]| start_incumbent(&p, &graph, &Control::new(), 1, seeds);
     let (s0, from_prev) = (start(&[]), start(&[prev]));

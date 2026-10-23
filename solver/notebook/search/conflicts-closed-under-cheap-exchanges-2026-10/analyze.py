@@ -67,7 +67,7 @@ def table(title, head, lines):
         print("| " + " | ".join(str(c) for c in line) + " |")
 
 
-def analyse(uid, line, rows):
+def analyze(uid, line, rows):
     steps = line["nodes"]
     priced = [r for r in rows if r["price"] is not None]
     swaps = [r for r in priced if r["kind"] in "TP"]
@@ -252,7 +252,7 @@ def main():
     for uid in units:
         path = find(f"{uid}.images.tsv")
         if path and (uid, "check") in lines:
-            analyse(uid, lines[(uid, "check")], list(read_rows(path)))
+            analyze(uid, lines[(uid, "check")], list(read_rows(path)))
     learning(lines)
     for uid in units:
         path = find(f"{uid}.classes.tsv")

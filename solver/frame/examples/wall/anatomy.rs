@@ -78,7 +78,7 @@
 //! (`search::StepHook::branch`), so the best is the same and only the tree changes.  `--nodes K` stops a unit after
 //! about K steps (`completed` false).
 //!
-//! **The best completion** (`--best-cpu S`): large neighbourhood search below the unit's node for S CPU seconds (`lns`,
+//! **The best completion** (`--best-cpu S`): large neighborhood search below the unit's node for S CPU seconds (`lns`,
 //! its units restricted to the node's candidates, from the greedy completion of the node), not sound; the line has
 //! `best_completion` (the sum of what it found beyond the node's promotions), its members (`completion`), the heaviest
 //! set of the unit's first step (`chosen`) with each member's home and live factors at the node (`chosen_lf`, as
@@ -751,7 +751,7 @@ fn solve<const W: usize>(
 // ---------------------------------------------------------------------------------------------------------
 // The best completion and the cores
 
-/// The best completion of the node of `unit` that large neighbourhood search finds in `cpu` CPU seconds of this thread:
+/// The best completion of the node of `unit` that large neighborhood search finds in `cpu` CPU seconds of this thread:
 /// from the greedy completion (the node's candidates promoted from the largest down where they can be), units that fix
 /// the node's promotions and a random 70 to 90% of the completion's, searching the rest of the node's candidates for at
 /// most 1,024 steps.  Returns the completion (without the node's promotions).

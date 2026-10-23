@@ -5,7 +5,7 @@ Part of the [lab notebook](../../README.md).
 Started 2026-10-17.  Concluded 2026-10-17.
 
 **Question.**  Can searches that are not sound, which may miss opt(n), find better games quickly, and does a better
-starting game make the sound search much cheaper?  **Answer.**  Yes to both.  Large neighbourhood search (LNS) finds the
+starting game make the sound search much cheaper?  **Answer.**  Yes to both.  Large neighborhood search (LNS) finds the
 optimum in 64.4% of 253 games of 2176-3440 in 5 CPU s of one thread, where the sound search itself finds it in 20.6%.
 The sound search seeded with opt(n) takes a median 0.474 of the nodes it needs from the start incumbent, and seeded
 with LNS's game after 1 s it takes 0.437 of them in total, 0.48 of the CPU with the finder and the start counted.
@@ -15,8 +15,8 @@ with LNS's game after 1 s it takes 0.437 of them in total, 0.48 of the CPU with 
 The ledger keeps a lower bound L(n), a real game the referee replays, and an upper bound U(n) for many boards.  A lower
 bound needs only a legal game, so any method may find it, sound or not; only an upper bound has to be proven.  The
 start incumbent falls short of opt(n) by a median 227 on 2176-3440 ([the
-landscape](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)), a neighbour's heuristic
-game closes 40% of that ([seeding](../seeding-the-start-from-a-neighbours-heuristic-game-2026-10/README.md)), and a
+landscape](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)), a neighbor's heuristic
+game closes 40% of that ([seeding](../seeding-the-start-from-a-neighbors-heuristic-game-2026-10/README.md)), and a
 standalone search finds its optimum after a median 77% of its time, so stopping it early is no cheap way to a good game.
 
 The runs were on the laptop on 2026-10-17, with the test-profile build of `wall`, one process a game and four at once
@@ -68,7 +68,7 @@ at 5 CPU s:
 |---|---|---|---|---|---|---|---|
 | start | 227 | 328.7 | 782 | 12.6% | | | 3.0 |
 | LNS | 0 | 27.9 | 96 | 64.4% | 77.9% | 3.6% | 5.0 |
-| restricted | 76 | 189.7 | 629 | 33.2% | 63.2% | 6.3% | 5.0 + 6.1 for the neighbours' starts |
+| restricted | 76 | 189.7 | 629 | 33.2% | 63.2% | 6.3% | 5.0 + 6.1 for the neighbors' starts |
 | control | 195 | 297.4 | 752 | 20.6% | | | 5.0 |
 
 * The 94 games that need a search of their own (no primes, no repeats) give alike numbers (LNS mean 20.7, exact 69%;
@@ -80,7 +80,7 @@ at 5 CPU s:
   control did in 8.
 * At 20 s on 51 games, the mean shortfall of LNS goes from 29.0 (57% exact) at 5 s to 20.8 (65%), restricted's from
   170.8 (29%) to 121.5 (49%), and the control's from 325.7 (16%) to 287.1 (26%).  So LNS has most of what it gets in the
-  first seconds, and the games it misses it keeps missing: its neighbourhoods probably do not reach opt(n) of about
+  first seconds, and the games it misses it keeps missing: its neighborhoods probably do not reach opt(n) of about
   a third of the games.
 
 **3. The sound search seeded with LNS's game (stage 3).**  The nodes of the search over (i)'s, and the CPU in all (the
@@ -103,7 +103,7 @@ a search's tree is not monotone in its incumbent.
 * The sound search from opt(n) takes a median 0.47 of the nodes of the search from the start incumbent (0.19 for
   the six games that take more than 300 s), and 0.38 in total: a better start makes the search much cheaper.
 * LNS is the finder to use: it finds opt(n) in 64% of the games in 5 CPU s, and has most of its gain in 1-2 s.
-  Restricted on the neighbours' starts is better than the control and worse than LNS.  Lower bounds can be found by a
+  Restricted on the neighbors' starts is better than the control and worse than LNS.  Lower bounds can be found by a
   finder for a fraction of the time of the search they would shorten.
 * LNS is the ledger's finder since 2026-10-17 (`--lns-seconds`, 1 s by default; its code is `examples/common/lns.rs`):
   [the finder in the
@@ -112,9 +112,9 @@ a search's tree is not monotone in its incumbent.
   (`git checkout 9d9dae3`, then `cargo build --release --example wall` in `rust/`).
 
 Not measured, and what would extend the study: games past 3440, where no optimum is known to score the finders
-against; LNS from the proven game of n − 1 or from a neighbour's heuristic game; a finder budget that scales with the
+against; LNS from the proven game of n − 1 or from a neighbor's heuristic game; a finder budget that scales with the
 game (the start incumbent alone costs 1 to 7 s), which would shrink the 8 of stage 3's 40 games that cost more CPU
-than (i) at 5 s; nogood tables carried across units, adaptive neighbourhoods and perturbation, for the third of the
+than (i) at 5 s; nogood tables carried across units, adaptive neighborhoods and perturbation, for the third of the
 games LNS does not solve; and threads.  The study spent 6.8 core-hours.
 
 ## Files

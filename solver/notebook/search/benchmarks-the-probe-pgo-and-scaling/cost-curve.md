@@ -243,7 +243,7 @@ How much that inflated the times: the four repeats above, run with Zoom up, diff
 run-to-run variation of the node count with 8 threads (the tree depends on scheduling: 1225 took 14.0M and 19.3M
 nodes), which is +-10-25% on its own.  So a loss of ~5% per node typically and <= ~12% at worst can be attributed
 to the background load, i.e. at most ~0.05 in log10 of time: 1-3 n at the fitted slope, against x5.7 per 50 n
-on average (x18 across 1250-1300) and a spread of up to x45 between neighbouring n (1230 against 1250).  The
+on average (x18 across 1250-1300) and a spread of up to x45 between neighboring n (1230 against 1250).  The
 data agree that it is small: it would move the later bands' times by <= 10%, the fitted slope by ~3% and the
 cumulative times by <= 10%, much less than the slope's own standard error (14%).  The chain/standalone ratio is
 unaffected (both ran in the quiet period, the chain in the quietest).  A measurement on a quiet machine would
@@ -251,7 +251,7 @@ still be better than this estimate.
 
 ## Caveats
 
-* **Small, correlated samples.**  Four to six points per fit, each a band of 8 (or 3) neighbouring n that share
+* **Small, correlated samples.**  Four to six points per fit, each a band of 8 (or 3) neighboring n that share
   frames in groups of two to four, so about two to three independent cost values per band.  Band 1350 has three
   games; the first, 1350, was also stopped at 477 s without finishing in a shortened run (consistent with its
   538 s).

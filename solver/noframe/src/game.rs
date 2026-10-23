@@ -167,7 +167,7 @@ impl Board {
 /// downward edges weigh BIG more and its upward ones are dropped (it may not pay); a barred number's downward
 /// edges are dropped (it may not be picked).
 pub struct MatchingBound {
-    /// Neighbours of each number (its maximal factors and maximal composites).
+    /// Neighbors of each number (its maximal factors and maximal composites).
     adj: Vec<Vec<u32>>,
     dist: Vec<i64>,
     pot: Vec<i64>,
@@ -347,8 +347,8 @@ impl MatchingBound {
         self.mate[v as usize]
     }
 
-    /// The neighbours of `v` in the graph (its maximal factors and composites).
-    pub fn neighbours(&self, v: u32) -> &[u32] {
+    /// The neighbors of `v` in the graph (its maximal factors and composites).
+    pub fn neighbors(&self, v: u32) -> &[u32] {
         &self.adj[v as usize]
     }
 
@@ -1019,7 +1019,7 @@ impl<'a> Prover<'a> {
             }
             for &v in &vertices {
                 blocked[v as usize] = true;
-                for &u in self.bound.neighbours(v) {
+                for &u in self.bound.neighbors(v) {
                     blocked[u as usize] = true;
                 }
             }

@@ -211,7 +211,7 @@ fn a_floor_step_ended_by_the_ceiling_at_its_floor_is_moot() {
     assert_eq!(text(&job_events(&dir)[0], "outcome").as_deref(), Some("moot"));
 }
 
-/// The climbs go first; then the boards whose bounds a proven neighbour changed; then the boards that have yet to give
+/// The climbs go first; then the boards whose bounds a proven neighbor changed; then the boards that have yet to give
 /// their line two points, each a step; then the board whose proof is forecast to cost the least, by the line of its own
 /// steps; the ordinary job of a board with a wide gap is a step to a floor a step below its upper bound.
 #[test]
@@ -269,7 +269,7 @@ fn floor_steps_go_by_the_forecast_of_the_proofs_and_the_climbs_go_first() {
 }
 
 /// A climb into the repeat class {925, 926} holds the boards beside the whole class, 924 and 927, not just the
-/// neighbours of the board searched; and a climb down into it from 927 is seeded with 927's game, which is not beside
+/// neighbors of the board searched; and a climb down into it from 927 is seeded with 927's game, which is not beside
 /// the board searched.
 #[test]
 fn a_climb_into_a_class_holds_the_boards_beside_it_and_is_seeded_from_the_far_side() {

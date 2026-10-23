@@ -42,7 +42,7 @@ quick = {d["n"]: d for d in jsonl(LANDSCAPE / "cal.jsonl") if first <= d["n"] <=
 
 # What proved each game: the rule of the upper bound that met the lower one.
 METHODS = [("search", "its own search"), ("repeat", "the same search as another game"),
-           ("prime", "the prime formula"), ("ceiling", "a neighbour's bound")]
+           ("prime", "the prime formula"), ("ceiling", "a neighbor's bound")]
 METHOD_OF = {"exhausted": "search", "dual": "search", "repeat": "repeat", "prime": "prime", "ceiling": "ceiling",
              "monotone": "ceiling"}
 CHAIN_METHOD = {"exhausted": "search", "same_search": "repeat", "prime_formula": "prime", "cap": "ceiling",
@@ -398,7 +398,7 @@ chain, in order of n</span></div>
 {curve_svg}
 <h2>The same games, both ways</h2>
 <p>What each spent on the games the ledger proved and on those it left open.  On the games it proved, the ledger paid
-about twice what the chain paid, because the chain had each game's neighbour below already proven; the chain spent
+about twice what the chain paid, because the chain had each game's neighbor below already proven; the chain spent
 nearly all of its cost on the games the ledger left open.  The ledger's advantage is reach, not price: it proved those
 games without first proving everything below them.</p>
 {same_svg}

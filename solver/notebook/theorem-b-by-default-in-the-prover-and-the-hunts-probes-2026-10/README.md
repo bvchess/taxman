@@ -72,7 +72,7 @@ same pairs on one thread:
 | 896 to 899 | 2 | none | 120.9 to 184.9 | 351,905 to 1,146,404 | |
 | 959 to 1215 | 3 | probed | 181.8 to 186.9 (a 180 s search and a start of 2 to 7 s) | 551,015 to 1,015,324 | 598 to 854 |
 
-The start (greedy set, dive, local search) reaches within 0.02 to 0.05 per cent of the recorded score at these margins
+The start (greedy set, dive, local search) reaches within 0.02 to 0.05 percent of the recorded score at these margins
 and is never above it.  Forced to run as probes at 1302 (`--probe-above 0 --probe-minutes 1`, the three pairs above,
 whose searches end in milliseconds, so the lines say `"finished":true` and `probed`), the start with the recorded game
 of 1302 as its seed (`--results ../../results/strict.jsonl`) reached 44, 116 and 308 below the score, without the seed

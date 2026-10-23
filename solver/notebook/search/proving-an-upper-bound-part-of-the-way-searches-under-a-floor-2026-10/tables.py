@@ -64,7 +64,7 @@ def fit(points):
 
 def crossing(points, level):
     """The x at which the line through the (x, y) points, in order of x, first reaches `level`, interpolating between
-    neighbours; None if it does not."""
+    neighbors; None if it does not."""
     for (x0, y0), (x1, y1) in zip(points, points[1:]):
         if y0 <= level <= y1 and y1 > y0:
             return x0 + (x1 - x0) * (level - y0) / (y1 - y0)
@@ -146,7 +146,7 @@ def linearity(games, ns, cols):
     print(f"\nslope, decades of nodes per 100 of gap proven down: median {statistics.median(per):.3f} "
           f"(min {min(per):.3f}, max {max(per):.3f}); r2 median {statistics.median(f[1] for f in fits):.4f}, "
           f"worst residual over all games {max(f[2] for f in fits):.3f} decades")
-    # The slope of each step between two neighbouring runs (the last is from the highest floor to the full proof).
+    # The slope of each step between two neighboring runs (the last is from the highest floor to the full proof).
     steps = []
     for n in ns:
         g = games[n]
@@ -154,7 +154,7 @@ def linearity(games, ns, cols):
             a, b = run_at(g, lo), run_at(g, hi)
             if a["completed"] and b["completed"] and a["nodes"] >= FLAT:
                 steps.append((lo, math.log10(b["nodes"] / a["nodes"]) / ((hi - lo) * g["gap"]) * 100))
-    print(f"every step between two neighbouring runs, in decades per 100 of gap: "
+    print(f"every step between two neighboring runs, in decades per 100 of gap: "
           f"{spread([slope for _, slope in steps])} ({len(steps)} steps)")
     for lo, hi in ((0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0)):
         part = [slope for start, slope in steps if lo <= start < hi]
@@ -173,7 +173,7 @@ def against_the_model(games, ns):
 
 def budgets(games, ns):
     print("\nHow far down a budget proves: the share of the gap at which a game's floor search costs the budget, as a")
-    print("share of its full proof's nodes (interpolating log10 of the nodes between neighbouring runs)\n")
+    print("share of its full proof's nodes (interpolating log10 of the nodes between neighboring runs)\n")
     for budget in BUDGETS:
         reached = []
         for n in ns:

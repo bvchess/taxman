@@ -10,7 +10,7 @@
 //! With no multipliers it is the root's GF(2) bound, the baseline.  The inner problem is the crate's own GF(2) bound
 //! on `Gf2Graph::reweighted` (the same matroids with the weights above).
 //!
-//! * The *harvest*: [`finder`] runs the finder (large neighbourhood search, `search/finder.rs`) from a start incumbent for
+//! * The *harvest*: [`finder`] runs the finder (large neighborhood search, `search/finder.rs`) from a start incumbent for
 //!   `--cpu` CPU seconds, and [`control`] the sound search standalone from the same start for the same CPU time, and
 //!   each leaves the nogoods its searchers' tables learned (a searcher's table after each unit it ran; the caller
 //!   keeps the tables from being forgotten, and a finder's unit search is shorter than the forgetting period anyway).

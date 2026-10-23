@@ -156,7 +156,7 @@ run's results file and its checkpoints, which were copied from the cloud machine
 and each game the bounds store had proven from the store, with no search, and searched the others, from 4875 on.  Its
 own file started with `known` copies of games 1–4874.  The lines of games 4875–4900 were appended to this file, byte for
 byte.  Those copies and the run's incomplete lines (two of game 4875, and one each of 4879, 4880, 4895 and 4899) were
-left out.  No line was relabelled: every build is after commit 7987c86, so a search that took no step already says
+left out.  No line was relabeled: every build is after commit 7987c86, so a search that took no step already says
 `start`.  Every kept line records that the tree was clean (`dirty` false), no `--time-limit` or `--node-limit`, the
 `default` tactics, with the tactic `conflict_branching` on, and the option `use_prev`; the lines of 4899 and 4900 record
 `background` and `finder_seconds` 900 too.  The first line, 4875, records its game of 4874 as the line of this file,

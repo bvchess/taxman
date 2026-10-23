@@ -668,7 +668,7 @@ class Report(Case):
         hours = {label: float(row[8].replace(",", "")) for label, row in rows.items()}
         self.assertAlmostEqual(hours["3300-3314"] + hours["3315-3330"], hours["all 3300-3330"], places=1)
 
-    def test_the_first_band_is_labelled_by_the_part_of_it_planned(self):
+    def test_the_first_band_is_labeled_by_the_part_of_it_planned(self):
         results = [completed(2176 + i) for i in range(30)]
         uppers = [upper(2176 + i) for i in range(30)]
         argv = ["--results", self.write("r.jsonl", results), "--upper", self.write("u.jsonl", uppers),

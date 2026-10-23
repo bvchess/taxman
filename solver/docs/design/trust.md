@@ -183,7 +183,7 @@ reads nothing of the truth (`optimal.json`, the results files) unless it is give
   and D, with what each rests on).  The referee replays every game that a relation makes before it counts, if it could
   raise a game's L (a game that cannot is not shown to the referee, or not made), and an L above a U stops the run as
   an error;
-* the *finder*, a large neighbourhood search (`search/finder.rs`; [finders for good games that are not
+* the *finder*, a large neighborhood search (`search/finder.rs`; [finders for good games that are not
   sound](../../notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and
   proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a
   game's map and before a search whose best seed has changed since it last ran on the game (a climb's always has).  Its
@@ -208,7 +208,7 @@ little for each.  Then the searches go where a proof looks cheapest, with *climb
 The cost of a search under a floor is about log-linear in the floor's distance below the root's bound, so each game has
 a line, fitted from its completed steps, which forecasts its proof.  Each step costs tenfold more than the depth already
 proven.  A game goes to its proof (the ordinary search, seeded and capped) when its gap is within two steps.  After the
-climbs and the games that a proven neighbour has changed, the games go by the forecast seconds of their proofs, cheapest
+climbs and the games that a proven neighbor has changed, the games go by the forecast seconds of their proofs, cheapest
 first (`examples/ledger/cost.rs`; with no floor steps, by least `level + gap / gap_unit`, which finds the games proven
 with no help from below).
 

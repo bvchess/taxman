@@ -125,7 +125,7 @@ I=$(aws ec2 run-instances --instance-type $INSTANCE_TYPE --placement Availabilit
 The instance requires IMDSv2 (`HttpTokens=required`), which `spot-watch.sh` uses.  A job that starts itself adds its
 steps to the user data, as [the ledger's experiment](ledger.md) and [the
 sweep](sweep.md#launch-watch-stop-bring-the-results-home) do.  To launch from the console, set the same fields: the
-image, the volume, no inbound rule, the instance profile, shutdown behaviour "terminate", the timer in the user data,
+image, the volume, no inbound rule, the instance profile, shutdown behavior "terminate", the timer in the user data,
 and the tags with a `Name`.  For SSH access, see [Steps through SSM, or SSH](#steps-through-ssm-or-ssh).
 
 ### Steps through SSM, or SSH

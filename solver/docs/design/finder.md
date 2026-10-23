@@ -9,7 +9,7 @@ when a game's search has taken NODES steps (over every run of it, a resumed sear
 thread of its own starts beside the workers, for the seconds of `--finder-seconds` (default 60), and ends sooner if
 the search does.  Each game of a window decides for itself.
 
-The thread runs *rounds* of large neighbourhood search ([glossary](../../../docs/GLOSSARY.md), the finder;
+The thread runs *rounds* of large neighborhood search ([glossary](../../../docs/GLOSSARY.md), the finder;
 `search::finder`).  A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit
 of the engine on one thread for at most 1,024 steps, takes a better set, and repeats; a round lasts 15 seconds and draws
 with a seed of its own, and the generator is seeded, so the same game and seed make the same rounds.  The first round

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests of quick_check.py's judgement of a run (the summary that run_tests.py writes) and of its wait for a quiet
+"""Unit tests of quick_check.py's judgment of a run (the summary that run_tests.py writes) and of its wait for a quiet
 machine (the CPU ticks, the share they say is busy, and the decision to wait, go on or give up) and of its lock, which
 makes two checks take turns.
 

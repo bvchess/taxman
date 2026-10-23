@@ -118,7 +118,7 @@ Kept: all five changes, with every tree the same.  Left for later, with estimate
   step) could be pivoted with the rows of the members kept in the tableau.
 
 **The tactics that tune the GF(2) search** were added in this round for a harness that sweeps them; the defaults are the
-behaviour before, every tree the same: `force_window` (80; a number, a percentage of the slack such as `25%`, or `all`),
+behavior before, every tree the same: `force_window` (80; a number, a percentage of the slack such as `25%`, or `all`),
 `branching` (`exact`; or `forced`, `split`, `largest`), `strong_limit` (`all`; a number), `strong_depth` (`all`; a
 number of promotions from which `deep_branching` chooses), `deep_branching` (`split`) and `more_forced` (`on`).  A
 checkpoint records them in a header of version 6 when they are not the defaults, and in the header of version 5 as

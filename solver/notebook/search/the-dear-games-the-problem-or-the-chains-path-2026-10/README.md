@@ -169,7 +169,7 @@ start is below opt(n) are not a random sample.  In n, 15% is about 70: a doublin
 ## Decision
 
 * **The dear games are the problem's.**  A start at opt(n) takes 6% of the residual that sets them apart, so no start
-  brings them back to their neighbours.  They go with the rest of the cost, to the bound ([completions near the
+  brings them back to their neighbors.  They go with the rest of the cost, to the bound ([completions near the
   optimum](../completions-near-the-optimum-in-the-hard-subtrees-2026-10/README.md) finds the bound's error in their
   trees), not to the chain's path.
 * **Seeding the chain with a better start is a modest item, not the big one.**  It is worth about 15% of the search time

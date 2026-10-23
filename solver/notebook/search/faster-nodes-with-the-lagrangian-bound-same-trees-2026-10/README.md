@@ -80,7 +80,7 @@ cycles of the proof of 1250):
 * **Cheaper node work** (34648e1): the matching's forced members found with one settle of the level instead of one
   per member, and whether a known conflict can rule out a candidate of a child that promotes one number is a
   membership test, not a set intersection.  −0.5% to −1.1%.
-* **The Hungarian search's fields apart** (5755c3e): `add_inner` reached each neighbour through `&mut self`, so the
+* **The Hungarian search's fields apart** (5755c3e): `add_inner` reached each neighbor through `&mut self`, so the
   slots' place and the epoch were loaded again at every edge; taken apart, they stay in registers.  Bucket 0's code set
   is a bitset of fixed size.  Instructions −2.0% to −2.2%, cycles −0.2% to −1.1%.
 * **Forced members only among those not forced yet** (31b9c95): the Lagrangian bound's forced members join the

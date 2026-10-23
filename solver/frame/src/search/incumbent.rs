@@ -1,8 +1,8 @@
 //! The incumbent a search starts from: the best of the greedy set ([`crate::bounds::greedy`], made by
 //! [`prepare`](super::prepare)), what [`surviving`] of the seed (the previous game's promotions), and the
-//! [`dive`] (with the matching bound), improved by a local search ([`Neighbourhood::improve`]).  Every one of them
+//! [`dive`] (with the matching bound), improved by a local search ([`Neighborhood::improve`]).  Every one of them
 //! is a set of candidates that can be promoted, so any of them is a valid incumbent; a good one only makes the
-//! search prune sooner.  The local search also runs on several threads ([`Neighbourhood::improve_on`]), with the
+//! search prune sooner.  The local search also runs on several threads ([`Neighborhood::improve_on`]), with the
 //! answer of the sequential one, and ends early when its set reaches a ceiling.
 
 use super::reaches;
@@ -40,13 +40,13 @@ pub(super) fn distinct<const W: usize>(sets: impl IntoIterator<Item = Bits<W>>) 
 
 /// Where a local search for better promotion sets works: the search's model, root and candidates.
 #[derive(Clone, Copy)]
-pub struct Neighbourhood<'a, const W: usize> {
+pub struct Neighborhood<'a, const W: usize> {
     pub model: &'a FrameGraph,
     pub root: &'a FrameSet<W>,
     pub candidates: &'a Bits<W>,
 }
 
-impl<const W: usize> Neighbourhood<'_, W> {
+impl<const W: usize> Neighborhood<'_, W> {
     /// `base` (which must be promotable) with candidates outside `excluded` added greedily, from the largest down,
     /// narrowing the candidates after each promotion as [`crate::bounds::greedy`] does.
     fn fill(&self, scratch: &mut Scratch<W>, base: &Bits<W>, excluded: &Bits<W>) -> Bits<W> {
@@ -230,7 +230,7 @@ mod tests {
     use std::cell::Cell;
 
     /// The local search as the nested loops spell it, which `Move` numbers: what `improve` must reproduce.
-    fn improve_by_loops<const W: usize>(hood: &Neighbourhood<W>, start: &Bits<W>, pairs: bool) -> Bits<W> {
+    fn improve_by_loops<const W: usize>(hood: &Neighborhood<W>, start: &Bits<W>, pairs: bool) -> Bits<W> {
         let mut scratch = Scratch::new();
         let mut best = hood.fill(&mut scratch, start, &Bits::EMPTY);
         'search: loop {
@@ -286,7 +286,7 @@ mod tests {
     fn same_answers<const W: usize>(n: u32) -> usize {
         let board = Board::<W>::for_n(n);
         let prepared = board.prepare(SearchTactics::default()).unwrap();
-        let hood = Neighbourhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
+        let hood = Neighborhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
         let seed = board.seed(Optimal::built_in().moves(n - 1).expect("optimal.json has the game"));
         let starts = [("greedy", prepared.greedy), ("seed", surviving(&prepared, &seed))];
         let mut improved = 0;

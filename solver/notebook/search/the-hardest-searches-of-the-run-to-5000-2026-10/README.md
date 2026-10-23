@@ -145,7 +145,7 @@ is a whole-game result that gains reliably, which the three here do not give.
   (8, 2) and, on the expanded units, 760-1,100 (8, 3; stopped by hand); 4548: 800-1,300 (10, 2) and 850-1,250 (10, 2,
   `--seed 3`); the whole games' units: 550-900, `--lo 50000`, `--per-game 6`, `--max-failures 2`.  The tuning campaign's
   tool gained `--ladder`, `--ids`, `--max-load`, `--whole-limits`, `--whole-gaps`, `--runs` and, for `candidates`,
-  `--from` and `--to`, with defaults that keep its behaviour; `test_tune.py` tests them.
+  `--from` and `--to`, with defaults that keep its behavior; `test_tune.py` tests them.
 * `runs.jsonl`: the lines of `wall images`, one a run, with the problem's `gap`, the one-minute `load` at its start and
   its `wall_s`: 30 learning runs of the hard games' units, and the default search and the learning of the three whole
   games and their units.  `suite.py run runs.jsonl --suite suite-hard.jsonl --modes closure --only IDS` made the first;

@@ -260,7 +260,7 @@ use taxman::numtheory::Tables;
 use taxman::rng;
 use taxman::search::finder as lns;
 use taxman::search::{
-    search, start_incumbent, stat, Diagnostics, Neighbourhood, Prepared, SearchSpace, SearchTactics, TaxSearcher,
+    search, start_incumbent, stat, Diagnostics, Neighborhood, Prepared, SearchSpace, SearchTactics, TaxSearcher,
     TaxUnit,
 };
 use taxman::solver::MAX_N;
@@ -1067,7 +1067,7 @@ fn setup<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Result<(), S
         .seconds("problem_s", fastest(r, || p.problem().digest()).0)
         .seconds("search_problem_s", fastest(r, || search_problem(n).expect("problem")).0)
         .seconds("match_graph_s", fastest(r, || MatchGraph::new(&p.model, &p.root)).0);
-    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let hood = Neighborhood { model: &p.model, root: &p.root, candidates: &p.candidates };
     line.seconds("improve_s", fastest(r, || hood.improve(&mut Scratch::new(), &p.greedy, true)).0);
 
     // The search's own setup: it is stopped before its first node.
@@ -1249,7 +1249,7 @@ fn start<const W: usize>(n: u32, _: &Options, optimal: &Optimal) -> Result<(), S
     let base_sum = base.sum();
 
     // The local search from it, as the solver calls it (with pairs), and without them.
-    let hood = Neighbourhood { model: &p.model, root: &p.root, candidates: &p.candidates };
+    let hood = Neighborhood { model: &p.model, root: &p.root, candidates: &p.candidates };
     let (singles_s, singles) = fastest(1, || hood.improve(&mut Scratch::new(), &base, false).sum());
     let (pairs_s, pairs) = fastest(1, || hood.improve(&mut Scratch::new(), &base, true).sum());
 

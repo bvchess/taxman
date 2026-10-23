@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 
 from f2lib import (Frame2, bipartite_graph, components, fibers, induced, primes_of, read_instances,
                    smallest_prime_factor_table, treewidth_lower, treewidth_upper, two_core)
-from fixing import analyse
+from fixing import analyze
 from gf2check import rank
 
 
@@ -61,7 +61,7 @@ def measure(inst, spf):
     m["families"], m["in_families"] = len(big), sum(big) / total
     m["largest_families"] = sorted(((len(v), k) for k, v in fam.items()), reverse=True)[:4]
     if need is not None and "flipped" in inst:
-        m["fix"] = analyse(inst, spf)
+        m["fix"] = analyze(inst, spf)
     chosen = set(inst["chosen"])
     home = dict((x, h) for x, h in inst["cands"])
     ins = [x for x in chosen if home[x] == 3]

@@ -28,7 +28,7 @@
 //!   under that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over
 //!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
-//!   `repeat`): the bounds of one board give bounds of its neighbours, of the board past or before a prime, and of
+//!   `repeat`): the bounds of one board give bounds of its neighbors, of the board past or before a prime, and of
 //!   the boards with the same search problem, applied to a fixpoint after every change (docs/theory/ledger.md).  *Given* games (`given`): the completed games of `--proven FILE` (a results
 //!   file) in A − 1..B, each replayed, are fixed points.  `trivial`: a board with nothing to promote.
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
@@ -58,7 +58,7 @@
 //! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
 //!   bounds kept as they come, and when the last is in the relations carry them to the other boards in one go
 //!   (`settle`: a map's cascade through the boards, one map at a time, would make every board many times over);
-//!   then the climbs (below); then the boards whose bounds a proven neighbour has changed since their last search (the
+//!   then the climbs (below); then the boards whose bounds a proven neighbor has changed since their last search (the
 //!   ceiling and the prime formula of a board next to a proven one are exact: such a board is often proven by a search
 //!   at its ceiling in a few steps), smallest gap first; then the board whose proof is forecast to cost the least: its
 //!   line at the distance from the root's bound down to its lower bound, in seconds of one thread (its own rate, else
@@ -70,7 +70,7 @@
 //!   `solver/notebook/search/the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/`).  `--workers`
 //!   searches at once (default all CPUs).  When a board is proven, its search is stopped if one is going, and its
 //!   checkpoints deleted; a search whose U falls is given the lower ceiling.
-//! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbour.  A search whose
+//! * **Wedge and climb.**  The order above finds wedges: boards proven with no help from a neighbor.  A search whose
 //!   board below is proven is far cheaper (the ceiling opt(n) <= opt(n − 1) + n is exact in about a third of the
 //!   games, and the proven game starts an optimal game about 88% of the time), so the ledger *climbs* from a wedge.  A
 //!   board that is searched, not proven, not parked, and has its board below proven (however that was proven, and
@@ -87,12 +87,12 @@
 //!   it starts), as the climb may prove that board within its limit; the climb into a class is seeded with the games of
 //!   the boards just outside it, the proven one it goes from included.
 //! * **The finder** (`search/finder.rs`; `--lns-seconds` seconds of one thread, default
-//!   1; 0: none): large neighbourhood search, which keeps a random 70-90% of a game's promotions and searches the
+//!   1; 0: none): large neighborhood search, which keeps a random 70-90% of a game's promotions and searches the
 //!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:
 //!   its game is offered as the board's L (`lns`) after the referee has replayed it on the worker, like every other
 //!   game.  It runs on the worker, after a board's map from the start incumbent, and before a search whose best seed
 //!   has changed since it last ran on the board (`lns_score` in the ledger: the score of the best seed then, its own
-//!   game included; a climb, whose seed is a proven neighbour's game, always counts as changed), from that seed, and
+//!   game included; a climb, whose seed is a proven neighbor's game, always counts as changed), from that seed, and
 //!   not at all if the seed already reaches the ceiling.  The search is then seeded with its game if that is better.
 //!   Its time counts in the CPU budget and in the board's `search_s`; the search's limit is the search's alone.
 //! * **The main thread** applies every result, and a worker whose search has ended waits for it: so what it does for a
@@ -112,7 +112,7 @@
 //! has none until a run reads it), `steps` (the floor steps that completed having found nothing, each its `floor`, a
 //! score, `nodes` and `seconds`) and `stalled` (the step its limit stopped: `floor`, `nodes`, `seconds` and `tries`;
 //! null if none; a ledger from before the floor steps has neither field), `lns_score` (see the finder), `mapped` (its
-//! own map is made), `boosted` (a proven neighbour changed its bounds since its last search) and `parked` (a climb to
+//! own map is made), `boosted` (a proven neighbor changed its bounds since its last search) and `parked` (a climb to
 //! it ended unproven).  `events.jsonl`, one line an event, appended: each has `t` (seconds since the run began) and `cpu`
 //! (the CPU seconds of all runs); a run's `start` (its settings), an `init` or `search` of board `n` (`limit_s`,
 //! `seconds`, `nodes` of this search, `completed`, `reached_cap`, `found` (the score of its game), `dual` (its dual

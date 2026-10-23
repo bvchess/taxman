@@ -16,7 +16,7 @@ dear games from 1430 to 2172 by 4 to 9 times in cycles.
 
 The measurements are one-thread proofs (`examples/matroid.rs prove`, the incumbent the optimum as a value, no seed or
 ceiling), in cycles and instructions of the process, one process at a time on the M1 Max.  Other agents' jobs kept the
-load at 3 to 30, so cycles moved by a few per cent from run to run and instructions far less.  After each step the quick
+load at 3 to 30, so cycles moved by a few percent from run to run and instructions far less.  After each step the quick
 set of 12 proofs ran (936, 990, 992, 1024, 1100, 1184, 1215, 1232, 1254, 1287, 1300, 1350); the 146 proofs of the slope
 study and the dearest games past 1300 (1430, 1472, 1475, 1521, 2170, 2172) ran at the start and the end.  The probe was
 `perf --tactic gf2=on`.  The window's fingerprint used to fold in the GF(2) bound's counts of solves and augmentations,
@@ -121,7 +121,7 @@ sets), and `verify-results` and `solver/tools/check_results.py` accept it.
 at 2125, M1 Max).  Each game that is not a prime spends about 0.5 s outside the frames and the search at this size (0.63
 s in all for a repeat; 0.10 s for a prime).  Within a game the samples go 45% to building the move list from the
 promotions (`accelerate::solution_for_promotions`), 22% to the frames, 30% to the local search on the starting incumbent
-(`Neighbourhood::improve`) and 8% to the repeat lookup's search problem (they overlap).  The run's start-up, checking
+(`Neighborhood::improve`) and 8% to the repeat lookup's search problem (they overlap).  The run's start-up, checking
 the 2125 games of the results file, took 77% of the run's samples (43 s on Graviton4).  With searches 3 to 9 times
 cheaper, these weigh more in a chain.
 

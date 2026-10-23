@@ -148,8 +148,8 @@ median 1,177 over 3176-3440, and the search must still close it.  Measurements t
 standalone search of any game past 3440; whether the shortfall keeps the 523 of 3176-3440 past it (the map has no
 optima); searches of more than 30 minutes or on more than one thread; a different start incumbent (a longer local
 search, or a second heuristic), for which the shortfall of 227 to 523 is the room.  Stage 2's 64 searches ran at once on
-one machine and are a sample, not the 1,265 games.  The start incumbents seeded from a neighbour's, against the
-standalone start, are in [the seeding entry](../seeding-the-start-from-a-neighbours-heuristic-game-2026-10/README.md).
+one machine and are a sample, not the 1,265 games.  The start incumbents seeded from a neighbor's, against the
+standalone start, are in [the seeding entry](../seeding-the-start-from-a-neighbors-heuristic-game-2026-10/README.md).
 
 ## Files
 

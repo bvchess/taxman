@@ -82,7 +82,7 @@ is [the gap past 2175](../the-gap-past-2175-2026-10/README.md).  It found:
   units of n^0.3 with 0 and 0.5 as brackets;
 * the dear games are the games of high gap, and avenue A4 is killed (below);
 * the projection: a day on a `c8g.16xlarge` reaches about 4,100.  The day itself reached 3440, below the projection's
-  10th percentile for the centre model ([the cloud run](../../the-frontier-chain-to-3440-2026-10/README.md)).
+  10th percentile for the center model ([the cloud run](../../the-frontier-chain-to-3440-2026-10/README.md)).
 
 ## Later (2026-10): the agenda's text of 2026-10-18
 
@@ -120,7 +120,7 @@ proof scales 58 times on 64 threads ([wall regime](../the-wall-regime-2026-10/RE
 * *Branching and learning*: strong branching, forced members, nogoods, the rule of symmetric pairs (×0.8 of the
   cycles); dominance by exchange and transpositions (none to speak of).  Constant factors, all taken.
 * *Reuse along the chain*: the ceiling, the prime formula and same search are in; carrying nogoods, a chain that comes
-  back down, ceilings from neighbouring problems and equivalent problems gave nothing more
+  back down, ceilings from neighboring problems and equivalent problems gave nothing more
   ([going higher](../going-higher-and-coming-back-down-2026-10/README.md)), nor did reusing the previous game's tree,
   carrying its nogoods on the GF(2) path or proving a run in one search
   ([carrying](../carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).

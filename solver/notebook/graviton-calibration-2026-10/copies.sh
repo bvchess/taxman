@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # K copies of one run at once: copies.sh OUTDIR LABEL K COMMAND [ARG...]
 #
-# Each copy is a timed.sh run labelled LABEL.kK.cI (I = 1..K), and every "@" in the command's arguments is replaced by
+# Each copy is a timed.sh run labeled LABEL.kK.cI (I = 1..K), and every "@" in the command's arguments is replaced by
 # the copy's number I, so that copies can write files of their own (--out FILE.@.jsonl).  Returns when all are done.
 
 set -u

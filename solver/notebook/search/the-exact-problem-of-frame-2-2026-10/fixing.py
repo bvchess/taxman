@@ -15,7 +15,7 @@ from f2lib import (Frame2, bipartite_graph, components, max_factors, read_instan
                    treewidth_lower, treewidth_upper, two_core)
 
 
-def analyse(inst, spf, slack=0, h=2):
+def analyze(inst, spf, slack=0, h=2):
     need = inst["need"]
     if need is None:
         return None
@@ -76,7 +76,7 @@ def main():
         n = inst["n"]
         if n not in spf_cache:
             spf_cache[n] = smallest_prime_factor_table(n)
-        r = analyse(inst, spf_cache[n], slack)
+        r = analyze(inst, spf_cache[n], slack)
         if r is None:
             continue
         gap = inst["bound"] - inst["need"] + 1

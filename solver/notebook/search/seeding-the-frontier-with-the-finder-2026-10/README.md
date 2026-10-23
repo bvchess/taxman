@@ -25,7 +25,7 @@ games that start at opt(n) predicts (a mean residual of −0.03 decades), where 
   opt of every line agrees with the chain's.
 * **The finder's game.**  `ledger run N --dir DIR --cpu-hours 0.0001 --workers 1 --lns-seconds 5 --climb off
   --floor-step 0`, a ledger of the game alone.  Its first job, the map, sets the game up standalone (no game of n − 1),
-  finds the start incumbent and runs the finder from it for 5 s of one thread: large neighbourhood search, the code of
+  finds the start incumbent and runs the finder from it for 5 s of one thread: large neighborhood search, the code of
   `examples/common/lns.rs`, its game replayed by the referee.  The map spends the budget, so no search follows.  The
   map's event gives the finder's start (`lns_from`) and its game (`lns_found`).  **d_finder** is opt(n) less the
   better of the start in order and the finder's game, which is what a seeded search would begin with.  A game that
@@ -134,7 +134,7 @@ the games within 100 below opt(n), which the sweep puts at 0.0 to 0.1.  The mult
 of a tree a thousand times larger, where the early work with a poor incumbent may be an extra cost that does not
 grow with the tree.  If a start's cost were the extra steps game 3020 takes (35,857 steps from opt(n) times the
 multiple less 1) and not a multiple of the game's own tree, a perfect start would save 0.02% of the nodes and the finder
-0.01%.  So the estimate lies between 0.01% and 5.0%, and the chain's own trees favour the low end for the games far
+0.01%.  So the estimate lies between 0.01% and 5.0%, and the chain's own trees favor the low end for the games far
 below.  One game does look like a costly start: 4192, the one the finder leaves at 228 below, has a residual of +1.17.
 The other four games in 150-249 have −0.31 to +0.09, and the ten that start 250 or more below −0.47 to +0.49 (mean
 −0.04).
@@ -144,7 +144,7 @@ The other four games in 150-249 have −0.31 to +0.09, and the ten that start 25
 The finder above starts from the standalone start incumbent, which is below the start in order in 42 of 49 games; a
 finder that began from the start in order or the seed would reach further.  A probe through the ledger, with the game of
 n − 1 given to it (`--proven`, one line of the chain), re-ran the 10 games the finder leaves 50 or more below opt(n).
-The ledger runs its finder before a search from the best seed of the neighbouring games, and by its rule only when
+The ledger runs its finder before a search from the best seed of the neighboring games, and by its rule only when
 that seed differs from the one the finder last ran from (the first finder's game, when that is the best seed).  It ran
 the finder in 2 of the 10: at 4224 the finder began 90 below opt(n) and reached it in 5 s, and at 4232 it began 94
 below and stayed there.  In the other 8 it did not run it.  The probe settles nothing about those 8, and a finder run

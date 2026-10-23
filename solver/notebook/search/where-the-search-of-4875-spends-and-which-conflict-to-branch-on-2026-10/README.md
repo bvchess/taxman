@@ -374,7 +374,7 @@ the numbers.
   `project-g300.txt`, and with the two large units `project-g300-big.txt` (`... fit-g300.jsonl big-tactic-done.jsonl
   ...`).
 * The cost of a step: `run-cost.sh` runs a build on the three cases, `cost-variants.patch` holds the variants, and
-  `cost.jsonl` has every run, each line labelled with its `variant` (`same` and `same2` are the patch with no variant
+  `cost.jsonl` has every run, each line labeled with its `variant` (`same` and `same2` are the patch with no variant
   set).  `profile.py` reads a `sample` call graph; `run-profile.sh` wrote `profile-4050.txt` and `profile-4875-10.txt`
   (the samples, 0.35 MB each, are not kept).  `run-threads.sh` ran the release build on one and eight threads, with
   its result lines in `threads.jsonl`.

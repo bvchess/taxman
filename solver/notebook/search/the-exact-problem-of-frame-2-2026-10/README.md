@@ -40,7 +40,7 @@ median 1.6 s.  Nothing was prototyped.
   decoding of erasure codes, where the peel is the same procedure.
 * *Treewidth* is measured on the incidence graph, movers and factors as vertices.  Its upper bounds are the widths of
   the elimination orders that min-degree and min-fill choose; its lower bound is the minor-min-width (contract a vertex
-  of least degree into its neighbour of least degree, and take the largest least degree met), valid because treewidth
+  of least degree into its neighbor of least degree, and take the largest least degree met), valid because treewidth
   never grows under contraction and is at least the least degree.
 * With T = ⌊√(n/8)⌋ (22 or 23 here), every number of frame 2 has at most one prime above T, to the first power: a
   mover has Ω = 5 and a factor Ω = 4, and two such primes p and q (or p twice) have a product above n/8, which would
@@ -206,7 +206,7 @@ in some stopping set.  The gaps here are the GF(2) bound less the need, plus one
   cycle of length 6 or more has a chord), but for the cacti, which have treewidth at most 2.
 * **By treewidth.**  O(2^(tw²/2)·n) for uniquely restricted matching (Chaudhary, Sau and Zehavi 2025), and
   2^O(k log k)·n for Morse matchings on a complex of treewidth k, which no 2^o(k log k) algorithm beats unless the
-  exponential time hypothesis fails (Philip and Vågset, arXiv:2603.05406).  The state of such a dynamic programme
+  exponential time hypothesis fails (Philip and Vågset, arXiv:2603.05406).  The state of such a dynamic program
   carries an order of the bag's vertices, or the alternating paths between them.
 * **Integer programming.**  The exact solvers of Morse matchings rest on the matching LP with Joswig and Pfetsch's
   per-level cycle inequalities.  On our problem [flat-cycle
@@ -227,9 +227,9 @@ in some stopping set.  The gaps here are the GF(2) bound less the need, plus one
 Not prototyped; frame 2's exact problem has no fast exact method in view.
 
 * **Treewidth is the only general handle, and it is too wide.**  After fixing, frame 2 at a node of gap 400 to 1,000
-  has treewidth at least 9 to 12 (at most 21 to 27).  An order-based programme at width 9 holds 10! · 3¹⁰ ≈ 2·10¹¹
+  has treewidth at least 9 to 12 (at most 21 to 27).  An order-based program at width 9 holds 10! · 3¹⁰ ≈ 2·10¹¹
   states a bag (orders of the bag's vertices, and each vertex's place in the matching), and the alternating-path
-  programme 2^(10²/2) ≈ 10¹⁵; the proof it would replace takes a median 1.6 s.  The gap to the bar is many orders of
+  program 2^(10²/2) ≈ 10¹⁵; the proof it would replace takes a median 1.6 s.  The gap to the bar is many orders of
   magnitude, not a constant to engineer away.
 * **The width sits in the arithmetic, not in the node.**  The smooth core alone has treewidth at least 9 at every node,
   and fixing removes candidates but not the core's moves.  Fibers have treewidth at most 3, so the hard part is the

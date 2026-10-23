@@ -21,7 +21,7 @@ Seven changes, each a pure speedup: the same frames, trees and games.
 1. *No dive or local search at the ceiling* (fd2c67f).  When the best of the greedy set and the seed's survivors reaches
    the ceiling (`cap`), nothing can beat it, so the dive is skipped, and the local search when the incumbent after the
    dive reaches it: neither could change it while the ceiling holds, as the proof by the ceiling assumes.
-2. *The local search on the search's threads* (fd2c67f).  `Neighbourhood::improve_on`: the refills of one pass are
+2. *The local search on the search's threads* (fd2c67f).  `Neighborhood::improve_on`: the refills of one pass are
    independent, so the threads take the moves of a pass in order from one counter and the improvement with the lowest
    number is kept: the sequential answer (tested against the nested loops at 0 to 4 threads on four boards, from the
    greedy set and the seed).

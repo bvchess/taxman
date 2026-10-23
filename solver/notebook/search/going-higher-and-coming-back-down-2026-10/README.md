@@ -54,10 +54,10 @@ that include B's, and winnability only gets easier with fewer moves and more fac
 non-prime non-trivial board of 2..1300 against the 8 earlier boards that set a search up) reduces a problem to a *form*
 and compares forms.  A frame's winnability is a property of the bipartite graph between its movers (its moves and the
 candidates of home i + 1) and its factors, so the feasible sets are fixed by the candidates with their homes and, per
-frame, that graph with the candidates labelled; the other numbers are *anonymous*.  The form strips each frame's graph
+frame, that graph with the candidates labeled; the other numbers are *anonymous*.  The form strips each frame's graph
 by peeling, in the hardest state, every mover that lists a live anonymous factor no other mover lists, and two problems
 are equivalent when their forms have an isomorphism that fixes every candidate and maps anonymous movers and factors to
-their kind.  The isomorphism is found by colour refinement and then checked edge by edge, so a hash collision can only
+their kind.  The isomorphism is found by color refinement and then checked edge by edge, so a hash collision can only
 lose an equivalence, never invent one.
 
 ## Results
@@ -76,7 +76,7 @@ even m: 8, 12, 16, 24, 32, 48, 64, 96, 256, 384, 512, 768, 1024), 11 at K = 2 an
 games, the bound from n + 1 settles 107: 106 through a prime n + 1, whose search problem is n's own (each of the 204
 primes whose predecessor sets a search up poses that problem, so nothing is learned), and 1023 through 1024.
 
-**2. Neighbouring problems differ by a local edit, and the edit runs one way.**  From odd n to n + 1 = 2f, f leaves the
+**2. Neighboring problems differ by a local edit, and the edit runs one way.**  From odd n to n + 1 = 2f, f leaves the
 moves of a frame h (a freedom more there) and becomes a candidate factor of frame h + 1 that pays for the new move 2f;
 at 2^k a new top frame appears.  From even n to an odd composite n + 1, n + 1 joins frame 0 or 1 as a new move, or with
 a new hive, a freedom less.  So after an odd n, n + 1 relaxes n or poses the same problem (all but 6 of 434), and after
@@ -142,11 +142,11 @@ changes; whether the same happens at 1536 or 2048 is beyond the chain.
 Going higher and coming back down does not make the expensive games cheap, and nothing was built.  The exact relations
 that exist are the prime formula (whose problem is n's) and changes of the top frame (1023 in 1001-1300), and a proof
 kind for the last would save 0.55% of 1001-1300, not worth the reordering of the chain it needs.  What the study does
-show is that neighbouring problems share their hard part: the edit between them changes the bound and the optimum alike,
+show is that neighboring problems share their hard part: the edit between them changes the bound and the optimum alike,
 so the GF(2) gap is the same across every chain step after an exhausted game, and equal across runs of nearby searched
 games that hold a fifth of the proof nodes of 880-1300.
 
-One avenue was left open: one tree that proves a run of such neighbours together could save up to a fifth of the proof
+One avenue was left open: one tree that proves a run of such neighbors together could save up to a fifth of the proof
 nodes.  It was measured later, with the GF(2) bound in the search: the trees of consecutive games share 0.15% of their
 steps, and a run costs at least its dearest game, so perfect reuse saves 18-29% of the nodes at best ([carrying a
 search's learning](../carrying-a-searchs-learning-to-the-next-game-2026-10/README.md)).  Since every exact relation

@@ -80,7 +80,7 @@ mean of CPU seconds against the default, rung 1 runs those on two thirds, rung 2
 report gives, per setting, the geometric means of CPU seconds and of nodes against the default over the problems both
 ran (below 1 is better), the worst problem, and the jobs cut off; it flags a best sum that differs from the default's
 (a sound setting changes the tree, not the answer, except `symmetry` on 3441's units, which have no known optimum).
-Comparisons are between runs at the same concurrency, since a thread's CPU time grows with its neighbours' memory
+Comparisons are between runs at the same concurrency, since a thread's CPU time grows with its neighbors' memory
 traffic and the nodes do not.
 
 ### The campaign

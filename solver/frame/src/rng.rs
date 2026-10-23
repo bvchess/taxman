@@ -1,5 +1,5 @@
-//! A seeded generator, for the code that samples: the large neighbourhood search of [`crate::search::finder`] picks
-//! its neighbourhoods with it, and the tuning benchmark (`examples/tune.rs`) samples the units of a checkpoint.
+//! A seeded generator, for the code that samples: the large neighborhood search of [`crate::search::finder`] picks
+//! its neighborhoods with it, and the tuning benchmark (`examples/tune.rs`) samples the units of a checkpoint.
 
 /// SplitMix64: a small, good generator, seeded.
 pub struct Rng(pub u64);

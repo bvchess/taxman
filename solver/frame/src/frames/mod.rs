@@ -102,7 +102,7 @@
 //! gets none.  Among the frames with one number, the order is that of their smallest source.
 //!
 //! So the numbering is *clean* by construction: every frame with freedoms directly in front of a frame numbered `k`
-//! is numbered `k − 1`, and frames with one number are never neighbours.  A promoted number, paid for by one of its
+//! is numbered `k − 1`, and frames with one number are never neighbors.  A promoted number, paid for by one of its
 //! maximal factors, finds them one layer lower, in the frame numbered one lower or in closed frames, which is what the
 //! frame model's exactness needs (docs/THEORY.md, Theorem M, lemma M3).  The Java numbered the frames breadth
 //! first from the front instead (number 0 to every frame with freedoms with no frame with freedoms directly in front
@@ -159,7 +159,7 @@
 //! `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
 //! boards of `testdata/golden_wide` (up to n = 2048), with what the Java produced (the data keeps the Java's names,
 //! which the test maps).  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet
-//! counts as having freedoms (`Frame::new`), and the stale-frame behaviour of `Home::MergedAway`.
+//! counts as having freedoms (`Frame::new`), and the stale-frame behavior of `Home::MergedAway`.
 //!
 //! # What setup costs
 //!

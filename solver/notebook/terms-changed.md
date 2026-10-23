@@ -26,6 +26,7 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | frontier (the largest n solved in a row, or the hardest games) | the end of the chain, the hardest games |
 | cores (CPU) | CPUs, threads |
 | selection, pick | move |
+| British spellings (neighbour, labelled, analyse, behaviour, centre, colour, catalogue, optimise, ...) | the American spelling (neighbor, labeled, analyze, behavior, center, color, catalog, optimize); the docs test lists the words, and the names in committed data (`neighbours_cpu_s`, `cover_relabelled`, the seed `"neighbour"`) are as written |
 | board size | game n, the game of n, or n |
 | the optimum (a noun) | opt(n), the best score; P\*, the best promotion sum |
 | the strong bound (`wall choice`) | the Lagrangian bound over the nogoods, with the GF(2) bound inside, refitted at the node |
@@ -45,7 +46,7 @@ they used and `solver/tools/cloud/hunt.sh`.  An entry that used one ends with a 
 commit where it builds (8753189); the register and the entries keep the paths and commands of their time.
 The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of the example `wall` were removed on
 2026-10-18, with the code only they used (`choice-prepare` and `choice` stay); their entries end the same way, and name
-the commit 9d9dae3.  The large neighbourhood search (`examples/common/lns.rs`) and the seeded generator
+the commit 9d9dae3.  The large neighborhood search (`examples/common/lns.rs`) and the seeded generator
 (`examples/common/rng.rs`) moved into the library on 2026-10-21 as `src/search/finder.rs` and `src/rng.rs`; the
 entries before that date name the old paths.  The study tools that stay (`tune`, `extended`, `structure`, `finder` and
 `wall`) are built with `--features studies`, not by default.

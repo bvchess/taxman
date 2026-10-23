@@ -159,7 +159,7 @@ The measurement leaves some things open, which could reopen the question:
   steps of every fit.
 * `test_analyze.py` checks the arithmetic on made-up lines (`python3 -I test_analyze.py`).
 * `cloud-20261018/`, the output of the run:
-  * `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt`: the script's three analyses (all the steps; the
+  * `analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt`: the script's three analyzes (all the steps; the
     floor entry's slope; the first 50 steps);
   * `log`: the stages' times (UTC) and the commit;
   * `prepare.jsonl`: the line each `wall choice-prepare` printed (suite, made, probe games in the script's order): the
@@ -170,7 +170,7 @@ The measurement leaves some things open, which could reopen the question:
     CPU seconds (4,636 in all);
   * `measure.jsonl.gz`: the 553 lines of `measure/worker-0.jsonl` to `worker-15.jsonl`, joined in the order of the
     workers and gzipped.  `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I analyze.py measure.jsonl
-    [--model floor] [--steps 50]` makes the analyses again, byte for byte.
+    [--model floor] [--steps 50]` makes the analyzes again, byte for byte.
 
 Not kept: `prep/` (the files of `wall choice-prepare`, up to 2 MB a game), `fixtures/` (the nodes of the six proofs,
 70-250 KB a game) and `logs/` (each worker's output), which the commands make again or `fixtures.txt` and

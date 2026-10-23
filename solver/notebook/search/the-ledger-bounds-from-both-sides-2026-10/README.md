@@ -31,7 +31,7 @@ their ceiling and the dual bound read from each checkpoint.  Every board it sear
 stopped before its first node, which gives the start incumbent and the root bound.  Then come searches of one thread,
 `--base` seconds the first time and twice as long each time after, each going on from the board's checkpoint, seeded
 with the best of the games held for n − 1, n and n + 1, with U(n) as the ceiling.  Boards whose bounds a proven
-neighbour has changed go first, smallest gap first; the rest go by least `level + gap / 175`, a decade of the chain's
+neighbor has changed go first, smallest gap first; the rest go by least `level + gap / 175`, a decade of the chain's
 steps per about 580 of standalone gap ([the
 landscape](../the-landscape-past-the-chain-standalone-bounds-and-searches-2026-10/README.md)). After each search the
 relations run to a fixpoint, every game they make is replayed by the referee, and L > U stops the run.
@@ -58,7 +58,7 @@ exhaustion; relations proved 117 (repeats 79, the ceiling 21, the prime formula 
   repeats).  The ledger spent 1.33 times that CPU in a third of the wall time on six workers.  The dearest boards cost
   it what they cost the chain; the extra third is 35 s on the 9 boards the chain settled at its ceiling with no search,
   84 s net on the boards both searched to the end (here in pieces, at first without the seed and ceiling of a proven
-  neighbour), and 20 s of maps.
+  neighbor), and 20 s of maps.
 
 On an easy stretch the ledger is the chain run out of order on many threads: the same searches prove the hard boards,
 the relations prove the rest, and the out-of-order work costs a third more CPU.
@@ -91,7 +91,7 @@ boards before the board below them was proven: only 103 of the 356 boards proven
 when their final search began.  The searches that began with n − 1 proven used 6.7 core-hours and completed 106 times;
 those that began without used 40.8 and completed 265 times.  A proven board below gives the search of n the ceiling
 (exact in about a third of the boards) and a start that is the optimum about 88% of the time.  The ledger's order finds
-*wedges*, boards proven with no help from a neighbour; the change adds climbing from them, in both directions.
+*wedges*, boards proven with no help from a neighbor; the change adds climbing from them, in both directions.
 
 **The change** (`examples/ledger/schedule.rs`; [the runbook](../../../docs/runbook/ledger.md) describes the settings).
 A searched board that is not proven and has its board below proven, however that was proven, gets a *climb* ahead of
@@ -143,7 +143,7 @@ build of eb9dc9c, `off`, `both` and `down` with the build of 55d2b2a.  All had 0
 ### Later (2026-10-17): the finder in the ledger
 
 **Why.**  [The finders experiment](../finders-for-good-games-that-are-not-sound-2026-10/README.md) found that large
-neighbourhood search (LNS: keep a random 70-90% of the incumbent's promotions, search the rest exactly as a unit,
+neighborhood search (LNS: keep a random 70-90% of the incumbent's promotions, search the rest exactly as a unit,
 repeat) reaches the optimum of 64% of the games of 2176..3440 in 5 CPU seconds of one thread, against 21% for the sound
 search in the same time, and that the sound search seeded with 1 second of its game costs 0.48 of the CPU, finder
 included.  A lower bound needs only a legal game, so the ledger may take its L(n) and its seeds from LNS if the referee
@@ -275,7 +275,7 @@ and resumed under the same floor with the limit doubled.
   (0.5 + 0.0068 · distance).  The forecast of the proof is the line at the distance down to the lower bound, and not
   less than twice what the board's ordinary searches and climbs have spent without finishing.  On the 14 games its
   median absolute error, in log10 of nodes, is 0.59 with no point, 0.35 with one, 0.27 with two and 0.13 with three.
-* **The order**: after the maps, the climbs; the boards a proven neighbour has boosted, smallest gap first; then the
+* **The order**: after the maps, the climbs; the boards a proven neighbor has boosted, smallest gap first; then the
   boards that have yet to give their line two points, each a cheap step; then the board whose forecast seconds are
   least.  The exploring tier came from the first build's dry run at game 4500, where a board with no line is forecast by
   the median line, which is far off, so the few boards that had a line looked 5 decades cheaper than the rest and kept
@@ -309,7 +309,7 @@ builds, most of its boards having gaps within two steps.
 * **On 3076..3200 nothing can be proven in the budget** (the maps take 320 of the 906 CPU s), and the steps spend the
   rest on bounds: with every board exploring first, 193 steps (584 s) lower U on all 56 searched boards, and the gaps
   sum to 65,806 against 132,877, half; the first build stepped eight boards only.  Of the 584 s, 322 were steps that
-  completed, 62 were steps that a neighbour's bounds ended (moot), and 200 were steps that the end of the budget
+  completed, 62 were steps that a neighbor's bounds ended (moot), and 200 were steps that the end of the budget
   stopped.
 * **At game 4500** the first points of the line have a slope of 0.0033 to 0.0039 a point (about 0.0035), about half the
   median 0.0068 of the 14 games: the steps of one board went down 150, 150, 150, 150, 195, 257 and 289 points as the

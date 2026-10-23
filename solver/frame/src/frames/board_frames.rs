@@ -316,15 +316,15 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// nothing in front of them, smallest source first; after taking a frame, queue the frames directly behind it
     /// whose every frame in front is already taken, again smallest source first.  (Frames without a source sort
     /// first; among those the order is that of formation.)  "In front" here passes through holes
-    /// ([`Self::neighbours_through_holes`]).
+    /// ([`Self::neighbors_through_holes`]).
     ///
     /// The tie-breaking by smallest source is what makes the order, and with it the names and the final game,
     /// the Java's.
     fn order_frames(&self) -> Vec<usize> {
         let count = self.frames.len();
         let t = self.t;
-        let down: Vec<Vec<usize>> = (0..count).map(|i| self.neighbours_through_holes(i, &t.max_factors)).collect();
-        let up: Vec<Vec<usize>> = (0..count).map(|i| self.neighbours_through_holes(i, &t.max_composites)).collect();
+        let down: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors_through_holes(i, &t.max_factors)).collect();
+        let up: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors_through_holes(i, &t.max_composites)).collect();
         let min_source = |i: usize| self.frames[i].sources.min();
 
         let mut roots: Vec<usize> = (0..count).filter(|&i| down[i].is_empty()).collect();
@@ -366,7 +366,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     }
 
     // -----------------------------------------------------------------------------------------------------
-    // Looking up frames and their neighbours
+    // Looking up frames and their neighbors
 
     /// The frames, in playing order.
     pub fn frames(&self) -> &[Frame<W>] {
@@ -390,23 +390,23 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// The frames in front of frame `i` (other than `i`): those that hold a maximal factor of a number in frame
     /// `i`, ascending.  Note that this looks at the board's maximal factors, not at the frames' factor tables.
     pub(crate) fn frames_in_front(&self, i: usize) -> Vec<usize> {
-        self.neighbours(i, &self.t.max_factors)
+        self.neighbors(i, &self.t.max_factors)
     }
 
     /// The frames behind frame `i` (other than `i`): those that hold a maximal composite of a number in frame
     /// `i`, ascending.
     pub(crate) fn frames_behind(&self, i: usize) -> Vec<usize> {
-        self.neighbours(i, &self.t.max_composites)
+        self.neighbors(i, &self.t.max_composites)
     }
 
     /// The frames (other than frame `i`) that hold a number related to one in frame `i`.  Holes are skipped.
-    fn neighbours(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
+    fn neighbors(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
         let frame = &self.frames[i];
         let mut out = Vec::new();
         for x in (frame.sources | frame.factors).iter() {
             for &y in &board_relation[x as usize] {
                 // A number homed in a merged-away frame is skipped: that frame is no longer one of the board's
-                // frames, so there is nothing to reach.  (The Java's neighbour sets do contain the stale frame,
+                // frames, so there is nothing to reach.  (The Java's neighbor sets do contain the stale frame,
                 // but every use of them filters down to the frames that are still there.)
                 if let Home::Live(j) = self.home[y as usize] {
                     if j as usize != i {
@@ -420,13 +420,13 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         out
     }
 
-    /// [`neighbours`](Self::neighbours), except that a related hole is passed through: the frames holding the
+    /// [`neighbors`](Self::neighbors), except that a related hole is passed through: the frames holding the
     /// numbers related to the hole are reached instead.  This keeps the relation transitive across holes, as
     /// divisibility is (a number sweeps its divisors whether or not the chain of maximal factors between them
-    /// is on the board).  Without holes it is `neighbours`.
-    fn neighbours_through_holes(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
+    /// is on the board).  Without holes it is `neighbors`.
+    fn neighbors_through_holes(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
         if self.t.holes.is_empty() {
-            return self.neighbours(i, board_relation);
+            return self.neighbors(i, board_relation);
         }
         let frame = &self.frames[i];
         let mut out = Vec::new();
@@ -540,11 +540,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     // -----------------------------------------------------------------------------------------------------
     // Simplification of the frames
 
-    /// Runs the simplification on every frame, then keeps re-running it on the neighbours of any frame that
+    /// Runs the simplification on every frame, then keeps re-running it on the neighbors of any frame that
     /// changed, until nothing changes.  First every frame drops its impossible sources (so that the checks in
     /// `unzip` see the real frames); then, in rounds, the frames that have been touched are visited in playing
-    /// order.  A frame's findings change what its neighbours may conclude (`unzip` asks whether a neighbour could
-    /// use a factor, and that depends on the neighbour's sources and freedoms), which is why they are revisited.
+    /// order.  A frame's findings change what its neighbors may conclude (`unzip` asks whether a neighbor could
+    /// use a factor, and that depends on the neighbor's sources and freedoms), which is why they are revisited.
     ///
     /// Called by [`BoardFrames::new`], and again by the frame builder after it has merged frames
     /// ([`crate::frames`]): a merged frame starts with nothing found, and has to be simplified again.

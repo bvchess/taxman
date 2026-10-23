@@ -5,7 +5,7 @@ Part of the [lab notebook](../../README.md).
 Started 2026-10-18.  Concluded 2026-10-18.
 
 **Question.**  Can a burst of the finder's work produce nogoods that lower a game's upper bound?  The finder (large
-neighbourhood search, [the finders entry](../finders-for-good-games-that-are-not-sound-2026-10/README.md)) fixes part of
+neighborhood search, [the finders entry](../finders-for-good-games-that-are-not-sound-2026-10/README.md)) fixes part of
 an incumbent's promotions and runs the sound search on the rest as a unit, over and over; every one of those searches
 learns nogoods.  Any nogoods with any non-negative multipliers give a valid upper bound by Lagrangian relaxation of "at
 most `|N| - 1` members of `N`".  Two earlier studies measured what such bounds can reach at n ≤ 1300: a Lagrangian over
@@ -104,10 +104,10 @@ bound and the store:
 | 4788 | | 120 | 7213831 | 736 | | 488 | 1,212 |
 
 The nogood bound is 500-770 under the root's, as at the known games.  It beats the store's upper bound at 4522 and 4788
-(by about 500, ceilings that rest on one to three proven neighbours), not at 4761, whose ceiling rests on 4755 and 4757
+(by about 500, ceilings that rest on one to three proven neighbors), not at 4761, whose ceiling rests on 4755 and 4757
 and is 920-960 under the nogood bound.  In no game is it near the best lower bound: 1,050-1,400 above, so no board is
 closer to a proof.  At 120 s the finder's pool is no better than at 10 s (4522: 6431436 against 6431399); the search's
-pool is as good as the finder's at 4300 and 4522.  Unlike the ceiling, the nogood bound needs no proven neighbour.
+pool is as good as the finder's at 4300 and 4522.  Unlike the ceiling, the nogood bound needs no proven neighbor.
 
 ## Decision
 

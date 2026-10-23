@@ -69,7 +69,7 @@ Tried and not kept:
   choosing the member to branch on by the potentials alone): each traded nodes for time at about even.
 * **Rounding the heaviest matching into an incumbent at every node:** five times slower per node, and the optimum of
   1050 was found at the same step.
-* **A large-neighbourhood search before the search** (free a window of the incumbent's members, keep the rest promoted,
+* **A large-neighborhood search before the search** (free a window of the incumbent's members, keep the rest promoted,
   search that unit with a node limit): at 1025 it reached 25080 in 1.3 s (the search takes 11 s to), but the optimum,
   7 members out and 8 in across frames 1-4, was found only by the search, at about the same point (one thread: 160 s
   instead of 170 s).  The incumbents of 1025 and 1050 improve late because the search reaches the subtree that holds

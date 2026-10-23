@@ -178,11 +178,11 @@ the board that 24 hours reach (median [10th, 90th percentile]), of the whole cha
 
 ## Decision
 
-* **The projection uses the scaled gap** with p = 0.3 as its centre and 0 and 0.5 as its brackets; the gap alone is the
+* **The projection uses the scaled gap** with p = 0.3 as its center and 0 and 0.5 as its brackets; the gap alone is the
   conservative end (3,700-3,900 in a day).
 * **The steeper regime is refuted, and the reason is the gaps, not the 6.4 hours.**  The chain's speed alone is no
   evidence (a crest of the gap costs an hour or two of the 64 threads for a hundred games, a valley seconds).  With the
-  measured gaps the cost of a game grows ×10 for each 1,050-1,250 n at the centre of the model (830 to 1,500 across its
+  measured gaps the cost of a game grows ×10 for each 1,050-1,250 n at the center of the model (830 to 1,500 across its
   exponents), against ×10 for each 380 n for the old regime; 100 times the compute buys 2,100 to 2,500 n (1,700 to
   3,000).
 * **The root explains the dear games and nothing more** (agenda A4, killed): what remains is that consecutive boards are

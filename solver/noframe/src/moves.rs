@@ -24,7 +24,7 @@ const NONE: u32 = u32::MAX;
 /// ν(m) for every m = 0..=n: the matching number of the maximal-factor graph of the board 1..=m.  Incremental:
 /// adding the number m to the board raises ν by one exactly when a maximum matching of 1..=m − 1 has an
 /// augmenting path from m (Berge), which one alternating search from m finds (the graph is bipartite by the
-/// parity of Ω, and m's neighbours on the board 1..=m are its maximal factors).
+/// parity of Ω, and m's neighbors on the board 1..=m are its maximal factors).
 pub fn matching_numbers(board: &Board) -> Vec<u64> {
     let n = board.n as usize;
     let mut mate = vec![NONE; n + 1];
@@ -42,8 +42,8 @@ pub fn matching_numbers(board: &Board) -> Vec<u64> {
 /// Kuhn's alternating search from `u` on the board 1..=`limit`: true (and the matching augmented) if an
 /// augmenting path starts at `u`.
 fn augment(board: &Board, u: u32, limit: u32, mate: &mut [u32], seen: &mut [u32]) -> bool {
-    let neighbours = board.mf[u as usize].iter().chain(board.mc[u as usize].iter().take_while(|&&c| c <= limit));
-    for &v in neighbours {
+    let neighbors = board.mf[u as usize].iter().chain(board.mc[u as usize].iter().take_while(|&&c| c <= limit));
+    for &v in neighbors {
         if seen[v as usize] == limit {
             continue;
         }
@@ -267,7 +267,7 @@ mod tests {
     }
 
     /// M(n) against brute force for n <= 22, from below (a smaller game given) and with the segment cuts; and the
-    /// proven relations between neighbouring games.
+    /// proven relations between neighboring games.
     #[test]
     fn longest_against_brute_force() {
         let spf = smallest_prime_factors(100);

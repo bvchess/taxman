@@ -97,7 +97,7 @@ The five pairs past 2175 above add 13 games past 2176 (the ten certified and thr
 * **The dearest:** 3440 (3.72 billion nodes in the chain; 676 thread-hours, 10.6 hours on 64 threads, the floor on the
   campaign's wall time), 3424 (235), 3425 (223), 3427 (223: a repeat of 3425 that the rule cannot settle), 2346 (155),
   3430 (146), 3400 (95), 3300 (86).  2349, which the consultation's pilot named for its recorded 4,879 s, took 68
-  million nodes, 9 thread-hours: its seconds are mostly the window's (2346 and its neighbours ran beside it).
+  million nodes, 9 thread-hours: its seconds are mostly the window's (2346 and its neighbors ran beside it).
 * **The lists:** `pilot.txt` the five dearest (2346, 3424, 3425, 3427, 3440: 1,513 thread-hours, 24 hours of one
   machine), `dear.txt` the next fifteen with the games that rest on them (835), and `rest_1..4.txt` the others in
   increasing n, balanced (231 to 245 each).  A game the rule settles is in its source's list, after it.

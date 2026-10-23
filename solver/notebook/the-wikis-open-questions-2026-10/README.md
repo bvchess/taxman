@@ -38,7 +38,7 @@ tax has k numbers.  δ(n) = n + opt(n − 1) − opt(n) is how far opt(n) falls 
 | `strict.jsonl` (1..2175) | 2,175 | 1,027,886 | 1,005,340 | 22,472 | 74 | 74 in 1250..2159 |
 
 No game of the Java's (1..1000) has a move paying three, which is what the page's author saw.  The 74 are eight moves,
-each in a run of neighbouring games that share it: 748 = 2²·11·17 pays 44, 68 and 374 in 1250..1253, then 836, 988,
+each in a run of neighboring games that share it: 748 = 2²·11·17 pays 44, 68 and 374 in 1250..1253, then 836, 988,
 1012, 1610 (17 games, 1638..1714), 1276, 1218 and 2030 (2156..2159) follow, each paying three of its maximal factors.
 The solver's moves come frame by frame from the front (`accelerate::solution_for_promotions`), each paid with one
 maximal factor, and nothing in that order spreads the rest of what a move sweeps: at 1250 the other multiples of 44

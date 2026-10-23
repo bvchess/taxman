@@ -479,7 +479,7 @@ def optsets(paths):
             listed = {r["n"]: listed_sets(r) for r in rows if r["ended"] == "complete"}
             unlisted = [n for n, sets in listed.items() if sets is None]
             if unlisted:
-                print(f"too many sets to list (not analysed below): {compact_ranges(unlisted)}")
+                print(f"too many sets to list (not analyzed below): {compact_ranges(unlisted)}")
             sets_of = {n: sets for n, sets in listed.items() if sets}
             print("-- exchanges")
             optsets_exchanges(modes[mode], sets_of)

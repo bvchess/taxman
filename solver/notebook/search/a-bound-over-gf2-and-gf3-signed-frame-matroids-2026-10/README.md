@@ -142,7 +142,7 @@ E3 starts from.
 **Roots and instrument.**  The optima past 2175 are those of the EC2 chain, from a snapshot of its results to board 3423
 (`--known` takes the snapshot after `results/strict.jsonl`; [the files section](#files) names it by its hash).  The
 roots are every 100th game of 2200-3400 (13) and the *dear* games, the searched games past 2175 with the largest root
-GF(2) gaps: 3300 (1443), 3333, 3335 and 3336 (1427 each, neighbours of one search with nearly one root) and 3176 (1388),
+GF(2) gaps: 3300 (1443), 3333, 3335 and 3336 (1427 each, neighbors of one search with nearly one root) and 3176 (1388),
 17 distinct roots.  Two games of proof `cap` have gaps as large (3303, 3339) and were not searched.  The instrument
 (32cccb3) adds `--fit-mode search`, which skips the exact checks; `--save-fit DIR`, which writes the fit of each
 `f1cores` run as `DIR/n{N}.json`; and an arm `f1cores16` with 16 core-derived signings a frame.  The fit is that of the

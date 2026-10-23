@@ -136,7 +136,7 @@ closes 89%.  The bound is right to the end of its tether and the tether is the c
 s at gap 100-199, 6 s at 200-299 and 16 s at 300-399, against 0.1 to 0.3 s for the nogood fit.
 
 **The policy** (compute the bound only where the forecast subtree exceeds N) loses for both A1 forms, in all four groups
-(all, made, probe, suite) and in all three analyses, at every N.  Over the 840 nodes, where searching them all costs
+(all, made, probe, suite) and in all three analyzes, at every N.  Over the 840 nodes, where searching them all costs
 4,460 CPU s, `full` computed everywhere costs 5,770 CPU s more than it saves (cutting 686 nodes); `r2` costs 56 more
 than it saves.  By group, `full` loses 4,330 CPU s on the made nodes (cutting 500 of 600, whose searches cost 374 s in
 all), 233 s on the probes (cutting 186 of 200, searches 0.9 s) and 1,200 s on the suite, where it cuts none of the 40
@@ -161,12 +161,12 @@ empty.
 
 | file | what it is |
 |---|---|
-| `cloud-20261018-a1/analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyses (all the steps; the floor entry's slope; the first 50 steps), with the A1 tables |
+| `cloud-20261018-a1/analysis.txt`, `analysis-floor.txt`, `analysis-steps50.txt` | the script's three analyzes (all the steps; the floor entry's slope; the first 50 steps), with the A1 tables |
 | `cloud-20261018-a1/log` | the stages' times (UTC) and the commit |
 | `cloud-20261018-a1/prepare.jsonl` | the line each `wall choice-prepare` printed (suite, made, probe games in the script's order), now with the A1 root fit: `a1_source` (`file` for 3300, 2700 and 1215, `fitted` for the other nine), `a1_fit_s`, `a1_bound`, `a1_share` of the gap it closes (0.33-0.34 for 3441, 3440 and 3425 fitted in 300 s, 0.40 for 3300, 0.45-0.64 for the others), `a1_stop` (`Converged` at 3213, 3129, 2976 and 936, `Seconds` at 3441, 3440, 3425, 3260 and 3267) and `a1_lb` |
 | `cloud-20261018-a1/fixtures.txt` | the six proofs that made the fixtures: runs, nodes and distinct units (the numbers of `cloud-20261018/`, the proofs being the same) |
 | `cloud-20261018-a1/workers.jsonl` | a line for each worker and game, from the workers' output: the nodes it measured, skipped or left to other workers, and its CPU seconds (10,606 in all: 133 to 385 a worker) |
-| `cloud-20261018-a1/measure.jsonl.gz` | the 876 lines of `measure/worker-0.jsonl` to `worker-63.jsonl`, joined in the order of the workers and gzipped (1.3 MB): 840 open nodes (the 40 of the suite and 100 of each of the 8 other games, whose `source` is `fixture`) and the 36 path nodes.  `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I solver/notebook/search/the-node-choice-where-the-strong-bound-pays-2026-10/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the three analyses again, byte for byte (A1 needs no flag: `analyze.py` reads the `a1` of the lines) |
+| `cloud-20261018-a1/measure.jsonl.gz` | the 876 lines of `measure/worker-0.jsonl` to `worker-63.jsonl`, joined in the order of the workers and gzipped (1.3 MB): 840 open nodes (the 40 of the suite and 100 of each of the 8 other games, whose `source` is `fixture`) and the 36 path nodes.  `gunzip -c measure.jsonl.gz > measure.jsonl`, then `python3 -I solver/notebook/search/the-node-choice-where-the-strong-bound-pays-2026-10/analyze.py measure.jsonl [--model floor] [--steps 50]` makes the three analyzes again, byte for byte (A1 needs no flag: `analyze.py` reads the `a1` of the lines) |
 
 Not kept: `prep/` (25 MB), `fixtures/` and `logs/` (the workers' output repeats `measure.jsonl.gz`'s lines and
 `workers.jsonl`'s, which was checked line for line when the files were made).  Costs: [STATUS](../../../docs/STATUS.md)

@@ -157,7 +157,7 @@ fn loose_bounds_and_the_relations_bracket_the_optimum_of(
     assert!(derived("lower") > lower && derived("upper") > upper, "{rules:?}");
 }
 
-/// The games the relations make from the optimal game of a neighbour are finished and score what the lemmas say: the
+/// The games the relations make from the optimal game of a neighbor are finished and score what the lemmas say: the
 /// exchange of the opening primes by exactly p - q, the game of n - 1 followed by n by its sum or n more, the game
 /// below that of n + 1 by at least its sum less n + 1 and at most opt(n).  The ledger relies on the first and the
 /// second to leave a game unmade or unrefereed when it cannot beat the target's.
@@ -666,7 +666,7 @@ fn ended_after_finder(n: u32, value: u64, lns: Option<LnsRun>, seed_from: Option
 /// event says what the finder and the seed were.
 #[test]
 fn the_finders_game_is_the_lower_bound_where_it_beats_the_search_and_the_event_says_what_it_did() {
-    // A board alone in its ledger (so that no relation reaches it from a fabricated neighbour), its bounds 10 under
+    // A board alone in its ledger (so that no relation reaches it from a fabricated neighbor), its bounds 10 under
     // opt(n) and 400 over, that a search ended on after a finder whose run began 10 under opt(n) and found
     // `found` under it (the same if it found nothing better): the board after, and the event.
     let finished = |n: u32, value: u64, found: Option<u64>, seed_from: Option<SeedFrom>| {
