@@ -1,0 +1,4 @@
+./unit.sh tune-carry2 e2-carry2 4050 root
+STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e2-all 4050 root
+./unit.sh tune-carry2 e2-carry2 3000 root
+STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e2-all 3000 root

@@ -361,6 +361,8 @@ struct Walked {
     derived: u64,
     derived_from_copies: u64,
     derivations_checked: u64,
+    /// Members priced (`Gf2Bound::prices_excluding`) whose shortest cycle came from the parent's pricing.
+    carried: u64,
 }
 
 /// Runs `f` on every engine, checks that all give the same result and returns it.
@@ -384,12 +386,13 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// are the fresh solves', and so are the bounds without a candidate that are solved (to the end, where they must be
 /// equal, or stopped early, where they are between the stop and the truth).  Half the promotions go as strong
 /// branching makes them: the bounds without some members of the heaviest set certified, the node going on without
-/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  The
-/// narrowing of a child's candidates and the count of the promotions left are the model's, so that `p` may be an
-/// extended problem with one-sided candidates (for a problem without them they are the frame set's own).  Of the
-/// forced members of a node, which can be hundreds when the need is close to the bound, at most `forced_cap` are
-/// checked, evenly spread over them.  Every tableau the first engine derives from a related one instead of building it
-/// ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.
+/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  Every
+/// node's members are priced as conflict branching prices them, carrying its parent's cycles, and the prices are the
+/// bounds found without the carry.  The narrowing of a child's candidates and the count of the promotions left are
+/// the model's, so that `p` may be an extended problem with one-sided candidates (for a problem without them they are
+/// the frame set's own).  Of the forced members of a node, which can be hundreds when the need is close to the bound,
+/// at most `forced_cap` are checked, evenly spread over them.  Every tableau the first engine derives from a related
+/// one instead of building it ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.
 fn walk_random_paths<const W: usize>(
     p: &Prepared<W>,
     rng: &mut Rng,
@@ -420,6 +423,20 @@ fn walk_random_paths<const W: usize>(
             // Forced members at a need just below the bound.
             let need = eval.value.saturating_sub(rng.below(40));
             let with_forced = agree(engines, |e| e.evaluate(cap, Some(need)));
+            let members = (with_forced.chosen & cands).to_vec();
+            let before = engines[0].stats().carried;
+            let prices = agree(engines, |e| {
+                let mut out = Vec::new();
+                e.prices_excluding(&members, cap, &mut out);
+                out
+            });
+            walked.carried += engines[0].stats().carried - before;
+            let certified = agree(engines, |e| {
+                let mut out = Vec::new();
+                e.certified_excluding(&members, cap, &mut out);
+                out
+            });
+            assert_eq!(prices, certified, "n={n}: the prices of {members:?}, promoted {promoted:?}");
             let step = (with_forced.forced.len() as usize).div_ceil(forced_cap).max(1);
             for x in with_forced.forced.iter().step_by(step) {
                 let without = fresh.value_excluding(x, cap, u64::MAX);
@@ -561,12 +578,14 @@ fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64) {
             && at_least(excluded_checked, 300),
         "{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}"
     );
-    let Walked { derived, derived_from_copies, derivations_checked, .. } = walked;
+    let Walked { derived, derived_from_copies, derivations_checked, carried, .. } = walked;
     println!("{derived} tableaux derived, {derived_from_copies} from a copy, {derivations_checked} checked");
     assert!(
         at_least(derived, 900) && at_least(derived_from_copies, 150) && derivations_checked == derived,
         "{derived} {derived_from_copies} {derivations_checked}"
     );
+    println!("{carried} prices carried");
+    assert!(at_least(carried, 4000), "{carried} prices carried");
 }
 
 /// [`levels_match_fresh_matroids_along_random_paths`] along 3 paths of the boards 60, 120, 200 and 330.

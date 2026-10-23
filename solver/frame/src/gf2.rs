@@ -449,7 +449,8 @@ pub struct Eval<const W: usize> {
     pub value: u64,
     /// That set.
     pub chosen: Bits<W>,
-    /// Its members without which the bound (from the weight split) is below `need`; empty unless asked for.
+    /// Its members without which the bound (from the weight split) is below `need`; empty unless asked for, and
+    /// empty where the bound itself is below `need`.
     pub forced: Bits<W>,
 }
 
@@ -477,6 +478,9 @@ pub struct Gf2Stats {
     /// ([`Gf2Bound::certified_excluding`]), and children whose heaviest set their parent's certified.
     pub certified: u64,
     pub certified_children: u64,
+    /// Members of a pricing ([`Gf2Bound::prices_excluding`]) whose shortest cycle came from the parent's pricing,
+    /// with no search.
+    pub carried: u64,
     /// Members found forced by `Levels::force_by_cycles` where the split left them free.
     pub forced_by_cycles: u64,
     /// Tableaux of solved levels made again ([`resolve`]): derived from a related one rather than built, of those
@@ -562,8 +566,8 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         dispatch!(self, l => l.remove_candidate(x))
     }
 
-    /// The bound of the top level with at most `cap` promotions, its heaviest set, and with `need` (if any) its
-    /// forced members.
+    /// The bound of the top level with at most `cap` promotions, its heaviest set, and with `need` (if any, and if
+    /// the bound reaches it) its forced members.
     pub fn evaluate(&mut self, cap: u32, need: Option<u64>) -> Eval<W> {
         dispatch!(self, l => l.evaluate(cap as usize, need))
     }
@@ -581,7 +585,17 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// for every one, unless the level is solved and its heaviest set is of all sizes, within `cap`).  Each is what
     /// [`value_excluding`](Self::value_excluding) with no `stop` would return.  The top level is unchanged.
     pub fn certified_excluding(&mut self, xs: &[u32], cap: u32, out: &mut Vec<Option<u64>>) {
-        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out))
+        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out, false))
+    }
+
+    /// [`certified_excluding`](Self::certified_excluding) for the prices of conflict branching, the same bounds, with
+    /// the shortest cycles of the parent's pricing carried where they are the child's.  A child whose heaviest set is
+    /// its parent's less the members it promoted has its parent's exchange graph less the elements it promoted or
+    /// dropped, so a member's shortest cycle there that is still a cycle of the child's is the child's shortest, and
+    /// no search is made for it (see `Levels::certified_excluding`).  It keeps what it finds for the top level's
+    /// children.
+    pub fn prices_excluding(&mut self, xs: &[u32], cap: u32, out: &mut Vec<Option<u64>>) {
+        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out, true))
     }
 
     /// Keeps the level of the top level without `x` that the last [`certified_excluding`](Self::certified_excluding)
@@ -674,6 +688,23 @@ struct Level<const W: usize, const R: usize> {
     source: Source<W, R>,
     /// What the level's node promoted from its parent's (nothing at a unit's root).
     added: Bits<W>,
+}
+
+/// What a pricing ([`Gf2Bound::prices_excluding`]) found at a level, for its children's: the level's node, heaviest
+/// set and live candidates, and each member priced whose exchange graph has a cycle through it within the reach, with
+/// the length of the shortest one and its elements (indices, from the member in the order of its arcs, in `elems`).
+struct Priced<const W: usize> {
+    node: u64,
+    set: Bits<W>,
+    live: Bits<W>,
+    cycles: Vec<(u32, i64, std::ops::Range<usize>)>,
+    elems: Vec<u32>,
+}
+
+impl<const W: usize> Default for Priced<W> {
+    fn default() -> Self {
+        Priced { node: 0, set: Bits::EMPTY, live: Bits::EMPTY, cycles: Vec::new(), elems: Vec::new() }
+    }
 }
 
 /// Where a solved level's tableau can be derived from instead of built ([`meet::Meet::derive`]): the workspace's solve
@@ -787,6 +818,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     nodes: Vec<u64>,
     next_node: u64,
     starts: Vec<(SplitStart, u64)>,
+    /// The last pricing at each depth ([`Gf2Bound::prices_excluding`]).
+    priced: Vec<Priced<W>>,
 }
 
 impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
@@ -824,6 +857,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             nodes: vec![0],
             next_node: 0,
             starts: Vec::new(),
+            priced: Vec::new(),
         }
     }
 
@@ -986,7 +1020,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let level = &mut self.levels[d];
         let chosen = level.history.last().copied().unwrap_or(Bits::EMPTY);
         let mut forced = Bits::EMPTY;
-        if let Some(need) = need {
+        // A bound below the need cuts the node, which then needs neither its split nor its forced members.
+        if let Some(need) = need.filter(|&need| level.value >= need) {
             if !level.has_split && level.settled {
                 if self.starts.len() <= d {
                     self.starts.resize_with(d + 1, Default::default);
@@ -1139,10 +1174,20 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         self.scratch.value
     }
 
-    fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>) {
+    /// With `carry` (a pricing), each member's shortest cycle is first sought in the parent node's last pricing.  It
+    /// carries where the level's problem is that pricing's with members of its heaviest set promoted (`added`) and
+    /// other candidates dropped, and the level's heaviest set is that pricing's less them.  Then the level's exchange
+    /// graph is that pricing's less the elements promoted or dropped: promoting a member contracts it in both
+    /// matroids, which keeps the circuits of the others and which of them are free, and dropping an element outside
+    /// the set deletes it.  So every cycle of the level's graph is one of the parent's, as long, and a member's
+    /// shortest cycle at the parent that is still a cycle here, every element live and every arc there
+    /// ([`Meet::cycle_length`]), is its shortest here: the search would find one as long.  The bound, and whether it
+    /// certifies, are then found as after a search.  A member the parent found no cycle for is searched.
+    fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>, carry: bool) {
         out.clear();
         let graph = self.graph;
-        let level = &mut self.levels[self.depth];
+        let d = self.depth;
+        let level = &mut self.levels[d];
         let size = level.history.last().map_or(0, |last| last.len() as usize);
         if !(level.solved && level.settled && level.has_pot && size <= cap) {
             out.extend(xs.iter().map(|_| None));
@@ -1162,13 +1207,67 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         let reach = losses.reach(&last);
         self.certified.clear();
+        if self.priced.len() <= d {
+            self.priced.resize_with(d + 1, Priced::default);
+        }
+        let (above, here) = self.priced.split_at_mut(d);
+        let parent = above.last().filter(|p| {
+            carry
+                && p.node == self.nodes[d - 1]
+                && level.added.is_subset(&p.set)
+                && p.set - level.added == last
+                && level.live.is_subset(&p.live)
+        });
+        let mine = &mut here[0];
+        if carry {
+            (mine.node, mine.set, mine.live) = (self.nodes[d], last, level.live);
+            mine.cycles.clear();
+            mine.elems.clear();
+        }
         for &x in xs {
+            let carried = parent.and_then(|p| {
+                let (_, length, range) = p.cycles.iter().find(|c| c.0 == x)?;
+                let cycle = &p.elems[range.clone()];
+                let live = cycle.iter().all(|&e| level.live.contains(graph.elems[e as usize]));
+                (live && self.meet.cycle_length(&problem, cycle) == Some(*length)).then_some((*length, cycle))
+            });
+            #[cfg(debug_assertions)]
+            if let Some((length, _)) = carried {
+                let e = graph.index[x as usize];
+                let searched = self.meet.without(&problem, &level.pot, e, reach, &[]).map(|v| level.value as i64 - v);
+                assert_eq!(searched, (length <= reach).then_some(length), "the cycle carried through {x}");
+            }
+            // The length of the shortest cycle through x if it is within the reach.
+            let found = match carried {
+                Some((length, _)) => {
+                    self.stats.carried += 1;
+                    (length <= reach).then_some(length)
+                }
+                None => self
+                    .meet
+                    .without(&problem, &level.pot, graph.index[x as usize], reach, &[])
+                    .map(|value| level.value as i64 - value),
+            };
             let mut bound = None;
-            if let Some(value) = self.meet.without(&problem, &level.pot, graph.index[x as usize], reach, &[]) {
+            if let Some(delta) = found {
+                let cycle = carried.map_or_else(|| self.meet.cycle(), |c| c.1);
                 // The heaviest set flipped along the cycle, which is the heaviest set without x if the sizes
                 // certify it.
-                let flip: Bits<W> = self.meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
-                let delta = level.value as i64 - value;
+                let flip: Bits<W> = cycle.iter().map(|&e| graph.elems[e as usize]).collect();
+                if carry {
+                    // From x in the order of its arcs: a search's cycle is x and then its predecessors, against them.
+                    let start = mine.elems.len();
+                    match carried {
+                        Some(_) => mine.elems.extend_from_slice(cycle),
+                        None => {
+                            let (&first, rest) = cycle.split_first().expect("a cycle holds its member");
+                            mine.elems.push(first);
+                            mine.elems.extend(rest.iter().rev());
+                        }
+                    }
+                    mine.cycles.push((x, delta, start..mine.elems.len()));
+                }
+                let value = level.value as i64 - delta;
                 if losses.certify(delta, &mut self.meet, &problem, &level.pot) {
                     self.certified.push((x, (last - flip) | (flip - last), value as u64, delta));
                     bound = Some(value as u64);

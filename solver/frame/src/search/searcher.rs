@@ -1536,7 +1536,7 @@ fn conflict_to_branch_on<const W: usize>(
     let members: Vec<u32> = eval.chosen.iter().collect();
     let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
     let mut bounds = Vec::new();
-    g.certified_excluding(&exact, cap, &mut bounds);
+    g.prices_excluding(&exact, cap, &mut bounds);
     let certified: std::collections::HashMap<u32, Option<u64>> = exact.into_iter().zip(bounds).collect();
     let mut price = std::collections::HashMap::with_capacity(members.len());
     for &x in &members {

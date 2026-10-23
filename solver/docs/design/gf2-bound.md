@@ -53,7 +53,14 @@ misses are the *odd* cores of movers with three or more factors.
   lose comes from the level's history (a dominant set one smaller), from a floor carried along the path, or from a
   search for the shortest path between members; what the larger sets lose is the solve's last shortest path.  A child
   that loses one member of its parent's heaviest set besides those it promotes gets its own the same way, from the
-  parent's exchange graph with the dropped elements banned from the cycle.
+  parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a hundred members
+  of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's heaviest set
+  carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the elements it
+  promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle of the child's graph
+  is one of the parent's, as long, and a member's shortest cycle at the parent that is still a cycle of the child
+  (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches, nearly
+  all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees
+  ([cheaper steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
 * **Forced members.**  The weight split of `I*` bounds the intersection without each member in one pass, by weak
   duality, and a member without which that bound is below the need is forced, as the matching's are.  The split is
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by

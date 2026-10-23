@@ -262,9 +262,11 @@ which a lab may set from 0 to `MAX_GATE`, 4,000), the check weighs:
 
 A conflict weighs the sum over its members of 10^(−price/`CONFLICT_BRANCHING_SLOPE`), with the slope 291: its children's
 subtrees against the node's, if a subtree grows tenfold for every 291 points of its gap.  The node branches on the
-lightest.  Prices come off the exchange graph of `I*`, as strong branching reads them (`Gf2Bound::certified_excluding`),
+lightest.  Prices come off the exchange graph of `I*`, as strong branching reads them (`Gf2Bound::prices_excluding`),
 for the members that a failing frame's conflict can hold (`FrameGraph::conflict_members`); the others take the weight
-split's estimate.  Below the gap of 300 the search's own `K` is kept, since a small subtree does not repay the pricing.
+split's estimate.  A child that inherits its parent's heaviest set takes most of its prices from its parent's pricing
+with no search ([gf2-bound.md](gf2-bound.md)).  Below the gap of 300 the search's own `K` is kept, since a small
+subtree does not repay the pricing.
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
@@ -275,7 +277,7 @@ only chooses among true conflicts, the tactic may change between a search's unit
 off, and a lab may switch it while the search runs ([lab.md](lab.md)).
 
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
-default's steps and 0.26 and 0.27 of its CPU; a step costs three to five times a default one, mostly in the pricing.
+default's steps and 0.26 and 0.27 of its CPU; a step costs more than a default one, the excess mostly in the pricing.
 The share of steps saved grows with the gap.  The measurements, and the gap and slope chosen, are in [where the search
 of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 

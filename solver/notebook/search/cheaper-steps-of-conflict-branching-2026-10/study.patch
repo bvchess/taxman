@@ -1,0 +1,388 @@
+diff --git a/solver/frame/src/gf2.rs b/solver/frame/src/gf2.rs
+index 153e5f3..b0eefdc 100644
+--- a/solver/frame/src/gf2.rs
++++ b/solver/frame/src/gf2.rs
+@@ -72,6 +72,10 @@
+ //! (`certify_child`).
+ 
+ pub mod meet;
++#[cfg(feature = "studies")]
++mod price_study;
++#[cfg(feature = "studies")]
++pub use price_study::timers as study_timers;
+ 
+ use crate::bits::Bits;
+ use crate::model::{FrameGraph, FrameSet};
+@@ -565,7 +569,15 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
+     /// The bound of the top level with at most `cap` promotions, its heaviest set, and with `need` (if any) its
+     /// forced members.
+     pub fn evaluate(&mut self, cap: u32, need: Option<u64>) -> Eval<W> {
+-        dispatch!(self, l => l.evaluate(cap as usize, need))
++        #[cfg(feature = "studies")]
++        let t0 = std::time::Instant::now();
++        let eval = dispatch!(self, l => l.evaluate(cap as usize, need));
++        #[cfg(feature = "studies")]
++        {
++            price_study::timers::since(price_study::timers::EVALUATE, t0);
++            price_study::timers::add(price_study::timers::EVALUATES, 1);
++        }
++        eval
+     }
+ 
+     /// The bound of the top level without the candidate `x` (its heaviest set restarted from the history), with at
+@@ -581,7 +593,30 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
+     /// for every one, unless the level is solved and its heaviest set is of all sizes, within `cap`).  Each is what
+     /// [`value_excluding`](Self::value_excluding) with no `stop` would return.  The top level is unchanged.
+     pub fn certified_excluding(&mut self, xs: &[u32], cap: u32, out: &mut Vec<Option<u64>>) {
+-        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out))
++        #[cfg(feature = "studies")]
++        let t0 = std::time::Instant::now();
++        dispatch!(self, l => l.certified_excluding(xs, cap as usize, out));
++        #[cfg(feature = "studies")]
++        {
++            use price_study::timers;
++            let pricing = dispatch!(self, l => l.study.pricing);
++            timers::since(if pricing { timers::PRICING } else { timers::STRONG }, t0);
++            timers::add(if pricing { timers::PRICINGS } else { timers::STRONGS }, 1);
++        }
++    }
++
++    /// For a study: the heaviest set without `x` that the last [`certified_excluding`](Self::certified_excluding)
++    /// certified, if it did.
++    #[cfg(feature = "studies")]
++    pub fn certified_set(&mut self, x: u32) -> Option<Bits<W>> {
++        dispatch!(self, l => l.certified.iter().find(|c| c.0 == x).map(|c| c.1))
++    }
++
++    /// For the study of prices (`price_study`): whether the next calls of
++    /// [`certified_excluding`](Self::certified_excluding) are the search's pricing.
++    #[cfg(feature = "studies")]
++    pub fn price_study(&mut self, on: bool) {
++        dispatch!(self, l => l.study.pricing = on)
+     }
+ 
+     /// Keeps the level of the top level without `x` that the last [`certified_excluding`](Self::certified_excluding)
+@@ -787,6 +822,18 @@ struct Levels<'g, const W: usize, const R: usize> {
+     nodes: Vec<u64>,
+     next_node: u64,
+     starts: Vec<(SplitStart, u64)>,
++    #[cfg(feature = "studies")]
++    study: price_study::PriceStudy<W>,
++}
++
++#[cfg(feature = "studies")]
++impl<const W: usize, const R: usize> Drop for Levels<'_, W, R> {
++    fn drop(&mut self) {
++        if self.study.on && self.study.started.is_some() {
++            eprintln!("PRICESTUDY {}", self.study.report());
++            eprintln!("STEPTIMERS {}", price_study::timers::report());
++        }
++    }
+ }
+ 
+ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+@@ -824,6 +871,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+             nodes: vec![0],
+             next_node: 0,
+             starts: Vec::new(),
++            #[cfg(feature = "studies")]
++            study: price_study::PriceStudy::new(),
+         }
+     }
+ 
+@@ -865,6 +914,11 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+         for x in promoted.iter() {
+             contract(self.graph, level, x);
+         }
++        #[cfg(feature = "studies")]
++        {
++            self.study.reset();
++            self.study.pushed(0);
++        }
+     }
+ 
+     fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
+@@ -934,6 +988,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+             self.nodes.push(0);
+         }
+         self.nodes[d + 1] = self.next_node;
++        #[cfg(feature = "studies")]
++        self.study.pushed(d + 1);
+     }
+ 
+     fn pop(&mut self) {
+@@ -974,6 +1030,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+ 
+     fn evaluate(&mut self, cap: usize, need: Option<u64>) -> Eval<W> {
+         let d = self.depth;
++        #[cfg(feature = "studies")]
++        self.study.evaluated(d);
+         let level = &mut self.levels[d];
+         let fits = level.solved && level.history.last().is_some_and(|last| last.len() as usize <= cap);
+         // A heaviest set under a larger limit that fits a smaller one is the heaviest under it too, and one of all
+@@ -1008,7 +1066,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+                 };
+                 let contracted = same_problem.then_some(&contracted[..]);
+                 let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
++                let t0 = std::time::Instant::now();
++                let open = level.value >= need;
+                 split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted);
++                {
++                    use price_study::timers as t;
++                    t::since(if open { t::SPLIT_OPEN_NS } else { t::SPLIT_CUT_NS }, t0);
++                    t::add(if open { t::SPLIT_OPEN_N } else { t::SPLIT_CUT_N }, 1);
++                }
+                 if level.has_pot {
+                     self.meet.save_split(&mut self.starts[d].0);
+                     self.starts[d].1 = node;
+@@ -1151,7 +1216,15 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+         if level.meet_solve != self.meet.solves {
+             // The workspace holds another solve: the level's heaviest set solved again from itself (its tableau
+             // built and one shortest path, no augmentation).
++            #[cfg(feature = "studies")]
++            let t0 = std::time::Instant::now();
+             resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
++            #[cfg(feature = "studies")]
++            {
++                use price_study::timers;
++                let which = if self.study.pricing { timers::RESOLVE_PRICING } else { timers::RESOLVE_STRONG };
++                timers::since(which, t0);
++            }
+         }
+         let problem = Problem {
+             block: [&graph.block[0], &graph.block[1]],
+@@ -1162,9 +1235,16 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
+         let reach = losses.reach(&last);
+         self.certified.clear();
++        #[cfg(feature = "studies")]
++        let tracing = self.study.on && self.study.pricing;
++        #[cfg(feature = "studies")]
++        let mut priced = Vec::new();
+         for &x in xs {
++            #[cfg(feature = "studies")]
++            let t0 = tracing.then(std::time::Instant::now);
+             let mut bound = None;
+-            if let Some(value) = self.meet.without(&problem, &level.pot, graph.index[x as usize], reach, &[]) {
++            let found = self.meet.without(&problem, &level.pot, graph.index[x as usize], reach, &[]);
++            if let Some(value) = found {
+                 // The heaviest set flipped along the cycle, which is the heaviest set without x if the sizes
+                 // certify it.
+                 let flip: Bits<W> = self.meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+@@ -1174,8 +1254,53 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
+                     bound = Some(value as u64);
+                 }
+             }
++            #[cfg(feature = "studies")]
++            if let Some(t0) = t0 {
++                let nanos = t0.elapsed().as_nanos() as u64;
++                // The cycle in the order of its arcs: the search's predecessors run against them.
++                let cycle = match self.meet.cycle().split_first() {
++                    Some((&first, rest)) if found.is_some() => {
++                        std::iter::once(first).chain(rest.iter().rev().copied()).collect()
++                    }
++                    _ => Vec::new(),
++                };
++                let length = found.map(|value| level.value as i64 - value);
++                priced.push(price_study::Priced { x, length, certified: bound.is_some(), cycle, nanos });
++            }
+             out.push(bound);
+         }
++        #[cfg(feature = "studies")]
++        if tracing {
++            use price_study::{Record, Relation};
++            let d = self.depth;
++            let study = &mut self.study;
++            study.started.get_or_insert_with(std::time::Instant::now);
++            let now = Record { node: self.nodes[d], evals: study.evals[d], set: last, live: level.live, reach, members: priced };
++            let prev = study.reference(d, &self.nodes).and_then(|(i, same)| Some((i, same, study.recs[i].take()?)));
++            let added = level.added;
++            let relation = |same: bool, r: &Record<W>| {
++                if same {
++                    Relation::SameNode
++                } else if added.is_subset(&r.set) && r.set - added == last {
++                    Relation::ChildInherited
++                } else {
++                    Relation::ChildOther
++                }
++            };
++            let (meet, live) = (&self.meet, level.live);
++            let holds = |cycle: &[u32]| {
++                let all_live = cycle.iter().all(|&e| live.contains(graph.elems[e as usize]));
++                if all_live { meet.cycle_length(&problem, cycle) } else { None }
++            };
++            study.count(&now, prev.as_ref().map(|(_, same, r)| (r, relation(*same, r))), holds);
++            if let Some((i, _, r)) = prev {
++                study.recs[i] = Some(r);
++            }
++            if study.recs.len() <= d {
++                study.recs.resize_with(d + 1, || None);
++            }
++            study.recs[d] = Some(now);
++        }
+         level.loss_floor = losses.smaller;
+         self.stats.certified += out.iter().filter(|b| b.is_some()).count() as u64;
+     }
+diff --git a/solver/frame/src/search/searcher.rs b/solver/frame/src/search/searcher.rs
+index 4d90efa..9f80d94 100644
+--- a/solver/frame/src/search/searcher.rs
++++ b/solver/frame/src/search/searcher.rs
+@@ -1533,10 +1533,16 @@ fn conflict_to_branch_on<const W: usize>(
+     known: &mut Vec<Bits<W>>,
+     look: Option<Look<'_, W>>,
+ ) -> Bits<W> {
++    #[cfg(feature = "studies")]
++    let choose_t0 = std::time::Instant::now();
+     let members: Vec<u32> = eval.chosen.iter().collect();
+     let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
+     let mut bounds = Vec::new();
++    #[cfg(feature = "studies")]
++    g.price_study(true);
+     g.certified_excluding(&exact, cap, &mut bounds);
++    #[cfg(feature = "studies")]
++    g.price_study(false);
+     let certified: std::collections::HashMap<u32, Option<u64>> = exact.into_iter().zip(bounds).collect();
+     let mut price = std::collections::HashMap::with_capacity(members.len());
+     for &x in &members {
+@@ -1560,19 +1566,26 @@ fn conflict_to_branch_on<const W: usize>(
+     }
+     let mut order = members;
+     order.sort_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b)));
++    #[cfg(feature = "studies")]
++    let ordered_t0 = std::time::Instant::now();
+     for k in model.conflicts_ordered(scratch, state, &eval.chosen, &order) {
+         let w = weight(&k);
+         if w < best.0 {
+             best = (w, k, true);
+         }
+     }
++    #[cfg(feature = "studies")]
++    crate::gf2::study_timers::since(crate::gf2::study_timers::ORDERED, ordered_t0);
+     if let Some(mut look) = look.filter(|_| best.1 != k0 && eval.forced.is_empty() && k0.len() >= 2) {
+         let by_price = |a: &u32, b: &u32| price[a].total_cmp(&price[b]).then(a.cmp(b));
+         let cheapest = k0.iter().min_by(by_price).expect("a conflict has members");
+         let without_cheapest = weight(&k0) - weight(&Bits::EMPTY.with(cheapest));
+-        if price[&cheapest] <= CONFLICT_LOOK_PRICE
+-            && without_cheapest < best.0 * CONFLICT_LOOK_SLACK
+-            && in_child_cut(
++        #[cfg(feature = "studies")]
++        let avoids = g.certified_set(cheapest).map(|set| k0.without(cheapest).is_subset(&set));
++        if price[&cheapest] <= CONFLICT_LOOK_PRICE && without_cheapest < best.0 * CONFLICT_LOOK_SLACK && {
++            #[cfg(feature = "studies")]
++            let look_t0 = std::time::Instant::now();
++            let cut = in_child_cut(
+                 g,
+                 model,
+                 scratch,
+@@ -1581,8 +1594,25 @@ fn conflict_to_branch_on<const W: usize>(
+                 k0.without(cheapest),
+                 cheapest,
+                 learning.as_deref_mut(),
+-            )
+-        {
++            );
++            #[cfg(feature = "studies")]
++            {
++                use crate::gf2::study_timers as t;
++                t::since(t::LOOK, look_t0);
++                t::add(t::LOOKS, 1);
++                t::add(t::LOOK_CUTS, u64::from(cut));
++                t::add(t::LOOK_UNCERTIFIED, u64::from(avoids.is_none()));
++                if avoids == Some(true) {
++                    t::add(t::LOOK_AVOID, 1);
++                    t::add(t::LOOK_AVOID_CUTS, u64::from(cut));
++                }
++                if k0.len() == 2 {
++                    t::add(t::LOOK_PAIRS, 1);
++                    t::add(t::LOOK_PAIR_CUTS, u64::from(cut));
++                }
++            }
++            cut
++        } {
+             best = (without_cheapest, k0, false);
+         }
+     }
+@@ -1597,6 +1627,8 @@ fn conflict_to_branch_on<const W: usize>(
+         }
+         known.push(k);
+     }
++    #[cfg(feature = "studies")]
++    crate::gf2::study_timers::since(crate::gf2::study_timers::CHOOSE, choose_t0);
+     k
+ }
+ 
+@@ -1628,6 +1660,8 @@ fn in_child_cut<const W: usize>(
+     m: u32,
+     learning: Option<&mut Learning<'_, W>>,
+ ) -> bool {
++    use crate::gf2::study_timers as t;
++    let t0 = std::time::Instant::now();
+     // As `make_child` promotes: one number in place, several together with every frame they touch left with freedoms.
+     let child = if added.len() == 1 {
+         let mut child = *state;
+@@ -1641,7 +1675,11 @@ fn in_child_cut<const W: usize>(
+             })
+         })
+     };
+-    let Some(child) = child else { return true };
++    let Some(child) = child else {
++        t::add(t::LOOK_R_PROMO, 1);
++        t::since(t::LOOK_MODEL_NS, t0);
++        return true;
++    };
+     let promoted = look.promoted | added;
+     let Some(need) = look.need.checked_sub(added.sum()) else { return false };
+     let rest = (look.cands - added).without(m);
+@@ -1652,23 +1690,39 @@ fn in_child_cut<const W: usize>(
+         cands -= l.table.ruled_out(&added, &promoted, &cands);
+     }
+     if cands.sum_largest(max_next) < need {
++        t::add(t::LOOK_R_LARGEST, 1);
++        t::since(t::LOOK_MODEL_NS, t0);
+         return true;
+     }
++    t::since(t::LOOK_MODEL_NS, t0);
++    let t1 = std::time::Instant::now();
+     g.push_all(&added, &cands);
+     let eval = g.evaluate(max_next, Some(need));
++    t::since(t::LOOK_EVAL_NS, t1);
++    let t2 = std::time::Instant::now();
++    if eval.value < need {
++        t::add(t::LOOK_R_GF2, 1);
++    }
+     let cut = eval.value < need || {
+         let mut known = Vec::new();
+         let mut seek =
+             Seek { model, scratch, cache: &mut *look.cache, state: &child, known: &mut known, learning: &mut learning };
+         match seek.conflict(&eval.chosen, eval.forced).0 {
+-            Lookup::AllForced => true,
++            Lookup::AllForced => {
++                t::add(t::LOOK_R_FORCED, 1);
++                true
++            }
+             Lookup::None => false,
+-            Lookup::Conflict(k) if k.is_subset(&eval.forced) => true,
++            Lookup::Conflict(k) if k.is_subset(&eval.forced) => {
++                t::add(t::LOOK_R_FORCED, 1);
++                true
++            }
+             // The table's conflict is not all forced, but the smallest a peel finds may be: learned as a nogood, it
+             // cuts the child when the search makes it (the table's lookup finds it all forced).
+             Lookup::Conflict(_) => {
+                 match model.conflict_cached(scratch, Some(&mut *look.cache), &child, &eval.chosen, true) {
+                     Some(k) if k.is_subset(&eval.forced) => {
++                        t::add(t::LOOK_R_PEEL, 1);
+                         if let Some(l) = learning.as_mut() {
+                             if let Some(nogood) = model.nogood(scratch, l.root, &promoted, &k) {
+                                 l.table.insert(nogood);
+@@ -1681,6 +1735,10 @@ fn in_child_cut<const W: usize>(
+             }
+         }
+     };
++    t::since(t::LOOK_SEEK_NS, t2);
++    if !cut {
++        t::add(t::LOOK_R_OPEN, 1);
++    }
+     g.pop();
+     cut
+ }

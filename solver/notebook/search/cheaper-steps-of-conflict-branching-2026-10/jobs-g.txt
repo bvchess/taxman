@@ -1,0 +1,4 @@
+./unit.sh tune-carry2 g300 4050 root --gate 300
+./unit.sh tune-carry2 g200 4050 root --gate 200
+./unit.sh tune-carry2 g150 4050 root --gate 150
+./unit.sh tune-carry2 g300 3000 root --gate 300; ./unit.sh tune-carry2 g200 3000 root --gate 200; ./unit.sh tune-carry2 g150 3000 root --gate 150
