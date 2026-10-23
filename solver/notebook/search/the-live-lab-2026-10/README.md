@@ -252,6 +252,24 @@ event, the turns and seconds of the session's last result, and the cost the sess
   1000](../where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md#2026-10-22-the-tripwires-of-game-1000).
 * **Next:** the request of 06:59 asks the next study to compare the units far above the line with those on it.
 
+## 2026-10-23: the look, tested on whole games
+
+With the look on, a game took 0.79 to 0.97 of its neighbour's steps in all five pairs that could be compared, 0.85 in
+geometric mean.  The test ran on the chain on the 88-thread machine: the lab's policy file (`run.lab`) turned the look
+([glossary](../../../../docs/GLOSSARY.md#the-search), tactic `conflict_look`) on for the even games 4918 to 4948 and off
+for the odd ones.  The pairs, each a game with the look on beside neighbours with it off, are 4920 and 4921, 4928 and
+4925 with 4929, 4936 and 4935, 4940 and 4941, and 4944 and 4945.  The comparison counts steps.
+
+**Decision.**  The lab's policy turns the look on for every game from 4948.  Whether it becomes the code's default is
+open, for the project's owner.  Five pairs are few, though neighbouring games share the top of their trees (see [the
+root gap and the size of a game](../the-root-gap-and-the-size-of-a-game-2026-10/README.md)), which makes the pairs fair.
+
+## 2026-10-23: the studies stopped
+
+The studies stopped at 09:34 UTC on 2026-10-23, and stay off until a better approach.  They were not paying off, and
+adapting them cost the chain.  The `done` hook still appends a line per finished game to the lab's games history ([the
+runbook](../../../docs/runbook/lab.md)).
+
 ## Files
 
 The reports, the journal and the log are copies of the files in `~/taxman-lab/` on the machine of the chain, read with
