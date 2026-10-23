@@ -363,6 +363,10 @@ struct Walked {
     derivations_checked: u64,
     /// Members priced (`Gf2Bound::prices_excluding`) whose shortest cycle came from the parent's pricing.
     carried: u64,
+    /// Children bounded by their parent's weight split (`Gf2Bound::child_bound`), each checked against the bound of
+    /// the matroids built afresh from the child's state, and of those the bounds equal to it.
+    child_bounds: u64,
+    child_bounds_equal: u64,
 }
 
 /// Runs `f` on every engine, checks that all give the same result and returns it.
@@ -392,7 +396,10 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// the model's, so that `p` may be an extended problem with one-sided candidates (for a problem without them they are
 /// the frame set's own).  Of the forced members of a node, which can be hundreds when the need is close to the bound,
 /// at most `forced_cap` are checked, evenly spread over them.  Every tableau the first engine derives from a related
-/// one instead of building it ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.
+/// one instead of building it ([`Gf2Bound::check_derivations`]) is checked against the one a solve builds.  At each
+/// node a child is looked at as the tactic `conflict_look` looks: it promotes some members of the heaviest set and
+/// leaves out another, and the bound from the node's weight split ([`Gf2Bound::child_bound`]) does no other work and
+/// is no lower than the child's bound.
 fn walk_random_paths<const W: usize>(
     p: &Prepared<W>,
     rng: &mut Rng,
@@ -404,6 +411,8 @@ fn walk_random_paths<const W: usize>(
     let n = p.n;
     let one_sided: Bits<W> = p.model.one_sided().iter().map(|&(s, _)| s).collect();
     let mut scratch = Scratch::<W>::new();
+    // The looks draw from their own generator, so that the paths are those a walk without them takes.
+    let mut look_rng = Rng(rng.0 ^ 0x100C_A7C4_11D0_0001);
     engines[0].check_derivations();
     for _ in 0..paths {
         agree(engines, |e| e.reset(&Bits::EMPTY, &p.candidates));
@@ -450,6 +459,15 @@ fn walk_random_paths<const W: usize>(
                 let split = agree(engines, |e| e.split_without(x));
                 walked.splits_compared += u64::from(split.is_some());
             }
+            look_at_a_child(
+                p,
+                &mut look_rng,
+                engines,
+                &mut scratch,
+                (&state, &promoted, &cands),
+                &with_forced.chosen,
+                walked,
+            );
             match rng.below(10) {
                 // Promote a member of the heaviest set (the child inherits it) or any candidate.
                 0..=4 => {
@@ -554,6 +572,57 @@ fn walk_random_paths<const W: usize>(
     }
 }
 
+/// The look of the tactic `conflict_look` at a child of the node `(state, promoted, cands)` on top of `engines`,
+/// whose heaviest set is `chosen`: the child promotes a random part of it and leaves out one other member, and its
+/// candidates are narrowed as the search narrows them, with a few more dropped.  The bound from the node's weight
+/// split ([`Gf2Bound::child_bound`]) does no work but its count, and is no lower than the bound of the matroids
+/// built afresh from the child's state.
+fn look_at_a_child<const W: usize>(
+    p: &Prepared<W>,
+    rng: &mut Rng,
+    engines: &mut [Gf2Bound<'_, W>],
+    scratch: &mut Scratch<W>,
+    (state, promoted, cands): (&FrameSet<W>, &Bits<W>, &Bits<W>),
+    chosen: &Bits<W>,
+    walked: &mut Walked,
+) {
+    let members = (*chosen & *cands).to_vec();
+    if members.len() < 2 {
+        return;
+    }
+    let left_out = members[rng.below(members.len() as u64) as usize];
+    let added: Bits<W> = members.iter().copied().filter(|&y| y != left_out && rng.chance(40)).collect();
+    if added.is_empty() {
+        return;
+    }
+    let Some(next) = p.model.promote_all_using(scratch, state, &added) else { return };
+    let mut child_cands = p.model.narrow(&next, &(*cands - added).without(left_out));
+    for y in child_cands.to_vec() {
+        if rng.chance(5) {
+            child_cands.remove(y);
+        }
+    }
+    let room = p.max_total.saturating_sub(promoted.len() + added.len());
+    let cap = room.min(p.model.max_promotions_among(&next, &child_cands).max(0) as u32);
+    let before = engines[0].stats();
+    let Some(bound) = agree(engines, |e| e.child_bound(&added, &child_cands)) else { return };
+    let after = engines[0].stats();
+    assert_eq!(
+        Gf2Stats { child_bounds: before.child_bounds, ..after },
+        before,
+        "n={}: a child's split bound worked",
+        p.n
+    );
+    // The child's bound from matroids built afresh from its state, which leaves the engines' workspaces as they were.
+    let fresh_graph = Gf2Graph::new(&p.model, &next, &child_cands);
+    let mut fresh = Gf2Bound::<W>::new(&fresh_graph);
+    fresh.reset(&Bits::EMPTY, &child_cands);
+    let value = fresh.evaluate(cap, None).value;
+    assert!(value <= bound, "n={}: promoting {added:?} from {promoted:?}, the bound {value} is above {bound}", p.n);
+    walked.child_bounds += 1;
+    walked.child_bounds_equal += u64::from(value == bound);
+}
+
 /// Walks `paths` random paths of each of `boards` at W = 16 (`walk_random_paths`, with the one engine a board needs),
 /// and checks that the walks reached at least `percent` percent of what [`levels_match_fresh_matroids_along_random_paths`]
 /// asks: the bound of every node equals the bound of the matroids built afresh from its state, and the forced members,
@@ -586,6 +655,9 @@ fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64) {
     );
     println!("{carried} prices carried");
     assert!(at_least(carried, 4000), "{carried} prices carried");
+    let Walked { child_bounds, child_bounds_equal, .. } = walked;
+    println!("{child_bounds} children bounded by their parent's split, {child_bounds_equal} equal to the solve's");
+    assert!(at_least(child_bounds, 3000) && child_bounds_equal > 0, "{child_bounds} {child_bounds_equal}");
 }
 
 /// [`levels_match_fresh_matroids_along_random_paths`] along 3 paths of the boards 60, 120, 200 and 330.

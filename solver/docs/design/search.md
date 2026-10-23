@@ -295,20 +295,30 @@ looks only where no member is forced, and where:
 If that child is cut on sight, the node branches on `K`.  A child is cut on sight when its promotion fails, or its
 largest candidates, its GF(2) bound, or a conflict of its heaviest set all of whose members it forces put it below its
 need.  The look does not apply the rule of `symmetry`, the matching bound, the Lagrangian bound or the conflicts that
-the node knows, so a child that it lets through may still be cut when the search makes it.
+the node knows, so a child that it lets through may still be cut when the search makes it.  The child leaves out a
+member of the node's heaviest set, so it inherits no heaviest set, and a solve of its bound costs several evaluations of
+a node.  So the look first bounds the child's bound from the node's weight split, with no solve
+([gf2-bound.md](gf2-bound.md#the-gf2-bound), the item "A child's bound from its parent's split"), and solves the child
+only where that bound reaches the need.  It cuts nearly every child that the solve cuts: there the substitute that made
+`c` cheap is mostly a candidate that the child lost, and the split's bound loses both.
 
 *Why the look is exact.*  It only chooses between two true conflicts of the node, `K` and the one conflict branching
 chose, so the second fact of [the default step's](#the-default-step) exactness holds for it as for the choice.  It must
 also leave the node's state as it found it.  The child is pushed on the GF(2) stack and popped before the node reads its
-own level again, which then resolves its level as it does after any child.  The conflict that cuts the child is learned
-as a nogood of the root, which holds at every node, as the search learns its own.  No node's list of known conflicts
-gains anything from it.  So the look may change between a search's units, as the choice may ([lab.md](lab.md)).
+own level again, which then resolves its level as it does after any child.  Where the split's bound cuts the child,
+nothing is pushed and the workspace keeps the node's tableau; the split's bound is never below the child's own (weak
+duality), so it cuts only children that the solve would cut, and the look chooses as it would with the solve.  The
+conflict that cuts the child is learned as a nogood of the root, which holds at every node, as the search learns its
+own.  No node's list of known conflicts gains anything from it.  So the look may change between a search's units, as the
+choice may ([lab.md](lab.md)).
 
-*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the default's steps, and a step
-costs 12% more; on the whole games 3000, 3200, 3500 and 4050 it takes 0.975 of the default's steps together.  Whole
-games of that size have few deep nodes of large gap, so it is a test on a game of the chain that decides it.  The
-measurements are in [when a node should use conflict
-branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).
+*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the default's steps; on the whole
+games 3000, 3200, 3500 and 4050 it takes 0.975 of the default's steps together.  Whole games of that size have few deep
+nodes of large gap, so it is a test on a game of the chain that decides it.  The measurements are in [when a node
+should use conflict branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).
+With the split's bound, units of games 4875 and 4950 take 0.79 to 0.95 of the CPU that they took with a look that
+solves every child, with the same trees ([cheaper steps of conflict
+branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
 
 ## The starting incumbent, the ceiling and the seed
 

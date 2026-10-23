@@ -313,6 +313,8 @@ pub struct Meet<const R: usize> {
     split_pred: Vec<u32>,
     repl: [Vec<i64>; 2],
     walk: Vec<u32>,
+    /// [`split_bound_among`](Self::split_bound_among)'s elements of positive weight, with their weights.
+    order: Vec<(i64, u32)>,
     #[cfg(debug_assertions)]
     cold: Vec<i64>,
     /// [`without`](Self::without)'s scratch: its search's distances, predecessors (towards the member searched
@@ -579,6 +581,7 @@ impl<const R: usize> Meet<R> {
             split_pred: vec![NONE; n + 1],
             repl: [vec![0; n], vec![0; n]],
             walk: Vec::with_capacity(n + 1),
+            order: Vec::with_capacity(n),
             #[cfg(debug_assertions)]
             cold: vec![0; n + 1],
             reach: vec![INF; n],
@@ -787,6 +790,41 @@ impl<const R: usize> Meet<R> {
                 -gain
             }
         }
+    }
+
+    /// An upper bound on the weight of the elements of `live` in any common independent set that holds `fixed`
+    /// beside them (`fixed` common independent, none of it in `live`): with `pot` the weight split of a heaviest set
+    /// of all sizes of `p` (its `w1` by element, as [`potentials`](Self::potentials) has it), the heaviest
+    /// independent set of `A` for `w1` plus that of `B` for `w2`, each among the sets of `live` elements that are
+    /// independent with `fixed` (weak duality, see the module docs, "The weight split": `w = w1 + w2` on every
+    /// element, so a common independent set `J` of `live` elements with `fixed` weighs `w1(J) + w2(J)`, each at
+    /// most its matroid's heaviest).  Each heaviest set is greedy (a matroid's, contracted by `fixed`): the elements
+    /// of positive weight there, by decreasing weight, each kept while independent.  It uses the spans of the
+    /// uncontended elements, not the tableau, so the workspace still holds its solve.
+    pub fn split_bound_among(&mut self, p: &Problem<'_, R>, pot: &[i64], live: &[u32], fixed: &[u32]) -> i64 {
+        let w = p.weight;
+        let mut total = 0;
+        for m in 0..2 {
+            for span in &mut self.spans[m] {
+                span.clear();
+            }
+            for &e in fixed {
+                let i = e as usize;
+                let inserted = self.spans[m][usize::from(p.block[m][i])].insert(p.vector[m][i], e);
+                debug_assert!(inserted, "the fixed elements are dependent");
+            }
+            let weight = |i: usize| if m == 0 { pot[i] } else { w[i] - pot[i] };
+            self.order.clear();
+            self.order.extend(live.iter().map(|&e| (weight(e as usize), e)).filter(|&(we, _)| we > 0));
+            self.order.sort_unstable_by(|a, b| b.cmp(a));
+            for &(we, e) in &self.order {
+                let i = e as usize;
+                if self.spans[m][usize::from(p.block[m][i])].insert(p.vector[m][i], e) {
+                    total += we;
+                }
+            }
+        }
+        total
     }
 
     /// The weight and size of a common independent set of the elements `live` (ascending) found greedily: `base`

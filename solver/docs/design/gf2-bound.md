@@ -87,6 +87,13 @@ misses are the *odd* cores of movers with three or more factors.
   least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of
   packed (distance, vertex) keys, bucketed by distance and the keys of one distance sorted once, which come out in the
   binary heap's order.
+* **A child's bound from its parent's split.**  The same weak duality bounds a child before it is made.  A child that
+  promotes members `F` of `I*` has the parent's problem contracted by `F`, so each of its common independent sets `J`
+  makes `J ∪ F` one of the parent's, with no candidate the child lacks.  So `w1(J) + w2(J)` is at most the heaviest
+  independent set of `A` for `w1` plus that of `B` for `w2`, each among the sets of the child's candidates that are
+  independent with `F`, and each of those is greedy: two passes over the child's candidates, with no solve and the
+  workspace's tableau untouched (`Gf2Bound::child_bound`).  The look of `conflict_look` cuts its child where this is
+  below the child's need, and solves the child only where it is not ([search.md](search.md#conflict-branching)).
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection is
   lowest.  The search reads each such bound off the exchange graph where it certifies it, and solves it where not: in
   the order of the split's bounds, each solve stopped once it reaches both the lowest so far and the need, after a

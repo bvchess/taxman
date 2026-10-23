@@ -1724,8 +1724,10 @@ struct Look<'r, const W: usize> {
 /// sight: its promotion fails, or its largest candidates, its GF(2) bound, or a conflict of its heaviest set all of
 /// whose members it forces put it below its need (the checks of `check_child`, less the rule of `symmetry`, the
 /// matching bound, the Lagrangian bound and the propagation of the node's known conflicts, so a "no" may be a child the
-/// search would cut).  The child is pushed on `g` and popped.  The conflict found is learned as a nogood, as the search
-/// learns its own, and is known to no node.  Nothing else a node's step reads changes: the node's level in `g`
+/// search would cut).  Its GF(2) bound is first bounded from the node's weight split ([`Gf2Bound::child_bound`]),
+/// which is never below it: where that is below the need the child is cut as its solve would cut it, with nothing
+/// pushed.  Otherwise the child is pushed on `g`, solved and popped.  The conflict found is learned as a nogood, as the
+/// search learns its own, and is known to no node.  Nothing else a node's step reads changes: the node's level in `g`
 /// resolves again at its next read, as after any child.
 #[allow(clippy::too_many_arguments)]
 fn in_child_cut<const W: usize>(
@@ -1764,8 +1766,22 @@ fn in_child_cut<const W: usize>(
     if cands.sum_largest(max_next) < need {
         return true;
     }
+    // An upper bound on the child's GF(2) bound from the node's weight split, with no solve: below the need, the
+    // bound is too, and the child is cut as the solve would cut it.
+    let split_bound = g.child_bound(&added, &cands);
+    if split_bound.is_some_and(|bound| bound < need) {
+        #[cfg(debug_assertions)]
+        {
+            g.push_all(&added, &cands);
+            let value = g.evaluate(max_next, None).value;
+            g.pop();
+            assert!(value <= split_bound.unwrap(), "the child's bound {value} is above its split bound");
+        }
+        return true;
+    }
     g.push_all(&added, &cands);
     let eval = g.evaluate(max_next, Some(need));
+    debug_assert!(split_bound.is_none_or(|bound| eval.value <= bound), "a child's bound is above its split bound");
     let cut = eval.value < need || {
         let mut known = Vec::new();
         let mut seek =

@@ -19,8 +19,10 @@ with no exception.  Kept: a child carries those prices, and a check whose bound 
 split.  With the same trees, a step costs 0.66 to 0.81 of the CPU on units of 4875 and 4914, and the whole game 4050
 0.79.  Carrying the other prices too, where it is not proved, saves another 11 to 14% a step but changes the trees, and
 the whole games split; not kept.  The look's cost is the GF(2) solve of the child it looks at, 3.6 to 7 times an
-evaluation; a solve warm-started from the node's heaviest set without the cheapest member would cut the same children
-for less (not built).
+evaluation.  Kept: the look bounds its child from the node's weight split first, with no solve, which cuts 86 to 100%
+of the children that the solve cuts; with the same trees, units of 4875 and 4950 take 0.79 to 0.95 of the CPU of the
+look that solves every child.  A repair of the node's heaviest set by certified cycles would not have cut them: the
+children lose `c` and its substitute, and their heaviest set is smaller.
 
 ## 2026-10-23: the setup
 
@@ -194,21 +196,88 @@ A step costs 11 to 14% less, but the trees change, by +0.6 to +8.4% where they f
 3000 loses 4.5%, 4050 gains 4.5%.  Not kept: the gain is within what such a change does to a tree, and a search
 exact in its prices is easier to trust and to measure.
 
+## 2026-10-23: a cheaper look
+
+**The units.**  The lab's snapshot of game 4914 is gone, so three units of game 4950 stand in for its three: sampled
+from the chain's checkpoint of 4950 at 08:38 UTC (`tune units 4950 n4950.ckpt --sample 400 --seed 7`), chosen as the
+4914 ones were, by a gap near 1,150 and a depth of about 10, 55 and 60: 4950-1486 (depth 14, gap 1,267), 4950-4352
+(depth 53, gap 1,153) and 4950-853 (depth 60, gap 1,161), in `units-4950.jsonl`.  Game 4950 was not yet proven, so
+they run from the checkpoint's incumbent, 549,269, the best of every run.  4875-10 is the same unit as above.  Every
+run had the look on (`--tactic conflict_look=on`), one thread, `--node-limit 60000`, at nice 19 beside the chain,
+which takes every thread of the machine at idle priority, four runs at a time.
+
+**What the look's children lose.**  A study build (`LOOKSTUDY=1`) printed, at each look, the node's heaviest set
+without `c` that the pricing certified, less the promoted members, and the members of it that the child lost.  It
+lost none at 24 to 603 looks a unit and one at nearly all the others (2 at 30 of 3,540), and every child that the
+bound cut had lost one.  Of the node's own heaviest set the child lost only `c` at 95% of the looks: the member lost
+is the substitute that `c`'s cycle brought in, which promoting the rest of `K` takes from the child's candidates.  The
+children's solves took 59 to 117 augmentations on average, and the cut children 83 to 93% of the look's solving time.
+The loss is large (the solved bound is a median 1,334 to 1,486 below the need where it cut), and the heaviest set
+without `c` and its substitute is smaller than the node's, which a cycle of the exchange graph does not certify, so
+the repair by certified cycles that the last section proposed would not have cut them.  It was not built.
+
+**The bound from the node's split.**  The node's weight split bounds every common independent set of its problem that
+holds the promoted members and no candidate that the child lacks (weak duality: `w = w1 + w2` on every element), and
+so the child's bound, with two greedy passes over the child's candidates and no solve (`Gf2Bound::child_bound`,
+`Meet::split_bound_among`).  The look takes it first, and cuts the child where it is below the need; otherwise it
+solves the child as before.  A bound above the child's own cuts only children that the solve cuts, so the trees are
+the same, and the workspace keeps the node's tableau where the split cuts, so the node does not make it again.  The
+bound of the split without one member, which a node has already for every member of its heaviest set, cut none: it
+loses `c` but not its substitute, and was at least 147 above the need where the solve cut (300 on the units of
+4950).
+
+At each look a second study build (`look-study.patch`, the same variable) printed which way the look went and its
+time (`look-study.py` sums it up, `look-study.txt`):
+
+| unit | looks that reached the bound | cut by the split's bound | solved | of those, cut by the solve | the split's bound less the solved one (median) |
+|---|---|---|---|---|---|
+| 4875-10 | 669 | 328 (0.10 s) | 341 (2.13 s) | 55 (0.80 s) | 6 |
+| 4950-1486 | 1,260 | 635 (0.17 s) | 625 (1.14 s) | 0 | 8 |
+| 4950-4352 | 1,441 | 994 (0.25 s) | 447 (1.32 s) | 26 | 8 |
+| 4950-853 | 170 | 128 (0.04 s) | 42 (0.26 s) | 0 | 8 |
+
+So the split's bound cuts 86 to 100% of the children that the bound cuts, at about 0.3 ms a look, where their solve
+took 10 to 14 ms.
+
+**Side by side** (`tune-base` at cab9648, `tune-warm1` with the change; two rounds, the order swapped;
+`look-runs.jsonl`, `look-cmp.py`):
+
+| unit | steps | CPU s, base | split | ratio | second round: base | split | ratio |
+|---|---|---|---|---|---|---|---|
+| 4875-10 | 38,540 | 80.3 | 75.6 | 0.941 | 79.4 | 75.7 | 0.954 |
+| 4950-1486 (stopped) | 60,415 | 118.8 | 110.1 | 0.927 | 118.6 | 108.9 | 0.918 |
+| 4950-4352 (stopped) | 60,415 | 107.5 | 93.8 | 0.873 | 110.3 | 99.2 | 0.899 |
+| 4950-853 | 8,170 | 15.5 | 12.2 | 0.787 | 16.5 | 14.4 | 0.871 |
+| all four | | 322.2 | 291.7 | 0.906 | 324.9 | 298.2 | 0.918 |
+
+Every unit took the same steps, found the same best and had the same counters of its results line but the GF(2)
+bound's own: 0.81 to 0.89 of the solves and 0.71 to 0.85 of the augmentations.  The whole game 3000 with the look on
+(`tune solve 3000 --ids root --known results/strict.jsonl`, the two builds side by side) took the same 117,197 steps
+and the same GF(2) solves, 39.6 and 39.2 CPU seconds: its looks are few and none was cut by the split.
+
+**Tests.**  The random paths of the GF(2) tests look at a child at every node, as the look does (some members of the
+heaviest set promoted, another left out, the candidates narrowed and a few more dropped), and check that the split's
+bound does no other work and is no lower than the bound of the matroids built afresh from the child's state: 223
+children on the few paths, 4,126 on the long ones, 81 and 1,094 of them equal.  The looks draw from a generator of
+their own, so the paths and every other count are those of the walks without them.  Debug builds of the search check
+every bound the split gives against the child's solved bound.  The tripwires and soundness tests pass in release.
+
 ## Where this leaves the question
 
 **Kept, with the same trees:** a child carries its parent's prices where its heaviest set is its parent's less what it
-promoted, and a check below the need skips its split.  A step of conflict branching on the units of 4875 and 4914
+promoted, a check below the need skips its split, and the look bounds its child from the node's split before it
+solves it.  A step of conflict branching on the units of 4875 and 4914
 costs 0.66 to 0.81 of what it did, the whole game 4050 0.79.  What a step spends now, at 4875-10 (the study's timers,
 scaled to the carry): the GF(2) bound's evaluations about half, the prices left (at a node's later checks and at the
 children that lost a member of their parent's set) about a sixth, the ordered conflicts' peels 7%, strong branching 4%.
 
 **What would go further,** ranked:
 
-1. *A cheaper look* (with `conflict_look` on): solve the look's child from the node's heaviest set without the cheapest
-   member, less the promoted, repairing only the members the narrowing takes from it.  The same bound, so the same
-   cuts and trees; it could save most of the look's 2 to 20% of the CPU.  To build: a repair of several members in
-   `meet` (a certified child repairs one).  The test: the four units above with the look on, steps the same, CPU side
-   by side.
+1. *The look's last solves.*  Done in part: [a cheaper look](#2026-10-23-a-cheaper-look) cuts most of the look's
+   children from the node's split.  What is left is the solve of the children that the split does not cut, 1 to 3% of
+   a unit's CPU, of which the solve cuts at most a sixth.  An exact repair of the node's heaviest set without
+   `c` and its substitute would need the smaller sets' structure (a path through `c`, not a cycle), and could reach
+   the bound only where the split falls short.
 2. *The gate on a chain game.*  With the carry, gates 200 and 150 win on game 3000 (0.81, 0.77 of the CPU) and lose
    on 4050 (1.09, 1.27).  The lab's per-game gate is the place to try 200 on a game near 4900.
 3. *The prices left, exactly.*  A flip along a cycle changes the arcs of the blocks it touches, and a shorter cycle
@@ -231,8 +300,14 @@ children that lost a member of their parent's set) about a sixth, the ordered co
 * `runs.jsonl`: every run, a line each with its label (the job's), and `study.txt` the study's lines; `collect.py`
   made both from the runs' folders.  `cmp.py runs.jsonl A B` sets two labels side by side; `pstudy.py study.txt`
   sums up the study.
+* The cheaper look, run on this machine's chain host from a scratch folder: `look-build.sh NAME` (a build of `tune`),
+  `look-unit.sh` (one unit or whole game, as `unit.sh`), `look-jobs.py LABEL A B` (the four units, two builds side
+  by side, run by `queue.sh`), `look-cmp.py A B` (two labels side by side), `look-runs.jsonl` (every run of the side
+  by side comparison, a line each with its label and CPU seconds), `units-4950.jsonl` (the three units of 4950), and
+  `look-study.patch` with `look-study.py` and its output `look-study.txt` (the study of which way each look went).
 
 ## Commits
 
 The change, its docs (`gf2-bound.md`, `search.md`) and this entry are one commit on master, its message opening "A
-child carries its parent's prices".
+child carries its parent's prices".  The cheaper look is a commit of its own, its message opening "The look of
+conflict_look bounds its child from the node's weight split".

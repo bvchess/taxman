@@ -483,6 +483,8 @@ pub struct Gf2Stats {
     pub carried: u64,
     /// Members found forced by `Levels::force_by_cycles` where the split left them free.
     pub forced_by_cycles: u64,
+    /// Children bounded with no solve ([`Gf2Bound::child_bound`]).
+    pub child_bounds: u64,
     /// Tableaux of solved levels made again ([`resolve`]): derived from a related one rather than built, of those
     /// from a copy, and the blocks built in them all.
     pub derived: u64,
@@ -610,6 +612,18 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// with nothing else done to the stack meanwhile, it becomes the top level, solved.
     pub fn keep_excluded(&mut self) {
         dispatch!(self, l => l.keep_excluded())
+    }
+
+    /// An upper bound on the bound of the child of the top level that promotes `added` (members of its heaviest set)
+    /// with the candidates `child_cands`: what [`push_all`](Self::push_all) and [`evaluate`](Self::evaluate) would
+    /// find for the child, or more, with no solve and nothing pushed.  It is the top level's weight split's bound on
+    /// the common independent sets of its problem that hold `added` and no candidate but the child's, less `added`
+    /// ([`Meet::split_bound_among`]): the child's problem is the top level's contracted by `added`, so each set of
+    /// the child's with `added` is one of those.  `None` if the top level has no split (it was not evaluated with a
+    /// need that its bound reaches).  The stack is left as a push and a pop leave it, and the workspace holds the
+    /// tableau it held.
+    pub fn child_bound(&mut self, added: &Bits<W>, child_cands: &Bits<W>) -> Option<u64> {
+        dispatch!(self, l => l.child_bound(added, child_cands))
     }
 
     /// The weight split's bound on the top level without its member `x`, if the last evaluation asked for forced
@@ -1311,6 +1325,31 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             std::mem::swap(&mut self.scratch, &mut self.kept);
             self.kept_for = Some((self.depth, x));
         }
+    }
+
+    fn child_bound(&mut self, added: &Bits<W>, child_cands: &Bits<W>) -> Option<u64> {
+        // As a push and a pop leave the stack.
+        self.kept_for = None;
+        self.prior_for = None;
+        let graph = self.graph;
+        let level = &self.levels[self.depth];
+        // The split is of the heaviest set of all sizes, and `added` is common independent: members of that set.
+        let set = level.history.last()?;
+        if !(level.solved && level.settled && level.has_pot && added.is_subset(set)) {
+            return None;
+        }
+        self.live_idx.clear();
+        self.live_idx.extend((level.live & *child_cands).iter().map(|x| graph.index[x as usize]));
+        self.start_idx.clear();
+        self.start_idx.extend(added.iter().map(|x| graph.index[x as usize]));
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: &graph.weight,
+        };
+        let bound = self.meet.split_bound_among(&problem, &level.pot, &self.live_idx, &self.start_idx);
+        self.stats.child_bounds += 1;
+        Some(bound.max(0) as u64)
     }
 }
 
