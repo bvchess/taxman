@@ -50,9 +50,14 @@ class Limits(unittest.TestCase):
 
 
 class Ticks(unittest.TestCase):
-    def test_linux_reads_the_cpu_line_of_proc_stat_and_counts_waiting_for_input_as_idle(self):
+    def test_linux_reads_the_cpu_line_of_proc_stat_and_counts_waiting_for_input_and_niced_work_as_idle(self):
         text = "cpu  100 5 50 800 20 0 5 0 0 0\ncpu0 50 2 25 400 10 0 2 0 0 0\nintr 12345\n"
-        self.assertEqual(quick_check.ticks_in_proc_stat(text), quick_check.Ticks(idle=820, total=980))
+        self.assertEqual(quick_check.ticks_in_proc_stat(text), quick_check.Ticks(idle=825, total=980))
+
+    def test_a_machine_busy_with_niced_work_only_is_quiet(self):
+        before = quick_check.ticks_in_proc_stat("cpu  500 100000 400 1000 0 0 0 0 0 0\n")
+        after = quick_check.ticks_in_proc_stat("cpu  550 200000 450 1100 0 0 0 0 0 0\n")
+        self.assertAlmostEqual(quick_check.busy_share(before, after), 100 / 100200)
 
     def test_the_share_is_what_the_ticks_between_two_readings_say_was_not_idle(self):
         before = quick_check.Ticks(idle=1000, total=2000)

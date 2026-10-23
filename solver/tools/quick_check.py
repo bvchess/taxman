@@ -19,6 +19,10 @@ exits with status 1 if
   * the tests take more than TOTAL_LIMIT seconds (their time, not the build's), or
   * a test uses more than TEST_LIMIT seconds of CPU.
 
+Work run niced (at a priority below the normal) counts as idle, not as busy: it yields its CPUs to the tests, so a
+machine that is busy only with such work is quiet enough.  The tests still share a core's hyperthread and the caches
+with it, which the CPU-second limits feel; testing.md says what to do if they fail for that.
+
 A test is held to its CPU seconds, not to the seconds it takes: with every CPU busy a test takes several times as long
 as it does alone, and its CPU seconds do not change.  The limits are here and nowhere else; raising either needs
 the project owner's approval.  A test that takes more than about a second is long: solver/docs/design/testing.md says what to do
@@ -66,18 +70,26 @@ class Ticks(NamedTuple):
     total: int
 
 
+# Niced work does not make the machine busy.  Work at a low priority (a long search at nice 10 or SCHED_IDLE) gives its
+# CPUs up to a test the moment the test wants one, so the test runs as it would on a machine with nothing else to do,
+# except for what it shares with that work (a core's other hyperthread, the caches).  Both systems' `nice` ticks are
+# counted as idle, here, in the one place where the ticks are read.
+NICED_IS_IDLE = True
+
 WRAP = 1 << 32  # macOS counts ticks in 32 bits, and a laptop that stays up wraps them within weeks
 
 
 def ticks_in_proc_stat(text: str) -> Ticks:
     """Linux: the first line of /proc/stat is `cpu user nice system idle iowait irq softirq steal ...`, the ticks of all
-    the CPUs together; a CPU that waits for input or output is idle."""
+    the CPUs together; a CPU that waits for input or output is idle, and so is one that runs niced work (see
+    NICED_IS_IDLE)."""
     fields = [int(field) for field in text.splitlines()[0].split()[1:9]]
-    return Ticks(fields[3] + fields[4], sum(fields))
+    return Ticks(fields[3] + fields[4] + fields[1], sum(fields))
 
 
 def ticks_of_mach() -> Ticks:
-    """macOS: the host's `host_cpu_load_info`, the ticks of user, system, idle and nice time of all the CPUs."""
+    """macOS: the host's `host_cpu_load_info`, the ticks of user, system, idle and nice time of all the CPUs; nice time
+    is idle (see NICED_IS_IDLE)."""
     libc = ctypes.CDLL("/usr/lib/libSystem.dylib")
     libc.mach_host_self.restype = ctypes.c_uint32
     libc.host_statistics.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.POINTER(ctypes.c_uint32),
@@ -87,7 +99,7 @@ def ticks_of_mach() -> Ticks:
     info, count = (ctypes.c_uint32 * 4)(), ctypes.c_uint32(4)
     if libc.host_statistics(libc.mach_host_self(), host_cpu_load_info, info, ctypes.byref(count)) != 0:
         raise OSError("host_statistics failed")
-    return Ticks(info[idle], (info[user] + info[system] + info[idle] + info[nice]) % WRAP)
+    return Ticks((info[idle] + info[nice]) % WRAP, (info[user] + info[system] + info[idle] + info[nice]) % WRAP)
 
 
 def read_ticks() -> Optional[Ticks]:

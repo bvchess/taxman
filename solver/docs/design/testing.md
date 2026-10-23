@@ -20,7 +20,10 @@ included.
 
 **It waits for a quiet machine**, because its limits are for one with nothing else to do.  When the build has ended it
 samples what everything on the machine uses of the CPUs for 2 s, and if other work uses more than 25% of the CPUs it
-says so, names the busiest processes and samples again until the machine is quiet.  After 10 minutes it fails with
+says so, names the busiest processes and samples again until the machine is quiet.  Work run niced (a long search at
+nice 10 or SCHED_IDLE) counts as idle, not busy: it gives its CPUs up to a test at once, so the machine is as quiet for
+the tests as one with nothing else to do; they still share a core's other hyperthread and the caches with it, so on such
+a machine a test may use more CPU seconds than alone, which is the chain's doing and not the test's.  After 10 minutes it fails with
 "machine busy" and runs no test, so that a busy machine is never taken for a slow suite.  Two checks do not run at once:
 the second waits for the first's lock (a file in the system's temporary directory, which the system frees when a check
 ends, however it ends) before it builds anything, says so, and counts that wait in the same 10 minutes.
