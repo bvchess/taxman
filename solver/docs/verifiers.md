@@ -47,17 +47,17 @@ each line's proof and assumptions again, so that a hand edit cannot change them.
   no count, and the key on a line that ran no search.  Neither refuses a line for lacking the key, as every line made
   before the cut does.
 
-On 2026-10-22, the committed chain gave, on four threads of the laptop:
+On 2026-10-23, the committed chain gave, on four threads of the chain's machine, busy with the chain:
 
 ```
 $ taxman verify-results --threads 4 results/strict.jsonl
-results/strict.jsonl: 4900 completed games, n = 1..=4900 (0 missing), 0 incomplete lines
-  proof: trivial 13, prime_formula 611, cap 429, exhausted 1551, same_search 1914, known 382
-  assumptions: none in 4518 of 4900 games; 382 assume statement U at 298 boards in all
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1586, prime formula 653
-  searches shortened by the near-repeat cut, by proof: none
+results/strict.jsonl: 4949 completed games, n = 1..=4949 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 618, cap 432, exhausted 1572, same_search 1932, known 382
+  assumptions: none in 4567 of 4949 games; 382 assume statement U at 298 boards in all
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1602, prime formula 660
+  searches shortened by the near-repeat cut, by proof: exhausted 2
 0 games are in more than one file, with equal scores in all
-checked in 17756.4 ms
+checked in 75176.2 ms
 ```
 
 What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal, when the
