@@ -46,7 +46,8 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 |---|---|---|
 | the game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each kind of proof |
 | the architecture | [architecture.md](design/architecture.md) | find your way in the code: the modules in their reading order |
-| the search | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, conflict branching, the start, the finder |
+| the search | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, conflict branching, the start, the near-repeat cut |
+| the finder | [finder.md](design/finder.md) | see how a thread beside a long search looks for a better incumbent, and why it cannot make an answer wrong |
 | extended mode | [extended-mode.md](design/extended-mode.md) | search the extended problem, with one-sided candidates, that a certificate of U searches |
 | the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
 | the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |

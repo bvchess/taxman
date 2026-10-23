@@ -467,7 +467,7 @@ them.
   search has taken NODES steps (over all its invocations; default 1000000, and 0 starts none), which looks for a better
   game than the incumbent and offers it to the search; `--finder-seconds S` is its budget (default 60).  It changes no answer, and it is not part of a
   checkpoint: a checkpoint resumes with any finder or none.  The line records what it did (`engine.finder`, [the
-  reference](../docs/REFERENCE.md#a-results-line---out-schema-5)); [the design](../docs/design/search.md#the-finder) says
+  reference](../docs/REFERENCE.md#a-results-line---out-schema-5)); [the design](../docs/design/finder.md) says
   how it works.
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the
   checkpoint of a finished game is left over, and the next run deletes it.
@@ -507,7 +507,7 @@ merged file, so that each game sees the game before it whichever block made it, 
 
 Its file, `explore.jsonl`, holds every line of every block and pass.  It is **not a chain**, and never goes into
 `results/strict.jsonl`: some of its games have only an unfinished search, or none, and each proof in it rests only on
-the games it holds.  Both verifiers accept it ([the reference, "The verifiers"](../docs/REFERENCE.md#the-verifiers)).
+the games it holds.  Both verifiers accept it ([verifiers.md](../docs/verifiers.md)).
 
 **The ledger** works on a whole stretch of games at once instead of in order.  For every game it keeps a lower bound
 with a game that reaches it, and an upper bound, each with how it was derived, and a game is proven when its bounds

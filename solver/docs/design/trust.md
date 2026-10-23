@@ -19,13 +19,13 @@ refuses no game for what it assumes: the line says it, and the verifiers count i
 
 **Checks and referees.**  `game::replay_finished` replays every game before it counts, the solver checks its arithmetic
 and the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`, and two verifiers read results files without changing them:
-`taxman verify-results`, and `solver/tools/check_results.py`, an independent referee in Python ([REFERENCE.md, "The
-verifiers"](../REFERENCE.md#the-verifiers) says what each checks).  Both read results lines of schema 5 only.  Both
-derive the proof and the assumptions again from a line's fields, so both refuse a line whose fields contradict each
-other (say a sum at the ceiling without `reached_cap`).  A line that cites a known source is checked against the
-sources, which both read as they are (`known::Known::check_cite`; the Python referee from the lines of the files).  No
-check can catch a game that is legal, finished and within the ceilings but not optimal, when the game of n − 1 is not
-optimal either: that is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
+`taxman verify-results`, and `solver/tools/check_results.py`, an independent referee in Python
+([verifiers.md](../verifiers.md) says what each checks).  Both read results lines of schema 5 only.  Both derive the
+proof and the assumptions again from a line's fields, so both refuse a line whose fields contradict each other (say a
+sum at the ceiling without `reached_cap`).  A line that cites a known source is checked against the sources, which both
+read as they are (`known::Known::check_cite`; the Python referee from the lines of the files).  No check can catch a
+game that is legal, finished and within the ceilings but not optimal, when the game of n − 1 is not optimal either: that
+is what the proof kinds and the assumptions track, and why a chain from n = 1 matters.
 
 **Result lines** are one JSON object per line ([REFERENCE.md, "A results line
 (`--out`, schema 5)"](../REFERENCE.md#a-results-line---out-schema-5)).  A line is never rewritten, and a run locks the
@@ -42,17 +42,19 @@ a checkpoint of another search.  It holds:
 
 A search tuned as the builds before those tactics were (`force_window=80` and the other five at their defaults) writes
 version 5, which implies that tuning, so its checkpoint is the one those builds wrote; a search tuned otherwise writes
-version 6.  The default's window is `all`, so the default's search writes version 6, and resumes a checkpoint of
-version 5 (or 4) only as `--tactic force_window=80`, as for any tactic that differs; a build from before that change
-reads a checkpoint of version 6 as the search it is.  The tactics that set how the nogoods are kept (`nogood_period`,
+version 6.  The default's window is `all`, so the default's search writes version 6, and resumes a checkpoint of version
+5 (or 4) only as `--tactic force_window=80`, as for any tactic that differs; a build from before that change reads a
+checkpoint of version 6 as the search it is.  The tactics that set how the nogoods are kept (`nogood_period`,
 `nogood_keep` and `nogood_limit`) are in no version: they change the trees and never the answer, and a resumed search
-starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`, [search.md, "The
-finder"](search.md#the-finder)) is in none either: it only offers sets, each after the check below, so a checkpoint
-resumes with any finder or none.  The switches `conflict_branching` and `conflict_look` have a bit each among the search
-tactics, which records how the search began and binds nothing, since the switches only choose which true conflict a
-node branches on ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with them on or
-off, those of the builds before them, whose bits are clear, included.  A build before `conflict_branching` refuses a
-checkpoint with it on, its default, as unknown tactics, and a build before `conflict_look` refuses one with it on.
+starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`,
+[finder.md](finder.md)) is in none either: it only offers sets, each after the check below, so a checkpoint resumes with
+any finder or none.  The switches `conflict_branching` and `conflict_look` have a bit each among the search tactics,
+which records how the search began and binds nothing, since the switches only choose which true conflict a node branches
+on ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with them on or off, those of
+the builds before them, whose bits are clear, included.  So does `near_repeat`, whose bit binds nothing either: each run
+of a search sets the cut up again from the game before, as it takes its ceiling.  A build before `conflict_branching`
+refuses a checkpoint with it on, its default, as unknown tactics, and a build before `conflict_look` or `near_repeat`
+refuses one with that tactic on.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header

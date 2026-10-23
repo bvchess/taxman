@@ -370,7 +370,8 @@ fn forgetting_nogoods_often_does_not_change_answers() {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
             let every = Forgetting::every(period);
-            let r = search_forgetting(&p, &config(threads), &[], None, false, None, every, None, None, None).unwrap();
+            let r =
+                search_forgetting(&p, &config(threads), &[], None, false, None, every, None, None, None, None).unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -415,8 +416,9 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for forgetting in policies {
             for threads in [1, 2] {
-                let r = search_forgetting(&p, &config(threads), &[], None, false, None, forgetting, None, None, None)
-                    .unwrap();
+                let r =
+                    search_forgetting(&p, &config(threads), &[], None, false, None, forgetting, None, None, None, None)
+                        .unwrap();
                 let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
                 assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
                 assert_eq!(r.sum, golden_sum(g), "{what}");
@@ -1104,9 +1106,17 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&looking.encode()), Ok(looking));
     assert!(!header.tactics.conflict_look);
 
+    // So is the near-repeat cut, which is on by default.
+    let mut cutting = header;
+    cutting.tactics.near_repeat = !header.tactics.near_repeat;
+    assert_eq!(cutting.mismatch(&header), None);
+    assert_ne!(cutting.encode(), header.encode());
+    assert_eq!(Header::<8>::decode(&cutting.encode()), Ok(cutting));
+    assert!(header.tactics.near_repeat);
+
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0x3B9, `symmetry` is bit 8, `conflict_branching` bit 9 and `conflict_look`
-    // bit 10, which is off), and no higher bit is used.
+    // each switch that is on (the defaults: 0xBB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look`
+    // bit 10, which is off, and `near_repeat` bit 11), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -1118,6 +1128,7 @@ fn units_and_headers_round_trip() {
                 gf2: on,
                 symmetry: off,
                 conflict_branching: off,
+                near_repeat: off,
                 ..SearchTactics::legacy_tuning()
             };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
@@ -1126,17 +1137,29 @@ fn units_and_headers_round_trip() {
             assert_eq!(t.bits() >> 8 & 1, u16::from(on));
             let t = SearchTactics { conflict_branching: on, ..t };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 9, u16::from(on));
+            assert_eq!(t.bits() >> 9 & 1, u16::from(on));
+            let t = SearchTactics { near_repeat: on, ..t };
+            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+            assert_eq!(t.bits() >> 11, u16::from(on));
         }
     }
-    assert_eq!(SearchTactics::default().bits(), 0x3B9);
-    assert_eq!(SearchTactics::from_bits(0x3B9), Ok(SearchTactics::legacy_tuning()));
+    assert_eq!(SearchTactics::default().bits(), 0xBB9);
+    assert_eq!(SearchTactics::from_bits(0xBB9), Ok(SearchTactics::legacy_tuning()));
+    // A checkpoint written before `near_repeat` has bit 11 clear, so it reads with the tactic off; the bit binds
+    // nothing, and a run that resumes a search says it.
+    let uncut = SearchTactics { near_repeat: false, ..SearchTactics::legacy_tuning() };
+    assert_eq!(SearchTactics::from_bits(0x3B9), Ok(uncut));
+    assert_eq!(SearchTactics::NEAR_REPEAT_BIT, 1 << 11);
+    assert!(uncut.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(SearchTactics::legacy_tuning().same_recorded(&uncut));
+    assert_eq!(uncut.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
+    assert!(!uncut.same_recorded(&SearchTactics { symmetry: false, ..uncut }));
     // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off.  The bit only
     // chooses how nodes branch, and binds nothing: each search resumes the other's, under its own setting.  The other
     // switches bind.
     let before = SearchTactics { conflict_branching: false, ..SearchTactics::legacy_tuning() };
-    assert_eq!(SearchTactics::from_bits(0x1B9), Ok(before));
-    assert_eq!(SearchTactics::from_bits(0xB9), Ok(SearchTactics { symmetry: false, ..before }));
+    assert_eq!(SearchTactics::from_bits(0x9B9), Ok(before));
+    assert_eq!(SearchTactics::from_bits(0x8B9), Ok(SearchTactics { symmetry: false, ..before }));
     assert!(before.same_recorded(&SearchTactics::legacy_tuning()));
     assert!(SearchTactics::legacy_tuning().same_recorded(&before));
     assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 9 | 1 << 10);
@@ -1146,7 +1169,7 @@ fn units_and_headers_round_trip() {
     // `conflict_look` is bit 10, off by default, so every checkpoint written before it reads with it off.  It binds
     // nothing either, and a run that resumes a search says it.
     let looking = SearchTactics { conflict_look: true, ..SearchTactics::legacy_tuning() };
-    assert_eq!(looking.bits(), 0x3B9 | 1 << 10);
+    assert_eq!(looking.bits(), 0xBB9 | 1 << 10);
     assert_eq!(SearchTactics::from_bits(looking.bits()), Ok(looking));
     assert!(looking.tuning_is_legacy());
     assert!(looking.same_recorded(&SearchTactics::legacy_tuning()));
@@ -1154,7 +1177,7 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&looking), looking);
     assert_eq!(looking.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
     assert!(!looking.same_recorded(&SearchTactics { symmetry: false, ..looking }));
-    assert!(SearchTactics::from_bits(1 << 11).unwrap_err().contains("unknown tactics"));
+    assert!(SearchTactics::from_bits(1 << 12).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- the extended problem: one-sided candidates ----

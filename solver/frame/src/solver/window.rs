@@ -1209,13 +1209,19 @@ impl<'a> Window<'a> {
         if n == self.next {
             self.advance_clock(now);
         }
+        // The game before it, if it is concluded and proven: the game of the near-repeat cut (`near_repeat`).  A search
+        // started before then does not cut by it.
+        let proven = match self.known_before(n) {
+            Known::Final(prev) if prev.proven => Some(prev.clone()),
+            _ => None,
+        };
         let Some(game) = self.games.get_mut(&n) else { return };
         // A search that resumes from its checkpoint goes on from the clock the last invocation kept.
         game.headed = clock::resume(self.opts, n);
         game.headed_kept = game.headed;
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
-            let _ = go.send(Go { seed, finder_seed, cap, threads });
+            let _ = go.send(Go { seed, finder_seed, cap, threads, proven });
         }
         if let Stage::Search(_, plan) = &mut game.stage {
             *plan = Plan::Search(Search::Running(Run::new(threads, now, given)));

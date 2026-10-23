@@ -276,7 +276,7 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "
 the incumbent catches up.  So by default a game whose search has taken a million steps in all gets a thread of its
 own, beside the workers, for 60 s: it looks for a better game than the incumbent, from the incumbent and from the game
 of n − 1, and offers it to the search ([the reference](../REFERENCE.md#1-the-flags-of-solve); [the
-design](../design/search.md#the-finder)).  `--extra-args` can change the two with `--finder-after NODES` (0 starts
+design](../design/finder.md)).  `--extra-args` can change the two with `--finder-after NODES` (0 starts
 none) and `--finder-seconds S`.  A checkpoint resumes with any finder flags or none, the answers do not change, and a
 progress line `n=N finder: ...` says when it started and what it found.  A game that ends before NODES steps never
 starts one.

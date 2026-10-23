@@ -21,6 +21,7 @@ use super::diagnostics::{cut, Probe};
 #[cfg(feature = "studies")]
 use super::hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 use super::lagrange::{Lagrangian, Refits};
+use super::near_repeat::NearRepeat;
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
@@ -136,6 +137,10 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
     /// the tactic, or when the root has no pair).
     pub symmetry: Option<Symmetries>,
+    /// With the tactic `near_repeat`: the game proven before whose problem cuts the nodes ([`NearRepeat`]), if the
+    /// search was given one and its incumbent or floor reached its bound when it was set up ([`NearRepeat::arms`]);
+    /// `None` otherwise.
+    pub near_repeat: Option<&'a NearRepeat<W>>,
     /// A study's hook, which each searcher makes for itself (see [`StepHook`]; `None` in the solver's searches, and
     /// absent from a build without the feature `studies`).
     #[cfg(feature = "studies")]
@@ -184,6 +189,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
                 .symmetry
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
                 .filter(|pairs| !pairs.is_empty()),
+            near_repeat: None,
             #[cfg(feature = "studies")]
             hooks: None,
         }
@@ -247,6 +253,23 @@ pub(super) struct Node<const W: usize> {
     pub(super) known_end: usize,
     /// What the bound check of the node said when it was made, until its loop's first step takes it.
     pub(super) checked: Option<Checked<W>>,
+    /// With the near-repeat cut: whether `promoted` is a promotion set of Π_M, the problem of the game proven before
+    /// ([`NearRepeat`]), if that has been asked, and if so its state there, σ_M(P), in `near_state`.
+    pub(super) near: Near,
+    pub(super) near_state: FrameSet<W>,
+}
+
+/// What a node knows of its promotions in Π_M, the problem of the near-repeat cut's game ([`NearRepeat`]): found only
+/// where the cut's checks get as far as asking (check 2), so that a search where they do not pays nothing for it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Near {
+    /// Not asked yet.
+    Unknown,
+    /// The promotions are no promotion set of Π_M (a member is no candidate of Π_M, or they cannot be promoted there),
+    /// nor is any superset of them: the cut never holds at the node or below it.
+    Off,
+    /// They are, and the node's `near_state` is σ_M(P).
+    On,
 }
 
 /// The verdict of a child's bound check that let it through, kept for the first step of its loop: at the
@@ -311,6 +334,8 @@ pub(super) struct Counts {
     pub(super) conflicts: u64,
     /// Candidates the rule of the tactic `symmetry` dropped from the candidates of children and of nodes.
     pub(super) symmetry_excluded: u64,
+    /// Nodes and children the near-repeat cut cut ([`NearRepeat`]).
+    pub(super) near_repeat: u64,
 }
 
 /// The Taxman searcher: explores units depth-first on a stack of nodes it reuses (no recursion, and no
@@ -436,8 +461,17 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
         let max_add = max_additional(space.model, space.max_total, &state, &unit.promoted, &unit.cands);
         let sum = unit.promoted.sum();
-        let node =
-            Node { state, promoted: unit.promoted, sum, cands: unit.cands, max_add, known_end: 0, checked: None };
+        let node = Node {
+            state,
+            promoted: unit.promoted,
+            sum,
+            cands: unit.cands,
+            max_add,
+            known_end: 0,
+            checked: None,
+            near: Near::Unknown,
+            near_state: state,
+        };
         self.stepper.known.clear();
         if self.stack.is_empty() {
             self.stack.push(node);
@@ -471,7 +505,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             self.stack.push(copy); // the slot for the children of a node this deep, made once
         }
         let (path, below) = self.stack.split_at_mut(depth + 1);
-        let next = self.stepper.step(&mut path[depth], &mut below[0], depth > 0, ctx);
+        let (above, node) = path.split_at_mut(depth);
+        let next = self.stepper.step(&mut node[0], above.last(), &mut below[0], ctx);
         #[cfg(feature = "studies")]
         if let Some((hook, record)) = &mut self.stepper.hook {
             let made = !matches!(record.end, StepEnd::LoopEnd(_) | StepEnd::ChildFailed);
@@ -512,10 +547,18 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
 
 impl<'a, const W: usize> Stepper<'a, W> {
     /// One step of `node`'s loop (see the module docs of [`crate::search`]): whether the loop goes on, the
-    /// candidate to branch on, the child (made in `child`), and whether the child is worth exploring.  `pushed`:
-    /// `node` is not the unit's node, so its matching level was pushed for it and is popped when its loop ends.
+    /// candidate to branch on, the child (made in `child`), and whether the child is worth exploring.  `parent`: the
+    /// node's parent on the stack, if `node` is not the unit's node; then its matching level was pushed for it and is
+    /// popped when its loop ends.
     #[inline]
-    fn step(&mut self, node: &mut Node<W>, child: &mut Node<W>, pushed: bool, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Next {
+    fn step(
+        &mut self,
+        node: &mut Node<W>,
+        parent: Option<&Node<W>>,
+        child: &mut Node<W>,
+        ctx: &mut Ctx<'_, TaxUnit<W>>,
+    ) -> Next {
+        let pushed = parent.is_some();
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
         if self.matching_on {
             // The node without the candidate it last branched on, if strong branching kept it.
@@ -531,7 +574,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             *record = StepRecord { promoted: node.promoted, cands: node.cands, need, ..StepRecord::default() };
         }
 
-        let open = match self.check_node(node, need, ctx) {
+        let open = match self.check_node(node, parent, need, ctx) {
             Ok(open) => open,
             Err(reason) => return self.end_loop(reason, &node.promoted, pushed),
         };
@@ -549,7 +592,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             self.tell(StepEnd::ChildFailed);
             return Next::Same;
         };
-        if let Err(reason) = self.check_child(child, &branch.added, max_next, best, ctx) {
+        if let Err(reason) = self.check_child(child, node, &branch.added, max_next, best, ctx) {
             if let Some(p) = &mut self.probe {
                 p.child_cut(reason);
             }
@@ -583,9 +626,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// Cheapest first: candidates left; the sum of the `max_add` largest (no completion has more promotions, nor
     /// larger ones: a bound of its own); then, unless the node kept its verdict from when it was made at this
     /// `need`, the rule of the tactic `symmetry` (a function of the node's promotions and candidates alone, and
-    /// cheaper than the bounds), then the bound check (the GF(2) bound; the matching bound without `gf2`).
+    /// cheaper than the bounds), then the near-repeat cut ([`near_repeat_cuts`](Self::near_repeat_cuts); `parent`: the
+    /// node's parent on the stack, if it has one), then the bound check (the GF(2) bound; the matching bound without
+    /// `gf2`).
     #[inline]
-    fn check_node(&mut self, node: &mut Node<W>, need: u64, ctx: &mut Ctx<'_, TaxUnit<W>>) -> Result<Open<W>, usize> {
+    fn check_node(
+        &mut self,
+        node: &mut Node<W>,
+        parent: Option<&Node<W>>,
+        need: u64,
+        ctx: &mut Ctx<'_, TaxUnit<W>>,
+    ) -> Result<Open<W>, usize> {
         let checked = node.checked.take();
         if node.cands.is_empty() {
             return Err(cut::EMPTY);
@@ -609,6 +660,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         #[cfg(feature = "studies")]
         self.apply_hook_rule(node, need)?;
+        if self.near_repeat_cuts(node, parent) {
+            return Err(cut::NEAR_REPEAT);
+        }
         let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
@@ -725,6 +779,52 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.proposals = proposals;
     }
 
+    /// The near-repeat cut at `node` ([`NearRepeat`], tactic `near_repeat`): whether its three checks hold, so that no
+    /// completion of the node is worth more than the cut's bound, which the incumbent reached when the search was set
+    /// up ([`SearchSpace::near_repeat`]).  Check 1 for the candidates first, a few set operations; then σ_M(P), found
+    /// once for the node ([`near_state`](Self::near_state)) and kept in it for its later steps and its children; then
+    /// check 3, on the frames that its candidates touch.  `parent`: the node's parent on the stack, if it has one.
+    #[inline]
+    fn near_repeat_cuts(&mut self, node: &mut Node<W>, parent: Option<&Node<W>>) -> bool {
+        let Some(near) = self.space.near_repeat else { return false };
+        if node.near == Near::Off || !near.candidates_marked(&node.cands) {
+            return false;
+        }
+        if node.near == Near::Unknown && !self.near_state(near, node, parent) {
+            return false;
+        }
+        let cut = near.frames_agree(self.space.model.graph(), &node.state, &node.near_state, &node.cands);
+        self.counts.near_repeat += u64::from(cut);
+        cut
+    }
+
+    /// Checks 1 (for the promotions) and 2 of the near-repeat cut at `node`, whose state in Π_M is not known yet:
+    /// whether its promotions are marked and are a promotion set of Π_M, recorded in the node with σ_M(P).  A parent's
+    /// verdict is its children's too where it is `Off` (a superset of an unmarked set is unmarked, and of a set that
+    /// cannot be promoted cannot be); where it is `On`, the child's state is the parent's with the node's own
+    /// promotions promoted ([`NearRepeat::promote`]), and otherwise it is promoted from the root of Π_M
+    /// ([`NearRepeat::state_of`]).
+    fn near_state(&mut self, near: &NearRepeat<W>, node: &mut Node<W>, parent: Option<&Node<W>>) -> bool {
+        let on = match parent.map(|p| p.near) {
+            Some(Near::Off) => false,
+            _ if !near.marked(&node.promoted) => false,
+            Some(Near::On) => {
+                let parent = parent.expect("a parent");
+                let added = node.promoted - parent.promoted;
+                near.promote(&mut self.scratch, &parent.near_state, &added, &mut node.near_state)
+            }
+            _ => match near.state_of(&mut self.scratch, &node.promoted) {
+                Some(state) => {
+                    node.near_state.assign(&state);
+                    true
+                }
+                None => false,
+            },
+        };
+        node.near = if on { Near::On } else { Near::Off };
+        on
+    }
+
     /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
     /// every member of the conflict is forced (no completion reaches `need`, and the loop ends).
     ///
@@ -787,6 +887,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let model = space.model;
         self.counts.attempts += 1;
         child.checked = None;
+        child.near = Near::Unknown;
         let added = branch.added;
         // Several forced members are promoted together, each frame checked once (see `FrameGraph::promote_all_using`);
         // one by one, each would take a freedom from the frames it touches (two, or its own frame for a one-sided
@@ -840,7 +941,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         Some(max_next)
     }
 
-    /// Phase 4: whether the child made in `child` (which promoted `added` and can make `max_next` more
+    /// Phase 4: whether the child made in `child` of `node` (which promoted `added` and can make `max_next` more
     /// promotions) is worth exploring at the incumbent `best` the step began with.  `Err(reason)` if no
     /// completion of it can beat the incumbent, or if its best completion is known (then offered).
     ///
@@ -852,6 +953,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
     fn check_child(
         &mut self,
         child: &mut Node<W>,
+        node: &Node<W>,
         added: &Bits<W>,
         max_next: u32,
         best: u64,
@@ -880,6 +982,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
             if sym.hopeless(&mut self.symmetry_scratch, &child.promoted, &cands) {
                 return Err(cut::SYMMETRY);
             }
+        }
+        if self.near_repeat_cuts(child, Some(node)) {
+            return Err(cut::NEAR_REPEAT);
         }
         if self.matching_on {
             self.matching.push_all(added, &cands);
@@ -1359,6 +1464,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         ];
         for (i, count) in extra {
             stats.extra[i] += count;
+        }
+        if let Some(near) = self.space.near_repeat {
+            near.add_cut(counts.near_repeat);
         }
         if let Some(g) = &self.gf2 {
             let (now, before) = (g.stats(), self.gf2_flushed);

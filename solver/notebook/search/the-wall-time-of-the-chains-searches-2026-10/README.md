@@ -115,11 +115,10 @@ local search's refills on all the search's threads.  A game's own search takes 5
 **Why it is exact.**  The rule changes only which promotable set the search starts from.  Every set that
 `start_incumbent` returns can be promoted, and `search::offer_found` checks it (`Prepared::can_promote` and its sum)
 before the search takes it.  The search is exhaustive from any promotable incumbent: a node is cut only when its bound,
-an upper bound on its completions ([search.md, "The default step"](../../../docs/design/search.md#the-default-step)),
-is below the node's need, and a heavier incumbent raises the need only to what a set already held reaches.  The finder's
-offers and the window's seeds rest on the same argument ([search.md, "The
-finder"](../../../docs/design/search.md#the-finder)).  A start that reaches the ceiling proves the game by the ceiling,
-as any start does.
+an upper bound on its completions ([search.md, "The default step"](../../../docs/design/search.md#the-default-step)), is
+below the node's need, and a heavier incumbent raises the need only to what a set already held reaches.  The finder's
+offers and the window's seeds rest on the same argument ([finder.md](../../../docs/design/finder.md)).  A start that
+reaches the ceiling proves the game by the ceiling, as any start does.
 
 **The prototype** (the local branch `research-wall` of this entry's clone on the chain's machine, not pushed):
 `SearchJob::search` in `src/solver.rs`, before the search, makes the start of each seed it did not choose, with a

@@ -47,7 +47,7 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 22;
+pub const TACTIC_COUNT: usize = 23;
 
 /// The value of a tactic: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the nogood
 /// table, or one of the settings that tune the GF(2) search.
@@ -205,6 +205,7 @@ impl Tactics {
             ("more_forced", Slot::Switch(&mut self.search.more_forced)),
             ("conflict_branching", Slot::Switch(&mut self.search.conflict_branching)),
             ("conflict_look", Slot::Switch(&mut self.search.conflict_look)),
+            ("near_repeat", Slot::Switch(&mut self.search.near_repeat)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
@@ -288,6 +289,7 @@ mod tests {
                 "more_forced",
                 "conflict_branching",
                 "conflict_look",
+                "near_repeat",
                 "prev_cap",
                 "seed_incumbent"
             ]
@@ -295,7 +297,7 @@ mod tests {
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected = [
             "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "all", "exact", "all", "all",
-            "split", "on", "on", "off", "on", "on",
+            "split", "on", "on", "off", "on", "on", "on",
         ];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
@@ -403,6 +405,19 @@ mod tests {
     }
 
     #[test]
+    fn the_near_repeat_cut_is_on_by_default_and_set_by_name() {
+        let mut t = Tactics::default();
+        assert!(t.search.near_repeat);
+        t.set("near_repeat=off").unwrap();
+        assert!(!t.search.near_repeat);
+        assert_eq!(t.description(), "near_repeat=off");
+        assert_eq!(t.to_json().get("near_repeat").and_then(Json::as_bool), Some(false));
+        assert!(t.set("near_repeat=no").unwrap_err().starts_with("tactic near_repeat: expected on or off"));
+        t.set("near_repeat=on").unwrap();
+        assert_eq!(t.description(), "default");
+    }
+
+    #[test]
     fn the_policy_of_keeping_nogoods_is_set_by_three_tactics() {
         // The defaults forget everything after each 50,000 steps, as before the knobs.
         assert_eq!(Tactics::default().search.forgetting(), Forgetting::DEFAULT);
@@ -472,6 +487,7 @@ mod tests {
                 more_forced: false,
                 conflict_branching: false,
                 conflict_look: true,
+                near_repeat: false,
             },
             prime_shortcut: false,
             same_search: false,

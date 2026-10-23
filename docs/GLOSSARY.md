@@ -150,11 +150,11 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **seed**: a promotion set that a search starts from: the promotions of the game of n − 1, and the game of a lower
   bound that the bounds store holds, when it has one.
 * **finder**: a large neighbourhood search for a good game, which only offers sets: it fixes a random share of an
-  incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.  It
-  is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search as
-  an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps (a million
-  by default) starts one beside it ([solver/docs/design/search.md, "The
-  finder"](../solver/docs/design/search.md#the-finder)); the ledger runs it before its searches.
+  incumbent's promotions, searches the rest exactly as a unit of the engine on one thread, and takes any better game.
+  It is not sound and proves nothing, but a lower bound needs only a legal game, so what it finds is offered to a search
+  as an incumbent after the checks of a checkpoint's incumbent.  A search that has taken `--finder-after` steps (a
+  million by default) starts one beside it ([solver/docs/design/finder.md](../solver/docs/design/finder.md)); the ledger
+  runs it before its searches.
 * **conflict**: a subset of a promotion set that cannot be promoted together from a node.  Every completion leaves out
   one of its members.
 * **nogood**: a conflict of the root, learned from a conflict found at a node.  It holds at every node, on any thread
@@ -267,6 +267,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
   concludes it with the earlier game's promotions instead of searching.  `same_search` is the name of the tactic and of
   the proof; the method of the line is `repeat`.
+* **near repeat**, **near-repeat cut**: a game that poses nearly the search problem of a game before it, one move
+  swapped for another, say.  The near-repeat cut (tactic `near_repeat`) ends a node of its search whose completions are
+  all promotion sets of the proven game before, once the incumbent reaches that game's best promotion sum
+  ([solver/docs/design/search.md, "The near-repeat cut"](../solver/docs/design/search.md#the-near-repeat-cut)).
 * **proof** (kind): how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
   `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).

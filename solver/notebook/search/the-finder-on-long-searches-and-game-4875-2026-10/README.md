@@ -17,7 +17,7 @@ ends.  The finder is a large neighbourhood search on one thread, moved from `exa
 from the search's incumbent, and offers each better game to the search after the checks of a checkpoint's incumbent
 (`search::offer_found`).  The search stays exhaustive, and its proof is its own.  The two settings are flags of `solve`,
 not tactics, so they are in no checkpoint's header and a checkpoint resumes with any value.  A line records what the
-finder did in `engine.finder`.  [The design](../../../docs/design/search.md#the-finder) and [the
+finder did in `engine.finder`.  [The design](../../../docs/design/finder.md) and [the
 reference](../../../docs/REFERENCE.md#1-the-flags-of-solve) have the rest.
 
 **Checks.**

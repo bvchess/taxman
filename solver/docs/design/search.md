@@ -7,8 +7,9 @@ and explores the sets that could beat it, pruning every part of the tree that a 
 it up: the state and the order of the search, two bounds on a node (the matching bound and the Lagrangian bound over the
 nogoods), and the conflicts and nogoods that the branching rests on; the GF(2) bound, the default, and the rule of
 symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
-changes which conflict a node branches on, and the last two parts are the search's start and its finder.  The search
-of a problem with one-sided candidates is in [extended-mode.md](extended-mode.md).  The
+changes which conflict a node branches on, and the last two parts are the search's start and the cut that the game
+before gives it.  The finder, a thread beside a long search, is in [finder.md](finder.md), and the search of a problem
+with one-sided candidates in [extended-mode.md](extended-mode.md).  The
 [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
 
 ## Search state and order
@@ -189,7 +190,7 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 1. end the loop if cands is empty, or the max_add largest candidates sum below need; unless this is the node's
    first step (its candidates as step 7 left them), drop from cands the candidates that no completion keeping the
    symmetric pairs' inequalities holds, and end the loop if none keeps them (symmetry), or if what is left is empty
-   or its max_add largest sum below need
+   or its max_add largest sum below need; end the loop if the near-repeat cut holds (near_repeat, below)
 2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
      F = the forced members of I* (by the weight split: those without which the bound is below need; and those it
@@ -210,9 +211,9 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
    that no completion keeping the symmetric pairs' inequalities holds (symmetry)
 8. cut the child if the max_next largest of its cands sum below its need (max_next: how many more promotions the
    child can make among its remaining candidates, the child's own max_add), or no completion of it keeps the
-   inequalities (symmetry), or its GF(2) bound is below it, or its heaviest set is exact (offered as incumbent); a
-   child that stays open keeps this verdict, with its forced members, for its first step; a child with no
-   candidates is not pushed
+   inequalities (symmetry), or the near-repeat cut holds, or its GF(2) bound is below it, or its heaviest set is
+   exact (offered as incumbent); a child that stays open keeps this verdict, with its forced members, for its first
+   step; a child with no candidates is not pushed
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
@@ -224,7 +225,7 @@ below `need`), then the Lagrangian bound over the nogoods (a cut, or more forced
 whose removal lowers the matching bound most, and its step 8 checks the child's matching bound, refinement and
 Lagrangian bound.
 
-*Why the step is exact.*  Exactness rests on five facts:
+*Why the step is exact.*  Exactness rests on six facts:
 
 1. the bound is an upper bound: the GF(2) bound by Theorem 11, the matching bound with refinement, and the Lagrangian
    bound for any multipliers;
@@ -235,7 +236,8 @@ Lagrangian bound.
 4. nogoods and known conflicts hold at every node they are applied to, since a subset of a promotable set is
    promotable;
 5. every heaviest promotion set keeps the symmetric pairs' inequalities (Theorem 13), so the completions that the rule
-   leaves out hold none of them.
+   leaves out hold none of them;
+6. every completion of a node that the near-repeat cut ends is worth no more than the incumbent (Lemma R).
 
 A node is cut only when its bound is below `need`, since a completion that merely ties the incumbent is of no use, and
 a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs` attacks each of these
@@ -352,33 +354,26 @@ the proof's tree, node for node, as a search seeded with an optimal set makes it
 of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
 floor](../../notebook/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
 
-## The finder
+## The near-repeat cut
 
-A search that starts well below its final best spends most of its steps before the incumbent catches up, and a finder
-catches it up sooner.  A search that ends within a few seconds has little to gain, so a finder runs only once a search
-has taken some steps: with `--finder-after NODES` (default 1000000, a few seconds on many threads; 0 starts none),
-when a game's search has taken NODES steps (over every run of it, a resumed search counting the runs before), one
-thread of its own starts beside the workers, for the seconds of `--finder-seconds` (default 60), and ends sooner if
-the search does.  Each game of a window decides for itself.
+Consecutive games often pose nearly the same problem, and the game before, once proven, closes most of such a search.
+The cut ends a node whose completions are all promotion sets of the problem Π_M of a game M proven before, once the
+incumbent is worth at least a proven bound B of M's best promotion sum: none of those completions can beat it.
+[Lemma R](../../../docs/theory/ledger.md#the-near-repeat-cut) proves it and lists the checks a node must pass, and the
+search makes exactly those (tactic `near_repeat`, on by default; `search::NearRepeat`).
 
-The thread runs *rounds* of large neighbourhood search ([glossary](../../../docs/GLOSSARY.md), the finder;
-`search::finder`).  A round fixes a random share of a set's promotions (70 to 90%), searches the rest exactly as a unit
-of the engine on one thread for at most 1,024 steps, takes a better set, and repeats; a round lasts 15 seconds and draws
-with a seed of its own, and the generator is seeded, so the same game and seed make the same rounds.  The first round
-and every odd one starts from what survives of a seed of the search, the seeds in turn (the survivors are offered as
-they are, being a game of their own); the others start from the search's incumbent as it is, and go on from a better one
-the search finds meanwhile.  A search without a seed has the second kind of round only.  A resumed search has no seed in
-its start, but its finder has the game of n − 1 all the same.
+* **Setup.**  The solver takes as M the game of n − 1, if that game is concluded before the search starts, is proven,
+  and assumes nothing (`solver::near_repeat`; [the reference](../REFERENCE.md#assumptions) has what a game assumes).
+  Π_M is set up as Π_n is, and B is score(n − 1) less its `in_the_bag`.  The cut acts only if the incumbent or floor
+  the search starts from reaches B.  A search that starts while the game of n − 1 is still in the window does not cut.
+* **At a node.**  Every promotion must be a candidate of Π_M, and every candidate left one with the same home frame in
+  both problems.  The promotions must be promotable in Π_M.  On every frame the candidates touch, every move of Π_M's
+  state must be a move of Π_n's, and every factor of Π_n's state that Π_M's lacks must be no candidate and pay for no
+  move of Π_M's frame and no candidate.  The check comes after the rule of symmetric pairs, before the bound.
+* **Cost.**  Where the first check fails, the cut costs a few set operations.  A node's state in Π_M is found only
+  where it passes, once, from its parent's (one promotion) or from Π_M's root, and kept beside the node's own.
 
-*Why it cannot make an answer wrong.*  The finder only offers sets.  A set it offers is checked as a checkpoint's
-incumbent is on resuming ([trust.md](trust.md), the paragraph "What identifies a checkpoint"): a set of candidates that can be promoted
-from the root, worth what it claims (`search::offer_found`).  It then reaches the incumbent the way a worker's improvement
-does (`Control::offer`), and the workers prune against it as against any promotable set; so the search stays exhaustive,
-and its proof is the search's own.  A set that fails the check is refused and ends the finder (`refused` in the line).
-The finder keeps nothing in the checkpoint's header: a checkpoint resumes whatever the finder's settings are.
-
-*What it costs and what it records.*  The finder's units are searched in a space of their own (its matching graph, its GF(2)
-matroids, its symmetric pairs: a second of setup at n near 4,900), so its counters are not the search's.  It takes one
-core beside the workers for its seconds.  The result line records it where it ran (`engine.finder`: the search's steps when
-it started, the incumbent then, the best it reached, how many of its sets became the incumbent, its seconds and when it
-reached its best), and `options` records the flags where given.
+The cut drops only nodes none of whose completions beats the incumbent, as a bound does, and learns nothing, so the
+search stays exact.  It does not treat the one-sided candidates of extended mode.  A checkpoint records the tactic in
+bit 11 of its tactics, and the bit binds nothing: each run of a search sets its cut up again, as it takes its ceiling,
+so a checkpoint resumes with the cut on or off.

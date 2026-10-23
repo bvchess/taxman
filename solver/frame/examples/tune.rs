@@ -57,6 +57,11 @@
 //! changes from the defaults), `node_limit` and `cpu_limit` (the limits asked for, in steps and seconds, or null) and
 //! `stats` (the searchers' counters, `search::stat`).
 //!
+//! With the tactic `near_repeat` (on by default), `solve` cuts by the known game of GAME − 1 if the known games have it
+//! (`taxman::board::near_repeat`: B is its score less its game with no promotions) and the starting incumbent reaches
+//! B, as the solver cuts by a proven game of n − 1; a known game of `optimal.json` is taken as optimal, as the known
+//! optimum of GAME is.  A unit's line then has `near_repeat_cut`, the nodes the cut cut (null without the cut).
+//!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an
 //! optimal set: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree
 //! below the root can hold a heavier completion that breaks one (docs/theory/bounds.md, "Prime exchanges: symmetries of
@@ -75,7 +80,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use taxman::bits::Bits;
-use taxman::board::Board;
+use taxman::board::{near_repeat, Board};
 use taxman::engine::{self, Control, Ctx, EngineConfig, Searcher, Start, Stats, Unit};
 use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
@@ -569,10 +574,18 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
         }
     };
     let graph = MatchGraph::new(&prepared.model, &prepared.root);
-    let space = SearchSpace::new(&prepared, &graph);
+    // The near-repeat cut by the known game of `game − 1`, armed as the solver arms it.
+    let near = match (o.tactics.near_repeat, game.checked_sub(1).and_then(|m| optimal.score(m))) {
+        (true, Some(score)) => near_repeat(&prepared, score)?,
+        _ => None,
+    };
+    let near_repeat = near.as_ref().filter(|near| near.arms(&o.tactics, start.sum()));
+    let space = SearchSpace { near_repeat, ..SearchSpace::new(&prepared, &graph) };
     let description = Tactics { search: o.tactics, ..Tactics::default() }.description();
     for Row { id, depth, unit } in wanted {
+        let cut_before = near_repeat.map_or(0, |near| near.nodes_cut());
         let solved = solve_unit(&space, unit, &start, Limits { nodes: o.node_limit, cpu: o.cpu_limit }, &id)?;
+        let cut = near_repeat.map_or(Json::Null, |near| Json::from(near.nodes_cut() - cut_before));
         let line = Json::object([
             ("game", Json::from(game)),
             ("id", Json::from(id)),
@@ -589,6 +602,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             ("tactics", Json::from(description.clone())),
             ("node_limit", o.node_limit.map_or(Json::Null, Json::from)),
             ("cpu_limit", o.cpu_limit.map_or(Json::Null, |limit| Json::from(limit.as_secs_f64()))),
+            ("near_repeat_cut", cut),
             ("stats", stats_json(&solved.stats)),
         ]);
         println!("{line}");

@@ -51,8 +51,8 @@ choice from one game to the games after it ([a policy](#a-policy-for-the-games-t
 candidates that can be promoted from the root, worth what the offer claims, the same check as a checkpoint's incumbent
 on resuming.  A promotable set is a game, so its sum is at most P\*, the game's best promotion sum.  The incumbent only
 prunes nodes whose bound is below it plus one, which hold no completion beating it, so the search still finds P\* and
-proves it.  The finder the lab may start offers its games the same way ([search.md, "The
-finder"](search.md#the-finder)).  A set the check refuses changes nothing, and the lab hears why.
+proves it.  The finder the lab may start offers its games the same way ([finder.md](finder.md)).  A set the check
+refuses changes nothing, and the lab hears why.
 
 **(d) A fresh search.**  A restarted game is searched from nothing: its root, the run's seed and ceiling, and the
 tactics the lab names.  Every tactic is proven or sound ([tactics.md](tactics.md)), so any set of them gives a complete
@@ -100,6 +100,11 @@ The others stay fixed for the life of a search, each for its reason:
 | `symmetry` | cuts nodes, and drops candidates no completion keeping the inequalities holds; its trees rest on Theorem 13 for the whole search |
 | `force_window` | says which members are searched for being forced, and forced members end loops |
 | `branching`, `strong_limit`, `strong_depth`, `deep_branching`, `more_forced` | they choose the member to branch on, but strong branching also finds forced members, the members without which the bound falls below the need, and those end loops |
+
+The near-repeat cut, `near_repeat`, prunes, and is no lever of the lab.  A checkpoint records it (bit 11) and does not
+bind it all the same: each run of a search sets its cut up again, as it takes its ceiling, and the cut drops only nodes
+that hold nothing better than the incumbent ([search.md, "The near-repeat cut"](search.md#the-near-repeat-cut)).  So
+the run that resumes a search says whether it cuts.
 
 The policy of the nogood tables, `forget_nogoods`, `nogood_period`, `nogood_keep` and `nogood_limit`, is a cache's,
 sound whatever it says, and was free already: no checkpoint records it, and the run that resumes a search sets it.  The

@@ -34,9 +34,12 @@ pub mod cut {
     pub const GF2: usize = 7;
     /// A symmetric pair's inequality: no completion keeps it (tactic `symmetry`, Theorem 13).
     pub const SYMMETRY: usize = 8;
-    pub const COUNT: usize = 9;
+    /// The near-repeat cut: every completion is a promotion set of a game proven before, whose bound the incumbent
+    /// reaches (tactic `near_repeat`, Lemma R).
+    pub const NEAR_REPEAT: usize = 9;
+    pub const COUNT: usize = 10;
     pub const NAMES: [&str; COUNT] =
-        ["empty", "largest", "match", "refined", "exact", "forced", "lagrange", "gf2", "symmetry"];
+        ["empty", "largest", "match", "refined", "exact", "forced", "lagrange", "gf2", "symmetry", "near_repeat"];
 }
 
 /// Buckets of [`Diagnostics::gaps`]: excesses `0..GAP_BUCKETS − 1`, and the last for everything above.

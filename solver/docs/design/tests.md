@@ -64,6 +64,11 @@ every second line of the Java fixtures), and the comment on each says what the w
     in random orders are independent in the node's matroids and no heavier than its bound, and the matching path's
     search started from the bound finds nothing above it (`tests/soundness.rs`);
   * conflicts and residuals are checked against promoting the sets;
+  * the checks of the near-repeat cut (`src/search/near_repeat/tests.rs`): on constructed problems, each check failing
+    alone where it must, among them a number that Π_M's model promotes but that is no candidate of Π_M (22 at n = 98),
+    and the checks holding where the problems agree or Π_n's frames are harder; and at random nodes of the boards 30
+    to 160 against each of the three boards before, every completion that can be promoted in Π_n where the checks hold
+    can be in Π_M, by the model's own promotability;
   * the prime exchanges (`src/search/symmetry.rs`): the symmetric pairs against their definition (every number looked
     at, every pair of primes tried) on the games 2..=300 and a sample to 2200; the images of the optimal set and of
     random maximal promotable sets promotable and worth the formula; every optimal set keeping every inequality; on the
@@ -72,13 +77,17 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Soundness harness** (`tests/soundness.rs`): the search starts from an incumbent worth 1 or 5 less than P\* with an
   empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place (which tests
   the `<` and `<=` boundaries too).  It runs:
-  * every game 2..=300 under each of 46 configurations: 19 of the matching path (every tactic; forgetting every step,
+  * every game 2..=300 under each of 48 configurations: 19 of the matching path (every tactic; forgetting every step,
     every third, never; the Lagrangian bound refitted every few steps; one thread and two), 11 of the default, the
     GF(2) bound with the rule of symmetric pairs (every way of choosing the branch; the matching bound as a first check;
     without forced members or nogoods; forgetting every step; two threads; the Lagrangian bound after it), the GF(2)
     bound without the rule on one thread, two, and forgetting every step, the matching path with the rule, 7 policies
-    of keeping nogoods, and 5 of conflict branching (at every check, whatever its gap, on one thread and two; off;
-    and with the look at the last child of the search's own conflict, on one thread and two);
+    of keeping nogoods, 5 of conflict branching (at every check, whatever its gap, on one thread and two; off;
+    and with the look at the last child of the search's own conflict, on one thread and two), and 2 without the
+    near-repeat cut;
+  * the near-repeat cut in every search of the harness on real games, by one of the four games before (the latest whose
+    optimum the handicapped incumbent reaches), and the games 232, 344 and 376, whose trees it changes, under every
+    configuration with the cut and without it;
   * the games 301..=500 (every tenth) with conflict branching at every check, with and without the look at the last
     child of the search's own conflict: the look changes the tree of some of them, and no answer;
   * every game 2..=600 with symmetric pairs, with the rule over either bound (and the oracle without the frame model to
@@ -109,7 +118,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` takes 27 to 67% more nodes).
   With one thread the tree is deterministic, so the test asserts the exact node count of a fixed game under fixed
   tactics: n = 480 to 1133, every tactic off or changed in turn, with the GF(2) bound and on the matching path, and the
-  tree of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps.  The matching
+  tree of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps.  The table
+  `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the committed
+  game of n − 1, with the near-repeat cut and without it.  The matching
   path's rows are the default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before
   that tactic, and the rows `symmetry=off` the default's before the rule of symmetric pairs.  The table `EXTENDED` does
   the same for the extended problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be

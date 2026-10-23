@@ -18,7 +18,7 @@ of the repository.
 | `--threads K` | worker threads (default: all CPUs; honours affinity masks and cgroup limits) |
 | `--background` | run every search worker under the idle scheduling policy (Linux `SCHED_IDLE`), so that any other process, even one at `nice -n 19`, runs before the workers and the search takes the CPU the rest of the machine leaves.  Use it on a machine shared with other work, with every hardware thread (no `--threads`).  The policy is set on the worker threads, not the process: the thread that coordinates a search, the finder and the lab's hook keep normal priority.  Elsewhere than Linux it does nothing and says so once on stderr.  It changes only the speed; a line records it in `options` |
 | `--window K` | games of a range in flight at once (also for `regress`): game n + 1 is set up, and searched from n's best game so far, while n searches, and the threads move to the searches that keep them busy; games are still concluded and recorded in order, with the scores and proofs of a window of 1 (default 4; 1 is one game after another, and it is always 1 with one thread) |
-| `--tactic NAME=VALUE` | set a tactic; repeatable ([design/tactics.md](design/tactics.md) lists them); the tactic `conflict_branching`, on by default, chooses the conflict a node branches on where the gap is large ([design, "Conflict branching"](design/search.md#conflict-branching)); `--tactic conflict_branching=off` branches on the smallest conflict the search knows, as the builds before it did; `--tactic conflict_look=on` adds [a look](design/search.md#conflict-branching) at the search's own conflict first |
+| `--tactic NAME=VALUE` | set a tactic; repeatable ([design/tactics.md](design/tactics.md) lists them); the tactic `conflict_branching`, on by default, chooses the conflict a node branches on where the gap is large ([design, "Conflict branching"](design/search.md#conflict-branching)); `--tactic conflict_branching=off` branches on the smallest conflict the search knows, as the builds before it did; `--tactic conflict_look=on` adds [a look](design/search.md#conflict-branching) at the search's own conflict first; the tactic `near_repeat`, on by default, cuts the nodes that the proven game of n − 1 shows hold nothing better than the incumbent ([design, "The near-repeat cut"](design/search.md#the-near-repeat-cut)), and `--tactic near_repeat=off` turns it off |
 | `--out FILE` | append result lines; skip the games the file completed; the game before the first comes from it |
 | `--checkpoint-dir DIR`, `--checkpoint-interval S` | checkpoints (default every 60 s) |
 | `--progress S` | seconds between progress lines on stderr (default 60; 0: none) |
@@ -30,7 +30,7 @@ of the repository.
 | `--keep-going` | a game that a limit stops does not end the range: its best game so far is an unfinished line and seeds the next game, which takes nothing that rests on its being optimal; the games are solved one at a time; a rerun passes over the unfinished games ([README, "Keeping going past limits"](../frame/README.md#keeping-going-past-limits-and-the-sweep)) |
 | `--retry`, `--retry-improved` | with `--keep-going`, search again every unfinished game of `--out`, or only those whose game before now has more to give than when they were tried |
 | `--pass N` | record N as `options.pass` of every line written, for a script that goes over the games more than once; no other effect |
-| `--finder-after NODES`, `--finder-seconds S` | once a game's search has taken NODES steps (over every run of it), start a finder beside it for S seconds (default 60): a thread that looks for a better game than the incumbent, from the incumbent and from the game of n − 1, and offers it to the search ([design, "The finder"](design/search.md#the-finder)).  NODES defaults to 1000000; 0 starts none.  Neither is a tactic or in a checkpoint's header, so a checkpoint resumes with any value, and neither changes an answer; a line records them in `options` unless NODES is 0 |
+| `--finder-after NODES`, `--finder-seconds S` | once a game's search has taken NODES steps (over every run of it), start a finder beside it for S seconds (default 60): a thread that looks for a better game than the incumbent, from the incumbent and from the game of n − 1, and offers it to the search ([design/finder.md](design/finder.md)).  NODES defaults to 1000000; 0 starts none.  Neither is a tactic or in a checkpoint's header, so a checkpoint resumes with any value, and neither changes an answer; a line records them in `options` unless NODES is 0 |
 | `--lab-dir DIR` | the command folder of a lab ([design/lab.md](design/lab.md)): at each progress tick the run takes the files of `DIR/in`, one JSON command each (`checkpoint`, `offer`, `branching`, `policy`, `restart`, `threads`, `finder`, `redeploy`), applies or refuses each, writes its outcome to `DIR/out` and moves it to `DIR/done`; a lab changes how the games are searched, never their results.  A `redeploy` ends the range with every search checkpointed, prints `redeploy to COMMIT` and exits with the status 5 |
 | `--hook PROGRAM`, `--hook-after S` | start PROGRAM, detached, with one JSON argument: the event `long` once a game's own search passes S seconds (default 3600; once a game), and `done` when such a game has its line.  The argument's fields: `event`, `n`, `nodes` (steps over every run), `best` (the best promotion sum), `own_seconds`, `checkpoint_dir` and `lab_dir` (absolute paths, or null), `commit`, and for `done` `result`, the game's line as an object; others may follow ([design/lab.md, "The hook"](design/lab.md#the-hook)) |
 | `--show` | print each game's promotions and moves |
@@ -181,7 +181,8 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
                     "forget_nogoods":true,"nogood_period":50000,"nogood_keep":"none","nogood_limit":0,
                     "lagrange":false,"gf2":true,"symmetry":true,"force_window":"all","branching":"exact",
                     "strong_limit":"all","strong_depth":"all","deep_branching":"split","more_forced":true,
-                    "conflict_branching":true,"conflict_look":false,"prev_cap":true,"seed_incumbent":true},
+                    "conflict_branching":true,"conflict_look":false,"near_repeat":true,"prev_cap":true,
+                    "seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"e8c39cfac7e6...","dirty":false}}
@@ -222,7 +223,7 @@ resumed game that is stopped again adds another incomplete line, and the complet
 
 Every completed game records how its optimality is established, its *proof*, and what that proof rests on beyond the
 frame model, its *assumptions*.  The referee replays every game before it counts, and two verifiers that share no code
-check every results file.
+check every results file ([verifiers.md](verifiers.md) says what each checks).
 
 ### Proof kinds
 
@@ -321,59 +322,3 @@ So a file of a sweep, with its games that only an unfinished search is recorded 
   proven `prev`, a `same_search` on the game it repeats, and the others on nothing of n − 1.
 * An unfinished game is a lower bound.
 * Where a game and the one before it are both completed, the chain bounds hold between them.
-
-### The verifiers
-
-* **The referee.**  Every `solve` replays each game through `game::replay_finished`, an independent referee that
-  shares no code with the solver's number theory: the game must be legal, be over, open with the largest prime, and
-  score what is recorded.  `solve` also checks the arithmetic and the ceilings `score(n-1) <= score(n) <= n +
-  score(n-1)` before the game counts.  A game that fails after it was found goes to `<results>.rejected.jsonl`, and
-  the run fails.
-* **`taxman verify-results FILE...`** reads results files without changing them.  It replays every game, confirms its
-  score against `optimal.json`, and checks the chain from n − 1, each line's arithmetic and provenance, and that the
-  files agree.  It checks that a line's fields agree with each other as the solver writes them, so that a hand edit
-  cannot drop an assumption or change a proof.  It counts the games by proof and by what they assume.  For a repeat it
-  sets the search problems of both games up again and compares them.  For a `known` line it checks the citation
-  against the sources ("Citing a known source", above): the table, the committed chain and the bounds store of the
-  repository, read as they are, since their own verifiers check them.  Opening a results file for `--out` runs the
-  same checks, with the sources that `--use-prev` draws on.
-* **Both verifiers accept a file with holes**, such as a `--keep-going` run's or the sweep's `explore.jsonl`, whose
-  games may have no line or only incomplete ones.  They check each line against what it rests on in the same file:
-  * a ceiling (`setup.cap`), or a `cap` or `prime_formula` proof, needs the game of n − 1 completed in the file;
-  * a repeat needs the game it repeats completed on an earlier line;
-  * an exhausted search needs nothing of n − 1;
-  * a line built on the best game of an unfinished search names an earlier incomplete line of n − 1 with that score and
-    those moves, scores no less than it, and has no ceiling and no such proof;
-  * an incomplete line that records its game (`best_so_far`, the moves) is checked to be legal, to score the
-    `best_so_far`, and to be no better than `optimal.json`'s score.
-
-  The report names the games that only an unfinished search is recorded for.  A line whose game of n − 1 is not in the
-  file at all is still refused.  `tests/results.rs` shows each case with both verifiers.
-* **`python3 solver/tools/check_results.py [FILE...]`** is an independent verifier in Python: standard library only,
-  and no code shared with the solver.  It derives every proof and assumption again, and also checks each score against
-  `optimal.json`, the Franklín–Moniot upper bound and the best-known heuristic chain in `heuristics/results`.  With no
-  arguments it checks `results/*.jsonl` but the store, `bounds.jsonl`, which is not a file of results.  It cannot
-  rebuild the frame model, so it takes an `exhausted` line at its word.  Of a repeat it checks only what the lines show:
-  the game repeated is earlier in the file and settles its search, and the recorded digests and promotions agree.  It
-  checks a `known` line against the sources (`--committed FILE` and `--bounds FILE`, by default the committed chain
-  and the store of `results/`), from the lines of the files alone.  It cannot play the store's promotion sets, so it
-  does not check the digest of a game of n − 1 taken from the store.  It also asks that the method fits the nodes: a
-  `start` line is completed with `nodes` 0 and a completed `search` line has more, which refuses a line of a build
-  that called a `start` game a `search`.
-
-On 2026-10-22, the committed chain gave, on four threads of the laptop:
-
-```
-$ taxman verify-results --threads 4 results/strict.jsonl
-results/strict.jsonl: 4900 completed games, n = 1..=4900 (0 missing), 0 incomplete lines
-  proof: trivial 13, prime_formula 611, cap 429, exhausted 1551, same_search 1914, known 382
-  assumptions: none in 4518 of 4900 games; 382 assume statement U at 298 boards in all
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1586, prime formula 653
-0 games are in more than one file, with equal scores in all
-checked in 17756.4 ms
-```
-
-What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal, when the
-game of n − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why a chain from n =
-1 matters.  [results/README.md](../../results/README.md#what-supports-the-scores) says what supports each committed
-score: solves from scratch, a second build's chain, and what the games assume.

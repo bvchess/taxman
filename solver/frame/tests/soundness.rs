@@ -42,13 +42,15 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// (tactic `conflict_branching`) at every check, whatever its gap, on one thread and on two (41 and 42), the search's
 /// own conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
 /// look at the last child of the search's own conflict (tactic `conflict_look`, off by default), on one thread and on
-/// two (44 and 45).  The matching path with the forgetting of nogoods at the production period, every step, every
-/// third, and never; on one thread and two; and the GF(2) bound with each way of choosing the branch, with and without
-/// the matching bound as a first check, forced members, nogoods and the Lagrangian bound's early refits.  The
-/// Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these searches
-/// never take, so some configurations refit them after the first few steps and every few steps after that (with and
-/// without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2) bound
-/// without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
+/// two (44 and 45), then the GF(2) bound and the matching path without the near-repeat cut (46 and 47; tactic
+/// `near_repeat`, which the others have, and which acts where a game has the cut of a game before it, [`game_after`],
+/// and the incumbent reaches its bound).  The matching path with the forgetting of nogoods at the production period,
+/// every step, every third, and never; on one thread and two; and the GF(2) bound with each way of choosing the branch,
+/// with and without the matching bound as a first check, forced members, nogoods and the Lagrangian bound's early
+/// refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000 steps, which most of these
+/// searches never take, so some configurations refit them after the first few steps and every few steps after that
+/// (with and without forgetting at the same time, refinement, and a second thread), and one turns it off.  The GF(2)
+/// bound without the rule runs on one thread, on two, and with the nogoods forgotten at every step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     vec![
@@ -98,6 +100,8 @@ fn configs() -> Vec<Config> {
         Config { conflict_branching: None, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
+        Config { near_repeat: false, ..g },
+        Config { near_repeat: false, ..base },
     ]
 }
 
@@ -107,19 +111,38 @@ fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
     optimal.score(n).map(|score| score - in_the_bag)
 }
 
+/// Game `n` at width `W` ([`Game::of_board`]) with the near-repeat cut (tactic `near_repeat`,
+/// [`Game::with_near_repeat`]) by the latest of the four games before it whose best promotion sum (`optimal.json`'s,
+/// the cut's bound) is at most `reach`, else by the latest of them; without it where none of them has candidates and a
+/// game in `optimal.json`.  A search cuts by it where its configuration has the tactic and its incumbent reaches the
+/// bound, so a search from an incumbent of `reach` cuts by the game chosen, if any.  The solver cuts by the game of
+/// n − 1 alone, but the lemma holds for any game proven before, and a search from an incumbent below its own optimum
+/// reaches few bounds of n − 1.
+fn game_after<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<Game<W>> {
+    let game = Game::<W>::of_board(n)?;
+    let before = |m: u32| Some((Game::<W>::of_board(m)?, optimal_sum::<W>(optimal, m)?));
+    let earlier: Vec<_> = (n.saturating_sub(4).max(1)..n).rev().filter_map(before).collect();
+    let chosen = earlier.iter().find(|(_, bound)| *bound <= reach).or(earlier.first());
+    Some(match chosen {
+        Some((m, bound)) => game.with_near_repeat(m, *bound),
+        None => game,
+    })
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Real games
 
 /// Every game of `ns` that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
-/// under each tactic (past the board 200 one in three): the search must come back with exactly that sum, and with a
-/// set that is promotable.  More than `fewest` searches are made.
-fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewest: usize) {
+/// under each tactic (past the board 200 one in three), with the near-repeat cut by a game before ([`game_after`])
+/// whose bound both incumbents reach where there is one: the search must come back with exactly that sum, and with a
+/// set that is promotable.  More than `fewest` searches are made.  Returns the nodes the cut cut.
+fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewest: usize) -> u64 {
     let optimal = Optimal::built_in();
     let configs = configs();
-    let mut runs = 0;
+    let (mut runs, mut cut) = (0, 0);
     for n in ns {
-        let Some(game) = Game::<8>::of_board(n) else { continue };
-        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let truth = optimal_sum::<8>(optimal, n).unwrap_or(0);
+        let Some(game) = game_after::<8>(optimal, n, truth.saturating_sub(5)) else { continue };
         // The big trees are for one configuration of each kind; the small ones for all.
         for (i, cfg) in configs.iter().enumerate() {
             for k in [1, 5] {
@@ -127,16 +150,19 @@ fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewe
                     continue;
                 }
                 let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
-                runs += 1;
+                (runs, cut) = (runs + 1, cut + out.near_cuts);
                 assert!(out.completed, "n={n} {cfg:?} from {}: not completed", truth - k);
                 assert!(out.best == truth && out.real, "n={n} {cfg:?} from {}: truth {truth}, got {out:?}", truth - k);
             }
         }
     }
     assert!(runs > fewest, "{runs} runs");
+    cut
 }
 
-/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum.
+/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum.  Their
+/// trees are too small for the near-repeat cut to act: [`the_near_repeat_cut_acts_and_changes_no_answer`] has games
+/// where it does.
 #[test]
 fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() {
     searches_from_a_handicapped_incumbent(2..=90, 300);
@@ -151,7 +177,39 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() 
     ignore = "long: the quick check is a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games"
 )]
 fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
-    searches_from_a_handicapped_incumbent(2..=300, 4000);
+    let cut = searches_from_a_handicapped_incumbent(2..=300, 4000);
+    assert!(cut > 0, "the near-repeat cut cut no node");
+}
+
+/// The near-repeat cut acts, and changes no answer: the games 232, 344 and 376, whose searches from an incumbent below
+/// their optimum it cuts (by the games 231, 343 and 375, [`game_after`]), under each tactic, from an incumbent worth 1
+/// or 5 less than `optimal.json`'s promotion sum, must come back with exactly that sum and a promotable set, and the
+/// cut changes some of the trees.
+#[test]
+fn the_near_repeat_cut_acts_and_changes_no_answer() {
+    let optimal = Optimal::built_in();
+    let (mut cut, mut changed) = (0, 0);
+    for n in [232, 344, 376] {
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let game = game_after::<8>(optimal, n, truth - 5).unwrap();
+        for cfg in configs() {
+            for k in [1, 5] {
+                let [with, without] = [cfg.near_repeat, false].map(|near_repeat| {
+                    game.search(Config { near_repeat, ..cfg }, vec![game.root_unit()], truth - k, None, None)
+                });
+                for out in [&with, &without] {
+                    assert!(
+                        out.completed && out.best == truth && out.real,
+                        "n={n} {cfg:?} from {}: {out:?}",
+                        truth - k
+                    );
+                }
+                cut += with.near_cuts;
+                changed += usize::from(with.nodes != without.nodes);
+            }
+        }
+    }
+    assert!(cut > 0 && changed > 0, "the cut cut {cut} nodes and changed {changed} trees");
 }
 
 /// The look at the last child of the search's own conflict (tactic `conflict_look`) acts, and changes no answer: with
@@ -218,8 +276,8 @@ fn lagrangian_configs() -> [Config; 5] {
 fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusive<u32>, configs: &[Config]) -> usize {
     let mut runs = 0;
     for n in ns.filter(|n| n % 10 == 1) {
-        let Some(game) = Game::<W>::of_board(n) else { continue };
-        let truth = optimal_sum::<W>(optimal, n).unwrap();
+        let truth = optimal_sum::<W>(optimal, n).unwrap_or(0);
+        let Some(game) = game_after::<W>(optimal, n, truth.saturating_sub(5)) else { continue };
         for cfg in configs {
             for k in [1, 5] {
                 let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
@@ -355,12 +413,12 @@ fn boards_with_pairs<const W: usize>(
 ) -> usize {
     let mut boards = 0;
     for n in ns {
-        let Some(game) = Game::<W>::of_board(n) else { continue };
+        let truth = optimal_sum::<W>(optimal, n).unwrap_or(0);
+        let Some(game) = game_after::<W>(optimal, n, truth.saturating_sub(5)) else { continue };
         if game.symmetries().is_empty() {
             continue;
         }
         boards += 1;
-        let truth = optimal_sum::<W>(optimal, n).unwrap();
         if n <= 40 {
             let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
             assert_eq!(Board::<W>::for_n(n).in_the_bag + truth, exact, "n={n}: the best score against the oracle");
@@ -381,10 +439,12 @@ fn boards_with_pairs<const W: usize>(
 
 /// Units of game `n` at width `W`, after up to 14 random promotions, with their candidates thinned to 6 to 23 (the
 /// largest, or at random) so that the truth can be found exhaustively, searched from an incumbent worth 1, 2, 5
-/// or 30 less under random `configs`: the search must come back with the truth (with the tactic `symmetry`, as
-/// [`Searched::run`] says).  Returns the number of searches.
+/// or 30 less under random `configs`, with the near-repeat cut by a game before ([`game_after`]): the search must
+/// come back with the truth (with the tactic `symmetry`, as [`Searched::run`] says).  Returns the number of searches.
 fn handicapped_units<const W: usize>(n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
-    let game = Game::<W>::of_board(n).expect("a game");
+    let optimal = Optimal::built_in();
+    let reach = optimal_sum::<W>(optimal, n).unwrap_or(0).saturating_sub(5);
+    let game = game_after::<W>(optimal, n, reach).expect("a game");
     let sym = game.symmetries();
     let (mut runs, mut made) = (0, 0);
     while made < units {
@@ -463,14 +523,15 @@ fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
 
 /// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
 /// 30, 50 or 70 percent of its members, the candidates what the search leaves them, searched under each of `configs`
-/// from an incumbent one below P*.  Such a unit holds `S*`, which keeps every symmetric pair's inequality (Theorem
-/// 13), so the search with the rule of the pairs (tactic `symmetry`) must find P*; a rule that cuts a node on the
-/// path to `S*`, or drops a candidate `S*` needs, does not.  The nodes of such a search are deep enough that the
-/// promotions and the candidates leave the pairs' inequalities open, which a game searched from its root rarely does.
-/// Returns the number of searches.
+/// from an incumbent one below P*, with the near-repeat cut by a game before ([`game_after`]).  Such a unit holds `S*`,
+/// which keeps every symmetric pair's inequality (Theorem 13), so the search with the rule of the pairs (tactic
+/// `symmetry`) must find P*; a rule that cuts a node on the path to `S*`, or drops a candidate `S*` needs, does not.
+/// The nodes of such a search are deep enough that the promotions and the candidates leave the pairs' inequalities
+/// open, which a game searched from its root rarely does.  Returns the number of searches.
 fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
-    let game = Game::<W>::of_board(n).expect("a game");
-    let (truth, sym) = (optimal_sum::<W>(optimal, n).unwrap(), game.symmetries());
+    let truth = optimal_sum::<W>(optimal, n).expect("a known game");
+    let game = game_after::<W>(optimal, n, truth - 1).expect("a game");
+    let sym = game.symmetries();
     let moves = optimal.moves(n).expect("a known game");
     let best: Bits<W> = moves.iter().copied().filter(|&x| game.candidates.contains(x)).collect();
     if best.sum() != truth || sym.is_empty() {

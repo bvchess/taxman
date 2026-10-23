@@ -24,15 +24,17 @@
 //! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
 //! same frames and candidates, node for node; and with the claims Lemma M5⁺ allows, which with no source open are all
 //! of them, Π⁺(∅) is the frame model's problem itself, so its search reproduces every tree of [`EXPECTED`], the
-//! matching rows too, which no table needs to say.
+//! matching rows too, which no table needs to say.  [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut
+//! shortens, solved as the solver solves them, with the cut and without it; its test prints its rows as observed.
 
 mod common;
 
-use common::{search_at_width, Config, Game};
+use common::{options, prev_of, search_at_width, stored_games, Config, Game};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
 use taxman::search::{prepare, search, Prepared, SearchTactics};
+use taxman::solver::{self, Method};
 use taxman::tactics::Tactics;
 use taxman::with_width;
 
@@ -435,4 +437,27 @@ fn the_tree_with_frequent_forgetting_has_not_changed() {
         (expected_forgetting, expected_never),
         "n={n}: nodes forgetting every 500 steps, nodes never forgetting; update FORGETTING"
     );
+}
+
+/// (game, nodes with the near-repeat cut, nodes without it): the game solved by the solver on one thread from the
+/// committed chain's game of n − 1, which is the cut's game proven before (tactic `near_repeat`).  The cut ends the
+/// search of 1101 at its first step, and shortens those of 768 and 1083.
+const NEAR_REPEATS: [(u32, u64, u64); 3] = [(768, 62, 85), (1083, 18, 70), (1101, 1, 548)];
+
+#[test]
+fn the_trees_that_the_near_repeat_cut_shortens_have_not_changed() {
+    let games = stored_games("strict.jsonl");
+    let mut observed = Vec::new();
+    for (n, ..) in NEAR_REPEATS {
+        let prev = prev_of(&games, n);
+        let [with, without] = [true, false].map(|near_repeat| {
+            let mut opts = options(1);
+            opts.tactics.search.near_repeat = near_repeat;
+            let r = solver::solve_game(n, Some(&prev), &opts).unwrap();
+            assert_eq!((r.method, r.score), (Method::Search, games[&n].0), "n={n}, near_repeat {near_repeat}");
+            r.nodes
+        });
+        observed.push((n, with, without));
+    }
+    assert_eq!(observed, NEAR_REPEATS, "the trees changed (see the top of tests/tripwires.rs); observed: {observed:?}");
 }

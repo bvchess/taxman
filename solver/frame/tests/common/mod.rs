@@ -36,8 +36,8 @@ use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
-    search, BranchSettings, Branching, Forgetting, Gf2Branching, Prepared, SearchSpace, SearchTactics, TaxSearcher,
-    TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
+    search, BranchSettings, Branching, Forgetting, Gf2Branching, NearRepeat, Prepared, SearchSpace, SearchTactics,
+    TaxSearcher, TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
 };
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -321,6 +321,9 @@ pub struct Config {
     /// The GF(2) graph padded to that many block words ([`Gf2Graph::padded`]), to run the engines of more words than
     /// the board needs; `None` for the words it needs.
     pub gf2_words: Option<usize>,
+    /// The near-repeat cut (tactic `near_repeat`), where the game has one ([`Game::with_near_repeat`]) and the
+    /// incumbent a search starts from reaches its bound.
+    pub near_repeat: bool,
 }
 
 impl Config {
@@ -351,6 +354,7 @@ impl Config {
             conflict_branching: t.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
             conflict_look: t.conflict_look,
             gf2_words: None,
+            near_repeat: t.near_repeat,
         }
     }
 }
@@ -365,6 +369,8 @@ pub struct Outcome<const W: usize> {
     pub real: bool,
     pub completed: bool,
     pub nodes: u64,
+    /// The nodes the near-repeat cut cut (0 without it).
+    pub near_cuts: u64,
 }
 
 /// The parts of a search of one game: the model, the starting state, the candidates and what the bounds need.
@@ -379,6 +385,8 @@ pub struct Game<const W: usize> {
     pub candidates: Bits<W>,
     pub max_total: u32,
     graph: MatchGraph,
+    /// The near-repeat cut of the game's searches, by a game proven before ([`Game::with_near_repeat`]).
+    near: Option<NearRepeat<W>>,
 }
 
 impl<const W: usize> Game<W> {
@@ -386,7 +394,16 @@ impl<const W: usize> Game<W> {
     pub fn new(model: FrameGraph, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = model.max_promotions_among(&root, &candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
-        Game { model, root, candidates, max_total, graph }
+        Game { model, root, candidates, max_total, graph, near: None }
+    }
+
+    /// The game whose searches cut by the problem of `m`'s game, whose best promotion sum is at most `bound`
+    /// ([`NearRepeat`], tactic `near_repeat`), where a configuration has the tactic and the incumbent reaches `bound`.
+    pub fn with_near_repeat(mut self, m: &Game<W>, bound: u64) -> Self {
+        let near =
+            NearRepeat::of(&self.model, &self.candidates, Arc::new(m.model.clone()), m.root, &m.candidates, bound);
+        self.near = Some(near.expect("problems without one-sided candidates"));
+        self
     }
 
     /// The game that a search of `prepared` plays: its model, root and candidates, one-sided candidates and all (the
@@ -471,9 +488,12 @@ impl<const W: usize> Game<W> {
                 conflict_look: cfg.conflict_look,
             })),
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
+            // As the search arms it (`NearRepeat::arms`): with the tactic, and an incumbent that reaches the bound.
+            near_repeat: self.near.as_ref().filter(|near| cfg.near_repeat && best >= near.bound()),
             #[cfg(feature = "studies")]
             hooks: None,
         };
+        let cut_before = space.near_repeat.map_or(0, NearRepeat::nodes_cut);
         let engine = engine.unwrap_or_else(|| config(cfg.threads));
         let start = match resume {
             Some(path) => Start::Resume(path),
@@ -487,6 +507,7 @@ impl<const W: usize> Game<W> {
             real: self.is_real(&set, out.best),
             completed: out.completed,
             nodes: out.stats.nodes,
+            near_cuts: space.near_repeat.map_or(0, |near| near.nodes_cut() - cut_before),
         }
     }
 

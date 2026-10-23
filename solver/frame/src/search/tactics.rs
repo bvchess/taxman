@@ -92,6 +92,11 @@ pub struct SearchTactics {
     /// `search::searcher`'s `conflict_to_branch_on` say where; sound: it only chooses between two true conflicts, and
     /// leaves the node's state as it found it).  Off by default.
     pub conflict_look: bool,
+    /// Cut a node whose completions are promotion sets of a game M proven before, once the incumbent reaches a proven
+    /// bound of M's best promotion sum ([`NearRepeat`](super::NearRepeat); proven: docs/theory/ledger.md, Lemma R).  It
+    /// acts only where the search is given M ([`search_steered`](super::search_steered): the solver gives the game of
+    /// n − 1 when it is concluded and proven before the search starts) and its incumbent or floor reaches that bound.
+    pub near_repeat: bool,
 }
 
 impl Default for SearchTactics {
@@ -115,6 +120,7 @@ impl Default for SearchTactics {
             more_forced: true,
             conflict_branching: true,
             conflict_look: false,
+            near_repeat: true,
         }
     }
 }
@@ -200,23 +206,38 @@ impl SearchTactics {
     /// them while it goes ([`Branching`](super::Branching)).
     pub const BRANCHING_BITS: u16 = 1 << 9 | 1 << 10;
 
+    /// The bit of [`bits`](Self::bits) of `near_repeat` (bit 11).  A checkpoint records it, as the search began with
+    /// it, but it binds nothing: the cut drops only nodes none of whose completions beats the incumbent, by a bound
+    /// that each run of the search sets up for itself, as it takes its ceiling, so a search whose units are searched
+    /// with the cut and without it is as exact as one that keeps it (docs/theory/ledger.md, the paragraph "What it
+    /// rests on").  And the bit cannot say whether the cut acted: that depends on whether the game before was proven
+    /// when the run set the search up.  So a checkpoint resumes with the tactic on or off, those of the builds before
+    /// it, whose bit is clear, included.
+    pub const NEAR_REPEAT_BIT: u16 = 1 << 11;
+
+    /// The bits of [`bits`](Self::bits) that a checkpoint records and that bind nothing:
+    /// [`BRANCHING_BITS`](Self::BRANCHING_BITS) and [`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT).
+    const UNBOUND_BITS: u16 = Self::BRANCHING_BITS | Self::NEAR_REPEAT_BIT;
+
     /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits) and
     /// [`tuning`](Self::tuning)): the tactics a checkpoint does not record, the policy of keeping and forgetting
     /// nogoods, may differ (a resumed search starts with no nogoods whichever policy made the first run's), and so may
-    /// those it records but that only choose how a node branches ([`BRANCHING_BITS`](Self::BRANCHING_BITS)).
+    /// those it records but that only choose how a node branches ([`BRANCHING_BITS`](Self::BRANCHING_BITS)) and the
+    /// near-repeat cut ([`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT)).
     pub fn same_recorded(&self, other: &SearchTactics) -> bool {
-        let bound = |t: &SearchTactics| t.bits() & !Self::BRANCHING_BITS;
+        let bound = |t: &SearchTactics| t.bits() & !Self::UNBOUND_BITS;
         bound(self) == bound(other) && self.tuning() == other.tuning()
     }
 
     /// These tactics with what of `run`'s a checkpoint does not bind ([`same_recorded`](Self::same_recorded)): its
-    /// policy of keeping and forgetting nogoods, and its branching switches `conflict_branching` and `conflict_look`.
-    /// The run that resumes a search says both.
+    /// policy of keeping and forgetting nogoods, its branching switches `conflict_branching` and `conflict_look`, and
+    /// `near_repeat`.  The run that resumes a search says them.
     #[must_use]
     pub fn with_unbound_of(self, run: &SearchTactics) -> SearchTactics {
         SearchTactics {
             conflict_branching: run.conflict_branching,
             conflict_look: run.conflict_look,
+            near_repeat: run.near_repeat,
             ..self.with_forgetting_of(run)
         }
     }
@@ -282,17 +303,18 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8), `conflict_branching` (9) and `conflict_look` (10); the defaults are `0x3B9`.  (Bits 9 and 10
-    /// record the settings the search began with and bind nothing ([`BRANCHING_BITS`](Self::BRANCHING_BITS)): a
-    /// checkpoint of a build before `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and
-    /// likewise bit 10 and `conflict_look`.  A build before a tactic refuses a checkpoint with its bit set, as "unknown
-    /// tactics".)  The
-    /// knobs of the nogood table's policy (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they
-    /// change the tree, never the answer, and a resumed search starts with an empty table whichever policy made the
-    /// first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it resumes with `gf2` off.  One of a build
-    /// before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which the default no longer is, so a run
-    /// resumes it only with `--tactic symmetry=off`.  A build before `symmetry` refuses a checkpoint with the tactic
-    /// on, as "unknown tactics": it would resume the search without a rule that shaped the tree it wrote.)
+    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10) and `near_repeat` (11); the defaults are `0xBB9`.
+    /// (Bits 9 to 11 record the settings the search began with and bind nothing
+    /// ([`BRANCHING_BITS`](Self::BRANCHING_BITS) and [`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT)): a checkpoint of a
+    /// build before `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and likewise bit 10
+    /// and `conflict_look`, and bit 11 and `near_repeat`.  A build before a tactic refuses a checkpoint with its bit
+    /// set, as "unknown tactics".)  The knobs of the nogood table's policy (`nogood_period`, `nogood_keep`,
+    /// `nogood_limit`) are not recorded: they change the tree, never the answer, and a resumed search starts with an
+    /// empty table whichever policy made the first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it
+    /// resumes with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which
+    /// the default no longer is, so a run resumes it only with `--tactic symmetry=off`.  A build before `symmetry`
+    /// refuses a checkpoint with the tactic on, as "unknown tactics": it would resume the search without a rule that
+    /// shaped the tree it wrote.)
     pub(super) fn bits(self) -> u16 {
         u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
             | u16::from(self.fix_forced) << 3
@@ -303,6 +325,7 @@ impl SearchTactics {
             | u16::from(self.symmetry) << 8
             | u16::from(self.conflict_branching) << 9
             | u16::from(self.conflict_look) << 10
+            | u16::from(self.near_repeat) << 11
     }
 
     /// The length of [`tuning`](Self::tuning).
@@ -343,6 +366,7 @@ impl SearchTactics {
             symmetry: other.symmetry,
             conflict_branching: other.conflict_branching,
             conflict_look: other.conflict_look,
+            near_repeat: other.near_repeat,
             ..self.with_forgetting_of(other)
         }
     }
@@ -394,7 +418,7 @@ impl SearchTactics {
     /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
     /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 11 != 0 {
+        if bits >> 12 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -407,6 +431,7 @@ impl SearchTactics {
             symmetry: bits & 1 << 8 != 0,
             conflict_branching: bits & 1 << 9 != 0,
             conflict_look: bits & 1 << 10 != 0,
+            near_repeat: bits & 1 << 11 != 0,
             ..SearchTactics::legacy_tuning()
         })
     }

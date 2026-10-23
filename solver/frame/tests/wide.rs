@@ -480,14 +480,16 @@ fn a_committed_checkpoint_resumes() {
 /// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
 /// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
 /// of the one-sided candidates) resumes with this build and finishes as the build that wrote it finishes it: the same
-/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  Its
+/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  That
+/// build had no near-repeat cut, which the game of 1132 makes end the search at once, so the run turns it off.  Its
 /// header reads as a version-5 header with no one-sided candidates; asked to resume a search of the extended problem
 /// with open sources instead, it is refused, saying why.
 #[test]
 fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
     let games = stored_games("strict.jsonl");
     let dir = TempDir::new("committed-checkpoint-v4");
-    let opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
+    let mut opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
+    opts.tactics.set("near_repeat=off").unwrap();
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
     std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();
@@ -528,14 +530,14 @@ fn a_w20_search_interrupted_and_resumed_once_gives_the_same_answer() {
 }
 
 /// The W = 20 search of game 1133 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
-/// the matching path.
+/// the matching path, without the near-repeat cut, by which the game of 1132 ends the search at its first step.
 fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
     let games = stored_games("strict.jsonl");
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(sets) {
         let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
         let mut opts = options(1);
-        opts.tactics.search = tactics;
+        opts.tactics.search = SearchTactics { near_repeat: false, ..tactics };
         opts.checkpoint_dir = Some(dir.join("ckpt"));
         opts.node_limit = Some(700);
         opts.queue_mem_cap = 2;

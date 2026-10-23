@@ -11,7 +11,9 @@
 //!   `n − 1`), so no promotion set sums to more than `n + opt(n − 1) − in_the_bag`: the search's *ceiling*, at which
 //!   it can stop ([`Board::promotion_cap`]);
 //! * the promotions of the previous game that are candidates of this board are a good, usually near-optimal, first
-//!   incumbent: the search's *seed* ([`Board::seed`]).
+//!   incumbent: the search's *seed* ([`Board::seed`]);
+//! * the previous game's problem, with a proven bound of its best promotion sum, cuts the nodes of this game's search
+//!   whose completions are promotion sets of it: the *near-repeat cut* ([`near_repeat`]).
 //!
 //! A board is generic over the set width `W` (see [`crate::bits`]): pick it with `with_width!`, as the solver and
 //! the ladder do.
@@ -23,7 +25,7 @@ use crate::accelerate::solution_for_promotions;
 use crate::bits::Bits;
 use crate::frames::{build_extended, build_frames, ExtendedFrames, SearchFrames};
 use crate::numtheory::Tables;
-use crate::search::{self, Prepared, Problem, SearchTactics};
+use crate::search::{self, NearRepeat, Prepared, Problem, SearchTactics};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -221,6 +223,29 @@ impl<const W: usize> Board<W> {
 /// board only by its `in_the_bag`.
 pub fn promotion_cap(n: u32, in_the_bag: u64, prev_score: u64) -> Option<u64> {
     (prev_score + u64::from(n)).checked_sub(in_the_bag)
+}
+
+/// The near-repeat cut ([`NearRepeat`]) of the search that `prepared` sets up for the board `1..=n`, by the game of
+/// n − 1, which scores `prev_score` and is optimal.  M is n − 1, whose problem Π_M is set up as `prepared` was (the
+/// same set width and tactics), and B is `prev_score` less the `in_the_bag` of n − 1.  B bounds P\*(Π_M), since every
+/// promotion set of Π_M is a game of n − 1 worth that `in_the_bag` plus its sum (docs/theory/ledger.md, the paragraph
+/// "Standing").  `None` if the board of n − 1 has no candidates (no member of a node could be marked).
+///
+/// # Errors
+///
+/// If `prev_score` is less than the `in_the_bag` of `n − 1`, which proves the game was not optimal, or the problem of
+/// `n − 1` cannot be set up.
+pub fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev_score: u64) -> Result<Option<NearRepeat<W>>, String> {
+    let Some(m) = prepared.n.checked_sub(1).filter(|&m| m > 0) else { return Ok(None) };
+    let board = Board::<W>::for_n(m);
+    if board.is_trivial() {
+        return Ok(None);
+    }
+    let problem = board.prepare(prepared.tactics).map_err(|e| format!("the near-repeat cut's game {m}: {e}"))?;
+    let bound = prev_score.checked_sub(board.in_the_bag).ok_or_else(|| {
+        format!("the game of {m} scores {prev_score}, less than its game with no promotions, {}", board.in_the_bag)
+    })?;
+    NearRepeat::new(prepared, &problem, bound).map(Some)
 }
 
 /// The search problem of game `n` ([`Board::problem`], at the set width `with_width!` picks for `n`), and the board's

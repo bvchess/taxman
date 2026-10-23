@@ -101,7 +101,9 @@ use crate::results::{
     assumed_optimal, assumptions_json, assumptions_of, build_json, moves_digest, Assumptions, Proof, ResultsFile,
     SCHEMA,
 };
-use crate::search::{self, finder, stat, BranchSettings, Branching, Prepared, Problem, ProblemSize, SearchTactics};
+use crate::search::{
+    self, finder, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, SearchTactics,
+};
 use crate::tactics::Tactics;
 use lab::{GameLab, Policies};
 use std::borrow::Cow;
@@ -982,6 +984,9 @@ struct Go {
     cap: Option<u64>,
     /// The workers the search starts with.
     threads: usize,
+    /// The game of `n − 1`, if it is concluded and proven when the search starts: the game of the near-repeat cut
+    /// ([`near_repeat`]).
+    proven: Option<Prev>,
 }
 
 /// What came of a game's search, whatever its set width.
@@ -1158,7 +1163,12 @@ impl<const W: usize> Job for SearchJob<W> {
             background: opts.background,
         };
         let (prepared, resuming, branching) = (&self.prepared, self.resuming, &self.branching);
-        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, finder.as_ref(), branching);
+        let near = match &go.proven {
+            Some(prev) if prepared.tactics.near_repeat => near_repeat(prepared, prev)?,
+            _ => None,
+        };
+        let plan = finder.as_ref();
+        let found = search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near.as_ref());
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);
@@ -1175,6 +1185,25 @@ impl<const W: usize> Job for SearchJob<W> {
             finder: found.finder,
         })
     }
+}
+
+/// The near-repeat cut of the search of `prepared`, game `n`, by `prev`, the game of `n − 1` concluded and proven
+/// before the search starts ([`crate::board::near_repeat`]; docs/theory/ledger.md, "The near-repeat cut").  `None`
+/// where `prev` is not proven, or its proof assumes anything.
+///
+/// B, `prev`'s score less the `in_the_bag` of `n − 1`, bounds P\*(Π_M) where that score is opt(n − 1)
+/// (docs/theory/ledger.md, the paragraph "Standing"): a proven game that assumes nothing is optimal within the frame
+/// model, so the cut adds nothing to what the search's answer rests on, and a result that the cut helped assumes what
+/// it assumed without it.  A game that assumes something (one of `optimal.json`, or one whose bound rests on statement
+/// U) would make the answer rest on that, which a result line has no way to say, so it carries no cut.  Nor does a
+/// provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: a search started before `n − 1`
+/// is concluded does not cut (`window`'s driver gives a search the game of `n − 1` with its go only once that game is
+/// concluded).
+fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Option<NearRepeat<W>>, String> {
+    if !prev.proven || !prev.assumes.is_empty() {
+        return Ok(None);
+    }
+    crate::board::near_repeat(prepared, prev.score)
 }
 
 type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known, Option<GameLab>, &Policies) -> Result<SetUp, Failure>;

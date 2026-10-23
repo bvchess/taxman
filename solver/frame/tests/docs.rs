@@ -880,6 +880,7 @@ const REWRITTEN: &[&str] = &[
     "solver/frame/testdata/golden/README.md",
     "solver/frame/testdata/fits/README.md",
     "solver/docs/REFERENCE.md",
+    "solver/docs/verifiers.md",
     "solver/docs/DESIGN.md",
     DESIGN_DIR,
     "solver/docs/AGENDA.md",

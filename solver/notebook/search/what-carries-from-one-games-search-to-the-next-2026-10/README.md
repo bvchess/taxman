@@ -427,3 +427,29 @@ studies`; the scripts name that host's folders.
   seconds, whether it ended, whether its best is the optimum: always).
 * `games.jsonl`: every whole game run (game, setting, steps, CPU seconds, whether it ended, whether its best is the
   optimum: always).
+
+## Later (2026-10-22): built as the tactic `near_repeat`
+
+The cut is built as the tactic `near_repeat`, on by default, with the check of [Lemma
+R](../../../../docs/theory/ledger.md#the-near-repeat-cut) in place of the study's equal frames ([the
+design](../../../docs/design/search.md#the-near-repeat-cut)).  The solver gives a search the game of n − 1 when that
+game is concluded before the search starts, is proven and assumes nothing.  The build of the commit "The near-repeat
+cut, as the tactic near_repeat" proved each game from its root against the known optimum, with
+`tune solve N --ids root --known strict.jsonl`, on one thread each, side by side at `nice -n 19` on the chain's host
+while the chain ran:
+
+| game | the cut | steps | CPU s | nodes cut |
+|---|---|---|---|---|
+| 4901 | on | 750 | 9.07 | 184 |
+| 3000 | on | 107,724 | 39.14 | 0 |
+| 3000 | off | 107,724 | 39.28 | |
+| 4050 | on | 582,353 | 494.62 | 0 |
+| 4050 | off | 582,353 | 495.66 | |
+
+4901 ends at its optimum, 547,431, in the study's 750 steps and 184 cuts: the lemma's wider check cuts no more there.
+On 3000 and 4050 the cut is armed, its bound reached, and never holds; its checks cost nothing measurable (0.4% and
+0.2% less CPU with them, within the noise of a loaded host).  Through the solver, on the games 2 to 1200 solved on one
+thread from the committed chain's game of n − 1 (a test build on the laptop), the cut changes 175 trees and no score:
+most end at their first step (1101 in 1 step against 548), and eight are shortened (1024 in 2,800 steps against 7,417).
+The games 2527, 3367 and 4899, and a game where P\* rises, are left to a lab's study.
+

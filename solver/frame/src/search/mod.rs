@@ -36,7 +36,9 @@
 //! `refine::Refiner::top`: the matching bound ([`crate::matchbound`]), the forced members, the conflict of the
 //! heaviest matching, and the refinement.  With the tactic `lagrange`, where they leave it open, the Lagrangian bound
 //! over the nogoods and the forced members it finds follow (`lagrange::Lagrangian::check`).  The tactics that switch
-//! these pieces are the fields of [`SearchTactics`].
+//! these pieces are the fields of [`SearchTactics`].  Before the bound check of a node or a child, with the tactic
+//! `near_repeat`, comes the near-repeat cut (`Stepper::near_repeat_cuts`, [`NearRepeat`]), where the search was given a
+//! game proven before.
 //!
 //! # Where the arguments are
 //!
@@ -58,6 +60,10 @@
 //!   search from the root.  A search of a node below the root finds the best of its completions that keep the
 //!   inequalities, which can be lighter than its best completion (THEORY.md, last paragraph of "Pruning with the
 //!   inequalities").
+//! * The near-repeat cut ([`NearRepeat`]; docs/theory/ledger.md, Lemma R): a node whose completions are promotion sets
+//!   of a game M proven before holds none worth more than M's best promotion sum, so where the incumbent reaches a
+//!   proven bound of that sum, it holds none that beats the incumbent.  The cut drops only such nodes, as a bound
+//!   does, and learns nothing.
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
 //!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its
@@ -79,6 +85,7 @@
 //! * `dual`: [`dual_bound`], the upper bound that a stopped search's checkpoint proves, and [`NodeBound`], the bound
 //!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
+//! * `near_repeat`: [`NearRepeat`], the setup of the near-repeat cut and its checks at a node.
 //! * here: [`search`], which starts or resumes the engine on a prepared game, and [`search_above`], the same from a
 //!   floor (an incumbent worth a given sum and no set) instead of a start incumbent; [`start_incumbent`], the incumbent
 //!   [`search`] starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`],
@@ -94,6 +101,7 @@ mod header;
 mod hooks;
 mod incumbent;
 pub mod lagrange;
+mod near_repeat;
 mod refine;
 mod searcher;
 mod setup;
@@ -106,6 +114,7 @@ pub use dual::{dual_bound, DualBound, NodeBound};
 #[cfg(feature = "studies")]
 pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 pub use incumbent::Neighbourhood;
+pub use near_repeat::NearRepeat;
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
     extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
@@ -247,7 +256,8 @@ pub fn search_above<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, &[], cap, resume, None, prepared.tactics.forgetting(), Some(floor), None, None)
+    let forgetting = prepared.tactics.forgetting();
+    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -260,7 +270,7 @@ pub fn search_with<const W: usize>(
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
     let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
-    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None)
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -276,7 +286,7 @@ pub fn search_beside<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, prepared.tactics.forgetting(), None, plan, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, prepared.tactics.forgetting(), None, plan, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
@@ -284,6 +294,11 @@ pub fn search_beside<const W: usize>(
 /// `prepared.tactics` says of them, and a fresh search's checkpoints record them as they were when it started.  A
 /// setting there chooses only which conflict a node branches on, so the search's answer is the same whatever they say
 /// and however often they change (solver/docs/design/lab.md).
+///
+/// With `near_repeat`, a game proven before, the search cuts by it ([`NearRepeat`]) if the tactic `near_repeat` is on
+/// and the incumbent it starts from (that of its start or of its checkpoint, the better) reaches the cut's bound
+/// ([`NearRepeat::arms`]).
+#[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
     cfg: &EngineConfig,
@@ -292,14 +307,16 @@ pub fn search_steered<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
     branching: &Arc<Branching>,
+    near_repeat: Option<&NearRepeat<W>>,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, Some(branching))
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, Some(branching), near_repeat)
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
-/// so that tests can make them forget often, under `floor` if given (then without a seed), and with the branching
-/// settings `branching` if given (else those of the tactics).
+/// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
+/// settings `branching` if given (else those of the tactics), and with the near-repeat cut of `near_repeat` if given
+/// ([`search_steered`]).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -312,6 +329,7 @@ fn search_forgetting<const W: usize>(
     floor: Option<u64>,
     plan: Option<&finder::Plan<W>>,
     branching: Option<&Arc<Branching>>,
+    near_repeat: Option<&NearRepeat<W>>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
@@ -363,7 +381,11 @@ fn search_forgetting<const W: usize>(
         });
     }
 
-    let space = SearchSpace { forgetting, diagnostics, began: t0, ..SearchSpace::new(prepared, &match_graph) };
+    // The near-repeat cut, if the incumbent the search starts from reaches its bound (the setup's last check): the
+    // incumbent only rises.
+    let near_repeat = near_repeat.filter(|near| near.arms(&prepared.tactics, best.1));
+    let space =
+        SearchSpace { forgetting, diagnostics, began: t0, near_repeat, ..SearchSpace::new(prepared, &match_graph) };
     let space = match branching {
         Some(branching) => SearchSpace { branching: Arc::clone(branching), ..space },
         None => space,
