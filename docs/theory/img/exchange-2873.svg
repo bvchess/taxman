@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="780" height="666" viewBox="0 0 780 666" font-family="Helvetica, Arial, sans-serif" font-size="14">
-<title>Game 2873&#x27;s six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with the source 2431 joined to three factors: the playable set A of four sources that nothing can join, and the playable set B of five.</title>
+<title>Game 2873&#x27;s six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with the source 2431 joined to three factors: the playable set Y of four sources that nothing can join, and the playable set Y′ of five.</title>
 <rect x="0" y="0" width="780" height="666" fill="#ffffff"/>
 <line x1="167.5" y1="70" x2="129.5" y2="70" stroke="#111111" stroke-width="3.6" fill="none"/>
 <line x1="212.5" y1="70" x2="250.5" y2="70" stroke="#111111" stroke-width="3.6" fill="none"/>
@@ -73,11 +73,11 @@
 <text x="430" y="465" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2873</text>
 <circle cx="270" cy="495" r="21" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
 <text x="270" y="495" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2431</text>
-<text x="390" y="22" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">A = {1573, 2057, 2431, 2873}: playable, stuck at four</text>
+<text x="390" y="22" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">Y = {1573, 2057, 2431, 2873}: playable, stuck at four</text>
 <text x="610" y="51" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">ground</text>
-<text x="390" y="268" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">1859 would make the core {1573, 1859, 2057, 2431, 2873}, and 2197 would make a core by itself:</text>
-<text x="390" y="286" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">no member of B fits into A.</text>
-<text x="390" y="342" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">B = {1573, 1859, 2057, 2197, 2873}: playable, with five</text>
+<text x="390" y="268" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">Y with 1859 is the core {1573, 1859, 2057, 2431, 2873}, and Y with 2197 is a core:</text>
+<text x="390" y="286" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">no member of Y′ fits into Y.</text>
+<text x="390" y="342" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">Y′ = {1573, 1859, 2057, 2197, 2873}: playable, with five</text>
 <text x="610" y="371" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">ground</text>
 <text x="390" y="588" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">So the playable sets are not the independent sets of a matroid:</text>
 <text x="390" y="606" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">one maximal set has four members and another five.</text>

@@ -1031,13 +1031,13 @@ def hypergraph_panel(fig, oy, members, factors, edges, styles, ground, title, no
 
 
 def exchange_2873():
-    """The six sources of game 2873 as edges on the factors 121 to 221: the maximal playable sets A and B."""
+    """The six sources of game 2873 as edges on the factors 121 to 221: the maximal playable sets Y and Y′."""
     fig = Fig(
         "exchange-2873",
         780,
         640,
         "Game 2873's six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with the source 2431 "
-        "joined to three factors: the playable set A of four sources that nothing can join, and the playable set B of "
+        "joined to three factors: the playable set Y of four sources that nothing can join, and the playable set Y′ of "
         "five.",
     )
     # factor -> (x, y); each source sits on the edge between its factors (2431 is a hub with three spokes)
@@ -1057,13 +1057,13 @@ def exchange_2873():
     panels = [  # (set, title, notes)
         (
             {1573, 2057, 2431, 2873},
-            "A = {1573, 2057, 2431, 2873}: playable, stuck at four",
-            ["1859 would make the core {1573, 1859, 2057, 2431, 2873}, and 2197 would make a core by itself:",
-             "no member of B fits into A."],
+            "Y = {1573, 2057, 2431, 2873}: playable, stuck at four",
+            ["Y with 1859 is the core {1573, 1859, 2057, 2431, 2873}, and Y with 2197 is a core:",
+             "no member of Y′ fits into Y."],
         ),
         (
             {1573, 1859, 2057, 2197, 2873},
-            "B = {1573, 1859, 2057, 2197, 2873}: playable, with five",
+            "Y′ = {1573, 1859, 2057, 2197, 2873}: playable, with five",
             ["So the playable sets are not the independent sets of a matroid:",
              "one maximal set has four members and another five."],
         ),
