@@ -43,13 +43,13 @@ other proof has reached.  The open statements about the sources concern the sour
 U\* by construction, its exactness is proved without (★) or (♦), and no score rests on them.
 
 * **Proved outright:** playability (P1 to P11); neighboring games (N1 to N6); the frame model and its exactness (F1 to
-  F9, X1 to X7, [the holes theorem X9](theory/exactness.md#boards-with-holes), and the inequality of [the corollary of
-  U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1, W2); the extended problem and its
-  certificates (E1 to E6); the bounds on the promotions (B1 to B5); the rules of a search (R1 to R5, [the near-repeat
-  lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat lemma
-  R6](theory/search-rules.md#the-repeat-lemma)); the matroid and length propositions (Q2, Q4) and the first two parts of
-  [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence in [the cardinality
-  conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
+  F10, X1 to X7, [the holes theorem X9](theory/exactness.md#boards-with-holes), and the inequality of [the corollary of
+  U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
+  certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
+  to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); the matroid and length propositions (Q2, Q4) and the first two
+  parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence in [the
+  cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
   law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
   theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
 * **Given statement U at n:** the equality of the corollary of U (X8), and the inequality and last part of the repeat
@@ -58,7 +58,7 @@ U\* by construction, its exactness is proved without (★) or (♦), and no scor
   the last part of the length lemma (Q3), and through Q1 [the sources
   conjecture](theory/sources.md#the-sources-conjecture) there.
 * **Given (♦) in game n:** (★) and the sources conjecture there, by the span theorem (S6), so the check of (♦) certifies
-  both game by game.
+  both game by game; and the last part of B6.
 
 What the programs' answers rest on:
 

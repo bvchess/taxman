@@ -143,13 +143,13 @@ reach.
 | F1 | [the frame lemma](frame-model.md#the-frame-lemma) | every number lies in one frame, each frame lies in one layer, and the frames in front of it one layer down | proved |
 | F2 | [the joining lemma](frame-model.md#the-joining-lemma) | acyclic schemes of disjoint sets against disjoint pools join into an acyclic scheme when each set lists only factors of its own pool and the pools before it | proved |
 | F3 | [the layer theorem](frame-model.md#the-layer-theorem) | a set is playable iff each of its layer instances is | proved |
-| F4 | [the bottom-layers theorem](frame-model.md#the-bottom-layers-theorem) | every optimal set plays q(n) alone in layer 1, exactly U\*_2 among the sources of layer 2, and a forest in layer 2; where the frames of layer 2 are closed, it plays no number of layer 2 up to n/2 | proved |
-| | [the closed frames of layer 2](frame-model.md#the-bottom-layers-theorem) | the frames of layer 2 are closed on every board checked but a few small ones | measured |
+| F4 | [the bottom-layers theorem](frame-model.md#the-bottom-layers-theorem) | every optimal set plays q(n) alone in layer 1, exactly U\*_2 among the sources of layer 2, and a forest in layer 2; where the frames of layer 2 are closed, as they are from n = 187 on ([F10](frame-model.md#the-square-theorem)), it plays no number of layer 2 up to n/2 | proved |
 | F5 | [the winnability lemma](frame-model.md#the-winnability-lemma) | a pair of Taxman Mini is winnable iff, read as an instance, it is playable, so it has at least as many factors as moves | proved |
 | F6 | [clean numbering](frame-model.md#clean-numbering) | every frame with freedoms in front of frame h is numbered h − 1 | proved |
 | F7 | [the take-on lemma](frame-model.md#the-take-on-lemma) | frame h can take a number on iff one of its frames can | proved |
 | F8 | [the reduction lemma](frame-model.md#the-reduction-lemma) | dropping a move with one live factor keeps winnability, and a winnable pair reduces to the same pair in any order | proved |
 | F9 | [the promotion-limit lemma](frame-model.md#the-promotion-limit-lemma) | filling each frame's promotions from the front reaches the promotion limit, which the freedoms and the candidates set; no completion adds more members than its node's limit, and a candidate is in some completion only if both frames it touches have freedoms | proved |
+| F10 | [the square theorem](frame-model.md#the-square-theorem) | a frame of layer 2 has one freedom if none of its sources is the square of a prime, and none if one is; from n = 187 on, layer 2 is one frame with a square, so every optimal set plays exactly U\*_2 in layer 2 and no number of layer 2 up to n/2, and k₀ ≥ 3 | proved, the boards 187 to 2499 and the primes in short intervals below 396,738 by computation |
 
 ### The exactness of the frame model
 
@@ -172,6 +172,7 @@ reach.
 |---|---|---|---|
 | W1 | [the parity bound](parity-bound.md#the-parity-bound) | a playable set is independent in both parity matroids, so the heaviest set independent in both bounds opt(n), and with picks and bars the playable sets that hold the picks and avoid the bars | proved |
 | W2 | [the barred bound](parity-bound.md#the-barred-bound) | for a number b that is not a pick of [F4](frame-model.md#the-bottom-layers-theorem), if b's barred bound is at most V, every playable set that obeys F4 and weighs more than V holds b | proved |
+| W3 | [the greedy-basis proposition](parity-bound.md#the-greedy-basis-proposition) | every heaviest set independent in both parity matroids holds, of the sources, the greedy basis of their GF(2) linear matroid, which is U\* iff (♦) holds in game n; then the parity bound equals the bound with the picks U\* | proved |
 | | [the exactness of the parity bound to 77](parity-bound.md#what-the-parity-bound-misses) | the parity bound equals opt(n) for every n ≤ 77, and exceeds it at 78 | measured |
 
 ### Franklín and Moniot's paper
@@ -200,11 +201,12 @@ reach.
 |---|---|---|---|
 | B1 | [the signed frame theorem](frame-bounds.md#the-signed-frame-theorem) | a promotion set is independent in every signed frame matroid, over every field; a loop lies in no promotion set; at a node, the contraction by P is the matroid of state(P), in which a candidate taken out of its home is a loop | proved |
 | B2 | [the frame bound](frame-bounds.md#the-frame-bound) | the heaviest set independent in both frame matroids, within the node's promotion limit, bounds every completion of a node, the root included | proved |
-| | [the frame bound against the parity bound](frame-bounds.md#the-frame-bound) | the parity bound equals ΣU\* plus the frame bound at every root where both were measured | measured |
+| | [the frame bound against the parity bound](frame-bounds.md#the-frame-bound) | the parity bound equals ΣU\* plus the frame bound at every board 2..8191, including the 5,496 boards from 1173 on where the last part of [B6](frame-bounds.md#the-contraction-theorem) does not apply | measured |
 | | [the frame bound's gap](franklin-moniot.md#the-hardness) | at the roots measured, the heaviest set of the frame bound fails only through odd cores, in the frames numbered 1 to 3 | measured |
 | B3 | [the frame bound for the extended problem](frame-bounds.md#the-frame-bound-for-the-extended-problem) | B2 holds for Π⁺(O), with its one-sided candidates added to both matroids, and with the promotion limit of the freedoms that the node's promotions leave | proved |
 | B4 | [the decomposition bound](frame-bounds.md#the-decomposition-bound) | the frame matroids and signed frame matroids combine into a Lagrangian bound on P\*, valid for every multiplier | proved |
 | B5 | [the GF(3) proposition](frame-bounds.md#the-gf3-proposition) | a frame of a state is winnable with L applied iff L ∩ T_h is independent under every signing over GF(3) | proved; explanatory |
+| B6 | [the contraction theorem](frame-bounds.md#the-contraction-theorem) | on the candidates the frame matroids are the parity matroids contracted by U\*; the promotion limit never lowers the frame bound at the root; ΣU\* plus the frame bound is the parity bound with the picks U\* and the bars outside U\* ∪ C, so at most the parity bound; given (♦), equal to it when every number up to n/2 that is a loop of neither contraction is a candidate | proved, the last part given (♦); explanatory |
 
 ### The rules of a search
 
