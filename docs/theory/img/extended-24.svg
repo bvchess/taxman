@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="400" viewBox="0 0 780 400" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<title>Frame 1 of game 24 with the numbers 8 and 12 promoted into it: with the move 18 and the factors 4, 6, 9 and 10 the frame is winnable, but with the claim (18, 6) kept, 8 and 12 both need the factor 4.</title>
+<rect x="0" y="0" width="780" height="400" fill="#ffffff"/>
+<rect x="25" y="52" width="360" height="230" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<rect x="410" y="52" width="360" height="230" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<line x1="65.6" y1="169.8" x2="87.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="124.4" y1="169.8" x2="102.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="143.6" y1="169.8" x2="165.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="204.3" y1="165.7" x2="180.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="219.7" y1="165.7" x2="243.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="65.6" y1="169.8" x2="87.5" y2="214.7" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="143.6" y1="169.8" x2="165.5" y2="214.7" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="219.7" y1="165.7" x2="243.5" y2="214.7" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="450.6" y1="169.8" x2="472.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="509.4" y1="169.8" x2="487.5" y2="214.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="528.6" y1="169.8" x2="550.5" y2="214.7" stroke="#b4b4b4" stroke-width="1.4" fill="none" stroke-dasharray="6 4"/>
+<line x1="589.3" y1="165.7" x2="565.5" y2="214.7" stroke="#b4b4b4" stroke-width="1.4" fill="none" stroke-dasharray="6 4"/>
+<line x1="604.7" y1="165.7" x2="628.5" y2="214.7" stroke="#b4b4b4" stroke-width="1.4" fill="none" stroke-dasharray="6 4"/>
+<line x1="589.3" y1="165.7" x2="565.5" y2="214.7" stroke="#b4b4b4" stroke-width="3.4" fill="none" stroke-dasharray="8 5"/>
+<line x1="450.6" y1="169.8" x2="472.5" y2="214.7" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="509.4" y1="169.8" x2="487.5" y2="214.7" stroke="#111111" stroke-width="3.6" fill="none"/>
+<rect x="81" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="95" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">4</text>
+<rect x="159" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="173" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">6</text>
+<rect x="237" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="251" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
+<rect x="315" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="329" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
+<circle cx="56" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="56" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="56" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">8</text>
+<circle cx="134" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="134" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="134" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">12</text>
+<circle cx="212" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="212" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">18</text>
+<rect x="66.5" y="181" width="18" height="18" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="75.5" y="190" text-anchor="middle" dy=".35em" font-size="11" font-weight="bold" fill="#111111">1</text>
+<rect x="144.5" y="181" width="18" height="18" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="153.5" y="190" text-anchor="middle" dy=".35em" font-size="11" font-weight="bold" fill="#111111">2</text>
+<rect x="222.5" y="181" width="18" height="18" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+<text x="231.5" y="190" text-anchor="middle" dy=".35em" font-size="11" font-weight="bold" fill="#111111">3</text>
+<rect x="466" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="480" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">4</text>
+<rect x="544" y="216" width="28" height="28" fill="#ffffff" stroke="#b4b4b4" stroke-width="1.7"/>
+<text x="558" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#b4b4b4">6</text>
+<rect x="622" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="636" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
+<rect x="700" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="714" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
+<circle cx="441" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="441" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="441" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">8</text>
+<circle cx="519" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="519" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="519" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">12</text>
+<circle cx="597" cy="150" r="16" fill="#cdcdcd" stroke="#b4b4b4" stroke-width="1.7"/>
+<text x="597" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#b4b4b4">18</text>
+<text x="205" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">Without the claim</text>
+<text x="39" y="72" text-anchor="start" dy=".35em" font-size="14" font-weight="bold" fill="#111111">Frame 1</text>
+<text x="205" y="262" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">winnable: drops 1, 2, 3</text>
+<text x="590" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">With the claim (18, 6) kept</text>
+<text x="424" y="72" text-anchor="start" dy=".35em" font-size="14" font-weight="bold" fill="#111111">Frame 1</text>
+<text x="590" y="262" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">8 and 12 both need 4: unplayable</text>
+<text x="390" y="330" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: 8 and 12, promoted into frame 1 from frame 2.  In frame 1, 8 lists 4 and 12 lists 6, 4.</text>
+<text x="390" y="348" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">The claim (18, 6), light dashed pair, takes 18 and 6 out first, which leaves 8 and 12 one factor, 4.</text>
+<text x="390" y="366" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">The promotion set {8, 12} would be lost, though 8 and 12 with the rest of the set are playable.</text>
+</svg>
