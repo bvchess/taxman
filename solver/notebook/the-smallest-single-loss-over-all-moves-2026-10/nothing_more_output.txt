@@ -1,0 +1,20 @@
+violations up to 300: 33; one more number fits: 14; none fits: 19
+  n=77: gives up 35, scores 1911, opt 1914, nothing more fits
+  n=81: gives up 27, scores 2095, opt 2105, nothing more fits
+  n=84: gives up 30, scores 2245, opt 2263, nothing more fits
+  n=120: gives up 54, scores 4572, opt 4593, nothing more fits
+  n=126: gives up 45, scores 5190, opt 5191, nothing more fits
+  n=128: gives up 64, scores 5269, opt 5301, nothing more fits
+  n=180: gives up 80, scores 10340, opt 10401, nothing more fits
+  n=187: gives up 91, scores 11118, opt 11132, nothing more fits
+  n=189: gives up 70, scores 11439, opt 11447, nothing more fits
+  n=192: gives up 96, scores 11743, opt 11787, nothing more fits
+  n=200: gives up 80, scores 12593, opt 12648, nothing more fits
+  n=204: gives up 78, scores 13143, opt 13146, nothing more fits
+  n=208: gives up 80, scores 13781, opt 13832, nothing more fits
+  n=210: gives up 75, scores 14057, opt 14066, nothing more fits
+  n=216: gives up 72, scores 14819, opt 14834, nothing more fits
+  n=220: gives up 90, scores 15331, opt 15346, nothing more fits
+  n=224: gives up 80, scores 15802, opt 15827, nothing more fits
+  n=288: gives up 96, scores 26371, opt 26395, nothing more fits
+  n=300: gives up 120, scores 28609, opt 28691, nothing more fits

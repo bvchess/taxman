@@ -9,9 +9,11 @@ Q4](../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#202
 The first three items attack that cost.  Any true conflict gives a correct proof, so a cheaper or better choice never
 puts an answer at risk.
 
-1. **The rest of a cheaper choice** (the same Q4): carry a node's prices from one step to the next instead of pricing
-   again, and a cheaper check of the candidate conflicts, about a quarter of the choice's cost.  The ceiling is about
-   16% of the hard games' CPU.
+1. **The rest of a cheaper choice.**  Keeping a node's prices from one step to the next is built and on the chain since
+   2026-10-23 (the tactic `price_reuse`: 0.82 of the CPU on the hard units, [the root gap,
+   Q6](../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-price-reuse-in-the-choice-q6)),
+   and the choice fell from about a quarter of the CPU to 17-18%.  What is left is a cheaper check of the candidate
+   conflicts (`FrameGraph::conflicts_ordered`), about a quarter of the choice's cost before reuse.
 2. **The choices of the game before, keyed by the node.**  A postmortem of game n − 1 cannot name the conflict for game
    n by the conflict alone: most of the overlap is the search's own memory or is shared by every game, and nothing
    cheap picks the right one among the hundreds that fit a node.  A table keyed by the node was right at 99-100% of the
@@ -37,7 +39,12 @@ puts an answer at risk.
    near-repeat cut cannot reach.  Near repeats were 10% of the nodes searched from 4850 to 4955, and 8.4% beyond what the
    cut already settles.  The next step is to prove the reduction as a lemma, then to measure the short proof on 1209,
    1833 and 2301 ([the corner of a
-   near repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).
+   near repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).  A related question: when the
+   promotions of n − 1 and n are the same, can the move that n's optimal game gives up be named from the factorization
+   of n?  At odd semiprimes it is p′q′, the product of the primes just below p and q, and at the near repeats of the
+   4953 kind 2·11·p gives way to 3·13·q with q the next prime after p.  Giving up the smallest move that makes room for
+   n is not such a rule: it falls short at 1,125 of 4,954 games ([the smallest single
+   loss](../notebook/the-smallest-single-loss-over-all-moves-2026-10/README.md)).
 5. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's
    learning](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md), results 3 to 5 and the

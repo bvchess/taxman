@@ -134,13 +134,27 @@ not violations: 622 and 678 are exact, and 623, 677 and 679 hold.  Their old sco
 predecessors were: each is the old score of its predecessor plus the same step as here, which is n at 622 and 678 and
 n − 415, n − 673 and n − 445 at 623, 677 and 679.  So the seven errors are two runs that started at 621 and at 676.
 
+## The rule with nothing left to add
+
+At 21 the rule's game can take one more number: with 10 gone, 9 fits too.  So the rule gains a second condition: the
+game it makes must have room for nothing more.  Then 21 is no violation, since the condition fails there.  Among the 33
+violations up to 300, the rule's game takes one more number at 14 and nothing more at 19, which stay violations
+(`nothing_more.py`, `nothing_more_output.txt`).  The first is 77: giving up 35 scores 1,911 and nothing more fits, but
+an optimal game scores 1,914 by giving up 27 as well and playing 30, a trade that no single addition finds.  Then 81
+(2,095 against 2,105) and 84 (2,245 against 2,263).  The check stopped at 300, by decision, since it settled the
+question.
+
 ## Decision
 
 The rule is false in about a quarter of the games, in every range, and the choice of the recorded game of n − 1 does
-not explain it: an optimal game often trades several heavier moves for lighter ones.  Nothing in the code changes.  The
-chain seeds each game from the one before and proves its result by search, so it does not rest on this rule.  A rule
-that predicts which moves an optimal game trades, and not only which move to lose, would reopen the question; nothing
-here suggests one.
+not explain it: an optimal game often trades several heavier moves for lighter ones.  It stays false with the second
+condition, that nothing more fits.  Nothing in the code changes.  The chain seeds each game from the one before and
+proves its result by search, so it does not rest on this rule.  A rule that names which move an optimal game gives up,
+from the factorization of n, would reopen the question, and two patterns point that way: δ(pq) = p′q′ for odd
+semiprimes, with p′ and q′ the primes just below p and q ([the wiki's open questions, section
+7](../the-wikis-open-questions-2026-10/README.md#7-which-n)), and in its three-prime form at the near repeats where
+2·11·p gives way to 3·13·q ([the corner of a near
+repeat](../search/the-corner-of-a-near-repeat-2026-10/README.md)).
 
 ## Files
 
@@ -160,3 +174,5 @@ All scripts run from the top of the repository with `PYTHONPATH=heuristics`, for
   none can; F, none among the lists; D, cannot tell; E, a listed set meets the rule, which no violation is).
 * `extra_stats.py`: counts over `violations.tsv` (the exchanges of the optimal game); `extra_stats_output.txt` is its
   output.
+* `nothing_more.py 300`: the rule with nothing left to add, over the violations up to 300; `nothing_more_output.txt` is
+  its output.
