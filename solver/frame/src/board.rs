@@ -229,8 +229,8 @@ pub fn promotion_cap(n: u32, in_the_bag: u64, prev_score: u64) -> Option<u64> {
 /// n − 1, which scores `prev_score` and is optimal.  M is n − 1, whose problem Π_M is set up as `prepared` was (the
 /// same set width and tactics), and B is `prev_score` less the `in_the_bag` of n − 1.  B bounds P\*(Π_M), since every
 /// promotion set of Π_M is a game of n − 1 worth that `in_the_bag` plus its sum (the near-repeat lemma (R7),
-/// docs/theory/search-rules.md, the paragraph "Standing").  `None` if the board of n − 1 has no candidates (no member
-/// of a node could be marked).
+/// docs/theory/search-rules.md, the paragraph "What it rests on").  `None` if the board of n − 1 has no candidates (no
+/// member of a node could be marked).
 ///
 /// # Errors
 ///
