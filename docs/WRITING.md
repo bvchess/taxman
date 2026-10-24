@@ -71,8 +71,9 @@ of task needs, whole, and two files a task always needs together are one.  The f
 beside its folder (RUNBOOK.md for runbook/), stays as its index, under 1,000 words, with a line a file saying which task
 it serves.  Files have plain names (`runbook/prover.md`), and a citation names the file and, where it needs one, the
 heading, never a section number.  In a doc every citation is a link, so that the reader can look the thing up in one
-click; a code comment, where links do not render, gives the path and the heading.  A split copies nothing: a passage that two tasks need lives in one file, and the other
-links it (rule 5).  The notebook's entries are records and keep their length.
+click; a code comment, where links do not render, gives the path and the heading.  A split copies nothing: a passage
+that two tasks need lives in one file, and the other links it (rule 5).  The notebook's entries are records and keep
+their length.
 
 ## 9. Write plainly, modestly and briefly
 
