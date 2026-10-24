@@ -239,7 +239,7 @@ impl<'a> Plus1<'a> {
     }
 
     /// Failed keeps: an open member whose keeping would make the kept members unplayable must be excluded.  (A
-    /// member with a factor no kept member lists can always be kept: the extension lemma.)  False if the kept
+    /// member with a factor no kept member lists can always be kept: the extension lemma, P6.)  False if the kept
     /// members are unplayable already.
     fn keeps(&mut self, state: &mut [State], changed: &mut bool) -> bool {
         let inst = self.inst;

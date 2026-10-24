@@ -18,7 +18,7 @@ found in `results/bounds.jsonl`.
 
 **The dual bound of a stopped search** (`search::dual_bound`) is the largest of the incumbent and, over the open units
 of the final checkpoint, each node's promotion sum plus the GF(2) bound the search computes when it starts the unit
-(Lemma D in [the ledger's theory](../../../../docs/theory/ledger.md)).  **The relations** between boards (the same page)
+(Lemma D in [the ledger's theory](../../../../docs/theory/search-rules.md#the-dual-bound-lemma)).  **The relations** between boards (the same page)
 are L1, monotone, opt(n − 1) ≤ opt(n); L2, the ceiling, opt(n) ≤ opt(n − 1) + n; L3, the prime formula both ways, opt(p)
 = opt(p − 1) + p − q for q the largest prime below p; and L4, repeats, U(n) − bag(n) ≤ U(m) − bag(m) for equal search
 problems.  Each comes with a construction of a game that needs a finished game (legal, over, opening with the largest

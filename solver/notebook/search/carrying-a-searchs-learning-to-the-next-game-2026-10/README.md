@@ -207,8 +207,8 @@ differ.
 on each incidence, a default elsewhere), read on Π_{n+1}'s frame h is a signing of it, so every promotion set of Π_{n+1}
 is independent in its matroid, and with any multipliers (n's by candidate number, 0 for a new candidate) L bounds every
 promotion set ([THEORY.md, signed frame
-matroids](../../../../docs/theory/bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields); frame h is the
-same layer in both games, [numbering by layer](../../../../docs/theory/frame-model.md#numbering-by-layer)).  Nothing is
+matroids](../../../../docs/theory/frame-bounds.md#the-signed-frame-theorem); frame h is the
+same layer in both games, [numbering by layer](../../../../docs/theory/frame-model.md#the-frame-model)).  Nothing is
 re-checked: validity is unconditional, only the strength depends on the fit.
 
 **Methods of other fields.**  Incremental SAT, proof reuse in verification and nogood recording in constraint

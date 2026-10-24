@@ -19,8 +19,8 @@
 //! holds `x`, holds `π(a)` with every `a`, and holds every number that `π` moves and that is adjacent to one of its
 //! members.  Three checks, from the strictest:
 //!
-//! * *whole*: every number of the node's frames that `π` moves has its image in its place (Theorem 13's conditions, at
-//!   the node);
+//! * *whole*: every number of the node's frames that `π` moves has its image in its place (the conditions of the
+//!   prime-exchange theorem (R2, docs/theory/search-rules.md), at the node);
 //! * *component*: every member of the component has its image in its place;
 //! * *reduced*: the same, with the frames *reduced* first: a factor of frame `f` that is no candidate and is a maximal
 //!   factor of exactly one mover of `f` is *private*, and that mover *inert* in `f` (it can be played last, with it, in

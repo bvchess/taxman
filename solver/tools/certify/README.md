@@ -1,11 +1,11 @@
 # The certificates of U: the work list of 2176-3440, and the data it is made from
 
 What a certificate is and what it proves: solver/docs/design/certificates.md, ["Certificates of
-U"](../../docs/design/certificates.md), and
-docs/THEORY.md, the corollary of Theorem M⁺.  What the files below showed: ["Certificates past
-2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).  Everything
-ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository, against the
-committed chain (`results/strict.jsonl`, then games 1..3440) and the prover's barred bounds
+U"](../../docs/design/certificates.md), and [the certificate theorem
+(E4)](../../../docs/theory/extended-problem.md#the-certificate-theorem).  What the files below showed: ["Certificates
+past 2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).
+Everything ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository,
+against the committed chain (`results/strict.jsonl`, then games 1..3440) and the prover's barred bounds
 (`solver/noframe/data/upper_*.jsonl`).  `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314,
 3315..3440).
 

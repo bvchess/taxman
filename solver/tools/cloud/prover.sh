@@ -11,7 +11,7 @@
 # conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may
 # take any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
 # `exact` takes one to three times as many), so that a long game starts early instead of last.  The searches start
-# from the roles of Theorem B (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
+# from the roles of F3 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,

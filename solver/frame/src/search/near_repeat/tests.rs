@@ -77,11 +77,11 @@ fn a_number_that_is_no_candidate_of_m_is_not_cut() {
     assert!(cuts(&n, &m, &[20], &[45]));
 }
 
-/// The trap of the ledger's "Why each check is needed": at n = 98 the model promotes 22, a factor of frame 1, which
-/// only the candidate filter keeps out of the candidates (docs/theory/frame-model.md, the paragraph "Why the candidate
-/// filter matters").  A problem N that has 22 among its candidates, and is the board's otherwise, is not cut by the
-/// board's problem while 22 is a candidate of the node, though the other checks hold: a check that took the model's
-/// promotability for candidacy would cut it.
+/// The trap of the near-repeat lemma (R7, docs/theory/search-rules.md), the paragraph "Why each condition is needed":
+/// at n = 98 the model promotes 22, a factor of frame 1, which only the candidate filter keeps out of the candidates
+/// (the example in the claims lemma (X5), docs/theory/exactness.md).  A problem N that has 22 among its candidates, and
+/// is the board's otherwise, is not cut by the board's problem while 22 is a candidate of the node, though the other
+/// checks hold: a check that took the model's promotability for candidacy would cut it.
 #[test]
 fn a_number_that_the_model_of_98_promotes_but_is_no_candidate_is_not_cut() {
     let p = Board::<W>::for_n(98).prepare(SearchTactics::default()).unwrap();

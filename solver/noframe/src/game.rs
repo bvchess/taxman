@@ -2,15 +2,15 @@
 //!
 //! Nothing here knows about frames, greedy, `unzip` or promotions.  It rests on:
 //!
-//! * **Theorem 1 with peel** (THEORY.md): a set S of picks can all be played iff dismantling the reduction
-//!   instance whose members are S, each listing its maximal factors outside S, removes everything.  (Peel
-//!   succeeds iff S is playable, Theorems 2 and 3; with every list a set of maximal factors and no member in any
-//!   list, playable implies no self-covering subset, Theorem 5 (⇒), and a full dismantling order rebuilds S by
-//!   the extension lemma, whose proof needs exactly that no member is in a list.)  So opt(n) is the largest sum
-//!   of a playable S ⊆ {2..n}, and every subset of a playable set is playable.
-//! * **The Franklín–Moniot bound**: a playable S pays each pick with a distinct maximal factor outside
-//!   S (Theorem 1), so S is the pick side of a matching in the graph joining each c to its maximal factors c/p,
-//!   with each number in at most one edge, weighing the larger end.  The graph is bipartite by the parity of Ω.
+//! * **The playability theorem with peel** (P2 and P4, docs/theory/playability.md): a set S of picks can all be played
+//!   iff dismantling the reduction instance whose members are S, each listing its maximal factors outside S, removes
+//!   everything.  (Peel succeeds iff S is playable, P4; with every list a set of maximal factors and no member in any
+//!   list, playable implies no self-covering subset, P7 (⇒), and a full dismantling order rebuilds S by the extension
+//!   lemma (P6), whose proof needs exactly that no member is in a list.)  So opt(n) is the largest sum of a playable S
+//!   ⊆ {2..n}, and every subset of a playable set is playable.
+//! * **The Franklín–Moniot bound**: a playable S pays each pick with a distinct maximal factor outside S (P2), so S is
+//!   the pick side of a matching in the graph joining each c to its maximal factors c/p, with each number in at most
+//!   one edge, weighing the larger end.  The graph is bipartite by the parity of Ω.
 //! * **opt(n) <= n + opt(n−1)** (deleting the move n from a game of n leaves a game of n − 1), and for a prime n,
 //!   **opt(n) <= n + opt(n−1) − p** with p the largest prime below n (a game playing n plays it first, paying 1;
 //!   swapping it for p, which divides nothing up to n − 1 by Bertrand, gives a game of n − 1).
@@ -805,12 +805,12 @@ impl<'a> Prover<'a> {
         self
     }
 
-    /// Turns on the parity bound ([`crate::parity`], THEORY.md Theorem 10) at every node, after the matching
-    /// bound: the heaviest set independent in both parity matroids with the node's forced picks contracted and
-    /// its barred numbers deleted, certified by a weight split.  It cuts the node when it is at most the target;
-    /// it bars every free number that depends on the forced picks in one of the matroids (no playable set of the
-    /// node holds it) and forces every member whose barring alone brings it to the target (by the split); and
-    /// the node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
+    /// Turns on the parity bound ([`crate::parity`], the parity bound, W1, docs/theory/parity-bound.md) at every node,
+    /// after the matching bound: the heaviest set independent in both parity matroids with the node's forced picks
+    /// contracted and its barred numbers deleted, certified by a weight split.  It cuts the node when it is at most the
+    /// target; it bars every free number that depends on the forced picks in one of the matroids (no playable set of
+    /// the node holds it) and forces every member whose barring alone brings it to the target (by the split); and the
+    /// node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
     pub fn with_parity(mut self) -> Self {
         self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));
         self

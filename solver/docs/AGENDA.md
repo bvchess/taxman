@@ -24,10 +24,11 @@ reaches and what each score rests on.  Outside the project the record stops at n
 project's), and the literature has bounds and one asymptotic result, not values of opt(n)
 ([agenda-ideas.md](agenda-ideas.md)).
 
-**The theory the search stands on.**  One count decides three conditions on a set of moves ([THEORY.md, Theorem
-12](../../docs/theory/franklin-moniot.md#one-count-three-conditions)): the set is playable exactly when some payment set
+**The theory the search stands on.**  One count decides three conditions on a set of moves ([the counting theorem
+(C2)](../../docs/theory/franklin-moniot.md#the-counting-theorem)): the set is playable exactly when some payment set
 has one payment scheme, independent over GF(2) in the parity matroids when some has an odd number of them, and matchable
-when some has at least one.  The search's GF(2) bound is the frame model's form of the middle condition (Theorem 11).
+when some has at least one.  The search's GF(2) bound is the frame model's form of the middle condition ([the frame
+bound (B2)](../../docs/theory/frame-bounds.md#the-frame-bound)).
 It equals the parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind
 only to *odd cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct
 primes.  At the roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3
@@ -175,8 +176,9 @@ entry](../notebook/search/measurements-made-for-the-research-agenda-2026-10/READ
 ### A1. A bound over several fields and signings (a change of slope, if its share holds)
 
 *Closed* (2026-10-18; the slope test killed it in the search on 2026-10-16).  The multi-field bound, the GF(2) frame
-matroids and the signed GF(3) ones coupled by Lagrangian multipliers ([the glossary](../../docs/GLOSSARY.md); THEORY.md,
-Theorems 14 and 15), closes a large share of the root's gap ([the fields
+matroids and the signed GF(3) ones coupled by Lagrangian multipliers ([the glossary](../../docs/GLOSSARY.md); [the
+signed frame theorem (B1)](../../docs/theory/frame-bounds.md#the-signed-frame-theorem) and [the decomposition bound
+(B5)](../../docs/theory/frame-bounds.md#the-decomposition-bound)), closes a large share of the root's gap ([the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound
 its trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost
 is, so every policy of computing it loses ([the E3
@@ -193,37 +195,43 @@ priority ([STATUS](STATUS.md)).
 
 *Idea.*  Turn the model's assumptions into proven facts, in general or game by game, so that the solver's chain is a
 proof on the whole board and the prover need not repeat the model's work by search.  The first assumption is the upper
-part: every optimal game plays U\*.  Barring a member u of U\* in the parity bound (Theorem 10 allows barred numbers)
-proves that every optimal set holds u when the bound falls below opt(n); with U\* maximal, every optimal set then has
-upper part U\*.
+part: every optimal game plays U\*.  Barring a member u of U\* in the parity bound ([the parity bound
+(W1)](../../docs/theory/parity-bound.md#the-parity-bound) allows barred numbers) proves that every optimal set holds u
+when the bound falls below opt(n); with U\* maximal, every optimal set then has upper part U\*.
 
 *Why it might work.*  One barred parity bound each certifies 207 of the 224 members of U\* at 600, 339 of 377 at 1000
 and 472 of 490 at 1300 (92-96%), in about ten seconds a game (measurements 7.3).  The rest are open by margins up to the
-root's gap, and theorems settle some of them already: the largest prime is in every optimal set (THEORY.md's lemma), yet
-its barred bound is open at 1000 and 1300.  The prover then searches with the certified members forced, and its tree
-should lose the part spent refuting sacrifices of U\*, which grows with n: A2's premise.
+root's gap, and theorems settle some of them already: the largest prime is in every optimal set ([the prime lemma
+(N1)](../../docs/theory/neighbors.md#the-prime-lemma)), yet its barred bound is open at 1000 and 1300.  The prover then
+searches with the certified members forced, and its tree should lose the part spent refuting sacrifices of U\*, which
+grows with n: A2's premise.
 
 *What is done.*
 
-* **Every assumption is a theorem** (2026-10-15): THEORY.md's Theorems B and M, with the numbering by layer clean by
-  construction, and the upper part reduced to U, its members of three or more prime factors ([the frame model on a
-  proven footing](../notebook/the-frame-model-on-a-proven-footing-2026-10/README.md)).
-* **The barred bounds**, with layers 1 and 2 fixed by Theorem B, for every game of 1301-3314 that rests on the model:
+* **Every assumption is a theorem** (2026-10-15): [the bottom-layers theorem
+  (F3)](../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
+  (X7)](../../docs/theory/exactness.md#the-exactness-theorem), with the numbering by layer clean by construction
+  ([F4](../../docs/theory/frame-model.md#clean-numbering)), and the upper part reduced to U, its members of three or
+  more prime factors ([the frame model on a proven
+  footing](../notebook/the-frame-model-on-a-proven-footing-2026-10/README.md)).
+* **The barred bounds**, with layers 1 and 2 fixed by F3, for every game of 1301-3314 that rests on the model:
   7.5% of U\*_{≥3} open to 2175 and 14.9% past it, no game closed by the bounds alone, and the open share following the
   root's gap ([the upper part game by
   game](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)).
 * **The search of the open members** is the integrated search over the extended problem Π⁺(O), built and proven exact
-  (THEORY.md, Theorem M⁺; [the frame model by layer, and the extended
+  ([the extended exactness theorem (E1)](../../docs/theory/extended-problem.md#the-extended-exactness-theorem); [the
+  frame model by layer, and the extended
   problem](../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md)).  `taxman certify` runs it
   game by game, and the certificates of 600..1300 are committed
   ([results/README.md](../../results/README.md#certificates)).
 
 
-*What remains.*  The campaign of certificates of 2176..3440, and the claim-by-claim rule (Lemma M5⁺), which would settle
-its last phase without a search; both are paused, since certifying U is not the priority ([STATUS](STATUS.md)).  The
-prover's search with the certified members forced, on five games of 1302-2100 (killed if the dear games take fewer than
-half the nodes), has not run; E6, the measurement of the sources left free against the upper part fixed to U\*, was
-prepared and then superseded by the certificates.
+*What remains.*  The campaign of certificates of 2176..3440, and the claim-by-claim rule ([the kept-claims lemma
+(E2)](../../docs/theory/extended-problem.md#the-kept-claims-lemma)), which would settle its last phase without a search;
+both are paused, since certifying U is not the priority ([STATUS](STATUS.md)).  The prover's search with the certified
+members forced, on five games of 1302-2100 (killed if the dear games take fewer than half the nodes), has not run; E6,
+the measurement of the sources left free against the upper part fixed to U\*, was prepared and then superseded by the
+certificates.
 
 *Payoff.*  The proofs on the whole board move with the solver's chain instead of falling behind tenfold per 1000 n.
 With a general proof of the model, the prover becomes a cross-check that can lag.
@@ -232,7 +240,7 @@ With a general proof of the model, the prover becomes a cross-check that can lag
 [solver/noframe/docs/before-and-after.md, "What remains open"](../noframe/docs/before-and-after.md#what-remains-open),
 and may be hard; the certificate game by game does not need it.
 
-*Proven first.*  Nothing new for barring (Theorem 10 with barred numbers); the forced members in the prover are sound
+*Proven first.*  Nothing new for barring (W1 with barred numbers); the forced members in the prover are sound
 because they are certified.
 
 ### A3. Split by the number of promotions (a sound tightening; constant factor, maybe more)
@@ -329,12 +337,13 @@ schemes; then regions with holes.
 **C3 (the upper part).**  *Open.*  Every optimal game plays U\*, and game by game barred parity bounds and small
 searches could certify it.  This strong form holds in every game whose optimal sets were enumerated (954 games of
 2..989).  The weak form, U, that some optimal set contains U\*_{≥3}, holds wherever the prover has proven opt(n), every
-n up to 2175, and certificates prove it game by game for 600..1300 ([docs/theory/frame-model.md, "The upper
-part"](../../docs/theory/frame-model.md#the-upper-part);
-[results/README.md](../../results/README.md#what-supports-the-scores)).  *Evidence:* every game enumerated
-([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)); 92-96% of U\* certified at the root by one bound
-each (measurements 7.3).  *Attack:* the frontier argument of [solver/noframe/docs/before-and-after.md, "What remains
-open"](../noframe/docs/before-and-after.md#what-remains-open) for a proof; A2 for certificates.
+n up to 2175, and certificates prove it game by game for 600..1300 ([statement
+U](../../docs/theory/exactness.md#statement-u); [results/README.md](../../results/README.md#what-supports-the-scores)).
+*Evidence:* every game enumerated ([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)); 92-96% of U\*
+certified at the root by one bound each (measurements 7.3).  *Attack:* a frontier argument for the whole game, as
+[solver/noframe/docs/before-and-after.md, "What remains open"](../noframe/docs/before-and-after.md#what-remains-open)
+sketches it after [the frontier theorem (S3)](../../docs/theory/sources.md#the-frontier-theorem), for a proof; A2 for
+certificates.
 
 **C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is within one of
 the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets have one size
@@ -342,10 +351,10 @@ the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enume
 at all 361 roots of 880-1300 ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1),
 and at 758 of the 760 searched and repeated games of 1301-2175
 (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s promotions).
-At 1320 and 1322 it has 77 members and the optimal set 78, which is `max_total`: a tie of weights, or a heavier set of
-the wrong size, which is not known.  So the strict form, the same size, is false or rests on ties.  *Why it mattered:*
-with it, A3 would have searched two values of k at most (it was not needed for A3's soundness); A3 is closed.  *Test:*
-the heaviest set of each size at the roots of 1320 and 1322.
+At 1320 and 1322 it has 77 members and the optimal set 78, which is the promotion limit (`max_total`): a tie of weights,
+or a heavier set of the wrong size, which is not known.  So the strict form, the same size, is false or rests on ties.
+*Why it mattered:* with it, A3 would have searched two values of k at most (it was not needed for A3's soundness); A3 is
+closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
 
 **C5 (the gap law).**  *Measured (2026-10-15): both forms hold, and neither regime.*  The true root gap of the searched
 games grows linearly in n past 2175, at a rate between the two regimes of [The diagnosis of the
@@ -364,10 +373,11 @@ gaps ([The diagnosis of the wall](#2-the-diagnosis-of-the-wall)): the 47 searche
 exhausted ones, the 11 of 1,300 or more hold 53% of the chain's nodes, and all of the 18 dearest have a gap of 1,094 or
 more.  What stays unexplained is a factor of 3 (sd 0.48 decades) in a game's tree at its gap.
 
-**C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([docs/theory/open-problem.md,
-"The span certificate (♦)"](../../docs/theory/open-problem.md#the-span-certificate-)).  Every source that descending
-greedy rejects on the sources' instance is a GF(2) combination of the sources it kept above it; it would prove the
-upper-half conjecture in general.  It is not on the critical path of the wall; C3 is.
+**C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([the span conjecture
+(S5)](../../docs/theory/sources.md#the-span-conjecture)).  Every source that descending greedy rejects on the sources'
+instance is a GF(2) combination of the sources it kept above it; it would prove [the sources conjecture
+(S1)](../../docs/theory/sources.md#the-sources-conjecture) in general.  It is not on the critical path of the wall; C3
+is.
 
 ## 5. What the cloud runs should measure
 

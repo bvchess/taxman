@@ -139,12 +139,14 @@ module comment of `examples/wall/fields/dw.rs` has the details.
 
 The rule of symmetric pairs (tactic `symmetry`, on by default) prunes the parts of the tree that are mirror images of
 others.  Exchanging two primes `p < q` in every number (`p^a q^b m ↦ p^b q^a m`) is an automorphism of divisibility.
-Where the exchange maps every frame of the root onto itself (moves to moves, factors to factors) and the candidates onto
-themselves, the pair is *symmetric*, and the exchange maps promotion sets to promotion sets worth `(q − p)(c_p − c_q)`
-more.  Here `c_r(S)` is the sum of `x / r` over the members `x` of `S` divisible by `r`; in the pairs used, no candidate
-is divisible by `pq`, `p²` or `q²`.  So every heaviest promotion set keeps `c_p ≤ c_q` for every symmetric pair at once:
-a set that breaks one pair's inequality is beaten by its image under that pair's exchange alone
-([docs/THEORY.md](../../../docs/theory/bounds.md#prime-exchanges-symmetries-of-the-promotions), Theorem 13).
+The pair is *symmetric* when the exchange maps the root onto itself and no candidate is divisible by `pq`, `p²` or
+`q²`.  Mapping the root onto itself means that each frame's moves go to its moves, its factors to its factors, and the
+candidates to the candidates (the code also asks that the lists of maximal factors that can pay for the frames'
+numbers map onto each other, and that `p` divides some candidate).  The exchange then maps promotion sets to promotion
+sets worth `(q − p)(c_p − c_q)` more, where `c_r(S)` is the sum of `x / r` over the members `x` of `S` divisible by `r`.
+So every heaviest promotion set keeps `c_p ≤ c_q` for every symmetric pair at once: a set that breaks one pair's
+inequality is beaten by its image under that pair's exchange alone ([the prime-exchange theorem
+(R2)](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).
 
 The pairs come in classes of primes that the frame builder treats alike.  At 1300 the classes are {41, 43}, {59, 61},
 {67, 71}, {73, 79}, {89, …, 107}, {109, …, 139} and {149, 151, 157}, which make 32 pairs; there are 99 at 2175 and 300
@@ -153,8 +155,9 @@ check only for the primes whose multiples have the same places and exponents in 
 [Dominance and symmetry](../../notebook/search/dominance-and-symmetry-2026-10/README.md) found the exchanges, and [prime
 exchanges in the search](../../notebook/search/prime-exchanges-in-the-search-2026-10/README.md) put them in.
 
-The search uses the pairs through the cofactor sums of a node's promotions `P` and candidates `C`
-(`Symmetries::exclude`, a few hundred bit tests: under 1% of the time of a proof of 1472):
+The search uses the pairs through the cofactor sums of a node's promotions `P` and candidates `C` ([the
+exchange-pruning lemma (R3)](../../../docs/theory/search-rules.md#pruning-by-prime-exchanges); `Symmetries::exclude`, a
+few hundred bit tests: under 1% of the time of a proof of 1472):
 
 * it cuts a node when some pair has `c_p(P) > c_q(P) + c_q(C)`, since no completion lifts `c_q` to `c_p` (the node is
   *hopeless*);

@@ -1,18 +1,20 @@
 //! The prover: independent proofs and checks of the solver's results.
 //!
 //! The prover is the second program of the repository: a branch and bound over sets of moves on the whole board that
-//! decides playability by peel (Theorem 1), uses only proven bounds, takes the recorded score as its target and proves
-//! that no set of moves beats it, so that the frame model's answers are checked without assuming the frame model.  It
-//! also lists every optimal set, finds the longest games, certifies conjecture (★) at scale and searches for
-//! adversarial instances.
+//! decides playability by peel (the peel theorem, P4, docs/theory/playability.md), uses only proven bounds, takes the
+//! recorded score as its target and proves that no set of moves beats it, so that the frame model's answers are checked
+//! without assuming the frame model.  It also lists every optimal set, finds the longest games, certifies conjecture
+//! (★) at scale and searches for adversarial instances.
 //!
 //! This crate shares no code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only on the
-//! theorems of `docs/THEORY.md` (playability = peel succeeds = no self-covering subset; residual
-//! confinement; the parity matroids; and the bottom layers of every optimal set, Theorem B, which the proofs of `exact`
-//! start from by default) and on elementary bounds.  The report is `README.md` next to this file.
+//! theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
+//! confinement, P8; the parity bound, W1; and the bottom layers of every optimal set, the bottom-layers theorem F3,
+//! which the proofs of `exact` start from by default) and on elementary bounds.  The report is `README.md` next to this
+//! file.
 //!
 //! * [`primes`]: the sieve.
-//! * [`instance`]: reduction instances (members, their maximal factors) and the upper-half instance of a game.
+//! * [`instance`]: reduction instances (members, their maximal factors) and the sources' instance of a game
+//!   (`Instance::upper_half`).
 //! * [`peel`]: dismantling, residuals, playability, components, descending greedy.
 //! * [`bounds`]: the matching-number, hypergraphic-matroid (Lorea) and rank bounds on the largest playable subset.
 //! * [`maxcard`], [`plus1`]: exact maximum-cardinality playable subsets by branch and bound over cores.
@@ -24,7 +26,7 @@
 //!   weighted intersection, a bound on opt(n).
 //! * [`upper`]: which members of U\*_{≥3}, the sources of three or more prime factors that descending greedy keeps,
 //!   every set beating a recorded score must hold, certified by the parity bound with the two bottom layers fixed
-//!   (Theorem B).
+//!   (F3).
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
 //! * [`jsonl`]: the resumable result files every campaign writes.
 

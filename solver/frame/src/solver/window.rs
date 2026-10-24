@@ -89,7 +89,7 @@
 //!   and deferrals change how or when a search runs, never the promotion sum it proves best: every set offered is
 //!   promotable (the seed's survivors), the ceiling is proven given the game of `n − 1` optimal, which a proof by the
 //!   ceiling rests on anyway, and the cut drops only nodes with nothing better than the incumbent, by a game that is
-//!   proven and assumes nothing (docs/theory/ledger.md, Lemma R and its standing).
+//!   proven and assumes nothing (the near-repeat lemma (R7, docs/theory/search-rules.md) and its standing).
 //! * What may differ: the moves and promotions where a problem has several optimal sets (as between thread counts),
 //!   and so the next line's digest of the previous game's moves; nodes, the searches' counters, the engines' counters
 //!   and the times.

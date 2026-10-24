@@ -92,9 +92,9 @@ a nogood if it was made here.
 **Why it is exact.**  It changes only which conflict the node branches on, and every completion leaves out some member
 of any conflict, so every completion lies in one of the children.  Each conflict made here is one: with its members
 alone applied, its frame keeps a stuck set of moves, so the frame is not winnable
-([decision-procedure.md](../../../../docs/theory/decision-procedure.md), Theorem 3).  A stuck set survives any larger
+([decision-procedure.md](../../../../docs/theory/playability.md#the-peel-theorem), Theorem 3).  A stuck set survives any larger
 set of promotions, which only adds moves and takes factors (Theorem 4 there), so no completion holding the whole
-conflict leaves the frame winnable, and none can be promoted ([frame-model.md](../../../../docs/theory/frame-model.md),
+conflict leaves the frame winnable, and none can be promoted ([frame-model.md](../../../../docs/theory/exactness.md#the-exactness-theorem),
 Theorem M).  The study build checks each one with the whole peel (`assert!` in `conflicts_ordered`).  A conflict whose
 members all cost much is often a set of forced members, and the search already cuts a node whose conflict its forced members contain:
 every completion that beats the incumbent promotes all of them, and they cannot all be promoted.

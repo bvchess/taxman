@@ -7,21 +7,16 @@
 //!
 //! A move with a *private* live factor (one no other move has) can always be taken last: nothing taken before it
 //! takes that factor.  So a frame is winnable exactly when repeatedly dropping a move with a private live factor
-//! drops every move, in any order:
-//!
-//! * if every move drops, taking them in the reverse order of the drops wins, since each move's private factor
-//!   (private among the moves still there when it dropped) is touched by none of the moves taken before it;
-//! * if the frame is winnable, the peel never gets stuck: fewer moves stay winnable (the factors the dropped moves
-//!   would have taken only help the others), and the last move of a winning order has a private factor (any
-//!   other move with that factor would have taken it earlier).
+//! drops every move, in any order.  The theory calls this *dismantling*: the moves left are the frame's residual,
+//! the same whatever the order of the drops (the residual theorem (P5, docs/theory/playability.md)), and the frame
+//! is winnable exactly when the residual is empty (the core theorem (P7, docs/theory/playability.md)).
 //!
 //! The Java peels with that rule plus "a move with a single live factor is taken first" and a pigeonhole test;
 //! those preserve winnability too, so the answers agree (the model's tests check this against the Java's
 //! procedure and, on small frames, against an exhaustive search of orders).  The dropping is done as in an
 //! invertible Bloom lookup table: each factor keeps the count and the XOR of its live moves, so a factor with
-//! count 1 names its move.  (`docs/THEORY.md`, Theorem 4, proves the same facts for the Python side's
-//! `peel`, there called dismantling; its residual is the residual below.)  "Peel" means this procedure
-//! throughout the Rust code; `BoardFrames::count_freedoms` (setup's count of a frame's freedoms) and the Python `peel`
+//! count 1 names its move.  "Peel" means this procedure throughout the Rust code, where the theory's *peel* also
+//! makes front moves; `BoardFrames::count_freedoms` (setup's count of a frame's freedoms) and the Python `peel`
 //! are other procedures.
 //!
 //! # The residual
@@ -36,13 +31,9 @@
 //!
 //! A move left with a single live factor must be paid by it: the move and that factor form a pair, which is
 //! dropped (not to be confused with the search's forced members, or with the mandatory moves that setup settles
-//! with `unzip`).  *Reducing* drops such pairs until none is left ([`reduce_from`]).  It never changes whether the
-//! frame is winnable, now or after further edits (moves added, other factors removed): if `m` is left with the
-//! single live factor `q`, any winning order takes `m` before every other move that has `q` (whichever came first
-//! would take `q`, and `m` has no other factor), so dropping `m` leaves a winning order of the frame without `m`
-//! and `q`; conversely, `m` taken first wins `q` and then anything that wins the frame without them.  Two moves
-//! left with only `q` make the frame unwinnable, so on a winnable frame such a pair stays a pair until it is
-//! dropped, and reduction is confluent: every order of drops ends at the same frame.
+//! with `unzip`).  *Reducing* drops such pairs until none is left ([`reduce_from`]).  By the reduction lemma (F5,
+//! docs/theory/frame-model.md) it never changes whether the frame is winnable, now or after further edits (moves
+//! added, other factors removed), and on a winnable frame every order of drops ends at the same frame.
 
 use super::FactorProvider;
 use crate::bits::Bits;

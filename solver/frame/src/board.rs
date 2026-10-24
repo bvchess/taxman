@@ -85,10 +85,10 @@ impl<const W: usize> Board<W> {
         search::prepare(&self.tables, &self.frames.columns(), &self.frames.candidates, tactics)
     }
 
-    /// The extended problem Π⁺(`open`) of the board ([`build_extended`]), keeping the claims of `unzip` that Lemma M5⁺
-    /// allows if `claims` is set (the frame model's, [`SearchFrames::claims`]), and none if not.  With `claims` set and
-    /// nothing open it is the frame model's problem (THEORY.md, Lemma M5⁺); the two formulations have the same
-    /// promotion sets (its corollary).
+    /// The extended problem Π⁺(`open`) of the board ([`build_extended`]), keeping the claims of `unzip` that the
+    /// kept-claims lemma (E2, docs/theory/extended-problem.md) allows if `claims` is set (the frame model's,
+    /// [`SearchFrames::claims`]), and none if not.  With `claims` set and nothing open it is the frame model's problem
+    /// (E2); the two formulations have the same promotion sets (the formulation corollary, E3).
     ///
     /// # Errors
     ///
@@ -228,8 +228,9 @@ pub fn promotion_cap(n: u32, in_the_bag: u64, prev_score: u64) -> Option<u64> {
 /// The near-repeat cut ([`NearRepeat`]) of the search that `prepared` sets up for the board `1..=n`, by the game of
 /// n − 1, which scores `prev_score` and is optimal.  M is n − 1, whose problem Π_M is set up as `prepared` was (the
 /// same set width and tactics), and B is `prev_score` less the `in_the_bag` of n − 1.  B bounds P\*(Π_M), since every
-/// promotion set of Π_M is a game of n − 1 worth that `in_the_bag` plus its sum (docs/theory/ledger.md, the paragraph
-/// "Standing").  `None` if the board of n − 1 has no candidates (no member of a node could be marked).
+/// promotion set of Π_M is a game of n − 1 worth that `in_the_bag` plus its sum (the near-repeat lemma (R7),
+/// docs/theory/search-rules.md, the paragraph "Standing").  `None` if the board of n − 1 has no candidates (no member
+/// of a node could be marked).
 ///
 /// # Errors
 ///
@@ -343,7 +344,7 @@ mod tests {
 
     /// The extended problem with no open source poses the search what the frame model does on every board to 300 that
     /// has something to promote: without the claims of `unzip`, the same `max_total` and candidates, and the same
-    /// `in_the_bag`; with them (Lemma M5⁺), the very problem.
+    /// `in_the_bag`; with them (E2), the very problem.
     #[test]
     fn the_extended_problem_without_open_sources_is_posed_as_the_frame_model_is() {
         for n in 2..=300 {

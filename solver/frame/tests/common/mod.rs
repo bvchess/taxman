@@ -554,10 +554,9 @@ impl<const W: usize> Game<W> {
     /// Until it has found a completion that keeps them the search has no sum to prune by, and where none does it would
     /// take the whole tree, so it also cuts a node where no completion can, by the inequality itself: a pair `(p, q)`
     /// has `c_p(P ∪ F) ≥ c_p(P)` and `c_q(P ∪ F) ≤ c_q(P) + c_q(C)` for every `F` among the candidates `C` that are
-    /// left, with `P` the node's promotions (`promoted` and the completion so far; `docs/theory/bounds.md`, "Prime
-    /// exchanges: symmetries of the promotions", the paragraph "Pruning with the inequalities"), so
-    /// `c_p(P) > c_q(P) + c_q(C)` leaves no `F` that keeps `c_p ≤ c_q`.  That is the cofactor arithmetic alone, not the
-    /// search's rule ([`Symmetries::hopeless`]).
+    /// left, with `P` the node's promotions (`promoted` and the completion so far; the exchange-pruning lemma, R3,
+    /// docs/theory/search-rules.md), so `c_p(P) > c_q(P) + c_q(C)` leaves no `F` that keeps `c_p ≤ c_q`.  That is the
+    /// cofactor arithmetic alone, not the search's rule ([`Symmetries::hopeless`]).
     pub fn exhaustive_keeping(
         &self,
         state: &FrameSet<W>,

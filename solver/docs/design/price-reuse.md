@@ -31,10 +31,10 @@ again raise the steps of the hard games by 17%, and a schedule that makes them a
 
 *Why it is exact.*  The prices only rank conflicts, and the node branches on a true conflict of its state whatever the
 ranking, as [conflict branching](search.md#conflict-branching) argues.  A conflict kept from an earlier check of the node,
-or of an ancestor, is still a conflict: a stuck set survives every larger set of promotions (Theorem 4 of
-docs/theory/decision-procedure.md), and the node's promotions only grow along a line.  The choice takes it only while it
-lies within the heaviest set.  Carried cycles are checked where the pricing uses them ([gf2-bound.md](gf2-bound.md)).  A
-checkpoint records the tactic and does not bind it ([trust.md](trust.md)).
+or of an ancestor, is still a conflict: a stuck set survives every larger set of promotions ([the residual theorem
+(P5)](../../../docs/theory/playability.md#the-residual-theorem)), and the node's promotions only grow along a line.  The
+choice takes it only while it lies within the heaviest set.  Carried cycles are checked where the pricing uses them
+([gf2-bound.md](gf2-bound.md)).  A checkpoint records the tactic and does not bind it ([trust.md](trust.md)).
 
 *What it does.*  On the 315 units of games 4920-4949, which are subtrees of the games' searches, a search with the
 tactic takes 0.82 of the CPU of one without it in the hard games and 0.86 in the easy, with 0.86 and 0.97 of the steps:

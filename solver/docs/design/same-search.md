@@ -43,11 +43,12 @@ establish P\*(Π_m):
   pruning is exact, which every exhausted proof rests on.
 * `cap`: m's promotions S are promotable and sum to ceiling(m) = m + score(m − 1) − in_the_bag(m), the ceiling as a
   promotion sum.  So P\*(Π_m) ≥ ceiling(m).  Conversely, every promotable set T of Π_m is a legal game of m scoring
-  in_the_bag(m) + sum(T).  This is the soundness of the frame model (THEORY.md, Theorem M).  Every search relies on it
-  each time it offers an incumbent, and the referee replays every game built from one; none has ever failed.  So
-  in_the_bag(m) + P\*(Π_m) ≤ opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be
-  optimal: the proof by the ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of
-  m's promotions, whatever tactics shaped the search.
+  in_the_bag(m) + sum(T).  This is the soundness of the frame model ([the exactness theorem
+  (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  Every search relies on it each time it offers an
+  incumbent, and the referee replays every game built from one; none has ever failed.  So in_the_bag(m) + P\*(Π_m) ≤
+  opt(m) ≤ m + opt(m − 1) = m + score(m − 1).  The last step needs the game of m − 1 to be optimal: the proof by the
+  ceiling rests on that, and m's assumptions record it.  So P\*(Π_m) = ceiling(m), the sum of m's promotions, whatever
+  tactics shaped the search.
 * `same_search`, by induction: m repeats a game k with Π_k = Π_m whose proof settles P\*(Π_k), and m's promotions are
   k's.
 * `known`, where an upper bound of the bounds store ended m's search: the search found a promotable set of the largest

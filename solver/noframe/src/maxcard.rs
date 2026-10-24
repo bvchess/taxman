@@ -4,9 +4,10 @@
 //! members?  A node is a set `I` of members every answer must keep and a set `U` still open (the rest are left
 //! out).  At each node:
 //!
-//! 1. *Reduce.*  Let K = I ∪ U and R its residual.  Some largest playable S with I ⊆ S ⊆ K contains all of
-//!    K ∖ R (Theorem 6 with exclusions E = K ∖ S: K ∖ (E ∩ R) is playable too), so only R is in question, and
-//!    a subset of K is playable iff its part in R is (every core of a subset of K lies in R).
+//! 1. *Reduce.*  Let K = I ∪ U and R its residual.  Some largest playable S with I ⊆ S ⊆ K contains all of K ∖ R (the
+//!    exclusion theorem, P8, docs/theory/playability.md, with exclusions E = K ∖ S: K ∖ (E ∩ R) is playable too), so
+//!    only R is in question, and a subset of K is playable iff its part in R is (every core of a subset of K lies in
+//!    R).
 //! 2. *Bound.*  |K ∖ R| + the Lorea rank of R with I ∩ R forced (a matroid: the forced independent set extends
 //!    to a basis) is an upper bound ([`crate::bounds`]); below `target`, the node is cut.
 //! 3. *Exact.*  If the basis found is playable, it (with K ∖ R) is a playable set as large as the bound.

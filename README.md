@@ -23,8 +23,8 @@ wiki](https://github.com/bvchess/taxman/wiki) explains the game and the algorith
 The file `results/strict.jsonl` holds a chain of optimal games, one for every n from 1 up to the chain's last game.
 Each game is built from the one before: game n starts from the optimal game of n − 1.  Each is proven within the *frame
 model*, a decomposition of the game that is exact given one open statement about which numbers an optimal game plays,
-called [U](docs/theory/frame-model.md#the-upper-part).  The first games of the chain, up to a smaller n, are also proven
-on the whole board by a second program that shares no code with the one that found them.
+called [statement U](docs/theory/exactness.md#statement-u).  The first games of the chain, up to a smaller n, are also
+proven on the whole board by a second program that shares no code with the one that found them.
 [results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and what
 supports every score.
 

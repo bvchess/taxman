@@ -51,19 +51,19 @@
 //!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
 //!   [`lagrange`].
 //! * The rule of the tactic `symmetry` ([`symmetry`]): every heaviest promotion set keeps the inequality
-//!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (docs/THEORY.md, Theorem 13), so a node none of
-//!   whose completions keeps them all holds no heaviest set, and neither does a completion that holds a candidate
-//!   no such completion holds: the node is cut and the candidate dropped, whatever bound the search uses.  The
-//!   other prunings hold for the completions that keep the inequalities as for all (bounds above every completion,
-//!   members every completion that beats the incumbent promotes, sets that cannot be promoted).  The rule is a
-//!   function of the node's promotions and candidates, so it changes which tree is searched, not the answer of a
-//!   search from the root.  A search of a node below the root finds the best of its completions that keep the
-//!   inequalities, which can be lighter than its best completion (THEORY.md, last paragraph of "Pruning with the
-//!   inequalities").
-//! * The near-repeat cut ([`NearRepeat`]; docs/theory/ledger.md, Lemma R): a node whose completions are promotion sets
-//!   of a game M proven before holds none worth more than M's best promotion sum, so where the incumbent reaches a
-//!   proven bound of that sum, it holds none that beats the incumbent.  The cut drops only such nodes, as a bound
-//!   does, and learns nothing.
+//!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (the prime-exchange theorem (R2),
+//!   docs/theory/search-rules.md), so a node none of whose completions keeps them all holds no heaviest set, and
+//!   neither does a completion that holds a candidate no such completion holds: the node is cut and the candidate
+//!   dropped, whatever bound the search uses.  The other prunings hold for the completions that keep the inequalities
+//!   as for all (bounds above every completion, members every completion that beats the incumbent promotes, sets that
+//!   cannot be promoted).  The rule is a function of the node's promotions and candidates, so it changes which tree is
+//!   searched, not the answer of a search from the root.  A search of a node below the root finds the best of its
+//!   completions that keep the inequalities, which can be lighter than its best completion (the exchange-pruning lemma
+//!   (R3), docs/theory/search-rules.md, part 3).
+//! * The near-repeat cut ([`NearRepeat`]; the near-repeat lemma (R7), docs/theory/search-rules.md): a node whose
+//!   completions are promotion sets of a game M proven before holds none worth more than M's best promotion sum, so
+//!   where the incumbent reaches a proven bound of that sum, it holds none that beats the incumbent.  The cut drops
+//!   only such nodes, as a bound does, and learns nothing.
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
 //!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its
@@ -187,8 +187,8 @@ pub struct SearchResult<const W: usize> {
     /// The search finished (or reached the ceiling); false when an engine limit or a stop stopped it.
     pub completed: bool,
     /// Under a floor ([`search_above`]): the search completed and found no set heavier than the floor, so no
-    /// promotion set is (docs/THEORY.md, Lemma F).  Then `sum` is the floor and `promotions` is empty.  Always
-    /// false when the search has no floor.
+    /// promotion set is (the floor lemma (R5), docs/theory/search-rules.md).  Then `sum` is the floor and `promotions`
+    /// is empty.  Always false when the search has no floor.
     pub floor_held: bool,
     /// The incumbent reached the ceiling (`cap`, or one the control was given), which proves it optimal.
     pub reached_cap: bool,
@@ -256,9 +256,10 @@ pub fn search<const W: usize>(
 /// seed, dive or local search), and nodes are pruned against `floor` as against an incumbent of that worth.  A set
 /// heavier than the floor becomes the incumbent as usual, and is a real game (so a lower bound on the game's optimum).
 /// If the search completes and finds none, no promotion set is heavier than `floor`
-/// ([`SearchResult::floor_held`], docs/THEORY.md, Lemma F): an upper bound on the game's best promotion sum,
-/// proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is P*.  `cap`
-/// and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same floor.
+/// ([`SearchResult::floor_held`], the floor lemma (R5), docs/theory/search-rules.md): an upper bound on the game's best
+/// promotion sum, proven by the tree of a search from an incumbent worth `floor`: the proof's, when the floor is P*.
+/// `cap` and `resume` are as for [`search`]; a search that a limit stopped resumes from its checkpoint under the same
+/// floor.
 ///
 /// # Errors
 ///

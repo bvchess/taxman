@@ -1,7 +1,8 @@
 //! Upper bounds on the largest playable subset of a set of members.
 //!
-//! * The **matching-number bound** ν: a playable set gives its members distinct factors (Theorem 1), so it is
-//!   matchable, and no playable subset is larger than a maximum matching of members to factors.
+//! * The **matching-number bound** ν: a playable set gives its members distinct factors (the playability theorem, P2,
+//!   docs/theory/playability.md), so it is matchable, and no playable subset is larger than a maximum matching of
+//!   members to factors.
 //! * The **hypergraphic-matroid bound** (Lorea's matroid).  Add one *ground* factor to the list of every member
 //!   with a single factor (the primes and prime powers), so that every list has at least two entries.  A
 //!   playable set stays playable (the ground never needs to be private: whatever order dismantles the set

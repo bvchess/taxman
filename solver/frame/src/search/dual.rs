@@ -4,17 +4,18 @@
 //! has not explored: the engine's deque and the units its workers held, which its final checkpoint holds, exactly what
 //! a resume needs ([`crate::engine`], "Checkpoint").  The search is exact (solver/docs/design/search.md: every pruning
 //! drops only sets no heavier than the incumbent of its time, sets that cannot be promoted, or, with the tactic
-//! `symmetry`, sets that break an inequality every heaviest set keeps, docs/THEORY.md, Theorem 13), so every promotable
-//! set that a resume would have to find, one heavier than the incumbent (keeping the inequalities, under `symmetry`),
-//! is a completion of an open unit's node: its promotions, plus some of its candidates.  So the best promotion sum of
-//! the game is at most the larger of the incumbent and, over the open units, the node's promotion sum plus a bound on
-//! what its completions add.  The bound of a node is the one the search computes when it starts the unit
-//! ([`TaxSearcher`](super::TaxSearcher)`::start`, then its first check): the GF(2) bound of the node's candidates given
-//! its promotions, with at most [`max_additional`] more promotions (THEORY.md, Theorem 11), which holds for every
-//! completion whatever the tactics.  This is the *dual bound* of the stopped branch and bound (docs/theory/ledger.md,
-//! Lemma D), and a stopped search usually throws it away; [`dual_bound`] reads it from the checkpoint, without the
-//! engine.  Like every bound of the frame model it bounds the frame model's optimum, which is opt(n) given statement U
-//! at n (solver/frame/README.md, “What "optimal" means”).
+//! `symmetry`, sets that break an inequality every heaviest set keeps, the prime-exchange theorem (R2,
+//! docs/theory/search-rules.md)), so every promotable set that a resume would have to find, one heavier than the
+//! incumbent (keeping the inequalities, under `symmetry`), is a completion of an open unit's node: its promotions, plus
+//! some of its candidates.  So the best promotion sum of the game is at most the larger of the incumbent and, over the
+//! open units, the node's promotion sum plus a bound on what its completions add.  The bound of a node is the one the
+//! search computes when it starts the unit ([`TaxSearcher`](super::TaxSearcher)`::start`, then its first check): the
+//! GF(2) bound of the node's candidates given its promotions, with at most [`max_additional`] more promotions (the
+//! frame bound (B2), docs/theory/frame-bounds.md), which holds for every completion whatever the tactics.  This is the
+//! *dual bound* of the stopped branch and bound (the dual-bound lemma (R4), docs/theory/search-rules.md), and a stopped
+//! search usually throws it away; [`dual_bound`] reads it from the checkpoint, without the engine.  Like every bound of
+//! the frame model it bounds the frame model's optimum, which is opt(n) given statement U at n (solver/frame/README.md,
+//! “What "optimal" means”).
 
 use super::header::Header;
 use super::setup::Prepared;

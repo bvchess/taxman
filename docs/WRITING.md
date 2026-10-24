@@ -32,8 +32,8 @@ a mechanical split.  Use one parenthesis at most, and never nest them.  Put thre
 ## 4. Define each term before using it
 
 Say what a word means where it first appears, or link the [glossary](GLOSSARY.md).  Give each
-idea one name and keep to it: two names make the reader wonder whether they are two ideas.  Internal labels (A1, L3,
-Lemma D, statement U) appear only after the text has said in words what they stand for.  Put a small example beside a
+idea one name and keep to it: two names make the reader wonder whether they are two ideas.  Internal labels (A1, N3,
+R4, statement U) appear only after the text has said in words what they stand for.  Put a small example beside a
 general statement: "12 has the maximal factors 6 and 4."
 
 ## 5. Give every fact that can change one home

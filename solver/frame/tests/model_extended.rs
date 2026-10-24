@@ -1,11 +1,12 @@
-//! Theorem M⁺, the extended problem Π⁺(O), against the code.
+//! The extended exactness theorem (E1), about the extended problem Π⁺(O), against the code.
 //!
 //! Π⁺(O) (`Board::extended`, which calls `taxman::frames::build_extended`, whose module documentation defines it) is
 //! the frame model with a set O of the sources of three or more prime factors that setup keeps made optional, and with
 //! a reference predicate for its promotion sets, `ExtendedFrames::promotable`, that peels the unreduced frames.  It
 //! comes in two formulations, both checked here: without the claims of `unzip` (nothing settled by it), and with the
-//! claims that Lemma M5⁺ allows (docs/THEORY.md; with O empty that is the frame model's own problem Π_n).  The tests
-//! with `with_claims` in their names have the claims, the others none.  The theorem (docs/theory/extended-problem.md):
+//! claims that the kept-claims lemma (E2, docs/theory/extended-problem.md) allows (with O empty that is the frame
+//! model's own problem Π_n).  The tests with `with_claims` in their names have the claims, the others none.  The
+//! theorem (E1, docs/theory/extended-problem.md):
 //!
 //! > Let U\* be the sources that setup keeps (the numbers above n/2 of the game with no promotions, `board.plain`),
 //! > O ⊆ U\*_{≥3} the open sources and F = U\* ∖ O.  For every S ⊆ {2, …, n} with S ⊇ F, no prime up to n/2 in S, and
@@ -13,8 +14,8 @@
 //! > promotion set of Π⁺(O), where K is the sources of S outside F and L is S ∩ [2, n/2]; and then ΣS = `in_the_bag`
 //! > + ΣK + ΣL.
 //!
-//! Playability is decided on the whole board by `common::playable` (the peel of THEORY.md, Theorems 1 to 3), with code
-//! that shares nothing with `frames` or `model`; U\* is read off the game with no promotions and the layers off
+//! Playability is decided on the whole board by `common::playable` (the peel, P4, docs/theory/playability.md), with
+//! code that shares nothing with `frames` or `model`; U\* is read off the game with no promotions and the layers off
 //! `Tables::omega`, foundation code.  A mismatch between the oracle and the predicate is either a bug in the code or a
 //! counterexample to the theorem.
 //!
@@ -34,12 +35,12 @@
 //!   is given the candidates and `max_total` of the frame model).  Greedy rejects a source of layer 3 or more on few
 //!   boards (374 at 741, the first), and only the boards of the test for them (741, 1100, 1200) put a rejected source
 //!   into a set.
-//! * The check of Lemma M5⁺ is needed.  On the boards to 400 it refuses the claims of a component, for some O that
-//!   leaves the component free, only on the boards 24 to 26 and 343 to 349, and then for O = U\*_{≥3} but the
-//!   component's sources, so no random subset meets it.  A mutant of the claims-on problem that keeps those claims
-//!   anyway (it takes the refused pairs out of the frames) is compared with the true problem on every set of the boards
-//!   to 80 for each such O (those of the boards 24 to 26) by `skipping_the_check_of_lemma_m5_plus_is_caught`: the true
-//!   problem agrees with the oracle, the mutant does not.
+//! * The check of the kept-claims lemma (E2) is needed.  On the boards to 400 it refuses the claims of a component,
+//!   for some O that leaves the component free, only on the boards 24 to 26 and 343 to 349, and then for O = U\*_{≥3}
+//!   but the component's sources, so no random subset meets it.  A mutant of the claims-on problem that keeps those
+//!   claims anyway (it takes the refused pairs out of the frames) is compared with the true problem on every set of the
+//!   boards to 80 for each such O (those of the boards 24 to 26) by `skipping_the_check_of_lemma_m5_plus_is_caught`:
+//!   the true problem agrees with the oracle, the mutant does not.
 //! * The model the search is given for Π⁺(O), `FrameGraph::build_extended` with the one-sided candidates, is checked
 //!   against the reference predicate, without the claims, on every board from 2 to 300 (to 500 in an ignored test), for
 //!   O empty, for O = U\*_{≥3} up to the board 120 and for five random subsets of it: random sets of candidates and
@@ -80,7 +81,7 @@ fn sum(numbers: &[u32]) -> u64 {
 }
 
 /// What a formulation of Π⁺(O) is called in the messages and the lines a check prints: `claims=on` for the one with the
-/// claims of `unzip` that Lemma M5⁺ allows, `claims=off` for the one without.
+/// claims of `unzip` that the kept-claims lemma (E2) allows, `claims=off` for the one without.
 fn formulation(claims: bool) -> &'static str {
     if claims {
         "claims=on"
@@ -98,7 +99,7 @@ struct Case<'b, const W: usize> {
     /// F = U\* ∖ O, ascending.
     fixed: Vec<u32>,
     open: Vec<u32>,
-    /// Whether the problem is the formulation with the claims of `unzip` that Lemma M5⁺ allows.
+    /// Whether the problem is the formulation with the claims of `unzip` that the kept-claims lemma (E2) allows.
     claims: bool,
 }
 
@@ -166,10 +167,10 @@ impl<'b, const W: usize> Case<'b, W> {
         format!("{}: {}", kind.what(), self.describe(x))
     }
 
-    /// The mutant of this problem that skips the check of Lemma M5⁺: the claims of the components the check refused
-    /// ([`ExtendedFrames::refused`]) are kept after all, each pair (s, f) taken out of its frame (s from the moves and
-    /// f from the factors, the freedoms recomputed), as if the component had passed.  The problem is the same
-    /// otherwise.  Only a problem with claims (`claims` set) refuses any.
+    /// The mutant of this problem that skips the check of the kept-claims lemma (E2): the claims of the components the
+    /// check refused ([`ExtendedFrames::refused`]) are kept after all, each pair (s, f) taken out of its frame (s from
+    /// the moves and f from the factors, the freedoms recomputed), as if the component had passed.  The problem is the
+    /// same otherwise.  Only a problem with claims (`claims` set) refuses any.
     fn skipping_the_check(&self) -> Case<'b, W> {
         let mut mutant = Case::new(self.board, &self.open, self.claims);
         let refused = std::mem::take(&mut mutant.extended.refused);
@@ -255,11 +256,11 @@ fn count_disagreements<const W: usize>(case: &Case<W>) -> (usize, usize) {
     (not_promotion_sets, not_playable)
 }
 
-/// Theorem M⁺ on the board `1..=n` for the open sources `open`, in the formulation `claims` says, on every set: the
-/// sets X of family A (F ∪ X playable, found depth first) are promotion sets, the promotion sets of family B (found the
-/// same way) make F ∪ X playable, the two families are equal, `in_the_bag` is ΣF, the heaviest ΣS is what the table of
-/// optimal games has for `n`, and the oracle's order for the heaviest S replays to its sum.  Returns the number of
-/// sets.
+/// The extended exactness theorem (E1) on the board `1..=n` for the open sources `open`, in the formulation `claims`
+/// says, on every set: the sets X of family A (F ∪ X playable, found depth first) are promotion sets, the promotion
+/// sets of family B (found the same way) make F ∪ X playable, the two families are equal, `in_the_bag` is ΣF, the
+/// heaviest ΣS is what the table of optimal games has for `n`, and the oracle's order for the heaviest S replays to its
+/// sum.  Returns the number of sets.
 ///
 /// The sets are those of [`walk_every_set`], which panics here at the first disagreement: every set of A asserted a
 /// promotion set puts A in B, and every set of B asserted playable with F puts B in A, so the families are equal (and
@@ -304,7 +305,7 @@ fn check_every_board(boards: RangeInclusive<u32>, claims: bool, mut choose: impl
     assert!(total > checks, "no board has a set but the empty one");
 }
 
-/// Theorem M⁺ with no open source, on every set of every board from 2 to 80.
+/// The extended exactness theorem (E1) with no open source, on every set of every board from 2 to 80.
 #[test]
 fn theorem_m_plus_with_no_open_source() {
     check_every_board(2..=80, false, |_, _| vec![Vec::new()]);
@@ -317,9 +318,9 @@ fn theorem_m_plus_with_no_open_source_with_claims() {
     check_every_board(2..=80, true, |_, _| vec![Vec::new()]);
 }
 
-/// Theorem M⁺ with three random subsets of U\*_{≥3} open, on every set of every board from 2 to 48 that has such
-/// sources.  (The boards 49 to 80 are in [`theorem_m_plus_with_open_sources_49_to_80`]: the number of sets, and the
-/// time, grow with the board, and the boards past 50 take most of it.)
+/// The extended exactness theorem (E1) with three random subsets of U\*_{≥3} open, on every set of every board from 2
+/// to 48 that has such sources.  (The boards 49 to 80 are in [`theorem_m_plus_with_open_sources_49_to_80`]: the number
+/// of sets, and the time, grow with the board, and the boards past 50 take most of it.)
 #[test]
 fn theorem_m_plus_with_open_sources() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
@@ -349,8 +350,9 @@ fn theorem_m_plus_with_open_sources_49_to_80_with_claims() {
     check_every_board(49..=80, true, |_, from_3| random_open_sets(&mut rng, from_3, 3, 8));
 }
 
-/// Theorem M⁺ with every source of three or more prime factors open, on every set of every board from 2 to 44.  (The
-/// boards 45 to 60 are in [`theorem_m_plus_with_every_source_open_45_to_60`], and take twenty times as long.)
+/// The extended exactness theorem (E1) with every source of three or more prime factors open, on every set of every
+/// board from 2 to 44.  (The boards 45 to 60 are in [`theorem_m_plus_with_every_source_open_45_to_60`], and take twenty
+/// times as long.)
 #[test]
 fn theorem_m_plus_with_every_source_open() {
     check_every_board(2..=44, false, |_, from_3| vec![from_3.to_vec()]);
@@ -410,7 +412,7 @@ fn theorem_m_plus_with_every_source_open_61_to_69_with_claims() {
     check_every_board(61..=69, true, |_, from_3| vec![from_3.to_vec()]);
 }
 
-/// The check of Lemma M5⁺ is needed: a mutant of the problem with the claims that skips it is caught.
+/// The check of the kept-claims lemma (E2) is needed: a mutant of the problem with the claims that skips it is caught.
 ///
 /// The check refuses the claims of a component that holds no open source when one of its back claims (s, f) has f a
 /// two-sided candidate or listed among the maximal factors of one (`ExtendedFrames::refused`).  The mutant keeps those
@@ -595,7 +597,7 @@ impl Tally {
     }
 }
 
-/// Theorem M⁺ on `sets` random sets of each of two kinds, for the open sources of `case`.
+/// The extended exactness theorem (E1) on `sets` random sets of each of two kinds, for the open sources of `case`.
 ///
 /// *Soundness*: a random promotion set of Π⁺(O) makes F ∪ K ∪ L playable.
 ///
@@ -664,9 +666,9 @@ fn check_random_sets_against_the_frame_model<const W: usize>(
     }
 }
 
-/// Theorem M⁺ on the board `1..=n` at width `W`, in the formulation `claims` says, on `sets` random sets of each kind
-/// for a random 20 members of U\*_{≥3} open, for all of them open, and for none open, where the frame model is checked
-/// against Π⁺(∅) too.
+/// The extended exactness theorem (E1) on the board `1..=n` at width `W`, in the formulation `claims` says, on `sets`
+/// random sets of each kind for a random 20 members of U\*_{≥3} open, for all of them open, and for none open, where
+/// the frame model is checked against Π⁺(∅) too.
 fn check_random_board<const W: usize>(n: u32, claims: bool, sets: usize, rng: &mut Rng) -> Tally {
     let board = Board::<W>::for_n(n);
     let every = upper_from_3(&board);
@@ -701,8 +703,8 @@ fn check_random_board<const W: usize>(n: u32, claims: bool, sets: usize, rng: &m
     tally
 }
 
-/// Theorem M⁺ on `sets` random sets of each kind on each of `boards`, each at the width the solver picks, in the
-/// formulation `claims` says, from the random stream seeded with `seed`.
+/// The extended exactness theorem (E1) on `sets` random sets of each kind on each of `boards`, each at the width the
+/// solver picks, in the formulation `claims` says, from the random stream seeded with `seed`.
 fn check_random_boards(boards: &[u32], claims: bool, sets: usize, seed: u64) -> Tally {
     let mut rng = Rng(seed);
     let (start, mut tally) = (Instant::now(), Tally::default());
@@ -715,7 +717,7 @@ fn check_random_boards(boards: &[u32], claims: bool, sets: usize, seed: u64) -> 
     tally
 }
 
-/// Theorem M⁺ on a few random sets of the boards 300 and 600.
+/// The extended exactness theorem (E1) on a few random sets of the boards 300 and 600.
 #[test]
 fn theorem_m_plus_on_a_few_random_sets() {
     check_random_boards(&[300, 600], false, 10, 0x9FB2_1C65_1E98_DF25);
@@ -727,7 +729,7 @@ fn theorem_m_plus_on_a_few_random_sets_with_claims() {
     check_random_boards(&[300, 600], true, 10, 0x510E_527F_ADE6_82D1);
 }
 
-/// Theorem M⁺ on random sets of the boards 300, 600, 1000 and 1300.
+/// The extended exactness theorem (E1) on random sets of the boards 300, 600, 1000 and 1300.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_on_a_few_random_sets")]
 fn theorem_m_plus_on_random_sets() {
@@ -741,7 +743,7 @@ fn theorem_m_plus_on_random_sets_with_claims() {
     check_random_boards(&[300, 600, 1000, 1300], true, 100, 0x5851_F42D_4C95_7F2D);
 }
 
-/// Theorem M⁺ on random sets of the boards 2000, 3000 and 4095.
+/// The extended exactness theorem (E1) on random sets of the boards 2000, 3000 and 4095.
 #[test]
 #[ignore = "takes a while; the boards to 1300 are in the default test"]
 fn theorem_m_plus_on_random_sets_past_1300() {
@@ -755,9 +757,10 @@ fn theorem_m_plus_on_random_sets_past_1300_with_claims() {
     check_random_boards(&[2000, 3000, 4095], true, 100, 0x1405_7B7E_F767_814F);
 }
 
-/// Theorem M⁺ on random sets of boards where greedy rejects a source of layer 3, which the opening of a source above
-/// it can let in: 741 (374 is rejected), 1100 (578) and 1200 (605).  Greedy rejects no source of layer 3 or more on
-/// the boards to 740, nor on 1000 or 1300, so the other tests never meet one; some of the sets here have one in them.
+/// The extended exactness theorem (E1) on random sets of boards where greedy rejects a source of layer 3, which the
+/// opening of a source above it can let in: 741 (374 is rejected), 1100 (578) and 1200 (605).  Greedy rejects no source
+/// of layer 3 or more on the boards to 740, nor on 1000 or 1300, so the other tests never meet one; some of the sets
+/// here have one in them.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_plus_with_a_few_sets_of_a_rejected_source")]
 fn theorem_m_plus_with_a_rejected_source() {

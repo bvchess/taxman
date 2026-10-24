@@ -361,13 +361,12 @@ fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusi
 
 /// A unit below the root of a game, searched from a handicapped incumbent, with what an exhaustive search found in it.
 ///
-/// Theorem 13 (docs/theory/bounds.md, "Prime exchanges: symmetries of the promotions") says that every heaviest
-/// promotion set of the *root* keeps the inequality of each symmetric pair, and the search with the tactic `symmetry`
-/// looks at the completions that keep them, at every node.  A unit below the root is no root: its best completion can
-/// break an inequality (some promotion of its `promoted` may even break one already, which no completion mends), and
-/// its search finds the best completion that keeps them ("Pruning with the inequalities", last paragraph).  So a search
-/// with the rule is compared with the oracle for that, [`Game::exhaustive_keeping`], and the others with
-/// [`Game::exhaustive`].
+/// The prime-exchange theorem (R2, docs/theory/search-rules.md) says that every heaviest promotion set of the *root*
+/// keeps the inequality of each symmetric pair, and the search with the tactic `symmetry` looks at the completions that
+/// keep them, at every node.  A unit below the root is no root: its best completion can break an inequality (some
+/// promotion of its `promoted` may even break one already, which no completion mends), and its search finds the best
+/// completion that keeps them (the exchange-pruning lemma, R3, part 3).  So a search with the rule is compared with the
+/// oracle for that, [`Game::exhaustive_keeping`], and the others with [`Game::exhaustive`].
 struct Searched<'a, const W: usize> {
     game: &'a Game<W>,
     sym: &'a Symmetries,
@@ -445,7 +444,7 @@ impl<'a, const W: usize> Searched<'a, W> {
 
 /// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
 /// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
-/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (Theorem 13:
+/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (R2:
 /// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40
 /// opt(n) is also checked against the exhaustive search without the frame model.
 #[test]
@@ -593,7 +592,7 @@ fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
 /// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
 /// 30, 50 or 70 percent of its members, the candidates what the search leaves them, searched under each of `configs`
 /// from an incumbent one below P*, with the near-repeat cut by a game before ([`game_after`]).  Such a unit holds `S*`,
-/// which keeps every symmetric pair's inequality (Theorem 13), so the search with the rule of the pairs (tactic
+/// which keeps every symmetric pair's inequality (R2), so the search with the rule of the pairs (tactic
 /// `symmetry`) must find P*; a rule that cuts a node on the path to `S*`, or drops a candidate `S*` needs, does not.
 /// The nodes of such a search are deep enough that the promotions and the candidates leave the pairs' inequalities
 /// open, which a game searched from its root rarely does.  Returns the number of searches.

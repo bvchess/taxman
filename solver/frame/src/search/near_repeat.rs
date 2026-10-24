@@ -1,8 +1,8 @@
 //! The near-repeat cut (tactic `near_repeat`): a node of game N's search is cut when its completions are promotion sets
-//! of a game M proven before, whose proven bound the incumbent reaches (docs/theory/ledger.md, "The near-repeat cut":
-//! the state lemma and Lemma R).  [`NearRepeat`] is the cut's setup, and its methods are the checks at a node, which
-//! follow the ledger's "What a search checks" word for word; the searcher keeps σ_M(P) along its path and calls them
-//! (`search::searcher`).
+//! of a game M proven before, whose proven bound the incumbent reaches (the near-repeat lemma (R7) and the state
+//! lemma (R1), docs/theory/search-rules.md).  [`NearRepeat`] is the cut's setup, and its methods are the checks at a
+//! node, which follow solver/docs/design/search.md, "The near-repeat cut", word for word; the searcher keeps σ_M(P)
+//! along its path and calls them (`search::searcher`).
 //!
 //! The words: a node has the promotions P, the candidates C its loop has still to try, and the state σ_N(P) in Π_N, the
 //! problem searched; σ_M(P) is the state of P in Π_M, the problem of game M.  B is a proven bound of P\*(Π_M).

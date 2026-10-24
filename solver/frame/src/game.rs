@@ -49,7 +49,7 @@ pub fn legal_moves_left(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
 /// `moves` followed by legal moves for as long as there are any, the largest each time: the game over.  One descending
 /// pass finds them all, for a move only takes numbers out of the pot, so a number that is not legal now never
 /// becomes legal.  (After a game of n − 1 followed by n, or a game of n + 1 less its move n + 1, these are the
-/// completions of the ledger's Lemmas L1 and L2, docs/THEORY.md.)
+/// completions of monotonicity (N3) and the ceiling lemma (N4), docs/theory/neighbors.md.)
 pub fn complete(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     let (_, mut in_pot) = play(n, moves)?;
     let mut game = moves.to_vec();

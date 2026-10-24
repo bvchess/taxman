@@ -78,9 +78,9 @@
 //!   `n`'s turn (indeed with every divisor of `n` in the pot then taken off the board), but which those are is
 //!   not known in advance, and `opt_M` only grows as holes are filled, hence the maximum over single holes.
 //!   With the rules' `opt(B_f)` in place of `opt_M(B_f)` the theorem still holds but is weaker.
-//! * It is an upper bound only.  In the terms of Theorem 1 of `docs/THEORY.md` (a set of moves is
-//!   playable iff each can be paid a distinct maximal factor outside the set, with an acyclic precedence "`a`
-//!   before `b` when `a`'s payment or `a` divides `b`"), `n + opt_M(B_f)` is the best set containing `n` with `n`
+//! * It is an upper bound only.  In the terms of the playability theorem (P2, docs/theory/playability.md: a set of
+//!   moves is playable iff each can be paid a distinct maximal factor outside the set, with an acyclic precedence
+//!   "`a` before `b` when `a`'s payment or `a` divides `b`"), `n + opt_M(B_f)` is the best set containing `n` with `n`
 //!   paying `f`, except that the precedence edges at `n` are dropped: `n` before every multiple of `f`, and after
 //!   every move that pays with a divisor of `n` or divides `n`.  So when `n` is played, the bound is tight exactly
 //!   when, for some `f` with the largest `opt_M(B_f)`, some best game of `B_f` stays acyclic with `n` added.
@@ -90,13 +90,13 @@
 //!   load-bearing.
 //! * Prime `n` (`mf(n) = {1}`).  On `B_1` no prime can be played, and the two rules agree (the other numbers have
 //!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` opens with
-//!   `P` (Lemma A of [`crate::accelerate::prime_shortcut`], where it is proved).  Dropping that first move gives
+//!   `P` (the prime lemma (N1, docs/theory/neighbors.md)).  Dropping that first move gives
 //!   a game on `B_1`, so `opt_M(B_1) ≥ opt(n − 1) − P`; and `P` followed by any game on `B_1` is a game on
 //!   `[n − 1]` (no multiple of `P` is on the board), so `opt_M(B_1) = opt(n − 1) − P`.  The bound is
 //!   `n + opt(n − 1) − P`, which the prime shortcut reaches: it is tight for every prime.  (That the shortcut is
-//!   optimal needs no frame-model assumption.  Its proof is a direct argument that does not go through this
-//!   theorem, and it lives with the shortcut.)  [`sacrifice_bound`] uses this value for the hole 1 without any
-//!   search (`without_one`).
+//!   optimal needs no frame-model assumption.  Its proof is the prime formula (N5, docs/theory/neighbors.md), a
+//!   direct argument that does not go through this theorem; see [`crate::accelerate::prime_shortcut`].)
+//!   [`sacrifice_bound`] uses this value for the hole 1 without any search (`without_one`).
 //!
 //! # Computing it
 //!
@@ -109,10 +109,11 @@
 //! mandatory moves, closed frames, one-frame promotions; solver/docs/design/frame-model.md and tactics.md, and
 //! [`crate::frames`]) apply to punctured boards as they do to `[n]`, and so does their proof: the frames are numbered
 //! by layer, so the frame model is exact on a board with holes as on `[n]`, given the sources setup keeps
-//! (docs/THEORY.md, Theorem M and "Boards with holes": the heaviest promotion set gives the best game, under the
-//! maximal-factor rule, among those that play every source setup keeps on the punctured board).  What a bound computed
-//! this way rests on is therefore the upper part of each punctured board: that some best game of `B_f` plays every
-//! source setup keeps there.  That is open, as U is on `[n]` (where Theorem B settles the sources of one and two prime
+//! (the exactness theorem (X7) and the holes theorem (X9), docs/theory/exactness.md: the heaviest promotion set
+//! gives the best game, under the maximal-factor rule, among those that play every source setup keeps on the
+//! punctured board).  What a bound computed this way rests on is therefore the upper part of each punctured board:
+//! that some best game of `B_f` plays every source setup keeps there.  That is open, as statement U is on `[n]`
+//! (where the bottom-layers theorem (F3, docs/theory/frame-model.md) settles the sources of one and two prime
 //! factors; it is not proven for punctured boards, so on them the statement takes in all the kept sources), and it is
 //! validated against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  Each punctured game
 //! is warm-started from an optimal game of the unpunctured board, which is its ceiling: if that game replays on the

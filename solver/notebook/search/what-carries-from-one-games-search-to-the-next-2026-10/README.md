@@ -431,7 +431,7 @@ studies`; the scripts name that host's folders.
 ## Later (2026-10-22): built as the tactic `near_repeat`
 
 The cut is built as the tactic `near_repeat`, on by default, with the check of [Lemma
-R](../../../../docs/theory/ledger.md#the-near-repeat-cut) in place of the study's equal frames ([the
+R](../../../../docs/theory/search-rules.md#the-near-repeat-lemma) in place of the study's equal frames ([the
 design](../../../docs/design/search.md#the-near-repeat-cut)).  The solver gives a search the game of n − 1 when that
 game is concluded before the search starts, is proven and assumes nothing.  The build of the commit "The near-repeat
 cut, as the tactic near_repeat" proved each game from its root against the known optimum, with

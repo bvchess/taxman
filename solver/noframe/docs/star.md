@@ -12,21 +12,22 @@ is greedy itself.
 For a set of members of a reduction instance, give each member its incidence vector over GF(2): a 1 at each of its
 factors.
 
-* **Playable sets are independent.**  A playable set dismantles completely (Theorems 4, 5).  In a dismantling order
-  x₁, x₂, … each xᵢ has a factor that no later member lists, so in any vanishing sum the first member's private
-  coordinate is 1.  So no playable subset of a set K is larger than rank(K).  On members with at most two factors this
-  is the rank of a graphic matroid, exact there.  The factors pq, pr and qr of a three-prime member are the edges of a
-  triangle on the primes, and the dependencies of such members are closed surfaces mod 2, invisible to counting
-  bounds.
+* **Playable sets are independent.**  A playable set dismantles completely ([the residual theorem
+  (P5)](../../../docs/theory/playability.md#the-residual-theorem) and [the core theorem
+  (P7)](../../../docs/theory/playability.md#the-core-theorem)).  In a dismantling order x₁, x₂, … each xᵢ has a factor
+  that no later member lists, so in any vanishing sum the first member's private coordinate is 1.  So no playable subset
+  of a set K is larger than rank(K).  On members with at most two factors this is the rank of a graphic matroid, exact
+  there.  The factors pq, pr and qr of a three-prime member are the edges of a triangle on the primes, and the
+  dependencies of such members are closed surfaces mod 2, invisible to counting bounds.
 * **(♦) ⟹ (★).**  Suppose every member that descending greedy rejects is a sum of members it kept above it.  Above any
   threshold t, greedy's kept members are independent (playable) and span every member above t, so they are a basis:
   greedy keeps rank(K_{≥t}) members, the most any playable subset has.  That is (★) for every component and every
-  truncation.  Since greedy is optimal on a matroid, it is also the upper-half conjecture for every weighting
-  consistent with the order.
-* **Checking (♦) is greedy itself** (`src/span.rs`).  A member with a factor no kept member lists is kept (the
-  extension lemma).  A member the kept ones span is rejected, since dependent sets are unplayable.  Only the rest are
-  peeled, and a rejection among them would be a violation.  Everything runs on the components of the residual, where
-  all cores and all dependencies live.
+  truncation.  Since greedy is optimal on a matroid, it is also [the sources conjecture
+  (S1)](../../../docs/theory/sources.md#the-sources-conjecture) for every weighting consistent with the order.
+* **Checking (♦) is greedy itself** (`src/span.rs`).  A member with a factor no kept member lists is kept ([the
+  extension lemma (P6)](../../../docs/theory/playability.md#the-extension-lemma)).  A member the kept ones span is
+  rejected, since dependent sets are unplayable.  Only the rest are peeled, and a rejection among them would be a
+  violation.  Everything runs on the components of the residual, where all cores and all dependencies live.
 
 Statement (♦) is stronger than (★).  A rejection forced by an "odd" core, self-covering but with no factor-even
 subset, would violate (♦) without breaking (★).  Such cores exist in Taxman (the exchange failure at n = 2873 needs
@@ -91,10 +92,11 @@ the real game and varying another.  It checks (♦) on each and, where (♦) fai
 | random generalized primes with the prime density (Cramér), n = 10,000 / 20,000 | 150 | 0 | 0 |
 
 "≥" marks families where some thresholds stayed undecided within the search budget.  At n = 1000 every family passed,
-20 instances each: traps need three-prime jams, and THEORY.md finds the first failure of exchange at n = 2873.
+20 instances each: traps need three-prime jams, and [the theory](../../../docs/theory/sources.md#where-exchange-breaks)
+finds the first failure of exchange at n = 2873.
 
-This sharpens [the open problem's](../../../docs/theory/open-problem.md) "the ordering is the protection, not the
-magnitudes":
+This sharpens [what a proof must use](../../../docs/theory/sources.md#what-a-proof-must-use), that the order of the
+integers protects descending greedy and not their sizes:
 
 * **The window law suffices; the rest of the order does not matter.**  Every order of the real incidence structure that
   keeps the members sharing a factor in the order of their cofactor primes, random or chosen adversarially, satisfied
@@ -105,5 +107,5 @@ magnitudes":
   sharing a factor agrees with the ranking of the primes that also decides which products lie in the window (n/2, n].
   Generalized primes, which rebuild the members and factors from the perturbed primes, never fail, even perturbed by
   50%.
-* So the open problem can be sharpened to a statement without magnitudes beyond the window: **(♦) for multiplicatively
-  generated instances under any order obeying their window law.**
+* So the sources conjecture can be sharpened to a statement without magnitudes beyond the window: **(♦) for
+  multiplicatively generated instances under any order obeying their window law.**

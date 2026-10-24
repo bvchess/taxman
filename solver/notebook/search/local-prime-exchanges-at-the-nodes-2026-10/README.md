@@ -32,7 +32,7 @@ hundredfold or more from path to path.  Not a breakthrough, and nothing to build
 * The root's *symmetric pairs* are the exchanges that map the root's frames and candidates onto themselves; the search
   keeps c_p ≤ c_q for each, c_r being the sum of the cofactors of r
   ([glossary](../../../../docs/GLOSSARY.md#the-search), "prime exchange"; [THEORY.md, Theorem
-  13](../../../../docs/theory/bounds.md#prime-exchanges-symmetries-of-the-promotions)).
+  13](../../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).
 
 ### The instrument
 

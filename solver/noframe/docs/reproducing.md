@@ -13,7 +13,8 @@ cargo build --release
 ./target/release/star --from 2 --to 20000 --threads 6 --seconds 540 --out OUT.jsonl
 ./target/release/exact --from 2 --to 1300 --threads 3 --seconds 540 --fix-low 0 --checkpoints work/fresh --out OUT.jsonl
                                     # with the parity bound, rerun until done (data/exact_parity_2_1300.jsonl; without
-                                    # --fix-low 0 the searches start from the roles of Theorem B, the default)
+                                    # --fix-low 0 the searches start from the roles of the bottom-layers theorem, the
+                                    # default)
 ./target/release/exact --from 2 --to 1231 --parity 0 --fix-low 0 --threads 6 --seconds 540 --out OUT.jsonl
                                     # the Franklín–Moniot bound alone (data/exact_2_1231.jsonl, which left open
                                     # searches:)
@@ -29,9 +30,9 @@ bash tools/adversary_campaign.sh                                                
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
 EXTRA_ARGS='--fix-low 0' ../tools/cloud/prover.sh 1301 2175   # `exact` over a range in resumable passes, all CPUs,
                                     # then the check (data/exact_parity_1301_2175.jsonl; without EXTRA_ARGS the
-                                    # searches start from the roles of Theorem B)
+                                    # searches start from the roles of the bottom-layers theorem)
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
-                                    # every n in 2..2175 proven, scores recorded, and how many proofs rest on Theorem B
+                                    # every n in 2..2175 proven, scores recorded, and how many proofs rest on it
 ./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min)
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --results ../../results/strict.jsonl --results CHAIN.jsonl \

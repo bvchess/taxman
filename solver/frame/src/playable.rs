@@ -1,6 +1,7 @@
 //! Whether a set of numbers of a whole board can all be played, decided with nothing from the frame solver.
 //!
-//! The decision is the peel of docs/THEORY.md (Theorems 1 to 3): a set is playable, that is, some order of it is
+//! The decision is the peel of docs/theory/playability.md (the playability theorem (P2) and the peel theorem (P4)): a
+//! set is playable, that is, some order of it is
 //! a legal game on the board `1..=n`, exactly when the peel pairs every member with a maximal factor of its own,
 //! whatever the order of the peel's moves.  The code uses only the tables of maximal factors and composites of
 //! [`crate::numtheory::Tables`], which are foundation code, and `std`: it shares nothing with `frames` or `model`.  So
@@ -27,8 +28,8 @@ enum Move {
 /// The members are `set` (distinct numbers of `2..=t.n`).  The pool is the maximal factors of the members that are not
 /// members themselves, and each member's list is its maximal factors in the pool.  A *front move* pairs a live member
 /// that has exactly one live (unpaired) factor in its list with that factor; a *back move* pairs a live factor that
-/// exactly one live member lists with that member.  Theorems 2 and 3 say that the pairs are a payment scheme with an
-/// acyclic precedence if the peel finishes, and that a playable set is never left stuck, so the set is playable
+/// exactly one live member lists with that member.  The peel theorem (P4) says that the pairs are a payment scheme with
+/// an acyclic precedence if the peel finishes, and that a playable set is never left stuck, so the set is playable
 /// exactly when the peel finishes, in whatever order its moves are made.
 ///
 /// Linear time in the size of the lists: per member the count of its live factors, per factor the count of the live
@@ -110,12 +111,12 @@ pub fn playable(t: &Tables, set: &[u32]) -> bool {
 }
 
 /// A legal game that plays exactly `set`, if it is playable: the topological order of the precedence of the peel's
-/// pairs (Theorems 1 and 2), where `a` comes before `b` whenever the payment of `a` divides `b`, or `a` divides `b`
+/// pairs (P2 and P4), where `a` comes before `b` whenever the payment of `a` divides `b`, or `a` divides `b`
 /// (and `a` is not `b`).  Quadratic in the size of the set.
 ///
 /// # Panics
 ///
-/// If the precedence has a cycle, which would contradict Theorem 2.
+/// If the precedence has a cycle, which would contradict P4.
 pub fn play_order(t: &Tables, set: &[u32]) -> Option<Vec<u32>> {
     let pairs = peel(t, set)?;
     let before = |a: usize, b: usize| {

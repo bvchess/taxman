@@ -3,9 +3,9 @@
 This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
 the games at the chain's end and past it, and the certificates of statement U.  This page says what each file holds,
 how far it reaches, how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the
-terms; the frame model and statement U, on which the frame solver's scores rest, are in [docs/theory/frame-model.md,
-"The upper part"](../docs/theory/frame-model.md#the-upper-part), and the prover in [its
-README](../solver/noframe/README.md).
+terms; [the frame model](../docs/theory/frame-model.md#the-frame-model) and [statement
+U](../docs/theory/exactness.md#statement-u), on which the frame solver's scores rest, are defined in the theory, and the
+prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
@@ -208,12 +208,13 @@ What that evidence amounts to:
 5. **Independence from `optimal.json`.**  `strict.jsonl` starts at n = 1, so no game of it is built from
    `optimal.json`, which is only compared with, up to 1300; a score that differs would be a hard error.
 6. **The prover's proofs.**  The prover proves every n up to 2175 optimal without the frame model, with no frames or
-   promotions ([the prover's README](../solver/noframe/README.md); [THEORY.md](../docs/THEORY.md), Theorem 10).  So
+   promotions ([the prover's README](../solver/noframe/README.md); [the parity bound
+   (W1)](../docs/theory/parity-bound.md#the-parity-bound)).  So
    `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are opt(n) on the whole board.  The
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
    notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 2774
-   games of 2176–4949 are proven within the frame model, which is exact given U
-   ([docs/theory/frame-model.md](../docs/theory/frame-model.md)).  `taxman certify` can check U there game by game, with
+   games of 2176–4949 are proven within the frame model, which is exact given U ([the exactness theorem
+   (X7)](../docs/theory/exactness.md#the-exactness-theorem)).  `taxman certify` can check U there game by game, with
    the prover's barred bounds ([the prover's README](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has
    them to 3440).
 
@@ -245,7 +246,8 @@ record of those proofs, which the lines of proof `known` in `strict.jsonl` cite.
 from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
-bound is the frame model's, carried between games by the lemmas of [docs/theory/ledger.md](../docs/theory/ledger.md).
+bound is the frame model's, carried between games as [the
+theory](../docs/theory/search-rules.md#bounds-carried-between-games) says.
 
 A line is a bound, not a game of `taxman solve`.  It is not in the schema of the results lines, and an export adds
 no line of a game that `strict.jsonl` has.  It is not `explore.jsonl`'s kind of file either: that one holds the
@@ -318,7 +320,8 @@ The rules of an upper bound:
 * `dual`, the dual bound of a search that a limit stopped;
 * `exhausted`, a search that explored its whole tree;
 * `floor`, a search under a floor F (an incumbent worth F and no set) that completed having found nothing.  No promotion
-  set weighs more than F (THEORY.md, Lemma F), so the bound is `in_the_bag` and F;
+  set weighs more than F ([the floor lemma (R5)](../docs/theory/search-rules.md#the-floor-lemma)), so the bound is
+  `in_the_bag` and F;
 * `nogoods`, the Lagrangian bound over nogoods that were each checked to fail to promote, with the GF(2) bound inside,
   as the removed `wall nogoods` made it; nothing makes it any more;
 * `given`;
@@ -342,9 +345,9 @@ A line of 3916 reads:
 
 **What an upper bound rests on.**  Every upper bound is a bound of the frame model at some game: a root bound, a dual
 bound, a completed search or a given game.  That is opt(n) where statement U holds at that game.  The lemmas carry it
-between games without more, except the second part of Lemma L4, the bound on opt(n) − in_the_bag(n), which rests on U
-at the game it is carried to ([docs/theory/ledger.md](../docs/theory/ledger.md)).
-`rests_on` lists the games:
+between games without more, except the second part of [the repeat lemma
+(R6)](../docs/theory/search-rules.md#the-repeat-lemma), the bound on opt(n) − in_the_bag(n), which rests on U at the
+game it is carried to.  `rests_on` lists the games:
 
 * a bound of the frame model has its own game alone;
 * a relation has what the bound it comes from rests on, and a game of the chain that it cites counts as resting on

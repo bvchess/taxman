@@ -12,7 +12,7 @@ the chain's remaining machinery is actually buying.
 
 Note cascade plays peel's raw sequence under real sweeps, so it
 needs TRUE divisor lists, not the maximal-factor pool: feasibility is
-pool-invariant (the lifting lemma) but raw play orders are not -- at
+pool-invariant (the lifting lemma, P1, docs/theory/playability.md) but raw play orders are not -- at
 n=5 a maximal-factor pool orders [4, 5], and playing 4 sweeps the 1
 that 5 needed.
 """

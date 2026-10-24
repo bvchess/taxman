@@ -1,6 +1,6 @@
-//! The span campaign: checks (♦) — every rejection of descending greedy on the upper-half instance is a GF(2)
-//! dependency of the members kept above it — for every game in a range, which certifies (★) and the upper-half
-//! conjecture for that game (see `span.rs`).  A game with a violation is also run through the
+//! The span campaign: checks (♦) — every rejection of descending greedy on the sources' instance is a GF(2) dependency
+//! of the members kept above it — for every game in a range, which certifies (★) and the sources conjecture (S1,
+//! docs/theory/sources.md) for that game (see `span.rs`).  A game with a violation is also run through the
 //! threshold-by-threshold check, whose verdicts are recorded with it.  One line per game, resumable.
 //!
 //!     span --from A --to B [--step S] [--list n,n,...] [--threads T] [--seconds S] [--budget NODES] --out FILE

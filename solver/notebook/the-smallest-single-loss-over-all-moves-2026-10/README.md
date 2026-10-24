@@ -45,7 +45,7 @@ says opt(21) = 135.  But opt(21) = 144.
   2026-10-23, and for 4950..4955 the chain's own file, `~/taxman_work/chain-data/results/strict.jsonl`.  Each n takes
   its first completed line, which carries the proven score.
 * **Playability.**  [`peel`](../../../docs/GLOSSARY.md#the-game) of `heuristics/core.py` decides whether a set is
-  playable, exactly ([theory/decision-procedure.md](../../../docs/theory/decision-procedure.md), Theorems 1 to 3).  It
+  playable, exactly ([theory/decision-procedure.md](../../../docs/theory/playability.md#the-playability-theorem), Theorems 1 to 3).  It
   is the call that `playable_order` of [`wiki_questions.py`](../../../heuristics/evaluation/wiki_questions.py) makes.
 * **Speed.**  Trying every x costs one peel each.  After a failed test of M ∪ {n}, QuickXplain (an algorithm that
   finds a minimal conflicting subset in few tests) finds one minimal unplayable subset C of it, and only the x in C are

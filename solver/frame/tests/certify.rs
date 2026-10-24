@@ -13,11 +13,12 @@
 //! one with no search (`same_problem`): the tests check the games it settles against a search of the same game, that a
 //! wrong score on such a game is still beaten, and that lines that are not what they say are not used.
 //!
-//! The extended problem has two formulations, with the claims of `unzip` that Lemma M5⁺ keeps (the default, which the
-//! tests use unless they say otherwise) and without (`--no-claims`, the committed certificates' of 600..=1300).  A line
-//! records which; the rule compares the problems in the run's formulation whichever the earlier game's certificate was
-//! made in, which the tests check within each formulation and across the two; the claims make the rule settle more
-//! games (101 of 600..=1300 against 81); and a file that mixes the formulations verifies.
+//! The extended problem has two formulations, with the claims of `unzip` that the kept-claims lemma (E2,
+//! docs/theory/extended-problem.md) keeps (the default, which the tests use unless they say otherwise) and without
+//! (`--no-claims`, the committed certificates' of 600..=1300).  A line records which; the rule compares the problems in
+//! the run's formulation whichever the earlier game's certificate was made in, which the tests check within each
+//! formulation and across the two; the claims make the rule settle more games (101 of 600..=1300 against 81); and a
+//! file that mixes the formulations verifies.
 //!
 //! `taxman certify` takes the boards of a list file as well as a range, and `taxman verify-certificates` checks the
 //! files it wrote: a file made over a stretch with repeats passes, each doctored line is refused naming the file, the
@@ -91,7 +92,7 @@ fn needing(range: RangeInclusive<u32>) -> Vec<u32> {
 }
 
 /// Certifies the recorded game of `n` with the committed data and `opts`, in the default formulation (with the claims
-/// of `unzip` that Lemma M5⁺ keeps).
+/// of `unzip` that the kept-claims lemma (E2) keeps).
 fn certify(n: u32, opts: &SolveOptions) -> Certificate {
     certify_in(n, true, opts)
 }

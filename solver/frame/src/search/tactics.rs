@@ -51,15 +51,16 @@ pub struct SearchTactics {
     pub lagrange: bool,
     /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest common independent set of the two GF(2)
     /// frame matroids, kept along the searcher's path by contraction), branch on the conflicts of its heaviest set,
-    /// and (with `fix_forced`) force the members without which it would cut (proven: docs/THEORY.md, Theorem
-    /// 11, and weak duality for the forced members).  Replaces the matching bound and its refinement as the node
-    /// bound; the Lagrangian bound over nogoods still applies after it.
+    /// and (with `fix_forced`) force the members without which it would cut (proven: the frame bound (B2,
+    /// docs/theory/frame-bounds.md), and weak duality for the forced members).  Replaces the matching bound and its
+    /// refinement as the node bound; the Lagrangian bound over nogoods still applies after it.
     pub gf2: bool,
     /// Cut a node none of whose completions keeps the inequality of every symmetric pair of the root, and drop from a
     /// node's candidates those that no such completion holds ([`crate::search::symmetry`]; proven:
-    /// docs/THEORY.md, Theorem 13 and "Pruning with the inequalities": every heaviest promotion set keeps the
-    /// inequalities, so a search for one needs only the completions that do).  It acts with either node bound.  The
-    /// rule is a function of the node's promotions and candidates alone, so the tree depends on nothing but the node.
+    /// the prime-exchange theorem (R2) and the exchange-pruning lemma (R3) of docs/theory/search-rules.md: every
+    /// heaviest promotion set keeps the inequalities, so a search for one needs only the completions that do).  It acts
+    /// with either node bound.  The rule is a function of the node's promotions and candidates alone, so the tree
+    /// depends on nothing but the node.
     pub symmetry: bool,
     /// With `gf2` and `fix_forced`: which members of a node's heaviest set that the weight split leaves free are
     /// searched for being forced after all, by the exchange graph ([`ForceWindow`]; sound whatever it is: a member is
@@ -82,8 +83,9 @@ pub struct SearchTactics {
     /// on the conflict of the heaviest set whose members cost the bound most to leave out, of the one the search found,
     /// the nogoods within the set and each failing frame's minimal conflict made by leaving out its cheapest members
     /// first (`search::searcher`'s `conflict_to_branch_on`; sound: every completion leaves out a member of any
-    /// conflict, so the branches cover them all, and the conflicts made there are conflicts by docs/THEORY.md's
-    /// Theorems 3, 4 and M).
+    /// conflict, so the branches cover them all, and the conflicts made there are conflicts by the peel theorem
+    /// (P4) and the residual theorem (P5) of docs/theory/playability.md, and the exactness theorem (X7) of
+    /// docs/theory/exactness.md).
     pub conflict_branching: bool,
     /// With `conflict_branching`, where it would branch on a conflict other than the search's own, look first at the
     /// last child of the search's own conflict, the one that promotes every member but the cheapest and leaves the
@@ -93,9 +95,10 @@ pub struct SearchTactics {
     /// leaves the node's state as it found it).  On by default.
     pub conflict_look: bool,
     /// Cut a node whose completions are promotion sets of a game M proven before, once the incumbent reaches a proven
-    /// bound of M's best promotion sum ([`NearRepeat`](super::NearRepeat); proven: docs/theory/ledger.md, Lemma R).  It
-    /// acts only where the search is given M ([`search_steered`](super::search_steered): the solver gives the game of
-    /// n − 1 when it is concluded and proven before the search starts) and its incumbent or floor reaches that bound.
+    /// bound of M's best promotion sum ([`NearRepeat`](super::NearRepeat); proven: the near-repeat lemma (R7),
+    /// docs/theory/search-rules.md).  It acts only where the search is given M
+    /// ([`search_steered`](super::search_steered): the solver gives the game of n − 1 when it is concluded and proven
+    /// before the search starts) and its incumbent or floor reaches that bound.
     pub near_repeat: bool,
     /// With `conflict_branching`, keep the prices of a node's members that the choice of the conflict makes, from one
     /// check of the node to the next and from a node to its children, and make only the prices a check lacks, all of
@@ -215,10 +218,10 @@ impl SearchTactics {
     /// The bit of [`bits`](Self::bits) of `near_repeat` (bit 11).  A checkpoint records it, as the search began with
     /// it, but it binds nothing: the cut drops only nodes none of whose completions beats the incumbent, by a bound
     /// that each run of the search sets up for itself, as it takes its ceiling, so a search whose units are searched
-    /// with the cut and without it is as exact as one that keeps it (docs/theory/ledger.md, the paragraph "What it
-    /// rests on").  And the bit cannot say whether the cut acted: that depends on whether the game before was proven
-    /// when the run set the search up.  So a checkpoint resumes with the tactic on or off, those of the builds before
-    /// it, whose bit is clear, included.
+    /// with the cut and without it is as exact as one that keeps it (the near-repeat lemma (R7),
+    /// docs/theory/search-rules.md, the paragraph "What it rests on").  And the bit cannot say whether the cut acted:
+    /// that depends on whether the game before was proven when the run set the search up.  So a checkpoint resumes with
+    /// the tactic on or off, those of the builds before it, whose bit is clear, included.
     pub const NEAR_REPEAT_BIT: u16 = 1 << 11;
 
     /// The bit of [`bits`](Self::bits) of `price_reuse` (bit 12).  A checkpoint records it, as the search began with it,
@@ -299,8 +302,9 @@ impl SearchTactics {
     /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search needs the
     /// GF(2) bound (`gf2`; the matching bound, `gf2=off`, gives a one-sided candidate no vertex, so it is no bound
     /// there), and refuses the Lagrangian bound (`lagrange`, built on the matching bound) and the rule of symmetric
-    /// pairs (`symmetry`: Theorem 13 is proven for the frame model, and for the extended problem would need each prime
-    /// exchange to map the one-sided candidates of each frame onto themselves, which nothing checks yet).
+    /// pairs (`symmetry`: the prime-exchange theorem (R2) is proven for the frame model, and for the extended problem
+    /// would need each prime exchange to map the one-sided candidates of each frame onto themselves, which nothing
+    /// checks yet).
     pub fn refusal_with_one_sided(&self) -> Option<String> {
         let mut why = Vec::new();
         if !self.gf2 {
@@ -310,7 +314,7 @@ impl SearchTactics {
             why.push("lagrange=on (the Lagrangian bound is the matching bound's)");
         }
         if self.symmetry {
-            why.push("symmetry=on (Theorem 13 is not proven for them)");
+            why.push("symmetry=on (the prime-exchange theorem, R2, is not proven for them)");
         }
         (!why.is_empty())
             .then(|| format!("a search with one-sided candidates (extended mode) cannot run with {}", why.join(", ")))

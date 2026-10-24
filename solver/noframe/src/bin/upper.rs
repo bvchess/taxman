@@ -10,16 +10,16 @@
 //! Every line has the game (`n`, its recorded `score`), its `relation` to the game before (`chain`, `prime` or
 //! `none`; `src/game.rs`) and `needs`, 1 if the relation is `none`: a game at its ceiling or meeting the prime
 //! formula rests on n − 1, not on the frame model, and has nothing more.  For a game that needs it the line gives
-//! the parity bound at the roles of Theorem B (`root`) and its `gap` over the score, whether the root's heaviest set
+//! the parity bound at the roles of F3 (`root`) and its `gap` over the score, whether the root's heaviest set
 //! holds all of U\*_{≥3} (`root_has_upper`), the number of members of U\*_{≥3} (`members`), how many the bound
 //! certifies (`certified`), and the `open` ones as triples [u, Ω(u), margin], ascending in u, the margin being the
 //! bound with u barred minus the score (null if the bound could not be certified).  Per game the recorded game is
-//! replayed by the rules, its moves above n/2 are checked to be U\* and the whole game to obey Theorem B's roles
+//! replayed by the rules, its moves above n/2 are checked to be U\* and the whole game to obey the roles of F3
 //! (checks of the data).
 //!
-//! The roles are those of every optimal set (THEORY.md, Theorem B; `upper.rs`).  A member u is certified when the
-//! bound with u barred as well is at most the score V (or the roles cannot be met): then every set that beats V and
-//! obeys Theorem B holds u, so if opt(n) > V every optimal set holds every certified member.
+//! The roles are those of every optimal set (the bottom-layers theorem, F3, docs/theory/frame-model.md; `upper.rs`).  A
+//! member u is certified when the bound with u barred as well is at most the score V (or the roles cannot be met): then
+//! every set that beats V and obeys F3 holds u, so if opt(n) > V every optimal set holds every certified member.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -66,7 +66,7 @@ fn main() {
         assert_eq!(board.replay(moves), Ok(*score), "n={n}: the recorded game does not replay to its score");
         let ustar = recorded_ustar(n, moves, &spf);
         let roles = low_roles(n as u32, &spf, &ustar);
-        obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles of Theorem B: {e}"));
+        obeys(&roles, moves).unwrap_or_else(|e| panic!("n={n}: the recorded game breaks the roles of F3: {e}"));
         let prev = known.get(&(n - 1)).map_or(0, |(s, _)| *s);
         let relation = relation(n, *score, prev, &spf);
         let needs = relation == Relation::None;

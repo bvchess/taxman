@@ -4,9 +4,9 @@
 //! A game's moves are its picks, so M(n) is the size of the largest playable set of picks on the board 1..=n.
 //! Three proven facts bound it:
 //!
-//! * **The matching number.**  A playable S pays each pick with a distinct maximal factor outside S (Theorem 1),
-//!   so S is the pick side of a matching of the board's maximal-factor graph (each number joined to its maximal
-//!   factors): M(n) <= ν(n), that graph's matching number ([`matching_numbers`]).
+//! * **The matching number.**  A playable S pays each pick with a distinct maximal factor outside S (the playability
+//!   theorem, P2, docs/theory/playability.md), so S is the pick side of a matching of the board's maximal-factor graph
+//!   (each number joined to its maximal factors): M(n) <= ν(n), that graph's matching number ([`matching_numbers`]).
 //! * **M(n − 1) <= M(n) <= M(n − 1) + 1.**  A game of n − 1 is a game of n (n divides nothing smaller), and a game
 //!   of n without its move n is a game of n − 1.
 //! * **M(n) = M(n − 1) for a prime n >= 3.**  A playable set holds at most one prime (primes pay only with 1); in
@@ -95,8 +95,8 @@ pub fn payments(board: &Board, set: &[u32]) -> Option<Vec<(u32, u32)>> {
     (paid.len() == set.len()).then_some(paid)
 }
 
-/// A legal order of the moves of a playable `set` (Theorem 1): a topological order of the precedence "a before b
-/// when a's payment divides b, or a divides b", with the payments of [`payments`].  None if unplayable.
+/// A legal order of the moves of a playable `set` (the playability theorem, P2): a topological order of the precedence
+/// "a before b when a's payment divides b, or a divides b", with the payments of [`payments`].  None if unplayable.
 pub fn play_order(board: &Board, set: &[u32]) -> Option<Vec<u32>> {
     let paid = payments(board, set)?;
     let k = paid.len();
@@ -121,7 +121,7 @@ pub fn play_order(board: &Board, set: &[u32]) -> Option<Vec<u32>> {
             }
         }
     }
-    assert_eq!(order.len(), k, "the dismantling payments' precedence is acyclic (Theorems 2 and 5)");
+    assert_eq!(order.len(), k, "the dismantling payments' precedence is acyclic (P4 and P7)");
     Some(order)
 }
 
@@ -247,7 +247,7 @@ mod tests {
             assert_eq!(board.replay(&play_order(&board, &set).unwrap()), Ok(*score), "n={n}");
         }
         let board = Board::new(39, &spf);
-        assert_eq!(payments(&board, &[22, 26, 33, 39]), None, "the self-covering core of THEORY.md");
+        assert_eq!(payments(&board, &[22, 26, 33, 39]), None, "the self-covering core (P7)");
     }
 
     /// The incremental matching numbers equal the unit-weight Franklín–Moniot bound solved afresh on each board.

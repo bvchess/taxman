@@ -15,8 +15,8 @@
 //!
 //! * winnability only gets harder as moves are added and factors removed, so the frames with all of `S` applied
 //!   are winnable exactly when every frame along the way is;
-//! * reducing never changes whether a frame is winnable, now or after further edits (the reduction lemma in
-//!   [`super::peel`]);
+//! * reducing never changes whether a frame is winnable, now or after further edits (the reduction lemma (F5,
+//!   docs/theory/frame-model.md), stated in [`super::peel`]);
 //! * a member that a reduction took as the paying factor of a move left with only that factor fails both ways: one
 //!   after the other it is no longer a factor of its home frame, and all at once that move is left with no factor.
 //!

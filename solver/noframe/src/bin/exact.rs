@@ -6,25 +6,25 @@
 //!           [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]
 //!           [--optimal FILE] [--results FILE] --out FILE
 //!
-//! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot
-//! bound and the parity bound (THEORY.md, Theorem 10; `parity.rs`) are computed at the root; the ceiling
-//! opt(n) <= n + opt(n−1) and, for a prime n, the prime formula opt(n) <= n + opt(n−1) − p are noted; and unless one
-//! of them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether any playable set beats
-//! V(n), with the parity bound at every node (`--parity 0`: the Franklín–Moniot bound alone, as the searches of
-//! `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked out by
+//! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot bound and
+//! the parity bound (W1, docs/theory/parity-bound.md; `parity.rs`) are computed at the root; the
+//! ceiling opt(n) <= n + opt(n−1) and, for a prime n, the prime formula opt(n) <= n + opt(n−1) − p are noted; and
+//! unless one of them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether any playable
+//! set beats V(n), with the parity bound at every node (`--parity 0`: the Franklín–Moniot bound alone, as the searches
+//! of `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked out by
 //! `tools/summarize.py exact` from the file.
 //!
-//! The roles of Theorem B (`--fix-low 1`, the default; `--fix-low 0` starts from the plain root, as the committed
-//! files `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below,
-//! the largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the other numbers of
+//! The roles of F3 (`--fix-low 1`, the default; `--fix-low 0` starts from the plain root, as the committed files
+//! `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below, the
+//! largest prime forced and every other prime barred, the sources of layer 2 in U\* forced and the other numbers of
 //! layer 2 above n/2 barred, and, on a board whose frames of layer 2 are closed (the function decides it from the
-//! board's own U\*, not from n), every number of layer 2 up to n/2 barred.  THEORY.md's Theorem B says every
-//! optimal set obeys them, so a search from them that proves "no playable set obeying them beats V" still proves
-//! opt(n) <= V (an optimal set beating V would obey them), and its line is written `"proven"` like any other.  The
-//! recorded game must obey them (checked).  The sources of layer 3 and up stay free.  Against the plain root it takes
-//! half the time a node (the parity solves have fewer free elements) at the plain search's nodes within a few percent
-//! (1575 and 1584).  Because the proof rests on Theorem B besides the other theorems, every line records `"fix_low"`,
-//! 1 or 0, and with it `fixed_bound`, the parity bound at the roles searched from.
+//! board's own U\*, not from n), every number of layer 2 up to n/2 barred.  The bottom-layers theorem (F3,
+//! docs/theory/frame-model.md) says every optimal set obeys them, so a search from them that proves "no playable set
+//! obeying them beats V" still proves opt(n) <= V (an optimal set beating V would obey them), and its line is written
+//! `"proven"` like any other.  The recorded game must obey them (checked).  The sources of layer 3 and up stay free.
+//! Against the plain root it takes half the time a node (the parity solves have fewer free elements) at the plain
+//! search's nodes within a few percent (1575 and 1584).  Because the proof rests on F3 besides the other theorems,
+//! every line records `"fix_low"`, 1 or 0, and with it `fixed_bound`, the parity bound at the roles searched from.
 //!
 //! A search still running at `--seconds` pauses and saves its open subtrees and nogoods to a checkpoint in
 //! `DIR` (default `work/checkpoints`); the next run resumes it, so a game may take any number of runs.  A search of
@@ -37,16 +37,16 @@
 //! checkpoint of such a run); its `"nodes"` count all of them.
 //!
 //! What the sources of layer 3 and up cost (E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole upper
-//! part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem on
-//! the whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open U of
-//! THEORY.md), so a finished search of that kind is written `"search":"upper_fixed"` and no tool counts it as a
-//! proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a real game whatever
-//! the roles, so a search that finds one stops with an error in every mode.  Two counters show where B spends on the
-//! sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the nodes that
-//! branched on a set holding a free source of layer 3 or up, and `barred_upper`, the nodes whose roles, as the node
-//! received them, bar a member of U\*_{>=3} (`game::Prover::watch`; they change nothing in the search).  `fm_bound`,
-//! `parity_bound` and the choice of the games to search stay the whole board's.  `tools/summarize.py sources`
-//! compares B with D.
+//! part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem on the
+//! whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open statement U
+//! of docs/theory/exactness.md), so a finished search of that kind is written `"search":"upper_fixed"` and no tool
+//! counts it as a proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a real
+//! game whatever the roles, so a search that finds one stops with an error in every mode.  Two counters show where B
+//! spends on the sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the
+//! nodes that branched on a set holding a free source of layer 3 or up, and `barred_upper`, the nodes whose roles, as
+//! the node received them, bar a member of U\*_{>=3} (`game::Prover::watch`; they change nothing in the search).
+//! `fm_bound`, `parity_bound` and the choice of the games to search stay the whole board's.  `tools/summarize.py
+//! sources` compares B with D.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -150,7 +150,7 @@ fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget) = (1usize, f64::INFINITY, u64::MAX);
     let (mut all, mut parity, mut segments, mut lagrangian) = (false, true, false, None);
-    // The roles of Theorem B are the default; --fix-low 0 starts from the plain root.
+    // The roles of F3 are the default; --fix-low 0 starts from the plain root.
     let (mut fix_low, mut fix_upper) = (true, false);
     let mut optimal = root.join("../../results/optimal.json");
     let mut results = root.join("../../results/strict.jsonl");
@@ -175,7 +175,7 @@ fn main() {
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
-    assert!(fix_low || !fix_upper, "--fix-upper needs the roles of Theorem B (--fix-low 1, the default)");
+    assert!(fix_low || !fix_upper, "--fix-upper needs the roles of F3 (--fix-low 1, the default)");
     // A search of one kind never resumes another's.
     let kind = if fix_upper {
         "_upper"
@@ -217,7 +217,7 @@ fn main() {
                 panic!("n={n}: the root's parity bound is not certified")
             };
             assert!(root_bound.value >= *score as i64, "n={n}: the parity bound is below a legal game's {score}");
-            // The recorded game's moves are independent in both parity matroids (Theorem 10).
+            // The recorded game's moves are independent in both parity matroids (W1).
             moves.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             let independent = parity_at(&roles);
             assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded game is dependent");
@@ -229,7 +229,7 @@ fn main() {
         let skip = bounded || (relation != "none" && !all);
         // U* fixes the roles and names the numbers the counters watch; a game that is left alone needs neither.
         let ustar = if fix_low || !skip { recorded_ustar(n, moves, &spf) } else { Vec::new() };
-        // The roles the search starts from (those of Theorem B unless --fix-low 0 says the plain root): the recorded
+        // The roles the search starts from (those of F3 unless --fix-low 0 says the plain root): the recorded
         // game obeys them, so their parity bound is at least its score.
         let unit = if fix_upper {
             upper_fixed_roles(n as u32, &spf, &ustar)

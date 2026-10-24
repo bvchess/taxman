@@ -7,12 +7,12 @@
     summarize.py span FILE...     the (♦) span campaign: games, rejections, spanned, violations, by range
     summarize.py star FILE...     the threshold-by-threshold (★) campaign: thresholds and components by method
     summarize.py exact FILE...    the proofs of optimal scores (a later file overrides), and how many searches start
-                                  from the roles of Theorem B (`fix_low` 1, which `exact` does unless told not to)
+                                  from the roles of F3 (`fix_low` 1, which `exact` does unless told not to)
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
     summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost [--band N] FILE...  its cost curve: the searches made with the parity bound from scratch, by band
     summarize.py sources B_FILE D_FILE  E6: the search with the sources of layer 3 and up free (exact, from the roles
-                                  of Theorem B) against the same search with the whole upper part fixed to U*
+                                  of F3) against the same search with the whole upper part fixed to U*
                                   (--fix-upper 1)
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
@@ -92,7 +92,8 @@ def exact_proofs(rows):
 
     Only `"search":"proven"` counts as a proof.  A line with `"search":"upper_fixed"` (`exact --fix-upper 1`, the
     frame model's problem with the whole upper part fixed to U*) is a measurement and never a proof.  A search with
-    `fix_low` 1 started from the roles of Theorem B, so its proof rests on that theorem too (`on_theorem_b`)."""
+    `fix_low` 1 started from the roles of F3 (the bottom-layers theorem, docs/theory/frame-model.md), so its proof
+    rests on that theorem too (`on_theorem_b`)."""
     proven = {1: True}
     how = Counter()
     first_gap = None
@@ -118,7 +119,7 @@ def exact_proofs(rows):
 
 def on_theorem_b(rows):
     """What the proofs of `rows` rest on beyond the model-independent bounds: the number of searches among them that
-    started from the roles of Theorem B (`fix_low` 1), and the number of all searches that proved."""
+    started from the roles of F3 (`fix_low` 1), and the number of all searches that proved."""
     searches = [r for r in rows.values() if r["search"] == "proven"]
     return sum(1 for r in searches if r.get("fix_low")), len(searches)
 
@@ -134,7 +135,7 @@ def exact(paths):
     print(f"games recorded: {len(rows)} ({done[0]}..{done[-1]}); proven: {sum(proven.values()) - 1}; "
           f"by {dict(how)}")
     from_b, searches = on_theorem_b(rows)
-    print(f"searches that proved: {searches}, of them {from_b} from the roles of Theorem B (fix_low)")
+    print(f"searches that proved: {searches}, of them {from_b} from the roles of F3 (fix_low)")
     print(f"every n in 2..{(first_gap or max(rows) + 1) - 1} proven; first unproven: {first_gap}")
     if first_gap:
         beyond = [n for n in range(first_gap, max(rows) + 1) if proven.get(n)]
@@ -157,7 +158,7 @@ def exact_cost(args):
     """cost [--band N] FILE...: the cost curve of the searches made with the parity bound from scratch (no nodes
     without it), by band of n (50 wide unless N says): how many, nodes and seconds, milliseconds a node (total seconds
     over total nodes), the root's parity gap; and the least-squares slopes of log10 nodes and seconds.  Lines with
-    `fix_upper` (measurements of the frame model's problem) are ignored.  A search from the roles of Theorem B
+    `fix_upper` (measurements of the frame model's problem) are ignored.  A search from the roles of F3
     (`fix_low` 1) takes about half the time a node of the plain root's: do not mix them in one table."""
     import math
     import statistics
@@ -211,7 +212,7 @@ E6_BRANCHING = 0.05  # B's nodes branching on a source of layer 3 or up at most 
 
 def exact_sources(args):
     """sources B_FILE D_FILE: E6, what the sources of layer 3 and up cost.  B_FILE holds the searches from the roles of
-    Theorem B (`exact`, whose default is `--fix-low 1`: `fix_low` 1, no `fix_upper`, `"search":"proven"`, so each is
+    F3 (`exact`, whose default is `--fix-low 1`: `fix_low` 1, no `fix_upper`, `"search":"proven"`, so each is
     a proof of opt(n) <= V with the sources of layer 3 and up free); D_FILE the same searches with the whole upper
     part fixed to U* (`--fix-upper 1`: `fix_upper` 1, `"search":"upper_fixed"`, which is the frame model's problem on
     the whole board and proves nothing).  For each game with a finished search in both files, a row: n, the root's
@@ -564,7 +565,7 @@ def exact_check(args):
     print(f"without a line: {compact_ranges(missing) or 'none'}; score not the recorded optimum: "
           f"{compact_ranges(wrong) or 'none'}; not proven in 2..{hi}: {compact_ranges(unproven) or 'none'}")
     from_b, searches = on_theorem_b({n: r for n, r in rows.items() if n <= hi})
-    print(f"searches that proved: {searches}, of them {from_b} from the roles of Theorem B (fix_low)")
+    print(f"searches that proved: {searches}, of them {from_b} from the roles of F3 (fix_low)")
     ok = not (missing or wrong or unproven)
     print(f"{'OK: opt(n) is proven equal to the recorded score for every n in 2..' + str(hi) if ok else 'FAILED'}")
     sys.exit(0 if ok else 1)

@@ -32,10 +32,10 @@ pub mod cut {
     pub const LAGRANGE: usize = 6;
     /// The GF(2) bound (tactic `gf2`).
     pub const GF2: usize = 7;
-    /// A symmetric pair's inequality: no completion keeps it (tactic `symmetry`, Theorem 13).
+    /// A symmetric pair's inequality: no completion keeps it (tactic `symmetry`, the prime-exchange theorem R2).
     pub const SYMMETRY: usize = 8;
     /// The near-repeat cut: every completion is a promotion set of a game proven before, whose bound the incumbent
-    /// reaches (tactic `near_repeat`, Lemma R).
+    /// reaches (tactic `near_repeat`, the near-repeat lemma R7).
     pub const NEAR_REPEAT: usize = 9;
     pub const COUNT: usize = 10;
     pub const NAMES: [&str; COUNT] =

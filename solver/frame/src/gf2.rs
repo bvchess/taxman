@@ -1,7 +1,7 @@
 //! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from two linear
 //! matroids over GF(2) in which every promotable set is independent (tactic `gf2`).  It is never above the matching
-//! bound ([`crate::matchbound`]) and usually far below it; `docs/THEORY.md`, Theorem 11, has the proof, and
-//! `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
+//! bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2, `docs/theory/frame-bounds.md`) has the
+//! proof, and `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
 //! `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md`, the measurements.
 //!
 //! # The matroids
@@ -11,13 +11,14 @@
 //! among them ([`FactorProvider::factors`](crate::model::FactorProvider::factors)), and each candidate `y` of home
 //! `h` the unit vector `e_y`.  If a set `Q` of candidates can be promoted, then in every frame the vectors of its
 //! moves, of `Q`'s members promoted into it and the unit vectors of `Q`'s members promoted out of it are linearly
-//! independent (Theorem 11: a winnable frame peels completely, each mover dropped with a live factor no mover still
-//! there has).  The moves of a frame are fixed, so the frame's condition is a linear matroid on the candidates that
-//! touch it: their vectors reduced modulo the span of the moves (contraction), in the quotient's coordinates, whose
-//! number is the frame's freedoms.  A candidate touches its home frame and the one in front of it, one of even index
-//! and one of odd, so the even frames' matroids are the blocks of one matroid `A` on the candidates and the odd frames'
-//! of another, `B`.  Every promotable set is independent in both, and the heaviest common independent set (weighted
-//! matroid intersection, [`meet`]) bounds the best completion, with at most `max_add` members.
+//! independent (the signed frame theorem (B1, `docs/theory/frame-bounds.md`): a winnable frame peels completely, each
+//! mover dropped with a live factor no mover still there has).  The moves of a frame are fixed, so the frame's
+//! condition is a linear matroid on the candidates that touch it: their vectors reduced modulo the span of the moves
+//! (contraction), in the quotient's coordinates, whose number is the frame's freedoms.  A candidate touches its home
+//! frame and the one in front of it, one of even index and one of odd, so the even frames' matroids are the blocks of
+//! one matroid `A` on the candidates and the odd frames' of another, `B`.  Every promotable set is independent in both,
+//! and the heaviest common independent set (weighted matroid intersection, [`meet`]) bounds the best completion, with
+//! at most `max_add` members.
 //!
 //! [`Gf2Graph`] builds the root's matroids once per search; [`Gf2Bound`] keeps one level per node on the search's
 //! path, like [`MatchBound`](crate::matchbound::MatchBound).
@@ -25,14 +26,14 @@
 //! # One-sided candidates
 //!
 //! In the extended problem ([`crate::frames::build_extended`]) a one-sided candidate `s` of frame `j` is a mover of
-//! frame `j` and touches no other frame (docs/THEORY.md, Theorem 11 for the extended problem).  So its element
-//! has the vector of its maximal factors in the matroid of frame `j`, and in the other matroid it is a *coloop*: it
-//! constrains nothing there.  The coloops of a matroid are put in *free blocks* after its frames' blocks, each element
-//! its own unit vector, at most `64·words` of them a block, so that a game with hundreds of one-sided candidates needs
-//! no wider vectors than its frames do.  A free block is no frame: nothing reads a frame from a block index (the frames'
-//! ranks are [`Gf2Graph::ranks`], the free blocks have none), and the intersection ([`meet`]) knows only blocks.
-//! Contracting by a coloop clears its own coordinate, which no other element has.  Without one-sided candidates there
-//! are no free blocks, and the matroids are those above.
+//! frame `j` and touches no other frame (the frame bound for the extended problem (B3), docs/theory/frame-bounds.md).
+//! So its element has the vector of its maximal factors in the matroid of frame `j`, and in the other matroid it is a
+//! *coloop*: it constrains nothing there.  The coloops of a matroid are put in *free blocks* after its frames' blocks,
+//! each element its own unit vector, at most `64·words` of them a block, so that a game with hundreds of one-sided
+//! candidates needs no wider vectors than its frames do.  A free block is no frame: nothing reads a frame from a block
+//! index (the frames' ranks are [`Gf2Graph::ranks`], the free blocks have none), and the intersection ([`meet`]) knows
+//! only blocks.  Contracting by a coloop clears its own coordinate, which no other element has.  Without one-sided
+//! candidates there are no free blocks, and the matroids are those above.
 //!
 //! # Contraction along the path
 //!

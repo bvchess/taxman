@@ -1,8 +1,9 @@
 //! The two GF(2) frame matroids of a state, in the form the multi-field bound reads them (`dw::Ctx` hands their vectors
 //! to the crate's intersection, `taxman::gf2::meet`): the blocks of the even frames' matroid `A` and of the odd frames'
 //! matroid `B`, on the candidates of a state.  They are the matroids of `taxman::gf2::Gf2Graph` (src/gf2.rs has the
-//! claim that every promotable set is independent in both, and its proof is THEORY.md, Theorem 11), built here as plain
-//! vectors so that the study can read them; the crate's graph keeps its own.
+//! claim that every promotable set is independent in both, and its proof is the frame bound (B2,
+//! docs/theory/frame-bounds.md)), built here as plain vectors so that the study can read them; the crate's graph keeps
+//! its own.
 
 use taxman::bits::Bits;
 use taxman::model::{FrameGraph, FrameSet};

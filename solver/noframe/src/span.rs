@@ -1,4 +1,5 @@
-//! The span check (♦): is every rejection of descending greedy a linear dependency over GF(2)?
+//! The span check (♦, the span conjecture S5 of docs/theory/sources.md): is every rejection of descending greedy a
+//! linear dependency over GF(2)?
 //!
 //! Give each member its incidence vector over GF(2) (a 1 at each of its factors).  A playable set's vectors are
 //! independent ([`crate::bounds`], the rank bound), so for every truncation K_{≥t} of the instance no
@@ -6,18 +7,18 @@
 //!
 //! > **(♦)** whenever descending greedy rejects x, x's vector is a sum of vectors of members greedy kept above x.
 //!
-//! Then greedy's kept members above any threshold t are independent (they are playable) and span every member
-//! above t (the kept ones trivially, the rejected ones by (♦)), so they are a basis of K_{≥t}: greedy keeps
-//! rank(K_{≥t}) members, the most any playable subset can have.  That is (★) for every component and every
-//! truncation at once, and with it the upper-half optimality conjecture for every weighting consistent with
-//! the order (greedy on a matroid).  (♦) is checked here exactly, one game at a time.
+//! Then greedy's kept members above any threshold t are independent (they are playable) and span every member above t
+//! (the kept ones trivially, the rejected ones by (♦)), so they are a basis of K_{≥t}: greedy keeps rank(K_{≥t})
+//! members, the most any playable subset can have.  That is (★) for every component and every truncation at once (the
+//! span theorem, S6), and with it the sources conjecture (S1) for every weighting consistent with the order (greedy on
+//! a matroid).  (♦) is checked here exactly, one game at a time.
 //!
-//! The run is greedy itself, with linear algebra doing most of the playability work: a member with a factor
-//! that no kept member lists is kept (the extension lemma); a member whose vector the kept ones span is rejected
-//! (a dependent set is unplayable); only the rest need a peel, and a rejection among them is a violation of
-//! (♦), reported for the threshold-by-threshold check of [`crate::star`].  Everything runs on the components of
-//! the residual, where all cores and all linear dependencies live (a set whose vectors sum to zero lists every
-//! factor an even number of times, so it is self-covering).
+//! The run is greedy itself, with linear algebra doing most of the playability work: a member with a factor that no
+//! kept member lists is kept (the extension lemma, P6, docs/theory/playability.md); a member whose vector the kept ones
+//! span is rejected (a dependent set is unplayable); only the rest need a peel, and a rejection among them is a
+//! violation of (♦), reported for the threshold-by-threshold check of [`crate::star`].  Everything runs on the
+//! components of the residual, where all cores and all linear dependencies live (a set whose vectors sum to zero lists
+//! every factor an even number of times, so it is self-covering).
 
 use crate::bounds::Gf2Basis;
 use crate::instance::Instance;

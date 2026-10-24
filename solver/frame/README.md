@@ -57,8 +57,8 @@ to its glossary entry.
    [factor](../../docs/GLOSSARY.md#the-frame-model), which serves as tax and sometimes as a move.
 2. **Maximal factors are enough.**  A move needs only one of its [maximal factors](../../docs/GLOSSARY.md#the-game) to
    be still in the pot, and that factor pays for it, whatever else the taxman takes with the move.  This is the [lifting
-   argument](../../docs/GLOSSARY.md#the-game) of [src/numtheory.rs](src/numtheory.rs), which
-   [THEORY.md](../../docs/THEORY.md) proves as Theorem 1.
+   argument](../../docs/GLOSSARY.md#the-game) of [src/numtheory.rs](src/numtheory.rs), which [the lifting lemma
+   (P1)](../../docs/theory/playability.md#the-lifting-lemma) proves.
 3. **Frames.**  Sources that share a factor form a [frame](../../docs/GLOSSARY.md#the-frame-model), with the factors
    that can pay for them.  Frame X is [in front of](../../docs/GLOSSARY.md#the-frame-model) frame Y, and Y
    [behind](../../docs/GLOSSARY.md#the-frame-model) X, when a number of Y has a maximal factor in X; the frames in front
@@ -77,8 +77,8 @@ to its glossary entry.
 6. **Promotions.**  What a game can still choose is which spare factors to
    [promote](../../docs/GLOSSARY.md#the-frame-model): to play as moves instead of leaving them as tax.  A promotion
    makes a factor of frame h a move of frame h − 1, one frame forward, and both frames must stay winnable.  Nothing
-   further forward is needed, which [docs/theory/frame-model.md](../../docs/theory/frame-model.md)
-   proves.
+   further forward is needed, which [the one-frame-forward lemma
+   (X3)](../../docs/theory/exactness.md#the-exactness-theorem) proves.
 7. **The score.**  A game of the model scores its [`in_the_bag`](../../docs/GLOSSARY.md#the-frame-model) plus the sum of
    its [promotion set](../../docs/GLOSSARY.md#the-frame-model).  So the solver searches for the promotion set with the
    largest sum, [P\*](../../docs/GLOSSARY.md#the-frame-model), by a branch and bound over which
