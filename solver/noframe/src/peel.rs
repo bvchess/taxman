@@ -1,11 +1,10 @@
-//! Dismantling, residuals and playability (docs/theory/decision-procedure.md, "Unplayable sets: cores and the
-//! residual").
+//! Dismantling, residuals and playability (docs/theory/playability.md, "Cores and the residual").
 //!
-//! A set of members is *self-covering* when every factor of every member is listed by another member of the
-//! set.  *Dismantling* repeatedly removes a member holding a factor that no other remaining member lists; its
-//! fixpoint, the *residual*, is the union of all self-covering subsets (Theorem 4), and on a separated instance a
-//! set is playable exactly when its residual is empty (Theorem 5, which with Theorems 1-3 makes it the same test
-//! as peel).  Every instance in this crate is separated.
+//! A set of members is *self-covering* when every factor of every member is listed by another member of the set.
+//! *Dismantling* repeatedly removes a member holding a factor that no other remaining member lists; its fixpoint, the
+//! *residual*, is the union of all self-covering subsets (the residual theorem, P5), and on a separated instance a set
+//! is playable exactly when its residual is empty (the core theorem, P7, which with the playability theorem P2 and the
+//! peel theorem P4 makes it the same test as peel).  Every instance in this crate is separated.
 
 use crate::instance::Instance;
 
@@ -157,12 +156,12 @@ pub fn component_of(inst: &Instance, alive: &[bool], x: u32) -> Vec<u32> {
 }
 
 /// Descending greedy: scan the members in index order and keep each one whose addition leaves the kept set
-/// playable.  Returns the kept flags.  (On the upper-half instance this is `optimize_mini`, and its set is U*.)
+/// playable.  Returns the kept flags.  (On the sources' instance this is `optimize_mini`, and its set is U*.)
 pub fn greedy(inst: &Instance, peeler: &mut Peeler) -> Vec<bool> {
     let mut kept = vec![false; inst.len()];
     let mut listed = vec![0u32; inst.num_factors()];
     for x in 0..inst.len() {
-        // A factor no kept member lists makes x safe (the extension lemma); otherwise dismantle.
+        // A factor no kept member lists makes x safe (the extension lemma, P6); otherwise dismantle.
         let safe = inst.factors[x].iter().any(|&f| listed[f as usize] == 0);
         let accept = safe || {
             kept[x] = true;
@@ -180,7 +179,7 @@ pub fn greedy(inst: &Instance, peeler: &mut Peeler) -> Vec<bool> {
     kept
 }
 
-/// U\* of game n: descending greedy on the upper-half instance (the numbers above n/2), returned in descending order.
+/// U\* of game n: descending greedy on the sources' instance (the numbers above n/2), returned in descending order.
 /// `spf` must reach `n`.
 pub fn u_star(n: u64, spf: &[u32]) -> Vec<u32> {
     let inst = Instance::upper_half(n, spf);

@@ -17,8 +17,8 @@ tactic names, data file fields, golden data keys, `results/strict.jsonl`):
 | free factor count, spare factors | freedoms |
 | feasible (a set of promotions) | promotable |
 | cap, the cap on the promotion sum | the ceiling (`n + score(n − 1)`; as a promotion sum, minus `in_the_bag`); `cap`, `reached_cap`, `prev_cap` stay the names of fields, a proof kind and a tactic |
-| the cap on the number of promotions (`max_total`) | the most promotions the freedoms allow |
-| core (what a peel cannot drop in a frame) | residual |
+| the cap on the number of promotions (`max_total`) | the promotion limit, the most promotions the freedoms allow (`max_total` in the code) |
+| core (what a peel cannot drop in a frame) | residual (what the code's peel, the theory's dismantling, leaves; the theory's *remainder* is what moves of its peel leave) |
 | the evidence crate, `rust/evidence/`, `evidence.sh`; the model-free search, checker, proofs, bound | the prover, `solver/noframe/`, `solver/tools/cloud/prover.sh`; the prover's search and proofs; a bound on the whole board |
 | the matching bound of the model-free search, chain relation, prime relation | the Franklín–Moniot bound, the ceiling, the prime formula |
 | the Rust solver, the exact solver, the main solver | the frame solver ("the solver" for short; the prover stays the prover) |

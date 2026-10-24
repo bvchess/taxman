@@ -159,10 +159,10 @@ impl FrameGraph {
     ///
     /// Each is a conflict, so no completion holds all of it.  With its members alone applied, its frame keeps a stuck
     /// set of moves (each live factor listed by two of them or more), so the frame is not winnable
-    /// (docs/theory/decision-procedure.md, Theorem 3).  A stuck set survives any larger set of promotions, which only
-    /// adds moves and takes away factors (Theorem 4 there), so no set holding the whole conflict leaves the frame
-    /// winnable, and none can be promoted (docs/theory/frame-model.md, Theorem M).  Each is checked by the whole peel,
-    /// apart from the search that made it.
+    /// (the peel theorem (P4), docs/theory/playability.md).  A stuck set survives any larger set of promotions, which
+    /// only adds moves and takes away factors (it stays a core: the residual theorem, P5), so no set holding the whole
+    /// conflict leaves the frame winnable, and none can be promoted (the exactness theorem (X7),
+    /// docs/theory/exactness.md).  Each is checked by the whole peel, apart from the search that made it.
     pub fn conflicts_ordered<const W: usize>(
         &self,
         scratch: &mut Scratch<W>,

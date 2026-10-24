@@ -4,7 +4,7 @@ Part of the [lab notebook](../../README.md).
 
 Started 2026-10-22.
 
-**Question.**  The near-repeat cut ([Lemma R](../../../../docs/theory/ledger.md#the-near-repeat-cut)) carries the
+**Question.**  The near-repeat cut ([Lemma R](../../../../docs/theory/search-rules.md#the-near-repeat-lemma)) carries the
 proof of a proven game M into the search of a later game N, at the nodes whose frames are no harder in M.  How much of
 the chain's search does it reach, which widenings of it are sound and worth building, and which steps can no cut of
 its kind ever reach?
@@ -170,7 +170,7 @@ hold.  And half the line lies in units that hold a set of N that M lacks, which 
 ## The widenings and their proofs
 
 Each widening keeps Lemma R's statement and conclusion and replaces part of its frame condition by a weaker one.  The
-words are those of the [ledger](../../../../docs/theory/ledger.md#the-near-repeat-cut): a node of game N's search has
+words are those of the [ledger](../../../../docs/theory/search-rules.md#the-near-repeat-lemma): a node of game N's search has
 the promotions P and the candidates C; on frame j, C_in are the members of C of home j + 1 (moves the frame may gain)
 and C_out those of home j (factors it may lose); a *mover* of frame j is a move of the frame or a member of C_in.  A
 move *pays with* its maximal factors in the frame, and taking it takes them all.  Each lemma below has been checked at
@@ -238,7 +238,7 @@ home j are factors of N's frame, and with which N's frame is winnable, leaves M'
 home j are factors of M's frame.  Condition 3 is the case where nothing is dropped; Lemma F's drops of free moves are
 drops of the residual.
 
-*Proof.*  A frame is an instance of the [decision procedure](../../../../docs/theory/decision-procedure.md): its movers
+*Proof.*  A frame is an instance of the [decision procedure](../../../../docs/theory/playability.md#the-core-theorem): its movers
 are the members, its factors the pool, and each mover lists the maximal factors it pays with.  The instance is
 separated, since the movers of a frame lie in one layer and their factors one below.  So by Theorem 5 a frame is
 winnable iff no nonempty set of its movers is *self-covering*: every factor that a member of the set pays with is

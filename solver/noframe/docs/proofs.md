@@ -5,23 +5,24 @@ Part of [the prover's README](../README.md).
 The prover proves opt(n) = V(n), the recorded score, for every n ≤ 2175.  `src/game.rs` proves upper bounds on opt(n)
 from proven facts only:
 
-* Theorem 1 with peel: a set of picks is playable iff dismantling the instance of the picks, each listing its maximal
-  factors that are not picks, removes everything;
-* the Franklín–Moniot bound, and the parity bound (THEORY.md, Theorem 10);
+* [the playability theorem (P2)](../../../docs/theory/playability.md#the-playability-theorem) with [the core theorem
+  (P7)](../../../docs/theory/playability.md#the-core-theorem): a set of picks is playable iff dismantling the instance
+  of the picks, each listing its maximal factors that are not picks, removes everything;
+* the Franklín–Moniot bound, and [the parity bound (W1)](../../../docs/theory/parity-bound.md#the-parity-bound);
 * opt(n) ≤ n + opt(n − 1);
 * the prime formula's upper bound: a game playing a prime n plays it first, and swapping it for the largest prime
   below n gives a game of n − 1;
-* in a search that starts from the roles of Theorem B (the default of `exact`; `--fix-low 0` starts from the plain
-  root), THEORY.md's Theorem B.  Every optimal set holds the largest prime and no other, and holds exactly U\*_2 among
-  the sources of layer 2.  On a board whose frames of layer 2 are closed, it holds no number of layer 2 up to n/2.
-  The frames of layer 2 are closed when U\*_2 spans every prime up to n/2, which `src/upper.rs` decides for each board
-  from its own U\*.
+* [the bottom-layers theorem (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem), in a search that
+  starts from its roles (the default of `exact`; `--fix-low 0` starts from the plain root).  Every optimal set holds the
+  largest prime and no other, and holds exactly U\*_2 among the sources of layer 2.  On a board whose frames of layer 2
+  are closed, it holds no number of layer 2 up to n/2.  The frames of layer 2 are closed when U\*_2 spans every prime up
+  to n/2, which `src/upper.rs` decides for each board from its own U\*.
 
 A search from the roles proves that no playable set that obeys them beats V(n).  That proves opt(n) ≤ V(n), because an
 optimal set beating V(n) would obey them.  Its lines say `"fix_low":1`, and the plain root's `"fix_low":0`; the
-committed `data/exact_*.jsonl` are all from the plain root, from before the field, and rest on no Theorem B.
+committed `data/exact_*.jsonl` are all from the plain root, from before the field, and do not rest on F3.
 `tools/summarize.py exact` and `check` count the proofs that rest on it.  Its game (`src/game.rs`) knows nothing of
-frames, greedy, `unzip` or promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of Theorem B
+frames, greedy, `unzip` or promotions; U\* and descending greedy (`src/peel.rs`) enter through the roles of F3
 and the checks of the conjectures.
 
 The search:
@@ -31,8 +32,8 @@ The search:
   the parent's optimal matching and dual, each freed vertex repaired by one Hungarian step.  That made the search 160
   times faster than solving each node from scratch.
 * **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set is
-  independent in two linear matroids over GF(2), split by the parity of Ω (THEORY.md, [the parity
-  matroids](../../../docs/theory/bounds.md#the-parity-matroids-a-bound-on-the-whole-game)).  So at a node, the heaviest
+  independent in two linear matroids over GF(2), split by the parity of Ω ([the parity
+  matroids](../../../docs/theory/parity-bound.md#the-parity-matroids), W1).  So at a node, the heaviest
   set independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
   * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.
   * It is reported only with a weight split that satisfies the local optimality conditions of both matroids, checked
@@ -54,15 +55,15 @@ The search:
 * **Pausing.**  A search still running at the end of a run saves its open subtrees and nogoods, and resumes in the
   next run, depth first.  So a game can take any number of ten-minute runs.
 
-The target is the recorded score V(n).  The search proves that no playable set beats it, or, from the roles of Theorem
-B, none that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
+The target is the recorded score V(n).  The search proves that no playable set beats it, or, from the roles of F3, none
+that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
 
 Every rule above is tested against brute force or against the recorded score.  The search must still reach
-optimal.json's score from one below it, with each rule on, on every seventh game to 420, and from the roles of Theorem
-B on every third game of 187-700 that needs a search.  The parity bound's intersection is checked against enumeration on
+optimal.json's score from one below it, with each rule on, on every seventh game to 420, and from the roles of F3 on
+every third game of 187-700 that needs a search.  The parity bound's intersection is checked against enumeration on
 random pairs of matroids.
 
-**From the roles of Theorem B** (the default since 2026-10; the committed proofs below are from the plain root).  Over
+**From the roles of F3** (the default since 2026-10; the committed proofs below are from the plain root).  Over
 the games of 2..999, the 391 searches took 588,026 nodes and 357 s from the roles, against 614,900 nodes and 712 s from
 the plain root (`data/exact_parity_2_1300.jsonl`).  The nodes are within 5%, and the time of a node is halved, since the
 parity solves have the primes and the numbers of layer 2 settled.  Every game of 2..2175 has the recorded game obey the
@@ -206,14 +207,14 @@ account, the projection game by game, and what the run says about the projection
 
 Past the prover's proofs, the frame solver's answer for a game that rests on its search is opt(n) exactly when U holds
 at n: some optimal set plays U\*_{≥3}, the members of U\* with three or more prime factors
-([THEORY.md](../../../docs/theory/frame-model.md#the-upper-part)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity
+([statement U](../../../docs/theory/exactness.md#statement-u)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity
 bound which of those members every set beating the recorded score V must play.
 
-* It fixes layers 1 and 2 as Theorem B says every optimal set has them: the largest prime and no other; U\*_2 among the
+* It fixes layers 1 and 2 as F3 says every optimal set has them: the largest prime and no other; U\*_2 among the
   sources of layer 2; and, where U\*_2 spans every prime up to n/2, which it decides for each board, no number of layer
   2 up to n/2.
 * It bars one member u at a time, and calls u *certified* when the bound is then at most V.  Every set that beats V
-  and obeys Theorem B then plays u, so if opt(n) > V, every optimal set plays every certified member.
+  and obeys F3 then plays u, so if opt(n) > V, every optimal set plays every certified member.
 * The members it does not certify are *open*, with the bound's margin over V.
 
 Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula, whose
@@ -222,14 +223,14 @@ search of the theory track, which the certificates of U carry out
 ([solver/docs/design/certificates.md](../../docs/design/certificates.md)).  That is why the files are kept: U\* less a
 game's open members is that search's fixed set.
 
-The tests check the certificates against every playable set that obeys Theorem B, on boards to 60 (1,403 checks):
+The tests check the certificates against every playable set that obeys F3, on boards to 60 (1,403 checks):
 
 * the certificates are computed again at each claim T of V − 1, V − 2 and V − 5, and checked against every such set
   worth more than T; a member certified against V says nothing of the sets worth V − 4;
 * a deliberately wrong rule, which certifies a member also when its bound is at most T + 10, is caught by the same
   check (12 false certifications over the boards and claims, 15 (set, member) misses on 12 boards), so that the test
   can see the failure it guards against;
-* Theorem B's roles are checked against every optimal set there and every recorded game to 1300.
+* F3's roles are checked against every optimal set there and every recorded game to 1300.
 
 Four files, each made on one thread of the laptop:
 

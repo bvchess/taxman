@@ -29,8 +29,9 @@
 //!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbors, of the board past or before a prime, and of
-//!   the boards with the same search problem, applied to a fixpoint after every change (docs/theory/ledger.md).  *Given* games (`given`): the completed games of `--proven FILE` (a results
-//!   file) in A − 1..B, each replayed, are fixed points.  `trivial`: a board with nothing to promote.
+//!   the boards with the same search problem, applied to a fixpoint after every change (docs/theory/search-rules.md,
+//!   "Bounds carried between games").  *Given* games (`given`): the completed games of `--proven FILE` (a results file)
+//!   in A − 1..B, each replayed, are fixed points.  `trivial`: a board with nothing to promote.
 //! * **The searches.**  Of a repeat class (the boards whose search problems are equal) only its smallest board is
 //!   searched, and no prime whose board before it the ledger has (the prime formula gives its bounds both ways).  A
 //!   search is `taxman::search::search` on one thread, as `taxman solve` searches: seeded with the best of the games
@@ -42,19 +43,19 @@
 //!   its climbs, and, when `--floor-step` is 0, of every ordinary job.
 //! * **Floor steps** (`cost.rs`; `--floor-step P`, default 150, 0: none).  A search under a floor F
 //!   (`taxman::search::search_above`: an incumbent worth F and no set) that completes having found nothing proves that
-//!   no promotion set weighs more than F (docs/THEORY.md, Lemma F), at a cost that grows about tenfold for every
-//!   147 points the floor is below the root's bound, a line of `log10(nodes)` against the distance for each board.  So
-//!   an open board, unless it is climbed to, is stepped down before its proof: a step is a search under the floor `P`
-//!   points below the board's upper bound (fewer points on a steeper line: the same factor of cost), without seed or
-//!   finder, limited to `--floor-slack` (default 4) times its forecast time (at least `--base`).  If it completes
-//!   having found nothing the floor is U (rule `floor`) and the step is a point of the board's line (its steps of 100
-//!   nodes or more; fewer than two points keep the median slope, none the median line).  If it finds a set above the
-//!   floor the set is a game like any other, offered as L after the referee has replayed it, and if the search
-//!   completes the set is optimal (the board is proven); if the limit stops it with a set, the floor is below L and
-//!   the step is dropped, its checkpoint (a search from that set) becoming the board's own for its proof if the board
-//!   has none.  A step that its limit stops with nothing is *stalled*: kept with its
-//!   checkpoint (DIR/ckpt/nN.floor.ckpt, apart from the ordinary searches'), tried again under the same floor with the
-//!   limit doubled, and dropped if the bounds move to it.  A board whose gap is within two steps goes to its proof.
+//!   no promotion set weighs more than F (the floor lemma (R5, docs/theory/search-rules.md)), at a cost that grows
+//!   about tenfold for every 147 points the floor is below the root's bound, a line of `log10(nodes)` against the
+//!   distance for each board.  So an open board, unless it is climbed to, is stepped down before its proof: a step is a
+//!   search under the floor `P` points below the board's upper bound (fewer points on a steeper line: the same factor
+//!   of cost), without seed or finder, limited to `--floor-slack` (default 4) times its forecast time (at least
+//!   `--base`).  If it completes having found nothing the floor is U (rule `floor`) and the step is a point of the
+//!   board's line (its steps of 100 nodes or more; fewer than two points keep the median slope, none the median line).
+//!   If it finds a set above the floor the set is a game like any other, offered as L after the referee has replayed
+//!   it, and if the search completes the set is optimal (the board is proven); if the limit stops it with a set, the
+//!   floor is below L and the step is dropped, its checkpoint (a search from that set) becoming the board's own for its
+//!   proof if the board has none.  A step that its limit stops with nothing is *stalled*: kept with its checkpoint
+//!   (DIR/ckpt/nN.floor.ckpt, apart from the ordinary searches'), tried again under the same floor with the limit
+//!   doubled, and dropped if the bounds move to it.  A board whose gap is within two steps goes to its proof.
 //! * **The order** (`schedule.rs`): first the map of every board searched, all of them on the workers at once, their
 //!   bounds kept as they come, and when the last is in the relations carry them to the other boards in one go
 //!   (`settle`: a map's cascade through the boards, one map at a time, would make every board many times over);
@@ -78,14 +79,14 @@
 //!   as above (so seeded with the proven game), for `--climb-limit` seconds (default 60; 0: no climbs), resumed from its
 //!   checkpoint if it has one, and not counted among its ordinary searches (its `level` and so its next limit stay).
 //!   If the climb proves the board, the board above it is climbed to next, and so on.  A board with its board *above*
-//!   proven gets a climb *down*, after the climbs up: seeded with that game (the game below it that Lemma L2 makes from
-//!   it is optimal for n − 1 in about 35% of the composite pairs), but with the ledger's ceiling, which is loose
-//!   (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.  `--climb` picks the ways (`up`, `down`,
-//!   `both`, the default, or `off`).  If a climb stops at its limit the board is *parked* (`parked` in the ledger): it
-//!   goes by the ordinary order, with its checkpoint, and the climb from that wedge ends.  Climbs from different wedges
-//!   run side by side.  A board just outside the repeat class of one that is being climbed to waits (no ordinary job of
-//!   it starts), as the climb may prove that board within its limit; the climb into a class is seeded with the games of
-//!   the boards just outside it, the proven one it goes from included.
+//!   proven gets a climb *down*, after the climbs up: seeded with that game (the game below it that the ceiling lemma
+//!   (N4, docs/theory/neighbors.md) makes from it is optimal for n − 1 in about 35% of the composite pairs), but with
+//!   the ledger's ceiling, which is loose (opt(n − 1) <= opt(n)); a proof brings the climb to the board below it.
+//!   `--climb` picks the ways (`up`, `down`, `both`, the default, or `off`).  If a climb stops at its limit the board
+//!   is *parked* (`parked` in the ledger): it goes by the ordinary order, with its checkpoint, and the climb from that
+//!   wedge ends.  Climbs from different wedges run side by side.  A board just outside the repeat class of one that is
+//!   being climbed to waits (no ordinary job of it starts), as the climb may prove that board within its limit; the
+//!   climb into a class is seeded with the games of the boards just outside it, the proven one it goes from included.
 //! * **The finder** (`search/finder.rs`; `--lns-seconds` seconds of one thread, default
 //!   1; 0: none): large neighborhood search, which keeps a random 70-90% of a game's promotions and searches the
 //!   rest exactly, again and again.  It is not sound and proves nothing, but a lower bound needs only a legal game:

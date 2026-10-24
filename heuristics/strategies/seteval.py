@@ -44,8 +44,8 @@ class SetEval:
     candidate pool (`mf`): `owner` maps each candidate factor currently
     spent as tax to the pick holding it, and `match` is the inverse
     restricted to the current picks.  The pool is maximal factors rather
-    than all proper divisors because the lifting lemma makes the two
-    matching-equivalent (verified bit-identical for every n in 1..1000).
+    than all proper divisors because the lifting lemma (P1, docs/theory/playability.md)
+    makes the two matching-equivalent (verified bit-identical for every n in 1..1000).
     `match` is not threaded
     through Kuhn's recursion; it is rebuilt by one dict inversion after
     every committed mutation, which keeps it immune to augmenting-path

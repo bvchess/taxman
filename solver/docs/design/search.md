@@ -72,7 +72,8 @@ far as their remaining edges allow.  The module comment of `matchbound.rs` is th
 
 When the candidates `Q*` of the heaviest matching cannot all be promoted, the matching bound yields a *conflict*: a few
 candidates that cannot be promoted together from the node.  Some frame is unwinnable with all of `Q*`.  A peel of that
-frame stops at its *residual*, the moves that no order can take (THEORY.md's word for where every dismantling ends).
+frame stops at its *residual*, the moves that no order can take, the same set whatever the order of the drops
+([the residual theorem (P5)](../../../docs/theory/playability.md#the-residual-theorem)).
 The members of `Q*` that the residual needs cannot be promoted together: those promoted into the frame that are residual
 moves, and those promoted out of it that are factors of residual moves.  Peeling only the residual makes the set
 minimal, and the result `K ⊆ Q*` is the conflict (`FrameGraph::conflict_using`).  Conflicts are tiny: a median of two
@@ -227,17 +228,19 @@ Lagrangian bound.
 
 *Why the step is exact.*  Exactness rests on six facts:
 
-1. the bound is an upper bound: the GF(2) bound by Theorem 11, the matching bound with refinement, and the Lagrangian
-   bound for any multipliers;
+1. the bound is an upper bound: the GF(2) bound by [the frame bound (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound), the
+   matching bound with refinement, and the Lagrangian bound for any multipliers;
 2. every promotable completion leaves out a member of a conflict, so branching on a member and then going on without
    it explores every promotable set;
 3. every completion that can beat the incumbent promotes the forced members (by weak duality, for the weight split, the
    potentials and the Lagrangian bound alike);
 4. nogoods and known conflicts hold at every node they are applied to, since a subset of a promotable set is
    promotable;
-5. every heaviest promotion set keeps the symmetric pairs' inequalities (Theorem 13), so the completions that the rule
-   leaves out hold none of them;
-6. every completion of a node that the near-repeat cut ends is worth no more than the incumbent (Lemma R).
+5. every heaviest promotion set keeps the symmetric pairs' inequalities
+   ([the prime-exchange theorem (R2)](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)), so the
+   completions that the rule leaves out hold none of them;
+6. every completion of a node that the near-repeat cut ends is worth no more than the incumbent
+   ([the near-repeat lemma (R7)](../../../docs/theory/search-rules.md#the-near-repeat-lemma)).
 
 A node is cut only when its bound is below `need`, since a completion that merely ties the incumbent is of no use, and
 a unit rebuilt from a checkpoint is a node whose bound can only be tighter.  `tests/soundness.rs` attacks each of these
@@ -271,11 +274,12 @@ subtree does not repay the pricing.
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
-applied, its frame keeps a stuck set of moves, so it is not winnable (docs/theory/decision-procedure.md, Theorem 3), and
-a stuck set survives every larger set of promotions (Theorem 4 there), so no completion holding the whole conflict is
-promotable (docs/theory/frame-model.md, Theorem M).  `conflicts_ordered` checks each with the whole peel.  Since it
-only chooses among true conflicts, the tactic may change between a search's units: a checkpoint resumes with it on or
-off, and a lab may switch it while the search runs ([lab.md](lab.md)).
+applied, its frame keeps a stuck set of moves, so it is not winnable ([the peel theorem
+(P4)](../../../docs/theory/playability.md#the-peel-theorem)), and a stuck set survives every larger set of promotions
+(P5), so no completion holding the whole conflict is promotable ([the exactness theorem
+(X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  `conflicts_ordered` checks each with the whole peel.
+Since it only chooses among true conflicts, the tactic may change between a search's units: a checkpoint resumes with
+it on or off, and a lab may switch it while the search runs ([lab.md](lab.md)).
 
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
 default's steps and 0.26 and 0.27 of its CPU; a step costs more than a default one, the excess mostly in the pricing.
@@ -363,8 +367,8 @@ place that knows the path from the tables to the frames, the prepared search, th
 *A floor.*  A search can start instead from a *floor* (`search::search_above`): an incumbent worth a given promotion
 sum, with no set and no start made.  The search prunes nodes against the floor as against a set of that weight, and a
 set it finds heavier becomes the incumbent as usual.  A search that completes with none found has proven that nothing is
-heavier than the floor ([docs/THEORY.md](../../../docs/THEORY.md), Lemma F, the argument of the dual bound of a stopped
-search), which `SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
+heavier than the floor ([the floor lemma (R5)](../../../docs/theory/search-rules.md#the-floor-lemma)), which
+`SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
 the proof's tree, node for node, as a search seeded with an optimal set makes it; above P\* a smaller one, by a factor
 of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
 floor](../../notebook/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).

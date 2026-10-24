@@ -35,8 +35,8 @@ median 1.6 s.  Nothing was prototyped.
   alternating cycle (M. C. Golumbic, T. Hirst and M. Lewenstein, "Uniquely restricted matchings", *Algorithmica* 31
   (2001)).  Graph theory's *acyclic* matchings (the matched vertices induce a forest) are another notion.
 * A *stopping set* of a frame is a nonempty set of movers whose every live factor is listed by two of them or more: the
-  self-covering sets of [decision-procedure.md, "Unplayable sets: cores and the
-  residual"](../../../../docs/theory/decision-procedure.md#unplayable-sets-cores-and-the-residual), named as in the
+  self-covering sets of [playability.md, "Cores and the
+  residual"](../../../../docs/theory/playability.md#cores-and-the-residual), named as in the
   decoding of erasure codes, where the peel is the same procedure.
 * *Treewidth* is measured on the incidence graph, movers and factors as vertices.  Its upper bounds are the widths of
   the elimination orders that min-degree and min-fill choose; its lower bound is the minor-min-width (contract a vertex
@@ -62,16 +62,16 @@ hybrid bound of the bound study) is
 > less the factors L ∩ C₂ has a uniquely restricted matching covering M₀ ∪ (L ∩ C₃).
 
 *Proof that this is the hybrid bound.*  The hybrid bound asks L to be independent in both GF(2) matroids and frame 2 to
-be winnable with L applied.  Winnable implies independent in frame 2's own matroid (Theorem 11, [bounds.md, "The frame
-matroids: a bound on the promotions"](../../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions)),
+be winnable with L applied.  Winnable implies independent in frame 2's own matroid (Theorem 11, [frame-bounds.md, "The frame
+bound"](../../../../docs/theory/frame-bounds.md#the-frame-bound)),
 so dropping that block from A leaves the family unchanged.  A frame is an instance of two ranks: movers above, factors
-below, every cycle flat.  By Theorem 1 and the bridge ([franklin-moniot.md, "Their Theorem 1 is Theorem
-1"](../../../../docs/theory/franklin-moniot.md#their-theorem-1-is-theorem-1)), the frame is winnable exactly when some
+below, every cycle flat.  By Theorem 1 and the bridge ([franklin-moniot.md, "The bridge
+lemma"](../../../../docs/theory/franklin-moniot.md#the-bridge-lemma)), the frame is winnable exactly when some
 payment scheme has no flat alternating cycle, that is when some matching covering the movers is uniquely restricted.
 An alternating cycle passes only through matched vertices, so the factors no mover is paid with play no part: a
 factor promoted out is one the matching may not use, and nothing more.  Equivalently, by Theorem 5
-([decision-procedure.md, "Unplayable sets: cores and the
-residual"](../../../../docs/theory/decision-procedure.md#unplayable-sets-cores-and-the-residual); the frame's instance
+([playability.md, "The core
+theorem"](../../../../docs/theory/playability.md#the-core-theorem); the frame's instance
 is separated), the movers hold no stopping set over F₀ less L ∩ C₂, which the peel decides.  ∎
 
 **Frame 2 alone.**  With the matroids dropped, or priced by Lagrange multipliers as in [the per-frame
@@ -92,8 +92,8 @@ by this family.
 **At the nodes, a square problem.**  At all 49 nodes of the searches the heaviest set fills frame 2's freedoms exactly
 (its members promoted into frame 2 and out of it are as many as the freedoms), so the frame it leaves is closed: a
 square 0/1 matrix, nonsingular over GF(2).  A closed frame is winnable exactly when its matrix has one perfect matching
-(Theorem 12 (3) of [franklin-moniot.md, "One count, three
-conditions"](../../../../docs/theory/franklin-moniot.md#one-count-three-conditions), the payment set being all the
+(Theorem 12 (3) of [franklin-moniot.md, "The counting
+theorem"](../../../../docs/theory/franklin-moniot.md#the-counting-theorem), the payment set being all the
 factors), that is when its rows and columns can be ordered to make it triangular.  The exact problem near the optimum is
 to choose the rows (home 3) and columns (home 2) that make it so.
 

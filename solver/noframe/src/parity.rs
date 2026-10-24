@@ -1,18 +1,18 @@
 //! The parity matroids: an upper bound on opt(n) on the whole board by weighted matroid intersection over GF(2).
 //!
-//! THEORY.md, Theorem 10.  Give every number s of the board 2..=n the vector v(s) over GF(2) with a 1 at each of
-//! its maximal factors (coordinates 1..=n/2), and, when s <= n/2, also the unit vector e_s.  If S is playable, the
-//! vectors {v(s) : s ∈ S} ∪ {e_s : s ∈ S, s <= n/2} are linearly independent: in a legal order each move pays with a
-//! maximal factor still in the pot (the lifting argument of Theorem 1), which no earlier move lists and which is no
-//! pick, so restricted to the coordinates outside S the v(s) are independent (the last-played member of a vanishing
-//! sum has a coordinate no other member of the sum has), and the e_s are exactly the coordinates in S.  A maximal
-//! factor has one prime factor fewer, so v(s) lies in the coordinates whose Ω has the other parity than Ω(s), and
-//! e_s in those of s's own parity.  The coordinates split into the even-Ω and the odd-Ω ones, every number has one
-//! vector in each part (none in its own parity when s > n/2: a coloop there), and a family of vectors each in one
-//! part is independent iff its vectors in each part are.  So every playable set is independent in two linear
-//! matroids on 2..=n, [`Parity`]'s class 0 (even Ω) and class 1 (odd Ω), and the heaviest set independent in both
-//! bounds opt(n).  At a node of a search with forced picks P and barred numbers X, the same holds for the matroids
-//! contracted by P with X deleted: a playable S ⊇ P has S − P independent in both contractions.
+//! The parity bound (W1, docs/theory/parity-bound.md).  Give every number s of the board 2..=n the vector v(s) over
+//! GF(2) with a 1 at each of its maximal factors (coordinates 1..=n/2), and, when s <= n/2, also the unit vector e_s.
+//! If S is playable, the vectors {v(s) : s ∈ S} ∪ {e_s : s ∈ S, s <= n/2} are linearly independent: in a legal order
+//! each move pays with a maximal factor still in the pot (the lifting lemma, P1, docs/theory/playability.md), which no
+//! earlier move lists and which is no pick, so restricted to the coordinates outside S the v(s) are independent (the
+//! last-played member of a vanishing sum has a coordinate no other member of the sum has), and the e_s are exactly the
+//! coordinates in S.  A maximal factor has one prime factor fewer, so v(s) lies in the coordinates whose Ω has the
+//! other parity than Ω(s), and e_s in those of s's own parity.  The coordinates split into the even-Ω and the odd-Ω
+//! ones, every number has one vector in each part (none in its own parity when s > n/2: a coloop there), and a family
+//! of vectors each in one part is independent iff its vectors in each part are.  So every playable set is independent
+//! in two linear matroids on 2..=n, [`Parity`]'s class 0 (even Ω) and class 1 (odd Ω), and the heaviest set independent
+//! in both bounds opt(n).  At a node of a search with forced picks P and barred numbers X, the same holds for the
+//! matroids contracted by P with X deleted: a playable S ⊇ P has S − P independent in both contractions.
 //!
 //! [`Meet`] computes the heaviest common independent set of two linear matroids over GF(2) given by sparse vectors
 //! ([`Pair`]), with forced elements (contracted) and barred ones (deleted), and *certifies* it with a weight split.
@@ -1218,9 +1218,9 @@ mod tests {
         );
     }
 
-    /// Theorem 10 on small boards: every playable set of 2..=n is independent in both parity matroids, so the
-    /// heaviest common independent set is at least opt(n); and with random roles the bound is at least the
-    /// heaviest playable set with those roles, and the intersection is exact against enumeration.
+    /// The parity bound (W1) on small boards: every playable set of 2..=n is independent in both parity matroids, so
+    /// the heaviest common independent set is at least opt(n); and with random roles the bound is at least the heaviest
+    /// playable set with those roles, and the intersection is exact against enumeration.
     #[test]
     fn playable_sets_are_independent_in_both_parity_matroids() {
         let spf = smallest_prime_factors(64);

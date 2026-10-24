@@ -21,7 +21,7 @@ promotion set weighs more than F, and its tree has a gap of the distance from th
 **What was built** (commit 742e88a).  `search::search_above(prepared, cfg, floor, cap, resume)` is the search with a
 virtual incumbent worth `floor` and no start (no greedy set, seed, dive or local search).  `SearchResult::floor_held`
 says that it completed and found none.  With no floor the code path is the old one, and every other test is unchanged.
-[Lemma F](../../../../docs/theory/ledger.md) says that a completed search with a floor that found no set proves
+[Lemma F](../../../../docs/theory/search-rules.md#the-floor-lemma) says that a completed search with a floor that found no set proves
 P\* ≤ F, by the argument of Lemma D.  The tests (`src/search/tests.rs`) cover every game of the Java's that needs a
 search, to 400: a floor below the optimum finds it, a floor at it or above completes with nothing found, and a floor at
 the root's bound or above ends at the first check, also on four threads, on the matching path and without the rule of

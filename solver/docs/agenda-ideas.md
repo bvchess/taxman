@@ -9,7 +9,8 @@ the relevant pages, the others were seen in abstracts.
   zero patterns and sign patterns", Linear and Multilinear Algebra 34 (1993) 3-19 (read): over a field of at least three
   elements, an r × n zero-nonzero pattern has independent rows for every choice of nonzero entries exactly when its
   bipartite graph has a *constrained* r-matching (the only one between its vertex sets: a uniquely restricted matching),
-  and their Example 3.6 shows it fails over GF(2).  With Theorem 12, a set of moves is playable exactly when it is
+  and their Example 3.6 shows it fails over GF(2).  With [the counting theorem
+  (C2)](../../docs/theory/franklin-moniot.md#the-counting-theorem), a set of moves is playable exactly when it is
   independent under every GF(3) signing.  *Transfers:* the completeness of the signed GF(3) family, and its constructive
   proof (column sums made to vanish), which turns each core the search meets into a matroid that sees it (A1, closed).
   The minimum-rank literature (zero forcing bounds the maximum nullity over every field; minimum rank depends on the
@@ -39,7 +40,7 @@ the relevant pages, the others were seen in abstracts.
   ZPP (Mishra, 2011), and fixed-parameter tractable in treewidth in 2^O(tw²) n (Chaudhary, Sau, Zehavi,
   arXiv:2508.12004, 2025).  No integer-programming formulation or polyhedral study of it was found.  *Transfers:* a good
   polynomial bound must use the arithmetic, as GF(2) does; the core inequalities of A1 and the anatomy are new ground;
-  the treewidth recursion could close small residual components exactly after branching.
+  the treewidth recursion could close small components exactly after branching.
 * **Algebraic combinatorics.**  The weak Lefschetz property of monomial ideals in three variables: the multiplication
   map between degrees has a determinant that counts lozenge tilings, and fails in characteristic p when p divides the
   count.  *Transfers:* product formulas for those counts, to predict which primes see the three-prime cores (C2).  Not

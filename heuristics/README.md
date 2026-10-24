@@ -38,9 +38,10 @@ number c, the divisors f for which c/f is prime.
 > member a distinct maximal factor not in S such that the precedence relation "a before b whenever a's assigned factor
 > divides b, or a divides b" is acyclic.  Any topological order of the precedence is a legal game.
 
-Both directions are proven in [THEORY.md](../docs/THEORY.md) — the harder one by the Franklín–Moniot [lifting
-argument](../docs/GLOSSARY.md#the-game) turned inward, whose payoff is that maximal factors are the only factor notion
-the whole project needs.
+Both directions are proven ([the playability theorem (P2)](../docs/theory/playability.md#the-playability-theorem)) — the
+harder one by the Franklín–Moniot [lifting argument](../docs/GLOSSARY.md#the-game) turned inward ([the lifting lemma
+(P1)](../docs/theory/playability.md#the-lifting-lemma)), whose payoff is that maximal factors are the only factor
+notion the whole project needs.
 
 For the upper half alone, the lifting argument gives a hard ceiling: every legal game's upper picks use distinct maximal
 factors from outside, so **no legal game's upper half can outscore M\*, the maximum-weight matchable upper set**, a
@@ -52,9 +53,9 @@ upper-half siblings of the n=21 set.
 
 What is proven is that no game beats M\*.  What is measured (`verify.py`, 1000/1000) is that optimal games' upper halves
 equal U\* exactly.  That no *playable* upper set outweighs U\* is proven wherever the frontier jam is hyperedge-free
-(THEORY.md), certified game by game for every n = 2..100,000 by a GF(2) linear-algebra certificate
-(docs/theory/open-problem.md, "The span certificate (♦)"), and open in general; both the exchange route (n=2873) and the
-single-sacrifice route (n=9170) are provably closed.  `order_for_real_game` turns peel's assignment into a legal order.
+([the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem)), certified game by game for every
+n = 2..100,000 by a GF(2) linear-algebra certificate ([the span conjecture (♦, S5)](../docs/theory/sources.md#the-span-conjecture)),
+and open in general; both the exchange route (n=2873) and the single-sacrifice route (n=9170) are provably closed.  `order_for_real_game` turns peel's assignment into a legal order.
 
 What makes the game hard lies in the *lower* half: an optimal game sometimes skips a larger number to fund two smaller
 ones, and those one-for-two trades cascade through chains of reassignments.
@@ -66,39 +67,43 @@ What is proven, measured or conjectured:
 | opt(n) ≤ n + opt(n−1) | proven (wiki) |
 | no upper half beats M\*, the max-weight *matchable* upper set | proven (lifting: every game's picks pair with distinct factors) |
 | U\* (`solve_upper_half`) equals the optimal game's upper half | measured, 1000/1000 |
-| U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) (docs/theory/uniqueness-and-longest-games.md, "Uniqueness of the optimal set", Theorem 8), so certified for every n ≤ 100,000 |
-| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe/docs/uniqueness.md`) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors (THEORY.md, Theorem B); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, U (docs/theory/frame-model.md), which holds wherever the prover has proven the game ([results/README.md](../results/README.md)) |
+| U\* is the *unique* heaviest playable upper set (every other playable upper set is termwise below it) | theorem given (★) ([the uniqueness theorem (Q1)](../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)), so certified for every n ≤ 100,000 |
+| *every* optimal game, not just the recorded one, has upper part U\* | measured: the prover (`solver/noframe/docs/uniqueness.md`) enumerated every optimal set in every completely enumerated game; open in general.  **Theorem** for the members of U\* with one or two prime factors ([the bottom-layers theorem (F3)](../docs/theory/frame-model.md#the-bottom-layers-theorem)); the frame solver's answers rest on the weaker statement that *some* optimal game plays the rest, [statement U](../docs/theory/exactness.md#statement-u), which holds wherever the prover has proven the game ([results/README.md](../results/README.md)) |
 | the optimal set (not just its upper half) is unique | measured for every n ≤ 424; **false** from 425 on, where some games have two or three optimal sets, differing by equal-sum exchanges below n/2 |
-| optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem (THEORY.md, Theorem 9) |
-| an optimal game plays the most moves any game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than opt(833) (docs/theory/uniqueness-and-longest-games.md, "Longest games").  True of every other game to 1300, the gap never above one (`solver/noframe/docs/longest-games.md`).  The bounds M(n) ≤ ν(n) (a matching certificate) and M(n−1) ≤ M(n) ≤ M(n−1) + 1 are theorems |
-| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free (docs/theory/open-problem.md, "The frontier argument, and exactly where it stops"); the single-sacrifice route is **false** in general (n=9170 witness).  It is **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph (docs/theory/open-problem.md, "The cardinality reformulation") — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it (docs/theory/open-problem.md, "The span certificate (♦)").  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard (THEORY.md) |
-| greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; proof in THEORY.md) |
-| on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem (via the core characterization; verified on 89,400 random subsets) |
-| playability ⟺ maximal-factor matching + acyclic precedence | proven |
-| playable ⟺ residual empty (no self-covering subset), for separated instances (no member is another's maximal factor — automatic above n/2) | **theorem** (docs/theory/decision-procedure.md, "Unplayable sets: cores and the residual", via the extension lemma).  Unrestricted version: 30,000 fuzz trials clean, unproven — and its confinement cousin is **false** there ({2,4,8} witness) |
-| minimal exclusion sets live inside the residual (exclusion confinement) | **theorem** (same section, same separation hypothesis) — grounds the residual-restricted exact searches of the cardinality campaigns (validated 35/35 before the proof existed) |
-| for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 |
-| peel's assignment is always schedulable | **theorem** ("schedulability", proof in THEORY.md): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
-| peel's failure means the set is unplayable | **theorem** ("completeness", proof in THEORY.md) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With schedulability, peel is a proven playability oracle |
+| optimal sets of n from those of n−1: T ∪ {n} at a game at its ceiling (opt(n) = n + opt(n−1)), T − p + n (a bijection) at a prime | theorem ([the step theorem (N6)](../docs/theory/neighbors.md#the-step-theorem)) |
+| an optimal game plays the most moves any game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; the heaviest 363-move game of 833 scores 29 less than opt(833) ([the length proposition (Q4)](../docs/theory/uniqueness-and-longest-games.md#the-length-proposition)).  True of every other game to 1300, the gap never above one (`solver/noframe/docs/longest-games.md`).  The bounds ℓ(n) ≤ ν(n) (a matching certificate) and ℓ(n−1) ≤ ℓ(n) ≤ ℓ(n−1) + 1, with ℓ(n) the most moves of a game of n, are theorems ([the length lemma (Q3)](../docs/theory/uniqueness-and-longest-games.md#the-length-lemma)) |
+| no *playable* upper set outweighs U\* | conjecture — proven wherever the jam is hyperedge-free ([the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem)); the single-sacrifice route is **false** in general (n=9170 witness).  It is **equivalent to a pure cardinality claim** — descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph ([the cardinality conjecture (★, S4)](../docs/theory/sources.md#the-cardinality-conjecture)) — and **implied by a linear-algebra one**, (♦): every greedy rejection is a GF(2) dependency of the members kept above it ([the span conjecture (♦, S5)](../docs/theory/sources.md#the-span-conjecture) and [the span theorem (S6)](../docs/theory/sources.md#the-span-theorem)).  **Certified for every game n = 2..100,000** and 902 sampled games to 2,000,000 by checking (♦) exactly (`solver/noframe`), zero counterexamples; the five components the earlier campaign left undecided are settled.  The full 3-prime padded-jam census (428 shapes, 22,909 trap orderings) closes with **zero unprotected traps**: every trap dies by monomial inversion or a window-forced guard ([what a proof must use](../docs/theory/sources.md#what-a-proof-must-use)) |
+| greedy weight-optimality when the frontier jam has only ≤2-prime members | theorem (unique minimal core: forest + one edge; [the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem)) |
+| on members with ≤ 2 distinct primes, playable = forest in the factor-value graph | theorem ([the two-factor proposition (C3)](../docs/theory/franklin-moniot.md#the-two-factor-proposition), via [the core theorem (P7)](../docs/theory/playability.md#the-core-theorem); verified on 89,400 random subsets) |
+| playability ⟺ maximal-factor matching + acyclic precedence | proven ([the playability theorem (P2)](../docs/theory/playability.md#the-playability-theorem)) |
+| playable ⟺ residual empty (no self-covering subset); for a set of numbers, the residual of its own instance | **theorem**, with no separation hypothesis ([the core theorem (P7)](../docs/theory/playability.md#the-core-theorem), via [the extension lemma (P6)](../docs/theory/playability.md#the-extension-lemma)).  Earlier, the unrestricted version was only fuzz-tested (30,000 trials clean) |
+| minimal exclusion sets live inside the residual (exclusion confinement) | **theorem** for every instance, and for sets of numbers that are separated (no member is another's maximal factor — automatic above n/2) ([the exclusion theorem (P8)](../docs/theory/playability.md#the-exclusion-theorem)); **false** for sets of numbers that are not separated ({2,4,8} witness) — grounds the residual-restricted exact searches of the cardinality campaigns (validated 35/35 before the proof existed) |
+| for prime n: opt(n) = n + opt(n−1) − (largest prime < n) | proven, verified 167/167 ([the prime formula (N5)](../docs/theory/neighbors.md#the-prime-formula)) |
+| peel's assignment is always schedulable | **theorem** (the soundness half of [the peel theorem (P4)](../docs/theory/playability.md#the-peel-theorem)): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
+| peel's failure means the set is unplayable | **theorem** (the completeness half of P4) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With soundness, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, the parity bound (THEORY.md, Theorem 10), the ceiling and the prime formula |
+| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
 
 ### The proofs
 
-The proofs are in [THEORY.md](../docs/THEORY.md), which the table cites:
+The proofs are in the [theory](../docs/THEORY.md), which the table cites:
 
-* the **playability characterization** (lifting: maximal factors suffice);
-* the **schedulability theorem** (peel's assignments can always be scheduled, so the ordering step never fails) and the
-  **completeness theorem** (a peel refusal proves the set unplayable), which together make acceptance a proven decision
-  procedure for playability;
-* the **core/forest characterization** (playable ⟺ core-free; on ≤2-prime members, playable ⟺ forest), with the
-  n=2873 gadget where the exchange property fails;
-* the **frontier argument**, which proves greedy weight-optimal wherever the jam is hyperedge-free, and pins the
-  remaining open problem to its first hard witness at n=9170;
-* the **cardinality reformulation**, which strips the weights from that open problem: greedy optimality is exactly the
-  claim that descending greedy is maximum-cardinality on every component of the upper-half instance's incidence graph;
-* the **span certificate**, which bounds playable sets by a GF(2) rank and reduces the open problem to one statement of
-  linear algebra, certified in every game to n = 100,000.
+* [the playability theorem (P2)](../docs/theory/playability.md#the-playability-theorem) (lifting: maximal factors
+  suffice);
+* [the peel theorem (P4)](../docs/theory/playability.md#the-peel-theorem): its soundness half says that peel's
+  assignments can always be scheduled, so the ordering step never fails, and its completeness half that a peel refusal
+  proves the set unplayable, which together make acceptance a proven decision procedure for playability;
+* [the core theorem (P7)](../docs/theory/playability.md#the-core-theorem) (playable ⟺ core-free) and [the two-factor
+  proposition (C3)](../docs/theory/franklin-moniot.md#the-two-factor-proposition) (on ≤2-prime members, playable ⟺
+  forest), with the n=2873 gadget where the [exchange property fails](../docs/theory/sources.md#where-exchange-breaks);
+* [the frontier theorem (S3)](../docs/theory/sources.md#the-frontier-theorem), which proves greedy weight-optimal
+  wherever the jam is hyperedge-free, and pins the remaining open problem to its first hard witness at n=9170;
+* [the cardinality conjecture (★, S4)](../docs/theory/sources.md#the-cardinality-conjecture), which strips the weights
+  from that open problem: greedy optimality is exactly the claim that descending greedy is maximum-cardinality on every
+  component of the upper-half instance's incidence graph;
+* [the span conjecture (♦, S5)](../docs/theory/sources.md#the-span-conjecture) and [the span theorem
+  (S6)](../docs/theory/sources.md#the-span-theorem), which bound playable sets by a GF(2) rank and reduce the open
+  problem to one statement of linear algebra, certified in every game to n = 100,000.
 
 ## Solvent: a near-quadratic strategy
 
@@ -348,7 +353,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 
 | file | contents |
 |---|---|
-| [`../docs/THEORY.md`](../docs/THEORY.md) | the proofs: the decision procedure (playability, schedulability, completeness), cores and the residual, the frontier argument, the cardinality reformulation, and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
+| [`../docs/THEORY.md`](../docs/THEORY.md) | the index of the theory's proofs: playability, peel, cores and the residual, the sources conjecture and the frontier theorem, and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
 | `core.py` | shared foundations: `maximal_factors`, the wiki's `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
 | `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |

@@ -131,9 +131,9 @@ pub enum Way {
     /// To the board above: the proven game seeds the search, and the ceiling opt(n) <= opt(n − 1) + n, which the
     /// relations have derived and is exact in about a third of the boards, is its ceiling.
     Up,
-    /// To the board below: the proven game seeds the search (the game below it that Lemma L2 makes, its moves less n
-    /// and then completed, is exactly optimal for n − 1 in about 35% of the composite pairs), and the ceiling is the
-    /// ledger's, which is loose (opt(n − 1) <= opt(n)).
+    /// To the board below: the proven game seeds the search (the game below it that the ceiling lemma (N4,
+    /// docs/theory/neighbors.md) makes, its moves less n and then completed, is exactly optimal for n − 1 in about 35%
+    /// of the composite pairs), and the ceiling is the ledger's, which is loose (opt(n − 1) <= opt(n)).
     Down,
 }
 
@@ -456,8 +456,8 @@ fn attempt_at<const W: usize>(
 /// A floor step: the search under `floor` (`search::search_above`), from the checkpoint in `cfg` if the step was
 /// stopped before and is resumed, else from scratch (an old checkpoint is deleted).  There is no seed and no finder:
 /// the floor is the start, and a set found above it is a game like any other, which the referee replays.  A stopped
-/// step gives no bound (Lemma D would give its dual bound, but the open units of a depth-first search are the root's
-/// and near it).
+/// step gives no bound (the dual-bound lemma (R4, docs/theory/search-rules.md) would give its dual bound, but the open
+/// units of a depth-first search are the root's and near it).
 fn step_at<const W: usize>(
     job: &Job,
     floor: Floor,
@@ -1120,7 +1120,7 @@ impl Scheduler {
         }
         // The upper bound the job proved: a search that reached its ceiling proves its game by the bound that was its
         // ceiling, which stands; a floor step that completed having found nothing proves its floor, and one that
-        // completed having found a set proves that set (Lemma F); a floor step that stopped proves nothing.
+        // completed having found a set proves that set (the floor lemma, R5); a floor step that stopped proves nothing.
         let upper = match done.kind {
             _ if a.reached_cap => None,
             Kind::Floor if a.held => done.floor,

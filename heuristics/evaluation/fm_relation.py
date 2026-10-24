@@ -9,23 +9,23 @@ scheme* of a pick set S pays each member s with a distinct maximal factor of s o
 maximal-factor graph whose upper ends are exactly S.  per(S, T) counts the schemes whose payments are exactly the set
 T, the permanent of S's rows on the columns T.  The section proves
 
-    S is matchable (the relaxation of the F-M upper bound)     iff  per(S, T) >= 1 for some T,
-    S is independent (the lemma of Theorem 10)                 iff  per(S, T) is odd for some T,
-    S is playable (F-M Theorem 1; THEORY.md, Theorem 1)        iff  per(S, T) == 1 for some T,
+    S is matchable (the relaxation of the F-M upper bound)       iff  per(S, T) >= 1 for some T,
+    S is independent (the independence lemma, P10)               iff  per(S, T) is odd for some T,
+    S is playable (F-M Theorem 1; the playability theorem, P2)   iff  per(S, T) == 1 for some T,
 
 so playable => independent => matchable, and an independent set that is not playable is an *odd core*.
 
 * `exhaustive` checks every pick set of the boards up to --max-n.  Playability is decided by the rule alone (some
   order of S is legal); Franklín and Moniot's condition literally (a scheme with no flat alternating cycle in the
-  maximal-factor graph); independence twice (the lemma's family, and the two parity matroids of Theorem 10); and
-  each is compared with the permanents and with `core.peel`.  It also prints, board by board, the heaviest playable,
-  independent and matchable sets: opt(n), the parity bound and the F-M bound.  Below 30 every number has at most two
-  distinct primes, so these boards test the graph-like regime only.
+  maximal-factor graph); independence twice (the independence lemma's family, and the two parity matroids of the
+  parity bound, W1); and each is compared with the permanents and with `core.peel`.  It also prints, board by board,
+  the heaviest playable, independent and matchable sets: opt(n), the parity bound and the F-M bound.  Below 30 every
+  number has at most two distinct primes, so these boards test the graph-like regime only.
 * `sampled` makes the same comparisons on random dense sets of the boards 30..--sample-max, grown around members
   with three or more distinct primes, where the hierarchy is strict.
 * `odd_cores` searches the boards --core-boards for odd cores of at most --core-size members.  Every odd core has a
-  member with three or more distinct primes whose maximal factors are all outside it (THEORY.md), so the search
-  enumerates the sets that have one.  The section proves that no board below 45 has an odd core.
+  member with three or more distinct primes whose maximal factors are all outside it (the two-factor proposition,
+  C3), so the search enumerates the sets that have one.  The section proves that no board below 45 has an odd core.
 * `example` works the n = 21 sets in both languages.
 
 The run of the section (a few minutes):
@@ -201,14 +201,14 @@ def gf2_independent(vectors: Iterable[int]) -> bool:
 
 
 def lemma_independent(board: Board, picks: Iterable[int]) -> bool:
-    """The family of Theorem 10's lemma: v(s) for every pick, e_s for every pick s <= n/2."""
+    """The family of the independence lemma (P10): v(s) for every pick, e_s for every pick s <= n/2."""
     picks = list(picks)
     family = [mask_of(board.mf[s]) for s in picks] + [1 << s for s in picks if s <= board.half]
     return gf2_independent(family)
 
 
 def parity_independent(board: Board, picks: Iterable[int]) -> bool:
-    """Independence in both of Theorem 10's matroids M_0 and M_1 (a coloop is independent of everything)."""
+    """Independence in both parity matroids M_0 and M_1 (W1) (a coloop is independent of everything)."""
     picks = list(picks)
     for q in (0, 1):
         rows = [mask_of(board.mf[s]) if board.omega[s] % 2 != q else 1 << s
@@ -235,7 +235,7 @@ class Verdict(NamedTuple):
     fm: bool  # a payment scheme with no flat alternating cycle (F-M Theorem 1's condition)
     unique: bool  # per(S, T) == 1 for some T
     peel: bool  # core.peel accepts
-    independent: bool  # the family of Theorem 10's lemma
+    independent: bool  # the family of the independence lemma (P10)
     odd: bool  # per(S, T) odd for some T
     parity: bool  # independent in both parity matroids
     matchable: bool  # some payment scheme

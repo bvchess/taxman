@@ -17,7 +17,7 @@ support, about 3200 at the steepest measured.
 ## Method
 
 **What was built** (commits 679635b to 7af8b0e; [the GF(2) bound](../../../docs/design/gf2-bound.md) describes the code
-as it stands, and [the frame matroids](../../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions)
+as it stands, and [the frame matroids](../../../../docs/theory/frame-bounds.md#the-frame-bound)
 give the proof, Theorem 11):
 
 * `gf2::Gf2Graph` holds the root's two matroids (the even and the odd frames' quotients by their moves, 1 to 3 words a

@@ -18,8 +18,9 @@ in phases (solver/docs/runbook/certify.md):
              to the lightest list so far, certify_plan.spread), each list in increasing n: four processes of a
              quarter of the threads each.
   deferred   phase C.  The repeats of a search that the rule cannot settle (proof same_search, no share) with their
-             groups, in increasing n, last: a rule that knows unzip's claims in the extended problem (Lemma M5+) may
-             settle them with no search once it is built, from the certificates of the earlier phases.
+             groups, in increasing n, last: a rule that knows unzip's claims in the extended problem (the kept-claims
+             lemma, E2, docs/theory/extended-problem.md) may settle them with no search once it is built, from the
+             certificates of the earlier phases.
 
 No game is in two lists, every game that needs a certificate is in one, and a game that shares has the game it shares
 with earlier in the same list (`check` verifies all three of any directory of lists).

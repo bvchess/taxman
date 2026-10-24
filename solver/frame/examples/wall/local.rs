@@ -3,12 +3,12 @@
 //! solver/notebook/search/a-bound-exact-in-a-few-frames-2026-10/README.md, whose `analyze.py` reads the lines.
 //!
 //! A set of candidates can be promoted exactly when every frame stays winnable with its part of the set applied
-//! (Theorem M, docs/theory/frame-model.md), and the GF(2) bound relaxes each frame's winnability to the independence of
-//! its vectors (Theorem 11, docs/theory/bounds.md).  The *hybrid bound* of a node that checks the frames `F` is the
-//! heaviest completion that is independent in both frame matroids and leaves every frame of `F` winnable.  Every
-//! promotion set is such a set, so it is an upper bound on the node's completions, never above the GF(2) bound, and
-//! with every frame checked it is the node's best completion.  It is what any bound exact in the frames `F`, and
-//! GF(2) elsewhere, can reach at most.  It is computed by the search itself on a relaxed model
+//! (the exactness theorem (X7), docs/theory/exactness.md), and the GF(2) bound relaxes each frame's winnability to the
+//! independence of its vectors (the frame bound (B2), docs/theory/frame-bounds.md).  The *hybrid bound* of a node that
+//! checks the frames `F` is the heaviest completion that is independent in both frame matroids and leaves every frame
+//! of `F` winnable.  Every promotion set is such a set, so it is an upper bound on the node's completions, never above
+//! the GF(2) bound, and with every frame checked it is the node's best completion.  It is what any bound exact in the
+//! frames `F`, and GF(2) elsewhere, can reach at most.  It is computed by the search itself on a relaxed model
 //! (`FrameGraph::relaxing`: the frames outside `F` are not checked, so the conflicts it branches on are those of `F`)
 //! with the GF(2) bound, from the node, with a known best set (worth P*) as the incumbent and without the rule of
 //! symmetric pairs.  Its best is the hybrid bound if that beats P*; if it does not, the hybrid bound cuts the node.

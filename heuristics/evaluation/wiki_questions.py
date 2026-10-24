@@ -76,7 +76,10 @@ def taxes(n: int, moves: Sequence[int], divs: Sequence[List[int]]) -> Optional[L
 
 
 def playable_order(n: int, selected: Set[int], spf: Sequence[int]) -> Optional[List[int]]:
-    """A legal order of a set of moves on the board 1..n (THEORY.md, Theorems 1-3), or None if none exists."""
+    """A legal order of a set of moves on the board 1..n, or None if none exists.
+
+    The playability theorem (P2) and the peel theorem (P4), docs/theory/playability.md, say when one exists.
+    """
     mf = {c: maximal_factors(c, spf) for c in selected}
     try:
         _, match = peel(selected, set(range(1, n + 1)) - selected, mf)

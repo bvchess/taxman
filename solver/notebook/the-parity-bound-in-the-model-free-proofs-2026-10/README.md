@@ -16,7 +16,7 @@ The matching bound overrates opt(n) by about 1,170 at n = 1000, and games 990, 9
 1023-1027 had spent millions to tens of millions of nodes each without finishing.  The [matroid
 study](../search/matroid-intersection-bounds-2026-10/README.md) found a bound with a tenth of that gap: every playable
 set is independent in two linear matroids over GF(2), split by the parity of the number of prime factors (Theorem 10 of
-THEORY.md, [the parity matroids](../../../docs/theory/bounds.md#the-parity-matroids-a-bound-on-the-whole-game)).  The
+THEORY.md, [the parity matroids](../../../docs/theory/parity-bound.md#the-parity-matroids)).  The
 prover reimplements it from the mathematics, sharing no code with the frame solver or the study.
 
 * **The bound** (`solver/noframe/src/parity.rs`).  It builds the two matroids from the board alone and finds the

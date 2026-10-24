@@ -57,7 +57,7 @@ time limit, appends a line per pair, resumes, summarizes, and exits 2 on a count
 ran it under `run.sh`'s deadline, saves and power-off.  The punctured boards were numbered breadth first, which the
 census did not check on them; that can only hide games from the hunt, never invent one, since every game found is
 refereed.  Numbering by layer, which is clean by construction, made the hunt's model on a punctured board exact given
-the sources setup keeps there (THEORY.md, "Boards with holes").
+the sources setup keeps there (docs/theory/exactness.md, "Boards with holes").
 
 ## Results
 
@@ -212,7 +212,7 @@ launch](../../docs/runbook/launch.md#rules-for-every-launch)).
 ## Files
 
 What the hunt does and what each verdict is worth: the module comment of `examples/hunt.rs` and `sacrifice::hunt`, at
-commit 8753189.  Why: THEORY.md, "The upper part" (U).  The open sources and their margins come from the prover's
+commit 8753189.  Why: docs/theory/exactness.md, "Statement U".  The open sources and their margins come from the prover's
 `upper` (`solver/noframe/data/upper_*.jsonl`).
 
 | file | command | what it is |

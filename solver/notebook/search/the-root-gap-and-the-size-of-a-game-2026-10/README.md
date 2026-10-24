@@ -270,7 +270,7 @@ none in the other pairs.  The idea is dropped.
 build on all 630 solves) writes, at every choice made by `conflict_to_branch_on`, the conflict chosen `k` and the
 search's own `K`, the node's gap, the node's heaviest set, and the steps of the subtree below the call.  A conflict is
 named by the sorted list of its members' numbers: a member is the number promoted, the same number in every game, and a
-candidate keeps its home frame in both games ([Lemma R](../../../../docs/theory/ledger.md#the-near-repeat-cut)), so the
+candidate keeps its home frame in both games ([Lemma R](../../../../docs/theory/search-rules.md#the-near-repeat-lemma)), so the
 list names the same set of moves in n and in n − 1.  The 315 units of the section on the lower gate (14 games, 18 to 24
 units a game) were solved under B (gate 300, `conflict_look` on) and C (gate 150, look on), one thread each, 8 at once,
 with the known games of the chain's file as the near-repeat cut's reference.  The logs hold 125,000 choices (B) and

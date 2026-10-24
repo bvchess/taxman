@@ -1,7 +1,7 @@
 //! The census of the structure of the frames: for each game of a range, how the board's frames sit by the number of
 //! prime factors of their numbers (their *layer*), how they are numbered from the front, what `unzip` claimed, and
-//! whether the hypotheses of the exactness theorem of the frame model (docs/theory/frame-model.md, "The frame model is
-//! exact, given its upper part") hold on the board.  It looks at the frames as setup forms them and at the frames the
+//! whether the hypotheses of the exactness theorem (X7, docs/theory/exactness.md) of the frame model hold on the
+//! board.  It looks at the frames as setup forms them and at the frames the
 //! search takes, built by the very function the solver uses (`taxman::frames::numbering`), and at the model the search
 //! builds from them ([`taxman::model::FrameGraph`]).  It searches nothing.
 //!
@@ -45,7 +45,8 @@
 //!   maximal factor that no other remaining member lists; every member must go).  Item: `{"plain_only": [..],
 //!   "greedy_only": [..]}`, the numbers in one set and not the other.
 //! * **H** (the claims in Π⁺(∅)): the extended problem with nothing open and the claims of `unzip` given
-//!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; docs/theory/extended-problem.md, the paragraph "The claims of `unzip` in Π⁺(O)") is the frame model's problem: it refuses no
+//!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; the formulation corollary
+//!   (E3, docs/theory/extended-problem.md)) is the frame model's problem: it refuses no
 //!   claim, keeps every claim of the search's frames in the order made, has the search's frames and candidates, and
 //!   poses the same search problem
 //!   ([`taxman::search::problem_of_extended`] of its frames and candidates equals [`taxman::search::problem_of`] of
@@ -77,9 +78,9 @@
 //! gives (`taxman::frames::extended_frame_count`; docs/theory/extended-problem.md), and the layers they
 //! span (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
 //!
-//! **Lemma M5⁺'s check.**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if `f` passes the check
-//! ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided candidate has it among its
-//! maximal factors (docs/theory/extended-problem.md, the paragraph "The claims of `unzip` in Π⁺(O)"); a
+//! **The check of the kept-claims lemma (E2).**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if
+//! `f` passes the check ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided
+//! candidate has it among its maximal factors (the kept-claims lemma (E2), docs/theory/extended-problem.md); a
 //! component that fails it for one back claim keeps none of its claims, front claims included; so does one that holds
 //! a source in O.  The candidates of
 //! Π⁺(O) only grow with O, so a back claim fails the check for some O exactly when it fails for the largest O that
@@ -106,7 +107,7 @@
 //! number's frames span several layers, and those whose `layer2_closed` is false; the totals of `claims_pre` and
 //! `claims_numbered`; the boards with back claims that have a composite among the factors; the boards where
 //! `merged_away` was reached, and the totals; the largest `frames`, `numbers`, `max_layer` and `candidates`; the
-//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; for Lemma M5⁺'s check,
+//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; for E2's check,
 //! the boards with back claims at risk (how many, the total of their claims, the first as ranges), the boards beyond
 //! the reach of the check (the fields are `null`), the boards where some O refuses a back claim (as ranges, and the
 //! items of the first 5), and the boards whose lines lack the fields; the seconds, summed over the boards.  The last
@@ -114,11 +115,11 @@
 //!
 //! **Lines from an earlier version.**  A line of a file written before the census had check H lacks the four fields
 //! (`violations` lists only what failed, so the fields are the sign that H ran).  Resuming into such a file does not
-//! crash: those lines are left out of the three rows about Lemma M5⁺'s check, and the last row counts their boards.
+//! crash: those lines are left out of the three rows about E2's check, and the last row counts their boards.
 //! But check H did not run on them, so the run is a `FAIL` while any exists: run the range again into a new file.
 //!
-//! **Exit status**: 0 if every board of the range has a line with the Lemma M5⁺ fields and passes A, C, D, E, F, G and
-//! H; 1 if one does not, or a board could not be analyzed (the message goes to stderr); 2 for a usage error.
+//! **Exit status**: 0 if every board of the range has a line with the fields of E2's check and passes A, C, D, E, F,
+//! G and H; 1 if one does not, or a board could not be analyzed (the message goes to stderr); 2 for a usage error.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
@@ -427,8 +428,8 @@ fn check_extended_is_frame_model<const W: usize>(t: &Tables, frames: &SearchFram
     Ok(items)
 }
 
-/// What the check of Lemma M5⁺ could do to the back claims of the search's frames, as `(s, f)` pairs in the order the
-/// claims were made (see the module comment).
+/// What the check of the kept-claims lemma (E2) could do to the back claims of the search's frames, as `(s, f)` pairs
+/// in the order the claims were made (see the module comment).
 struct ClaimRisk {
     /// The back claims whose factor fails the check against the two-sided candidates of Π⁺(U\*_{≥3}).
     at_risk: Vec<(u32, u32)>,
@@ -590,7 +591,7 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
     let frame_count = |value: fn(&NumberedFrame<W>) -> i64| by_layer(&numbered, &layers, max_layer, value);
     let (reached, answered) = numbered.merged_away_reach;
 
-    // The extended problem with every source of three or more prime factors open, and what Lemma M5⁺'s check does to
+    // The extended problem with every source of three or more prime factors open, and what E2's check does to
     // the back claims there, where it can be built.
     let from_layer_3 = numbered.frames.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
     let upper = from_layer_3.fold(Bits::<W>::EMPTY, |acc, (frame, _)| acc | frame.sources);
@@ -657,7 +658,7 @@ fn pair_of(line: &Json, key: &str) -> (u64, u64) {
     (at(0), at(1))
 }
 
-/// What a line says of a count of back claims for Lemma M5⁺'s check (`key`: `m5_at_risk_count` or `m5_refused_count`):
+/// What a line says of a count of back claims for E2's check (`key`: `m5_at_risk_count` or `m5_refused_count`):
 /// `None` if the line lacks the field (an earlier version of the census wrote it), `Some(None)` if it is `null`
 /// (Π⁺ of every source of three or more prime factors cannot be built), else `Some(Some(count))`.
 fn claims_reported(line: &Json, key: &str) -> Option<Option<u64>> {
@@ -819,21 +820,21 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
         first(&beyond, 10)
     ));
 
-    // Lemma M5⁺'s check on the back claims; a line without the fields is left out.
+    // E2's check on the back claims; a line without the fields is left out.
     let reported = |line: &Json, key: &str| claims_reported(line, key).flatten().filter(|&count| count > 0);
     let number = |line: &Json| number_of(line, "n") as u32;
     let at_risk: Vec<(u32, u64)> =
         lines.iter().filter_map(|line| Some((number(line), reported(line, "m5_at_risk_count")?))).collect();
     let at_risk_boards: Vec<u32> = at_risk.iter().map(|&(n, _)| n).collect();
     rows.push(format!(
-        "boards with back claims at risk of Lemma M5⁺ ({}), {} claims: {}",
+        "boards with back claims at risk of the kept-claims lemma (E2) ({}), {} claims: {}",
         at_risk.len(),
         at_risk.iter().map(|&(_, count)| count).sum::<u64>(),
         first_ranges(&at_risk_boards, 30)
     ));
     let out_of_reach = boards_where(lines, |line| claims_reported(line, "m5_at_risk_count") == Some(None));
     rows.push(format!(
-        "boards beyond the reach of Lemma M5⁺'s check, Π⁺ of every source of layer 3 or more needing more than \
+        "boards beyond the reach of E2's check, Π⁺ of every source of layer 3 or more needing more than \
          {MAX_FRAMES} frames ({}): {}",
         out_of_reach.len(),
         first_ranges(&out_of_reach, 30)
@@ -855,7 +856,7 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
     let lacking = boards_where(lines, |line| claims_reported(line, "m5_at_risk_count").is_none());
     passes &= lacking.is_empty();
     rows.push(format!(
-        "boards whose lines lack the Lemma M5⁺ fields (check H did not run on them), left out of the rows above \
+        "boards whose lines lack the fields of E2's check (check H did not run on them), left out of the rows above \
          ({}): {}",
         lacking.len(),
         first_ranges(&lacking, 30)

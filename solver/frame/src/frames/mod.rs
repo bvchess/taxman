@@ -21,8 +21,9 @@
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
 //! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
-//!   factors are optional and only the claims of `unzip` that Lemma M5⁺ allows are kept ([`build_extended`]); research
-//!   code, which the solver does not use either.
+//!   factors are optional and only the claims of `unzip` that the kept-claims lemma (E2,
+//!   docs/theory/extended-problem.md) allows are kept ([`build_extended`]); research code, which the solver does not
+//!   use either.
 //!
 //! The Java has several names for the one idea (solver/docs/design/frame-model.md, "The Java solver and the frame
 //! solver", maps them); this module calls it a frame throughout.  [`Frame`] has the name of [`crate::model::Frame`],
@@ -58,8 +59,11 @@
 //!
 //! After the frames are formed, [`BoardFrames::new`] simplifies each one until nothing changes (`finish_setup`).
 //! Three things are decided frame by frame.  All three were assumptions of the frame model, validated but not proven;
-//! they are theorems: docs/theory/frame-model.md (Theorem M and its
-//! lemmas M1 to M6, which follow this code step by step), summed up in solver/docs/design/frame-model.md, “What "optimal" means”.  What remains is a statement about the game, not about this code:
+//! they are theorems: the exactness theorem (X7, docs/theory/exactness.md) and its lemmas X1 to X6 (the kept-sources
+//! lemma X1, the closed-frames lemma X2, the one-frame-forward lemma X3, the candidate lemma X4, the claims lemma X5
+//! and the reduction-step lemma X6), which follow this code step by step, summed up in
+//! solver/docs/design/frame-model.md, “What "optimal" means”.  What remains is a statement about the game, not about
+//! this code:
 //! that some optimal game plays every source with three or more prime factors that setup keeps.
 //!
 //! * **unzip** finds the frame's *mandatory* moves, in two ways: a source with a single usable factor must take
@@ -68,20 +72,21 @@
 //!   second way) as a promoted number itself, a move of a frame in front of it.  Each settled pair of a move and
 //!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
 //!   search.  Every such pair is a move that any game playing the frame's sources must make, as the frame takes
-//!   them with whatever is promoted into it (THEORY.md, M5); a pair of the second kind needs that no promotion
+//!   them with whatever is promoted into it (X5); a pair of the second kind needs that no promotion
 //!   candidate has the factor among its maximal factors, which the candidate filter makes so (`examples/structure.rs`
 //!   checks it on every board).  (Earlier notes call these moves "forced"; this code keeps that word out of the
 //!   frames, since the search has forced members of its own that are unrelated.)
 //! * **remove_impossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
-//!   plays.  What the greedy keeps is U\* (THEORY.md, M1), the heaviest playable set of sources wherever the
-//!   upper-half conjecture holds (certified on every board to 100,000), although the playable subsets of a frame's
-//!   sources are not a matroid; that an optimal game plays all of U\* is proven for the sources with one or two prime
-//!   factors (THEORY.md, Theorem B) and is the open statement for the others.
+//!   plays.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
+//!   sources conjecture (S1, docs/theory/sources.md) holds (certified on every board to 100,000), although the playable
+//!   subsets of a frame's sources are not a matroid; that an optimal game plays all of U\* is proven for the sources
+//!   with one or two prime factors (the bottom-layers theorem, F3, docs/theory/frame-model.md) and is the open
+//!   statement for the others.
 //! * The *freedoms* (the field `freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
 //!   in the search; one with some goes on to it.  A closed frame's factors all pay its own sources in every game
-//!   that plays them (THEORY.md, M2), and the count is only a count: the search still checks every promotion for
+//!   that plays them (X2), and the count is only a count: the search still checks every promotion for
 //!   winnability, which implies it.
 //!
 //! # Numbering the frames
@@ -97,17 +102,18 @@
 //! The frames are numbered by *layer*.  The layer of a frame is the number of prime factors, counted with
 //! multiplicity, of its sources (`layer_of`): every source of a frame has the same count, every factor one fewer, and
 //! every frame in front of it (one holding a maximal factor of one of its numbers, `BoardFrames::frames_in_front`)
-//! lies one layer lower (docs/THEORY.md, Lemma Ω; `build_frames` asserts it in debug builds).  With `ℓ₀` the
-//! lowest layer of a frame with freedoms, a frame with freedoms of layer `ℓ` gets the number `ℓ − ℓ₀`; a closed frame
-//! gets none.  Among the frames with one number, the order is that of their smallest source.
+//! lies one layer lower (the frame lemma (F1, docs/theory/frame-model.md); `build_frames` asserts it in debug builds).
+//! With `ℓ₀` the lowest layer of a frame with freedoms, a frame with freedoms of layer `ℓ` gets the number `ℓ − ℓ₀`; a
+//! closed frame gets none.  Among the frames with one number, the order is that of their smallest source.
 //!
 //! So the numbering is *clean* by construction: every frame with freedoms directly in front of a frame numbered `k`
 //! is numbered `k − 1`, and frames with one number are never neighbors.  A promoted number, paid for by one of its
 //! maximal factors, finds them one layer lower, in the frame numbered one lower or in closed frames, which is what the
-//! frame model's exactness needs (docs/THEORY.md, Theorem M, lemma M3).  The Java numbered the frames breadth
-//! first from the front instead (number 0 to every frame with freedoms with no frame with freedoms directly in front
-//! of it, `k + 1` to every one directly behind a frame numbered `k` and not yet numbered); on every board up to 8191,
-//! the largest the solver supports, the two numberings are the same (the census `examples/structure.rs`,
+//! frame model's exactness needs (the one-frame-forward lemma, X3).  Clean numbering is F4 of
+//! docs/theory/frame-model.md.  The Java numbered the frames breadth first from the front instead (number 0 to every
+//! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
+//! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
+//! numberings are the same (the census `examples/structure.rs`,
 //! `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, and this module's tests), so the frames,
 //! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
 //! for the census of the structure of the frames.
@@ -209,8 +215,8 @@ pub struct SearchFrames<const W: usize> {
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
     /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`) and the
-    /// extended problem, which keeps those Lemma M5⁺ allows ([`build_extended`]); the solver's search does not read
-    /// them.
+    /// extended problem, which keeps those the kept-claims lemma (E2) allows ([`build_extended`]); the solver's search
+    /// does not read them.
     pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected
@@ -356,10 +362,10 @@ struct Numbers {
     layers: Vec<u32>,
 }
 
-/// The layer of a frame (docs/THEORY.md, Lemma Ω): Ω of its sources, the number of their prime factors counted
-/// with multiplicity.  The frame's sources and impossible sources all have the same Ω, so this is Ω of the smallest of
-/// them.  A frame that has neither (only a punctured board has one: a factor whose maximal composites are all holes)
-/// is a single factor, one layer above that factor's.
+/// The layer of a frame (the frame lemma (F1), docs/theory/frame-model.md): Ω of its sources, the number of their prime
+/// factors counted with multiplicity.  The frame's sources and impossible sources all have the same Ω, so this is Ω of
+/// the smallest of them.  A frame that has neither (only a punctured board has one: a factor whose maximal composites
+/// are all holes) is a single factor, one layer above that factor's.
 pub(crate) fn layer_of<const W: usize>(frame: &Frame<W>, t: &Tables) -> u32 {
     match (frame.sources() | frame.impossible()).min() {
         Some(source) => t.omega(source),
@@ -400,10 +406,10 @@ fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Numbers {
     Numbers { groups, number, layers }
 }
 
-/// Where the frames of the board do not lie in layers (docs/THEORY.md, Lemma Ω), given the `layers` of the
-/// frames ([`layer_of`]): a message naming the board, the first frame that fails and what fails, or `None`.  In a
-/// frame of layer `k`, every source and impossible source has Ω equal to `k`, every factor has Ω equal to `k − 1`, and
-/// every frame in front of it ([`BoardFrames::frames_in_front`]) is of layer `k − 1`.
+/// Where the frames of the board do not lie in layers (the frame lemma (F1), docs/theory/frame-model.md), given the
+/// `layers` of the frames ([`layer_of`]): a message naming the board, the first frame that fails and what fails, or
+/// `None`.  In a frame of layer `k`, every source and impossible source has Ω equal to `k`, every factor has Ω equal to
+/// `k − 1`, and every frame in front of it ([`BoardFrames::frames_in_front`]) is of layer `k − 1`.
 fn lemma_omega_violation<const W: usize>(board_frames: &BoardFrames<W>, layers: &[u32]) -> Option<String> {
     let t = board_frames.tables();
     let board = if t.holes.is_empty() { format!("n={}", t.n) } else { format!("n={} without {:?}", t.n, t.holes) };
@@ -470,10 +476,10 @@ fn breadth_first_numbers<const W: usize>(
     (number, in_front)
 }
 
-/// Where a numbering is not clean (docs/THEORY.md, N): the first frame `y`, by position, that is numbered `h`
-/// and has a frame with freedoms `x` directly in front of it not numbered `h − 1`, as `(y, Some(x))`, or that has
-/// freedoms and no number, as `(y, None)`; `None` when the numbering is clean.  `number` is the number of each frame
-/// and `in_front` the frames in front of each frame with freedoms (`None` for a closed frame), as
+/// Where a numbering is not clean (clean numbering (F4), docs/theory/frame-model.md): the first frame `y`, by position,
+/// that is numbered `h` and has a frame with freedoms `x` directly in front of it not numbered `h − 1`, as `(y,
+/// Some(x))`, or that has freedoms and no number, as `(y, None)`; `None` when the numbering is clean.  `number` is the
+/// number of each frame and `in_front` the frames in front of each frame with freedoms (`None` for a closed frame), as
 /// [`breadth_first_numbers`] returns them; `closed` says whether a frame is closed.  It looks at the frames with
 /// freedoms only and at their lists of frames in front once, and computes nothing new.
 #[cfg(test)]
@@ -680,8 +686,8 @@ mod tests {
         }
     }
 
-    /// The frames lie in layers (docs/THEORY.md, Lemma Ω) on every board to 400 and on every board of up to 60
-    /// numbers with one number taken off it, and on all of them the numbering by layer is clean.
+    /// The frames lie in layers (the frame lemma (F1), docs/theory/frame-model.md) on every board to 400 and on every
+    /// board of up to 60 numbers with one number taken off it, and on all of them the numbering by layer is clean.
     #[test]
     fn lemma_omega_holds_on_every_board() {
         let check = |t: &Tables| {

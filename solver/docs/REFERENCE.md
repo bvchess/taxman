@@ -97,8 +97,9 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   optional, from the recorded game.  The search ends `certified` (nothing beats the score) or `beaten`.  A game that
   beats the score is written to `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes
   `--threads`, `--background`, the checkpoint flags and the limits of `solve`, and resumes like it.  The extended
-  problem keeps the claims of `unzip` that Lemma M5⁺ allows, unless `--no-claims`, the formulation of the certificates
-  made before it; a line records which.
+  problem keeps the claims of `unzip` that [the kept-claims lemma
+  (E2)](../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows, unless `--no-claims`, the formulation of
+  the certificates made before it; a line records which.
 * **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
   that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
   the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they

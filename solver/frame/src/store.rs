@@ -6,7 +6,7 @@
 //!
 //! * the vocabulary of a bound: [`Rule`], how it was derived, and [`Side`];
 //! * the relations between boards, with the arithmetic of the upper bounds ([`upper_by`]) and the games that carry a
-//!   lower bound across ([`carry_game`]), which docs/theory/ledger.md, proves;
+//!   lower bound across ([`carry_game`]), which docs/theory/neighbors.md and docs/theory/search-rules.md prove;
 //! * the line ([`Line`], [`Game`]) and the file ([`Store`], [`Best`]);
 //! * a lower bound's game as the referee has it ([`play`], [`expand`], [`carried`]).
 //!
@@ -44,7 +44,8 @@ pub enum Rule {
     Search,
     Dual,
     Exhausted,
-    /// A search under a floor F that completed having found no set (U): P* <= F (Lemma F), so U is in_the_bag + F.
+    /// A search under a floor F that completed having found no set (U): P* <= F (the floor lemma, R5,
+    /// docs/theory/search-rules.md), so U is in_the_bag + F.
     Floor,
     /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
     /// (U): the removed `wall nogoods` made it; the store takes it on record.
@@ -138,29 +139,30 @@ impl Side {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The relations between boards (docs/theory/ledger.md)
+// The relations between boards (docs/theory/neighbors.md and docs/theory/search-rules.md)
 
-/// Lemma L1: the game of `n` (composite) that the finished game `moves` of n − 1 gives: the same moves, then n if it is
-/// still legal.  (n is the only move that can be left: the legal moves that `complete` adds are n, or none.)
+/// Monotonicity (N3, docs/theory/neighbors.md): the game of `n` (composite) that the finished game `moves` of n − 1
+/// gives: the same moves, then n if it is still legal.  (n is the only move that can be left: the legal moves that
+/// `complete` adds are n, or none.)
 pub fn monotone_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     complete(n, moves)
 }
 
-/// Lemma L2: the game of `n` that the finished game `moves` of n + 1 (composite) gives: its moves without n + 1, which
-/// stay legal, then the largest legal move as long as there is one.
+/// The ceiling lemma (N4): the game of `n` that the finished game `moves` of n + 1 (composite) gives: its moves without
+/// n + 1, which stay legal, then the largest legal move as long as there is one.
 pub fn ceiling_game(n: u32, moves: &[u32]) -> Result<Vec<u32>, String> {
     let without: Vec<u32> = moves.iter().copied().filter(|&m| m != n + 1).collect();
     complete(n, &without)
 }
 
-/// Lemma L3: the game of the prime `p` that the finished game `moves` of p − 1 gives: its opening move, the largest
-/// prime below p, exchanged for p (`accelerate::prime_shortcut`).
+/// The prime formula (N5): the game of the prime `p` that the finished game `moves` of p − 1 gives: its opening move,
+/// the largest prime below p, exchanged for p (`accelerate::prime_shortcut`).
 pub fn prime_up(p: u32, moves: &[u32]) -> Vec<u32> {
     prime_shortcut(p, moves)
 }
 
-/// Lemma L3: the game of `n` = p − 1 that the finished game `moves` of the prime p gives: its opening move p exchanged
-/// for the largest prime up to n (none for n = 1, whose game has no move).
+/// The prime formula (N5): the game of `n` = p − 1 that the finished game `moves` of the prime p gives: its opening
+/// move p exchanged for the largest prime up to n (none for n = 1, whose game has no move).
 pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
     match largest_prime_at_most(n) {
         Some(q) => {
@@ -176,7 +178,7 @@ pub fn prime_down(n: u32, moves: &[u32]) -> Vec<u32> {
 
 /// Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `from` to the
 /// board `n`: `Monotone` up a board to a composite, `Ceiling` down a board from a composite, `Prime` across a prime, in
-/// either direction (Lemmas L1 to L3).  The game is made by [`carry_game`].
+/// either direction (N3 to N5).  The game is made by [`carry_game`].
 pub fn carries(rule: Rule, from: u32, n: u32) -> bool {
     let prime = |m: u32| largest_prime_at_most(m) == Some(m);
     match rule {
@@ -204,7 +206,8 @@ pub fn carry_game(rule: Rule, from: u32, n: u32, moves: &[u32]) -> Result<Vec<u3
     }
 }
 
-/// Lemma L4: `promotions` played on the board of `n` (`solution_for_promotions`).
+/// The repeat lemma (R6, docs/theory/search-rules.md): `promotions` played on the board of `n`
+/// (`solution_for_promotions`).
 pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
     crate::with_width!(n, W => solution_for_promotions::<W>(&Tables::new(n), Bits::<W>::from_slice(promotions)))
 }
@@ -213,7 +216,7 @@ pub fn repeat_game(n: u32, promotions: &[u32]) -> Vec<u32> {
 /// boards next to each other, `Ceiling` (the target is the board after the source: opt(n) <= opt(n − 1) + n),
 /// `Monotone` (the board before: opt(n − 1) <= opt(n)) and `Prime` (either way, across a prime p, q the largest prime
 /// below it: opt(p) = opt(p − 1) + p − q); and for boards with the same search problem, `Repeat`, with their bags
-/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  Lemmas L1 to L4 (docs/theory/ledger.md); the
+/// (`bags`: the source's, the target's): U(n) − bag(n) <= U(m) − bag(m).  N3 to N5 and R6; the
 /// book and the store's verifiers use this one copy of the arithmetic.
 ///
 /// # Errors
@@ -297,7 +300,8 @@ pub struct Line {
     pub from_value: Option<u64>,
     /// A repeat's upper bound: `in_the_bag` of `n` and of `from`.
     pub bags: Option<(u64, u64)>,
-    /// An upper bound: the boards at which statement U is assumed, ascending (docs/theory/ledger.md).
+    /// An upper bound: the boards at which statement U is assumed, ascending (docs/theory/search-rules.md, "Bounds
+    /// carried between games").
     pub rests_on: Vec<u32>,
     /// A dual bound: where the checkpoint of the search that gave it is, if the export was given the place.
     pub checkpoint: Option<String>,

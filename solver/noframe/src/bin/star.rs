@@ -1,4 +1,4 @@
-//! The threshold-by-threshold (★) campaign: checks conjecture (★) on the upper-half instance of every game in a
+//! The threshold-by-threshold (★) campaign: checks conjecture (★) on the sources' instance of every game in a
 //! range at every rejection threshold, recording which argument settles each, and appends one line per game to
 //! a resumable JSONL file.
 //!

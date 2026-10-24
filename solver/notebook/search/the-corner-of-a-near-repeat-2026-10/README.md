@@ -11,7 +11,7 @@ proof about that move's corner of the game, which reuses the proof of game n −
 
 **Answer.**  Open.  A sketch says that the proof of n needs to refute only the ways of playing n that use up every payer
 of the old move, the factors that can pay for it, and the [near-repeat
-cut](../../../../docs/theory/ledger.md#the-near-repeat-cut) does not reach those ways.  The sketch is not yet a lemma,
+cut](../../../../docs/theory/search-rules.md#the-near-repeat-lemma) does not reach those ways.  The sketch is not yet a lemma,
 and nothing was built or measured on the short proof.  Near repeats hold 10% of the nodes searched from 4850 to 4955
 (games 4899, 4901, 4929 and 4953), and 8.4% without 4901, which the cut already proves in 750 steps.  The cut ended 165
 nodes of the 505 million of 4953 in its last run.
@@ -73,7 +73,7 @@ that a proof needs.
 replaces, and suppose the problems of n − 1 and n are the same but for the frame that holds the swap: the same
 candidates with the same homes, the same other frames.  Let T be a promotion set of n.  A *winning order* of a frame is
 an order in which every move is paid ([winnable](../../../../docs/GLOSSARY.md)), and "with T applied" is the frame
-after T's promotions, as [the ledger](../../../../docs/theory/ledger.md#the-near-repeat-cut) defines it.  If some
+after T's promotions, as [the ledger](../../../../docs/theory/search-rules.md#the-near-repeat-lemma) defines it.  If some
 winning order of the swapped frame, with T applied, ends with a payer of m still in the frame, then T is a promotion set
 of n − 1 too, so its sum is at most P\* of n − 1, which the proof of n − 1 established.
 

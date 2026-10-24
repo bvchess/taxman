@@ -274,10 +274,10 @@ const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", 
 /// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a
 /// prime, or a score at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to
 /// `--out` as it is made, and a rerun skips the games the file has a certificate for and resumes a stopped search
-/// from its checkpoint.  The extended problem is searched with the claims of `unzip` that Lemma M5⁺ keeps, unless
-/// `--no-claims` says to search it without them (the formulation of the certificates made before that lemma); each
-/// certificate records its formulation.  A game whose extended problem a certified game of the last 8 games (of
-/// this run, or of the file, made in either formulation) posed, with a recorded game worth what that game's
+/// from its checkpoint.  The extended problem is searched with the claims of `unzip` that the kept-claims lemma (E2)
+/// keeps, unless `--no-claims` says to search it without them (the formulation of the certificates made before that
+/// lemma); each certificate records its formulation.  A game whose extended problem a certified game of the last 8
+/// games (of this run, or of the file, made in either formulation) posed, with a recorded game worth what that game's
 /// certificate proved the most, is certified with no search (`same_problem`; [`taxman::certify`]).  A game found to
 /// beat its recorded score is printed, written to `<out>.counterexample.jsonl` too, and ends the run with status 2, as
 /// does a rerun over a game the file records beaten.

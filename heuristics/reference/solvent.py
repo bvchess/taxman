@@ -103,7 +103,7 @@ def peel(members, available_as_tax):
     distinct payments exists" - some refused sets have perfect
     payment assignments, every one of which is impossible to
     schedule.  The forced-move discipline makes peel reject
-    those too: it is a playability oracle, provably exact (THEORY.md),
+    those too: it is a playability oracle, provably exact (the peel theorem, P4, docs/theory/playability.md),
     strictly stronger than a matching test.
 
     Returns pay, mapping each member to its reserved payment.  No
@@ -112,7 +112,7 @@ def peel(members, available_as_tax):
     reserved factor.  Real sweeps take every divisor, maximal or not,
     so a real play order must be built from the full divisibility
     precedence - ordered()'s job, guaranteed to succeed by the
-    schedulability theorem.  A member's usable factors are read from
+    schedulability theorem (the soundness half of P4).  A member's usable factors are read from
     the module-level all_maximal_factors table (its maximal factors
     that still lie in available_as_tax).
 

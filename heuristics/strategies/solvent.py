@@ -22,7 +22,8 @@ Per candidate the decision has three outcomes:
 A rejection is permanent either way: playable sets are downward-closed,
 so a set unplayable now can never become playable by adding more.
 
-The key fact (sharpened by the lifting lemma to maximal factors only):
+The key fact (sharpened by the lifting lemma, P1 of
+docs/theory/playability.md, to maximal factors only):
 
     A set S of selections can all be played, in some order, if and only
     if there is a matching that assigns each selection a distinct
@@ -154,9 +155,9 @@ def _playable_order(
 
     The fast path's acceptances are verified acyclic before being
     committed; the complete tier accepts peel's assignment
-    unconditionally, which is sound by Theorem 2, schedulability
-    (docs/theory/decision-procedure.md, "The decision procedure": peel-produced
-    assignments are provably acyclic).
+    unconditionally, which is sound by the schedulability theorem
+    (the soundness half of the peel theorem, P4, docs/theory/playability.md: peel-produced assignments are provably
+    acyclic).
     Either way the final matching is acyclic, and a single
     Kahn's-algorithm pass orders every element.  A leftover cycle is
     impossible unless there is a bug, so this raises rather than
@@ -184,8 +185,8 @@ def _playable_order(
     if len(order) != len(selected):
         raise RuntimeError(
             "schedulability theorem violated - impossible unless there "
-            "is a bug (see THEORY.md, section 'The decision procedure', "
-            "Theorem 2)"
+            "is a bug (see the peel theorem, P4, "
+            "docs/theory/playability.md)"
         )
     return order
 

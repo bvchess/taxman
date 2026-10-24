@@ -45,11 +45,11 @@ Every completion of a node lies in the family that defines the hybrid bound, so 
 least the best completion.  This is proved, given the frame model.
 
 * A completion of a node with the promotions P is a set L of its candidates such that P ∪ L can be promoted from the
-  root.  By Theorem M ([frame-model.md, "The frame model is exact, given its upper
-  part"](../../../../docs/theory/frame-model.md#the-frame-model-is-exact-given-its-upper-part)), that holds exactly when
+  root.  By Theorem M ([exactness.md, "The exactness
+  theorem"](../../../../docs/theory/exactness.md#the-exactness-theorem)), that holds exactly when
   every frame is winnable with its part of P ∪ L applied.  So every frame of F is winnable with L applied.
-* By Theorem 11 ([bounds.md, "The frame matroids: a bound on the
-  promotions"](../../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions)), in a winnable frame
+* By Theorem 11 ([frame-bounds.md, "The frame
+  bound"](../../../../docs/theory/frame-bounds.md#the-frame-bound)), in a winnable frame
   the vectors of the movers and the unit vectors of the factors promoted out are independent over GF(2).  So L is
   independent in both frame matroids of the node, in every frame, checked exactly or not.
 * So L is in the family, and the hybrid bound is at least the best completion.  It is never above the GF(2) bound, and

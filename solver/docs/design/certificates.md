@@ -4,9 +4,9 @@ Part of the [design](../DESIGN.md).
 
 A *certificate* proves statement U at one game: that the recorded score of a game whose proof uses the frame model
 (`exhausted`, `trivial`, `same_search`) is opt(n) on the whole board ([frame-model.md](frame-model.md)).
-`taxman certify` makes certificates game by game, by the corollary of Theorem M⁺ (docs/theory/extended-problem.md),
-and `taxman verify-certificates` checks them.  [results/README.md](../../../results/README.md#certificates) says which
-games have one.
+`taxman certify` makes certificates game by game, by [the certificate theorem
+(E4)](../../../docs/theory/extended-problem.md#the-certificate-theorem), and `taxman verify-certificates` checks them.
+[results/README.md](../../../results/README.md#certificates) says which games have one.
 
 *What `certify` does* (`taxman certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`;
 `src/certify.rs`).  It certifies the games whose lines in the prover's barred parity bounds
@@ -15,7 +15,9 @@ and sets up the extended problem Π⁺(O) in extended mode ([extended-mode.md, "
 candidates"](extended-mode.md)), with the other members of U\*_{≥3} fixed.  It searches that
 problem from the recorded game, as the promotion set (O, its moves up to n/2), with the ceiling n + score(n − 1) −
 in_the_bag⁺.  Before the search it checks that the game replays to its score, plays U\* above n/2, and is a promotion
-set of Π⁺(O) worth the score (Theorem M⁺ says that a playable one is).  The search ends with one of two verdicts:
+set of Π⁺(O) worth the score ([the extended exactness theorem
+(E1)](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem) says that a playable one is).  The search
+ends with one of two verdicts:
 
 * *certified*: the search ends with nothing better, so opt(n) is the score, given that the members not open were
   certified against it.  A line of the bounds whose score is above the recorded one certifies nothing against it, and
@@ -26,11 +28,13 @@ set of Π⁺(O) worth the score (Theorem M⁺ says that a playable one is).  The
   the score rests on the frame model.  It goes to `<out>.counterexample.jsonl` as well, and the run exits with the
   status 2.
 
-*The formulation.*  Π⁺(O) has two formulations (`Board::extended`; THEORY.md, Lemma M5⁺): with the claims of `unzip`
-that the lemma allows to keep (the default), and without any (`certify --no-claims`, the formulation of every
-certificate made before the lemma).  The two have the same promotion sets, and so the same heaviest promotion set (the
-lemma's corollary), so a certificate made in one bounds the heaviest promotion set of the problem in the other.  A line
-records the formulation it was made in (`claims`, true or false); a line with no such field reads as false.
+*The formulation.*  Π⁺(O) has two formulations (`Board::extended`; [the kept-claims lemma
+(E2)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): with the claims of `unzip` that the lemma allows
+to keep (the default), and without any (`certify --no-claims`, the formulation of every certificate made before the
+lemma).  The two have the same promotion sets, and so the same heaviest promotion set ([the formulation corollary
+(E3)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)), so a certificate made in one bounds the heaviest
+promotion set of the problem in the other.  A line records the formulation it was made in (`claims`, true or false); a
+line with no such field reads as false.
 
 *The same problem.*  Consecutive games often pose the same Π⁺(O) (the same `search::Problem`, which has no n in it:
 "Same search"), and then an earlier game's certificate settles the later one with no search.  If game m is certified,
@@ -58,11 +62,12 @@ score(m) − in_the_bag⁺(m), which m's certificate proved, and a recorded game
   * worth(n) > best(m): impossible with genuine data (the recorded game of n is a promotion set of a problem that m's
     certificate says nothing beats), so the run fails, naming n, m and both values, and certifies nothing.
 
-The rule is sound because equal problems have equal heaviest promotion sets: the form holds the frames, the
-candidates, `max_total` and the graph's lists, and nothing of n.  The heaviest promotion set of a problem does not
-depend on the formulation it was certified in, so nothing beats n's recorded game, and n's own barred bounds then give
-opt(n) = score(n) by the corollary, exactly as after a search.  The refusal of a line of the bounds that was found
-against a higher score applies to a game the rule settles too.
+The rule is sound ([the same-problem corollary (E5)](../../../docs/theory/extended-problem.md#the-certificate-theorem))
+because equal problems have equal heaviest promotion sets: the form holds the frames, the candidates, `max_total` and
+the graph's lists, and nothing of n.  The heaviest promotion set of a problem does not depend on the formulation it was
+certified in, so nothing beats n's recorded game, and n's own barred bounds then give opt(n) = score(n) by E4, exactly
+as after a search.  The refusal of a line of the bounds that was found against a higher score applies to a game the rule
+settles too.
 
 *The line.*  `--out` gets one line a game: the game, the score, the open members, how many sources greedy rejected
 beside them, the frames and candidates of Π⁺(O), the nodes and seconds of the search, the threads and set width, the

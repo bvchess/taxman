@@ -16,7 +16,7 @@ plain GF(2) branch and bound their hopeless test took 0.948 of the nodes and the
 constant share, time −3%.  Two questions remained: whether pruning by all the inequalities at once is sound when the
 classes interact, and whether it is sound with what the search learns (the matching pilot's trees grew, 1184 +27%).
 
-**The theorem** ([Theorem 13](../../../../docs/theory/bounds.md#prime-exchanges-symmetries-of-the-promotions)).  An
+**The theorem** ([Theorem 13](../../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).  An
 exchange π of p < q that maps the root's frames and candidates onto themselves maps promotion sets to promotion sets,
 and changes a sum by (q − p)(c_p − c_q) when no candidate is divisible by pq, p² or q².  So a heaviest set keeps c_p ≤
 c_q, or π of it would be promotable and heavier.  The argument for one pair uses no other, so every optimum keeps every

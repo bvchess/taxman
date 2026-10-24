@@ -9,10 +9,11 @@ could lean on it: to reuse the game of n − 1 when solving n, to justify shortc
 
 ## What is proven
 
-THEORY.md, ["Uniqueness of the optimal
-set"](../../../docs/theory/uniqueness-and-longest-games.md#uniqueness-of-the-optimal-set):
+The theory, in [the uniqueness theorem
+(Q1)](../../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem) and [the step theorem
+(N6)](../../../docs/theory/neighbors.md#the-step-theorem):
 
-* **Theorem 8: the heaviest playable set of sources is unique wherever (★) holds**, so in every game n ≤ 100,000
+* **The heaviest playable set of sources is unique wherever (★) holds** (Q1), so in every game n ≤ 100,000
   ([Conjecture (★) at scale](star.md#conjecture--at-scale)).  More precisely, U\* dominates every playable set of
   sources S termwise: the i-th largest member of S is at most the i-th largest of U\*, so S weighs strictly less unless
   S = U\*.  The playable sets are not a matroid, but under (♦) they lie inside the GF(2) matroid of which U\* is the
@@ -20,7 +21,7 @@ set"](../../../docs/theory/uniqueness-and-longest-games.md#uniqueness-of-the-opt
   It does *not* say that every optimal game's upper part is U\*: a game with a lighter upper part could in principle win
   the difference back below n/2.
 * **The prime of every optimal set**: every optimal set of n holds the largest prime q ≤ n, and no other prime.
-* **Theorem 9: optimal sets from the game before.**  If opt(n) = n + opt(n − 1), a game at its ceiling, the optimal
+* **Optimal sets from the game before** (N6).  If opt(n) = n + opt(n − 1), a game at its ceiling, the optimal
   sets of n are exactly the playable T ∪ {n}, for T optimal for n − 1.  If n is prime, T ↦ T − p + n, with p the
   largest prime below n, is a bijection from the optimal sets of n − 1 onto those of n.  So a game has as many optimal
   sets as its predecessor at a prime, and no more at a game at its ceiling; only a composite game below its ceiling can
@@ -35,7 +36,7 @@ set"](../../../docs/theory/uniqueness-and-longest-games.md#uniqueness-of-the-opt
 worth at most its target, so after a playable set P is found the search goes on: it partitions the rest of P's node by
 the first number on which a set disagrees with P.  With the target V(n) − 1, the recorded score minus one, it lists
 every playable set worth at least V(n), so every optimal set; it would stop on one worth more, refuting V(n).  The games
-at their ceiling and the prime games take their sets from the predecessor's by Theorem 9 (`derive_optimal_sets`).
+at their ceiling and the prime games take their sets from the predecessor's by N6 (`derive_optimal_sets`).
 
 Optionally (`--upper fixed` / `other`) the question splits in two:
 
@@ -126,7 +127,7 @@ What the data shows, observed and not proven:
 * **The sources.**  Fixing the sources to U\*, as the frame model does, gives up nothing that ties.  The set U\* is the
   unique heaviest playable set of sources (proven given (★), so to 100,000), and every optimal game observed has upper
   part U\*.  The second statement is the one still open in general.
-* **Reuse of n − 1 (Theorem 9).**  The prime step is exact: the optimal sets of a prime n are those of n − 1 with p
+* **Reuse of n − 1 (N6).**  The prime step is exact: the optimal sets of a prime n are those of n − 1 with p
   swapped for n.  The step to a game at its ceiling is decidable from the complete list of the optimal sets of n − 1:
   n meets the bound n + opt(n − 1) iff one of them stays playable with n added, and then the optimal sets of n are
   known without search.  With only one recorded set the test is not decisive (685 → 686).  The lists are short, 1–3

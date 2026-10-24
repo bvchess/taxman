@@ -94,7 +94,7 @@ closed avenue and a shorter section 1.  This is the text condensed, with the num
 
 **The theory the search stands on.**  A set of moves is playable, independent over GF(2) in the parity matroids, or
 matchable exactly when some payment set has one, an odd number, or at least one payment scheme ([THEORY.md, Theorem
-12](../../../../docs/theory/franklin-moniot.md#one-count-three-conditions)).  The GF(2) bound of the search is the frame
+12](../../../../docs/theory/franklin-moniot.md#the-counting-theorem)).  The GF(2) bound of the search is the frame
 model's form of the middle condition (Theorem 11), equal to the parity bound at every root measured, exact on movers
 with at most two live factors, and blind only to *odd cores*: self-covering sets with an odd number of schemes, which
 need movers with three or more distinct primes.  At the roots, what the bound gets wrong is which candidates, never how
@@ -133,7 +133,7 @@ The one change of slope in the project's history is the GF(2) bound itself (the 
 
 **A1. A bound over several fields and signings** (a change of slope, if its share held).  A playable set's payment
 matrix is unit triangular after its play order, so its rows are independent over every field and for every choice of
-nonzero entries ([THEORY.md](../../../../docs/theory/franklin-moniot.md#what-the-parity-bound-keeps-and-what-it-drops)).
+nonzero entries ([THEORY.md](../../../../docs/theory/playability.md#the-peel-order-lemma)).
 Each choice (a field, and signs or values on the edges) gives a pair of frame matroids, even and odd, in which every
 promotion set is independent.  Alone, each is weaker than GF(2): GF(3) with 0/1 entries misses the triangle {6, 10, 15}
 (determinant ±2), and with signs it sees only the orientable closed surfaces.  Together they are stronger: the LP over

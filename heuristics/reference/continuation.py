@@ -26,8 +26,8 @@ The strategy, game by game, seeded by game n-1's own produced solution
    greedy scan - largest candidate first, kept whenever solvent's
    playable() still accepts it - reproduces the same upper-half set as
    core.solve_upper_half's specialized matching code (both are exact
-   playability oracles over the same restricted game; see THEORY.md's
-   playability characterization).  upper_half_selection() does this.
+   playability oracles over the same restricted game; see the playability
+   theorem, P2, docs/theory/playability.md).  upper_half_selection() does this.
 2. Carry forward game n-1's own lower-half picks (the numbers <= n/2),
    largest first, keeping whichever still fit.
 3. A lucky exit: if that carried-forward set already scores exactly

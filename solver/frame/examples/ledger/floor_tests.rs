@@ -97,9 +97,10 @@ fn a_floor_step_that_completes_lowers_the_upper_bound_with_the_floor_rule() {
 }
 
 /// A floor below opt(n) finds sets, the last of them optimal, and the search that completes has proven it
-/// (Lemma F): the lower bound is the game it found, which the referee replays, and the upper bound is exhausted.  One
-/// that its limit stops with a set found leaves the lower bound at that game; its floor, now below it, is dropped, and
-/// its checkpoint, a search from that set, becomes the board's own for the proof if the board has none.
+/// (the floor lemma (R5, docs/theory/search-rules.md)): the lower bound is the game it found, which the referee
+/// replays, and the upper bound is exhausted.  One that its limit stops with a set found leaves the lower bound at that
+/// game; its floor, now below it, is dropped, and its checkpoint, a search from that set, becomes the board's own for
+/// the proof if the board has none.
 #[test]
 fn a_floor_step_that_finds_a_set_raises_the_lower_bound_with_a_game_the_referee_replays() {
     let (dir, n) = (TempDir::new("ledger-floor-found"), 1218);

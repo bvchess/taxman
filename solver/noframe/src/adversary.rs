@@ -244,7 +244,7 @@ fn window_order_by(inst: &Instance, rng: &mut Rng, rule: Rule) -> Vec<u32> {
     order
 }
 
-/// The upper-half instance of the generalized integers built on `primes` (reals >= 2, ascending): members are
+/// The sources' instance of the generalized integers built on `primes` (reals >= 2, ascending): members are
 /// the products in (N/2, N], largest first, each listing the products with one prime deleted.
 fn generalized(primes: &[f64], n: f64) -> Instance {
     let mut primes = primes.to_vec();

@@ -1,7 +1,7 @@
 //! Reduction instances: a set of members, each listing the factors it can pay with.
 //!
-//! The instances here are *separated* (no member is a factor of another member), as the residual theorems of
-//! docs/theory/decision-procedure.md require: the upper half of a game, its truncations, their components and
+//! The instances here are *separated* (no member is a factor of another member), as the exclusion theorem (P8,
+//! docs/theory/playability.md) requires: the sources of a game, its truncations, their components and
 //! residuals, and synthetic instances built the same way.  Members are indexed in *greedy order*: member 0 is
 //! considered first (for a game, the largest number), so descending greedy is a scan of the indices in order.
 
@@ -55,8 +55,8 @@ impl Instance {
         Instance { value, factors, listers, factor_value }
     }
 
-    /// The upper-half instance of game `n`: the members are the numbers in `(n/2, n]`, largest first, each
-    /// listing its maximal factors.  `spf` must reach `n`.
+    /// The sources' instance of game `n` (docs/theory/sources.md): the members are the numbers in `(n/2, n]`, largest
+    /// first, each listing its maximal factors.  `spf` must reach `n`.
     pub fn upper_half(n: u64, spf: &[u32]) -> Self {
         let value: Vec<u64> = (n / 2 + 1..=n).rev().collect();
         let lists: Vec<Vec<u64>> = value.iter().map(|&c| maximal_factors(c, spf)).collect();

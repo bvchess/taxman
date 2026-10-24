@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Independent referee for the bounds store (results/bounds.jsonl, one JSON line a bound; results/README.md, "bounds.jsonl", has the format).  Standard library only; it shares no code with the Rust crate.  The rules of the game
 and of a finished game are solver/tools/check_results.py's (the referee of the results files), which this loads from
-beside itself; the bounds' arithmetic (Lemmas L1-L4 of docs/theory/ledger.md) is written
-out again here, and so is the format.
+beside itself; the bounds' arithmetic (monotonicity N3, the ceiling lemma N4 and the prime formula N5 of
+docs/theory/neighbors.md, and the repeat lemma R6 of docs/theory/search-rules.md) is written out again here, and so is
+the format.
 
 For every line:
   format      the fields a line of its side and rule has and no others; ascending `rests_on`; a repeat's two bags
@@ -93,7 +94,7 @@ def upper_by(referee, rule, source, target, value, bags=None):
 def carries(referee, rule, source, target):
     """Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `source` to
     the board `target`: monotone up a board to a composite, the ceiling down a board from a composite, the prime
-    formula across a prime, either way (Lemmas L1-L3)."""
+    formula across a prime, either way (N3 to N5)."""
     prime = referee.is_prime
     if rule == "monotone":
         return source + 1 == target and not prime(target)

@@ -35,74 +35,105 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **score**: the sum of a game's moves.  **opt(n)**: the best score of game n.  **optimal game**: a game that scores
   opt(n).  Game 6 has the optimal game 5, 4, 6 (the taxman takes 1, then 2, then 3), so opt(6) = 15.
 * **Taxman sequence**: opt(1), opt(2), opt(3), ..., which is [OEIS A019312](https://oeis.org/A019312).
-* **optimal set**: the set of moves of an optimal game.  Many orders play one set.  From game 425 on, some games have
-  two or three optimal sets ([solver/noframe/docs/uniqueness.md](../solver/noframe/docs/uniqueness.md)).
+* **optimal set**: the set of moves of an optimal game, written S\*, or S\*(n) where the game must be named.  Many
+  orders play one set.  From game 425 on, some games have two or three optimal sets
+  ([solver/noframe/docs/uniqueness.md](../solver/noframe/docs/uniqueness.md)); a game can have several, so a statement
+  about S\* says whether it holds for every optimal set or for some.
 * **maximal factor**: of a number m, the quotient m/p for a prime p that divides m.  12 has the maximal factors 6 and
   4.  Its inverse is the **maximal composite**: on the board of 85, 8 has the maximal composites 16, 24, 40 and 56.
   The **maximal factor graph** joins each number to its maximal factors.  A move is legal exactly when one of its
   maximal factors is still in the pot: if some proper divisor of the move is in the pot, so is a maximal factor.  This
-  is the *lifting argument* (`solver/frame/src/numtheory.rs`; [THEORY.md](THEORY.md), Theorem 1, which proves it).  A
+  is the *lifting argument* (`solver/frame/src/numtheory.rs`; [the lifting lemma
+  (P1)](theory/playability.md#the-lifting-lemma) proves it).  A
   maximal factor still in the pot *pays for* the move: it is among the divisors the taxman takes with it.  The taxman
   takes every divisor of a move, but the frame model needs only the maximal factors, and a factor pays for one move.
-* **playable**: a set of numbers is playable when all of its members can be played as moves, in some order.
-  **peel**: the procedure that decides it.  It repeatedly drops a member that has a factor no other member has, and the
-  set is playable exactly when nothing is left ([THEORY.md](THEORY.md), Theorems 1 to 3).  Inside a frame the same
-  procedure decides whether the frame is winnable.
+* **playable**: a set of numbers is playable when all of its members can be played as moves, in some order.  That is
+  exactly when its **own instance** has a **payment scheme** with an acyclic **precedence** ([the playability theorem
+  (P2)](theory/playability.md#the-playability-theorem)).  The instance has the set as its *members* and their maximal
+  factors outside it as its *pool*, each member *lists* its maximal factors in the pool, a scheme gives each member a
+  distinct factor it lists, and the precedence says which member must be played before which
+  ([definitions](theory/playability.md#payment-schemes)).
+* **peel**: the procedure that decides it by forced choices.  A **front move** pairs a member that lists one factor
+  with it, a **back move** pairs a factor that one member alone lists with that member, and the set is playable exactly
+  when peel pairs every member, in any order of moves ([the peel theorem (P4)](theory/playability.md#the-peel-theorem)).
+  What is left after some moves is the **remainder**.  Inside a frame the same procedure decides whether the frame is
+  winnable.  The code's `peel` (`model/peel.rs`) makes back moves alone, which the theory calls *dismantling*.
+* **core**, **dismantling**, **residual**: a *core* is a nonempty set of members of an instance in which every factor
+  a member lists is listed by another member.  *Dismantling* deletes, one at a time, a member that lists a factor no
+  other remaining member lists.  What it leaves is the *residual*, the union of the cores, the same in any order, and
+  empty exactly when the instance is playable ([the residual theorem
+  (P5)](theory/playability.md#the-residual-theorem), [the core theorem (P7)](theory/playability.md#the-core-theorem)).
+  A minimal *exclusion set*, members whose removal leaves the rest playable, lies in the residual ([the exclusion
+  theorem (P8)](theory/playability.md#the-exclusion-theorem)).  An *odd core* is a core whose lists are linearly
+  independent over GF(2) ([odd cores](theory/playability.md#odd-cores)).
+* **finished game**: a game of n that opens with the largest prime q(n) and is over, with no move left.  Every optimal
+  game is one ([the finished-game lemma (N2)](theory/neighbors.md#finished-games)).
 * **ceiling**: n + opt(n − 1), which no game of n can exceed: deleting the move n from an optimal game of n leaves a
   game of n − 1.  The solver uses n + score(n − 1), with the recorded score of n − 1.  A game *at its ceiling* scores
-  exactly that, and needs no search to prove (`results::CeilingProof`; the bound is Lemma L2 of
-  [theory/ledger.md](theory/ledger.md), and Theorem 9 gives the optimal sets there).  As a bound on the promotion sum,
+  exactly that, and needs no search to prove (`results::CeilingProof`; the bound is [the ceiling lemma
+  (N4)](theory/neighbors.md#the-ceiling-lemma), and [the step theorem (N6)](theory/neighbors.md#the-step-theorem) gives
+  the optimal sets there).  As a bound on the promotion sum,
   the ceiling is n + score(n − 1) − `in_the_bag`, which the results lines and a tactic call `cap`: the proof `cap`, the
   fields `reached_cap` and `setup.cap`, the tactic `prev_cap`.
 * **prime formula**: for a prime n, opt(n) = n + opt(n − 1) − q, with q the largest prime below n.  The optimal game
   of n is that of n − 1 with its first move, q, replaced by n.  For game 7: 7 + 15 − 5 = 17.  The tactic is
-  `prime_shortcut`, the proof `prime_formula`, and the proof of the formula is at `accelerate::prime_shortcut`.
+  `prime_shortcut`, the proof `prime_formula`, and the theory proves the formula ([the prime formula
+  (N5)](theory/neighbors.md#the-prime-formula)).
 
 ## The frame model
 
 * **source**: a number above n/2.  It divides nothing else on the board, so it is never tax: it is a move or nothing,
   and a move unless setup finds it impossible.  On the board of 21 the sources are 11 to 21.  A set's **upper part** is
-  its members above n/2, which are sources.  The frame solver's docs and code, and THEORY.md, never say "upper half" for
-  them; the heuristics do.
+  its members above n/2, which are sources.  The frame solver's docs and code, and the theory, never say "upper half"
+  for them; the heuristics do.
 * **factor**: a number up to n/2.  It is tax for a larger number, and sometimes a move itself.  Not "lower half".
-* **frame**: a group of sources that share factors, with all the factors they can be paid with.  On the board of 21, one
+* **frame**: a group of sources that share factors, with all the factors they can be paid with: a component of the
+  graph that joins each source to its maximal factors ([the frame lemma
+  (F1)](theory/frame-model.md#the-frame-lemma)).  On the board of 21, one
   frame has the sources 14, 15 and 21 and the factors 2, 3, 5 and 7.  In the code a frame is `frames::Frame` as setup
   forms it and `model::Frame` as the search takes it; `frames::BoardFrames` holds all of a board's, and
   `frames::SearchFrames` those the search works on.
 * **in front of**, **behind**: frame X is in front of frame Y, and Y is behind X, when a number of Y has a maximal
   factor in X.  Y's numbers are then multiples of X's.  Frames in front are played first, so frame 0 is the front.  Not
   "upstream" or "downstream".
-* **Taxman Mini**: the game a frame plays.  It has a set of moves and a set of factors.  Each move must still have one
-  of its maximal factors in the frame when it is taken, and taking it removes all of its factors still in the frame.
+* **Taxman Mini**: the game a frame plays ([the frame model](theory/frame-model.md#the-frame-model)).  It has a set of
+  moves and a set of factors.  Each move must still have one of its maximal factors in the frame when it is taken, and
+  taking it removes all of its factors still in the frame.
 * **winnable**: a frame is winnable when some order takes every move.  Peel decides it.
 * **setup**: what the frame solver does to a board before it searches.  It forms the frames, simplifies them, numbers
   and merges them, and finds the candidates and `in_the_bag`.
 * **mandatory move**: a move that setup settles (`unzip`).  A source with one usable factor must take it, and a factor
-  that one source alone wants goes to that source.  On the board of 21, 15 must take 5 and 20 must take 10.  Never
-  "forced move": *forced* is the search's word.
+  that one source alone wants goes to that source.  On the board of 21, 15 must take 5 and 20 must take 10.  The theory
+  calls them *claims*, front and back.  Never "forced move": *forced* is the search's word.
 * **impossible source**: a source that cannot be played together with the larger sources already kept.  Setup finds
-  them greedily from the largest source down (`removeImpossible`) and drops them from the frame's moves.  On the board
-  of 21 the sources 11, 13 and 17 are impossible: their frame's only factor, 1, pays for 19.
-* **U\***: the sources that setup keeps.  It is the heaviest playable set of sources wherever conjecture (★) holds,
-  which is certified for every game to 100,000 ([solver/noframe/docs/star.md, "Conjecture (★) at
-  scale"](../solver/noframe/docs/star.md#conjecture--at-scale)).  Its members with two prime factors are U\*_2, and
+  them by *descending greedy* from the largest source down (`removeImpossible`) and drops them from the frame's moves.
+  On the board of 21 the sources 11, 13 and 17 are impossible: their frame's only factor, 1, pays for 19.
+* **descending greedy**: takes an instance's members from the largest down, and keeps each one that is still playable
+  with those kept before it ([definition](theory/sources.md#descending-greedy)).  Not the search's *greedy*, below.
+* **U\***: the sources that descending greedy keeps on the sources of game n, which setup keeps.  It is the heaviest
+  playable set of sources wherever [the sources conjecture (S1)](theory/sources.md#the-sources-conjecture) holds.
+  Conjecture (★), which implies it, is certified for every game to 100,000 ([solver/noframe/docs/star.md, "Conjecture
+  (★) at scale"](../solver/noframe/docs/star.md#conjecture--at-scale)).  Its members with two prime factors are U\*_2, and
   those with three or more U\*_{≥3}.
 * **freedoms**: a frame's factors minus its moves, the number of factors it can spare.  A promotion into or out of the
   frame uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
-  frame's layer is its sources'.  The frames in front of a frame lie one layer lower.
+  frame's layer is its sources'.  The frames in front of a frame lie one layer lower.  A set is playable exactly when
+  each of its *layer instances* is ([the layer theorem (F2)](theory/frame-model.md#the-layer-theorem)).
 * **frame number**: setup numbers the frames that have freedoms by layer, from the front.  If L is the lowest layer of a
   frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged into
-  one, so that a promotion always has one frame to go to.  The numbering is **clean** (statement N of THEORY.md): every
+  one, so that a promotion always has one frame to go to.  The numbering is **clean** ([clean numbering
+  (F4)](theory/frame-model.md#clean-numbering)): every
   frame with freedoms directly in front of frame h is frame h − 1.  The numbering by layer is clean by construction.  On
   every board the solver supports it equals the numbering breadth first from the front, the Java's: frame 0 is every
   frame with freedoms that has no other in front of it, and frame k + 1 every frame directly behind frame k.
 * **promote**, **promotion**: to play a factor as a move.  Promoting a factor of frame h takes it out of the frame's
   factors and makes it a move of frame h − 1, one frame forward.  It is legal when both frames stay winnable.  The
   maximal factors that pay for the promoted number lie in the frames directly in front of its own, and the numbering
-  puts those that have freedoms in frame h − 1; that nothing further forward is needed is a theorem
-  ([theory/frame-model.md](theory/frame-model.md)).  After promotions the frames are *reduced*: a move left with one
-  live factor is paid by it, and the pair is dropped, repeatedly.
+  puts those that have freedoms in frame h − 1; that nothing further forward is needed is [the one-frame-forward lemma
+  (X3)](theory/exactness.md#the-exactness-theorem).  After promotions the frames are *reduced*: a move left with one
+  live factor is paid by it, and the pair is dropped, repeatedly; this never changes whether a frame is winnable ([the
+  reduction lemma (F5)](theory/frame-model.md#the-reduction-lemma)).
 * **candidate** **(overloaded)**: (1) a number that setup says could be promoted (`SearchFrames::candidates`,
   `BoardFrames::promotion_candidates`).  Game 21 has 2 candidates, game 85 has 10, and game 1100 has 273.  (2) In a
   search node, `cands`: the candidates the node's loop still has to try.  (3) A role in the matching bound's graph: a
@@ -110,38 +141,53 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **root**: the frames as setup leaves them, before any promotion.
 * **promotion set**: a set of candidates that can be promoted together from the root, keeping every frame winnable and
   its freedoms at least 0.  *Promotable* is its adjective: a promotable set is a promotion set.  The score of a game of
-  the model is `in_the_bag` plus the sum of its promotion set.  On the board of 21, {9} and {4} are promotion sets.
-* **in the bag** (`in_the_bag`): what the game with no promotions scores.  Game 21 has `in_the_bag` = 135.
-* **max_total**: the most promotions the frames' freedoms allow.
+  the model is `in_the_bag` plus the sum of its promotion set.  On the board of 21, {9} and {4} are promotion sets.  A
+  candidate's *home* is the root frame whose factors hold it ([definitions](theory/frame-model.md#the-frame-model)).
+* **in the bag** (`in_the_bag`): what the game with no promotions scores, ΣU\* in the theory.  Game 21 has `in_the_bag`
+  = 135.
+* **the promotion limit** (`max_total`): the most promotions the frames' freedoms allow ([the promotion-limit lemma
+  (F6)](theory/frame-model.md#the-promotion-limit-lemma)).
 * **search problem**, **Π**: what setup gives the search, less what only changes how the search runs: the frames, the
   candidates, `max_total` and the factor graph among their numbers.  `search::Problem` writes it out canonically, and
   `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n
   ([solver/docs/design/same-search.md](../solver/docs/design/same-search.md)).
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
-* **the frame model**: this decomposition of the game into frames and promotions.  It is exact given statement U: then
-  `in_the_bag` + P\* = opt(n) ([theory/frame-model.md](theory/frame-model.md); [solver/docs/design/frame-model.md, “What
+* **the frame model**: this decomposition of the game into frames and promotions ([definition](theory/frame-model.md#the-frame-model)).
+  It is exact given statement U: then
+  `in_the_bag` + P\* = opt(n) ([the exactness theorem (X7)](theory/exactness.md#the-exactness-theorem) and [its
+  corollary (X8)](theory/exactness.md#statement-u); [solver/docs/design/frame-model.md, “What
   "optimal" means”](../solver/docs/design/frame-model.md#what-optimal-means)).  `model::FrameGraph` is the immutable
   factor graph and home frames, not "the model".
-* **statement U**: some optimal game plays every member of U\*_{≥3}.  The frame solver's answers rest on it where their
+* **statement U**: some optimal game plays every member of U\*_{≥3} ([statement U](theory/exactness.md#statement-u)).
+  The frame solver's answers rest on it where their
   proofs use the frame model: an exhausted search, a trivial game or a repeat assumes U at n, and a proof by the ceiling
   or by the prime formula does not ([solver/docs/design/frame-model.md, “What "optimal"
   means”](../solver/docs/design/frame-model.md#what-optimal-means)).  U is open in general, and proven at every n the
   prover has proven.  Past those games `taxman certify` checks it game by game ([certificate of U](#results-and-trust)).
-* **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional
-  ([THEORY.md](THEORY.md), Theorem M⁺; `frames::build_extended`).  The certificates of U search it.
+* **extended problem**, **Π⁺(O)**: the frame model with a set O of members of U\* made optional, the *open* sources,
+  and the rest *fixed* ([the extended exactness theorem
+  (E1)](theory/extended-problem.md#the-extended-exactness-theorem); `frames::build_extended`).  The members of O and
+  the sources rejected in their frames are *one-sided candidates*, the factors that can be promoted *two-sided* ones
+  ([definitions](theory/extended-problem.md#the-extended-problem)).  The certificates of U search it.
 
 ## The search
 
 * **tactic**: a switchable piece of the frame solver's algorithm (`--tactic NAME=VALUE`).  Each is graded *proven* or
   *sound* in [solver/docs/design/tactics.md](../solver/docs/design/tactics.md), so switching one changes how fast an
   answer comes, never the answer.
-* **node**, **step**: a search node is a set of promotions made from the root, plus the candidates left to it.  The
-  `nodes` that results and progress lines count are *steps*, one for each candidate a node's loop tries.
+* **node**, **step**: a search node is a set of promotions made from the root, plus the candidates left to it
+  ([definition](theory/frame-model.md#searching-the-frame-model)).  The
+  `nodes` that results and progress lines count are *steps*, one for each candidate a node's loop tries.  The node's
+  **state(P)** is the root's frames with the promotions P applied and reduced; it decides which completions are
+  promotion sets ([the state lemma (R1)](theory/search-rules.md#the-state-lemma)).
 * **completion**: of a node, a promotion set that extends the node's promotions with some of its candidates.  Its
   **best completion** is the heaviest.  At the root the best completion is worth P\*.
 * **incumbent**: the best promotion set found so far, shared by all threads.  A node's **need** is what its
-  completions must reach to beat the incumbent: the incumbent's sum, less the node's own, plus one.
+  completions must reach to beat the incumbent: the incumbent's sum, less the node's own, plus one.  A search is
+  **exact** when each completion it gives up is no heavier than the incumbent or breaks an inequality that every heaviest
+  set keeps; a completed exact search proves P\* ([exact searches](theory/search-rules.md#exact-searches)).  Its *open
+  units* are the nodes it has still to explore.
 * **greedy**: promote every candidate that can be, from the largest down.  The search starts from the best start of its
   seeds, each the best of the greedy set, the seed and a rounding of the root's matching, which a local search improves
   ([solver/docs/design/search.md, "The starting incumbent, the ceiling and the
@@ -176,10 +222,13 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   that child is cut on sight ([solver/docs/design/search.md,
   "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
 * **prime exchange**, **symmetric pair**: exchanging two primes p < q in every number.  The pair is symmetric when the
-  exchange maps the root's frames and candidates onto themselves.  It then maps promotion sets to promotion sets
+  exchange maps the root's frames and candidates onto themselves and no candidate is divisible by pq, p² or q².  It then
+  maps promotion sets to promotion sets
   worth (q − p)(c_p − c_q) more, where c_r is the sum of a set's cofactors x/r.  So every heaviest set keeps c_p ≤ c_q
-  for every symmetric pair ([THEORY.md](THEORY.md), Theorem 13).  With the tactic `symmetry` the search cuts a node
-  none of whose completions can keep them, and drops the candidates that no completion keeping them holds.
+  for every symmetric pair ([the prime-exchange theorem (R2)](theory/search-rules.md#the-prime-exchange-theorem)).
+  With the tactic `symmetry` the search cuts a node
+  none of whose completions can keep them, and drops the candidates that no completion keeping them holds ([the
+  exchange-pruning lemma (R3)](theory/search-rules.md#pruning-by-prime-exchanges)).
 * **window** **(overloaded)**: (1) the games of a range in flight at once (`--window K`, `solver::window`; [the frame
   solver's README, "Games in flight"](../solver/frame/README.md#games-in-flight)).  A search started before the game
   before it is proven is *speculative*; it is seeded from that game's *provisional game*, its best so far.  A
@@ -227,9 +276,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **matching bound** (`matchbound`; the tactic `gf2=off`): relaxes winnability to matchability.  It is the largest sum
   of promotions such that every move and every promoted number gets a distinct maximal factor in its frame.  It is a
   maximum-weight bipartite matching, kept along the search path.
-* **GF(2) bound** (`gf2`, the default node bound): the heaviest set that is independent in two matroids over GF(2), one
-  for the even frames and one for the odd ones ([THEORY.md](THEORY.md), Theorem 11; [solver/docs/design/gf2-bound.md,
-  "The GF(2) bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
+* **GF(2) bound** (`gf2`, the default node bound): the heaviest set, with at most the promotion limit members, that is
+  independent in two matroids over GF(2), the *frame matroids* A and B, one for the even frames and one for the odd ones
+  ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound); [solver/docs/design/gf2-bound.md, "The GF(2)
+  bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 * **the Lagrangian bound over the nogoods**: an inner bound, either the matching bound or the GF(2) bound, with each
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
   inner bound when it matters.  It comes in three forms:
@@ -241,25 +291,34 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.
 * **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in the frame
-  matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  The bound is the
-  linear program over all of them, computed by Lagrangian decomposition ([THEORY.md](THEORY.md), Theorems 14 and 15;
+  matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  A *signing* gives
+  each pair of a number and a maximal factor in a frame a nonzero value in a field, and the frame's *signed frame
+  matroid* represents the candidates that touch the frame modulo its moves ([the signed frame theorem
+  (B1)](theory/frame-bounds.md#the-signed-frame-theorem)).  The bound is the
+  linear program over all of them, computed by Lagrangian decomposition ([the decomposition bound
+  (B5)](theory/frame-bounds.md#the-decomposition-bound);
   [the fields study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
   agenda's A1 measured it and is closed ([solver/docs/AGENDA.md, "Ranked
   avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
   bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
-  [THEORY.md](THEORY.md), Lemma D).  A search stopped before its first node has the root's bound as its dual bound.
+  [the dual-bound lemma (R4)](theory/search-rules.md#the-dual-bound-lemma)).  A search stopped before its first node has
+  the root's bound as its dual bound.
 * **floor**: a search from a floor F starts from an incumbent worth F that has no set.  If it ends having found
-  nothing, no promotion set weighs more than F ([THEORY.md](THEORY.md), Lemma F).
+  nothing, no promotion set weighs more than F ([the floor lemma (R5)](theory/search-rules.md#the-floor-lemma)).
 * **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n), from
   [Franklín and Moniot (2023)](https://arxiv.org/abs/2211.00461).  `solver/tools/check_results.py` compares each score
   with it where `heuristics/results` has the bound.
-* **parity bound**: the prover's bound.  Every playable set is independent in two matroids over GF(2), split by the
-  parity of the number of prime factors, and the bound is their heaviest common independent set ([THEORY.md](THEORY.md),
-  Theorem 10).
-* **barred bound**: the parity bound with one member u of U\* barred.  The prover *certifies* u when the barred bound is
-  at most the recorded score: then every set of moves that beats the score, and obeys Theorem B, plays u.  The members
+* **parity bound**: the prover's bound.  Every playable set is independent in two matroids over GF(2), the *parity
+  matroids*, split by the parity of the number of prime factors, and the bound is their heaviest common independent set
+  ([the parity bound (W1)](theory/parity-bound.md#the-parity-bound)).  Independence holds because a playable set's
+  incidence vectors, a 1 at each maximal factor, are linearly independent ([the independence lemma
+  (P10)](theory/playability.md#the-independence-lemma)).
+* **barred bound**: the parity bound with one member u of U\* barred ([the barred bound
+  (W2)](theory/parity-bound.md#the-barred-bound)).  The prover *certifies* u when the barred bound is
+  at most the recorded score: then every set of moves that beats the score, and keeps the layers 1 and 2 that [the
+  bottom-layers theorem (F3)](theory/frame-model.md#the-bottom-layers-theorem) gives every optimal set, plays u.  The members
   it does not certify are *open* ([solver/noframe/docs/proofs.md, "The upper part, game by
   game"](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 * **sacrifice bound** (`src/sacrifice.rs`): an upper bound on opt(n) from games on boards with holes.  The frame solver
@@ -273,12 +332,14 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its range.  The **end of the chain** is
   its last game.
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
-  concludes it with the earlier game's promotions instead of searching.  `same_search` is the name of the tactic and of
+  concludes it with the earlier game's promotions instead of searching ([the repeat lemma
+  (R6)](theory/search-rules.md#the-repeat-lemma)).  `same_search` is the name of the tactic and of
   the proof; the method of the line is `repeat`.
 * **near repeat**, **near-repeat cut**: a game that poses nearly the search problem of a game before it, one move
   swapped for another, say.  The near-repeat cut (tactic `near_repeat`) ends a node of its search whose completions are
-  all promotion sets of the proven game before, once the incumbent reaches that game's best promotion sum
-  ([solver/docs/design/search.md, "The near-repeat cut"](../solver/docs/design/search.md#the-near-repeat-cut)).
+  all promotion sets of the proven game before, once the incumbent reaches that game's best promotion sum ([the
+  near-repeat lemma (R7)](theory/search-rules.md#the-near-repeat-lemma); [solver/docs/design/search.md, "The
+  near-repeat cut"](../solver/docs/design/search.md#the-near-repeat-cut)).
 * **proof** (kind): how a completed game's optimality is established: `trivial`, `exhausted`, `cap`, `prime_formula`,
   `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
@@ -321,10 +382,15 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
   moves beats a recorded score ([its README](../solver/noframe/README.md)).
 * **brute force** (`src/brute.rs`): the frame solver's exhaustive search, the test oracle for small games.
-* **conjecture (★)**: on every component of the sources' incidence graph, and every truncation of it, descending
-  greedy keeps a playable set of the largest size.  It is equivalent to THEORY.md's *upper-half conjecture*, that U\*
-  is the heaviest playable set of sources.  **(♦)**: every source that descending greedy rejects is a GF(2)
-  combination of sources it kept above it.  Statement (♦) implies (★) ([THEORY.md](THEORY.md), Theorem 7).
+* **the sources conjecture (S1)**: no playable set of sources outweighs U\*.  The *sources' instance* has the sources
+  as members, each listing all its maximal factors, and its *components*, *truncations*, *jams* and *victims* are
+  defined with the conjecture ([definitions](theory/sources.md#definitions)).  **Conjecture (★)**, the cardinality
+  conjecture: on every component of the sources' incidence graph, and every truncation of it, descending greedy keeps a
+  playable set of the largest size ([S4](theory/sources.md#the-cardinality-conjecture)).  It implies the sources
+  conjecture, and is equivalent to it for every weighting that increases with value.  **(♦)**, the span conjecture:
+  every source that descending greedy rejects is a GF(2) combination of sources it kept above it
+  ([S5](theory/sources.md#the-span-conjecture)).  Statement (♦) implies (★) ([the span theorem
+  (S6)](theory/sources.md#the-span-theorem)).
 * **the heuristics** (`heuristics/`): strategies that play good games quickly but don't guarantee optimal results.
 * **the probe** (`examples/perf.rs`), **the ladder** (`examples/ladder.rs`) and **`taxman bench`**: the performance
   tools of [solver/docs/design/performance.md](../solver/docs/design/performance.md).
@@ -341,7 +407,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 ## Labels
 
 Plans and theorems carry short labels.  A reference document gives the descriptive name first and the label once after
-it.
+it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
 
 * **A1 to A7**: the research avenues of [solver/docs/AGENDA.md, "Ranked
   avenues"](../solver/docs/AGENDA.md#3-ranked-avenues), such as A1, the multi-field bound, and A3, splitting the search
@@ -350,5 +416,11 @@ it.
 * **E-numbers** (E1, E6, E9(a), ...): the experiments of one plan, numbered within it.  The same number means
   different experiments in different plans; the entry or document that uses one defines it.  R1 to R3 likewise name
   the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.
-* **Theorems, lemmas and statements** (Theorem 1, Theorem M, Lemma D, L1 to L4, M1 to M6, statements N and U): the
-  results of [THEORY.md](THEORY.md).
+* **Results of the theory** (P2, N5, X7, R4, statement U, and so on): a letter for the file and a number in one
+  sequence through it: P [playability](theory/playability.md), N [neighbors](theory/neighbors.md), S
+  [sources](theory/sources.md), Q [uniqueness and longest games](theory/uniqueness-and-longest-games.md), W [the
+  parity bound](theory/parity-bound.md), C [Franklín and Moniot](theory/franklin-moniot.md), F [the frame
+  model](theory/frame-model.md), X [its exactness](theory/exactness.md), E [the extended
+  problem](theory/extended-problem.md), B [the bounds on the promotions](theory/frame-bounds.md) and R [the rules of a
+  search](theory/search-rules.md).  The letters C, E and R also head the numbers above, so a label of the theory comes
+  with its name.

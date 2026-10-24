@@ -23,9 +23,9 @@
 //! reports and checks.
 //!
 //! Every promotable set `Q` is an integer point that satisfies every cut below: in each frame, the peel's order pays
-//! each mover with a factor no mover left after it lists (THEORY.md, Theorem 1 and the bridge lemma of "Relation to
-//! Franklín and Moniot"), a matching of the frame with no alternating cycle.  So each bound is an upper bound on the
-//! node's completions.
+//! each mover with a factor no mover left after it lists (the playability theorem (P2) and the peel-order lemma (P9)
+//! of docs/theory/playability.md, and the bridge lemma (C1) of docs/theory/franklin-moniot.md), a matching of the frame
+//! with no alternating cycle.  So each bound is an upper bound on the node's completions.
 //!
 //! # The cuts
 //!

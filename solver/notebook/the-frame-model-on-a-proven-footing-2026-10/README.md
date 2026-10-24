@@ -5,8 +5,8 @@ Part of the [lab notebook](../README.md).
 Started 2026-10-15.  Concluded 2026-10-15.
 
 **Question.**  Can the five assumptions of the frame model, validated on the data and never proven, be proved from one
-statement about the game and one fact about each board?  **Answer.**  Yes: the proofs are in [THEORY.md, "The frame
-model: what is proven and what remains"](../../../docs/theory/frame-model.md), and the checks on every board to 8191,
+statement about the game and one fact about each board?  **Answer.**  Yes: the proofs are in [frame-model.md, "The frame
+model"](../../../docs/theory/frame-model.md), and the checks on every board to 8191,
 on the code and on the recorded optimal sets found no exception.  The frame solver's answer for a game proven
 `exhausted`, `trivial` or `same_search` is opt(n) exactly when statement U holds at n.
 
@@ -88,8 +88,8 @@ code is right; games proven by `cap` or `prime_formula` need nothing of the mode
 up to 2175, and the certificates of U go game by game past it (barred parity bounds with layers 1 and 2 fixed by
 Theorem B, then a search of the members they leave open).
 
-The hard check of N is superseded by the numbering by layer, which is clean by construction ([THEORY.md, "Numbering by
-layer"](../../../docs/theory/frame-model.md#numbering-by-layer)).  A board or a game that fails a check above would
+The hard check of N is superseded by the numbering by layer, which is clean by construction ([frame-model.md, "Clean
+numbering"](../../../docs/theory/frame-model.md#clean-numbering)).  A board or a game that fails a check above would
 reopen the proofs.
 
 ## Files

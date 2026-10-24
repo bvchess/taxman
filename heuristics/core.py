@@ -122,8 +122,8 @@ def peel(
     mean "no perfect matching exists".  Some sets have perfect payment
     matchings, every one of which is precedence-cyclic and hence
     unplayable; the forced-move discipline rejects those too.  Both
-    directions are theorems (docs/theory/decision-procedure.md, "The decision procedure":
-    Theorem 2, schedulability, and Theorem 3, completeness): with
+    directions are theorems (the peel theorem, P4, docs/theory/playability.md:
+    soundness, which gives schedulability, and completeness): with
     maximal-factor pools, success here is exactly playability.  See the
     n=21 example.
     """
@@ -227,10 +227,11 @@ def order_for_real_game(matching: Dict[int, int]) -> List[int]:
     role of solving frames front-to-back in the wiki's walkthrough.)
 
     Any topological order of that precedence works, and one always
-    exists: by the schedulability theorem (docs/theory/decision-procedure.md, "The decision procedure", Theorem 2), an assignment produced by peel can never
-    have a cyclic precedence -- the prime-counting potential confines
-    any would-be cycle to pool edges, and the peel rules refuse those
-    configurations outright.
+    exists: by the schedulability theorem (the soundness half of the peel
+    theorem, P4, docs/theory/playability.md), an assignment produced by
+    peel can never have a cyclic precedence -- the prime-counting
+    potential confines any would-be cycle to pool edges, and the peel
+    rules refuse those configurations outright.
 
     Algorithmically this is Kahn's topological sort verbatim: build the
     precedence DAG, repeatedly emit a vertex with no unplayed
@@ -305,8 +306,8 @@ def maximal_factor_lists(n: int) -> List[List[int]]:
 
     Same shape and index contract as divisor_lists (indices 0 and 1 are
     empty).  This is the candidate-payment pool for the matching machinery:
-    the lifting lemma guarantees any surviving proper divisor of a pick
-    lifts to a surviving maximal factor outside the set, so restricting the
+    the lifting lemma (P1, docs/theory/playability.md) guarantees any
+    surviving proper divisor of a pick lifts to a surviving maximal factor outside the set, so restricting the
     pool to maximal factors is matching-equivalent to using all proper
     divisors (confirmed bit-identical for every n in 1..1000).
     """

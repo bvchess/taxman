@@ -37,7 +37,9 @@ chose: every promotable completion leaves out some member of a conflict, so bran
 one, explores every promotable set ([search.md, "The default step"](search.md#the-default-step), fact 2).  The conflicts
 that `conflict_branching` chooses among are true conflicts: the search's own, the nogoods within the heaviest set, and
 the minimal conflicts that `FrameGraph::conflicts_ordered` makes, each checked unwinnable by the whole peel
-(docs/theory/decision-procedure.md, Theorems 3 and 4; docs/theory/frame-model.md, Theorem M; [search.md, "Conflict
+([the peel theorem (P4)](../../../docs/theory/playability.md#the-peel-theorem), [the residual theorem
+(P5)](../../../docs/theory/playability.md#the-residual-theorem) and [the exactness theorem
+(X7)](../../../docs/theory/exactness.md#the-exactness-theorem); [search.md, "Conflict
 branching"](search.md#conflict-branching)).  The look that `conflict_look` makes chooses between two of them, the
 search's own conflict and the one `conflict_branching` chose, and leaves the node's state as it found it ([search.md,
 "Conflict branching"](search.md#conflict-branching), the paragraph "Why the look is exact").  The gate is the gap from
@@ -101,7 +103,7 @@ The others stay fixed for the life of a search, each for its reason:
 | `nogoods` | rules candidates out of children, and cuts a node whose conflict is all forced or promoted |
 | `lagrange` | a bound, which cuts nodes and finds forced members |
 | `gf2` | the node bound itself |
-| `symmetry` | cuts nodes, and drops candidates no completion keeping the inequalities holds; its trees rest on Theorem 13 for the whole search |
+| `symmetry` | cuts nodes, and drops candidates no completion keeping the inequalities holds; its trees rest on [the prime-exchange theorem (R2)](../../../docs/theory/search-rules.md#the-prime-exchange-theorem) for the whole search |
 | `force_window` | says which members are searched for being forced, and forced members end loops |
 | `branching`, `strong_limit`, `strong_depth`, `deep_branching`, `more_forced` | they choose the member to branch on, but strong branching also finds forced members, the members without which the bound falls below the need, and those end loops |
 

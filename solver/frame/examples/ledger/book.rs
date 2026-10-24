@@ -1,26 +1,26 @@
 //! The book of the ledger: for every game n, a lower bound L(n), the score of a game it holds, and an upper bound U(n)
 //! on opt(n), each with its derivation (the rule and the board it came from), and the relations between boards, applied
-//! to a fixpoint.  The relations are proven in docs/theory/ledger.md; each lemma there gives an L direction (a game of
-//! one board made from a game of another, which the referee replays here before it counts, and which is made and
-//! replayed only if it can beat the board's own) and a U direction (an inequality on opt(n)):
+//! to a fixpoint.  The relations are proven in docs/theory/neighbors.md and docs/theory/search-rules.md; each gives an
+//! L direction (a game of one board made from a game of another, which the referee replays here before it counts, and
+//! which is made and replayed only if it can beat the board's own) and a U direction (an inequality on opt(n)):
 //!
-//! * `monotone` (Lemma L1): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still legal
-//!   (n composite); U(n − 1) ≤ U(n).
-//! * `ceiling` (Lemma L2): opt(n) ≤ opt(n − 1) + n.  U(n) ≤ U(n − 1) + n; L(n − 1) from the game of n without the
-//!   move n, completed (n composite).
-//! * `prime` (Lemma L3): for a prime p and q the largest prime below it, opt(p) = opt(p − 1) + p − q, both ways, the
-//!   games by exchanging the opening q and p.
-//! * `repeat` (Lemma L4): boards with the same search problem have the same best promotion sum, so U(n) − bag(n)
-//!   ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
+//! * `monotone` (monotonicity, N3): opt(n − 1) ≤ opt(n).  L(n) from the game of n − 1, followed by n when it is still
+//!   legal (n composite); U(n − 1) ≤ U(n).
+//! * `ceiling` (the ceiling lemma, N4): opt(n) ≤ opt(n − 1) + n.  U(n) ≤ U(n − 1) + n; L(n − 1) from the game of n
+//!   without the move n, completed (n composite).
+//! * `prime` (the prime formula, N5): for a prime p and q the largest prime below it, opt(p) = opt(p − 1) + p − q, both
+//!   ways, the games by exchanging the opening q and p.
+//! * `repeat` (the repeat lemma, R6, in docs/theory/search-rules.md): boards with the same search problem have the same
+//!   best promotion sum, so U(n) − bag(n) ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
 //!
 //! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map, as `wall
-//! landscape` computes it), searches (`search`, `dual`, `exhausted`, Lemma D for the dual bound; `floor`, Lemma F, a
-//! search under a floor that completed having found nothing: U is the floor), the finder's games (`lns`: L only),
-//! proven games given (`given`), boards with nothing to promote (`trivial`), and the Lagrangian bound over checked
-//! nogoods (`nogoods`: U only, which nothing makes now: the removed `wall nogoods` did).  Every bound only
-//! improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a violation, which
-//! [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on statement U, a
-//! counterexample to it.
+//! landscape` computes it), searches (`search`, `dual`, `exhausted`, the dual-bound lemma (R4) for the dual bound;
+//! `floor`, the floor lemma (R5), a search under a floor that completed having found nothing: U is the floor), the
+//! finder's games (`lns`: L only), proven games given (`given`), boards with nothing to promote (`trivial`), and the
+//! Lagrangian bound over checked nogoods (`nogoods`: U only, which nothing makes now: the removed `wall nogoods` did).
+//! Every bound only improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a
+//! violation, which [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on
+//! statement U, a counterexample to it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use taxman::board::Board;
@@ -428,7 +428,8 @@ impl Book {
     /// the boards (each one's ceiling from the one before) is passed on in one sweep and a chain down them in the
     /// next, and a board is not improved again by every source that happens to reach it first.
     /// Returns the changes, in order.  An error is a violation (L > U), or a game a relation made that the referee
-    /// refuses: either is a bug, or a counterexample to statement U (docs/theory/ledger.md).
+    /// refuses: either is a bug, or a counterexample to statement U (docs/theory/search-rules.md, "Bounds carried
+    /// between games").
     pub fn propagate(&mut self, changed: impl IntoIterator<Item = u32>) -> Result<Vec<Change>, String> {
         let mut pending: BTreeSet<u32> = changed.into_iter().collect();
         let mut cursor = 0;
@@ -461,9 +462,9 @@ impl Book {
         let t = &self.entries[&target];
         let (t_bag, t_prime, t_value) = (t.bag, t.prime, t.lower.as_ref().map_or(0, |l| l.value));
         // The relation that carries a game across the link, and the rule that names the upper bound (up a board it is
-        // the ceiling, down a board monotonicity).  Lemma L3 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange
-        // of the opening q for p scores that much more, and the same down; Lemma L2 (the ceiling): U(n) <= U(n - 1) +
-        // n; Lemma L1 (monotone): the game of n - 1 scores as it did, or n more, and U(n - 1) <= U(n); Lemma L4: U(n) -
+        // the ceiling, down a board monotonicity).  N5 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange
+        // of the opening q for p scores that much more, and the same down; N4 (the ceiling): U(n) <= U(n - 1) +
+        // n; N3 (monotone): the game of n - 1 scores as it did, or n more, and U(n - 1) <= U(n); R6 (repeat): U(n) -
         // bag(n) <= U(m) - bag(m), and the promotions of the source's game on the target's board score its bag and
         // their sum (a game that was not made from promotions is made only if it has more to give than the target's,
         // on the same terms).  `upper_by` has the arithmetic, which bounds the score of a game too, except down a board.

@@ -10,16 +10,19 @@ stop searching every branch that cannot reach the most moves.  Neither the Java 
 
 ## What is proven
 
-THEORY.md, ["Longest games"](../../../docs/theory/uniqueness-and-longest-games.md#longest-games).  Let M(n) be the most
-moves of a game of n, the size of the largest playable set of picks.
+The theory, in [the length lemma (Q3)](../../../docs/theory/uniqueness-and-longest-games.md#the-length-lemma) and [the
+length proposition (Q4)](../../../docs/theory/uniqueness-and-longest-games.md#the-length-proposition).  Let M(n) be the
+most moves of a game of n, the size of the largest playable set of picks (ℓ(n) in the theory).
 
 * **M(n) <= ν(n)**, the matching number of the board's maximal-factor graph, which joins each number to its maximal
-  factors: a playable set pays each pick with a distinct maximal factor outside it (Theorem 1).  So a legal game of
-  ν(n) moves is a longest game, a certificate that costs one matching.
+  factors: a playable set pays each pick with a distinct maximal factor outside it ([the playability theorem
+  (P2)](../../../docs/theory/playability.md#the-playability-theorem)).  So a legal game of ν(n) moves is a longest game,
+  a certificate that costs one matching.
 * **M(n − 1) <= M(n) <= M(n − 1) + 1**, and **M(n) = M(n − 1) for a prime n >= 3**: the count forms of the ceiling and
   the prime formula.
-* Given (★), a playable set has at most |U\*| members above n/2 (Theorem 8's count inequality): a longest game cannot
-  gain on an optimal game whose upper part is U\* except below n/2.
+* Given (★), a playable set has at most |U\*| members above n/2 ([the uniqueness theorem
+  (Q1)](../../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)'s count inequality): a longest game
+  cannot gain on an optimal game whose upper part is U\* except below n/2.
 
 ## Method
 
@@ -34,7 +37,7 @@ pick weighing 1 ([`Prover::weighted`](../src/game.rs)), in a mode that raises it
 recorded one exists, the heaviest longest game comes from the same search with the pick of c weighing K + c, where K is
 above every sum, so that a set's weight orders by moves, then by sum.  That search starts from the heaviest longest game
 with the recorded game's upper part, found with the sources fixed, which is cheap.  Every longest game written is
-replayed by the rules, in the order Theorem 1 gives from peel's payments (`play_order`).
+replayed by the rules, in the order P2 gives from peel's payments (`play_order`).
 
 The checks: M(n) and the heaviest longest game against brute force for n <= 22, ν(n) against the matching solver for
 every board to 400, and `play_order` against the recorded games to 400.

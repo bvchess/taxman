@@ -17,7 +17,7 @@ of the multipliers is tens of seconds a root and 0.1 to 0.6 s a node, two to thr
 
 The study is the advisor's experiment E1 (with E0, its validation, E1-lite, a quick look, and E1n, the probe's nodes)
 and then E2 (past 2175).  The solver is unchanged.  Theorems 14 and 15 of
-[THEORY.md](../../../../docs/theory/bounds.md#signed-frame-matroids-the-frame-bound-over-other-fields) prove what the
+[THEORY.md](../../../../docs/theory/frame-bounds.md#the-signed-frame-theorem) prove what the
 bound rests on.
 
 ## Method

@@ -1,20 +1,21 @@
 //! Certificates of U: a recorded score proven optimal on the whole board, game by game, by a search of the extended
-//! problem (`taxman certify`; docs/theory/extended-problem.md, Theorem M⁺ and its corollary).
+//! problem (`taxman certify`; docs/theory/extended-problem.md, the extended exactness theorem (E1) and the certificate
+//! theorem (E4)).
 //!
 //! A game of `n` whose proof uses the frame model (an exhausted search, a trivial board, a repeat) is optimal on the
 //! whole board if some optimal game plays every source of three or more prime factors that setup keeps, U\*_{≥3}
 //! (the statement U).  The prover's barred parity bounds (`solver/noframe/src/bin/upper.rs`, one line per game) settle
-//! most of U\*_{≥3} against the game's score V: a member is *certified* when no set that respects Theorem B and leaves
-//! it out weighs more than V; the others are *open*, O.  The *extended problem* Π⁺(O)
-//! ([`build_extended`](crate::frames::build_extended)) keeps the certified ones fixed and leaves the open ones
-//! optional (one-sided candidates of the search), and by the corollary of Theorem M⁺, if no promotion set of Π⁺(O)
-//! is worth more than V − `in_the_bag⁺`, then opt(n) = V.
+//! most of U\*_{≥3} against the game's score V: a member is *certified* when no set that respects the bottom-layers
+//! theorem (F3, docs/theory/frame-model.md) and leaves it out weighs more than V; the others are *open*, O.  The
+//! *extended problem* Π⁺(O) ([`build_extended`](crate::frames::build_extended)) keeps the certified ones fixed and
+//! leaves the open ones optional (one-sided candidates of the search), and by the certificate theorem (E4), if no
+//! promotion set of Π⁺(O) is worth more than V − `in_the_bag⁺`, then opt(n) = V.
 //!
 //! [`certify_game`] does that for one game: it takes V and the recorded game from the results files, checks that the
 //! game plays U\* above n/2 and is the promotion set (K\*, L\*) = (O, its moves up to n/2) of Π⁺(O), worth V, and
 //! searches Π⁺(O) from it, in extended mode ([`SearchTactics::extended`]), with the ceiling n + V(n − 1) −
 //! `in_the_bag⁺`.  The verdict is [`Verdict::Certified`] when the search ends with nothing better (opt(n) = V), and
-//! [`Verdict::Beaten`] when it finds a promotion set worth more: then F ∪ K ∪ L is playable (Theorem M⁺), and the game
+//! [`Verdict::Beaten`] when it finds a promotion set worth more: then F ∪ K ∪ L is playable (E1), and the game
 //! that plays it, in the order of [`play_order`] (which shares no code with the frame model) and finished with the
 //! largest legal moves left, is refereed by [`replay_finished`] and scores more than V: a counterexample to the score,
 //! and to U if the score was proven on the frame model.  A search stopped by a limit or a signal keeps its checkpoint
@@ -24,12 +25,12 @@
 //! against more cover only the sets worth more than that), so a game whose `upper` line has a larger score is not
 //! certified; a promotion set that beats V is a counterexample whatever the line says.
 //!
-//! The extended problem has two *formulations* ([`Board::extended`]): with the claims of `unzip` that Lemma M5⁺ allows
-//! to keep (`claims`, the default), and without any, as every certificate made before that lemma was.  A run searches
-//! in one of them (`taxman certify --no-claims` in the second), and a certificate's line records which
+//! The extended problem has two *formulations* ([`Board::extended`]): with the claims of `unzip` that the kept-claims
+//! lemma (E2) allows to keep (`claims`, the default), and without any, as every certificate made before that lemma was.
+//! A run searches in one of them (`taxman certify --no-claims` in the second), and a certificate's line records which
 //! ([`Certificate::claims`]; a line with no such field is read as without).  The two have the same promotion sets and
-//! so the same heaviest promotion set (docs/THEORY.md, the corollary of Lemma M5⁺), so a certificate made in one
-//! bounds the heaviest promotion set of the problem in the other.
+//! so the same heaviest promotion set (the formulation corollary (E3), docs/theory/extended-problem.md), so a
+//! certificate made in one bounds the heaviest promotion set of the problem in the other.
 //!
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often
 //! pose the same search problem in the solver (`solver::SAME_SEARCH_WINDOW`).  If an earlier game m of the last
@@ -39,7 +40,7 @@
 //! m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever formulation
 //! m's certificate was made in (a line of the other formulation is set up again in the run's): m's certificate bounds
 //! the heaviest promotion set, which does not depend on the formulation, so the rule proves what a search of Π⁺(n)
-//! would, and n's own barred bounds then give opt(n) = V(n) by the corollary of Theorem M⁺.  A game worth less than
+//! would, and n's own barred bounds then give opt(n) = V(n) by E4.  A game worth less than
 //! m's certificate says is searched (it is not optimal, and the search finds the better set); one worth more
 //! contradicts the certificate and is refused.  Research code: the solver does not use it.
 //!
@@ -213,7 +214,7 @@ pub struct Certificate {
     pub threads: usize,
     /// The set width the search ran at, in words: the board's own, or the widest where the GF(2) bound needs it.
     pub width: usize,
-    /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that Lemma M5⁺
+    /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that E2
     /// keeps, false with none, as every certificate made before it (whose lines have no `claims`, and read as false).
     pub claims: bool,
     pub verdict: Verdict,
@@ -338,8 +339,8 @@ impl Certificate {
 /// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1`
 /// (the results files, over the table of optimal games), `upper` the open members; the search runs with `opts`'
 /// threads, checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.
-/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that Lemma M5⁺ keeps, or
-/// without any.
+/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E2 keeps, or without
+/// any.
 ///
 /// # Errors
 ///
@@ -544,7 +545,7 @@ fn check_recorded_game<const W: usize>(
     let promotable = start.is_subset(&prepared.candidates)
         && prepared.model.can_promote_all_using(&mut Scratch::new(), &prepared.root, &start);
     if !promotable {
-        return Err(at("the recorded game is not a promotion set of Π⁺(O) (Theorem M⁺ says a playable one is)".into()));
+        return Err(at("the recorded game is not a promotion set of Π⁺(O) (E1 says a playable one is)".into()));
     }
     let worth = start.sum();
     if extended.in_the_bag + worth != score {
@@ -786,8 +787,9 @@ fn apply_rule(m: &Certificate, best: u64, theirs: &Problem, ours: &Problem, wort
 }
 
 /// The game of a promotion set `promotions` of Π⁺(O) worth more than `score`: the set S = F ∪ K ∪ L played in the
-/// order of [`play_order`] (the peel of THEORY.md, Theorem 2, which uses nothing of the frame model), then the largest
-/// legal move left, again and again, until none is left, so that the game is over; refereed by [`replay_finished`].
+/// order of [`play_order`] (the peel of the peel theorem (P4, docs/theory/playability.md), which uses nothing of the
+/// frame model), then the largest legal move left, again and again, until none is left, so that the game is over;
+/// refereed by [`replay_finished`].
 fn beating_game<const W: usize>(
     t: &Tables,
     extended: &ExtendedFrames<W>,

@@ -179,10 +179,13 @@ reads nothing of the truth (`optimal.json`, the results files) unless it is give
   computes it when it starts the unit (`search::NodeBound`);
 * given games;
 * the relations between games, applied to a fixpoint after every change: monotonicity, the ceiling and the game below
-  it, the prime formula both ways, and repeats (docs/theory/ledger.md, Lemmas L1 to L4
-  and D, with what each rests on).  The referee replays every game that a relation makes before it counts, if it could
-  raise a game's L (a game that cannot is not shown to the referee, or not made), and an L above a U stops the run as
-  an error;
+  it, the prime formula both ways, and repeats ([monotonicity (N3), the ceiling lemma (N4) and the prime formula
+  (N5)](../../../docs/theory/neighbors.md), [the repeat lemma
+  (R6)](../../../docs/theory/search-rules.md#the-repeat-lemma) and [the dual-bound lemma
+  (R4)](../../../docs/theory/search-rules.md#the-dual-bound-lemma); [bounds carried between
+  games](../../../docs/theory/search-rules.md#bounds-carried-between-games) says what each rests on).  The referee
+  replays every game that a relation makes before it counts, if it could raise a game's L (a game that cannot is not
+  shown to the referee, or not made), and an L above a U stops the run as an error;
 * the *finder*, a large neighborhood search (`search/finder.rs`; [finders for good games that are not
   sound](../../notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and
   proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a
@@ -202,8 +205,8 @@ little for each.  Then the searches go where a proof looks cheapest, with *climb
 * a climb that stops parks its game in the ordinary order, and the games just outside the class of a game being
   climbed to wait for it;
 * an open game that is not climbed to is *stepped down* before its proof (`--floor-step`): a search under a floor below
-  its upper bound (`search::search_above`, Lemma F) which, if it completes having found nothing, makes the floor the
-  upper bound (the rule `floor`).
+  its upper bound (`search::search_above`, [the floor lemma (R5)](../../../docs/theory/search-rules.md#the-floor-lemma))
+  which, if it completes having found nothing, makes the floor the upper bound (the rule `floor`).
 
 The cost of a search under a floor is about log-linear in the floor's distance below the root's bound, so each game has
 a line, fitted from its completed steps, which forecasts its proof.  Each step costs tenfold more than the depth already
@@ -227,8 +230,8 @@ format, the commands and the referees.
   game of another line; else its moves.
 * An upper bound has its rule, the bound and game it was derived from (`from`, `from_value`, and for a repeat the two
   bags), and `rests_on`, the games at which it assumes statement U: its own game for a bound of the frame model, what
-  the bound it comes from rests on for a relation, and its own game added for a repeat (Lemma L4's inequality between
-  upper bounds).
+  the bound it comes from rests on for a relation, and its own game added for a repeat ([the repeat lemma
+  (R6)](../../../docs/theory/search-rules.md#the-repeat-lemma)'s inequality between upper bounds).
 * `ledger export` appends a run's improvements, and `ledger run --bounds` starts a run from the file's best bounds (a
   game with both needs no map).  `ledger verify-bounds` is the Rust referee: it replays every game, computes again every
   root bound and every repeat's bags and search problem, and checks every relation's arithmetic against the line it

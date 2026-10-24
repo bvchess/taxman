@@ -10,21 +10,26 @@ words.
 Why that matters: the frame solver ([its README](../frame/README.md)) searches the promotions of the frame model, whose
 answer is opt(n) exactly when [statement U](../../docs/GLOSSARY.md#the-frame-model) holds at n: some optimal game plays
 every source with three or more prime factors that setup keeps
-([docs/theory/frame-model.md](../../docs/theory/frame-model.md), where the model's other rules are proven;
+([docs/theory/exactness.md](../../docs/theory/exactness.md), where the model's other rules are proven;
 [solver/docs/design/frame-model.md](../docs/design/frame-model.md)).  Where the prover proves opt(n), U holds.  The
 sources that setup keeps, [U\*](../../docs/GLOSSARY.md#the-frame-model), are the heaviest playable set of sources
-wherever THEORY.md's conjecture (★) holds (Theorem 8;
-[docs/theory/uniqueness-and-longest-games.md](../../docs/theory/uniqueness-and-longest-games.md)).
+wherever [the cardinality conjecture (★) (S4)](../../docs/theory/sources.md#the-cardinality-conjecture) holds ([the
+uniqueness theorem (Q1)](../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)).
 
 The prover also lists every optimal set of a game, finds the longest games, certifies conjecture (★) at scale, and
-searches for adversarial instances.  It rests only on THEORY.md's theorems and on elementary bounds, and every exact
-method in it is tested against brute force.  The theorems are these:
+searches for adversarial instances.  It rests only on [the theory's](../../docs/THEORY.md) theorems and on elementary
+bounds, and every exact method in it is tested against brute force.  The theorems are these:
 
-* Theorem 1, with peel as the playability oracle: it decides playability by peel;
-* the residual theorems;
-* the parity matroids of Theorem 10;
-* Theorem B, the bottom layers of every optimal set, in the proofs that start from its roles, which is the default of
-  `exact`.
+* [the playability theorem (P2)](../../docs/theory/playability.md#the-playability-theorem) and [the peel theorem
+  (P4)](../../docs/theory/playability.md#the-peel-theorem), with peel as the playability oracle: it decides playability
+  by peel;
+* [the residual theorem (P5)](../../docs/theory/playability.md#the-residual-theorem), [the core theorem
+  (P7)](../../docs/theory/playability.md#the-core-theorem) and [the exclusion theorem
+  (P8)](../../docs/theory/playability.md#the-exclusion-theorem);
+* [the parity matroids](../../docs/theory/parity-bound.md#the-parity-matroids) of [the parity bound
+  (W1)](../../docs/theory/parity-bound.md#the-parity-bound);
+* [the bottom-layers theorem (F3)](../../docs/theory/frame-model.md#the-bottom-layers-theorem), the bottom layers of
+  every optimal set, in the proofs that start from its roles, which is the default of `exact`.
 
 [proofs.md](docs/proofs.md) lists what each proof rests on.  This document says *pick* for a
 [move](../../docs/GLOSSARY.md#the-game), *forced picks* for the numbers fixed in at a node (the frame solver's [forced
@@ -36,10 +41,10 @@ What the prover established, assumption by assumption
 
 | assumption | what the prover established | grade |
 |---|---|---|
-| (★): descending greedy is maximum-cardinality on every component and truncation of the sources' instance, hence U\* is the heaviest playable set of sources (the upper-half conjecture) | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five components that the earlier evidence left undecided settled; no counterexample | certified per game (a bound met), open in general |
+| (★): descending greedy is maximum-cardinality on every component and truncation of the sources' instance, hence U\* is the heaviest playable set of sources ([the sources conjecture (S1)](../../docs/theory/sources.md#the-sources-conjecture)) | **every game n = 2 .. 100,000** (602,777,907 greedy rejections) and **902 games to 2,000,000** (60,183,674 more): every rejection a GF(2) linear dependency, which certifies (★) for the whole game; the five components that the earlier evidence left undecided settled; no counterexample | certified per game (a bound met), open in general |
 | greedy removal of impossible sources in frames (`removeImpossible`) | at the root (where it shapes the search space) it *is* descending greedy on each component of the sources, so it is certified with (★) for every n ≤ 100,000 | certified per game |
 | the frame model as a whole: `unzip`'s mandatory moves, freedoms, closed frames inert, promotions one frame forward, greedy removal | **opt(n) proven equal to the recorded score, on the whole board, for every n = 2 .. 2175**, the committed chain as far as it reached when the proofs were made | verified (exact, on the whole board) |
-| uniqueness: one optimal set per game, and every optimal game's upper part U\* | **U\* is the unique heaviest playable set of sources wherever (★) holds** (Theorem 8), so to 100,000; every optimal set enumerated, on the whole board, in 954 of the games 2..989 (the other 34 with the sources fixed to U\*): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (the sources, given (★)); measured (whole game) |
+| uniqueness: one optimal set per game, and every optimal game's upper part U\* | **U\* is the unique heaviest playable set of sources wherever (★) holds** ([Q1](../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem)), so to 100,000; every optimal set enumerated, on the whole board, in 954 of the games 2..989 (the other 34 with the sources fixed to U\*): **the optimal set is unique for every n ≤ 424, not at 425**; 30 games have two or three; every optimal set found has upper part U\* | proven (the sources, given (★)); measured (whole game) |
 | the longest games: an optimal game plays the most moves a game of the board can (the wiki's open question) | **false**: at n = 833, 834 and 835 every optimal game is one move short of the longest; every other game to 1300 is a longest game, the difference never above one | refuted (on the whole board); measured to 1300 |
 
 Its files, in [docs/](docs/):

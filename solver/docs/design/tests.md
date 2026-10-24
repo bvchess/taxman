@@ -23,23 +23,26 @@ every second line of the Java fixtures), and the comment on each says what the w
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
   `frames` check what the frames remember (which numbers each can take on, which sources `removeImpossible` has been
   through) against a fresh computation.
-* **The frame model's exactness** (THEORY.md, Theorems B and M; [frame-model.md](frame-model.md#what-optimal-means)):
+* **The frame model's exactness** ([the bottom-layers theorem (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)
+  and [the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem);
+  [frame-model.md](frame-model.md#what-optimal-means)):
   * `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
     `model` (`src/playable.rs`, the peel, itself checked against the rules on every subset of the games to 20).  It
-    checks both directions of Theorem M on every set of every game to 100 (to 120 ignored) and on random sets of games
+    checks both directions of X7 on every set of every game to 100 (to 120 ignored) and on random sets of games
     to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98).
-  * `tests/model_extended.rs` checks Theorem M⁺ (the extended problem, with the sources of three or more prime factors
-    optional) both ways, in both formulations (with and without the claims of `unzip`, Lemma M5⁺): on every set of
+  * `tests/model_extended.rs` checks [E1](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem) (the
+    extended problem, with the sources of three or more prime factors
+    optional) both ways, in both formulations (with and without the claims of `unzip`, [E2](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
-    with none open the promotion sets are the frame model's, and catches a mutant that skips the check of Lemma M5⁺.
-  * `tests/bottom_layers.rs` checks Theorem B on every game of `optimal.json`, the committed chain and another run of
+    with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E2.
+  * `tests/bottom_layers.rs` checks F3 on every game of `optimal.json`, the committed chain and another run of
     its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
     set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
-    `build_frames` uses, that the frames lie in layers (Lemma Ω, also on punctured boards), and that the numbering by
+    `build_frames` uses, that the frames lie in layers (F1, also on punctured boards), and that the numbering by
     layer is the Java's breadth-first numbering on every game to 400 and a sample to 8191.
   * The census of every game (`examples/structure.rs`; its data are in
-    `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`) checks what Theorem M's proof says of setup
+    `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`) checks what X7's proof says of setup
     one game at a time, and that Π⁺(∅) with the claims of `unzip` is Π_n (check H).
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against `optimal.json`.
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
@@ -108,7 +111,7 @@ every second line of the Java fixtures), and the comment on each says what the w
 
   A search below the root with the rule of symmetric pairs is held to the best completion that keeps their
   inequalities (an exhaustive oracle of its own, which prunes by the same bound but shares no code with the rule), which
-  it must reach; at the root that is P\* (Theorem 13).
+  it must reach; at the root that is P\* ([R3](../../../docs/theory/search-rules.md#pruning-by-prime-exchanges)).
 * **The floor** (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400, a floor below P\*
   finds an optimal set, a floor at P\* or above completes with nothing found, and a floor at the root's bound or above
   ends at the first check; with the default tactics and (every ninth game) on four threads, on the matching path, and

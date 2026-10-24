@@ -66,8 +66,8 @@
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an
 //! optimal set: the rule keeps only the completions that keep the root's symmetric pairs' inequalities, and a subtree
-//! below the root can hold a heavier completion that breaks one (docs/theory/bounds.md, "Prime exchanges: symmetries of
-//! the promotions", the paragraph "Pruning with the inequalities").  With an optimal set as the incumbent nothing beats
+//! below the root can hold a heavier completion that breaks one (the exchange-pruning lemma (R3),
+//! docs/theory/search-rules.md, part 3).  With an optimal set as the incumbent nothing beats
 //! it whatever the settings, so a different `best` there is a bug.
 
 #[allow(dead_code)] // this reads and writes hex sets only; the probe reads the nodes fixtures too

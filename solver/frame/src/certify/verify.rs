@@ -9,7 +9,7 @@
 //! members and the line's score), the results' game (its score, the checks `certify` makes of the recorded game, at
 //! the set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce
 //! the line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
-//! formulation, the one it records (`claims`: with the claims of `unzip` that Lemma M5⁺ keeps, or without), for the
+//! formulation, the one it records (`claims`: with the claims of `unzip` that E2 keeps, or without), for the
 //! width and for the problem.  A `certified` line has no `beaten_by` and no line for its board in the counterexample
 //! file beside the certificates ([`counterexample_path`]); a `certified` line with `same_problem` rests on the last
 //! final line of the game it names before it in the same file, which must be `certified` and among the last

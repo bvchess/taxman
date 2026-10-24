@@ -1022,8 +1022,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         if let Some(sym) = &space.symmetry {
             // The candidates the rule drops are in no completion of the child that keeps the symmetric pairs'
-            // inequalities, which are the only ones the search needs (Theorem 13).  Whether the child has any such
-            // completion is `check_child`'s to ask, of these candidates; the count leaves out a child it cuts.
+            // inequalities, which are the only ones the search needs (the prime-exchange theorem, R2).  Whether the
+            // child has any such completion is `check_child`'s to ask, of these candidates; the count leaves out a
+            // child it cuts.
             let before = cands;
             if !sym.exclude(&mut self.symmetry_scratch, &child.promoted, &mut cands) {
                 self.counts.symmetry_excluded += u64::from((before - cands).len());
@@ -1070,7 +1071,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         if let Some(sym) = &self.space.symmetry {
             // No completion of the child keeps every pair's inequality, and a heaviest promotion set keeps them
-            // (Theorem 13, "Pruning with the inequalities"): none of its completions beats the incumbent.
+            // (R2 and the exchange-pruning lemma, R3): none of its completions beats the incumbent.
             if sym.hopeless(&mut self.symmetry_scratch, &child.promoted, &cands) {
                 return Err(cut::SYMMETRY);
             }

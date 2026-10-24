@@ -837,7 +837,7 @@ const RETIRED_EVERYWHERE: &[Retired] = &[
 ];
 
 /// Retired in the guides and comments of the solver (`solver/` but for the prover), which use the wiki's
-/// words.  The heuristics and the prover keep some of these for their own meanings (THEORY's frontier argument).
+/// words.  The heuristics and the prover keep some of these for their own meanings (the theory's frontier theorem).
 const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("upstream", "behind"),
     retired("downstream", "in front of"),
@@ -848,7 +848,7 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
     retired("feasible completion", "promotable"),
     retired("feasible set", "promotable"),
     retired("feasible optimum", "promotable"),
-    retired("cap", "ceiling (and `max_total`: the most promotions the freedoms allow)"),
+    retired("cap", "ceiling (and the promotion limit, `max_total`: the most promotions the freedoms allow)"),
     retired("caps", "ceilings"),
     retired("frontier", "the end of the chain, or the hardest games"),
     retired("strict run", "the committed chain"),
@@ -954,6 +954,7 @@ const RETIRED_NAMES: &[Retired] = &[
 /// they point to it.
 const STAYS: &[&str] = &[
     "frontier argument",
+    "frontier theorem",
     "frontier jam",
     "frontier chain",
     "odd core",
