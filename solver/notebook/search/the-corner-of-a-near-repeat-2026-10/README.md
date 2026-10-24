@@ -144,6 +144,26 @@ searched, the second repeats the first's work, within 11% of its nodes in these 
 
 The node counts are those committed, each from the build of its own run.
 
+**The move given up is always n's shadow.**  Call the *shadow* of n the number made from n by replacing each of its
+prime factors with the prime just below it, with multiplicity: the shadow of 4953 = 3·13·127 is 2·11·113 = 2486, and
+the shadow of a prime is the prime before it.  In every one of the 1,729 swaps, the move that n replaces is n's shadow
+when n is odd, and n/2 when n is even (2 has no prime below it):
+
+| n | swaps | the move given up |
+|---|---|---|
+| prime | 662 | the prime before n (the prime shortcut's formula) |
+| odd composite | 1,053, 67 of them searched | the shadow of n, in every one |
+| even | 15, 12 of them searched | n/2, at n = 8, 12, 16, 24, 32, 48, 64, 96, 256, 384, 512, 768, 1024, 2048, 3072 |
+
+There is no exception (`shadow.py`, its output [shadow.txt](shadow.txt)).  The 21 searched swaps of the 4953 kind are
+the shadows of 3·13·q, and the odd semiprimes are the case that [the wiki's open questions, section
+7](../../the-wikis-open-questions-2026-10/README.md#7-which-n) found from the other side: δ(pq) = p′q′, the loss of an
+odd semiprime is its shadow, at 417 of the 427 up to 2175.  The even swaps are the powers of two and three times them,
+where δ(n) = n/2 (the same entry, section 8).  So when two consecutive games differ by one move and promote the same
+numbers, the move given up is fixed by the factorization of n alone.  The law describes which move a swap gives up, not
+when a swap happens, and it is measured, not proven.  A proof would say why the shadow is the one move of the game of
+n − 1 that n displaces.
+
 ## 740 to 741 in detail
 
 The smallest of the kind has the same shape as 4953.  Both games have 6 frames, 174 candidates and `max_total`
@@ -208,6 +228,8 @@ as 4953, and it is an item of [what to try once the chain passes 5000](../../../
 * `scan_swaps.py [STRICT.jsonl ...]`: the scan of swaps.  With no argument it reads the two files above; `./scan_swaps.py
   > swaps.txt` made [swaps.txt](swaps.txt).  It prints the counts, the shares of nodes and one line for each searched
   swap, and marks the kind of 4953 with an asterisk.
+* `shadow.py`: compares the move each swap gives up with the shadow of n (odd n) or n/2 (even n); `./shadow.py >
+  shadow.txt` made [shadow.txt](shadow.txt), from the top of the repository or anywhere.
 * `payers.sh [TAXMAN]`: runs `taxman tables` on the two corners and counts what each payer pays for; `./payers.sh >
   payers.txt` made [payers.txt](payers.txt).  The first two lines of each corner are the moves, which pay for nothing.
 * `cut_runs.sh [TAXMAN]`: the runs of the cut on 741, 1209 and 1833.  Run it from the top of the repository, with its

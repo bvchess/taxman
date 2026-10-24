@@ -39,11 +39,12 @@ puts an answer at risk.
    near-repeat cut cannot reach.  Near repeats were 10% of the nodes searched from 4850 to 4955, and 8.4% beyond what the
    cut already settles.  The next step is to prove the reduction as a lemma, then to measure the short proof on 1209,
    1833 and 2301 ([the corner of a
-   near repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).  A related question: when the
-   promotions of n − 1 and n are the same, can the move that n's optimal game gives up be named from the factorization
-   of n?  At odd semiprimes it is p′q′, the product of the primes just below p and q, and at the near repeats of the
-   4953 kind 2·11·p gives way to 3·13·q with q the next prime after p.  Giving up the smallest move that makes room for
-   n is not such a rule: it falls short at 1,125 of 4,954 games ([the smallest single
+   near repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).  A related law, measured and not
+   proven: when the optimal games of n − 1 and n differ by one move and promote the same numbers, the move given up is
+   the *shadow* of n, n with each prime factor replaced by the prime just below it (2486 = 2·11·113 for 4953 =
+   3·13·127), or n/2 for even n, in all 1,729 such pairs of games 1 to 4955.  Why, and whether it says when such a swap
+   happens, are open; a proof could make some swaps provable without a search.  Giving up the smallest move that makes
+   room for n is not such a rule: it falls short at 1,125 of 4,954 games ([the smallest single
    loss](../notebook/the-smallest-single-loss-over-all-moves-2026-10/README.md)).
 5. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's

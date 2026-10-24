@@ -1,0 +1,7 @@
+even n, x = n/2                  not searched      3
+even n, x = n/2                  searched         12
+odd composite n, x its shadow    not searched    986
+odd composite n, x its shadow    searched         67
+prime n, x the prime before      not searched    662
+even n: [8, 12, 16, 24, 32, 48, 64, 96, 256, 384, 512, 768, 1024, 2048, 3072]
+exceptions: none
