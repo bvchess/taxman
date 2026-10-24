@@ -315,8 +315,7 @@ Setup builds the root problem by a longer route, which [the design of the frame
 model](../../solver/docs/design/frame-model.md#setup-in-the-code) follows step by step: it makes claims in rounds before
 and after merging, runs descending greedy again after each round, tests (a) after its first claims, and reduces at the
 end.  [X1](exactness.md#the-exactness-theorem) and part 3 of X5 show that these steps change neither the sources nor the
-candidates.  On a few small boards its order of claims gives another root problem of game n than Π_n; the design doc
-says which.
+candidates.
 
 ## Searching the frame model
 

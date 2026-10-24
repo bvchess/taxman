@@ -38,12 +38,9 @@
 //! * **E** (no candidate in frame 0): the frame as setup forms it whose factors hold a candidate has a number of at
 //!   least 1, so that the candidate has a frame in front to be promoted into.  Item: `[c, number]` (`null` for none).
 //! * **F** (homes): the home frame of every candidate in the search's model is at least 1.  Item: `c`.
-//! * **G** (the numbers above n/2): the numbers above `n/2` that the game with no promotions plays are exactly those
-//!   an independent descending greedy keeps, written in this file with no frames code: the sources are the numbers `x`
-//!   with `2x > n`, joined to their maximal factors by a union-find; in each component, from the largest source
-//!   down, a source is kept if the kept ones plus it *dismantle completely* (repeatedly remove a member that has a
-//!   maximal factor that no other remaining member lists; every member must go).  Item: `{"plain_only": [..],
-//!   "greedy_only": [..]}`, the numbers in one set and not the other.
+//! * **G** (the numbers above n/2): the numbers above `n/2` that the game with no promotions plays are exactly U\* of
+//!   the root problem Π_n as [`taxman::root_problem::build`] builds it from the definitions of the theory, with no
+//!   frames code.  Item: `{"plain_only": [..], "greedy_only": [..]}`, the numbers in one set and not the other.
 //! * **H** (the claims in Π⁺(∅)): the extended problem with nothing open and the claims of `unzip` given
 //!   ([`taxman::frames::build_extended`] with `Bits::EMPTY` and the search frames' claims; the formulation corollary
 //!   (E5, docs/theory/extended-problem.md)) is the frame model's problem: it refuses no
@@ -56,27 +53,31 @@
 //!   "frames", "frame": h}` (a different number of frames, or frame `h` differs), `{"what": "candidates",
 //!   "extended_only": [..], "frame_model_only": [..]}`, `{"what": "problem"}`.  Every board to the largest the solver
 //!   supports can be checked: Π⁺(∅) never has more frames than the frame model.
+//! * **I** (setup builds Π_n): the frames setup builds are the root problem Π_n of the theory
+//!   (docs/theory/frame-model.md) as [`taxman::root_problem::build`] builds it with no frames code: U\* (the sources
+//!   of the frames as setup forms them), the candidates, and the moves and factors of each frame of the search's
+//!   model at its root are the same.  Item, one for each thing that differs: `{"what": "ustar", "setup_only":
+//!   [..], "theory_only": [..]}`, the same with `"what": "candidates"`, `{"what": "frames", "count": k,
+//!   "expected": e}` or `{"what": "frames", "frame": h}`.
 //!
 //! **A line.**  `n`; `w`, the set width; `secs`, the wall seconds for the board.  The counts: `frames` (as setup forms
 //! them, before any merge), `numbers` (the search's frames, one per number), `candidates`, `max_layer`.  By layer, as
 //! arrays indexed by layer `0..=max_layer`: `frames_by_layer`, `closed_by_layer`, `freedoms_by_layer` (the sum of the
-//! frames' freedoms), `kept_by_layer` (the sum of their sources, mandatory ones included), `impossible_by_layer`.
-//! The numbering: `frame0_layers`, the sorted set of the layers of the frames numbered 0 (this is no check);
-//! `number_layers`, for each number the sorted set of the layers of its frames; `layer_numbering`, true if every
-//! frame with freedoms has the number `layer - l0`, `l0` being the lowest layer of a frame with freedoms (true when
-//! there is none); `layer2_closed`, true if every frame of layer 2 is closed (true when there is none).  What `unzip`
-//! claimed: `claims_pre`, `[front, back]` counts over all the frames as setup forms them, and `claims_numbered`, the
-//! same over the search's merged frames; `back_with_composite_count`, the number of back claims `(s, f)` of the
-//! search's frames whose factor `f` has a maximal composite `c = f*p` that is a factor of some numbered frame as setup
-//! forms it (the boards where check D has something to check), and `back_with_composite`, the first 20 as `[s, f,
-//! c]` with the smallest such `c`.  `merged_away`, `[reached, true]` (`BoardFrames::merged_away_reach`): how often
-//! `unzip`, asking whether a factor has a use outside its frame, met a number homed in a frame that has since been
-//! merged away, and how often that number counted as such a use.  `violations`: an object with a key for each failed
-//! check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`, `"G"`, `"H"`) whose value is the first 20 of its items, and `"A_count"`,
-//! ... with how many there are; `{}` when everything holds.  `extended_frames`, `[count, lowest, highest]`: the
-//! frames of the extended problem Π⁺(O) with every source of three or more prime factors open, the most frames any O
-//! gives (`taxman::frames::extended_frame_count`; docs/theory/extended-problem.md), and the layers they
-//! span (`[0, null, null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
+//! frames' freedoms), `kept_by_layer` (the sum of their sources, mandatory ones included), `impossible_by_layer`.  The
+//! numbering: `frame0_layers`, the sorted set of the layers of the frames numbered 0 (this is no check);
+//! `number_layers`, for each number the sorted set of the layers of its frames; `layer_numbering`, true if every frame
+//! with freedoms has the number `layer - l0`, `l0` being the lowest layer of a frame with freedoms (true when there is
+//! none); `layer2_closed`, true if every frame of layer 2 is closed (true when there is none).  What `unzip` claimed:
+//! `claims_pre`, `[front, back]` counts over all the frames as setup forms them, and `claims_numbered`, the same over
+//! the search's merged frames; `back_with_composite_count`, the number of back claims `(s, f)` of the search's frames
+//! whose factor `f` has a maximal composite `c = f*p` that is a factor of some numbered frame as setup forms it (the
+//! boards where check D has something to check), and `back_with_composite`, the first 20 as `[s, f, c]` with the
+//! smallest such `c`.  `violations`: an object with a key for each failed check (`"A"`, `"C"`, `"D"`, `"E"`, `"F"`,
+//! `"G"`, `"H"`, `"I"`) whose value is the first 20 of its items, and `"A_count"`, ... with how many there are; `{}`
+//! when everything holds.  `extended_frames`, `[count, lowest, highest]`: the frames of the extended problem Π⁺(O) with
+//! every source of three or more prime factors open, the most frames any O gives
+//! (`taxman::frames::extended_frame_count`; docs/theory/extended-problem.md), and the layers they span (`[0, null,
+//! null]` when no frame has freedoms there); the search holds at most `MAX_FRAMES` = 9.
 //!
 //! **The check of the kept-claims lemma (E4).**  Π⁺(O) keeps a back claim `(s, f)` of the search's frames only if
 //! `f` passes the check ([`taxman::frames::ClaimCheck`]): it is no two-sided candidate of Π⁺(O), and no two-sided
@@ -101,17 +102,16 @@
 //!
 //! **The summary** is computed from the lines of `FROM..=TO` (with `--out`, read again from FILE at the end, so a
 //! resumed run summarizes everything; without it, from memory) and written as plain text to stdout (to stderr when the
-//! lines went to stdout): the boards checked; for each of A, C, D, E, F, G and H the boards that fail it, with the
+//! lines went to stdout): the boards checked; for each of A, C, D, E, F, G, H and I the boards that fail it, with the
 //! first items of the first 5; the sets of layers that frame 0 had, with the number of boards of each, and the boards
 //! where frame 0 includes a frame of layer 2, as ranges; the boards whose `layer_numbering` is false, those where a
 //! number's frames span several layers, and those whose `layer2_closed` is false; the totals of `claims_pre` and
-//! `claims_numbered`; the boards with back claims that have a composite among the factors; the boards where
-//! `merged_away` was reached, and the totals; the largest `frames`, `numbers`, `max_layer` and `candidates`; the
-//! boards by the frame count of `extended_frames`, and those where it is above `MAX_FRAMES`; for E4's check,
-//! the boards with back claims at risk (how many, the total of their claims, the first as ranges), the boards beyond
-//! the reach of the check (the fields are `null`), the boards where some O refuses a back claim (as ranges, and the
-//! items of the first 5), and the boards whose lines lack the fields; the seconds, summed over the boards.  The last
-//! line is `PASS` or `FAIL`.
+//! `claims_numbered`; the boards with back claims that have a composite among the factors; the largest `frames`,
+//! `numbers`, `max_layer` and `candidates`; the boards by the frame count of `extended_frames`, and those where it is
+//! above `MAX_FRAMES`; for E4's check, the boards with back claims at risk (how many, the total of their claims, the
+//! first as ranges), the boards beyond the reach of the check (the fields are `null`), the boards where some O refuses
+//! a back claim (as ranges, and the items of the first 5), and the boards whose lines lack the fields; the seconds,
+//! summed over the boards.  The last line is `PASS` or `FAIL`.
 //!
 //! **Lines from an earlier version.**  A line of a file written before the census had check H lacks the four fields
 //! (`violations` lists only what failed, so the fields are the sign that H ran).  Resuming into such a file does not
@@ -119,7 +119,7 @@
 //! But check H did not run on them, so the run is a `FAIL` while any exists: run the range again into a new file.
 //!
 //! **Exit status**: 0 if every board of the range has a line with the fields of E4's check and passes A, C, D, E, F,
-//! G and H; 1 if one does not, or a board could not be analyzed (the message goes to stderr); 2 for a usage error.
+//! G, H and I; 1 if one does not, or a board could not be analyzed (the message goes to stderr); 2 for a usage error.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
@@ -136,15 +136,16 @@ use taxman::frames::{
     SearchFrames,
 };
 use taxman::json::Json;
-use taxman::model::{FrameGraph, MAX_FRAMES};
+use taxman::model::{FrameGraph, FrameSet, MAX_FRAMES};
 use taxman::numtheory::Tables;
+use taxman::root_problem::{self, RootProblem};
 use taxman::search::{problem_of, problem_of_extended};
 use taxman::solver::MAX_N;
 
 const USAGE: &str = "usage: structure FROM TO [--threads K] [--out FILE]   (2 <= FROM <= TO)";
 
 /// The checks, in the order of the summary.
-const CHECKS: [&str; 7] = ["A", "C", "D", "E", "F", "G", "H"];
+const CHECKS: [&str; 8] = ["A", "C", "D", "E", "F", "G", "H", "I"];
 
 /// How many items of a failed check, and how many back claims with a composite or at risk, a line keeps.
 const ITEM_LIMIT: usize = 20;
@@ -284,89 +285,10 @@ fn check_homes<const W: usize>(graph: &FrameGraph, frames: &SearchFrames<W>) -> 
     frames.candidates.iter().filter(|&c| graph.home(c) < 1).map(Json::from).collect()
 }
 
-/// The root of `x` in a union-find forest, halving the path on the way.
-fn find(parent: &mut [u32], mut x: u32) -> u32 {
-    while parent[x as usize] != x {
-        let grandparent = parent[parent[x as usize] as usize];
-        parent[x as usize] = grandparent;
-        x = grandparent;
-    }
-    x
-}
-
-/// Whether `members` dismantle completely: repeatedly a member that has a maximal factor that no other remaining
-/// member lists is removed, and they do if every one is.  `count` and `owner` are scratch arrays by number, all zero
-/// on entry and on exit: for each factor, how many remaining members list it and the exclusive or of their numbers
-/// (which is the member itself when there is just one).
-fn dismantles(t: &Tables, members: &[u32], count: &mut [u32], owner: &mut [u32]) -> bool {
-    let factors_of = |m: u32| t.max_factors[m as usize].iter().copied();
-    for &m in members {
-        for f in factors_of(m) {
-            count[f as usize] += 1;
-            owner[f as usize] ^= m;
-        }
-    }
-    let mut worklist: Vec<u32> =
-        members.iter().flat_map(|&m| factors_of(m)).filter(|&f| count[f as usize] == 1).collect();
-    let mut removed = 0;
-    while let Some(f) = worklist.pop() {
-        if count[f as usize] != 1 {
-            continue; // its only member has gone, by another factor
-        }
-        let m = owner[f as usize];
-        removed += 1;
-        for g in factors_of(m) {
-            count[g as usize] -= 1;
-            owner[g as usize] ^= m;
-            if count[g as usize] == 1 {
-                worklist.push(g);
-            }
-        }
-    }
-    for &m in members {
-        for f in factors_of(m) {
-            (count[f as usize], owner[f as usize]) = (0, 0);
-        }
-    }
-    removed == members.len()
-}
-
-/// The numbers above `n/2` that a descending greedy keeps, with no frames code (see check G in the module comment),
-/// ascending.
-fn greedy_upper(t: &Tables) -> Vec<u32> {
-    let sources: Vec<u32> = (1..=t.n).filter(|&x| 2 * x > t.n).collect();
-    let mut parent: Vec<u32> = (0..=t.n).collect();
-    for &x in &sources {
-        for &f in &t.max_factors[x as usize] {
-            let (a, b) = (find(&mut parent, x), find(&mut parent, f));
-            parent[a as usize] = b;
-        }
-    }
-    let mut components: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
-    for &x in &sources {
-        components.entry(find(&mut parent, x)).or_default().push(x);
-    }
-
-    let (mut count, mut owner) = (vec![0; t.n as usize + 1], vec![0; t.n as usize + 1]);
-    let mut all_kept = Vec::new();
-    for members in components.values() {
-        let mut kept: Vec<u32> = Vec::new();
-        for &s in members.iter().rev() {
-            kept.push(s);
-            if !dismantles(t, &kept, &mut count, &mut owner) {
-                kept.pop();
-            }
-        }
-        all_kept.extend(kept);
-    }
-    all_kept.sort_unstable();
-    all_kept
-}
-
-/// Check G: the numbers above `n/2` in the game with no promotions are those the greedy keeps.
-fn check_upper(t: &Tables, plain: &[u32]) -> Vec<Json> {
+/// Check G: the numbers above `n/2` in the game with no promotions are U\* of the theory's `root`.
+fn check_upper(t: &Tables, plain: &[u32], root: &RootProblem) -> Vec<Json> {
     let in_plain: BTreeSet<u32> = plain.iter().copied().filter(|&x| 2 * x > t.n).collect();
-    let in_greedy: BTreeSet<u32> = greedy_upper(t).into_iter().collect();
+    let in_greedy: BTreeSet<u32> = root.ustar.iter().copied().collect();
     if in_plain == in_greedy {
         return Vec::new();
     }
@@ -384,7 +306,7 @@ fn count_and_pairs(pairs: Option<&[(u32, u32)]>) -> (Json, Json) {
     })
 }
 
-/// An item of check H: what differs, and the details.
+/// An item of check H or I: what differs, and the details.
 fn differs(what: &str, details: impl IntoIterator<Item = (&'static str, Json)>) -> Json {
     Json::object(std::iter::once(("what", Json::from(what))).chain(details))
 }
@@ -426,6 +348,44 @@ fn check_extended_is_frame_model<const W: usize>(t: &Tables, frames: &SearchFram
         items.push(differs("problem", []));
     }
     Ok(items)
+}
+
+/// An item of check I that compares two sets of numbers, if they differ: `what`, and the numbers in one and not the
+/// other.
+fn sets_differ(what: &str, setup: &[u32], theory: &[u32]) -> Option<Json> {
+    let setup: BTreeSet<u32> = setup.iter().copied().collect();
+    let theory: BTreeSet<u32> = theory.iter().copied().collect();
+    (setup != theory).then(|| {
+        let setup_only = Json::array(setup.difference(&theory).copied().collect::<Vec<_>>());
+        let theory_only = Json::array(theory.difference(&setup).copied().collect::<Vec<_>>());
+        differs(what, [("setup_only", setup_only), ("theory_only", theory_only)])
+    })
+}
+
+/// Check I: setup builds the root problem Π_n of the theory: U\* (the sources of the `numbered` frames), the
+/// candidates of the search's `frames` and the frames of the model's `root` are those of `theory`.
+fn check_root_problem<const W: usize>(
+    numbered: &Numbering<W>,
+    frames: &SearchFrames<W>,
+    root: &FrameSet<W>,
+    theory: &RootProblem,
+) -> Vec<Json> {
+    let ustar: Vec<u32> = numbered.frames.iter().flat_map(|frame| frame.sources.to_vec()).collect();
+    let sets = [
+        sets_differ("ustar", &ustar, &theory.ustar),
+        sets_differ("candidates", &frames.candidates.to_vec(), &theory.candidates),
+    ];
+    let mut items: Vec<Json> = sets.into_iter().flatten().collect();
+    let built: Vec<(Vec<u32>, Vec<u32>)> =
+        root.frames().iter().map(|frame| (frame.moves.to_vec(), frame.factors.to_vec())).collect();
+    if built.len() != theory.frames.len() {
+        let sizes = [("count", built.len()), ("expected", theory.frames.len())];
+        items.push(differs("frames", sizes.map(|(key, size)| (key, Json::from(size)))));
+    } else {
+        let off = built.iter().zip(&theory.frames).enumerate().filter(|(_, (ours, theirs))| ours != theirs);
+        items.extend(off.map(|(h, _)| differs("frames", [("frame", Json::from(h))])));
+    }
+    items
 }
 
 /// What the check of the kept-claims lemma (E4, docs/theory/extended-problem.md) could do to the back claims of the
@@ -567,7 +527,8 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
     let omega = omega_table(&t);
     let (numbered, frames) = numbering::<W>(&t);
     let plain = solution_for_promotions::<W>(&t, Bits::EMPTY);
-    let (graph, _root) = FrameGraph::build::<W>(&t, &frames.columns())?;
+    let (graph, root) = FrameGraph::build::<W>(&t, &frames.columns())?;
+    let theory = root_problem::build(&t);
 
     let layers: Vec<usize> = numbered.frames.iter().map(|frame| layer_of(frame, &omega)).collect();
     let max_layer = layers.iter().copied().max().unwrap_or(0);
@@ -577,8 +538,9 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
         check_back_claims(&t, &frames),
         check_candidates_not_in_front(&numbered, &frames),
         check_homes(&graph, &frames),
-        check_upper(&t, &plain),
+        check_upper(&t, &plain, &theory),
         check_extended_is_frame_model(&t, &frames)?,
+        check_root_problem(&numbered, &frames, &root, &theory),
     ];
 
     // The layers of frame 0 and of each number.
@@ -589,7 +551,6 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
     let back_with_composite = back_claims_with_composite(&t, &numbered, &frames);
 
     let frame_count = |value: fn(&NumberedFrame<W>) -> i64| by_layer(&numbered, &layers, max_layer, value);
-    let (reached, answered) = numbered.merged_away_reach;
 
     // The extended problem with every source of three or more prime factors open, and what the check of E4
     // (docs/theory/extended-problem.md) does to the back claims there, where it can be built.
@@ -624,7 +585,6 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
         ("claims_numbered", count_claims(frames.claims.iter().flatten())),
         ("back_with_composite_count", Json::from(back_with_composite.len())),
         ("back_with_composite", Json::Arr(back_with_composite.into_iter().take(ITEM_LIMIT).collect())),
-        ("merged_away", Json::array([reached, answered])),
         ("violations", failed_checks(&violations)),
         ("extended_frames", extended_frames),
         ("m5_at_risk_count", at_risk_count),
@@ -778,17 +738,6 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
         "boards with back claims that have a composite among the factors ({}): {}{more}",
         composite.len(),
         listed.join(", ")
-    ));
-
-    // The quirk of the merged-away frames.
-    let reached = boards_where(lines, |line| pair_of(line, "merged_away").0 > 0);
-    let reach = total("merged_away");
-    rows.push(format!(
-        "merged_away: reached on {} boards ({}), {} times, answered yes {} times",
-        reached.len(),
-        ranges(&reached),
-        reach.0,
-        reach.1
     ));
 
     // The largest.

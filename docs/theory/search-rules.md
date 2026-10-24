@@ -272,13 +272,12 @@ heaviest set, and a floor at or above the root's frame bound ends the search at 
 
 ## The repeat lemma
 
-The number that a board adds often lands where the frame model settles it before the search, leaving the problem as
-it was.  Game n is a *repeat* of game m when a root problem of n equals one of m: the same root frames, numbered alike,
+The number that a board adds often lands where the frame model settles it before the search, leaving the problem as it
+was.  Game n is a *repeat* of game m when a root problem of n equals one of m: the same root frames, numbered alike,
 with the same moves and factors, and the same candidates with the same homes.  The solver compares the problems that
-setup builds, which are Π_n and Π_m but on six small boards, 8, 12, 13, 16, 17 and 27, where setup builds another root
-problem of the game.  Below, U\*(n) is the set U\* of board n, and the game of n
-*made from* a promotion set L of Π_n plays U\*(n) ∪ L, in an order that [the exactness theorem
-(X7)](exactness.md#the-exactness-theorem) makes legal.
+setup builds, which are Π_n and Π_m.  Below, U\*(n) is the set U\* of board n, and the game of n *made from* a promotion
+set L of Π_n plays U\*(n) ∪ L, in an order that [the exactness theorem (X7)](exactness.md#the-exactness-theorem) makes
+legal.
 
 **Lemma R6 (the repeat lemma).**  Let n and m be games, and Π and Π′ root problems of n and of m with Π = Π′.
 

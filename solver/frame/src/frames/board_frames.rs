@@ -1,11 +1,11 @@
 //! The frames as setup forms them: [`Frame`] and [`BoardFrames`], with the peel that decides what a frame can play.
 //!
 //! The module documentation of [`crate::frames`] says what they are, what simplifying them assumes, how they are
-//! numbered and merged, and why every loop below keeps the Java's order.
+//! numbered and merged, and the order of the claims that `unzip` makes.
 
 use crate::bits::Bits;
 use crate::numtheory::Tables;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
 /// Which of the two loops of `unzip` settled a pair of a mandatory move and the factor it claims.  The names are those
@@ -43,8 +43,6 @@ pub struct Frame<const W: usize> {
     claims: Vec<(u32, u32, ClaimKind)>,
     /// Sources that cannot be played together with the others.
     impossible: Bits<W>,
-    /// The frame's freedoms, `|factors| − |sources|` once the frame has been simplified; see `Frame::new`.
-    freedoms: i32,
     /// What `BoardFrames::can_add_source` has answered for this frame, by number.  The answer depends on nothing but
     /// the frame's `sources` and `factors`, so the memo is emptied when `sources` changes (`factors` never does).
     can_add: RefCell<HashMap<u32, bool>>,
@@ -55,11 +53,7 @@ pub struct Frame<const W: usize> {
 }
 
 impl<const W: usize> Frame<W> {
-    /// A frame that has only just been formed: nothing is mandatory or impossible, and every factor counts as
-    /// spare.  The freedoms (`freedoms`) therefore start as `|factors|`, not `|factors| − |sources|`: they
-    /// are corrected when the frame is first simplified (`BoardFrames::finish_frame`), so until then the frame counts
-    /// as having freedoms, and a frame visited earlier in a round sees the frames not yet visited that way.  That is
-    /// what the Java does, and the results can depend on it.
+    /// A frame that has only just been formed: nothing is mandatory, claimed or impossible yet.
     fn new(sources: Bits<W>, factors: Bits<W>) -> Self {
         Frame {
             name: String::new(),
@@ -69,21 +63,20 @@ impl<const W: usize> Frame<W> {
             claimed: Bits::EMPTY,
             claims: Vec::new(),
             impossible: Bits::EMPTY,
-            freedoms: factors.len() as i32,
             can_add: RefCell::default(),
             swept: false,
         }
     }
 
     /// One frame made of several: the frames that get the same number are merged into one (see
-    /// [`crate::frames`]).  It starts from scratch: the sources and factors are the unions of the current ones, and
-    /// whatever the parts had found mandatory or impossible is forgotten (and found again on the next
-    /// `BoardFrames::finish_setup`).  Note what that means for an impossible source: it is no longer among the parts'
-    /// `sources`, so it is not carried over, and the merged frame does not know it (see `Home::MergedAway`).
+    /// [`crate::frames`]).  Its sources, factors and impossible sources are the unions of the parts'.  What the parts
+    /// had found mandatory is forgotten, and found again on the next `BoardFrames::finish_setup`; their impossible
+    /// sources stay impossible, so that the merged frame holds every number of its parts.
     fn merged(parts: &[&Frame<W>]) -> Self {
         let sources = parts.iter().fold(Bits::EMPTY, |acc, h| acc | h.sources);
         let factors = parts.iter().fold(Bits::EMPTY, |acc, h| acc | h.factors);
         let mut frame = Frame::new(sources, factors);
+        frame.impossible = parts.iter().fold(Bits::EMPTY, |acc, h| acc | h.impossible);
         frame.name = parts.iter().map(|h| h.name.as_str()).collect::<Vec<_>>().join("+");
         frame
     }
@@ -127,14 +120,16 @@ impl<const W: usize> Frame<W> {
     }
 
     /// The frame's freedoms, `|factors| − |sources|`: how many factors are left over once every source has one.
-    /// (Both counts include the mandatory pairs, so this is also `|remaining factors| − |remaining sources|`.)
+    /// (Both counts include the mandatory pairs, so this is also `|remaining factors| − |remaining sources|`.)  They
+    /// are the theory's freedoms once `remove_impossible` has taken the impossible sources out, which
+    /// `BoardFrames::finish_setup` does to every frame before it tests any claim.
     pub fn freedoms(&self) -> i32 {
-        self.freedoms
+        self.factors.len() as i32 - self.sources.len() as i32
     }
 
     /// Whether the frame is *closed*: it has no freedoms, so it can neither spare a factor nor take another move.
     pub fn is_closed(&self) -> bool {
-        self.freedoms <= 0
+        self.freedoms() <= 0
     }
 }
 
@@ -143,25 +138,6 @@ impl<const W: usize> Frame<W> {
 enum Home {
     /// The frame at this position in [`BoardFrames::frames`].
     Live(u32),
-    /// The number is an impossible source of a frame that has since been merged into another one.
-    ///
-    /// Merging builds a new frame from the parts' `sources` and `factors`, and re-homes the numbers the new frame
-    /// holds ([`BoardFrames::merge`]).  An impossible source is no longer among a part's `sources`, so it is not
-    /// re-homed: it keeps pointing at its old frame, which is no longer one of the board's frames but, as an
-    /// object, still remembers whether it had freedoms when it was merged.  The Java behaves exactly so, and `unzip`'s
-    /// test for outside moves goes on consulting the stale frame for such a number
-    /// (`BoardFrames::has_outside_move_using`).  It is a quirk, not something the model needs, and it is reproduced for
-    /// parity.
-    ///
-    /// It is inert, in principle and in practice.  In principle: it can only make `unzip` claim less, and the frame
-    /// model's exactness does not depend on how much `unzip` claims (the claims lemma (X5), docs/theory/exactness.md).
-    /// In practice: only [`frames::build_frames`](crate::frames::build_frames) merges frames, and on every board `2 ≤ n
-    /// ≤ 8191` the test that reads this variant is reached on a single board (n = 114, twice), where it does not make
-    /// the number an outside move ([`BoardFrames::merged_away_reach`], counted by the census `examples/structure.rs`);
-    /// building the frames with the variant forced to answer `false` gives identical frames, candidates and freedoms on
-    /// every board to 2000.  (Measured 2026-10; to repeat it, make that arm of `has_outside_move_using` return `false`
-    /// and compare the frames of all the boards with and without.)
-    MergedAway { had_freedoms: bool },
     /// None: the number is a hole of a punctured board ([`Tables::punctured`]).
     OffBoard,
 }
@@ -196,9 +172,6 @@ pub struct BoardFrames<'t, const W: usize> {
     composites_of: Lists,
     /// The working storage of `count_freedoms`.
     peel: RefCell<Peel>,
-    /// How often `has_outside_move_using` met a composite homed in a merged-away frame ([`Home::MergedAway`]), and
-    /// how often, at such a composite, it answered yes (see [`merged_away_reach`](Self::merged_away_reach)).
-    merged_away: Cell<(u32, u32)>,
 }
 
 impl<'t, const W: usize> BoardFrames<'t, W> {
@@ -239,8 +212,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
         let (frames, home) = Self::form_frames(t, sources, &factors_of);
         let peel = RefCell::default();
-        let merged_away = Cell::default();
-        let mut board_frames = BoardFrames { t, frames, home, factors_of, composites_of, peel, merged_away };
+        let mut board_frames = BoardFrames { t, frames, home, factors_of, composites_of, peel };
         let order = board_frames.order_frames();
         board_frames.reorder(&order);
         board_frames.finish_setup();
@@ -378,12 +350,11 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         self.t
     }
 
-    /// The position in [`frames`](Self::frames) of the frame that holds `x`, unless `x` is an impossible source
-    /// of a frame that has since been merged away (`Home::MergedAway`), or a hole.
+    /// The position in [`frames`](Self::frames) of the frame that holds `x`, unless `x` is a hole.
     pub(crate) fn frame_index_of(&self, x: u32) -> Option<usize> {
         match self.home.get(x as usize)? {
             Home::Live(p) => Some(*p as usize),
-            Home::MergedAway { .. } | Home::OffBoard => None,
+            Home::OffBoard => None,
         }
     }
 
@@ -405,9 +376,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         let mut out = Vec::new();
         for x in (frame.sources | frame.factors).iter() {
             for &y in &board_relation[x as usize] {
-                // A number homed in a merged-away frame is skipped: that frame is no longer one of the board's
-                // frames, so there is nothing to reach.  (The Java's neighbor sets do contain the stale frame,
-                // but every use of them filters down to the frames that are still there.)
+                // A hole belongs to no frame.
                 if let Home::Live(j) = self.home[y as usize] {
                     if j as usize != i {
                         out.push(j as usize);
@@ -569,13 +538,10 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         }
     }
 
-    /// Simplifies frame `i` once (`unzip`, then `remove_impossible`, then the freedoms are recomputed as
-    /// `|factors| − |sources|`); whether it found anything new.
+    /// Simplifies frame `i` once (`unzip`, then `remove_impossible`); whether it found anything new.
     fn finish_frame(&mut self, i: usize) -> bool {
         let found_mandatory = self.unzip(i);
         let found_impossible = self.remove_impossible(i);
-        let frame = &mut self.frames[i];
-        frame.freedoms = frame.factors.len() as i32 - frame.sources.len() as i32;
         found_mandatory | found_impossible
     }
 
@@ -601,7 +567,9 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     ///
     /// The factors are visited in ascending order against a snapshot, with the sources recomputed after each
     /// claim.  The sources are visited in descending order and the pass restarts after the first claim, since
-    /// a claim can make a larger source eligible.  Both orders are the Java's.
+    /// a claim can make a larger source eligible.  These are the orders of the claims of frame h in
+    /// docs/theory/frame-model.md, so that the frames setup builds are the root problem Π_n of the theory
+    /// (`tests/canonical_root.rs`, and check I of the census `examples/structure.rs`).
     ///
     /// The questions about a factor's use (`factor_can_go_forward` and `has_outside_move_using`) are about
     /// other frames and about this frame's sources and factors as they were when `unzip` began, none of which a
@@ -674,28 +642,17 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// Whether some move outside the frame of the factor `f` could use `f` as tax: a composite of `f` in a
     /// different frame (that has freedoms, so that it might be promoted) which the frame of `f` could take on as a
     /// source.  `unzip` leaves such a factor to the search, which may need it for that promotion.
-    ///
-    /// A composite that is an impossible source of a frame that has since been merged away counts as being in
-    /// a different frame (see [`Home::MergedAway`]), with the freedoms that frame had when it was merged.  That
-    /// is what the Java solver does, and it is inert (the variant's documentation gives the evidence).
     fn has_outside_move_using(&self, f: u32, answers: &mut Answers) -> bool {
         if let Some(&known) = answers.outside.get(&f) {
             return known;
         }
         let f_frame = self.frame_of_factor(f);
         let answer = self.composites_of.of(f).iter().any(|&c| {
-            let home = self.home[c as usize];
-            let c_frame_has_freedoms = match home {
+            let c_frame_has_freedoms = match self.home[c as usize] {
                 Home::Live(p) => p as usize != f_frame && !self.frames[p as usize].is_closed(),
-                Home::MergedAway { had_freedoms } => had_freedoms,
                 Home::OffBoard => unreachable!("a hole is nobody's composite"),
             };
-            let uses_f = c_frame_has_freedoms && self.can_add_source(&self.frames[f_frame], c);
-            if matches!(home, Home::MergedAway { .. }) {
-                let (reached, answered_yes) = self.merged_away.get();
-                self.merged_away.set((reached + 1, answered_yes + u32::from(uses_f)));
-            }
-            uses_f
+            c_frame_has_freedoms && self.can_add_source(&self.frames[f_frame], c)
         });
         answers.outside.insert(f, answer);
         answer
@@ -748,17 +705,14 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// the first of them was, and returns its position.  See `Frame::merged` for what the new frame holds.  The
     /// frame builder merges the frames that get the same number into one this way.
     ///
-    /// Every number is re-homed: those the merged frame holds point at it, the others at their frame's new
-    /// position.  The impossible sources of the parts are held by no frame any more, and keep a stale home
-    /// ([`Home::MergedAway`]); the new frame is not simplified until the next `finish_setup`.
+    /// Every number is re-homed: those of the parts, impossible sources included, point at the merged frame, the
+    /// others at their frame's new position.  The new frame is not simplified until the next `finish_setup`.
     pub(crate) fn merge(&mut self, group: &[usize]) -> usize {
         assert!(group.len() > 1, "merging fewer than two frames");
         let at = group[0];
         let in_group = |p: usize| group.contains(&p);
         let parts: Vec<&Frame<W>> = group.iter().map(|&p| &self.frames[p]).collect();
         let merged = Frame::merged(&parts);
-        let merged_numbers = merged.sources | merged.factors;
-        let had_freedoms: Vec<bool> = self.frames.iter().map(|f| !f.is_closed()).collect();
 
         let merged_pos = (0..at).filter(|&p| !in_group(p)).count();
         let mut new_pos = vec![0u32; self.frames.len()];
@@ -779,10 +733,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
         for x in 1..=self.t.n {
             self.home[x as usize] = match self.home[x as usize] {
-                Home::Live(p) if in_group(p as usize) && merged_numbers.contains(x) => Home::Live(merged_pos as u32),
-                Home::Live(p) if in_group(p as usize) => Home::MergedAway { had_freedoms: had_freedoms[p as usize] },
                 Home::Live(p) => Home::Live(new_pos[p as usize]),
-                stale @ (Home::MergedAway { .. } | Home::OffBoard) => stale,
+                Home::OffBoard => Home::OffBoard,
             };
         }
         merged_pos
@@ -813,20 +765,9 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         (0..self.frames.len()).fold(Bits::EMPTY, |acc, i| acc | self.promotion_candidates_of(i))
     }
 
-    /// The impossible sources of every frame.  (After a `merge` the impossible sources of the
-    /// merged frames are no longer listed by any frame.)
+    /// The impossible sources of every frame.
     pub fn impossible(&self) -> Bits<W> {
         self.frames.iter().fold(Bits::EMPTY, |acc, h| acc | h.impossible)
-    }
-
-    /// How far the quirk of [`Home::MergedAway`] reaches, as counted so far by this `BoardFrames`: how many times
-    /// `has_outside_move_using` met a composite homed in a merged-away frame, and how many times, at such a
-    /// composite, it found that the frame of the factor could take the composite on and the stale frame had freedoms
-    /// (so that the composite counted as an outside move).  Measured by the census of the frames' structure
-    /// (`examples/structure.rs`).  The quirk can only make `unzip` claim less: a composite homed in a merged-away
-    /// frame is an impossible source, which no frame can take on.
-    pub fn merged_away_reach(&self) -> (u32, u32) {
-        self.merged_away.get()
     }
 
     /// A legal order in which to play the sources of frame `i`: the peel of `count_freedoms`
@@ -1339,8 +1280,6 @@ mod tests {
             let t = Tables::new(n);
             let plain = BoardFrames::<5>::new(&t, Bits::EMPTY);
             check_claims(&plain, &format!("n={n}"));
-            // Nothing has been merged, so no number has a stale home.
-            assert_eq!(plain.merged_away_reach(), (0, 0), "n={n}");
             let promoted = subset(&mut rng, plain.promotion_candidates(), 50);
             check_claims(&BoardFrames::<5>::new(&t, promoted), &format!("n={n} promoting {promoted:?}"));
         }
@@ -1486,6 +1425,7 @@ mod tests {
         let f = a.frame_index_of(8).unwrap();
         assert!(g > f);
         let (sources_f, sources_g) = (a.frames()[f].sources(), a.frames()[g].sources());
+        let (freedoms_f, freedoms_g) = (a.frames()[f].freedoms(), a.frames()[g].freedoms());
         let merged = a.merge(&[g, f]);
         // The merged frame sits where the first listed frame (G) was, minus the removed F before it.
         assert_eq!(merged, g - 1);
@@ -1497,30 +1437,32 @@ mod tests {
         assert_eq!(a.frame_index_of(1), Some(0));
         assert_eq!(a.frame_index_of(4), Some(2));
         assert_eq!(a.frame_index_of(32), Some(merged + 1)); // H, which followed G
-        assert_eq!(a.frames()[merged].freedoms(), 10);
+
+        // The merged frame has the freedoms of its parts together, before it is simplified again.
+        assert_eq!(a.frames()[merged].freedoms(), freedoms_f + freedoms_g);
+        assert_eq!(a.frames()[merged].freedoms(), 4);
     }
 
     #[test]
-    fn merging_leaves_impossible_sources_behind() {
+    fn merging_keeps_impossible_sources() {
         let t = Tables::new(114);
         let mut a = BoardFrames::<2>::new(&t, Bits::EMPTY);
         let with_impossible = (0..a.frames().len()).find(|&i| !a.frames()[i].impossible().is_empty()).unwrap();
         let other =
             (0..a.frames().len()).find(|&i| i != with_impossible && !a.frames()[i].sources().is_empty()).unwrap();
-        let left_behind = a.frames()[with_impossible].impossible();
-        let kept = a.frames()[with_impossible].sources() | a.frames()[with_impossible].factors();
+        let impossible = a.frames()[with_impossible].impossible() | a.frames()[other].impossible();
+        let numbers = a.frames()[with_impossible].sources() | a.frames()[with_impossible].factors() | impossible;
         let merged = a.merge(&[other, with_impossible]);
-        for x in left_behind.iter() {
-            assert_eq!(a.frame_index_of(x), None, "impossible source {x}");
-        }
-        for x in kept.iter() {
+        for x in numbers.iter() {
             assert_eq!(a.frame_index_of(x), Some(merged), "number {x}");
         }
-        assert!(a.frames()[merged].impossible().is_empty());
-        // The merged frame re-derives what it needs, and the board's frames stay consistent.
+        assert_eq!(a.frames()[merged].impossible(), impossible);
+        // The merged frame finds its claims again, its impossible sources stay impossible, and its freedoms are its
+        // factors less its sources.
         a.finish_setup();
         let frame = &a.frames()[merged];
+        assert!(impossible.is_subset(&frame.impossible()));
         assert_eq!(frame.freedoms(), frame.factors().len() as i32 - frame.sources().len() as i32);
-        assert!(a.frame_index_of(left_behind.min().unwrap()).is_none());
+        assert_eq!(a.frame_index_of(impossible.min().unwrap()), Some(merged));
     }
 }

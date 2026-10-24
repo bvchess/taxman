@@ -10,6 +10,8 @@
 //! set that beats a recorded score with it, independently of the search that found the set.
 //!
 //! [`peel`] gives the pairing, [`playable`] the answer, and [`play_order`] a legal order of the set.
+//! [`playable_against`] decides an instance whose pool is given, as the frame model's definitions use it
+//! ([`crate::root_problem`]).
 
 use crate::numtheory::Tables;
 use std::mem;
@@ -41,13 +43,40 @@ enum Move {
 ///
 /// If a member is not on the board `2..=t.n`, or is in `set` twice.
 pub fn peel(t: &Tables, set: &[u32]) -> Option<Vec<(u32, u32)>> {
+    peel_in(t, set, None)
+}
+
+/// Whether the instance with the members `set` and the pool `pool` is playable: [`peel`], with each member's list
+/// its maximal factors in `pool` (docs/theory/frame-model.md calls the members *playable against* the pool).
+///
+/// # Panics
+///
+/// As [`peel`], and if a number of `pool` is not on the board `1..=t.n` or is a member.
+pub fn playable_against(t: &Tables, set: &[u32], pool: &[u32]) -> bool {
+    peel_in(t, set, Some(pool)).is_some()
+}
+
+/// The peel of [`peel`], against the pool `pool` if one is given, and otherwise against every number outside `set`.
+fn peel_in(t: &Tables, set: &[u32], pool: Option<&[u32]>) -> Option<Vec<(u32, u32)>> {
     let size = t.n as usize + 1;
     let mut member = vec![false; size];
     for &m in set {
         assert!((2..=t.n).contains(&m), "{m} is not a number of the board 2..={}", t.n);
         assert!(!mem::replace(&mut member[m as usize], true), "{m} is in the set twice");
     }
-    let factors_of = |m: u32| t.max_factors[m as usize].iter().copied().filter(|&f| !member[f as usize]);
+    let in_pool: Vec<bool> = match pool {
+        None => member.iter().map(|&m| !m).collect(),
+        Some(pool) => {
+            let mut in_pool = vec![false; size];
+            for &f in pool {
+                assert!((1..=t.n).contains(&f), "{f} is not a number of the board 1..={}", t.n);
+                assert!(!member[f as usize], "{f} is a member and in the pool");
+                in_pool[f as usize] = true;
+            }
+            in_pool
+        }
+    };
+    let factors_of = |m: u32| t.max_factors[m as usize].iter().copied().filter(|&f| in_pool[f as usize]);
 
     // The pool's side of the lists: how many live members list each factor, and the exclusive or of their numbers.
     let (mut live_factors, mut listers, mut owner) = (vec![0u32; size], vec![0u32; size], vec![0u32; size]);

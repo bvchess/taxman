@@ -10,14 +10,15 @@ every second line of the Java fixtures), and the comment on each says what the w
   n = 85).  The helpers that the unit and integration tests share (temporary directories, a random generator) are one
   file, `tests/common/support.rs`.
 * **Golden tests** (`tests/golden_frames.rs`, and unit tests in `src/search/tests.rs` and `src/bounds.rs`) check every
-  stage of the port against the Java's
-  answers in `testdata/golden/n*.json` ([its README](../../frame/testdata/golden/README.md) says where they came from):
-  the setup's frames, the numbered and merged frames, the candidates, the reduced frame set, the greedy incumbent, the
-  prime shortcut and the result of the solve.  The searched golden games (94, up to 760) give the Java's promotion sums
-  with the default tactics, and the tactic variants give the same answers on those up to 400.  Past 760 the Java's
-  structure is fixed in `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048,
-  checked at the width `with_width!` picks) and `games_java.txt` (the Java's game of the board's frames, move for move,
-  for 171 sets of promotions at 511–2049).
+  stage of the port against the Java's answers in `testdata/golden/n*.json` ([its
+  README](../../frame/testdata/golden/README.md) says where they came from): the setup's frames, the numbered and merged
+  frames, the candidates, the reduced frame set, the greedy incumbent, the prime shortcut and the result of the solve.
+  On eight small boards the Java's claims are not those of the theory's root problem, and the test lists where setup
+  departs from them.  The searched golden games (94, up to 760) give the Java's promotion sums with the default tactics,
+  and the tactic variants give the same answers on those up to 400.  Past 760 the Java's structure is fixed in
+  `testdata/golden_wide/` (n = 511, 512, 1000, 1001, 1023, 1024, 1025, 1100, 1231, 2047 and 2048, checked at the width
+  `with_width!` picks) and `games_java.txt` (the Java's game of the board's frames, move for move, for 171 sets of
+  promotions at 511–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
   `results/strict.jsonl`, and the last, the moves that the game's promotions make and the digest of the board's search
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
@@ -41,9 +42,12 @@ every second line of the Java fixtures), and the comment on each says what the w
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
     `build_frames` uses, that the frames lie in layers (F1, also on punctured boards), and that the numbering by
     layer is the Java's breadth-first numbering on every game to 400 and a sample to 8191.
+  * `tests/canonical_root.rs` checks that setup builds Π_n: its U\*, its candidates and its root frames are those of
+    `src/root_problem.rs`, which builds Π_n from the definitions with no code of `frames` or `model`, on every game to
+    200 (to 1000 ignored).
   * The census of every game (`examples/structure.rs`; its data are in
     `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`) checks what X7's proof says of setup
-    one game at a time, and that Π⁺(∅) with the claims of `unzip` is Π_n (check H).
+    one game at a time, that Π⁺(∅) with the claims of `unzip` is Π_n (check H), and that setup builds Π_n (check I).
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against `optimal.json`.
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
   checkpoint is refused when any of the search tactics differs.
@@ -327,7 +331,7 @@ the computations behind the statements that are not proved are in [evidence.md](
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded game is independent in both matroids on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)). |
 | F1, F3, F6 | The census of every board 2..8191 (`examples/structure.rs`): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
-| X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are those an independent descending greedy keeps (X1). |
+| X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |
 | E1 to E6 | `tests/model_extended.rs`, extended mode and the certificates (above), and the census's check H: Π⁺(∅) with the claims is Π_n (E5). |
 | B1, B4 | The study of the multi-field bound ([its entry](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed matroids; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
 | B2, B3 | The GF(2) bound under bound soundness, and its free blocks under extended mode (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in both matroids ([matroid intersection bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)). |

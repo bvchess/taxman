@@ -79,21 +79,14 @@ The code's tests against the theory's:
   the theory's rule.
 * **Front claims.**  `unzip` asks too that f have no outside move.  The theory's rule does not need it: a front claim is
   a front move whatever is promoted into its frame (X5).
-* **Two quirks of the Java**, kept for parity.  A frame not yet simplified counts as having freedoms (`Frame::new`), and
-  an impossible source of a frame merged away keeps a stale home that counts as an outside move (`Home::MergedAway`).
-  Both can only make `unzip` claim less, and the theory covers every claim that meets its rules.  The census of the
-  frames counts how far the second reaches (`merged_away`).
 
-**The root problem setup builds.**  The theory's root problem Π_n makes the claims of each frame h in one canonical
-order (the frame model), with its exact rules.  Setup makes its
-claims in rounds, before and after merging, and its first rounds see the frames behind a frame unsimplified, which
-counts them as having freedoms and can block a back claim until a later round.  A check that builds Π_n apart from the
-frames code and compares root frames found setup's root problem equal to Π_n on every board from 2 to 1000 except six: on
-8, 12, 13, 16, 17 and 27, frame 0 has a move with two factors that it alone wants, and setup claims the larger where Π_n
-claims the smaller (at 8, (6, 3) for (6, 2)).  Setup's is then another root problem of game n, with the same promotion
-sets and P\* (the exactness theorem (X7) holds for every root
-problem).  The front claims that setup's outside test blocks are dropped by its final reduction, which leaves the root
-frames as Π_n's.
+**Setup builds Π_n.**  The theory's root problem Π_n makes the claims of each frame h in one canonical order ([the frame
+model](../../../docs/theory/frame-model.md#the-frame-model)), and setup makes its claims in rounds, before and after
+merging, counting every frame's freedoms as they are.  The two meet at the root: setup's U\*, candidates and root frames
+are those of Π_n.  The front claims that setup's outside test blocks are dropped by its final reduction, which leaves
+the root frames as Π_n's.  `src/root_problem.rs` builds Π_n from the theory's definitions, apart from the frames code,
+and `tests/canonical_root.rs` compares setup with it on every board to 1000, check I of the census on every board to
+8191.
 
 **The Java's numbering.**  The Java numbered the frames breadth first from the front: 0 for those with no frame with
 freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
@@ -110,11 +103,12 @@ freedoms.
 check A [the frame lemma (F1)](../../../docs/theory/frame-model.md#the-frame-lemma), C [clean numbering
 (F6)](../../../docs/theory/frame-model.md#clean-numbering), D that no candidate lists a back claim's factor (X5), E that
 no candidate is a factor of frame 0, F that every candidate has a home of at least 1 (the reduction-step lemma (X6)), G
-that the sources kept are those of a descending greedy written apart from the frames code (X1), and H that the extended
-problem with nothing open and the claims poses the frame model's problem ([the formulation corollary,
-E5](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).  The theory proves all of these, so the census
-checks the code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the
-promotion sets: 27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
+that the game with no promotions plays the U\* of `src/root_problem.rs` (X1), H that the extended problem with nothing
+open and the claims poses the frame model's problem ([the formulation corollary,
+E5](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)), and I that setup builds Π_n.  The theory proves
+all of these, so the census checks the code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an
+unplayable set out of the promotion sets: 27 boards to 2000, all in 98–120 and 182–186, the first the theory's example
+at 98.
 
 ## Promotions and the score
 
@@ -234,8 +228,11 @@ The frame solver uses the Java solver's strategy, which the [wiki](https://githu
 split the game into frames of Taxman Mini, and search for the best promotion set.
 
 What must match the Java is the *results*.  The setup (frames, candidates, the greedy incumbent) defines the search
-space, and it reproduces the Java's values exactly; the Java's golden data in `testdata/golden/` is the check.  Every
-final score equals optimal.json's.
+space, and it reproduces the Java's values exactly, except where the Java's claims are not those of Π_n; the Java's
+golden data in `testdata/golden/` is the check.  On eight small boards (8, 12, 13, 16, 17 and 25 to 27) the Java counted
+a frame it had not yet simplified as having freedoms, which blocked a back claim and left a frame another factor;
+`tests/golden_frames.rs` lists these departures with the reason, and the games are the same.  Every final score equals
+optimal.json's.
 
 The search is the frame solver's own.  It started as the Java's loop: its bound, its depth-2 preclusion table, the
 promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was replaced by

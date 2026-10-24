@@ -83,7 +83,7 @@
 //!   subsets of a frame's sources are not a matroid; that an optimal game plays all of U\* is proven for the sources
 //!   with one or two prime factors (the bottom-layers theorem, F4, docs/theory/frame-model.md) and is the open
 //!   statement for the others.
-//! * The *freedoms* (the field `freedoms`) are `|factors| − |sources|`: how many factors the frame can
+//! * The *freedoms* (`Frame::freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
 //!   in the search; one with some goes on to it.  A closed frame's factors all pay its own sources in every game
 //!   that plays them (X2), and the count is only a count: the search still checks every promotion for
@@ -151,21 +151,25 @@
 //!
 //! # The order of operations matters
 //!
-//! The construction mirrors that of the Java solver, and the order is part of what it computes, because merging changes
-//! what the frames behind can do (a merged frame has more sources to place and more factors to share): the promotion
-//! candidates of the frames with one number are collected from them separately, *then* they are merged, and only then
-//! are the frames with the next number looked at.  Once all are merged, every frame is simplified once more
-//! (`BoardFrames::finish_setup`), since merging forgets what the parts had found.
+//! The order is part of what the construction computes, because merging changes what the frames behind can do (a
+//! merged frame has more sources to place and more factors to share): the promotion candidates of the frames with one
+//! number are collected from them separately, *then* they are merged, and only then are the frames with the next number
+//! looked at.  Once all are merged, every frame is simplified once more (`BoardFrames::finish_setup`), since a merged
+//! frame forgets the claims of its parts.
 //!
-//! # Parity with the Java
+//! # What setup builds
 //!
-//! The results of the Java solver are what this module has to reproduce, so the order of every loop in it is
-//! deliberate: which source is declared impossible, or which pair is claimed first, can depend on the order.  The
-//! golden tests (`tests/golden_frames.rs`) compare every field of every frame as setup forms it of the 318 boards in
-//! `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
-//! boards of `testdata/golden_wide` (up to n = 2048), with what the Java produced (the data keeps the Java's names,
-//! which the test maps).  Two details reproduce quirks of the Java on purpose: a frame that has not been simplified yet
-//! counts as having freedoms (`Frame::new`), and the stale-frame behavior of `Home::MergedAway`.
+//! Setup builds the root problem Π_n of docs/theory/frame-model.md: its U\*, its candidates and the root frames the
+//! model makes of its frames are Π_n's.  The order of every loop is part of that, since which source is declared
+//! impossible, or which pair is claimed first, can depend on the order.  [`crate::root_problem`] builds Π_n from the
+//! theory's definitions with no code of this module, and setup is compared with it on every board to 1000
+//! (`tests/canonical_root.rs`) and on every board to 8191 (check I of the census `examples/structure.rs`).
+//!
+//! The golden tests (`tests/golden_frames.rs`) compare every field of every frame as setup forms it of the 318 boards
+//! in `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
+//! boards of `testdata/golden_wide` (up to n = 2048), with what the Java solver produced (the data keeps the Java's
+//! names, which the test maps).  On eight small boards the Java's claims are not those of Π_n, and the test lists
+//! where setup departs from them.
 //!
 //! # What setup costs
 //!
@@ -243,8 +247,6 @@ fn columns_of<const W: usize>(frames: &[model::Frame<W>]) -> Vec<Vec<u32>> {
 #[derive(Clone, Debug)]
 pub struct Numbering<const W: usize> {
     pub frames: Vec<NumberedFrame<W>>,
-    /// [`BoardFrames::merged_away_reach`] of the board's frames once `build_frames` has merged and simplified them.
-    pub merged_away_reach: (u32, u32),
 }
 
 /// One of the board's frames before any merge, as [`Numbering`] lists it.
@@ -323,7 +325,7 @@ fn build<const W: usize>(t: &Tables, record: bool) -> (SearchFrames<W>, Option<N
         names.push(frame.name().to_owned());
         claims.push(frame.claims().to_vec());
     }
-    let listed = pre_merge.map(|frames| Numbering { frames, merged_away_reach: board_frames.merged_away_reach() });
+    let listed = pre_merge.map(|frames| Numbering { frames });
     (SearchFrames { frames, names, claims, candidates }, listed)
 }
 
@@ -791,17 +793,6 @@ mod tests {
             assert_eq!(score, exact, "{tactics:?}");
             let moves = solution_for_promotions::<W>(&board.tables, result.promotions);
             assert_eq!(replay_punctured(n, &holes, &moves), Ok(score), "{tactics:?}");
-        }
-    }
-
-    /// The quirk of `Home::MergedAway` is reached on the board of 114 and on no other board up to 400, twice, and
-    /// neither time does it make a factor wanted outside its frame (`BoardFrames::merged_away_reach`).
-    #[test]
-    fn the_reach_of_the_merged_away_quirk() {
-        for n in 2..=400u32 {
-            let (numbered, _) = numbering::<8>(&Tables::new(n));
-            let expected = if n == 114 { (2, 0) } else { (0, 0) };
-            assert_eq!(numbered.merged_away_reach, expected, "n={n}");
         }
     }
 

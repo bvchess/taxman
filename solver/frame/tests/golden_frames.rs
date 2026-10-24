@@ -5,6 +5,9 @@
 //! Every comparison is exact, including list orders.  Mismatches are collected over all the files and
 //! reported together, so one bad board does not hide the rest.
 //!
+//! Setup departs from the Java on eight small boards, where it builds the theory's root problem and the Java did not:
+//! `DEPARTURES` lists them, with the reason, and the comparisons take setup's values there.
+//!
 //! `testdata/golden` (n <= 760, and so `W <= 16`) is what the Java solved with its own assertions on.  Beyond its
 //! limit of 1023 the Java was run without them (`java` without `-ea`: its limit is an `assert`, and nothing else
 //! depends on it); `testdata/golden_wide` holds the structure of the boards at the edges of the set widths and
@@ -91,6 +94,86 @@ impl Mismatches {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// Where setup departs from the Java
+
+/// Which frames of the Java's record a departure is in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stage {
+    /// The board's frames as setup forms them (`apiary.hives` in the record).
+    Formed,
+    /// The search's frames, numbered and merged (`frames` in the record).
+    Search,
+}
+
+/// A frame whose remaining factors setup gives otherwise than the Java did.
+struct Departure {
+    n: u32,
+    stage: Stage,
+    frame: usize,
+    java: &'static [u32],
+    setup: &'static [u32],
+}
+
+const fn departure(n: u32, stage: Stage, frame: usize, java: &'static [u32], setup: &'static [u32]) -> Departure {
+    Departure { n, stage, frame, java, setup }
+}
+
+/// Where setup departs from the Java's record: the remaining factors of a frame, on eight small boards.  The Java
+/// counted a frame it had not yet simplified as having freedoms, so its `unzip`, asking whether a factor had a use
+/// outside its frame, could find one in a frame that is in fact closed, leave that factor to the search and claim the
+/// frame's next factor instead.  Setup counts every frame's freedoms as they are and builds the root problem Π_n of
+/// docs/theory/frame-model.md (`tests/canonical_root.rs`).  On 8, 12, 13, 16, 17 and 27 the search's frame 0 keeps
+/// another factor; on 25 and 26 two frames as setup forms them do, and merging them gives the Java's frame again.  The
+/// games are the same.
+const DEPARTURES: [Departure; 16] = [
+    departure(8, Stage::Formed, 1, &[2], &[3]),
+    departure(12, Stage::Formed, 2, &[2], &[5]),
+    departure(13, Stage::Formed, 2, &[2], &[5]),
+    departure(16, Stage::Formed, 2, &[4], &[6]),
+    departure(17, Stage::Formed, 2, &[4], &[6]),
+    departure(25, Stage::Formed, 2, &[6], &[9]),
+    departure(25, Stage::Formed, 3, &[4], &[10]),
+    departure(26, Stage::Formed, 2, &[6], &[9]),
+    departure(26, Stage::Formed, 3, &[4], &[10]),
+    departure(27, Stage::Formed, 3, &[4], &[10]),
+    departure(8, Stage::Search, 0, &[2], &[3]),
+    departure(12, Stage::Search, 0, &[2], &[5]),
+    departure(13, Stage::Search, 0, &[2], &[5]),
+    departure(16, Stage::Search, 0, &[4], &[6]),
+    departure(17, Stage::Search, 0, &[4], &[6]),
+    departure(27, Stage::Search, 0, &[4], &[10]),
+];
+
+/// The remaining factors setup must give frame `frame` of board `n` at `stage`: those of the Java's record (`java`),
+/// unless the frame is one of the `DEPARTURES`, whose Java value `java` must then hold.
+fn expected_remaining_factors<const W: usize>(n: u32, stage: Stage, frame: usize, java: &Json) -> Bits<W> {
+    match DEPARTURES.iter().find(|d| (d.n, d.stage, d.frame) == (n, stage, frame)) {
+        Some(d) => {
+            assert_eq!(ints(java), d.java, "n={n} {stage:?} frame {frame}: the Java's record");
+            d.setup.iter().copied().collect()
+        }
+        None => set(java),
+    }
+}
+
+/// Every departure is in the record: its board is in `testdata/golden` and has the frame, and setup's value is not
+/// the Java's.
+#[test]
+fn the_departures_are_from_the_record() {
+    let golden = load_golden();
+    for d in &DEPARTURES {
+        assert_ne!(d.java, d.setup, "n={} {:?} frame {}", d.n, d.stage, d.frame);
+        let g = golden.iter().find(|g| g.n == d.n).unwrap_or_else(|| panic!("n={}: no golden file", d.n));
+        let frames = match d.stage {
+            Stage::Formed => g.field("apiary").get("hives"),
+            Stage::Search => Some(g.field("frames")),
+        };
+        let frame = frames.and_then(|frames| frames.at(d.frame)).unwrap_or_else(|| panic!("n={}: no frame", d.n));
+        assert_eq!(ints(frame.get("remainingFactors").unwrap()), d.java, "n={} {:?} frame {}", d.n, d.stage, d.frame);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // The structure of a board, at any width
 
 /// The board's frames as setup forms them, against the golden data.  The data is the Java's export and keeps its
@@ -110,7 +193,8 @@ fn check_board_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) {
         bad.check(n, &at("sources"), got.sources(), set(field("sources")));
         bad.check(n, &at("factors"), got.factors(), set(field("factors")));
         bad.check(n, &at("remainingSources"), got.remaining_sources(), set(field("remainingSources")));
-        bad.check(n, &at("remainingFactors"), got.remaining_factors(), set(field("remainingFactors")));
+        let want_factors = expected_remaining_factors(n, Stage::Formed, i, field("remainingFactors"));
+        bad.check(n, &at("remainingFactors"), got.remaining_factors(), want_factors);
         bad.check(n, &at("impossible"), got.impossible(), set(field("impossible")));
         bad.check(n, &at("freeFactorCount"), i64::from(got.freedoms()), field("freeFactorCount").as_i64().unwrap());
         bad.check(
@@ -142,7 +226,8 @@ fn check_search_frames<const W: usize>(g: &Golden, bad: &mut Mismatches) -> usiz
         let field = |name: &str| want.get(name).unwrap_or_else(|| panic!("n={n} frame {i}: no {name}"));
         let at = |what: &str| format!("frame {i} {what}");
         bad.check(n, &at("name"), name.as_str(), field("name").as_str().unwrap());
-        bad.check(n, &at("factors"), got.factors, set(field("remainingFactors")));
+        let want_factors = expected_remaining_factors(n, Stage::Search, i, field("remainingFactors"));
+        bad.check(n, &at("factors"), got.factors, want_factors);
         bad.check(n, &at("moves"), got.moves, set(field("remainingSources")));
         bad.check(n, &at("freeFactorCount"), i64::from(got.freedoms), field("freeFactorCount").as_i64().unwrap());
     }
