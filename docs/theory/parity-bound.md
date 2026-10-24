@@ -8,7 +8,10 @@ over GF(2), one for each parity of the number of prime factors, so the heaviest 
 split checks its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out,
 it bounds the sets that make the same choices.  [The barred bound (W2)](#the-barred-bound) fixes the bottom two layers
 as every optimal set has them and leaves out one more number: when it is at most a score, every set that beats the score
-plays that number.  Both results are proved.  The prover bounds its searches by W1.  W2 settles most of [statement
+plays that number.  The sources are the heaviest numbers, and the heaviest common independent set holds those that the
+greedy algorithm of their own linear matroid keeps, which are U\* exactly when [the span conjecture
+(♦)](sources.md#the-span-conjecture) holds: [the greedy-basis proposition (W3)](#the-greedy-basis-proposition).  All
+three results are proved.  The prover bounds its searches by W1.  W2 settles most of [statement
 U](exactness.md#statement-u), the open statement that some optimal set plays every member of U\* with three or more
 prime factors, game by game, and [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) rests on
 it.  The same construction, frame by frame, bounds the frame model's promotions ([bounds on the
@@ -164,6 +167,51 @@ does not depend on V, so a member certified against one score is certified again
 computes the barred bounds game by game ([solver/noframe/docs/proofs.md, "The upper part, game by
 game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 
+## The greedy-basis proposition
+
+The sources are the heaviest numbers, and each is a coloop of one parity matroid, so the parity bound takes them as the
+greedy algorithm of the other would: by decreasing value, each one whose vector is no sum of those taken before it.
+The *sources' linear matroid* of game n is the linear matroid over GF(2) on its sources, each source s represented by
+v(s).  Its *greedy basis* is the set that its [greedy algorithm](primer.md#the-greedy-algorithm-of-a-matroid) keeps when
+it takes the sources by decreasing value.
+
+**Proposition W3 (the greedy-basis proposition).**  Let n ≥ 2.  Every heaviest set independent in M₀ and M₁ holds,
+among the sources, exactly the greedy basis of the sources' linear matroid.  The greedy basis is U\* if and only if
+[(♦)](sources.md#the-span-conjecture) holds in game n, and then the parity bound of n equals the parity bound with the
+picks U\* and with the bars the other sources.
+
+*Proof.*  The idea: a source left out of a heaviest set could replace any lighter member of its circuit, so its circuit
+is made of heavier sources, which is how the greedy algorithm rejects.
+
+1. *Sources in the parity matroids.*  A source s of layer k has no coordinate of its own, so it is a coloop of the
+   parity matroid of k's parity, and v(s) represents it in the other.  So a set of sources is independent in M₀ and M₁
+   exactly when its vectors v(s) are independent, by step 1 of the proof of [W1](#the-parity-bound): exactly when it
+   is independent in the sources' linear matroid.
+2. *The first difference.*  Let I be a heaviest set independent in both, G the greedy basis, and suppose that they
+   hold different sources.  Let d be the largest source in one of them and not the other; above d they agree.
+3. *d is not in I alone.*  The greedy algorithm rejected d, so v(d) is a sum of vectors of members of G above d, which
+   are members of I.  Then I is dependent, by step 1.
+4. *d is not in G alone.*  The set I + d is independent in the parity matroid in which d is a coloop.  In the other,
+   M_i, it is dependent, or it would outweigh I.  Let H be the fundamental circuit of d over I in M_i ([the
+   primer](primer.md#matroids)).  If H held a member e lighter than d, I − e + d would be independent in M_i, and in the
+   other matroid too, since d is a coloop there, and it would outweigh I.  So the other members of H are heavier than d:
+   sources above d, members of G.  A coloop lies in no circuit, so each is represented by its v in M_i, and these
+   vectors sum to v(d).  Then the greedy algorithm would have rejected d.
+5. *U\* and (♦).*  The set U\* is playable, so its vectors are independent ([the independence lemma
+   (P10)](playability.md#the-independence-lemma)).  If (♦) holds, the greedy algorithm decides every source as
+   descending greedy does, by induction down the sources: where descending greedy keeps x, v(x) is no sum of vectors of
+   U\* above x, by that independence, and where it rejects x, (♦) makes v(x) such a sum.  Conversely, if G = U\*, the
+   vector of each source that descending greedy rejects is a sum of vectors of members of U\* above it: (♦).
+6. *The bound.*  Given (♦), a heaviest set I independent in both holds U\* and no other source, so I ∖ U\* is
+   independent in M_i/U\* less the other sources, for i = 0 and 1, and the parity bound with those picks and bars is at
+   least ΣI.  It is at most ΣI, since every set it counts, together with U\*, is independent in both.  ∎
+
+The span conjecture holds in game 21, so the parity bound's heaviest set of 21 holds
+U\* = {12, 14, 15, 16, 18, 19, 20, 21} and no other source: it is U\* and 9, worth 144.  The conjecture holds in every
+game checked ([evidence.md](evidence.md#the-open-statements-about-the-sources)), so W3 settles the sources of the parity
+bound in all of them.  [The contraction theorem (B6)](frame-bounds.md#the-contraction-theorem) uses it to compare the
+parity bound with the frame bound.
+
 ## What the parity bound misses
 
 The parity bound admits exactly the sets independent with their own coordinates (step 1 of the proof of
@@ -178,6 +226,10 @@ Between it and the bounds it is compared with:
   members can be paid with distinct maximal factors outside it, since a set independent with its own coordinates has
   such a payment ([playability.md](playability.md#the-independence-lemma), the paragraph "Between playability and
   payment").
+* It is never below ΣU\* plus the frame bound at the root, since on the candidates the frame matroids are the parity
+  matroids contracted by U\* ([the contraction theorem (B6)](frame-bounds.md#the-contraction-theorem)), and the two
+  are equal on every board measured ([frame-bounds.md](frame-bounds.md#the-frame-bound), the paragraph "Against the
+  parity bound").
 * A bound built the same way over the rationals would admit every set that the parity bound admits ([the
   primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and more.  The triangle {6, 10, 15} is
   unplayable, since whichever member is played first leaves at most one of the factors 2, 3 and 5 for the other two,

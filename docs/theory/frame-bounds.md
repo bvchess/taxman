@@ -13,7 +13,9 @@ extended problem ([B3](#the-frame-bound-for-the-extended-problem)), whose search
 U](exactness.md#statement-u).  These three are load-bearing: proofs of scores rest on them.  Two more results serve
 studies of stronger bounds, and no proof of a score rests on them: signed matroids join the frame bound through Lagrange
 multipliers in [the decomposition bound (B4)](#the-decomposition-bound), and over GF(3) the signings together lose
-nothing that winnability keeps ([the GF(3) proposition, B5](#the-gf3-proposition), explanatory).  All five are proved.
+nothing that winnability keeps ([the GF(3) proposition, B5](#the-gf3-proposition), explanatory).  On the candidates
+the frame matroids are the parity matroids contracted by U\* ([the contraction theorem, B6](#the-contraction-theorem),
+explanatory).  All six are proved, a part of B6 given the span conjecture (♦).
 
 *Words.*  Frames, their numbering, [candidates, homes, winnable frames and promotion
 sets](frame-model.md#the-frame-model), and [nodes, completions, state(P) and the promotion
@@ -148,8 +150,13 @@ columns as rows, and a nonzero term of its determinant gives each row a distinct
 unit vector e_y can only take y, so the movers take distinct factors of the frame that are not promoted: the matching
 bound's assignment.  So every set the frame bound admits, the matching bound admits.
 
-*Against the parity bound.*  The parity bound is the same construction on the whole board, and at every root where both
-were measured it equals ΣU\* plus the frame bound ([evidence.md](evidence.md#observations)).
+*Against the parity bound.*  The parity bound is the same construction on the whole board.  It is never below ΣU\*
+plus the frame bound, and given (♦) the two differ only by what the numbers up to n/2 that are no candidates add ([the
+contraction theorem (B6)](#the-contraction-theorem)).  They are equal at every board from 2 to 8191
+([evidence.md](evidence.md#observations)), where fixing the sources to U\* and the promotions to the candidates costs
+the bound nothing: the prover's bound on the whole board and the frame solver's bound at the root agree.  On 5,496 of
+those boards, from 1173 on, B6 does not account for the equality: some numbers that are no candidates are loops of
+neither contracted parity matroid, though the heaviest sets found hold none of them.
 
 The frame solver's node bound is the frame bound, under the solver's name for it, the GF(2) bound; it keeps each node's
 frame matroids as contractions of the root's ([solver/docs/design/gf2-bound.md, "The GF(2)
@@ -308,3 +315,71 @@ The signing matters for the odd core {20, 27, 28, 30, 42, 50, 63, 75} of the boa
 no part of which is a core.  Under the plain signing its eight vectors have the determinant −1, so they are independent
 over GF(2), over GF(3) and over the rationals alike.  With the values of step 3, 1, 1, 1 at 10 and 1 and 2 at each other
 factor, the eight vectors sum to 0 over GF(3).
+
+## The contraction theorem
+
+On the candidates, the frame matroids are the [parity matroids](parity-bound.md#the-parity-matroids) contracted by
+U\*, so the frame bound is [the parity bound (W1)](parity-bound.md#the-parity-bound) with picks and bars.  Nothing that
+proves a score rests on this.
+
+**Theorem B6 (the contraction theorem).**  Let n ≥ 2, Π a root problem of game n with the candidates C and the frame
+matroids A and B, and k₀ the lowest layer of a frame with freedoms.
+
+1. *The matroids.*  The frame matroids A and B are the restrictions to C of M_a/U\* and M_b/U\*, where a and b are the
+   parities of k₀ − 1 and k₀.
+2. *The limit.*  No set independent in A and in B has more members than the promotion limit.
+3. *One side.*  The frame bound of Π at the root, plus ΣU\*, is the parity bound of n with the picks U\* and the bars
+   every number outside U\* ∪ C, so it is at most the parity bound of n.
+4. *The other side, given (♦).*  If [(♦)](sources.md#the-span-conjecture) holds in game n, the parity bound of n is
+   ΣU\* plus the heaviest ΣI over the sets I of numbers up to n/2 independent in M₀/U\* and M₁/U\*; and it is ΣU\*
+   plus the frame bound if every number up to n/2 that is a loop of neither contraction is a candidate.
+
+If no frame has freedoms, C is empty, the frame bound is 0, and parts 2 to 4 hold as stated.
+
+*Proof.*  The idea: the parity matroids split into blocks by layer, contracting U\* clears the closed frames from each
+block and leaves one frame h modulo its moves, and the claims change nothing on the candidates.
+
+1. *Blocks.*  Let block j be the coordinates up to n/2 in layer j.  A number s has v(s) in block Ω(s) − 1 and, if
+   s ≤ n/2, e_s in block Ω(s), so M_i is the direct sum of its parts on the blocks of parity i ([direct
+   sums](primer.md#deletion-contraction-direct-sums-and-truncation)).  Block j is the union of the pools F_D of the
+   frames D of layer j + 1 ([the frame lemma (F1)](frame-model.md#the-frame-lemma)).
+2. *Contracting U\*.*  In M_i a member of U\* is a coloop, or has its v(s) in a block, on the pool of its own frame.
+   For a closed frame D, U\* ∩ D is playable against F_D, so its |F_D| vectors on F_D are independent
+   ([P10](playability.md#the-independence-lemma)) and span all of them.  Working modulo U\*'s
+   vectors (direct sums), block j becomes the vectors on F_h, where h = j + 1 − k₀, modulo the span of frame h's moves,
+   or nothing if layer j + 1 has no frame with freedoms.
+3. *The candidates.*  A candidate x of home h + 1 has v(x) in block k₀ + h − 1, with the class of its vector on F_h,
+   and a candidate y of home h has e_y there too.  So the restriction of M_a/U\* to C is the direct sum, over the even
+   h, of the linear matroids N′_h on T_h that frame h defines as root frame h defines N_h, and that of M_b/U\* is the
+   sum over the odd h.  It remains to show N′_h = N_h.
+4. *The claims.*  Root frame h is frame h less a claim sequence, its drops included ([the reduction-step lemma
+   (X6)](exactness.md#the-exactness-theorem)).  Let (s, f) be a claim, with the moves M and the factors K before it;
+   f is no candidate ([the claims lemma (X5)](exactness.md#the-exactness-theorem), part 1).  A front claim's move s
+   has the vector e_f on K, so working modulo it deletes the coordinate f.  A back claim's f is listed by s alone among
+   M, and by no candidate (X5, part 2), so a vanishing combination of vectors of M and of candidates gives s the
+   coefficient 0, and a set X of candidates has X ∪ M independent on K exactly when X ∪ (M − s) is independent on
+   K − f.  Either way, removing s and f keeps the dependencies among the candidates.
+5. *Part 2.*  If I is independent in A and in B, with x_h members of home h, then x_h + x_{h+1} ≤ ρ_h, the freedoms of
+   root frame h, which bound the rank of N_h ([signed frame matroids](#signed-frame-matroids)).  With x_h at most the
+   number of candidates of home h and x_0 = 0, (x_h) is one of the sequences over which the promotion limit is the
+   largest sum ([searching the frame model](frame-model.md#searching-the-frame-model)).
+6. *Part 3.*  By parts 1 and 2, the frame bound is the heaviest ΣI over the sets I ⊆ C independent in M₀/U\* and M₁/U\*.
+   The set U\* is playable, so independent in both (W1), and that sum plus ΣU\* is the parity bound with those picks and
+   bars, by its definition, which is at most the parity bound of n.
+7. *Part 4.*  Given (♦), every heaviest set independent in M₀ and M₁ holds U\* and no other source, by [the
+   greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition), whose step 6 then gives the first
+   sentence.  A loop lies in no independent set, so that heaviest set lies among the numbers that are loops of neither
+   contraction.  Under the hypothesis they are candidates, and step 6 applies.  ∎
+
+In game 21, k₀ = 2 and A = M₁/U\*.  Modulo the vectors of U\*_2 = {14, 15, 21}, e₂ + e₇, e₃ + e₅ and e₃ + e₇, the
+primes 2, 3, 5 and 7 have one class.  So v(4) = e₂ and v(9) = e₃ are parallel, as in A, while v(6) = e₂ + e₃ and
+v(10) = e₂ + e₅ vanish: 6 and 10, which fail test (b), are loops, and each other number up to 10 but 4 and 9 is a loop
+of one contraction too.  The matroid B = M₀/U\* makes 4 and 9 parallel as well, and the claims (15, 5) and (20, 10)
+play no part.  Part 4 applies: the parity bound of 21, 144, is ΣU\* = 135 plus the frame bound 9.
+
+Every candidate x is a loop of neither contraction, since {x} is a promotion set, by tests (a) and (b) and X6, so
+U\* ∪ {x} is playable ([the exactness theorem (X7)](exactness.md#the-exactness-theorem)) and independent in M₀ and
+M₁.  So the hypothesis of part 4 says that the candidates are the numbers that pass tests (a) and (b) read over GF(2),
+with independence in place of playability.  It fails first at 1173, where 242, 286 and 374 fail test (b) through an
+odd core but are loops of neither, and part 4's conclusion holds there all the same (the paragraph "Against the parity
+bound").
