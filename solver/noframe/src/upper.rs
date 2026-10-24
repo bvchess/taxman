@@ -6,7 +6,7 @@
 //!
 //! The bottom-layers theorem (F3, docs/theory/frame-model.md) pins down the two bottom layers of every optimal set S of
 //! n: S holds the largest prime q ≤ n and no other prime; among the sources of layer 2 it holds exactly U\*_2; and
-//! wherever U\*_2 spans every prime up to n/2 (the frames of layer 2 are closed: every board from 187 to 8191, and some
+//! where U\*_2 has one member per prime ≤ n/2 (the frames of layer 2 are closed: every board from 187 to 8191, and some
 //! below) it holds no number of layer 2 up to n/2 at all.  [`low_roles`] writes this down as roles for the parity bound
 //! ([`crate::parity`], the parity bound W1, docs/theory/parity-bound.md), which is a certified upper bound on the
 //! weight of every playable set whose forced members (role `Pick`) are all in it and whose barred ones (role `Barred`)
