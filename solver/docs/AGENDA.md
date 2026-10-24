@@ -178,7 +178,7 @@ entry](../notebook/search/measurements-made-for-the-research-agenda-2026-10/READ
 *Closed* (2026-10-18; the slope test killed it in the search on 2026-10-16).  The multi-field bound, the GF(2) frame
 matroids and the signed GF(3) ones coupled by Lagrangian multipliers ([the glossary](../../docs/GLOSSARY.md); [the
 signed frame theorem (B1)](../../docs/theory/frame-bounds.md#the-signed-frame-theorem) and [the decomposition bound
-(B5)](../../docs/theory/frame-bounds.md#the-decomposition-bound)), closes a large share of the root's gap ([the fields
+(B4)](../../docs/theory/frame-bounds.md#the-decomposition-bound)), closes a large share of the root's gap ([the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound
 its trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost
 is, so every policy of computing it loses ([the E3
@@ -209,12 +209,12 @@ grows with n: A2's premise.
 *What is done.*
 
 * **Every assumption is a theorem** (2026-10-15): [the bottom-layers theorem
-  (F3)](../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
+  (F4)](../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
   (X7)](../../docs/theory/exactness.md#the-exactness-theorem), with the numbering by layer clean by construction
-  ([F4](../../docs/theory/frame-model.md#clean-numbering)), and the upper part reduced to U, its members of three or
+  ([F6](../../docs/theory/frame-model.md#clean-numbering)), and the upper part reduced to U, its members of three or
   more prime factors ([the frame model on a proven
   footing](../notebook/the-frame-model-on-a-proven-footing-2026-10/README.md)).
-* **The barred bounds**, with layers 1 and 2 fixed by F3, for every game of 1301-3314 that rests on the model:
+* **The barred bounds**, with layers 1 and 2 fixed by F4, for every game of 1301-3314 that rests on the model:
   7.5% of U\*_{≥3} open to 2175 and 14.9% past it, no game closed by the bounds alone, and the open share following the
   root's gap ([the upper part game by
   game](../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)).
@@ -227,7 +227,7 @@ grows with n: A2's premise.
 
 
 *What remains.*  The campaign of certificates of 2176..3440, and the claim-by-claim rule ([the kept-claims lemma
-(E2)](../../docs/theory/extended-problem.md#the-kept-claims-lemma)), which would settle its last phase without a search;
+(E4)](../../docs/theory/extended-problem.md#the-kept-claims-lemma)), which would settle its last phase without a search;
 both are paused, since certifying U is not the priority ([STATUS](STATUS.md)).  The prover's search with the certified
 members forced, on five games of 1302-2100 (killed if the dear games take fewer than half the nodes), has not run; E6,
 the measurement of the sources left free against the upper part fixed to U\*, was prepared and then superseded by the

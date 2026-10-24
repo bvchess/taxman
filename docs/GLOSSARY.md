@@ -53,7 +53,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   factors outside it as its *pool*, each member *lists* its maximal factors in the pool, a scheme gives each member a
   distinct factor it lists, and the precedence says which member must be played before which
   ([definitions](theory/playability.md#payment-schemes)).
-* **peel**: the procedure that decides it by forced choices.  A **front move** pairs a member that lists one factor
+* **peel**: the procedure that decides it by safe choices.  A **front move** pairs a member that lists one factor
   with it, a **back move** pairs a factor that one member alone lists with that member, and the set is playable exactly
   when peel pairs every member, in any order of moves ([the peel theorem (P4)](theory/playability.md#the-peel-theorem)).
   What is left after some moves is the **remainder**.  Inside a frame the same procedure decides whether the frame is
@@ -99,7 +99,8 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **Taxman Mini**: the game a frame plays ([the frame model](theory/frame-model.md#the-frame-model)).  It has a set of
   moves and a set of factors.  Each move must still have one of its maximal factors in the frame when it is taken, and
   taking it removes all of its factors still in the frame.
-* **winnable**: a frame is winnable when some order takes every move.  Peel decides it.
+* **winnable**: a frame is winnable when some order takes every move, which is when its moves are playable against its
+  factors, so peel decides it ([the winnability lemma (F5)](theory/frame-model.md#the-winnability-lemma)).
 * **setup**: what the frame solver does to a board before it searches.  It forms the frames, simplifies them, numbers
   and merges them, and finds the candidates and `in_the_bag`.
 * **mandatory move**: a move that setup settles (`unzip`).  A source with one usable factor must take it, and a factor
@@ -119,11 +120,11 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   frame uses one up, and none may go below zero.  A frame with none is **closed** and takes no part in the search.
 * **layer**: the number of prime factors of a number, counted with multiplicity: 12 = 2 · 2 · 3 is in layer 3.  A
   frame's layer is its sources'.  The frames in front of a frame lie one layer lower.  A set is playable exactly when
-  each of its *layer instances* is ([the layer theorem (F2)](theory/frame-model.md#the-layer-theorem)).
+  each of its *layer instances* is ([the layer theorem (F3)](theory/frame-model.md#the-layer-theorem)).
 * **frame number**: setup numbers the frames that have freedoms by layer, from the front.  If L is the lowest layer of a
   frame with freedoms, frame h is the frames with freedoms in layer L + h.  Frames with the same number are merged into
   one, so that a promotion always has one frame to go to.  The numbering is **clean** ([clean numbering
-  (F4)](theory/frame-model.md#clean-numbering)): every
+  (F6)](theory/frame-model.md#clean-numbering)): every
   frame with freedoms directly in front of frame h is frame h − 1.  The numbering by layer is clean by construction.  On
   every board the solver supports it equals the numbering breadth first from the front, the Java's: frame 0 is every
   frame with freedoms that has no other in front of it, and frame k + 1 every frame directly behind frame k.
@@ -133,9 +134,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   puts those that have freedoms in frame h − 1; that nothing further forward is needed is [the one-frame-forward lemma
   (X3)](theory/exactness.md#the-exactness-theorem).  After promotions the frames are *reduced*: a move left with one
   live factor is paid by it, and the pair is dropped, repeatedly; this never changes whether a frame is winnable ([the
-  reduction lemma (F5)](theory/frame-model.md#the-reduction-lemma)).
+  reduction lemma (F8)](theory/frame-model.md#the-reduction-lemma)).
 * **candidate** **(overloaded)**: (1) a number that setup says could be promoted (`SearchFrames::candidates`,
-  `BoardFrames::promotion_candidates`).  Game 21 has 2 candidates, game 85 has 10, and game 1100 has 273.  (2) In a
+  `BoardFrames::promotion_candidates`): a factor its frame can spare and the frame in front can take on ([the take-on
+  lemma (F7)](theory/frame-model.md#the-take-on-lemma)).  Game 21 has 2 candidates, game 85 has 10, and game 1100 has 273.  (2) In a
   search node, `cands`: the candidates the node's loop still has to try.  (3) A role in the matching bound's graph: a
   number that may be matched as a promoted move, pay for one behind it, or stay free.
 * **root**: the frames as setup leaves them, before any promotion.
@@ -145,8 +147,8 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   candidate's *home* is the root frame whose factors hold it ([definitions](theory/frame-model.md#the-frame-model)).
 * **in the bag** (`in_the_bag`): what the game with no promotions scores, ΣU\* in the theory.  Game 21 has `in_the_bag`
   = 135.
-* **the promotion limit** (`max_total`): the most promotions the frames' freedoms allow ([the promotion-limit lemma
-  (F6)](theory/frame-model.md#the-promotion-limit-lemma)).
+* **the promotion limit** (`max_total`): the most promotions that the frames' freedoms and the candidates allow ([the
+  promotion-limit lemma (F9)](theory/frame-model.md#the-promotion-limit-lemma)).
 * **search problem**, **Π**: what setup gives the search, less what only changes how the search runs: the frames, the
   candidates, `max_total` and the factor graph among their numbers.  `search::Problem` writes it out canonically, and
   `setup.digest` in a results line is a 64-bit digest of it.  Π_n is the root problem of game n
@@ -294,9 +296,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  A *signing* gives
   each pair of a number and a maximal factor in a frame a nonzero value in a field, and the frame's *signed frame
   matroid* represents the candidates that touch the frame modulo its moves ([the signed frame theorem
-  (B1)](theory/frame-bounds.md#the-signed-frame-theorem)).  The bound is the
+  (B1)](theory/frame-bounds.md#the-signed-frame-theorem)); the GF(3) signings together lose nothing that winnability
+  keeps ([the GF(3) proposition (B5)](theory/frame-bounds.md#the-gf3-proposition)).  The bound is the
   linear program over all of them, computed by Lagrangian decomposition ([the decomposition bound
-  (B5)](theory/frame-bounds.md#the-decomposition-bound);
+  (B4)](theory/frame-bounds.md#the-decomposition-bound);
   [the fields study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
   agenda's A1 measured it and is closed ([solver/docs/AGENDA.md, "Ranked
   avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
@@ -318,7 +321,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **barred bound**: the parity bound with one member u of U\* barred ([the barred bound
   (W2)](theory/parity-bound.md#the-barred-bound)).  The prover *certifies* u when the barred bound is
   at most the recorded score: then every set of moves that beats the score, and keeps the layers 1 and 2 that [the
-  bottom-layers theorem (F3)](theory/frame-model.md#the-bottom-layers-theorem) gives every optimal set, plays u.  The members
+  bottom-layers theorem (F4)](theory/frame-model.md#the-bottom-layers-theorem) gives every optimal set, plays u.  The members
   it does not certify are *open* ([solver/noframe/docs/proofs.md, "The upper part, game by
   game"](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 * **sacrifice bound** (`src/sacrifice.rs`): an upper bound on opt(n) from games on boards with holes.  The frame solver

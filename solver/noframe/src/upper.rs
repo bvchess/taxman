@@ -4,26 +4,26 @@
 //! and every recorded optimal game plays exactly U\* above n/2.  The *layer* of x is Ω(x), its number of prime
 //! factors with multiplicity; U\*_k holds the members of U\* in layer k, and U\*_{≥3} those in layers 3 and up.
 //!
-//! The bottom-layers theorem (F3, docs/theory/frame-model.md) pins down the two bottom layers of every optimal set S of
+//! The bottom-layers theorem (F4, docs/theory/frame-model.md) pins down the two bottom layers of every optimal set S of
 //! n: S holds the largest prime q ≤ n and no other prime; among the sources of layer 2 it holds exactly U\*_2; and
 //! where U\*_2 has one member per prime ≤ n/2 (the frames of layer 2 are closed: every board from 187 to 8191, and some
 //! below) it holds no number of layer 2 up to n/2 at all.  [`low_roles`] writes this down as roles for the parity bound
 //! ([`crate::parity`], the parity bound W1, docs/theory/parity-bound.md), which is a certified upper bound on the
 //! weight of every playable set whose forced members (role `Pick`) are all in it and whose barred ones (role `Barred`)
-//! are none of it.  So the bound at those roles bounds every playable set that obeys F3.
+//! are none of it.  So the bound at those roles bounds every playable set that obeys F4.
 //!
 //! Now bar one member u of U\*_{≥3} as well.  If the bound is then at most V, a score, no playable set that obeys
-//! F3 and lacks u is worth more than V; that is, every set beating V that obeys F3 holds u.  Call u
-//! *certified* (for V).  If V is below opt(n), every optimal set beats V and obeys F3, so it holds every
+//! F4 and lacks u is worth more than V; that is, every set beating V that obeys F4 holds u.  Call u
+//! *certified* (for V).  If V is below opt(n), every optimal set beats V and obeys F4, so it holds every
 //! certified member.  If with u barred the roles cannot be met at all ([`Outcome::Infeasible`]) no set lacks u, and
 //! u is certified for every V.  A member that is not certified is *open*, with the margin by which its bound
-//! exceeds V.  The bound at the roles of F3 alone, the *root*, is at least V whenever a game worth V obeys
+//! exceeds V.  The bound at the roles of F4 alone, the *root*, is at least V whenever a game worth V obeys
 //! them, and its excess over V is the gap that the open members share out.
 //!
 //! The members certified for a lower V are certified for a higher one: the bound does not depend on V.
 //!
 //! The same roles start the searches of `bin/exact.rs` (by default).  A search from [`low_roles`] still proves "no
-//! playable set beats V", since every optimal set obeys them (F3): if some set beat V, an optimal set would,
+//! playable set beats V", since every optimal set obeys them (F4): if some set beat V, an optimal set would,
 //! and it would obey the roles.  A search from [`upper_fixed_roles`], which fixes the whole upper part to U\* as well,
 //! is the frame model's problem and proves nothing about opt(n).  [`watched`] names the numbers whose branching and
 //! barring the search counts.
@@ -68,7 +68,7 @@ fn in_ustar(n: u32, ustar: &[u32]) -> Vec<bool> {
     member
 }
 
-/// Whether the frames of layer 2 are closed on game n (F3, docs/theory/frame-model.md): `ustar`, U\* in any order, has
+/// Whether the frames of layer 2 are closed on game n (F4, docs/theory/frame-model.md): `ustar`, U\* in any order, has
 /// as many members of layer 2 as there are primes up to n/2.  U\*_2 is a forest in the graph on those primes and a
 /// ground vertex (pq is the edge p–q and p² the edge p–ground), so with that many edges it is a spanning tree and every
 /// other number of layer 2 closes a cycle with it.  It decides each board by its own U\*; it does not assume a value of
@@ -80,11 +80,11 @@ pub fn layer_two_closed(n: u32, spf: &[u32], ustar: &[u32]) -> bool {
     members == primes
 }
 
-/// The roles of every optimal set of game n in the two bottom layers (F3, docs/theory/frame-model.md), indexed 0..=n,
+/// The roles of every optimal set of game n in the two bottom layers (F4, docs/theory/frame-model.md), indexed 0..=n,
 /// where `ustar` is U\* in any order.  0 and 1 are barred (they cannot be picked); the largest prime q ≤ n is forced
 /// and every other prime barred; each number of layer 2 above n/2 is forced if it is in U\* and barred if not; and, if
 /// the frames of layer 2 are closed on this board ([`layer_two_closed`]), every number of layer 2 up to n/2 is barred,
-/// since each closes a cycle with U\*_2 and F3 excludes it.  On a board where they are not closed those numbers stay
+/// since each closes a cycle with U\*_2 and F4 excludes it.  On a board where they are not closed those numbers stay
 /// free, with everything else.
 pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     assert!(n >= 2, "game n={n}: the board is 2..=n");
@@ -107,7 +107,7 @@ pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     roles
 }
 
-/// The roles of the frame model's problem on the whole board: [`low_roles`] (F3), and above n/2 every member of `ustar`
+/// The roles of the frame model's problem on the whole board: [`low_roles`] (F4), and above n/2 every member of `ustar`
 /// forced and every other number barred, so that nothing above n/2 is free.  A search from these roles proves nothing
 /// about opt(n): it looks only for sets whose upper part is U\*, and that some optimal set has that upper part is the
 /// open statement U (docs/theory/exactness.md).  It is a measurement of what the frame model's problem costs.
@@ -194,7 +194,7 @@ pub fn barred_bounds(board: &Board, spf: &[u32], v: u64, ustar: &[u32]) -> Barre
     let weights: Vec<i64> = (0..=i64::from(n)).collect();
     let mut meet = Meet::new(Parity::pair(board, &weights));
     let Outcome::Bound(root) = meet.solve(&roles) else {
-        panic!("n={n}: the parity bound at the roles of F3 is not certified")
+        panic!("n={n}: the parity bound at the roles of F4 is not certified")
     };
     let mut members: Vec<u32> = ustar.iter().copied().filter(|&u| omega(u, spf) >= 3).collect();
     members.sort_unstable();
@@ -234,7 +234,7 @@ mod tests {
 
     /// One board and one claim T below its recorded score V, for the tests of the certificates: the barred bounds
     /// recomputed at T (a member certified against V says nothing of the sets worth V − 4), those at V, and every
-    /// playable set that obeys the roles of F3 and is worth more than T, enumerated by the matching bound alone
+    /// playable set that obeys the roles of F4 and is worth more than T, enumerated by the matching bound alone
     /// so that the check does not rest on the parity bound under test.
     struct Case {
         n: u64,
@@ -282,7 +282,7 @@ mod tests {
     }
 
     /// Every claim T below the recorded score V, with certification recomputed at T: the members certified at T are
-    /// certified at V, and every playable set that obeys the roles of F3 and is worth more than T holds each
+    /// certified at V, and every playable set that obeys the roles of F4 and is worth more than T holds each
     /// of them.  Boards 2..=60.
     #[test]
     fn certified_members_are_held_by_every_set_beating_the_claim() {
@@ -333,7 +333,7 @@ mod tests {
         assert!(caught > 0, "the wrong rule was caught on no board: the test cannot see an over-generous rule");
     }
 
-    /// Every optimal set of a game obeys the roles of F3, found by enumeration from the plain root (the
+    /// Every optimal set of a game obeys the roles of F4, found by enumeration from the plain root (the
     /// sets worth more than V − 1).  Boards 2..=60.
     #[test]
     fn every_optimal_set_obeys_the_roles() {
@@ -475,7 +475,7 @@ mod tests {
         assert!(checked > 0, "the test checked nothing");
     }
 
-    /// Fixing the two bottom layers by F3 keeps the proofs and opt(n): from `low_roles`, with the target
+    /// Fixing the two bottom layers by F4 keeps the proofs and opt(n): from `low_roles`, with the target
     /// the score nothing beats it, and with the target one below a playable set obeying the roles is found, worth
     /// the score.  Every 3rd game that needs a search in 187..=700 (all of them take three times the time).
     #[test]

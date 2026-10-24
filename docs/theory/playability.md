@@ -392,7 +392,7 @@ with a cycle has at least as many edges as vertices, and the scheme pays its edg
 has no ground and one cycle, which pays one way round or the other; its trees, and the components without a cycle, pay
 in one way, from their leaves inward.  So the count is 2^c for the c components with a cycle.  P11 is what [the frontier
 theorem (S3)](sources.md#the-frontier-theorem), [the bottom-layers theorem
-(F3)](frame-model.md#the-bottom-layers-theorem) and [the frame bound](frame-bounds.md#the-frame-bound) use for members
+(F4)](frame-model.md#the-bottom-layers-theorem) and [the frame bound](frame-bounds.md#the-frame-bound) use for members
 with two factors.
 
 ### Odd cores

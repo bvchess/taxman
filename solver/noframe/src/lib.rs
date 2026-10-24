@@ -8,7 +8,7 @@
 //!
 //! This crate shares no code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only on the
 //! theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
-//! confinement, P8; the parity bound, W1; and the bottom layers of every optimal set, the bottom-layers theorem F3,
+//! confinement, P8; the parity bound, W1; and the bottom layers of every optimal set, the bottom-layers theorem F4,
 //! which the proofs of `exact` start from by default) and on elementary bounds.  The report is `README.md` next to this
 //! file.
 //!
@@ -26,7 +26,7 @@
 //!   weighted intersection, a bound on opt(n).
 //! * [`upper`]: which members of U\*_{≥3}, the sources of three or more prime factors that descending greedy keeps,
 //!   every set beating a recorded score must hold, certified by the parity bound with the two bottom layers fixed
-//!   (F3).
+//!   (F4).
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
 //! * [`jsonl`]: the resumable result files every campaign writes.
 

@@ -11,8 +11,8 @@ matroids on the candidates, and their heaviest common independent set bounds the
 every node of a search: the frame bound (B2).  The same holds for the extended problem (B3), whose searches make the
 certificates of [statement U](exactness.md#statement-u).  These three are load-bearing: proofs of scores rest on them.
 Two more results serve studies of stronger bounds, and no proof of a score rests on them: signed matroids join
-the frame bound through Lagrange multipliers in the decomposition bound (B5), and over GF(3) the signings together lose
-nothing that winnability keeps (the GF(3) proposition, B4, explanatory).  All five are proved.
+the frame bound through Lagrange multipliers in the decomposition bound (B4), and over GF(3) the signings together lose
+nothing that winnability keeps (the GF(3) proposition, B5, explanatory).  All five are proved.
 
 *Words.*  Frames, their numbering, [candidates, homes, winnable frames and promotion
 sets](frame-model.md#the-frame-model), and [nodes, completions, state(P) and the promotion
@@ -37,7 +37,7 @@ signing gives every incidence the value 1; over GF(2) it is the only signing.
 **Definition (signed frame matroid).**  The *signed frame matroid* N_h^σ is the linear matroid on T_h that represents
 each candidate in 𝔽^{Q_h} modulo the span of the vectors v_σ of frame h's moves: a candidate x of home h + 1 by the
 class of v_σ(x), and a candidate y of home h by the class of e_y.  Equivalently, it is the linear matroid of the moves'
-and the candidates' vectors, with the moves contracted ([the primer](primer.md#deletion-contraction-and-direct-sums)).
+and the candidates' vectors, with the moves contracted ([the primer](primer.md#deletion-contraction-direct-sums-and-truncation)).
 When the moves' vectors are independent, the quotient has dimension |Q_h| less the number of moves, the frame's
 freedoms, so no frame's matroid has rank above its freedoms.
 
@@ -90,7 +90,7 @@ their nonzero entries.
    coordinates outside the pool, which are the e_y of L's members of home h.
 3. *Independence in N_h^σ.*  A family made of the moves' vectors and some others is independent exactly when the moves'
    vectors are independent and the classes of the others, modulo the moves' span, are independent ([contraction is a
-   quotient](primer.md#deletion-contraction-and-direct-sums)).  The family of step 2 is such a family, so the classes
+   quotient](primer.md#deletion-contraction-direct-sums-and-truncation)).  The family of step 2 is such a family, so the classes
    of L ∩ T_h are independent: L ∩ T_h is independent in N_h^σ.
 4. *Loops.*  An independent set holds no element whose class is 0, so by step 3 no promotion set holds a loop.
 5. *Nodes.*  A completion P ∪ X is a promotion set, so by step 3, (P ∪ X) ∩ T_h is independent in N_h^σ; so is its
@@ -127,7 +127,7 @@ has taken out of its home is a loop of one of them.
 h.  A set is independent in a direct sum exactly when its part in each block is, and L's part in the block N_h is
 L ∩ T_h, so L is independent in A and in B.  A promotion set has no more members than the promotion limit, and a
 completion P ∪ X has |X| at most the node's promotion limit ([the promotion-limit lemma
-(F6)](frame-model.md#the-promotion-limit-lemma), part 2).  At a node, P ∪ X is a promotion set, so it is independent in
+(F9)](frame-model.md#the-promotion-limit-lemma), part 2).  At a node, P ∪ X is a promotion set, so it is independent in
 A and B, and X is then independent in A/P and B/P, by the definition of contraction.  ∎
 
 In game 21, the node that promotes 9 has the frame bound 9: its candidate 4 is a loop of both matroids, and its
@@ -193,11 +193,11 @@ candidates in C.
    members of home h and g_h one-sided members whose own frame is h.  Applying them to that frame adds g_h + x_{h+1}
    moves and removes x_h factors, and it stays winnable, so it keeps at least as many factors as moves:
    x_h + x_{h+1} + g_h ≤ r_h.  No candidate has the home 0, so x_0 = 0, and with no frame beyond the last the sequence
-   (x_h) is one of those that the promotion limit of the freedoms r_h ranges over, as in the proof of F6, part 2.  So
+   (x_h) is one of those that the promotion limit of the freedoms r_h ranges over, as in the proof of F9, part 2.  So
    Σx_h is at most that limit, and g_h ≥ 1 only if r_h ≥ 1.  The bound at a node follows from parts 2 and 3, since a
    completion's one-sided members are among the one-sided candidates of C.  ∎
 
-[The certificate theorem (E4)](extended-problem.md#the-certificate-theorem) searches Π⁺(O), and its search cuts by this
+[The certificate theorem (E2)](extended-problem.md#the-certificate-theorem) searches Π⁺(O), and its search cuts by this
 bound ([solver/docs/design/extended-mode.md](../../solver/docs/design/extended-mode.md)).
 
 ## The decomposition bound
@@ -206,7 +206,7 @@ Several signed frame matroids combine with A and B into one bound by splitting t
 allows ([the primer](primer.md#weak-duality-and-lagrangian-relaxation)).  Nothing that proves a score rests on this
 bound; studies of stronger bounds use it.
 
-**Theorem B5 (the decomposition bound).**  Let Π be a root problem of the frame model, A and B its frame matroids, and
+**Theorem B4 (the decomposition bound).**  Let Π be a root problem of the frame model, A and B its frame matroids, and
 N_{h_1}^{σ_1}, …, N_{h_t}^{σ_t} signed frame matroids of Π, each of one frame h_j and one signing σ_j over some field
 (several may share a frame).  For a weight function ω on the candidates, let MI(ω) be the largest ω(I) of a set I
 independent in A and in B with no more members than the promotion limit (I = ∅ included); for one on T_{h_j}, write
@@ -241,7 +241,7 @@ Over GF(3), the signings of a frame together see every way the frame can fail: a
 signing that shows it.  This is explanatory, and nothing rests on it; it says why signed matroids over GF(3) can close
 what the frame bound misses.
 
-**Proposition B4 (the GF(3) proposition).**  Let L be a set of candidates of a state of the frame model, and h a frame
+**Proposition B5 (the GF(3) proposition).**  Let L be a set of candidates of a state of the frame model, and h a frame
 of the state.  Frame h is winnable with L applied if and only if L ∩ T_h is independent in N_h^σ for every signing σ of
 frame h over GF(3).
 

@@ -3,7 +3,7 @@
 //! (docs/theory/extended-problem.md); the solver does not use it.  By the exactness theorem (X7,
 //! docs/theory/exactness.md) and the extended exactness theorem (E1, docs/theory/extended-problem.md) the promotion
 //! sets of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as `optimal.json` and
-//! `results/strict.jsonl` do.  With the claims the kept-claims lemma (E2) keeps, the default, Π⁺(∅) is the frame
+//! `results/strict.jsonl` do.  With the claims the kept-claims lemma (E4) keeps, the default, Π⁺(∅) is the frame
 //! model's problem itself, so `--compare` shows the same trees (a ratio of 1).  With `--no-claims`, the formulation
 //! of the first certificates (the measurement of stage 1), its root frames keep the pairs `unzip` would claim (only
 //! the root's reduction removes some), so its trees can differ from the default problem's: how many nodes it takes
@@ -16,7 +16,7 @@
 //! ```
 //!
 //! `--no-claims` applies to all three modes: Π⁺ is set up without the claims of `unzip` (the formulation of the
-//! certificates made before the kept-claims lemma (E2), `taxman certify --no-claims`) where the default keeps the
+//! certificates made before the kept-claims lemma (E4), `taxman certify --no-claims`) where the default keeps the
 //! claims that lemma allows (`Board::extended`).
 //!
 //! For each board `n` in `FROM..=TO` (2 at least, `TO` at most the largest board the solver supports), one after the
@@ -112,7 +112,7 @@ struct Args {
     from: u32,
     to: u32,
     compare: bool,
-    /// The formulation of Π⁺ (`Board::extended`): with the claims of `unzip` that E2 keeps unless `--no-claims`.
+    /// The formulation of Π⁺ (`Board::extended`): with the claims of `unzip` that E4 keeps unless `--no-claims`.
     claims: bool,
     known: Option<PathBuf>,
     out: Option<PathBuf>,

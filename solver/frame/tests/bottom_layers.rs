@@ -1,6 +1,6 @@
-//! The bottom-layers theorem (F3) against every recorded and enumerated optimal set.
+//! The bottom-layers theorem (F4) against every recorded and enumerated optimal set.
 //!
-//! The theorem (F3, docs/theory/frame-model.md):
+//! The theorem (F4, docs/theory/frame-model.md):
 //!
 //! > The *layer* of a number x is Ω(x), its number of prime factors counted with multiplicity.  Let q be the largest
 //! > prime ≤ n, and U\*_2 the numbers of layer 2 above n/2 that setup keeps (descending greedy; on layer 2 a set is
@@ -123,12 +123,12 @@ fn missing_from(from: &[u32], other: &[u32]) -> Vec<u32> {
     from.iter().copied().filter(|x| other.binary_search(x).is_err()).collect()
 }
 
-/// The bottom-layers theorem (F3) on `set`, a set of numbers of the board of `t` (n ≥ 2): the three statements and the
+/// The bottom-layers theorem (F4) on `set`, a set of numbers of the board of `t` (n ≥ 2): the three statements and the
 /// closed case.  Returns how many numbers of layer 2 up to n/2 the set holds (none where the frames of layer 2 are
 /// closed), or says which statement fails and with what numbers.
 fn check_theorem_b(t: &Tables, set: &[u32]) -> Result<usize, String> {
     let n = t.n;
-    assert!(n >= 2, "the bottom-layers theorem (F3) is about the boards from 2");
+    assert!(n >= 2, "the bottom-layers theorem (F4) is about the boards from 2");
     let mut seen = BTreeSet::new();
     if let Some(x) = set.iter().find(|&&x| !(2..=n).contains(&x) || !seen.insert(x)) {
         return Err(format!("the set is no set of numbers of 2..={n}: {x} is off the board or in it twice"));
@@ -180,7 +180,7 @@ fn check_theorem_b(t: &Tables, set: &[u32]) -> Result<usize, String> {
     Ok(lower.len())
 }
 
-/// The bottom-layers theorem (F3) on `set`; the numbers of layer 2 up to n/2 that it plays, if any, are noted in
+/// The bottom-layers theorem (F4) on `set`; the numbers of layer 2 up to n/2 that it plays, if any, are noted in
 /// `plays_lower` as n and the numbers.
 fn check_and_note(t: &Tables, set: &[u32], plays_lower: &mut Vec<(u32, Vec<u32>)>) -> Result<(), String> {
     if check_theorem_b(t, set)? > 0 {
@@ -320,7 +320,7 @@ fn completed_games(path: &Path) -> Vec<(u32, Vec<u32>)> {
     table.games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect()
 }
 
-/// The bottom-layers theorem (F3) on each of `games` (an n and a game's moves, taken as a set).  Prints what it found
+/// The bottom-layers theorem (F4) on each of `games` (an n and a game's moves, taken as a set).  Prints what it found
 /// under the name `source`, and returns the failures.
 fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
     let start = Instant::now();
@@ -341,7 +341,7 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
     failures
 }
 
-/// The bottom-layers theorem (F3) on the games of the table `optimal.json`, of the committed chain
+/// The bottom-layers theorem (F4) on the games of the table `optimal.json`, of the committed chain
 /// `results/strict.jsonl` and of the chain 2176 to 2276 of the Graviton calibration.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_b_holds_for_every_20th_recorded_game")]
@@ -355,7 +355,7 @@ fn theorem_b_holds_for_every_20th_recorded_game() {
     theorem_b_holds_for_the_recorded_games(20);
 }
 
-/// The bottom-layers theorem (F3) on every `every`th game of the table, the chain and the calibration's chain.
+/// The bottom-layers theorem (F4) on every `every`th game of the table, the chain and the calibration's chain.
 fn theorem_b_holds_for_the_recorded_games(every: usize) {
     let table: Vec<(u32, Vec<u32>)> =
         Optimal::built_in().games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect();
@@ -369,7 +369,7 @@ fn theorem_b_holds_for_the_recorded_games(every: usize) {
     let mut failures = check_games("optimal.json", &thin(table));
     failures.extend(check_games("results/strict.jsonl", &thin(chain)));
     failures.extend(check_games("testdata/c8g.chain-2176.jsonl", &thin(ec2)));
-    assert!(failures.is_empty(), "F3 fails on {} recorded games:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} recorded games:\n{}", failures.len(), failures.join("\n"));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -408,7 +408,7 @@ fn sets_of_line(line: &Json, recorded: &[u32]) -> Result<Vec<Vec<u32>>, String> 
     Ok(sets)
 }
 
-/// The bottom-layers theorem (F3) on every set of every line of `solver/noframe/data/<name>` that holds sets.  Each is
+/// The bottom-layers theorem (F4) on every set of every line of `solver/noframe/data/<name>` that holds sets.  Each is
 /// checked to be what the line says (the sets are distinct, as many as the line counts, worth its score, playable, the
 /// recorded game among them where the line lists all the optimal sets), and then against the theorem.  Prints what it
 /// found and returns the failures.
@@ -477,13 +477,13 @@ fn check_enumerated(name: &str) -> Vec<String> {
     failures
 }
 
-/// The bottom-layers theorem (F3) on every optimal set the prover enumerated: all those of the boards 2 to 989, and
+/// The bottom-layers theorem (F4) on every optimal set the prover enumerated: all those of the boards 2 to 989, and
 /// those of the boards 798 to 1019 that have U\* above n/2.
 #[test]
 fn theorem_b_holds_for_every_enumerated_optimal_set() {
     let mut failures = check_enumerated("optsets_2_989.jsonl");
     failures.extend(check_enumerated("optsets_fixed_798_1019.jsonl"));
-    assert!(failures.is_empty(), "F3 fails on {} enumerated sets:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} enumerated sets:\n{}", failures.len(), failures.join("\n"));
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -563,7 +563,7 @@ fn enumerated_counts() -> BTreeMap<u32, usize> {
 /// The largest board on which the brute force of the rules is run (past this it takes too long).
 const BRUTE_FORCE_TO: u32 = 40;
 
-/// The bottom-layers theorem (F3) on every optimal set of each board of `boards`, found by [`Search`]: there is one,
+/// The bottom-layers theorem (F4) on every optimal set of each board of `boards`, found by [`Search`]: there is one,
 /// the brute force has opt(n) (on the boards it reaches), the number of optimal sets is the prover's, the recorded game
 /// is one of them, and the theorem holds of each.  Prints what it found and returns the failures.
 fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
@@ -626,15 +626,15 @@ const SMALL_BOARDS_TO: u32 = 48;
 /// a number of layer 2 up to n/2 (the next such board is 70).
 const MORE_SMALL_BOARDS_TO: u32 = 54;
 
-/// The bottom-layers theorem (F3) on every optimal set of every board from 2 to [`QUICK_SMALL_BOARDS_TO`], found by
+/// The bottom-layers theorem (F4) on every optimal set of every board from 2 to [`QUICK_SMALL_BOARDS_TO`], found by
 /// exhaustive search.
 #[test]
 fn theorem_b_holds_for_every_optimal_set_of_the_smallest_boards() {
     let failures = check_small_boards(2..=QUICK_SMALL_BOARDS_TO);
-    assert!(failures.is_empty(), "F3 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
 }
 
-/// The bottom-layers theorem (F3) on every optimal set of every board from 2 to [`SMALL_BOARDS_TO`], found by
+/// The bottom-layers theorem (F4) on every optimal set of every board from 2 to [`SMALL_BOARDS_TO`], found by
 /// exhaustive search.
 #[test]
 #[cfg_attr(
@@ -643,7 +643,7 @@ fn theorem_b_holds_for_every_optimal_set_of_the_smallest_boards() {
 )]
 fn theorem_b_holds_for_every_optimal_set_of_the_small_boards() {
     let failures = check_small_boards(2..=SMALL_BOARDS_TO);
-    assert!(failures.is_empty(), "F3 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
 }
 
 /// The same on the boards from [`SMALL_BOARDS_TO`] + 1 to [`MORE_SMALL_BOARDS_TO`], where each board takes the search
@@ -652,5 +652,5 @@ fn theorem_b_holds_for_every_optimal_set_of_the_small_boards() {
 #[ignore = "takes twenty seconds; the boards to 48 are in the default test"]
 fn theorem_b_holds_for_every_optimal_set_of_more_small_boards() {
     let failures = check_small_boards(SMALL_BOARDS_TO + 1..=MORE_SMALL_BOARDS_TO);
-    assert!(failures.is_empty(), "F3 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "F4 fails on {} small boards:\n{}", failures.len(), failures.join("\n"));
 }

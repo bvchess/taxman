@@ -274,7 +274,7 @@ const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", 
 /// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a
 /// prime, or a score at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to
 /// `--out` as it is made, and a rerun skips the games the file has a certificate for and resumes a stopped search
-/// from its checkpoint.  The extended problem is searched with the claims of `unzip` that the kept-claims lemma (E2)
+/// from its checkpoint.  The extended problem is searched with the claims of `unzip` that the kept-claims lemma (E4)
 /// keeps, unless `--no-claims` says to search it without them (the formulation of the certificates made before that
 /// lemma); each certificate records its formulation.  A game whose extended problem a certified game of the last 8
 /// games (of this run, or of the file, made in either formulation) posed, with a recorded game worth what that game's

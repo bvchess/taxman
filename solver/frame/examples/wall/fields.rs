@@ -1,6 +1,6 @@
 //! The multi-field bound (A1) at a search node: the GF(2) frame matroids and a family of GF(3) signed frame matroids,
 //! coupled by Lagrangian multipliers that a column generation fits, for the node-choice measurement (`choice.rs`).  The
-//! bound, its proof (the signed frame theorem (B1) and the decomposition bound (B5), docs/theory/frame-bounds.md) and
+//! bound, its proof (the signed frame theorem (B1) and the decomposition bound (B4), docs/theory/frame-bounds.md) and
 //! the study that measured it at the roots and in a branch and bound are in
 //! solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md and
 //! solver/notebook/search/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md; its code is that study's,
@@ -23,7 +23,7 @@
 //!   fit's multipliers and frozen signings, with the exact checks and the separation of the node's own cores, within
 //!   a budget in seconds.
 //!
-//! Every bound returned is `⌊L⌋` at some multipliers and signings, valid whatever the master proposes (B1 and B5, at a
+//! Every bound returned is `⌊L⌋` at some multipliers and signings, valid whatever the master proposes (B1 and B4, at a
 //! node by B1 (2)): the node's completions weigh at most that.  A node is *cut* when it is at most the `target` the
 //! node was made with (`need - 1`: the most a completion may reach for the incumbent to stand).
 

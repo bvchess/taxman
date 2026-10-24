@@ -2,7 +2,7 @@
 //!
 //! The frame solver searches Π_n: the frames with freedoms, their sources fixed to U\* (the sources setup keeps), the
 //! pairs `unzip` settled taken out.  Π⁺(O) makes a set O of the members of U\* in layers 3 and up optional, and keeps
-//! only the pairs of `unzip` that the kept-claims lemma (E2, docs/theory/extended-problem.md) shows are still moves of
+//! only the pairs of `unzip` that the kept-claims lemma (E4, docs/theory/extended-problem.md) shows are still moves of
 //! every instance (below), or none.  It is research code, for certifying that a game's optimum plays U\*_{≥3}
 //! (docs/theory/extended-problem.md; `taxman certify`, [`crate::certify`]); the solver does not use it.  The search
 //! takes it with its one-sided candidates
@@ -38,20 +38,20 @@
 //! n/2, and conversely, and then ΣS = `in_the_bag` + ΣK + ΣL: `tests/model_extended.rs` checks this against the whole
 //! board.
 //!
-//! # The claims of `unzip` (the kept-claims lemma, E2)
+//! # The claims of `unzip` (the kept-claims lemma, E4)
 //!
 //! [`build_extended`] is given the claims of the frame model, the pairs (s, f) that `unzip` settled in the search's
 //! frames as the last `finish_setup` left them (`SearchFrames::claims`), or none.  Each pair belongs to the component
 //! of its source s, which also holds f.  A component *keeps* its claims if it holds no member of O ∪ R and each of its
-//! back claims (s, f) passes the check of E2 ([`ClaimCheck`]): f is not a two-sided candidate, and no two-sided
+//! back claims (s, f) passes the check of E4 ([`ClaimCheck`]): f is not a two-sided candidate, and no two-sided
 //! candidate has f among its maximal factors.  Then every pair of the component is taken out of its frame, s from the
 //! moves and f from the factors, before the root the search builds is reduced; the freedoms do not change.  A component
 //! that holds a member of O ∪ R keeps none, nor does one whose back claim fails the check (its claims are recorded as
 //! [`ExtendedFrames::refused`]).  The candidates do not change, as they are decided on the components with nothing
 //! claimed, and no claimed factor is one (a back claim's by the check, a front claim's because its source has nothing
-//! else left).  E2: the claims kept are front and back moves of every instance of Π⁺(O), so the extended exactness
+//! else left).  E4: the claims kept are front and back moves of every instance of Π⁺(O), so the extended exactness
 //! theorem (E1) holds with them taken out, and with O = ∅ every claim is kept and Π⁺(∅) is Π_n
-//! (`examples/structure.rs` checks the problems equal on every board; the formulation corollary, E3).  Without the
+//! (`examples/structure.rs` checks the problems equal on every board; the formulation corollary, E5).  Without the
 //! check a back claim could hide a use of f by a promoted number, as at n = 98 in Π_n (the example in the claims
 //! lemma (X5, docs/theory/exactness.md)): a component of f's layer that holds an open source has more freedoms
 //! and can take on composites of f that were no candidates in Π_n.
@@ -86,15 +86,15 @@ pub struct ExtendedFrames<const W: usize> {
     /// The lowest layer of a component with freedoms, which frame 0 lies in; `None` (and no frames) when no
     /// component has freedoms.
     pub lowest_layer: Option<u32>,
-    /// The claims kept (E2), in the order of the claims given: their pairs are not in `frames`.
+    /// The claims kept (E4), in the order of the claims given: their pairs are not in `frames`.
     pub claims: Vec<Claim>,
     /// The claims of the components that hold no member of O ∪ R but have a back claim that fails the check of
-    /// E2, in the order of the claims given: claims of Π_n that Π⁺(O) does not keep.  (The claims of a component
+    /// E4, in the order of the claims given: claims of Π_n that Π⁺(O) does not keep.  (The claims of a component
     /// that holds a member of O ∪ R are kept by neither list.)
     pub refused: Vec<Claim>,
 }
 
-/// The check of the kept-claims lemma (E2, docs/theory/extended-problem.md) on a factor claimed by a back claim: the
+/// The check of the kept-claims lemma (E4, docs/theory/extended-problem.md) on a factor claimed by a back claim: the
 /// factor is not a two-sided candidate, and no two-sided candidate has it among its maximal factors.  The one place it
 /// is written, which [`build_extended`] applies and the census of the frames (`examples/structure.rs`) counts.
 #[derive(Clone, Debug)]
@@ -130,7 +130,7 @@ impl<const W: usize> ExtendedFrames<W> {
     /// False if a member of `k` is not a one-sided candidate, or a member of `l` is a factor of no frame or of frame
     /// 0 (it has no frame to be promoted into).  Otherwise every frame must be winnable, which a plain peel of its
     /// moves, those of `k` in it and those of `l` that are factors of the frame behind it, against its factors less
-    /// those of `l` decides.  The peel needs no reduction first (the reduction lemma (F5, docs/theory/frame-model.md),
+    /// those of `l` decides.  The peel needs no reduction first (the reduction lemma (F8, docs/theory/frame-model.md),
     /// stated in `model::peel`: a move left with one live factor is paid by it, which changes no answer).  It does not
     /// check that `l` is made of candidates: a promotion set is both.
     pub fn promotable(&self, board: &BoardFrames<W>, k: &Bits<W>, l: &Bits<W>) -> bool {
@@ -204,7 +204,7 @@ pub fn extended_frame_count<const W: usize>(t: &Tables, open: &Bits<W>) -> Resul
 }
 
 /// The extended problem Π⁺(O) of the board `1..=t.n`, with the open sources `open`, keeping the pairs of `claims` that
-/// the kept-claims lemma (E2) allows (see the module documentation).  `claims` is the frame model's
+/// the kept-claims lemma (E4) allows (see the module documentation).  `claims` is the frame model's
 /// (`SearchFrames::claims` of [`build_frames`](super::build_frames) on the same tables: for each of its frames, the
 /// pairs in the order made), or empty for the problem with nothing claimed.
 ///
@@ -288,7 +288,7 @@ pub fn build_extended<const W: usize>(
     extended.one_sided.sort_unstable();
 
     // The claims, each with the component of its source; a component keeps them if it holds no member of O ∪ R and
-    // its back claims pass the check of E2.
+    // its back claims pass the check of E4.
     let component_of = |&(s, f, _): &Claim| {
         let i = board.frame_index_of(s).filter(|&i| components[i].sources().contains(s) && has_freedoms[i]);
         let i = i.unwrap_or_else(|| panic!("n={}: the claiming {s} is no source of a component with freedoms", t.n));
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(extended.lowest_layer.is_some(), !extended.frames.is_empty(), "n={n}: the lowest layer");
         assert!(extended.claims.is_empty() && extended.refused.is_empty(), "n={n}: claims given none");
 
-        // With the frame model's claims (E2), every one is kept and the frames are the search's.
+        // With the frame model's claims (E4), every one is kept and the frames are the search's.
         let with_claims = build_extended::<W>(&board.tables, &Bits::EMPTY, &found.claims).unwrap();
         assert_eq!(with_claims.frames, found.frames, "n={n}: the frames with claims");
         assert_eq!(with_claims.candidates, found.candidates, "n={n}: the candidates with claims");
@@ -400,7 +400,7 @@ mod tests {
     }
 
     /// The board of 24 with 16, 20 and 24 open, all of U\*_{≥3} but 18: the smallest board where a back claim fails the
-    /// check of E2 for some O (the candidates only grow with O, so a frame's claims fail for some O free of it
+    /// check of E4 for some O (the candidates only grow with O, so a frame's claims fail for some O free of it
     /// exactly when they fail for all of U\*_{≥3} but its sources; a scan of the boards to 400 found 24-26 and 343-349,
     /// none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted by 18 alone, and 12, its
     /// other composite, is a factor of the closed frame of 16 and 24).  With 16 and 24 open that frame has freedoms, 12

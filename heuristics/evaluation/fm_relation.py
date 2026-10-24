@@ -25,7 +25,7 @@ so playable => independent => matchable, and an independent set that is not play
   with three or more distinct primes, where the hierarchy is strict.
 * `odd_cores` searches the boards --core-boards for odd cores of at most --core-size members.  Every odd core has a
   member with three or more distinct primes whose maximal factors are all outside it (the two-factor proposition,
-  C3), so the search enumerates the sets that have one.  The section proves that no board below 45 has an odd core.
+  P11), so the search enumerates the sets that have one.  The section proves that no board below 45 has an odd core.
 * `example` works the n = 21 sets in both languages.
 
 The run of the section (a few minutes):

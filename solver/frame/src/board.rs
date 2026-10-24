@@ -86,9 +86,9 @@ impl<const W: usize> Board<W> {
     }
 
     /// The extended problem Π⁺(`open`) of the board ([`build_extended`]), keeping the claims of `unzip` that the
-    /// kept-claims lemma (E2, docs/theory/extended-problem.md) allows if `claims` is set (the frame model's,
+    /// kept-claims lemma (E4, docs/theory/extended-problem.md) allows if `claims` is set (the frame model's,
     /// [`SearchFrames::claims`]), and none if not.  With `claims` set and nothing open it is the frame model's problem
-    /// (E2); the two formulations have the same promotion sets (the formulation corollary, E3).
+    /// (E4); the two formulations have the same promotion sets (the formulation corollary, E5).
     ///
     /// # Errors
     ///
@@ -344,7 +344,7 @@ mod tests {
 
     /// The extended problem with no open source poses the search what the frame model does on every board to 300 that
     /// has something to promote: without the claims of `unzip`, the same `max_total` and candidates, and the same
-    /// `in_the_bag`; with them (E2), the very problem.
+    /// `in_the_bag`; with them (E4), the very problem.
     #[test]
     fn the_extended_problem_without_open_sources_is_posed_as_the_frame_model_is() {
         for n in 2..=300 {

@@ -31,7 +31,7 @@
 //!
 //! A move left with a single live factor must be paid by it: the move and that factor form a pair, which is
 //! dropped (not to be confused with the search's forced members, or with the mandatory moves that setup settles
-//! with `unzip`).  *Reducing* drops such pairs until none is left ([`reduce_from`]).  By the reduction lemma (F5,
+//! with `unzip`).  *Reducing* drops such pairs until none is left ([`reduce_from`]).  By the reduction lemma (F8,
 //! docs/theory/frame-model.md) it never changes whether the frame is winnable, now or after further edits (moves
 //! added, other factors removed), and on a winnable frame every order of drops ends at the same frame.
 

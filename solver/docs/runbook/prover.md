@@ -8,9 +8,9 @@ the chain.  [The prover's proofs](../../noframe/docs/proofs.md) holds the proofs
 
 **A run searches from the roles of the bottom-layers theorem.**  `exact` starts there by default (`--fix-low 1`), and
 the search is still a proof, because every optimal set obeys the roles ([the bottom-layers theorem
-(F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)).  Each line records `"fix_low":1`, and the check
+(F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)).  Each line records `"fix_low":1`, and the check
 counts the proofs that rest on the theorem.  Over 2..999 the roles took the plain root's nodes within 5 % at half the
-time a node, 0.61 ms against 1.16 ms ([proofs.md, the paragraph "From the roles of F3"](../../noframe/docs/proofs.md)),
+time a node, 0.61 ms against 1.16 ms ([proofs.md, the paragraph "From the roles of F4"](../../noframe/docs/proofs.md)),
 so by that measurement a run from the roles costs about half as much as one from the plain root.  `EXTRA_ARGS='--fix-low
 0'` searches from the plain root.  The two kinds of search keep separate checkpoints: `ckpt/exact_N_low.ckpt` from the
 roles, `ckpt/exact_N.ckpt` from the plain root.

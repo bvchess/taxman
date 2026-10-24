@@ -1082,14 +1082,16 @@ def exchange_2873():
 
 
 def cores_9170():
-    """The six sources of game 9170 as edges on the factors 289 to 437: the two minimal cores, then a third."""
+    """The six sources built from 17, 19 and 23, first all sources in game 8303, as edges on the factors 289 to 437:
+    the two minimal cores of T and 6137, then one of the two minimal cores that 6859 adds."""
     fig = Fig(
         "cores-9170",
         780,
         800,
-        "Game 9170's six sources as edges on the factors 289, 323, 361, 391, 437 and the ground, with the source 7429 "
-        "joined to three factors: the two minimal cores of T and 6137 share all but 4913 and 5491, and with 6859 "
-        "added a third core appears that does not hold 6137.",
+        "The six sources built from the primes 17, 19 and 23, first all sources in game 8303, as edges on the factors "
+        "289, 323, 361, 391, 437 and the ground, with the source 7429 joined to three factors: the two minimal cores "
+        "of T and 6137 share all but 4913 and 5491, and with 6859 added a core appears that does not hold 6137, one of "
+        "the two minimal cores that 6859 adds.",
     )
     factors = {289: (110, 170), 323: (390, 128), 361: (670, 170), 391: (190, 246), 437: (590, 246)}
     ground = (390, 0)

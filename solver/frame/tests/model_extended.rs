@@ -4,7 +4,7 @@
 //! the frame model with a set O of the sources of three or more prime factors that setup keeps made optional, and with
 //! a reference predicate for its promotion sets, `ExtendedFrames::promotable`, that peels the unreduced frames.  It
 //! comes in two formulations, both checked here: without the claims of `unzip` (nothing settled by it), and with the
-//! claims that the kept-claims lemma (E2, docs/theory/extended-problem.md) allows (with O empty that is the frame
+//! claims that the kept-claims lemma (E4, docs/theory/extended-problem.md) allows (with O empty that is the frame
 //! model's own problem Π_n).  The tests with `with_claims` in their names have the claims, the others none.  The
 //! theorem (E1, docs/theory/extended-problem.md):
 //!
@@ -35,7 +35,7 @@
 //!   is given the candidates and `max_total` of the frame model).  Greedy rejects a source of layer 3 or more on few
 //!   boards (374 at 741, the first), and only the boards of the test for them (741, 1100, 1200) put a rejected source
 //!   into a set.
-//! * The check of the kept-claims lemma (E2) is needed.  On the boards to 400 it refuses the claims of a component,
+//! * The check of the kept-claims lemma (E4) is needed.  On the boards to 400 it refuses the claims of a component,
 //!   for some O that leaves the component free, only on the boards 24 to 26 and 343 to 349, and then for O = U\*_{≥3}
 //!   but the component's sources, so no random subset meets it.  A mutant of the claims-on problem that keeps those
 //!   claims anyway (it takes the refused pairs out of the frames) is compared with the true problem on every set of the
@@ -81,7 +81,7 @@ fn sum(numbers: &[u32]) -> u64 {
 }
 
 /// What a formulation of Π⁺(O) is called in the messages and the lines a check prints: `claims=on` for the one with the
-/// claims of `unzip` that the kept-claims lemma (E2) allows, `claims=off` for the one without.
+/// claims of `unzip` that the kept-claims lemma (E4) allows, `claims=off` for the one without.
 fn formulation(claims: bool) -> &'static str {
     if claims {
         "claims=on"
@@ -99,7 +99,7 @@ struct Case<'b, const W: usize> {
     /// F = U\* ∖ O, ascending.
     fixed: Vec<u32>,
     open: Vec<u32>,
-    /// Whether the problem is the formulation with the claims of `unzip` that the kept-claims lemma (E2) allows.
+    /// Whether the problem is the formulation with the claims of `unzip` that the kept-claims lemma (E4) allows.
     claims: bool,
 }
 
@@ -167,7 +167,7 @@ impl<'b, const W: usize> Case<'b, W> {
         format!("{}: {}", kind.what(), self.describe(x))
     }
 
-    /// The mutant of this problem that skips the check of the kept-claims lemma (E2): the claims of the components the
+    /// The mutant of this problem that skips the check of the kept-claims lemma (E4): the claims of the components the
     /// check refused ([`ExtendedFrames::refused`]) are kept after all, each pair (s, f) taken out of its frame (s from
     /// the moves and f from the factors, the freedoms recomputed), as if the component had passed.  The problem is the
     /// same otherwise.  Only a problem with claims (`claims` set) refuses any.
@@ -412,7 +412,7 @@ fn theorem_m_plus_with_every_source_open_61_to_69_with_claims() {
     check_every_board(61..=69, true, |_, from_3| vec![from_3.to_vec()]);
 }
 
-/// The check of the kept-claims lemma (E2) is needed: a mutant of the problem with the claims that skips it is caught.
+/// The check of the kept-claims lemma (E4) is needed: a mutant of the problem with the claims that skips it is caught.
 ///
 /// The check refuses the claims of a component that holds no open source when one of its back claims (s, f) has f a
 /// two-sided candidate or listed among the maximal factors of one (`ExtendedFrames::refused`).  The mutant keeps those

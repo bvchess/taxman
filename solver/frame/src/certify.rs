@@ -1,14 +1,14 @@
 //! Certificates of U: a recorded score proven optimal on the whole board, game by game, by a search of the extended
 //! problem (`taxman certify`; docs/theory/extended-problem.md, the extended exactness theorem (E1) and the certificate
-//! theorem (E4)).
+//! theorem (E2)).
 //!
 //! A game of `n` whose proof uses the frame model (an exhausted search, a trivial board, a repeat) is optimal on the
 //! whole board if some optimal game plays every source of three or more prime factors that setup keeps, U\*_{≥3}
 //! (the statement U).  The prover's barred parity bounds (`solver/noframe/src/bin/upper.rs`, one line per game) settle
 //! most of U\*_{≥3} against the game's score V: a member is *certified* when no set that respects the bottom-layers
-//! theorem (F3, docs/theory/frame-model.md) and leaves it out weighs more than V; the others are *open*, O.  The
+//! theorem (F4, docs/theory/frame-model.md) and leaves it out weighs more than V; the others are *open*, O.  The
 //! *extended problem* Π⁺(O) ([`build_extended`](crate::frames::build_extended)) keeps the certified ones fixed and
-//! leaves the open ones optional (one-sided candidates of the search), and by the certificate theorem (E4), if no
+//! leaves the open ones optional (one-sided candidates of the search), and by the certificate theorem (E2), if no
 //! promotion set of Π⁺(O) is worth more than V − `in_the_bag⁺`, then opt(n) = V.
 //!
 //! [`certify_game`] does that for one game: it takes V and the recorded game from the results files, checks that the
@@ -26,10 +26,10 @@
 //! certified; a promotion set that beats V is a counterexample whatever the line says.
 //!
 //! The extended problem has two *formulations* ([`Board::extended`]): with the claims of `unzip` that the kept-claims
-//! lemma (E2) allows to keep (`claims`, the default), and without any, as every certificate made before that lemma was.
+//! lemma (E4) allows to keep (`claims`, the default), and without any, as every certificate made before that lemma was.
 //! A run searches in one of them (`taxman certify --no-claims` in the second), and a certificate's line records which
 //! ([`Certificate::claims`]; a line with no such field is read as without).  The two have the same promotion sets and
-//! so the same heaviest promotion set (the formulation corollary (E3), docs/theory/extended-problem.md), so a
+//! so the same heaviest promotion set (the formulation corollary (E5), docs/theory/extended-problem.md), so a
 //! certificate made in one bounds the heaviest promotion set of the problem in the other.
 //!
 //! Consecutive games often pose the same Π⁺ (the same [`search::Problem`], which has `n` nowhere in it), as they often
@@ -40,7 +40,7 @@
 //! m it rests on ([`SameProblem`]).  The problems are compared whole in the run's formulation, whatever formulation
 //! m's certificate was made in (a line of the other formulation is set up again in the run's): m's certificate bounds
 //! the heaviest promotion set, which does not depend on the formulation, so the rule proves what a search of Π⁺(n)
-//! would, and n's own barred bounds then give opt(n) = V(n) by E4.  A game worth less than
+//! would, and n's own barred bounds then give opt(n) = V(n) by E2.  A game worth less than
 //! m's certificate says is searched (it is not optimal, and the search finds the better set); one worth more
 //! contradicts the certificate and is refused.  Research code: the solver does not use it.
 //!
@@ -214,7 +214,7 @@ pub struct Certificate {
     pub threads: usize,
     /// The set width the search ran at, in words: the board's own, or the widest where the GF(2) bound needs it.
     pub width: usize,
-    /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that E2
+    /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that E4
     /// keeps, false with none, as every certificate made before it (whose lines have no `claims`, and read as false).
     pub claims: bool,
     pub verdict: Verdict,
@@ -339,7 +339,7 @@ impl Certificate {
 /// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1`
 /// (the results files, over the table of optimal games), `upper` the open members; the search runs with `opts`'
 /// threads, checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.
-/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E2 keeps, or without
+/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E4 keeps, or without
 /// any.
 ///
 /// # Errors

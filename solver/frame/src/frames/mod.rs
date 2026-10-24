@@ -21,7 +21,7 @@
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
 //!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
 //! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
-//!   factors are optional and only the claims of `unzip` that the kept-claims lemma (E2,
+//!   factors are optional and only the claims of `unzip` that the kept-claims lemma (E4,
 //!   docs/theory/extended-problem.md) allows are kept ([`build_extended`]); research code, which the solver does not
 //!   use either.
 //!
@@ -81,7 +81,7 @@
 //!   plays.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
 //!   sources conjecture (S1, docs/theory/sources.md) holds (certified on every board to 100,000), although the playable
 //!   subsets of a frame's sources are not a matroid; that an optimal game plays all of U\* is proven for the sources
-//!   with one or two prime factors (the bottom-layers theorem, F3, docs/theory/frame-model.md) and is the open
+//!   with one or two prime factors (the bottom-layers theorem, F4, docs/theory/frame-model.md) and is the open
 //!   statement for the others.
 //! * The *freedoms* (the field `freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
@@ -109,7 +109,7 @@
 //! So the numbering is *clean* by construction: every frame with freedoms directly in front of a frame numbered `k`
 //! is numbered `k − 1`, and frames with one number are never neighbors.  A promoted number, paid for by one of its
 //! maximal factors, finds them one layer lower, in the frame numbered one lower or in closed frames, which is what the
-//! frame model's exactness needs (the one-frame-forward lemma, X3).  Clean numbering is F4 of
+//! frame model's exactness needs (the one-frame-forward lemma, X3).  Clean numbering is F6 of
 //! docs/theory/frame-model.md.  The Java numbered the frames breadth first from the front instead (number 0 to every
 //! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
 //! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
@@ -215,7 +215,7 @@ pub struct SearchFrames<const W: usize> {
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
     /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`) and the
-    /// extended problem, which keeps those the kept-claims lemma (E2) allows ([`build_extended`]); the solver's search
+    /// extended problem, which keeps those the kept-claims lemma (E4) allows ([`build_extended`]); the solver's search
     /// does not read them.
     pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
@@ -476,7 +476,7 @@ fn breadth_first_numbers<const W: usize>(
     (number, in_front)
 }
 
-/// Where a numbering is not clean (clean numbering (F4), docs/theory/frame-model.md): the first frame `y`, by position,
+/// Where a numbering is not clean (clean numbering (F6), docs/theory/frame-model.md): the first frame `y`, by position,
 /// that is numbered `h` and has a frame with freedoms `x` directly in front of it not numbered `h − 1`, as `(y,
 /// Some(x))`, or that has freedoms and no number, as `(y, None)`; `None` when the numbering is clean.  `number` is the
 /// number of each frame and `in_front` the frames in front of each frame with freedoms (`None` for a closed frame), as

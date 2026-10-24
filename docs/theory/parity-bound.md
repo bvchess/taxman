@@ -10,7 +10,7 @@ sets that make the same choices.  The barred bound (W2) fixes the bottom two lay
 leaves out one more number: when it is at most a score, every set that beats the score plays that number.  Both results
 are proved.  The prover bounds its searches by W1.  W2 settles most of [statement U](exactness.md#statement-u), the
 open statement that some optimal set plays every member of U\* with three or more prime factors, game by game, and
-[the certificate theorem (E4)](extended-problem.md#the-certificate-theorem) rests on it.  The same construction, frame
+[the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) rests on it.  The same construction, frame
 by frame, bounds the frame model's promotions ([bounds on the promotions](frame-bounds.md)).
 
 *Words.*  Playable sets, maximal factors, layers and sources are the [glossary's](../GLOSSARY.md), and U\* is defined in
@@ -74,7 +74,7 @@ part, and the two halves are exactly the set's representations in M₀ and M₁.
 
 1. *A set S is independent in M₀ and in M₁ iff it is independent with its own coordinates.*  Every vector of that
    family lies in E₀ or in E₁, and GF(2)^{⌊n/2⌋} is the direct sum of the two parts, so the family is independent iff
-   its vectors in E₀ are and its vectors in E₁ are ([direct sums](primer.md#deletion-contraction-and-direct-sums)).  Its
+   its vectors in E₀ are and its vectors in E₁ are ([direct sums](primer.md#deletion-contraction-direct-sums-and-truncation)).  Its
    vectors in E_i are exactly those that represent in M_i the members of S that are not coloops of M_i: v(s) when Ω(s)
    and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is independent in M_i iff its members that
    are not coloops are, since a coloop joins any independent set ([the primer](primer.md#matroids)).
@@ -127,37 +127,37 @@ The prover bounds every node of its searches by W1, with the node's picks and ba
 
 ## The barred bound
 
-The barred bound fixes what [the bottom-layers theorem (F3)](frame-model.md#the-bottom-layers-theorem) says every
+The barred bound fixes what [the bottom-layers theorem (F4)](frame-model.md#the-bottom-layers-theorem) says every
 optimal set plays in layers 1 and 2, and bars one more number.
 
-**Definition.**  A set S ⊆ {2, …, n} *obeys F3* when it holds [q(n)](neighbors.md#neighboring-games), the largest
-prime ≤ n, and no other prime, and holds exactly U\*_2 among the sources of layer 2.  The *picks of F3* are q(n) and the
-members of U\*_2.  The *bars of F3* are the other primes, the sources of layer 2 outside U\*_2, and, when the frames of
+**Definition.**  A set S ⊆ {2, …, n} *obeys F4* when it holds [q(n)](neighbors.md#neighboring-games), the largest
+prime ≤ n, and no other prime, and holds exactly U\*_2 among the sources of layer 2.  The *picks of F4* are q(n) and the
+members of U\*_2.  The *bars of F4* are the other primes, the sources of layer 2 outside U\*_2, and, when the frames of
 layer 2 are closed, every number of layer 2 up to n/2.  The frames of layer 2 are closed when U\*_2 has one member for
-each prime up to n/2, which makes it a spanning tree of F3's graph G_n with its ground vertex.  For a number b of 2..n
-that is not a pick of F3, the *barred bound* of b is the parity bound of n with the picks of F3 and with the bars of F3
+each prime up to n/2, which makes it a spanning tree of F4's graph G_n with its ground vertex.  For a number b of 2..n
+that is not a pick of F4, the *barred bound* of b is the parity bound of n with the picks of F4 and with the bars of F4
 and b.
 
-By F3, every optimal set of n obeys F3.  A playable set obeys F3 exactly when it holds the picks of F3 and none of its
+By F4, every optimal set of n obeys F4.  A playable set obeys F4 exactly when it holds the picks of F4 and none of its
 bars.  The only bars that the definition of obeying leaves unnamed are the numbers of layer 2 up to n/2 when the frames
-of layer 2 are closed, and a playable set that obeys F3 holds none of them.  Such a number is an edge of G_n, so it
+of layer 2 are closed, and a playable set that obeys F4 holds none of them.  Such a number is an edge of G_n, so it
 closes a cycle with the spanning tree U\*_2.  The cycle's members list each of its primes twice, and the set holds no
 prime up to n/2, so the cycle is [self-covering](playability.md#cores-and-the-residual), and no playable set contains a
 self-covering set ([the core theorem (P7)](playability.md#the-core-theorem)).
 
 In game 21, U\*_2 = {14, 15, 21} has three members for the four primes 2, 3, 5 and 7: the frame of layer 2 has a
-freedom, so the numbers of layer 2 up to 10 are not barred, and the optimal set of 21, which plays 9 = 3², obeys F3.
+freedom, so the numbers of layer 2 up to 10 are not barred, and the optimal set of 21, which plays 9 = 3², obeys F4.
 
-**Corollary W2 (the barred bound).**  Let n ≥ 2, V a number, and b a number of 2..n that is not a pick of F3.  If the
-barred bound of b is at most V, every playable set that obeys F3 and weighs more than V holds b.  In particular, if
+**Corollary W2 (the barred bound).**  Let n ≥ 2, V a number, and b a number of 2..n that is not a pick of F4.  If the
+barred bound of b is at most V, every playable set that obeys F4 and weighs more than V holds b.  In particular, if
 opt(n) > V, every optimal set of n holds b.
 
-*Proof.*  Let S be playable, obey F3, and miss b.  Then S holds the picks of F3 and avoids its bars and b, so by W1, ΣS
-is at most the barred bound of b, which is at most V.  So a playable set that obeys F3 and weighs more than V cannot
-miss b.  If opt(n) > V, every optimal set weighs more than V, and it obeys F3.  ∎
+*Proof.*  Let S be playable, obey F4, and miss b.  Then S holds the picks of F4 and avoids its bars and b, so by W1, ΣS
+is at most the barred bound of b, which is at most V.  So a playable set that obeys F4 and weighs more than V cannot
+miss b.  If opt(n) > V, every optimal set weighs more than V, and it obeys F4.  ∎
 
 W2 is applied to the members of U\*_{≥3}, the sources that [statement U](exactness.md#statement-u) asks some optimal
-set to play.  Its conclusion is what [the certificate theorem (E4)](extended-problem.md#the-certificate-theorem) asks of
+set to play.  Its conclusion is what [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) asks of
 a member *certified against* V, so a member whose barred bound is at most V is certified against V.  The barred bound
 does not depend on V, so a member certified against one score is certified against every higher one.  The prover
 computes the barred bounds game by game ([solver/noframe/docs/proofs.md, "The upper part, game by

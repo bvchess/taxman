@@ -22,7 +22,7 @@
 //! formulation without the claims of `unzip` (the frame model with the claims put back and no source open;
 //! `Board::prepare_extended_with` with `claims` unset), whose rows are checked the same way.  Besides its table, Π⁺(∅)
 //! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
-//! same frames and candidates, node for node; and with the claims that the kept-claims lemma (E2,
+//! same frames and candidates, node for node; and with the claims that the kept-claims lemma (E4,
 //! docs/theory/extended-problem.md) allows, which with no source open are all of them, Π⁺(∅) is the frame model's
 //! problem itself, so its search reproduces every tree of [`EXPECTED`], the matching rows too, which no table needs to
 //! say.  [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut shortens, solved as the solver solves
@@ -117,7 +117,7 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
 
 /// (board, tactics, promotion sum, nodes): the search of the extended problem Π⁺(∅) of the board in its formulation
 /// without the claims of `unzip`, set up by `Board::prepare_extended_with` with no source open and `claims` unset, on
-/// one thread.  (With the claims that the kept-claims lemma (E2) allows, which with no source open are all of them,
+/// one thread.  (With the claims that the kept-claims lemma (E4) allows, which with no source open are all of them,
 /// Π⁺(∅) is the frame model's problem and its trees are those of [`EXPECTED`], node for node:
 /// [`extended_search_with_claims`].)  The tactics are `default` and `extended` ([`SearchTactics::extended`]: the
 /// default without the rule of the symmetric pairs, the tactics of a search with one-sided candidates, which refuses
@@ -229,7 +229,7 @@ fn extended_tree(n: u32, assignments: &str) -> (u64, u64) {
 
 /// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` with the claims of
 /// `unzip` (set up by `Board::prepare_extended_with` with no source open and `claims` set).  With no source open the
-/// kept-claims lemma (E2) keeps every claim, so Π⁺(∅) is the frame model's problem: it must pose the problem
+/// kept-claims lemma (E4) keeps every claim, so Π⁺(∅) is the frame model's problem: it must pose the problem
 /// `Board::prepare` poses (the roots, candidates, greedy sets and `max_total` too), and its search is that search.
 fn extended_search_with_claims<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, u64) {
     let board = Board::<W>::for_n(n);

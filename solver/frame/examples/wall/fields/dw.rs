@@ -12,17 +12,17 @@
 //! field, any nonzero entries).  For any multipliers `λ_k ≥ 0` on `supp_k`,
 //!
 //! ```text
-//! w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_k) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ)     (B5)
+//! w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_k) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ)     (B4)
 //! ```
 //!
 //! with `MI_cap(c)` the heaviest common independent set of `A` and `B` of at most `cap` elements (elements of weight
 //! at most 0 left out, which loses nothing over a down-closed family) and `G_k(μ)` the heaviest independent set of
 //! `N_k` (greedy).  A candidate that is a loop of some `N_k` is in no promotable set and is left out of the
-//! intersection (it is `L` at `λ_{k,x} = w_x`, so B5 covers it).  The bound reported is `⌊L⌋` evaluated exactly
+//! intersection (it is `L` at `λ_{k,x} = w_x`, so B4 covers it).  The bound reported is `⌊L⌋` evaluated exactly
 //! in integers: weights `x·S` and multipliers rounded to the grid `1/S` (`S = 2^16`, [`SCALE`]), the intersection by
 //! the crate's `taxman::gf2::meet::Meet` and the greedies over GF(3), all in `i64` (sums that would leave it saturate,
 //! which keeps the bound valid whatever multipliers are proposed: [`evaluate_grid`]).  Its soundness rests on the
-//! decomposition bound (B5) and the two exact oracles, never on the floating-point LP below, which only proposes
+//! decomposition bound (B4) and the two exact oracles, never on the floating-point LP below, which only proposes
 //! multipliers.
 //!
 //! # The multipliers
@@ -64,7 +64,7 @@
 //! number) comes from a root fit read from its file ([`Warm::from_saved`]) and is restricted to a node
 //! ([`Warm::child`]).  At a node, [`tier1`] evaluates `L` at the inherited multipliers, and [`refit_r2`] runs the
 //! column generation of [`bound`] from the inherited master in search mode.  Each returns the lowest `⌊L⌋` it
-//! evaluated, which is valid at any multipliers and signings (B1 and B5, at a node by B1 (2)); the master and
+//! evaluated, which is valid at any multipliers and signings (B1 and B4, at a node by B1 (2)); the master and
 //! the steps only propose multipliers.  (The study also handed a refit's state on from a node to its children, and
 //! refitted with node-local signings and with the exact checks; the state of the tree's nodes is not needed where
 //! nodes are measured one by one.)
@@ -358,7 +358,7 @@ impl Family {
 }
 
 /// A fit: signings and multipliers, which together give a valid bound at the state they were fitted at (and at its
-/// nodes: B1 and B5).
+/// nodes: B1 and B4).
 #[derive(Clone, Debug, Default)]
 pub struct Fit {
     pub signings: Vec<Signing>,

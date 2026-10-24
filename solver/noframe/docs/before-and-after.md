@@ -57,7 +57,7 @@ Before the prover, this was the state of the evidence.
   brute force), so `optsets` with it would extend [uniqueness.md](uniqueness.md) at about the cost of the proofs.
 * **Statement U past 2175.**  The frame model's individual assumptions are no longer open: they are theorems given a
   per-board fact that holds on every board to 8191 ([the bottom-layers theorem
-  (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
+  (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem) and [the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  What the model's answers rest on is one statement,
   U: some optimal game plays every source of three or more prime factors that setup keeps.  The prover's proofs
   establish U at every n ≤ 2175.  Beyond, the committed games past 2175 that rest on U, by an exhausted search or a

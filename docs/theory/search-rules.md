@@ -43,7 +43,7 @@ each completion that a step gives up
 2. breaks the inequality c_p ≤ c_q of a symmetric pair (p, q) of Π, as R2 defines them.
 
 A set that cannot be promoted is no completion, so dropping a candidate gives up nothing when the freedoms rule it out
-([the promotion-limit lemma (F6)](frame-model.md#the-promotion-limit-lemma)), or when it would join the node's
+([the promotion-limit lemma (F9)](frame-model.md#the-promotion-limit-lemma)), or when it would join the node's
 promotions in a set known, from states by R1, not to be promotable: a set that holds one is none either, since a frame
 stays winnable when a move is taken away or a factor put back.  A bound showing that no completion of a node beats
 the incumbent, the near-repeat lemma (R7), and promoting together the [forced members](../GLOSSARY.md#the-search),
@@ -89,11 +89,11 @@ with X applied is winnable before reduction exactly when it is after; if X takes
    X applied is winnable exactly when the members of X of home j are factors of frame j of state(P) and that frame is
    winnable with X applied.
 2. *The drops.*  The frame G₀ is winnable, since P is a promotion set, so by [the reduction lemma
-   (F5)](frame-model.md#the-reduction-lemma) every order of drops reduces it to frame j of state(P).  Take one, the
+   (F8)](frame-model.md#the-reduction-lemma) every order of drops reduces it to frame j of state(P).  Take one, the
    drops (a₁, y₁), …, (a_k, y_k): the move a_i has the single live factor y_i in the frame G_{i−1}, and G_i is G_{i−1}
    without a_i and y_i.  A member of X of home j is a factor of G₀, since applying P takes away only members of P, so it
    is missing from G_k exactly when it is one of the y_i.
-3. *A drop survives later edits.*  By F5, if a move a has the single live factor y in a frame G, then after any edit
+3. *A drop survives later edits.*  By F8, if a move a has the single live factor y in a frame G, then after any edit
    that adds moves and removes factors other than y, G is winnable exactly when G without a and y is.  Applying X to
    G_{i−1} is such an edit unless y_i is in X.
 4. *If no y_i is in X,* step 3 at every drop shows that G₀ with X applied is winnable exactly when G_k with X applied
@@ -103,14 +103,14 @@ with X applied is winnable before reduction exactly when it is after; if X takes
    is a member of X of home j that is missing from G_k.  Both sides fail.
 6. *The state of P ∪ X.*  If P ∪ X is a promotion set, step 4 is the case, and each drop (a_i, y_i) is a drop of G_{i−1}
    with X applied too, since there a_i's live factors lie among {y_i} and y_i is present.  So reducing G₀ with X applied
-   can pass through G_k with X applied, and since G₀ with X applied is winnable, by F5 every order of drops ends at the
+   can pass through G_k with X applied, and since G₀ with X applied is winnable, by F8 every order of drops ends at the
    same frame.
 
 *In Π⁺(O)* the steps read the same.  In step 1, a promotion set is a set of one-sided candidates and of two-sided ones
 with homes that leaves every root frame winnable, and every two-sided candidate has a home (step 5 of the proof of [the
 extended exactness theorem (E1)](extended-problem.md#the-extended-exactness-theorem)).  In step 2, the members of X of
 home j are two-sided, and factors of root frame j.  In step 3, applying X adds its one-sided members to the moves of
-their own frames, in those frames' layer of moves, so it is still an edit of the kind F5 allows; and no a_i, a member
+their own frames, in those frames' layer of moves, so it is still an edit of the kind F8 allows; and no a_i, a member
 of Φ or of P, is in X.  ∎
 
 *Example.*  On game 28, promoting 14 leaves frame 1 with the moves 20 and 28 and the factors 4 and 10, and frame 0 with
@@ -268,19 +268,22 @@ heaviest set, and a floor at or above the root's frame bound ends the search at 
 ## The repeat lemma
 
 The number that a board adds often lands where the frame model settles it before the search, leaving the problem as
-it was.  Game n is a *repeat* of game m when Π_n = Π_m: the same root frames, numbered alike, with the same moves and
-factors, and the same candidates with the same homes.  Below, U\*(n) is the set U\* of board n, and the game of n
+it was.  Game n is a *repeat* of game m when a root problem of n equals one of m: the same root frames, numbered alike,
+with the same moves and factors, and the same candidates with the same homes.  The solver compares the problems that
+setup builds, which are Π_n and Π_m but on six small boards, 8, 12, 13, 16, 17 and 27, where setup builds another root
+problem of the game.  Below, U\*(n) is the set U\* of board n, and the game of n
 *made from* a promotion set L of Π_n plays U\*(n) ∪ L, in an order that [the exactness theorem
 (X7)](exactness.md#the-exactness-theorem) makes legal.
 
-**Lemma R6 (the repeat lemma).**  Let n and m be games with Π_n = Π_m.
+**Lemma R6 (the repeat lemma).**  Let n and m be games, and Π and Π′ root problems of n and of m with Π = Π′.
 
 1. Every promotion set L of the problem makes a game of n worth ΣU\*(n) + ΣL.
 2. Given U at n, opt(n) − ΣU\*(n) ≤ opt(m) − ΣU\*(m).
 3. Given U at n, if the game of m made from a promotion set L is optimal, so is the game of n made from L.
 
-*Proof.*  Part 1 is X7 at n.  Equal problems have the same promotion sets, so P\*(Π_n) = P\*(Π_m).  By X8 at m,
-ΣU\*(m) + P\*(Π_m) ≤ opt(m), and given U at n, opt(n) = ΣU\*(n) + P\*(Π_n), by X8 at n; together these give part 2.
+*Proof.*  X7 and X8 hold for every root problem of a game, since all of a game's root problems have the same promotion
+sets and the same P\*.  Part 1 is X7 at n.  Equal problems have the same promotion sets, so P\*(Π) = P\*(Π′).  By X8 at
+m, ΣU\*(m) + P\*(Π′) ≤ opt(m), and given U at n, opt(n) = ΣU\*(n) + P\*(Π), by X8 at n; together these give part 2.
 For part 3, opt(m) = ΣU\*(m) + ΣL and part 2 give opt(n) ≤ ΣU\*(n) + ΣL, which the game of n made from L scores by part
 1.  ∎
 
@@ -330,7 +333,7 @@ order of n's frame, kept to m's moves, wins m's frame.
 2. *Each member x of X is a factor of its home h in state_m(P).*  The set C touches frame h, and x is in F^n and in C,
    so condition 3 puts x in F^m.
 3. *A frame that X does not touch* is as state_m(P) has it, and winnable, since P is a promotion set of Π_m and
-   reducing keeps a frame winnable (F5).
+   reducing keeps a frame winnable (F8).
 4. *A frame j that X touches* is touched by C too.  Let X_in be the members of X of home j + 1, which become moves of
    frame j, and X_out those of home j, which leave its factors.  Some order wins n's frame, the moves Y^n ∪ X_in against
    the factors F^n less X_out.  Keep in it only the moves Y^m ∪ X_in, all of them in n's frame since Y^m ⊆ Y^n.
@@ -405,7 +408,7 @@ found nothing (R5).  Each holds without statement U, but for one case: a search 
 lemma with Z = hi(m′) − ΣU\*(m′), for an earlier game m′, rests on what hi(m′) rests on (R7).  ΣU\*(m) + P\*(Π_m) is
 opt(m) given U at m (X8).  An upper bound passes from n − 1 to n by adding n (N4), from n to n − 1 unchanged (N3),
 between p − 1 and a prime p by adding or taking away p − q(p − 1) (N5), and from m to n by taking away ΣU\*(m) and
-adding ΣU\*(n) when Π_n = Π_m (R6).  All of these passages hold without U but the last, which needs U at n.  So hi(n)
+adding ΣU\*(n) when root problems of n and m are equal (R6).  All of these passages hold without U but the last, which needs U at n.  So hi(n)
 ≥ opt(n) rests on U at the game where its bound was made, at every game that a repeat carried it to, and at the games
 behind any hi(m′) that the near-repeat lemma used.
 

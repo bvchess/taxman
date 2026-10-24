@@ -125,7 +125,7 @@ commands:
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
                           --time-limit S, --node-limit N, --mem-cap UNITS, --background, as for solve; --no-claims,
                           search the extended problem without the claims of `unzip` (the formulation of the
-                          certificates made before the kept-claims lemma, E2; the default keeps the claims it
+                          certificates made before the kept-claims lemma, E4; the default keeps the claims it
                           allows).  A rerun skips the games --out has a verdict for and resumes a stopped search
                           from its checkpoint
   verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]

@@ -113,7 +113,7 @@
 //! gives the best game, under the maximal-factor rule, among those that play every source setup keeps on the
 //! punctured board).  What a bound computed this way rests on is therefore the upper part of each punctured board:
 //! that some best game of `B_f` plays every source setup keeps there.  That is open, as statement U is on `[n]`
-//! (where the bottom-layers theorem (F3, docs/theory/frame-model.md) settles the sources of one and two prime
+//! (where the bottom-layers theorem (F4, docs/theory/frame-model.md) settles the sources of one and two prime
 //! factors; it is not proven for punctured boards, so on them the statement takes in all the kept sources), and it is
 //! validated against the brute force ([`crate::brute`]) on every board `[N] ∖ {h}` with `N ≤ 52`.  Each punctured game
 //! is warm-started from an optimal game of the unpunctured board, which is its ceiling: if that game replays on the

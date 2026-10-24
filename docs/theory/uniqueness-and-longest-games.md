@@ -55,7 +55,7 @@ the difference back below n/2, where the factors that pay for the sources compet
 that ever happens is open, and the enumerations below never find it.  Among the sources of layers 1 and 2 it never
 happens: U\*_1 is {q(n)}, since descending greedy keeps the largest source prime, which lists the factor 1 that no
 member kept before it lists, and rejects the other primes, which list only 1 too; and every optimal set holds exactly
-U\*_1 and U\*_2 there ([the bottom-layers theorem (F3)](frame-model.md#the-bottom-layers-theorem)).  The weaker claim
+U\*_1 and U\*_2 there ([the bottom-layers theorem (F4)](frame-model.md#the-bottom-layers-theorem)).  The weaker claim
 that some optimal set holds the rest of U\* is [statement U](exactness.md#statement-u), on which the frame solver's
 scores rest.
 

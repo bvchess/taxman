@@ -28,7 +28,7 @@ bounds, and every exact method in it is tested against brute force.  The theorem
   (P8)](../../docs/theory/playability.md#the-exclusion-theorem);
 * [the parity matroids](../../docs/theory/parity-bound.md#the-parity-matroids) of [the parity bound
   (W1)](../../docs/theory/parity-bound.md#the-parity-bound);
-* [the bottom-layers theorem (F3)](../../docs/theory/frame-model.md#the-bottom-layers-theorem), the bottom layers of
+* [the bottom-layers theorem (F4)](../../docs/theory/frame-model.md#the-bottom-layers-theorem), the bottom layers of
   every optimal set, in the proofs that start from its roles, which is the default of `exact`.
 
 [proofs.md](docs/proofs.md) lists what each proof rests on.  This document says *pick* for a
