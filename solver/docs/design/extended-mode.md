@@ -6,7 +6,7 @@ The search ([search.md](search.md)) can also take the *extended problem* Π⁺(O
 searches ([certificates.md](certificates.md)).  It is the frame model with a set O of the sources of three or more prime
 factors that setup keeps made optional ([the extended
 problem](../../../docs/theory/extended-problem.md#the-extended-problem) and [the certificate theorem
-(E4)](../../../docs/theory/extended-problem.md#the-certificate-theorem);
+(E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem);
 `frames::build_extended`).  Besides the candidates of the frame model, which are *two-sided* (out of one frame, into
 the one in front), it has *one-sided* candidates: the members of O and the sources that greedy rejected beside them,
 each a possible move of its *own* frame.  It is research code: the solver's own path never builds an extended problem,
@@ -16,12 +16,12 @@ and with no one-sided candidate every piece below is what it is without them.
 that holds a maximal factor of x, which is the theory's test on frame h − 1, since a union of frames can take x on iff
 one of them can.  `ExtendedFrames::promotable`, a plain peel of each unreduced frame with (K, L) applied, decides the
 promotion sets for the tests, which compare it with a playability oracle on the whole board (`tests/model_extended.rs`).
-`taxman certify` applies the certificate theorem, and the same-problem corollary (E5) as its rule of the same problem
+`taxman certify` applies the certificate theorem, and the same-problem corollary (E6) as its rule of the same problem
 ([certificates.md](certificates.md)).
 
-*The claims of `unzip`* ([the kept-claims lemma (E2)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).
+*The claims of `unzip`* ([the kept-claims lemma (E4)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).
 The problem comes in the theory's two formulations, which have the same promotion sets (the formulation corollary,
-E3): without any claim, and, the default, with the claims of the frame model (`SearchFrames::claims`) that the lemma
+E5): without any claim, and, the default, with the claims of the frame model (`SearchFrames::claims`) that the lemma
 keeps.  `build_extended` gives each claim the frame, as setup forms it, of its source, and applies the theory's check
 (`frames::ClaimCheck`).  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
 every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check

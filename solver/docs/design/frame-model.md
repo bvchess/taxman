@@ -84,6 +84,17 @@ The code's tests against the theory's:
   Both can only make `unzip` claim less, and the theory covers every claim that meets its rules.  The census of the
   frames counts how far the second reaches (`merged_away`).
 
+**The root problem setup builds.**  The theory's root problem Π_n makes the claims of each frame h in one canonical
+order ([the frame model](../../../docs/theory/frame-model.md#the-frame-model)), with its exact rules.  Setup makes its
+claims in rounds, before and after merging, and its first rounds see the frames behind a frame unsimplified, which
+counts them as having freedoms and can block a back claim until a later round.  A check that builds Π_n apart from the
+frames code and compares root frames found setup's root problem equal to Π_n on every board from 2 to 1000 except six: on
+8, 12, 13, 16, 17 and 27, frame 0 has a move with two factors that it alone wants, and setup claims the larger where Π_n
+claims the smaller (at 8, (6, 3) for (6, 2)).  Setup's is then another root problem of game n, with the same promotion
+sets and P\* ([the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem) holds for every root
+problem).  The front claims that setup's outside test blocks are dropped by its final reduction, which leaves the root
+frames as Π_n's.
+
 **The Java's numbering.**  The Java numbered the frames breadth first from the front: 0 for those with no frame with
 freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
 numbering by layer when it is clean and its frames numbered 0 lie in one layer.  The census of every board to 8191, the
@@ -96,13 +107,13 @@ alike by the breadth-first rule, and without 4 the board of 32 has a layer with 
 freedoms.
 
 **The census** (`examples/structure.rs`) checks the theory's facts against what setup builds, on every board to 8191:
-check A the frame lemma (F1), C clean numbering (F4), D that no candidate lists a back claim's factor (X5), E that no
+check A the frame lemma (F1), C clean numbering (F6), D that no candidate lists a back claim's factor (X5), E that no
 candidate is a factor of frame 0, F that every candidate has a home of at least 1 ([the reduction-step lemma
 (X6)](../../../docs/theory/exactness.md#the-exactness-theorem)), G that the sources kept are those of a descending
 greedy written apart from the frames code (X1), and H that the extended problem with nothing open and the claims poses
-the frame model's problem (E3).  The theory proves all of these, so the census checks the code.  `tests/model_exact.rs`
-finds the boards where test (b) alone keeps an unplayable set out of the promotion sets: 27 boards to 2000, all in
-98–120 and 182–186, the first the theory's example at 98.
+the frame model's problem (the formulation corollary, E5).  The theory proves all of these, so the census checks the
+code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the promotion sets:
+27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
 
 ## Promotions and the score
 
@@ -134,7 +145,7 @@ problem](../../../docs/GLOSSARY.md#the-frame-model) Π exactly).  The answer is 
   filter and the root's reduction.  What the proof needs of the numbering is that it is
   [clean](../../../docs/GLOSSARY.md#the-frame-model), which the numbering by layer is by construction.
 * Every optimal game plays the members of U\* with one or two prime factors ([the bottom-layers theorem
-  (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)).
+  (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)).
 * So in_the_bag + P\*(Π_n) = opt(n) exactly when [statement U](../../../docs/GLOSSARY.md#the-frame-model) holds at n:
   some optimal game plays the members of U\* with three or more prime factors ([the corollary of U
   (X8)](../../../docs/theory/exactness.md#statement-u)).
@@ -165,7 +176,7 @@ better, with the other members certified, proves opt(n) on the whole board.  The
 one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_extended_with`).
 
 Details of the extended problem: it keeps the claims of `unzip` that [the kept-claims lemma
-(E2)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows.  With nothing open that is all of them, so
+(E4)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows.  With nothing open that is all of them, so
 Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (`examples/extended.rs
 --no-claims`).  A hunt for a counterexample on the boards without each open member, the example `hunt`, was prepared and
 never run.  It is removed from master, and [its
@@ -188,7 +199,7 @@ The tests tie the theorems to the code:
 * `tests/model_exact.rs` checks the exactness theorem (X7) both ways, on every set of every board to 100 and on random
   sets to 8191, against a playability oracle that shares no code with `frames` or `model`.
 * `tests/model_extended.rs` checks the extended exactness theorem (E1) the same way, with sources open.
-* `tests/bottom_layers.rs` checks the bottom-layers theorem (F3) on every recorded and enumerated optimal set.
+* `tests/bottom_layers.rs` checks the bottom-layers theorem (F4) on every recorded and enumerated optimal set.
 * Two exhaustive searches agree with the frame model's games on small boards: `brute`, the solver's own, to 40 in the
   test suite, and `heuristics/evaluation/certify.py`, to 62.  The example `sacrifice`, removed from master, once ran
   `brute` to 52 ([the entry](../../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md) has the
@@ -196,7 +207,7 @@ The tests tie the theorems to the code:
 
 The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route: games on punctured boards, boards
 with holes, where the exactness theorem holds too ([the holes theorem
-(X9)](../../../docs/theory/exactness.md#boards-with-holes)).  But U and F3 are statements about the board 1..n, so the
+(X9)](../../../docs/theory/exactness.md#boards-with-holes)).  But U and F4 are statements about the board 1..n, so the
 bound rests on the upper part of each punctured board.  It proves game 1133 and disagrees with nothing.
 
 **Given the pruning is exact.**  Every [tactic](../../../docs/GLOSSARY.md#the-search) is proven or sound;

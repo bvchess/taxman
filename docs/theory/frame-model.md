@@ -1,19 +1,22 @@
-# The frame model
+# Frames and the frame model
 
 Part of [the theory](../THEORY.md).
 
 The frame solver does not search the games of n.  It splits the board into *frames*, fixes the sources it plays to
 U\*, and searches only over which factors to *promote*, that is, to play as moves.  This file defines that model, the
-*frame model*, and the words a search of it uses.  [exactness.md](exactness.md) proves that the model is exact: its
-promotion sets are exactly the sets L of numbers up to n/2 with U\* ∪ L playable.  There one open statement is left
-between the model and the game, statement U: the solver's answer ΣU\* + P\* is opt(n) exactly when some optimal set
-contains every member of U\* with three or more prime factors.  [The extended problem](extended-problem.md) builds on
-the model, [frame-bounds.md](frame-bounds.md) bounds its promotion sets, and [search-rules.md](search-rules.md) says
-what a search of it proves.  Game 21 is the example throughout.
+*frame model*, and the words a search of it uses.  [The exactness theorem (X7)](exactness.md#the-exactness-theorem)
+shows that the model is exact: its promotion sets are exactly the sets L of numbers up to n/2 with U\* ∪ L playable.
+[The corollary of U (X8)](exactness.md#statement-u) leaves one open statement between the model and the game, statement
+U: the solver's answer ΣU\* + P\* is opt(n) exactly when some optimal set contains every member of U\* in layers 3 and
+up.  [The extended problem](extended-problem.md) builds on the model, [frame-bounds.md](frame-bounds.md) bounds its
+promotion sets, and [search-rules.md](search-rules.md) says what a search of it proves.  Game 21 is the example
+throughout.
 
-*Words.*  Sources, factors, maximal factors, layers and playable sets are the [glossary's](../GLOSSARY.md), and Ω(x)
-is the layer of x.  Descending greedy, and U\*, the sources it keeps, are defined in
-[sources.md](sources.md#descending-greedy).  U\*_k and S_k are the parts of U\* and of a set S in layer k
+*Words.*  [Sources](../GLOSSARY.md#the-frame-model), [factors](../GLOSSARY.md#the-frame-model), [maximal
+factors](../GLOSSARY.md#the-game), [layers](../GLOSSARY.md#the-frame-model) and [playable
+sets](../GLOSSARY.md#the-game) are the glossary's.  Ω(x) is the layer of x, and [q(n)](neighbors.md#neighboring-games)
+the largest prime ≤ n.  [Descending greedy](sources.md#descending-greedy), and U\*, the sources it keeps, are defined
+in sources.md.  U\*_k and S_k are the parts of U\* and of a set S in layer k, and ΣS is the sum of S
 ([notation](statements.md#notation)).
 
 *Instances.*  The words for instances are [playability.md](playability.md#payment-schemes)'s: members, pool, lists
@@ -30,14 +33,14 @@ members T and pool F is playable.  Four facts are used throughout:
   unplayable, and a run of peel that pairs every member yields an acyclic scheme;
 * *restriction*: if an acyclic scheme pays the members of a subset T with factors of a set F, then T is playable
   against F, since the scheme restricted to T is a scheme of that instance and its precedence is part of the old one;
-  and a scheme against a pool is one against any larger pool.
+  and a scheme against a pool is one against any larger pool.  So a set that holds an unplayable set is unplayable.
 
 ## Frames
 
 The *frame graph* of game n joins each source to its maximal factors.  A *frame* is a component of it: some sources
-with every factor that can pay for one of them.  F_D denotes the factors of a frame D.  A frame D is *in front of* a
-frame D′ ≠ D, and D′ *behind* D, when a factor of D′ has a maximal factor in D.  Game 21 has four frames, each in front
-of the next (9 has the maximal factor 3, for instance):
+with every factor that can pay for one of them.  We write D for a frame and F_D for its factors.  A frame D is *in front
+of* a frame D′ ≠ D, and D′ *behind* D, when a factor of D′ has a maximal factor in D.  Game 21 has four frames, each in
+front of the next (9 has the maximal factor 3, for instance):
 
 | layer | sources | factors |
 |---|---|---|
@@ -46,7 +49,8 @@ of the next (9 has the maximal factor 3, for instance):
 | 3 | 12, 18, 20 | 4, 6, 9, 10 |
 | 4 | 16 | 8 |
 
-A layer can hold several frames: game 98 has three in layer 3.
+A layer can hold several frames: in game 20 the frames of 14 (with the factors 2 and 7) and of 15 (with 3 and 5) both
+lie in layer 2.
 
 ### The frame lemma
 
@@ -67,195 +71,224 @@ of layer k lies in layer k − 1.
 So a factor has no proper divisor in its own frame, and the maximal factors of a frame's factors lie in the frames in
 front of it.
 
+### The joining lemma
+
+Schemes on disjoint pools join into one scheme, and the joint scheme has no cycle when no member reaches into a later
+pool.  Several proofs join schemes this way: of the layers, of the frames, and of the frames with a set promoted.
+
+**Lemma F2 (the joining lemma).**  Let T_1, …, T_r be disjoint sets of members and F_1, …, F_r disjoint pools, with an
+acyclic payment scheme of each T_i against F_i.  Suppose that each member of T_j lists, in F_1 ∪ ⋯ ∪ F_r, only factors
+of F_1, …, F_j.  Then the union of the schemes is an acyclic payment scheme of T_1 ∪ ⋯ ∪ T_r against F_1 ∪ ⋯ ∪ F_r.
+
+*Proof.*  The union pays each member with a factor it lists, no two the same, since the pools are disjoint.  On each
+edge a → b of a cycle of its precedence, pay(a) is a maximal factor of b (P3).  If a ∈ T_i, then pay(a) ∈ F_i, so b
+lists a factor of F_i, and b ∈ T_j for some j ≥ i.  Around a cycle the index never falls, so it never changes: the
+cycle lies in the scheme of one T_i, which has none.  ∎
+
 ### The layer theorem
 
 For S ⊆ {2, …, n}, the *layer instance* of S at k has the members S_k and the pool of the numbers of layer k − 1 up to
 n/2 that are not in S.
 
-**Theorem F2 (the layer theorem).**  A set S ⊆ {2, …, n} is playable iff every layer instance of S is playable.
+**Theorem F3 (the layer theorem).**  A set S ⊆ {2, …, n} is playable iff every layer instance of S is playable.
 
 *Proof.*  The maximal factors of a member of layer k lie in layer k − 1 and are at most n/2.  So a member of S_k has
-the same list in S's own instance as in the layer instance at k, and different layers draw on disjoint pools: a
-scheme of S is a union of schemes of its layer instances.  By P3 a cycle of its precedence lies in one layer, so the
-union is acyclic iff each part is.  ∎
+the same list in S's own instance as in the layer instance at k, and it lists only factors of that instance's pool.  If
+every layer instance is playable, the joining lemma (F2) joins their schemes into an acyclic scheme of S's own
+instance.  Conversely, a scheme of S's own instance pays S_k with factors of the pool at k, so by restriction each layer
+instance is playable.  P2 finishes the proof.  ∎
 
 A game is thus a chain of layer games, coupled only through the numbers up to n/2 that it plays, and the frame model
 is this chain with the sources fixed to U\*.  The [parity bound](parity-bound.md#the-parity-bound) groups the same
 layers by parity.
 
+**Freedoms.**  U\* is playable, and the members of U\* ∩ D pay with factors of D, since a source has all its maximal
+factors in its own frame; so U\* ∩ D is playable against F_D (restriction).  The *moves* of a frame D are U\* ∩ D, and
+its *freedoms* are its factors less its moves, |F_D| − |U\* ∩ D|, which is never negative, since a scheme pays with
+distinct factors.  D is *closed* when it has none.  In game 21 the frames of layers 1 and 4 are closed (U\* keeps only
+19 of layer 1), and those of layers 2 and 3 have a freedom each.
+
 ### The bottom-layers theorem
 
-In layers 1 and 2 every optimal set agrees with U\*.  Let G_n be the graph whose vertices are the primes up to n/2
-and one more vertex g, and whose edges are the numbers of layer 2 up to n: pq is the edge p–q, and p² the edge p–g.
+In layers 1 and 2 every optimal set plays exactly the sources of U\*.  Let G_n be the graph whose vertices are the
+primes up to n/2 and one more vertex g, and whose edges are the numbers of layer 2 up to n: pq is the edge p–q, and p²
+the edge p–g.
 
-**Theorem F3 (the bottom-layers theorem).**  Let n ≥ 2 and S an optimal set of n.  Then S_1 = {q(n)}, the numbers of
-S_2 above n/2 are exactly U\*_2, and S_2 is a forest in G_n.  Where the frames of layer 2 are closed (defined below),
-S plays no number of layer 2 up to n/2.
+**Theorem F4 (the bottom-layers theorem).**  Let n ≥ 2 and S an optimal set of n.  Then S_1 = {q(n)}, the sources of S
+in layer 2 are exactly U\*_2, and S_2 is a forest in G_n.  Where the frames of layer 2 are closed, S plays no number of
+layer 2 up to n/2.
 
 *Proof.*  In layer 2 descending greedy is the scan of a graphic matroid, the [greedy algorithm of a
 matroid](primer.md#the-greedy-algorithm-of-a-matroid), and an exchange shows that S_2 is what the scan keeps of
-S_2 ∪ U\*_2.  Parts (b) and (d) cited below are those of the primer's paragraph "What the scan finds".
+S_2 ∪ U\*_2.  Parts (b) and (d) cited below are those of the primer's paragraph "What the scan finds", and an
+independent set of the graphic matroid [spans](primer.md#matroids) an edge when the edge closes a cycle with it.
 
 1. S_1 = {q(n)} by [the prime lemma (N1)](neighbors.md#the-prime-lemma), so the pool of S's layer instance at 2 is
    every prime up to n/2.
 2. A set of numbers of layer 2 is playable against those primes iff it is a forest in G_n, by [the two-factor
-   proposition (C3)](franklin-moniot.md#the-two-factor-proposition): these sets are the independent sets of the
-   graphic matroid of G_n ([matroids](primer.md#matroids)).
-3. Adding a source s of layer 2 to the kept sources changes only their layer instance at 2 (F2), so descending greedy
-   keeps s iff s closes no cycle with the kept sources of layer 2: on the sources of layer 2 it is the scan.  By part
-   (b), the elements the scan keeps before an element x span all the elements above x, so it keeps x iff these do not
-   span x.
-4. Let G be what the scan keeps of W = S_2 ∪ U\*_2.  The members of W above a source x of W are sources of layer 2.
-   If x ∈ U\*_2 they do not span x, since all the sources of layer 2 above x do not; if x ∉ U\*_2, the members of U\*_2
-   above x span it.  So G = U\*_2 ∪ A, with A made of numbers of S_2 up to n/2.
-5. The weights, the numbers themselves, are distinct and positive, so by part (d) G is the only heaviest independent
-   subset of W.  S_2 is independent (F2 and step 2), so ΣG ≥ ΣS_2, with equality only if G = S_2.
-6. S′ = (S ∖ S_2) ∪ G is playable by F2: at layer 2 it has the forest G against the same pool; at layer 3 the pool
-   only grows, since S plays the numbers A too; the other layers do not change.  So ΣS′ ≤ ΣS, which forces
-   S_2 = G = U\*_2 ∪ A.
+   proposition (P11)](playability.md#the-two-factor-proposition): these sets are the independent sets of the graphic
+   matroid of G_n ([matroids](primer.md#matroids)).
+3. Adding a source s of layer 2 to the kept sources changes only their layer instance at 2 (F3), so descending greedy
+   keeps s iff s closes no cycle with the kept sources of layer 2: on these sources it is the scan.  By part (b), the
+   elements the scan keeps before an element x span all the elements above x, so it keeps x iff x closes no cycle with
+   the elements above x.
+4. Let I be what the scan keeps of W = S_2 ∪ U\*_2.  The members of W above a source x of W are sources of layer 2.  If
+   x ∈ U\*_2, x closes no cycle with them, since it closes none with all the sources of layer 2 above x (step 3).  If
+   x ∉ U\*_2, it closes a cycle with the members of U\*_2 above it.  So I = U\*_2 ∪ E, with E made of numbers of S_2 up
+   to n/2.
+5. The weights, the numbers themselves, are distinct and positive, so by part (d) I is the only heaviest independent
+   subset of W.  S_2 is independent (F3 and step 2), so ΣI ≥ ΣS_2, with equality only if I = S_2.
+6. S′ = (S ∖ S_2) ∪ I is playable by F3: at layer 2 it has the forest I against the same pool; at layer 3 the pool
+   only grows, since S plays the numbers E too; the other layers do not change.  So ΣS′ ≤ ΣS, which forces
+   S_2 = I = U\*_2 ∪ E.
 7. The frames of layer 2 hold the primes up to n/2 as factors (F1).  When they are closed, U\*_2 has one edge for each
-   of these primes, one fewer than G_n has vertices: it is a spanning tree, so A is empty.  ∎
+   of these primes, one fewer than G_n has vertices: it is a spanning tree, so E is empty.  ∎
 
 In game 21, G_n has the vertices 2, 3, 5, 7 and g, and U\*_2 = {14, 15, 21} is the forest of the edges 2–7, 3–5 and
-3–7.  The frame of layer 2 has a freedom, so an optimal set may add an edge, and the optimal set of 21 adds 9 = 3², the
-edge 3–g; 6 = 2·3 and 10 = 2·5 would close a cycle.  The frames of layer 2 are closed on all but a few small boards
-([evidence.md](evidence.md)).  [The barred bound (W2)](parity-bound.md#the-barred-bound) fixes layers 1 and 2 by this
-theorem.
+3–7, which leaves g alone.  So one more edge fits.  The edge 4 = 2² (2–g) or 9 = 3² (3–g) closes no cycle, while
+6 = 2·3 and 10 = 2·5 would, and 4 and 9 together close the cycle 2–g–3–7–2.  The optimal set takes the heavier, 9.  The
+frames of layer 2 are closed on every board checked past 186 ([evidence.md](evidence.md)).  [The barred bound
+(W2)](parity-bound.md#the-barred-bound) fixes layers 1 and 2 by this theorem.
 
 ## The frame model
 
-The model keeps the sources of U\*, leaves out the frames with nothing to spare, merges the rest by layer, and asks
-which factors to promote.  The code of each step is in [the design of the frame
-model](../../solver/docs/design/frame-model.md#setup-in-the-code).
+The model keeps the sources of U\*, leaves out the closed frames, merges the rest by layer, and asks which factors to
+promote.
 
 **The frame's game.**  *Taxman Mini* is played on a pair W of disjoint sets, its *moves* and its *factors*, the moves in
 one layer and the factors in the layer below.  A move's *live* factors are its maximal factors among W's factors.  The
 moves are taken one at a time; each must have a live factor when taken, and taking it removes its live factors.  W is
-*winnable* when some order takes every move.  Read as the instance with members its moves and pool its factors, W is
-winnable iff it is playable.  A winning order pays each move with a live factor present at its turn, and puts b after
-a whenever pay(a) divides b, or b would have removed pay(a): it is a topological order of an acyclic scheme (no move
-divides another).  Conversely, in a topological order of an acyclic scheme every move that lists pay(a) comes after a,
-so pay(a) is there at a's turn.
+*winnable* when some order takes every move.  We read W as the instance with members its moves and pool its factors,
+and its *freedoms* are its factors less its moves.
 
-**Freedoms.**  The members of U\* ∩ D pay in F_D, so U\* ∩ D is playable against F_D (restriction).  The *moves* of a
-frame D are U\* ∩ D, its *freedoms* are |F_D| − |U\* ∩ D| ≥ 0, and D is *closed* when it has none.  In game 21 the
-frames of layers 1 and 4 are closed (U\* keeps only 19 of layer 1), and those of layers 2 and 3 have a freedom each.
+### The winnability lemma
+
+**Lemma F5 (the winnability lemma).**  A pair W of Taxman Mini is winnable iff, read as an instance, it is playable.
+So a winnable pair has at least as many factors as moves.
+
+*Proof.*  No move divides another, since they lie in one layer, and a move's divisors among the factors are its live
+factors.  A winning order pays each move with a live factor present at its turn, and these payments are distinct.  When
+pay(a) divides b, b comes after a, or b would have removed pay(a): the order is a topological order of the precedence,
+which is therefore acyclic ([topological orders](primer.md#topological-orders)).  Conversely, in a topological order of
+an acyclic scheme every move that lists pay(a) comes after a, so pay(a) is there at a's turn, and the order wins.  A
+scheme pays the moves with distinct factors.  ∎
 
 **Numbering.**  Let k₀ be the lowest layer of a frame with freedoms.  A frame with freedoms in layer k gets the number
 k − k₀, a closed frame none.  *Frame h* is the union of the frames numbered h, with the moves U\* ∩ frame h and the
-factors F_h; it is empty if no frame of layer k₀ + h has freedoms.  In game 21 frame 0 is the frame of layer 2, and
-frame 1 that of layer 3.  In game 20 the frames of 14 (with the factors 2 and 7) and of 15 (with 3 and 5) both lie in
-layer 2, and frame 0 is their union.
+factors F_h; it is empty if no frame of layer k₀ + h has freedoms.  In game 21 frame 0 is the frame of layer 2 and
+frame 1 that of layer 3; in game 20 frame 0 is the union of the two frames of layer 2.  If no frame has freedoms, as in
+games 2 to 7, 9 to 11 and 15, there is no frame h, the root problem below is empty, and P\* = 0.
 
 ### Clean numbering
 
-**Proposition F4 (clean numbering).**  Every frame with freedoms in front of a frame numbered h is numbered h − 1.
+**Proposition F6 (clean numbering).**  Every frame with freedoms in front of a frame numbered h is numbered h − 1.
 
 *Proof.*  It lies one layer lower (F1), and the numbers follow the layers.  ∎
 
-The proof of exactness uses nothing else about the numbering: a promoted number pays one layer down (F1), and F4 puts
+The proof of exactness uses nothing else about the numbering: a promoted number pays one layer down (F1), and F6 puts
 the frames there that can pay for it in frame h − 1.
 
 **Taking a number on.**  A frame D, or a frame h, *can take x on* when its moves together with x are playable against
-its factors: x could become one more move of it without leaving the others short.  A closed frame can take nothing on,
-since its moves already need all its factors.  In game 21, frame 0 can take 9 on: 9 takes 3, 15 takes 5, 21 takes 7 and
-14 takes 2.  It cannot take 6 on: 15 still takes 5, and then 14, 21 and 6 list each of the factors 2, 3 and 7 twice, so
-peel stalls.
+its factors: x could become one more move without leaving the others short.  A closed frame can take nothing on, since
+its moves already need all its factors.  In game 21, frame 0 can take 9 on: 9 takes 3, 15 takes 5, 21 takes 7 and 14
+takes 2.  It cannot take 6 on: 15 still takes 5, by a back move, and then 14, 21 and 6 list each of 2, 3 and 7 twice,
+so peel stalls.
 
-Frame h can take x on iff one of its frames can.  This needs an argument, because x can have maximal factors in several
-frames of frame h.
+### The take-on lemma
 
-* *If frame h can take x on, so can one of its frames.*  Take an acyclic scheme of the moves of frame h with x.  The
-  payer of x lies in one frame D of frame h.  The moves of D pay in D, since a move's maximal factors lie in its own
-  frame, and x pays in D too: by restriction, D can take x on.
-* *If a frame D of frame h can take x on, so can frame h.*  Join an acyclic scheme of the moves of D with x to acyclic
-  schemes of the moves of the other frames of frame h, against their factors.  The frames share no factor, so the joint
-  scheme pays each member with a different factor.  Suppose its precedence had a cycle.  On each edge a → b of it,
-  pay(a) is a maximal factor of b (P3).  If b is a move of another frame D′, its maximal factors lie in D′, so a pays
-  in D′, and since only the moves of D′ pay there, a is a move of D′ too.  Going backward around the cycle from a move
-  of D′, every member is then a move of D′, so the cycle lies in D′'s scheme, which has none.  A cycle with no move of
-  another frame lies in the scheme of D's moves with x, which has none either.
+**Lemma F7 (the take-on lemma).**  Frame h can take x on iff one of its frames can.
+
+*Proof.*  This needs an argument, because x can have maximal factors in several frames of frame h.  If frame h can take
+x on, take an acyclic scheme, and let D be the frame of frame h that holds pay(x).  The moves of D pay with factors of
+D, since a move's maximal factors lie in its own frame, and so does x: by restriction, D can take x on.  Conversely, let
+a frame D of frame h take x on.  The moves of each other frame of frame h list only factors of that frame, and are
+playable against them.  The joining lemma (F2), with those frames first and D with x last, joins the schemes into an
+acyclic scheme of the moves of frame h with x against F_h.  ∎
 
 **Candidates.**  A *candidate* is a factor x of a frame D numbered h ≥ 1 that passes two tests: (a) U\* ∩ D is
 playable against F_D ∖ {x}; (b) frame h − 1 can take x on.  Test (a) asks that D can spare x, and test (b) that the
 frame in front can pay for it.  In game 21 the candidates are 4 and 9, factors of frame 1.  All four factors of frame 1
 pass (a), and 6 and 10 fail (b); 10 = 2·5 fails as 6 does, since 14, 15, 21 and 10 list each of 2, 3, 5 and 7 twice.
 
-**Claims.**  A *claim* (s, f) pairs a move s of a frame with a factor f of it, and takes both out.  A *claim sequence*
-of a frame X, a frame D or a frame h, is a sequence of claims, each one of two kinds given those before it:
+**Claims.**  A *claim* (s, f) pairs a move s of frame h with a factor f of frame h, and takes both out.  A *claim
+sequence* of frame h is a sequence of claims, each one of two kinds given those before it:
 
 * a *front claim*: f is the only maximal factor of s that no earlier claim took;
-* a *back claim*: no earlier claim took f; s is the only move of X left with f as a maximal factor; no frame of the
-  layer below can take f on; and X cannot take on any factor of a frame with freedoms that has f as a maximal factor.
+* a *back claim*: no earlier claim took f; s is the only move of frame h left with f as a maximal factor; no frame of
+  the layer below can take f on; and frame h cannot take on any factor of frame h + 1 that has f as a maximal factor.
 
-A front claim settles a move with one choice left, and a back claim a factor that only one move wants.  The last two
+A front claim settles a move with one choice left, and a back claim a factor that one move alone wants.  The last two
 conditions of a back claim say that f has no other use: it cannot be promoted, and it cannot pay for a number promoted
-into X.  In game 21 frame 0 has the back claim (15, 5): only 15 has the maximal factor 5, the frame of layer 1 is
-closed, and frame 0 cannot take on 10, the one factor of frame 1 with the maximal factor 5.  Frame 1 has the back claim
-(20, 10).  Each condition earns its place.  Once 15 is claimed only 21 has the maximal factor 3, but frame 0 can take
-on 9, which has it; and only 18 has the maximal factor 9, but frame 0 can take 9 on.  The claim (21, 3) or (18, 9)
-would lose the promotion set {9} (below).
+into frame h.  Read with a frame D numbered h in place of frame h, the same rules give the claim sequences of D, which
+[the claims lemma (X5)](exactness.md#the-exactness-theorem) uses to check setup.
+
+*The claims of frame h* are one claim sequence, made in rounds.  In each round, go through the factors of frame h not
+yet claimed, in increasing order, and make each back claim that the rules allow at its turn; then make the front claim
+of the largest move that has one, if any.  Stop after a round that makes no claim.  No move is then left with only one
+factor not yet claimed.
+
+In game 21 the claims of frame 0 are the one back claim (15, 5): only 15 has the maximal factor 5, the frame of layer 1
+is closed, and frame 0 cannot take on 10, the one factor of frame 1 with the maximal factor 5.  The claims of frame 1
+are the back claim (20, 10).  The last two conditions of a back claim each earn their place.  Once 15 is claimed, only
+21 has the maximal factor 3, but frame 0 can take on 9, which has it; and only 18 has the maximal factor 9, but frame 0
+can take 9 on.  The claim (21, 3) or (18, 9) would lose the promotion set {9} (below).  The order of the claims matters:
+in game 8, frame 0 has the move 6 and the factors 2 and 3, and the back claims (6, 2) and (6, 3) exclude each other.
+The claims of frame 0 make (6, 2), the first in increasing order.
 
 ![Game 21's four frames stacked by layer, with their claims, closed frames dashed, the candidates 4 and 9, and links to the frame in front](img/frames-21.svg)
 
-*The frames of 21 by layer, layer 4 at the top.  Double outline: the candidates 4 and 9.  Thick pair: a claim, lighter
-in a closed (dashed) frame.  Dotted arrow: a factor to its maximal factor in the frame in front.*
+*The frames of 21 by layer, layer 4 at the top.  Gray circles: U\*; hollow: the rejected 11, 13 and 17.  Double
+outline: the candidates 4 and 9.  Thick pair: a claim of frame 0 or 1.  Dashed box: a closed frame.  Dotted arrows: some
+of the links from a factor to its maximal factor in the frame in front.*
 
-**Reduction.**  To *reduce* a pair of Taxman Mini is to drop a move with one live factor, with that factor, until no
-such move is left.
+**Reduction.**  To *reduce* a pair of Taxman Mini is to drop a move with one live factor, together with that factor,
+until no such move is left; each step is a *drop*.
 
-**Setup** computes the model:
-
-1. it forms the frames, and runs descending greedy over each frame's sources against its factors;
-2. it makes claims, round after round, running descending greedy again over what each frame has left, until no claim
-   can be made;
-3. it numbers the frames, finds the candidates, and merges the frames of each number into frame h;
-4. it makes claims in each frame h, a merged frame starting with none and a frame alone in its number keeping its own;
-5. it reduces each frame h less its claims.
-
-The claims of step 2 in a frame are a claim sequence of it, and those that leave frame h are one of frame h; setup's own
-tests ask at least what the rules ask.  [The kept-sources lemma (X1)](exactness.md#the-exactness-theorem) shows that
-descending greedy keeps U\* at every pass, and [the claims lemma (X5)](exactness.md#the-exactness-theorem) that test
-(a), which setup applies after the claims of step 2, picks the same candidates.
-
-**The root problem.**  The *root frame h* is frame h less its claims, reduced.  The *root problem* Π_n is the root
-frames and the candidates; the *root* is the root frames before any promotion.  A number's *home* is the root frame
-whose factors hold it.  ΣU\* is the score with no promotions (X1).  In game 21, root frame 0 has the moves 14 and 21 and
-the factors 2, 3 and 7, and root frame 1 the moves 12 and 18 and the factors 4, 6 and 9; neither reduces further.  The
-candidates 4 and 9 have the home 1.
+**The root problem.**  A *root problem* of game n has, for each number h, the *root frame h*, which is frame h less a
+claim sequence of it, then reduced; and it has the candidates.  *The root problem* Π_n uses the claims of frame h,
+which leave no move with one live factor, so its root frame h is frame h less its claims.  The *root* is the root frames
+before any promotion.  A number's *home* is the number h of the root frame whose factors hold it, if one does; every
+candidate of a frame numbered h has the home h ([the reduction-step lemma (X6)](exactness.md#the-exactness-theorem)).
+ΣU\* is the score with no promotions ([the kept-sources lemma (X1)](exactness.md#the-exactness-theorem)).  In game 21,
+root frame 0 has the moves 14 and 21 and the factors 2, 3 and 7, and root frame 1 has the moves 12 and 18 and the
+factors 4, 6 and 9; the candidates 4 and 9 have the home 1.  In game 8, the claim (6, 3) in place of (6, 2) would give
+another root problem, with root frame 0 holding the factor 2 instead of 3.  [The exactness theorem
+(X7)](exactness.md#the-exactness-theorem) holds for every root problem of game n, so they all have the same promotion
+sets, and P\* does not depend on the claims.
 
 **Promotion sets.**  *Applying* a set L to frame h adds to its moves the members of L in F_{h+1} and removes from its
 factors those in F_h; applying L to root frame h adds the members of L whose home is h + 1 and removes those whose home
-is h.  A *promotion set* of Π_n is a set L of candidates, each with a home, such that every root frame is winnable with
-L applied.  *Promoting* x thus moves it one frame forward, from the factors of its home h to the moves of frame h − 1.
-P\* = P\*(Π_n) is the largest ΣL over the promotion sets.  A promotion set has at most as many members as the freedoms
-allow, the promotion limit ([the promotion-limit lemma (F6)](#the-promotion-limit-lemma)).
+is h.  A *promotion set* of a root problem is a set L of candidates such that every root frame is winnable with L
+applied.  *Promoting* x thus moves it from the factors of root frame h, its home, to the moves of root frame h − 1.
+P\* = P\*(Π_n) is the largest ΣL over the promotion sets of Π_n.  A promotion set has at most as many members as the
+freedoms and the candidates allow, the promotion limit ([the promotion-limit lemma (F9)](#the-promotion-limit-lemma)).
 
-In game 21, {9} is a promotion set.  Root frame 0 with 9 applied has the moves 14, 21 and 9 against 2, 3 and 7, won by 9
-with 3, 21 with 7 and 14 with 2; root frame 1 has the moves 12 and 18 against 4 and 6, won by 18 with 6 and 12 with 4.
-So is {4}, but not {4, 9}, which would leave root frame 0 four moves for three factors.  So P\* = 9, and
+In game 21, {9} is a promotion set.  Root frame 0 with 9 applied has the moves 14, 21 and 9 against 2, 3 and 7, and
+reduces to nothing by the drops (9, 3), (21, 7) and (14, 2); root frame 1 loses 9 and reduces to nothing by (18, 6) and
+(12, 4).  So is {4}, but not {4, 9}, which would leave root frame 0 four moves for three factors.  So P\* = 9, and
 ΣU\* + P\* = 135 + 9 = 144 = opt(21), the score of the game 19; 9, 15, 21, 14; 18, 12, 20; 16, which plays the frames
 one after another from the front.
 
 ![Game 21's root frames before and after promoting 9, which becomes a move of frame 0 paid by 3, with the numbered drops that empty both frames](img/promotion-21.svg)
 
-*Promoting 9 moves it from the factors of frame 1 to the moves of frame 0.  Numbered square tags: the drops of each
-frame, in order.*
+*Promoting 9 moves it from the factors of root frame 1 to the moves of root frame 0.  Numbered square tags: the drops
+of each frame, in order.*
 
 ### The reduction lemma
 
 Reducing is safe: a dropped pair could never have gone otherwise, now or after later promotions, as long as its factor
 stays.
 
-**Lemma F5 (the reduction lemma).**  Let W be a pair of Taxman Mini, and m a move of W whose only live factor is f.
+**Lemma F8 (the reduction lemma).**  Let W be a pair of Taxman Mini, and x a move of W whose only live factor is f.
 
-1. Dropping m and f never changes whether the pair is winnable, now or after later edits that keep f: for every set Y
-   of numbers of the moves' layer and every set Z of factors with f ∉ Z, W with Y added to its moves and Z removed from
-   its factors is winnable iff W less m and f, so edited, is.
+1. Dropping x and f never changes whether the pair is winnable, now or after later edits that keep f: for every set Y
+   of numbers of the moves' layer outside W's moves, and every set Z of factors with f ∉ Z, W with Y added to its moves
+   and Z removed from its factors is winnable iff W less x and f, edited alike, is.
 2. If W is winnable, reducing it ends at the same pair whatever the order of the drops.
 
-*Proof of part 1.*  After the edits m still has the single live factor f: added moves change no move's live factors,
-and Z leaves f.  So (m, f) is a front move, which keeps the pair winnable and keeps it unwinnable (P4).
+*Proof of part 1.*  After the edits x still has the single live factor f: added moves change no move's live factors,
+and Z leaves f.  So (x, f) is a front move of the edited pair, which keeps it playable and keeps it unplayable (P4), and
+a pair is winnable iff it is playable (F5).
 
 *Proof of part 2.*  The idea is the diamond argument.  Two different drops available at once commute: each leaves the
 other available, and doing both in either order reaches the same pair.  An induction spreads this local agreement to
@@ -263,19 +296,26 @@ whole reductions.
 
 1. *Every pair reached is winnable,* by part 1 with nothing added or removed.  So no two of its moves have the same
    single live factor, since a winnable pair pays its moves with different factors.
-2. *The diamond.*  Let (m₁, f₁) and (m₂, f₂) be different drops available in a winnable pair.  Then m₁ ≠ m₂, since a
-   move with one live factor gives one drop, and f₁ ≠ f₂ by step 1.  Dropping (m₁, f₁) removes only m₁ and f₁, so m₂
-   still has the single live factor f₂, and (m₂, f₂) is still available.  Both drops, in either order, leave W less the
+2. *The diamond.*  Let (x₁, f₁) and (x₂, f₂) be different drops available in a winnable pair.  Then x₁ ≠ x₂, since a
+   move with one live factor gives one drop, and f₁ ≠ f₂ by step 1.  Dropping (x₁, f₁) removes only x₁ and f₁, so x₂
+   still has the single live factor f₂, and (x₂, f₂) is still available.  Both drops, in either order, leave W less the
    two pairs.
 3. *The induction.*  We show, by induction on the number of moves, that all reductions of a winnable pair W end at the
    same pair.  If no move of W has one live factor, the only reduction is the empty one.  Otherwise let two reductions
    of W begin with the drops d₁ and d₂.  If d₁ = d₂, the rest of each is a reduction of W less d₁, which has fewer
-   moves, so they end together.  If d₁ ≠ d₂, take any reduction σ of W less both pairs.  By step 2, d₂ followed by σ is
-   a reduction of W less d₁, as is the rest of the first reduction, so by the induction hypothesis they end together.
-   Likewise d₁ followed by σ and the rest of the second reduction end together.  And d₁, d₂, σ and d₂, d₁, σ both end
-   where σ does.  So the two reductions end at the same pair.  ∎
+   moves, so they end together.  If d₁ ≠ d₂, take any reduction of W less both pairs, its tail.  By step 2, d₂ followed
+   by the tail is a reduction of W less d₁, as is the rest of the first reduction, so by the induction hypothesis they
+   end together.  Likewise d₁ followed by the tail and the rest of the second reduction end together.  And d₁, d₂ and
+   the tail, and d₂, d₁ and the tail, both end where the tail does.  So the two reductions end at the same pair.  ∎
 
+In game 21 the drops of root frame 0 with 9 applied can come in no other order, since each makes the next possible.
 Winnability is needed in part 2: against the factor 3, the moves 6 and 9 reduce to 9 alone or to 6 alone.
+
+Setup builds the root problem by a longer route, which [the design of the frame
+model](../../solver/docs/design/frame-model.md#setup-in-the-code) follows step by step: it makes claims in rounds
+before and after merging, runs descending greedy again after each round, tests (a) after its first claims, and reduces
+at the end.  X1 and part 3 of X5 show that these steps change neither the sources nor the candidates.  On a few small
+boards its order of claims gives another root problem of game n than Π_n; the design doc says which.
 
 ## Searching the frame model
 
@@ -283,44 +323,54 @@ A search of Π_n branches on which candidates to promote; [search-rules.md](sear
 cuts, and [frame-bounds.md](frame-bounds.md) the bounds it cuts with.  A *node* has *promotions* P, a promotion set, and
 *candidates* C, a set of candidates disjoint from P that it may still promote.  Its *completions* are the promotion sets
 P ∪ X with X ⊆ C; the root node, with no promotions and every candidate, has a heaviest completion worth P\*.  The
-*state* state(P) is the root frames with P applied, then reduced: each move with one live factor is dropped with that
-factor until none is left ([reduction](#the-frame-model)).  The frames with P applied are winnable, so the reduced
-frames are the same in any order of the drops (F5).  [The state lemma (R1)](search-rules.md#the-state-lemma) shows that
-state(P) decides which completions are promotion sets.  In game 21, state({9}) has two empty frames: in root frame 0
-with 9 applied, 9 drops with 3, then 21 with 7 and 14 with 2, and in root frame 1, 18 drops with 6 and then 12 with 4.
+*state* state(P) is the root frames with P applied, then [reduced](#the-frame-model).  These frames are winnable, so by
+the reduction lemma (F8) the reduced frames do not depend on the order of the drops.  [The state lemma
+(R1)](search-rules.md#the-state-lemma) shows that state(P) decides which completions are promotion sets.  In game 21,
+state({9}) has two empty frames, by the drops above.
 
-The *freedoms* of a pair of Taxman Mini are its factors less its moves.  Claims and drops keep them, and a promotion
-into or out of a frame spends one.  So frame h of state(P) has the freedoms of the frames numbered h, less the members
-of P promoted into or out of it.  For freedoms r_0, …, r_H of frames 0 to H, the *promotion limit* is the largest
-c_1 + ⋯ + c_H over integers c_h ≥ 0 with c_h + c_{h+1} ≤ r_h for every h, where c_0 = c_{H+1} = 0: c_h counts the
-promotions out of frame h, which spend a freedom of frame h and one of frame h − 1.  A node's promotion limit is that of
-state(P).
+Claims and drops keep a pair's freedoms, and a promotion into or out of a frame spends one.  So frame h of state(P)
+has the freedoms of the frames numbered h, less the members of P promoted into or out of it.  For a node, let ρ_h be
+the freedoms of frame h of state(P), for the frames 0 to t, and κ_h the number of its candidates that are factors of
+frame h of state(P).  The node's *promotion limit* is the largest c_1 + ⋯ + c_t over integers c_h with 0 ≤ c_h ≤ κ_h
+and c_h + c_{h+1} ≤ ρ_h for every h, where c_0 = c_{t+1} = 0.  Here c_h counts the promotions out of frame h, each of
+which spends a freedom of frame h and one of frame h − 1.  The promotion limit of Π_n is that of the root node.
 
 ### The promotion-limit lemma
 
-**Lemma F6 (the promotion-limit lemma).**  (1) Taking each c_h as large as fits from the front, c_h = min(r_h,
-r_{h−1} − c_{h−1}), reaches the promotion limit.  (2) Every completion P ∪ X of a node has |X| at most the node's
-promotion limit, and a candidate of home h is in some X only if frames h and h − 1 of state(P) have freedoms.
+**Lemma F9 (the promotion-limit lemma).**  Let a node have the freedoms ρ_h and the counts κ_h.
+
+1. Taking each c_h as large as fits from the front, c_h = min(ρ_h, κ_h, ρ_{h−1} − c_{h−1}) for h = 1, …, t, reaches
+   the node's promotion limit.
+2. Every completion P ∪ X of the node has |X| at most its promotion limit, and a candidate whose home is h is in some
+   X only if frames h and h − 1 of state(P) both have freedoms.
 
 *Proof of part 2.*  Let x_h be the number of members of X whose home is h; x_0 = 0, since no candidate has the home 0.
-Root frame h with P ∪ X applied has the freedoms r_h − x_h − x_{h+1}, and it is winnable, so it has at least as many
-factors as moves: x_h + x_{h+1} ≤ r_h.  So (x_h) is one of the sequences the promotion limit ranges over, and
-|X| = Σx_h is at most the limit.  If x_h ≥ 1, the conditions at h and h − 1 give r_h ≥ 1 and r_{h−1} ≥ 1.
+
+1. *Each member of X is a factor of its home's frame in state(P).*  Otherwise a drop of the reduction that made frame
+   h of state(P) took one; take the first drop whose factor X removes.  The drops before it keep their factors under
+   X, so by F8, part 1, root frame h with P ∪ X applied is winnable iff the pair after those drops, with X applied, is.
+   There the drop's move has its one live factor removed, so the pair is unwinnable, and P ∪ X is no promotion set.  So
+   x_h ≤ κ_h.
+2. *The freedoms.*  Root frame h with P ∪ X applied has the freedoms ρ_h − x_h − x_{h+1}, and it is winnable, so it
+   has at least as many factors as moves (F5): x_h + x_{h+1} ≤ ρ_h.
+3. So (x_h) is one of the sequences that the promotion limit ranges over, and |X| = Σx_h is at most the limit.  If
+   x_h ≥ 1, the conditions at h and h − 1 give ρ_h ≥ 1 and ρ_{h−1} ≥ 1.
 
 *Proof of part 1.*  The idea is an exchange: wherever a sequence falls short of the front-to-back choice, moving
-promotions forward from the next frame keeps it within the freedoms and never lowers its sum.
+promotions forward from the next frame keeps it within the conditions and never lowers its sum.
 
-1. *The choice (c_h) meets the conditions.*  By construction c_h ≤ r_h and c_{h−1} + c_h ≤ r_{h−1}, and c_h ≥ 0,
-   since c_{h−1} ≤ r_{h−1}.
+1. *The choice (c_h) meets the conditions.*  By construction c_h ≤ ρ_h, c_h ≤ κ_h and c_{h−1} + c_h ≤ ρ_{h−1}, and
+   c_h ≥ 0, since c_{h−1} ≤ ρ_{h−1}.
 2. *A sequence that agrees with it before h falls short at h.*  Let (d_h) meet the conditions, with d_j = c_j for every
-   j < h.  The condition at h gives d_h ≤ r_h, and the one at h − 1 gives d_h ≤ r_{h−1} − c_{h−1}, so d_h ≤ c_h.
+   j < h.  Then d_h ≤ ρ_h, d_h ≤ κ_h, and d_h ≤ ρ_{h−1} − c_{h−1} by the condition at h − 1, so d_h ≤ c_h.
 3. *The exchange.*  Raise d_h to c_h, and lower d_{h+1} by as much, but not below 0.  The condition at h − 1 holds,
-   since c_{h−1} + c_h ≤ r_{h−1}.  The one at h holds: d_h + d_{h+1} has not grown, unless d_{h+1} reached 0, and then
-   it is c_h ≤ r_h.  The one at h + 1 only loosens.  The sum has not fallen.
-4. Doing this for h = 1, 2, …, H turns (d_h) into (c_h) without lowering its sum, so the sum of (c_h) is the largest.  ∎
+   since c_{h−1} + c_h ≤ ρ_{h−1}, and c_h ≤ κ_h.  The one at h holds: d_h + d_{h+1} has not grown, unless d_{h+1}
+   reached 0, and then it is c_h ≤ ρ_h.  Those at h + 1 only loosen.  The sum has not fallen.
+4. Doing this for h = 1, 2, …, t turns (d_h) into (c_h) without lowering its sum, so the sum of (c_h) is the largest.  ∎
 
-In game 21 the freedoms of the root are 1 and 1, so the promotion limit is 1, which {4, 9} exceeds.  In game 98 they are
-1, 6, 3 and 2, and the front-to-back choice is c₁ = min(6, 1) = 1, c₂ = min(3, 6 − 1) = 3 and c₃ = min(2, 3 − 3) = 0:
-the promotion limit is 4.  The sequence 0, 3, 0 meets the conditions too; the exchange raises it to 1, 2, 0 and then to
-1, 3, 0.  The solver keeps state(P) as a node's frames and cuts by the promotion limit
-([its search](../../solver/docs/design/search.md)).
+In game 21 the root has the freedoms 1 and 1 and two candidates of home 1, so c₁ = min(1, 2, 1) = 1: the promotion limit
+is 1, which {4, 9} exceeds.  In game 98 the freedoms are 1, 6, 3 and 2, and the candidates of homes 1, 2 and 3 number
+4, 8 and 4; the front-to-back choice is c₁ = min(6, 4, 1) = 1, c₂ = min(3, 8, 6 − 1) = 3 and c₃ = min(2, 4, 3 − 3) = 0,
+so the promotion limit is 4.  The sequence 0, 3, 0 meets the conditions too; the exchange raises it to 1, 2, 0 and then
+to 1, 3, 0.  The solver keeps state(P) as a node's frames and cuts by the promotion limit ([its
+search](../../solver/docs/design/search.md)).
