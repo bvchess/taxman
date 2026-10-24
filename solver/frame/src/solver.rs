@@ -1233,13 +1233,13 @@ impl<const W: usize> Job for SearchJob<W> {
 /// not proven, or its proof assumes anything.
 ///
 /// B, `prev`'s score less the `in_the_bag` of `n − 1`, bounds P\*(Π_M) where that score is opt(n − 1)
-/// (docs/theory/search-rules.md, the paragraph "Standing"): a proven game that assumes nothing is optimal within the
-/// frame model, so the cut adds nothing to what the search's answer rests on, and a result that the cut helped assumes
-/// what it assumed without it.  A game that assumes something (one of `optimal.json`, or one whose bound rests on
-/// statement U) would make the answer rest on that, which a result line has no way to say, so it carries no cut.  Nor
-/// does a provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: `window`'s driver gives
-/// a search the game of `n − 1` only once that game is concluded, with the search's go or, for a search started before,
-/// at the conclusion ([`Job::arm`]).
+/// (docs/theory/search-rules.md, the paragraph "What it rests on"): a proven game that assumes nothing is optimal
+/// within the frame model, so the cut adds nothing to what the search's answer rests on, and a result that the cut
+/// helped assumes what it assumed without it.  A game that assumes something (one of `optimal.json`, or one whose bound
+/// rests on statement U) would make the answer rest on that, which a result line has no way to say, so it carries no
+/// cut.  Nor does a provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: `window`'s
+/// driver gives a search the game of `n − 1` only once that game is concluded, with the search's go or, for a search
+/// started before, at the conclusion ([`Job::arm`]).
 fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Option<NearRepeat<W>>, String> {
     if !prev.proven || !prev.assumes.is_empty() {
         return Ok(None);

@@ -981,10 +981,10 @@ def state_28():
         fig.text(x0 - 136, 282, "Frame 0", anchor="start", weight="bold")
         if not after:
             n1 = draw_frame(
-                fig, {20: -0.5, 28: 0.5}, {10: -1, 4: 0, 14: 1}, y1m, y1f, d, x0, hidden={14},
+                fig, {20: -0.5, 28: 0.5}, {10: -1, 4: 0, 14: 1}, y1m, y1f, d, x0, rings={4, 10, 14}, hidden={14},
                 styles={(28, 14): "faintdashed"},
             )
-            n0 = draw_frame(fig, {14: 0.5}, {2: 0}, y0m, y0f, d, x0, rings={14})
+            n0 = draw_frame(fig, {14: 0.5}, {2: 0}, y0m, y0f, d, x0)
             fig.edge(n1[14], n0[14], "dotted", head=True)
             for k, (m, f) in enumerate([(28, 4), (20, 10)], 1):
                 fig.edge(n1[m], n1[f], "thick")
@@ -993,15 +993,15 @@ def state_28():
             fig.tag((n0[14].x + n0[2].x) / 2, (n0[14].y + n0[2].y) / 2, 3, shape="square")
         else:
             for f, col in ((10, -1), (4, 0)):
-                fig.factor(x0 + col * d, y1f, f, hidden=True, hollow=True)
+                fig.factor(x0 + col * d, y1f, f, hidden=True, hollow=True, ring=True)
                 fig.text(x0 + col * d, y1f + 30, "gone", size=12, fill=MID, italic=True)
             fig.text(x0, y1m + 4, "empty", size=14, fill=MID)
             fig.text(x0, y0m + 24, "empty", size=14, fill=MID)
     fig.lines(
         390,
         388,
-        ["Numbered square tags: the drops (28, 4), (20, 10) and (14, 2), in order.",
-         "4 and 10 go out with them, so no candidate is left to join 14."],
+        ["Double outline: a candidate; gray: 14's old place.  Square tags: the drops (28, 4), (20, 10), (14, 2).",
+         "The candidates 4 and 10 go out with the drops, so none is left to join 14."],
         size=12,
         fill=MID,
     )
