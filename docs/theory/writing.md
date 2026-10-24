@@ -37,14 +37,18 @@ why.  Pair an example with a non-example where the line between them teaches som
 
 ## 5. Give each thing one name, and the standard name where there is one
 
-Each result has a short name that says what it is about, such as the layer theorem or the floor lemma, and every
-mention uses that name and links its heading.  The three open statements keep their symbols: U, (★) and (♦).  Each
-symbol keeps one meaning across the theory, and the notation table in [statements.md](statements.md) lists them; a
-letter that serves one proof only must not be one of those.  Introduce a symbol only for what the text uses again and
-again, and use words for the rest.  Where mathematics has a standard term, such as topological order or matroid
-intersection, use it, or give it beside the project's word.  Flag a project word that means something else in ordinary
-mathematics: a *factor* here is a number up to n/2, a role on the board, while in ordinary mathematics a factor is a
-divisor of some given number.
+Each result has a name that says what it is about, such as the ceiling lemma, and a short label: the letter of its
+file and its number there, as in N4.  The first mention of a result in a file gives its name, its label and a link
+to its heading; later mentions may use the label alone where the result is cited often, and the name where it is not.
+The three open statements keep their symbols: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and the
+notation table in [statements.md](statements.md) lists them; a letter that serves one proof only must not be one of
+those.  Introduce a symbol only for what the text uses again and again, and use words for the rest.
+
+Where mathematics has a standard term, such as topological order or matroid intersection, use it, or give it beside
+the project's word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2,
+a role on the board, while in ordinary mathematics a factor is a divisor of some given number.  And in Taxman *greedy*
+usually means the strategy that takes the largest legal move, so the theory never says greedy alone: *descending
+greedy* is the procedure that builds U\*, and the primer's greedy algorithm is a matroid's.
 
 ## 6. Define each term before using it, in one place
 
