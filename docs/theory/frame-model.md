@@ -147,8 +147,7 @@ independent set of the graphic matroid [spans](primer.md#matroids) an edge when 
 In game 21, G_n has the vertices 2, 3, 5, 7 and g, and U\*_2 = {14, 15, 21} is the forest of the edges 2–7, 3–5 and
 3–7, which leaves g alone.  So one more edge fits.  The edge 4 = 2² (2–g) or 9 = 3² (3–g) closes no cycle, while
 6 = 2·3 and 10 = 2·5 would, and 4 and 9 together close the cycle 2–g–3–7–2.  The optimal set takes the heavier, 9.  The
-frames of layer 2 have freedoms only on some small boards, 21 and 98 among them, and are closed on every larger board
-checked ([evidence.md](evidence.md#observations) gives the range).  [The barred bound
+frames of layer 2 are closed from game 187 on ([the square theorem (F10)](#the-square-theorem)).  [The barred bound
 (W2)](parity-bound.md#the-barred-bound) fixes layers 1 and 2 by this theorem.
 
 ## The frame model
@@ -376,3 +375,36 @@ is 1, which {4, 9} exceeds.  In game 98 the freedoms are 1, 6, 3 and 2, and the 
 so the promotion limit is 4.  The sequence 0, 3, 0 meets the conditions too; the exchange raises it to 1, 2, 0 and then
 to 1, 3, 0.  The solver keeps state(P) as a node's frames and cuts by the promotion limit ([its
 search](../../solver/docs/design/search.md)).
+
+## The square theorem
+
+**Theorem F10 (the square theorem).**  Let n ≥ 2.
+
+1. A frame of layer 2 has one freedom if none of its sources is the square of a prime, and none if one is.
+2. If n ≥ 187, layer 2 is one frame, with a square among its sources.  So every optimal set plays exactly U\*_2 in
+   layer 2 and no number of layer 2 up to n/2 ([F4](#the-bottom-layers-theorem)), and k₀ ≥ 3.
+
+The bound is sharp: at 186 a frame of layer 2 has a freedom.
+
+*Proof.*  Part 1 is a count, and part 2 rests on primes in short intervals.  Let H_n be G_n with the sources of layer 2
+alone as edges, and d the number of frames of layer 2 with no square.
+
+1. A source pq joins p and q in the frame graph, and p² hangs on p alone.  So H_n has d + 1 components: each frame with
+   no square, and g with the rest.
+2. U\*_2, which the scan keeps (step 3 of F4's proof), is a basis of H_n's graphic matroid ([part
+   (a)](primer.md#the-greedy-algorithm-of-a-matroid)).  So it has d fewer members than the primes up to n/2
+   ([rank](primer.md#linear-and-graphic-matroids)), the frames' factors ([F1](#the-frame-lemma)): the frames have d
+   freedoms in all.  A frame with no square has as moves a forest on its own primes, so a freedom at least: each of the
+   d has one, and the others none.
+3. *Nagura's theorem:* for every real x ≥ 25 some prime lies in (x, 6x/5].  It follows from Dusart's Proposition 6.8
+   ([arXiv:1002.0442](https://arxiv.org/abs/1002.0442)) for x ≥ 396,738, and from a computation below.
+4. Let n ≥ 2500, s < s′ consecutive primes up to √n, and x = n/(2s) > √n/2 ≥ 25.  Since s′ ≤ 5s/3 (step 3 from 25 on,
+   the primes to 29 below), step 3 gives a prime r in (x, 6x/5] ⊆ (x, n/s′].  Then sr and s′r lie in (n/2, n]: they
+   join s and s′ through r, or one is ss′ if r is s or s′.  So the primes up to √n share a frame, and a prime ℓ in
+   (√n, n/2] joins it through a source ℓp with p ≤ n/ℓ < √n (step 1 of F1's proof).  And step 3 at x = √(n/2) gives a
+   prime p < √n with p² a source.
+5. A computation covers 187 ≤ n ≤ 2499.  Part 1 closes the frame, F4 gives the optimal sets, and k₀ ≥ 3, since the
+   frame of layer 1 has one factor and one move, q(n).  ∎
+
+The script of [its notebook entry](../../solver/notebook/the-closed-frames-of-layer-2-2026-10/README.md) makes both
+computations in under a second, and the entry shows why 6/5 is needed; one trusts the script and Dusart's proposition.
