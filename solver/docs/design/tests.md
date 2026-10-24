@@ -23,7 +23,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
   `frames` check what the frames remember (which numbers each can take on, which sources `removeImpossible` has been
   through) against a fresh computation.
-* **The frame model's exactness** ([the bottom-layers theorem (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)
+* **The frame model's exactness** ([the bottom-layers theorem (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)
   and [the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem);
   [frame-model.md](frame-model.md#what-optimal-means)):
   * `tests/model_exact.rs` decides playability on the whole board with an oracle that shares no code with `frames` or
@@ -32,10 +32,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     to 1300 (to 8191 ignored), and the near miss that only the candidate filter keeps out (n = 98).
   * `tests/model_extended.rs` checks [E1](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem) (the
     extended problem, with the sources of three or more prime factors
-    optional) both ways, in both formulations (with and without the claims of `unzip`, [E2](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
+    optional) both ways, in both formulations (with and without the claims of `unzip`, [E4](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
-    with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E2.
-  * `tests/bottom_layers.rs` checks F3 on every game of `optimal.json`, the committed chain and another run of
+    with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E4.
+  * `tests/bottom_layers.rs` checks F4 on every game of `optimal.json`, the committed chain and another run of
     its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
     set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
@@ -111,7 +111,7 @@ every second line of the Java fixtures), and the comment on each says what the w
 
   A search below the root with the rule of symmetric pairs is held to the best completion that keeps their
   inequalities (an exhaustive oracle of its own, which prunes by the same bound but shares no code with the rule), which
-  it must reach; at the root that is P\* ([R3](../../../docs/theory/search-rules.md#pruning-by-prime-exchanges)).
+  it must reach; at the root that is P\* ([R2](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).
 * **The floor** (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400, a floor below P\*
   finds an optimal set, a floor at P\* or above completes with nothing found, and a floor at the root's bound or above
   ends at the first check; with the default tactics and (every ninth game) on four threads, on the matching path, and
@@ -318,17 +318,17 @@ the computations behind the statements that are not proved are in [evidence.md](
 
 | results | checks |
 |---|---|
-| P1 to P4, P10 | `src/playable.rs`, the frame solver's oracle, equals the rules on every subset of the games to 20 (the frame model's exactness, above).  The heuristics' check of the next row finds playability by the rules alone equal to peel's verdict on every set of moves of the boards to 22, and every playable set independent with its own coordinates.  The heuristics' Solvent makes the same moves with maximal factors as with every proper divisor on every game to 1000 (`heuristics/core.py`). |
-| C1 to C4 | `heuristics/evaluation/fm_relation.py`, run in heuristics/ as `../.venv/bin/python -m evaluation.fm_relation`, 85 s on one thread.  On all 2,097,152 sets of moves from {2, …, 22}, playability by the rules alone, Franklín and Moniot's condition, per = 1 for some T and peel agree, and so do independence of the family of P10, independence in both parity matroids and an odd per; 1,112 sets have a payment scheme and are dependent, the smallest {6, 10, 15}, and none is an odd core.  The heaviest sets of the three kinds give opt(n), the parity bound and the Franklín–Moniot bound, the prover's values on every board to 22.  On 18,200 random sets of the boards 30 to 120, grown around members of three or more primes, the same holds, with 500 odd cores and 570 dependent sets with a scheme.  Board 44 has no odd core of at most six members, and board 45 one, {12, 18, 20, 30, 45}. |
+| P1 to P4, P10, P11 | `src/playable.rs`, the frame solver's oracle, equals the rules on every subset of the games to 20 (the frame model's exactness, above).  The heuristics' check of the next row finds playability by the rules alone equal to peel's verdict on every set of moves of the boards to 22, and every playable set independent with its own coordinates; no number there has three distinct primes, so it checks P11's equivalence on every set.  The heuristics' Solvent makes the same moves with maximal factors as with every proper divisor on every game to 1000 (`heuristics/core.py`). |
+| C1 to C3 | `heuristics/evaluation/fm_relation.py`, run in heuristics/ as `../.venv/bin/python -m evaluation.fm_relation`, 85 s on one thread.  On all 2,097,152 sets of moves from {2, …, 22}, playability by the rules alone, Franklín and Moniot's condition, per = 1 for some T and peel agree, and so do independence of the family of P10, independence in both parity matroids and an odd per; 1,112 sets have a payment scheme and are dependent, the smallest {6, 10, 15}, and none is an odd core.  The heaviest sets of the three kinds give opt(n), the parity bound and the Franklín–Moniot bound, the prover's values on every board to 22.  On 18,200 random sets of the boards 30 to 120, grown around members of three or more primes, the same holds, with 500 odd cores and 570 dependent sets with a scheme.  Board 44 has no odd core of at most six members, and board 45 one, {12, 18, 20, 30, 45}. |
 | N1, N6 | The prover's enumeration of optimal sets (`solver/noframe/src/bin/optsets.rs`): the sets derived at the ceiling and at the primes equal those enumerated directly on every such game to 700, and to 260 in its tests; every optimal set found holds q(n) and no other prime. |
 | N3 to N5, R4, R6 | The ledger's tests (`examples/ledger/`): from proven games, its relations bracket opt(n) on 2..1300 with every game they make legal, a bound on the wrong side is refused, and runs prove 701..712 and 901..960.  The tests of `src/search/dual.rs`: a search stopped before its first node has the root's bound, the dual bound of game 999 brackets its promotion sum and falls as the node limit grows, and another game's checkpoint is refused. |
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded game is independent in both matroids on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)). |
-| F1, F2, F4 | The census of every board 2..8191 (`examples/structure.rs`): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
-| F3 | `tests/bottom_layers.rs` (above). |
+| F1, F3, F6 | The census of every board 2..8191 (`examples/structure.rs`): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
+| F4 | `tests/bottom_layers.rs` (above). |
 | X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are those an independent descending greedy keeps (X1). |
-| E1 to E5 | `tests/model_extended.rs`, extended mode and the certificates (above), and the census's check H: Π⁺(∅) with the claims is Π_n (E3). |
-| B1, B5 | The study of the multi-field bound ([its entry](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed matroids; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
+| E1 to E6 | `tests/model_extended.rs`, extended mode and the certificates (above), and the census's check H: Π⁺(∅) with the claims is Π_n (E5). |
+| B1, B4 | The study of the multi-field bound ([its entry](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md); its programs build at commit 8753189): every promotion set of the boards with at most 22 candidates, and sampled ones of the boards 137..400, independent under the plain signing and five random signings over GF(3) of every frame, 6.4 million pairs, and 14,472 of every 25th board of 400..2175 in 4,320 signed matroids; the decomposition bound never below P\* under random multipliers at 309 roots of 2..400 and at 400..2175. |
 | B2, B3 | The GF(2) bound under bound soundness, and its free blocks under extended mode (above).  At every root of 2..1300 that is not prime the bound is at least P\*, and every promotion set of the 90 roots with at most 22 candidates is independent in both matroids ([matroid intersection bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)). |
 | R2, R3, R5, R7 | The prime exchanges and the near-repeat cut under bound soundness, the soundness harness, the floor, and the tripwires (above). |
