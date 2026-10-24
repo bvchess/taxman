@@ -1,0 +1,11 @@
+short intervals: every real x in [25, 396738) has a prime in (x, 6x/5]: yes; tightest: 31, 37 (ratio 1.1935)
+boards: 2..8191
+part 1 (one freedom without a square, none with one) fails on: none
+boards where a frame of layer 2 has freedoms (80): 8, 12-14, 18-24, 28-34, 42-54, 70-76, 78-84, 98-120, 138-144, 182-186
+boards with several frames of layer 2 (51): 12-14, 20, 28-34, 42-54, 70-76, 78-84, 114, 138-144, 182-186
+boards with no square in (n/2, n] (33): 2-3, 8, 18-24, 98-120
+boards from 36 with no prime in (n/6, n/5] (28): 42-54, 78-84, 114, 138-144; closed among them: none
+census: 8190 boards compared, frames and freedoms of layer 2 differ on: none
+on 187..8191, layer 2 is a single frame with a square, and closed: yes
+CPU seconds: 5.9
+PASS
