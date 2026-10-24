@@ -114,13 +114,13 @@ heaviest independent set that avoids x is I − x + y if y exists and w(y) > 0, 
 w(I) − w(x) + max(0, w(y)).
 
 *Proof.*  Add as many coloops of weight 0, the *dummies*, as the matroid's rank r, and truncate to rank r.  The bases of
-the result are the independent sets padded with dummies, at the same weights, so I padded is a heaviest basis B.  Let
-B′ be any basis that avoids x.  By the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in
-dependence structures", *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), some y′ ∈ B′ ∖ B makes
-both B − x + y′ and B′ − y′ + x bases.  Since B is heaviest, w(B′ − y′ + x) ≤ w(B), that is w(B′) ≤ w(B − x + y′).
-If y′ is a dummy, B − x + y′ is I − x padded, worth w(I) − w(x).  If y′ is an element, I − x + y′ is independent, so
-y exists and w(y′) ≤ w(y), and B − x + y′ is worth at most w(I) − w(x) + w(y).  Either way
-w(B′) ≤ w(I) − w(x) + max(0, w(y)), and the set named in the statement avoids x, is independent, and has that weight.  ∎
+the result are the independent sets padded with dummies, at the same weights, so I padded is a heaviest basis G.  Let
+G′ be any basis that avoids x.  By the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in
+dependence structures", *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), some y′ ∈ G′ ∖ G makes
+both G − x + y′ and G′ − y′ + x bases.  Since G is heaviest, w(G′ − y′ + x) ≤ w(G), that is w(G′) ≤ w(G − x + y′).
+If y′ is a dummy, G − x + y′ is I − x padded, worth w(I) − w(x).  If y′ is an element, I − x + y′ is independent, so
+y exists and w(y′) ≤ w(y), and G − x + y′ is worth at most w(I) − w(x) + w(y).  Either way
+w(G′) ≤ w(I) − w(x) + max(0, w(y)), and the set named in the statement avoids x, is independent, and has that weight.  ∎
 
 The prover bounds every node of its searches by W1, with the node's picks and bars ([solver/noframe/docs/proofs.md,
 "With the parity bound (to 1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).

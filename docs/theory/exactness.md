@@ -72,21 +72,21 @@ The claims lemma says four things about a claim sequence: a candidate is never c
 pays for a candidate; so the claims stay front and back moves however a set of candidates is promoted; and setup's test
 (a), made after its first claims, picks the same candidates.
 
-**Lemma X5 (the claims lemma).**  Let X be a frame numbered h, or frame h, with a claim sequence.
+**Lemma X5 (the claims lemma).**  Let W be a frame numbered h, or frame h, with a claim sequence.
 
 1. No candidate is the factor of one of its claims.
-2. If X is frame h, no candidate has the factor of one of its back claims among its maximal factors.  So for every set
+2. If W is frame h, no candidate has the factor of one of its back claims among its maximal factors.  So for every set
    L of candidates, the claims are, in order, front and back moves of frame h with L applied, and none of them takes a
    member of L.
-3. If X is a frame D numbered h ≥ 1, a factor x of D that passes test (b) passes test (a) iff no claim takes x and the
+3. If W is a frame D numbered h ≥ 1, a factor x of D that passes test (b) passes test (a) iff no claim takes x and the
    remainder of the claims, with x taken from its pool, is playable.
 
 *Proof of part 1.*  Candidates lie in frames numbered at least 1, so let h ≥ 1.  Let (s, f) be a claim, and D the frame
-of X that holds f.
+of W that holds f.
 
 * If it is a back claim, no frame of the layer below can take f on, so neither can frame h − 1, by [the take-on lemma
   (F7)](frame-model.md#the-take-on-lemma).  So f fails test (b).
-* If it is a front claim, look at the claims of X whose moves lie in D, up to (s, f), and at the instance with members
+* If it is a front claim, look at the claims of W whose moves lie in D, up to (s, f), and at the instance with members
   U\* ∩ D and pool F_D ∖ {f}.  None of those before (s, f) takes f, so they are front and back moves of that instance,
   as in X1.  If the instance were playable, it would stay playable through them (P4); but after them s lists nothing,
   since f was its only factor left and f is not in the pool.  So the instance is unplayable, and f fails test (a).
