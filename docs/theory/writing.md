@@ -32,15 +32,15 @@ steps, each a claim with its reason, so that a reader who doubts one step can re
 
 A statement holds all of its hypotheses, so that it can be quoted alone in [the table of statements](statements.md):
 never "under this section's standing hypothesis".  Each hypothesis earns its place: say what fails without it, with the
-smallest example that shows the failure.  The exclusion theorem needs separated instances, and the set {2, 4, 8} shows
-why.  Pair an example with a non-example where the line between them teaches something.
+smallest example that shows the failure.  The exclusion theorem, read on the board, needs separated sets, and the set
+{2, 4} on the board of 4 shows why.  Pair an example with a non-example where the line between them teaches something.
 
 ## 5. Give each thing one name, and the standard name where there is one
 
 Each result has a name that says what it is about, such as the ceiling lemma, and a short label: the letter of its
 file and its number there, as in N4.  The first mention of a result in a file gives its name, its label and a link
 to its heading; later mentions may use the label alone where the result is cited often, and the name where it is not.
-The three open statements keep their symbols: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and the
+The open statements that have symbols keep them: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and the
 notation table in [statements.md](statements.md) lists them; a letter that serves one proof only must not be one of
 those.  Introduce a symbol only for what the text uses again and again, and use words for the rest.
 
@@ -90,6 +90,6 @@ reader must trust to accept the result: the program's correctness, or a data fil
 
 ## 11. Give standing and evidence one home each
 
-The standing of each statement (proved, proved given another statement, certified game by game, measured, or open)
-lives in the table of statements, and the computations behind it in [evidence.md](evidence.md).  A file states and
+The standing of each statement lives in [the table of statements](statements.md#the-statements), which also defines the
+words for it, and the computations behind it in [evidence.md](evidence.md).  A file states and
 proves its results, and links those two for the rest.
