@@ -410,8 +410,8 @@ def payment_graph_21():
     )
     s = 105
     panels = [
-        ("A: a matching that cannot be extended", {(10, 2), (14, 7), (15, 3)}),
-        ("B: a perfect matching", {(10, 2), (14, 7), (21, 3), (15, 5)}),
+        ("I: a matching that cannot be extended", {(10, 2), (14, 7), (15, 3)}),
+        ("A perfect matching", {(10, 2), (14, 7), (21, 3), (15, 5)}),
     ]
     for (title, matching), cx in zip(panels, (190, 570)):
         cy = 208

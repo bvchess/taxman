@@ -49,8 +49,8 @@
 <text x="570" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">21</text>
 <circle cx="465" cy="208" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
 <text x="465" y="208" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">14</text>
-<text x="190" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">A: a matching that cannot be extended</text>
-<text x="570" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">B: a perfect matching</text>
+<text x="190" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">I: a matching that cannot be extended</text>
+<text x="570" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">A perfect matching</text>
 <text x="190" y="355" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">21: no edge left</text>
 <text x="190" y="385" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">No other edge can be added:</text>
 <text x="190" y="403" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">each shares a number or a</text>
