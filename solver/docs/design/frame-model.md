@@ -32,12 +32,74 @@ none.
 
 `frames::build_frames` numbers the frames that have freedoms by [layer](../../../docs/GLOSSARY.md#the-frame-model), from
 the front, and merges the frames of one [frame number](../../../docs/GLOSSARY.md#the-frame-model), so that a promotion
-always has one frame to go to; the README's example shows where that happens.  The glossary's [frame
-number](../../../docs/GLOSSARY.md#the-frame-model) compares the numbering with the Java's.
+always has one frame to go to; the README's example shows where that happens.  [Setup in the code](#setup-in-the-code)
+compares the numbering with the Java's.
 
 Each frame plays [Taxman Mini](../../../docs/GLOSSARY.md#the-frame-model), and is
 [winnable](../../../docs/GLOSSARY.md#the-frame-model) when some order takes every move.  The module `model` tests that
 with counters instead of searching orders, by [peel](../../../docs/GLOSSARY.md#the-game).
+
+## Setup in the code
+
+The theory defines setup's steps as operations on the board ([the frame
+model](../../../docs/theory/frame-model.md#the-frame-model)).  This section names the code of each step, and says
+where the code asks more than the theory's rules.
+
+1. `BoardFrames::new` finds the sources and the lists of who can pay for whom (`factors_of`, `composites_of`), forms the
+   frames by a union-find over the edges from each source to its factors, and orders them so that a frame comes after
+   the frames in front of it.  Then `finish_setup` simplifies them.
+2. `finish_setup` runs `remove_impossible`, descending greedy over a frame's remaining sources against its remaining
+   factors, on every frame.  Then, round after round over the frames that changed and their neighbors, `finish_frame`
+   runs `unzip`, which makes the claims, and `remove_impossible` again, until nothing changes.  The later passes of
+   `remove_impossible` keep every source (the kept-sources lemma, F6), so a frame's `swept` flag skips them.  `unzip`
+   makes back claims (`ClaimKind::Back`) in a loop over the factors, ascending, and front claims (`ClaimKind::Front`)
+   in a loop over the sources, descending, which starts again after each claim.
+3. `frames::build_frames` numbers the frames with freedoms by layer (`numbered_frames`, `layer_of`).  Number by number,
+   it collects the candidates of each frame (`promotion_candidates_of`) and then merges the frames of that number
+   (`merge`).  After the last merge it calls `finish_setup` again, since a merged frame starts with nothing found.
+   `SearchFrames` holds, for each number, the merged frame's remaining sources and factors, its claims, and the
+   candidates.
+4. `model::FrameGraph::build` reduces each frame (`Frame::reduce`) and records each number's home frame.
+
+The code's tests against the theory's:
+
+* **Test (a).**  `promotion_candidates_of` tests a frame's remaining sources against its remaining factors less x,
+  after the claims of step 2.  The claims lemma (F10, part 3) shows that this picks the candidates of the theory, which
+  tests the whole frame.
+* **Test (b).**  `promotion_candidates_of` asks whether some frame that holds a maximal factor of x can take x on
+  (`can_add_source`).  It asks once the frames of the number below are merged, so it asks the theory's question
+  whether frame h − 1 can take x on; a closed frame can take nothing on.
+* **Back claims.**  `unzip` asks that a single remaining source want f, that f cannot go forward
+  (`factor_can_go_forward`: no frame that holds a maximal factor of f can take f on), and that f has no outside move
+  (`has_outside_move_using`: no composite of f in another frame with freedoms can be taken on by f's frame).  Before
+  the merges the frames asked are frames; after them, merged frames, which can take a number on iff one of their frames
+  can.  Every factor of a frame with freedoms that has f as a maximal factor is such a composite, so every back claim
+  meets the theory's rule.
+* **Front claims.**  `unzip` asks too that f have no outside move.  The theory's rule does not need it: a front claim
+  is a front move whatever is promoted into its frame (F10).
+* **Two quirks of the Java**, kept for parity.  A frame not yet simplified counts as having freedoms (`Frame::new`),
+  and an impossible source of a frame merged away keeps a stale home that counts as an outside move
+  (`Home::MergedAway`).  Both can only make `unzip` claim less, and the theory covers every claim that meets its rules.
+  The census of the frames counts how far the second reaches (`merged_away`).
+
+**The Java's numbering.**  The Java numbered the frames breadth first from the front: 0 for those with no frame with
+freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
+numbering by layer when it is clean and its frames numbered 0 lie in one layer.  The census of every board to 8191, the
+largest the solver supports (`examples/structure.rs`; the data in
+`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`), found the two the same on every one, with
+frame h in layer 3 + h on 8,100 boards and in layer 2 + h on the 80 where the frames of layer 2 have freedoms.  The
+tests of `src/frames/` compare the two numberings on every board to 400 and on a sample to 8191.  On boards with holes
+they can differ: without 39, the board of 56 gets a frame and a frame with freedoms directly in front of it numbered
+alike by the breadth-first rule, and without 4 the board of 32 has a layer with only closed frames between two with
+freedoms.
+
+**The census** (`examples/structure.rs`) checks the theory's facts against what setup builds, on every board to 8191:
+check A the frame lemma (F1), C clean numbering (F4), D that no candidate lists a back claim's factor (F10), E that no
+candidate is a factor of frame 0, F that every candidate has a home of at least 1 (F11), G that the sources kept are
+those of a descending greedy written apart from the frames code (F6), and H that the extended problem with nothing
+open and the claims poses the frame model's problem (E3).  The theory proves all of these, so the census checks the
+code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the promotion sets:
+27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
 
 ## Promotions and the score
 

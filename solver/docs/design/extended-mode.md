@@ -4,26 +4,32 @@ Part of the [design](../DESIGN.md).
 
 The search ([search.md](search.md)) can also take the *extended problem* Π⁺(O), the problem that a certificate of U
 searches ([certificates.md](certificates.md)).  It is the frame model with a set O of the sources of three or more prime
-factors that setup keeps made optional (THEORY.md, ["The extended problem"](../../../docs/theory/extended-problem.md),
-and the corollary of Theorem M⁺; `frames::build_extended`).  Besides the candidates of the frame model, which are
-*two-sided* (out of one frame, into the one in front), it has *one-sided* candidates: the members of O and the sources
-that greedy rejected beside them, each a possible move of its *own* frame.  It is research code: the solver's own path
-never builds an extended problem, and with no one-sided candidate every piece below is what it is without them.
+factors that setup keeps made optional ([the extended
+problem](../../../docs/theory/extended-problem.md#the-extended-problem) and [the certificate theorem
+(E4)](../../../docs/theory/extended-problem.md#the-certificate-theorem);
+`frames::build_extended`).  Besides the candidates of the frame model, which are *two-sided* (out of one frame, into
+the one in front), it has *one-sided* candidates: the members of O and the sources that greedy rejected beside them,
+each a possible move of its *own* frame.  It is research code: the solver's own path never builds an extended problem,
+and with no one-sided candidate every piece below is what it is without them.
 
-*The claims of `unzip`* (THEORY.md, Lemma M5⁺).  The problem comes in two formulations, which have the same promotion
-sets (the lemma's corollary): without any claim, and, the default, with the claims of the frame model
-(`SearchFrames::claims`) that the lemma keeps.  `build_extended` gives each claim the frame, as setup forms it, of its
-source.  A frame keeps its claims if it holds no member of O ∪ R and the factor of each of its back claims passes the
-check (`frames::ClaimCheck`): it is no two-sided candidate, and no candidate has it among its maximal factors.  The
-pairs of a frame that keeps them leave the moves and the factors before the root is reduced; the freedoms and the
-candidates do not change.  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
+*The theory in the code.*  `build_extended` tests a two-sided candidate's test (b) on each frame of the layer below
+that holds a maximal factor of x, which is the theory's test on frame h − 1, since a union of frames can take x on iff
+one of them can.  `ExtendedFrames::promotable`, a plain peel of each unreduced frame with (K, L) applied, decides the
+promotion sets for the tests, which compare it with a playability oracle on the whole board (`tests/model_extended.rs`).
+`taxman certify` applies the certificate theorem, and the same-problem corollary (E5) as its rule of the same problem
+([certificates.md](certificates.md)).
+
+*The claims of `unzip`* ([the kept-claims lemma (E2)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).
+The problem comes in the theory's two formulations, which have the same promotion sets (the formulation corollary,
+E3): without any claim, and, the default, with the claims of the frame model (`SearchFrames::claims`) that the lemma
+keeps.  `build_extended` gives each claim the frame, as setup forms it, of its source, and applies the theory's check
+(`frames::ClaimCheck`).  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
 every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
 H).  `Board::extended(open, claims)` is the one place the board's claims are passed.
 
-The check matters.  A frame that holds an open source has more freedoms, and can take on composites of a claimed factor
-that Π_n could not.  At 24 with 16, 20 and 24 open, 12 becomes a candidate that lists 6, which 18 claims; taking the
-pair out anyway loses the promotion set {8, 12}, which the oracle catches.  The census counts, game by game, the
-claims that some O refuses (`m5_refused`).
+The check matters: [the kept-claims lemma](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) shows, at
+24, the promotion set that a refused claim would lose, and the oracle catches that loss.  The census counts, game by
+game, the claims that some O refuses (`m5_refused`).
 
 * **The model** (`model`, "One-sided candidates").  `FrameGraph::build_extended` gives each one-sided candidate its own
   frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
