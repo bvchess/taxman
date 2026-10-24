@@ -52,8 +52,9 @@ any finder or none.  The switches `conflict_branching` and `conflict_look` have 
 which records how the search began and binds nothing, since the switches only choose which true conflict a node branches
 on ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with them on or off, those of
 the builds before them, whose bits are clear, included.  So does `near_repeat`, whose bit binds nothing either: each run
-of a search sets the cut up again from the game before, as it takes its ceiling.  A build before one of these three
-tactics refuses a checkpoint with it on, the default of each, as unknown tactics.
+of a search sets the cut up again from the game before, as it takes its ceiling.  So does `price_reuse` (bit 12), which
+only changes how the prices that rank the conflicts are made.  A build before one of these tactics refuses a checkpoint
+with it on, as unknown tactics: the default of the first three, and what a run that turns `price_reuse` on writes.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header

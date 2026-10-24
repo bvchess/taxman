@@ -36,8 +36,8 @@ use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
-    search, BranchSettings, Branching, Forgetting, Gf2Branching, NearRepeat, Prepared, SearchSpace, SearchTactics,
-    TaxSearcher, TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
+    search, BranchSettings, Branching, Forgetting, Gf2Branching, NearRepeat, Prepared, Reuse, SearchSpace,
+    SearchTactics, TaxSearcher, TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
 };
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -324,6 +324,8 @@ pub struct Config {
     /// The near-repeat cut (tactic `near_repeat`), where the game has one ([`Game::with_near_repeat`]), at the nodes
     /// where the incumbent reaches its bound.
     pub near_repeat: bool,
+    /// The reuse of the choice's prices (tactic `price_reuse`), where conflict branching chooses.
+    pub price_reuse: Option<Reuse>,
 }
 
 impl Config {
@@ -355,6 +357,7 @@ impl Config {
             conflict_look: t.conflict_look,
             gf2_words: None,
             near_repeat: t.near_repeat,
+            price_reuse: t.price_reuse.then_some(Reuse::STANDARD),
         }
     }
 }
@@ -493,6 +496,7 @@ impl<const W: usize> Game<W> {
             symmetry: cfg.symmetry.then(|| self.symmetries()).filter(|pairs| !pairs.is_empty()),
             // As a search has it: with the tactic, and cutting where the incumbent reaches the bound.
             near_repeat: cfg.near_repeat.then_some(&self.near),
+            price_reuse: cfg.price_reuse,
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,

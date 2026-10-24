@@ -86,6 +86,8 @@
 //!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
 //! * `near_repeat`: [`NearRepeat`], the setup of the near-repeat cut and its checks at a node.
+//! * `price_memo`: [`Reuse`], when the tactic `price_reuse` lets a choice of the conflict take the prices it made
+//!   before, and the memo that keeps them.
 //! * `profile`: [`SearchProfile`], the profile of a search (`taxman solve --profile`): its tree of tagged nodes, the
 //!   searchers' counts, its file.
 //! * here: [`search`], which starts or resumes the engine on a prepared game, and [`search_above`], the same from a
@@ -104,6 +106,8 @@ mod hooks;
 mod incumbent;
 pub mod lagrange;
 mod near_repeat;
+mod price_memo;
+pub use price_memo::Reuse;
 mod profile;
 mod refine;
 mod searcher;

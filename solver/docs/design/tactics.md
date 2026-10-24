@@ -13,7 +13,7 @@ below), but for the three that set how the nogoods are kept.  A test (`tests/doc
 tactics of `tactics::Tactics`, in order, with their defaults.  Two of them, `conflict_branching` and `conflict_look`,
 only choose how a node branches: a checkpoint records them but does not bind them, and a lab may switch them while a
 search runs ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs) lists which tactics may change, and why the
-others may not).  A checkpoint does not bind `near_repeat` either, since each run of a search sets its cut up again.
+others may not).  A checkpoint does not bind `near_repeat` either, since each run of a search sets its cut up again, nor `price_reuse`, which only changes how the prices that rank the conflicts are made.
 
 | tactic | default | status | effect |
 |---|---|---|---|
@@ -38,6 +38,7 @@ others may not).  A checkpoint does not bind `near_repeat` either, since each ru
 | `conflict_branching` | on | proven (every completion leaves out a member of any conflict; the conflicts it makes are conflicts by docs/THEORY.md's Theorems 3, 4 and M) | with `gf2`, where a check's gap is at least 300, branch on the conflict of the heaviest set whose members cost the bound most to leave out, instead of the smallest the search knows ([search.md, "Conflict branching"](search.md#conflict-branching)); on the whole games 4050 and 4176, on one thread, a fifth of the steps and a quarter of the CPU |
 | `conflict_look` | on | proven (as `conflict_branching`: it only chooses between two true conflicts of a node, and leaves the node's state as it found it) | with `conflict_branching`, where a check would branch on a conflict other than the search's own, look first at the last child of the search's own conflict, and branch on the search's own conflict if that child is cut on sight ([search.md, "Conflict branching"](search.md#conflict-branching), the paragraphs on the look); on the units of the games near 4900, 0.61 to 0.87 of the steps; `off` branches on the conflict chosen with no look |
 | `near_repeat` | on | proven (docs/theory/ledger.md, Lemma R, given a proven bound of the earlier game's best promotion sum; the solver takes it only from a game that assumes nothing) | cut a node whose completions are all promotion sets of the game of n − 1, once that game is concluded and proven (with the search's go, or while it runs) and the incumbent reaches its best promotion sum ([search.md, "The near-repeat cut"](search.md#the-near-repeat-cut)); it ends many searches of the games that pose nearly the problem of the game before at their first step |
+| `price_reuse` | off | proven (as `conflict_branching`: the prices only rank true conflicts of a node, so any ranking keeps the search exact) | with `conflict_branching`, keep the prices of a node's members that the choice of the conflict makes, take them again at the node's later checks and at its descendants' first checks, and make only the prices a check lacks; on the 315 units of games 4920-4949 it takes 0.82 (hard games) and 0.86 (easy games) of the CPU, and 0.91 of the steps ([price-reuse.md](price-reuse.md)) |
 | `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of each seed (the game of n − 1, the bounds store's game of n) that are still promotable |
 
@@ -55,7 +56,7 @@ taking no part in the search; and a promoted number paying tax only from the fra
 **Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from
 the defaults (such as `lagrange=on,gf2=off`), and `tactic_switches`, every tactic's value.  A line of a build before
 `gf2` has no such key, and ran the matching path.  A checkpoint records the search tactics, and is refused when they
-differ, but for `conflict_branching`, `conflict_look` and `near_repeat`: the error names each tactic that differs, and
+differ, but for `conflict_branching`, `conflict_look`, `near_repeat` and `price_reuse`: the error names each tactic that differs, and
 the `--tactic` flags that resume it.
 
 *The tactics removed.*  The [notebook](../../notebook/README.md) has what each tactic was worth and the order they were

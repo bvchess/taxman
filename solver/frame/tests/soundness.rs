@@ -32,7 +32,7 @@ use taxman::numtheory::Tables;
 use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
 use taxman::search::TaxUnit;
-use taxman::search::{search, Gf2Branching, SearchTactics};
+use taxman::search::{search, Gf2Branching, Reuse, SearchTactics};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
 /// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to 18),
@@ -44,7 +44,9 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
 /// look, on one thread and on two (44 and 45), then the GF(2) bound and the matching path without the near-repeat cut
 /// (46 and 47; tactic `near_repeat`, which the others have, and which acts where a game has the cut of a game before
-/// it, [`game_after`], and the incumbent reaches its bound).  The matching path with the forgetting of nogoods at the
+/// it, [`game_after`], and the incumbent reaches its bound), then conflict branching at every check with the reuse of
+/// its prices (tactic `price_reuse`), under the standard schedule, under one that never makes the prices again, on two
+/// threads, and under one that takes none (48 to 51).  The matching path with the forgetting of nogoods at the
 /// production period, every step, every third, and never; on one thread and two; and the GF(2) bound with each way of
 /// choosing the branch, with and without the matching bound as a first check, forced members, nogoods and the
 /// Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000
@@ -54,6 +56,11 @@ use taxman::search::{search, Gf2Branching, SearchTactics};
 /// step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
+    // The schedules of `price_reuse`, with conflict branching at every check: the standard one; one that takes the
+    // prices of an earlier check however old and however far the bound has fallen, and takes the ordered conflicts of
+    // the check before; and one whose limits ask for new prices at every check but the first of a node.
+    let forever = Reuse { max_steps: u32::MAX, own_drop: u64::MAX, max_seeds: u32::MAX, seed_drop: u64::MAX };
+    let never_again = Reuse { max_steps: 1, own_drop: 0, max_seeds: 0, seed_drop: 0 };
     vec![
         base,
         Config { period: Some(1), ..base },
@@ -103,6 +110,10 @@ fn configs() -> Vec<Config> {
         Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
         Config { near_repeat: false, ..g },
         Config { near_repeat: false, ..base },
+        Config { conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
+        Config { conflict_branching: Some(0), conflict_look: false, price_reuse: Some(forever), ..g },
+        Config { conflict_branching: Some(0), price_reuse: Some(forever), threads: 2, period: Some(3), ..g },
+        Config { conflict_branching: Some(0), price_reuse: Some(never_again), ..g },
     ]
 }
 

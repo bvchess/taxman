@@ -110,6 +110,10 @@ bind it all the same: each run of a search sets its cut up again, as it takes it
 that hold nothing better than the incumbent ([search.md, "The near-repeat cut"](search.md#the-near-repeat-cut)).  So
 the run that resumes a search says whether it cuts.
 
+The reuse of prices, `price_reuse`, only changes how the prices that rank the conflicts are made, and is no lever of the lab
+either: a checkpoint records it (bit 12) and does not bind it, and the run that resumes a search says whether it reuses
+([price-reuse.md](price-reuse.md)).
+
 The policy of the nogood tables, `forget_nogoods`, `nogood_period`, `nogood_keep` and `nogood_limit`, is a cache's,
 sound whatever it says, and was free already: no checkpoint records it, and the run that resumes a search sets it.  The
 lab does not switch it during a search, since a searcher's table is its own and nothing needs it.  The tactics outside

@@ -626,6 +626,22 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         dispatch!(self, l => l.child_bound(added, child_cands))
     }
 
+    /// Where the top level is: its depth, the number of its node (given to each unit's root and each child pushed, and
+    /// kept by the node through all the steps of its loop) and its parent's, 0 for a unit's root.  A node's number
+    /// is never another's, so a caller can tell the steps of one node, and a child from its parent.
+    pub fn node_ids(&mut self) -> (usize, u64, u64) {
+        dispatch!(self, l => (l.depth, l.nodes[l.depth], l.depth.checked_sub(1).map_or(0, |d| l.nodes[d])))
+    }
+
+    /// For a top level whose prices were not made by [`prices_excluding`](Self::prices_excluding) but taken from
+    /// elsewhere: its children's pricing, which carries the shortest cycles of the level's pricing where it can, takes
+    /// the cycles of the parent's, if the level's heaviest set is the parent's less what the level promoted (a child
+    /// of a child has its grandparent's exchange graph less more elements, as a child has its parent's).  A level
+    /// whose record does not serve keeps the one it had, which a child's pricing checks before it carries from it.
+    pub fn inherit_pricing(&mut self) {
+        dispatch!(self, l => l.inherit_pricing())
+    }
+
     /// The weight split's bound on the top level without its member `x`, if the last evaluation asked for forced
     /// members and the level has a split.
     pub fn split_without(&mut self, x: u32) -> Option<i64> {
@@ -1291,6 +1307,29 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         level.loss_floor = losses.smaller;
         self.stats.certified += out.iter().filter(|b| b.is_some()).count() as u64;
+    }
+
+    fn inherit_pricing(&mut self) {
+        let d = self.depth;
+        if d == 0 {
+            return;
+        }
+        if self.priced.len() <= d {
+            self.priced.resize_with(d + 1, Priced::default);
+        }
+        let level = &self.levels[d];
+        let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
+        let (above, here) = self.priced.split_at_mut(d);
+        let (parent, mine) = (&above[d - 1], &mut here[0]);
+        if parent.node == self.nodes[d - 1]
+            && level.added.is_subset(&parent.set)
+            && parent.set - level.added == last
+            && level.live.is_subset(&parent.live)
+        {
+            (mine.node, mine.set, mine.live) = (self.nodes[d], last, level.live);
+            mine.cycles.clone_from(&parent.cycles);
+            mine.elems.clone_from(&parent.elems);
+        }
     }
 
     fn keep_certified(&mut self, x: u32) {

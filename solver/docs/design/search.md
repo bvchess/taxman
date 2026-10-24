@@ -265,7 +265,8 @@ subtrees against the node's, if a subtree grows tenfold for every 291 points of 
 lightest.  Prices come off the exchange graph of `I*`, as strong branching reads them (`Gf2Bound::prices_excluding`),
 for the members that a failing frame's conflict can hold (`FrameGraph::conflict_members`); the others take the weight
 split's estimate.  A child that inherits its parent's heaviest set takes most of its prices from its parent's pricing
-with no search ([gf2-bound.md](gf2-bound.md)).  Below the gap of 300 the search's own `K` is kept, since a small
+with no search ([gf2-bound.md](gf2-bound.md)), and the tactic `price_reuse` keeps prices from check to check
+([price-reuse.md](price-reuse.md)).  Below the gap of 300 the search's own `K` is kept, since a small
 subtree does not repay the pricing.
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
@@ -313,8 +314,7 @@ own.  No node's list of known conflicts gains anything from it.  So the look may
 choice may ([lab.md](lab.md)).
 
 *What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it; on the whole
-games 3000, 3200, 3500 and 4050 it takes 0.975 of them together.  Whole games of that size have few deep nodes of large
-gap, so games of the chain decided it: on the chain, a game of 4918 to 4948 with the look took 0.79 to 0.97 of its
+games 3000, 3200, 3500 and 4050 it takes 0.975 of them together.  Games of the chain decided it: a game of 4918 to 4948 with the look took 0.79 to 0.97 of its
 neighbor's steps without it, 0.85 in geometric mean ([the live
 lab](../../notebook/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).  The measurements
 on units are in [when a node should use conflict

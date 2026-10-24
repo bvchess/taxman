@@ -22,6 +22,7 @@ use super::diagnostics::{cut, Probe};
 use super::hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 use super::lagrange::{Lagrangian, Refits};
 use super::near_repeat::NearRepeat;
+use super::price_memo::{PriceMemo, Reuse};
 use super::profile::{Branched, Made, Phase, Phases, SearchProfile, Tags};
 use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
 use super::setup::Prepared;
@@ -144,6 +145,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// unit, as it reads the branching settings, and cuts by it only where the incumbent its step read reaches the
     /// cut's bound ([`NearRepeat::reached`]).
     pub near_repeat: Option<&'a OnceLock<NearRepeat<W>>>,
+    /// With the tactic `price_reuse`, when the choice of the conflict takes the prices it made for a node of the
+    /// searcher's path at an earlier check ([`Reuse`]); `None`: it makes them at every check.
+    pub price_reuse: Option<Reuse>,
     /// The search's profile, if it keeps one ([`SearchProfile`]): each searcher counts its steps by node, and tags the
     /// nodes it makes near the root.  It observes the search and changes nothing of it.
     pub profile: Option<&'a SearchProfile>,
@@ -196,6 +200,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
                 .then(|| Symmetries::of(&prepared.model, &prepared.root, &prepared.candidates))
                 .filter(|pairs| !pairs.is_empty()),
             near_repeat: None,
+            price_reuse: tactics.price_reuse.then_some(Reuse::STANDARD),
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,
@@ -387,6 +392,9 @@ struct Stepper<'a, const W: usize> {
     known: Vec<Bits<W>>,
     /// The frames' last conflicts (see [`ConflictCache`]).
     conflict_cache: ConflictCache<W>,
+    /// With the tactic `price_reuse`, the prices of the choice of the conflict kept for the nodes of the path, and the
+    /// schedule of their reuse ([`SearchSpace::price_reuse`]).
+    price_memo: Option<(PriceMemo<W>, Reuse)>,
     /// The nogoods learned (tactic `nogoods`), and the steps taken since the table was last cleared.
     nogoods: Option<Nogoods<W>>,
     steps_since_clear: u64,
@@ -448,6 +456,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 certified: Vec::new(),
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
+                price_memo: space.price_reuse.map(|reuse| (PriceMemo::default(), reuse)),
                 nogoods: space.nogoods.then(|| {
                     let mut table = Nogoods::new(space.root_max, NOGOOD_CAPACITY);
                     table.set_limit(space.forgetting.limit);
@@ -1269,6 +1278,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
                     learning.as_mut(),
                     &mut self.known,
                     look,
+                    promoted.sum(),
+                    self.price_memo.as_mut().map(|(memo, reuse)| (memo, &*reuse)),
                 ))
             }
             (_, found) => found,
@@ -1642,20 +1653,41 @@ fn conflict_to_branch_on<const W: usize>(
     mut learning: Option<&mut Learning<'_, W>>,
     known: &mut Vec<Bits<W>>,
     look: Option<Look<'_, W>>,
+    promoted_sum: u64,
+    mut memo: Option<(&mut PriceMemo<W>, &Reuse)>,
 ) -> Bits<W> {
     let members: Vec<u32> = eval.chosen.iter().collect();
     let exact: Vec<u32> = (model.conflict_members(scratch, state, &eval.chosen) | k0).iter().collect();
-    let mut bounds = Vec::new();
-    g.prices_excluding(&exact, cap, &mut bounds);
-    let certified: std::collections::HashMap<u32, Option<u64>> = exact.into_iter().zip(bounds).collect();
+    // What leaving each member out costs the bound: priced now, or taken from the memo of the tactic `price_reuse`
+    // for the members it has priced (the others are priced now, and kept).
+    let (depth, node, parent) = g.node_ids();
+    let bound = eval.value + promoted_sum;
+    let mut taken = memo.as_mut().map(|(memo, reuse)| memo.take(depth, node, parent, bound, &eval.chosen, reuse));
+    let mut own = std::collections::HashMap::new();
+    let losses = match &mut taken {
+        Some(taken) => &mut *taken.losses,
+        None => &mut own,
+    };
+    let missing: Vec<u32> = exact.iter().copied().filter(|x| !losses.contains_key(x)).collect();
+    if missing.is_empty() {
+        // Nothing is priced here: the node's record of cycles for its children's pricing is its parent's, if that serves.
+        g.inherit_pricing();
+    } else {
+        let mut bounds = Vec::new();
+        g.prices_excluding(&missing, cap, &mut bounds);
+        for (x, bound) in missing.into_iter().zip(bounds) {
+            losses.insert(x, bound.map(|b| eval.value.saturating_sub(b)));
+        }
+    }
     let mut price = std::collections::HashMap::with_capacity(members.len());
     for &x in &members {
-        let p = match certified.get(&x).copied().flatten() {
-            Some(b) => eval.value.saturating_sub(b) as f64,
+        let p = match losses.get(&x).copied().flatten() {
+            Some(loss) => loss as f64,
             None => g.split_without(x).map_or(0.0, |b| (eval.value as i64 - b).max(0) as f64),
         };
         price.insert(x, p);
     }
+    let kept_conflicts = taken.and_then(|taken| taken.conflicts);
     let weight = |k: &Bits<W>| {
         k.iter().map(|x| 10f64.powf(-price.get(&x).copied().unwrap_or(0.0) / CONFLICT_BRANCHING_SLOPE)).sum::<f64>()
     };
@@ -1670,7 +1702,17 @@ fn conflict_to_branch_on<const W: usize>(
     }
     let mut order = members;
     order.sort_by(|a, b| price[a].total_cmp(&price[b]).then(a.cmp(b)));
-    for k in model.conflicts_ordered(scratch, state, &eval.chosen, &order) {
+    let ordered = match kept_conflicts {
+        Some(kept) => kept,
+        None => {
+            let made = model.conflicts_ordered(scratch, state, &eval.chosen, &order);
+            if let Some((memo, _)) = memo.as_mut() {
+                memo.keep_conflicts(depth, &made);
+            }
+            made
+        }
+    };
+    for k in ordered {
         let w = weight(&k);
         if w < best.0 {
             best = (w, k, true);

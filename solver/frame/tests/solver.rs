@@ -119,6 +119,8 @@ fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
             "conflict_branching=off",
             "conflict_look=off",
             "near_repeat=off",
+            "price_reuse=on",
+            "conflict_look=off,price_reuse=on",
             "lagrange=on,gf2=off",
             "lagrange=on,gf2=off,symmetry=off",
             "match_refine=0,lagrange=on,gf2=off",

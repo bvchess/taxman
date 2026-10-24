@@ -356,6 +356,87 @@ table keyed by the node, built from the earlier game's whole log, for the hard g
 the 0.33 seen takes C to 0.96 of B's CPU and saves 7% in B.  The rule of this stage (under 30% drop, over 50% go on) was
 written for a hint that could be picked; the raw share passes it and the pick fails.
 
+## 2026-10-23: price reuse in the choice (Q6)
+
+**Question.**  The choice of the conflict (Q4) is 23 to 25% of the CPU at gate 300, and a node's loop prices its members
+again at every step although a step changes the node little.  Does keeping a node's prices from one check to the next
+(the tactic `price_reuse`, off by default) cut the CPU, in the hard games and the easy, and does it make a lower gate
+pay?  **Answer.**  Yes at gate 300: on the 315 units of games 4920-4949 the tactic takes 0.82 of the CPU in the hard
+games and 0.86 in the easy, with 0.86 and 0.97 of the steps, and every one of the 14 games falls (0.72 to 0.92).  At
+gate 150 it helps too, but not past gate 300 with the tactic, so the gate stays 300.
+
+**Method.**  The tactic keeps, for the node at each depth of a searcher's path, the price of every member that the choice
+priced exactly (what leaving it out costs the bound); a later check of the node, and the first check of a child down to
+a number of generations, takes those prices and makes only the missing ones; the ordered conflicts of the check before
+are taken too, those still within the heaviest set ([price-reuse.md](../../../docs/design/price-reuse.md)).  It was built as environment knobs of one build of `tune` (the units of Q3: 315
+distinct units of the 14 games, `tune solve`, one thread each, at most 8 solves at once at `nice -n 19`), with counters of
+the choice's time.  Steps are exact; CPU seconds are a thread's, and on this machine they drift with the load by tens of
+percent between runs made one after the other, so the measurements that decide are *interleaved*: each unit is solved
+under every setting back to back (B solved twice, at the start and the end: within 1%).  The final measurement is of
+the committed code, 315 units under B and under B with the tactic, and 50 of them (25 hard, 25 easy) at gate 150 with and
+without it.
+
+**What the cost is made of.**  B on the 105-unit sample: the choice is 23.7% of the CPU, of which the exact prices
+(`prices_excluding`) 13.9%, `conflicts_ordered` 5.7%.  A pricing that must search the exchange graph for each member
+costs 6.9 ms; a pricing that carries its parent's cycles costs 0.2 ms or less.  B makes 49,445 pricing calls on the
+sample, in 95 s.  In the first run with reuse (a child takes its parent's prices, with a bound within 40 and a limit of
+8 checks), 36,378 of the calls priced nothing and 13,054 still priced, at 6.9 ms and 89 s together, so the calls it
+saved had cost B about 6 s.  That run took 1.00 and 0.96 of B's CPU (hard, easy).  So taking a child's prices from its
+parent's saves little, and it can cost: a check that makes no price leaves its children's pricing without a
+parent's cycles, which is what `Gf2Bound::inherit_pricing` repairs.  The expensive prices are a node's later checks,
+whose heaviest set has changed, and the first check of a line of descendants.
+
+**Results.**  Steps and CPU relative to B, interleaved runs (hard: games 4920-4929; easy: the others):
+
+| setting | units | hard: steps, CPU | easy: steps, CPU |
+|---|---|---|---|
+| B (gate 300), second run | 92 | 1.000, 1.001 | 1.000, 0.996 |
+| reuse, a child takes its parent's prices for 1 generation | 98 | 0.990, 0.935 | 0.970, 0.913 |
+| reuse, 3 generations | 93 | 0.916, 0.878 | 0.976, 0.884 |
+| C (gate 150) | 96 | 0.578, 1.156 | 0.732, 1.225 |
+| C with reuse, 1 generation | 94 | 0.586, 0.990 | 0.745, 1.048 |
+| C with reuse, 3 generations | 92 | 0.554, 0.921 | 0.751, 1.027 |
+| reuse, 3 generations (50 units) | 50 | 0.881, 0.841 | 1.017, 0.900 |
+| reuse, 6 generations (50 units) | 50 | 0.755, 0.754 | 1.021, 0.903 |
+| reuse, 3 generations, bound may fall 150 (50 units) | 50 | 0.840, 0.816 | 0.994, 0.912 |
+| reuse, 3 generations, at most 4 checks a node (50 units) | 50 | 0.881, 0.840 | 1.017, 0.911 |
+
+The committed schedule (6 generations, a fall of the bound of 40, no limit on the checks of a node) on the final build:
+
+| setting | units | hard: steps, CPU | easy: steps, CPU |
+|---|---|---|---|
+| B (gate 300), 635,034 steps and 849 s hard, 429,628 and 797 s easy | 315 | 1.000, 1.000 | 1.000, 1.000 |
+| B with `price_reuse=on` | 315 | 0.859, 0.824 | 0.974, 0.855 |
+| B with `price_reuse=on` | 50 | 0.755, 0.754 | 1.021, 0.898 |
+| C (gate 150) | 50 | 0.536, 1.232 | 0.733, 1.184 |
+| C with `price_reuse=on` | 50 | 0.431, 0.813 | 0.744, 0.917 |
+
+Every solve completed and found the best of B's.  Steps of a unit change in either direction (the tree depends on the
+ranking), and the hard games' steps fall more because their trees are deep, so the tactic's gain in steps is less
+certain than its gain in CPU.
+
+1. **The gain is in the CPU of a step, and in a few steps.**  The choice falls from 23 to 25% of the CPU to 17 to 18%
+   (the exact prices 13 to 15% to 11%, the ordered conflicts 5.5 to 6% to 1.6 to 2%), and the steps fall by 3 to 14%.
+2. **Gate 150 stays behind gate 300 with the tactic.**  C costs 1.16 to 1.23 of B's CPU, as Q4 found; with the tactic it
+   falls to 0.81 and 0.92 of B's, against 0.75 and 0.90 for gate 300 with it.  The earlier sequential runs, which put C
+   at 0.745 of B's CPU in the hard games, were load drift: the interleaved runs do not.
+3. **The prices want to be fresh within a line, not forever.**  Never making a node's prices again (no limit on
+   generations or the bound's fall) raised the steps by 17% and the CPU to 1.01; own-step reuse alone (no parent's
+   prices) took 0.94 and 0.90; parent's prices for any number of generations and a fall of 100 took 0.97 and 0.93.
+
+**Confidence.**  High that the tactic takes less CPU than B on these units (every game, interleaved, B repeated within
+1%); medium on the size (0.82 and 0.86, with the hard games' steps varying by several percent with the schedule: 0.755
+to 0.88 on 25 units); medium-low that a whole game gains as much, since the units are subtrees of 60-second checkpoints
+(Q3).  The schedule was chosen on the units it is measured on, from five to eight settings.
+
+**Decision.**  The tactic is kept, off by default, so that the default trees and the tripwires do not change.  The
+chain turns it on with `--tactic price_reuse=on` in its run script, at the default gate of 300; a different gate is not
+worth the change.  A checkpoint written with the tactic on has its bit 12 set, which a build before the tactic refuses
+as unknown tactics; the tactic binds nothing, so a build with it resumes a checkpoint with the tactic on or off.  The
+gate is no flag of `taxman solve`: it is set by the lab's `policy` or `branching` command ([the
+lab channel](../../../docs/design/lab.md#a-policy-for-the-games-to-come), `{"command": "policy", "from": N, "gate": 150}`
+in the channel folder), and kept in `run.lab`.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -369,3 +450,5 @@ with a file a solve) and the finder run (`finder-4950.jsonl`); `cheapchoice/` ha
 `run.sh`, `check.sh` (steps with and without the log), `compare.py` (steps against the gate runs), `analyze.py` to
 `analyze4.py` with their output (`analysis*.txt`), `out/` with a result file a solve and `pm/` with the choice log of
 each.
+`reuse/` has the price-reuse runs (Q6): the runners (`run.sh`, `irun.sh` with the config files `cfg*.txt`, `final.sh`),
+`analyze.py` and `counts.py`, the id lists, the builds of `tune` of each stage, and `out/` with a result file a solve.
