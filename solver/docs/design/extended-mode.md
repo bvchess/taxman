@@ -12,12 +12,13 @@ the one in front), it has *one-sided* candidates: the members of O and the sourc
 each a possible move of its *own* frame.  It is research code: the solver's own path never builds an extended problem,
 and with no one-sided candidate every piece below is what it is without them.
 
-*The theory in the code.*  `build_extended` tests a two-sided candidate's test (b) on each frame of the layer below
-that holds a maximal factor of x, which is the theory's test on frame h − 1, since a union of frames can take x on iff
-one of them can.  `ExtendedFrames::promotable`, a plain peel of each unreduced frame with (K, L) applied, decides the
-promotion sets for the tests, which compare it with a playability oracle on the whole board (`tests/model_extended.rs`).
-`taxman certify` applies the certificate theorem, and the same-problem corollary (E6) as its rule of the same problem
-([certificates.md](certificates.md)).
+*The theory in the code.*  `build_extended` tests a two-sided candidate's test (b) on each frame of the layer below that
+holds a maximal factor of x, which is the theory's test on frame h − 1, since a union of frames can take x on iff one of
+them can.  `ExtendedFrames::promotable`, a plain peel of each unreduced frame with (K, L) applied, decides the promotion
+sets for the tests, which compare it with a playability oracle on the whole board (`tests/model_extended.rs`).
+`taxman certify` applies the certificate theorem, and [the same-problem corollary
+(E6)](../../../docs/theory/extended-problem.md#the-same-problem-corollary) as its rule of the same problem
+(certificates.md).
 
 *The claims of `unzip`* ([the kept-claims lemma (E4)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).
 The problem comes in the theory's two formulations, which have the same promotion sets (the formulation corollary,
@@ -27,7 +28,7 @@ keeps.  `build_extended` gives each claim the frame, as setup forms it, of its s
 every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
 H).  `Board::extended(open, claims)` is the one place the board's claims are passed.
 
-The check matters: [the kept-claims lemma](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) shows, at
+The check matters: the kept-claims lemma shows, at
 24, the promotion set that a refused claim would lose, and the oracle catches that loss.  The census counts, game by
 game, the claims that some O refuses (`m5_refused`).
 

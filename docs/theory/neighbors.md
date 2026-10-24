@@ -2,13 +2,13 @@
 
 Part of [the theory](../THEORY.md).
 
-Game n differs from game n − 1 by one number, and much passes between them.  The best score never falls, and never
-rises by more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the
-game before that stay playable with n added.  The proofs rest on the rules alone and two facts about primes; only one
-example below draws on the rest of the theory.  Monotonicity, the ceiling lemma and the prime formula each come with a
-construction that turns a game of one board into a game of the other, and needs of that game only that it be finished,
-not that it be optimal.  So the lower bounds carried between games are the scores of real games, which anyone can
-replay by the rules ([search-rules.md](search-rules.md#bounds-carried-between-games)); an upper bound crosses by the
+Game n differs from game n − 1 by one number, and much passes between them.  The best score never falls, and never rises
+by more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the game
+before that stay playable with n added.  The proofs rest on the rules alone and two facts about primes; only one example
+below draws on the rest of the theory.  Monotonicity, [the ceiling lemma](#the-ceiling-lemma) and the prime formula each
+come with a construction that turns a game of one board into a game of the other, and needs of that game only that it be
+finished, not that it be optimal.  So the lower bounds carried between games are the scores of real games, which anyone
+can replay by the rules ([search-rules.md](search-rules.md#bounds-carried-between-games)); an upper bound crosses by the
 inequalities alone.
 
 The words of the game (board, pot, move, tax, score, opt(n), optimal set, playable, ceiling) are the
@@ -63,8 +63,8 @@ open with 19.
 **Lemma N2 (the finished-game lemma).**  Every optimal game of n ≥ 2 is finished.  So opt(n) is the best score of a
 finished game of n.
 
-*Proof.*  An optimal game opens with q(n), by the prime lemma (N1).  It is over, since a move still left could be played
-for a higher score.  ∎
+*Proof.*  An optimal game opens with q(n), by [the prime lemma (N1)](#the-prime-lemma).  It is over, since a move still
+left could be played for a higher score.  ∎
 
 The constructions of the lemmas below take finished games to finished games.
 
@@ -119,7 +119,7 @@ in G's order, played on the board of n − 1.
    if G does not play n, plus what the added moves score.  ∎
 
 The construction needs n composite: a finished game of a prime n opens with n, so without that move it does not open
-with q(n − 1).  The prime formula (N5) exchanges n for q(n − 1) instead.
+with q(n − 1).  [The prime formula (N5)](#the-prime-formula) exchanges n for q(n − 1) instead.
 
 Game 21 is not at its ceiling: opt(20) + 21 = 124 + 21 = 145, and opt(21) = 144.  Game 22 is: opt(22) = 166 = 144 + 22.
 [The step theorem (N6)](#the-step-theorem) says what keeps 21 from its ceiling.  The construction, applied to the
@@ -159,9 +159,10 @@ so the rest of the game cannot tell them apart.
    of none, so each later move of G took a divisor other than q(p − 1) and is legal in G′, with the same tax.  The pot
    of G′ stays G's less q(p − 1).  If G ends over, so does G′, since a number with no proper divisor in a pot has none
    in any part of it.
-4. *The formula.*  An optimal game of p − 1 is finished (N2), so it opens with q(p − 1), and step 2 makes it a game of p
-   scoring opt(p − 1) + p − q(p − 1).  An optimal game of p opens with p, and step 3 makes it a game of p − 1 scoring
-   opt(p) − p + q(p − 1).  So opt(p) ≥ opt(p − 1) + p − q(p − 1) and opt(p − 1) ≥ opt(p) − p + q(p − 1).  ∎
+4. *The formula.*  An optimal game of p − 1 is finished ([N2](#finished-games)), so it opens with q(p − 1), and step 2
+   makes it a game of p scoring opt(p − 1) + p − q(p − 1).  An optimal game of p opens with p, and step 3 makes it a
+   game of p − 1 scoring opt(p) − p + q(p − 1).  So opt(p) ≥ opt(p − 1) + p − q(p − 1) and opt(p − 1) ≥ opt(p) − p + q(p
+   − 1).  ∎
 
 The solver proves a prime game by this formula, with an optimal game of p − 1, exchanged, as its optimal game.
 
@@ -178,23 +179,24 @@ At the ceiling and at a prime, the optimal sets of game n follow from those of g
 * *At a prime.*  If n = p is a prime p ≥ 3, then T ↦ (T ∖ {q(p − 1)}) ∪ {p} is a one-to-one map from the optimal sets
   of game p − 1 onto the optimal sets of game p.
 
-*Proof.*  The ceiling lemma (N4) and the prime formula (N5) give the scores; what remains is to follow the sets.
+*Proof.*  [The ceiling lemma (N4)](#the-ceiling-lemma) and [the prime formula (N5)](#the-prime-formula) give the scores;
+what remains is to follow the sets.
 
 1. *At the ceiling, an optimal set of n.*  Let S\* be an optimal set of game n.  It scores opt(n − 1) + n, more than
-   opt(n − 1), so it holds n: a set without n that is playable in game n is playable in game n − 1, by monotonicity
-   (N3), and scores at most opt(n − 1).  Then S\* ∖ {n} is playable in game n − 1, by the ceiling lemma, and scores
-   opt(n) − n = opt(n − 1): it is an optimal set of game n − 1.
+   opt(n − 1), so it holds n: a set without n that is playable in game n is playable in game n − 1, by [monotonicity
+   (N3)](#monotonicity), and scores at most opt(n − 1).  Then S\* ∖ {n} is playable in game n − 1, by the ceiling lemma,
+   and scores opt(n) − n = opt(n − 1): it is an optimal set of game n − 1.
 2. *At the ceiling, the converse.*  If T is an optimal set of game n − 1 and T ∪ {n} is playable in game n, then T ∪
    {n} scores opt(n − 1) + n = opt(n), so it is optimal.
 3. *Which games reach it.*  If game n is at its ceiling, step 1 gives an optimal set T of game n − 1 with T ∪ {n}
    playable.  Conversely, if such a T exists, T ∪ {n} is playable and scores opt(n − 1) + n, so opt(n) ≥ opt(n − 1) +
    n, and the ceiling lemma gives equality.
 4. *At a prime.*  Let T be an optimal set of game p − 1 and G an optimal game that plays it.  It opens with q(p − 1) and
-   plays no other prime (N1, N2), so the exchange of the prime formula makes it a game of p that plays (T ∖ {q(p − 1)})
-   ∪ {p} and scores opt(p − 1) + p − q(p − 1) = opt(p): an optimal set.  Conversely, an optimal game of p opens with p
-   and plays no other prime, so for its set S the exchange makes it a game of p − 1 that plays (S ∖ {p}) ∪ {q(p − 1)}
-   and scores opt(p) − p + q(p − 1) = opt(p − 1).  The two maps undo each other, since an optimal set of p − 1 holds
-   q(p − 1) and not p, and one of p holds p and not q(p − 1).  ∎
+   plays no other prime ([N1](#the-prime-lemma), [N2](#finished-games)), so the exchange of the prime formula makes it a
+   game of p that plays (T ∖ {q(p − 1)}) ∪ {p} and scores opt(p − 1) + p − q(p − 1) = opt(p): an optimal set.
+   Conversely, an optimal game of p opens with p and plays no other prime, so for its set S the exchange makes it a game
+   of p − 1 that plays (S ∖ {p}) ∪ {q(p − 1)} and scores opt(p) − p + q(p − 1) = opt(p − 1).  The two maps undo each
+   other, since an optimal set of p − 1 holds q(p − 1) and not p, and one of p holds p and not q(p − 1).  ∎
 
 The optimal set of game 21 is unique, {9, 12, 14, 15, 16, 18, 19, 20, 21}, and 22 is at its ceiling, so the optimal set
 of game 22 is that set with 22 added.  At the prime 23 the optimal set is that of 22 with 19 exchanged for 23.  Game 21

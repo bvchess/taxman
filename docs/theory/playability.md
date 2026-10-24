@@ -32,8 +32,8 @@ no two members the same factor.
 is the directed graph on the members with an edge a → b, for a ≠ b, whenever pay(a) divides b or a divides b.  The edge
 says that a must be played before b, or else b's tax would take pay(a), or a itself.
 
-*Playable instance.*  An instance is *playable* when it has a payment scheme whose precedence is acyclic.  By P2, a set
-is playable exactly when its own instance is.
+*Playable instance.*  An instance is *playable* when it has a payment scheme whose precedence is acyclic.  By
+[P2](#the-playability-theorem), a set is playable exactly when its own instance is.
 
 *Induced instance.*  A set T of members of an instance *induces* the instance with members T and the same pool, in which
 each member of T keeps its list, and T is *playable in* the instance when the instance it induces is playable.  A
@@ -74,9 +74,10 @@ injective map pay gives each x in S a maximal factor of x outside S, and the pre
    plays S and nothing else; and
 2. the order in which any game plays the members of S is a topological order of the precedence of such a map.
 
-*Proof.*  A topological order keeps each payment in the pot until its move, and once P1 gives each move a payment, the
-order of play is a topological order.  A map as in the statement is a payment scheme of S's own instance, so part 1
-gives "if" and part 2 "only if".  *Time i* is the moment just before the i-th move of the order at hand.
+*Proof.*  A topological order keeps each payment in the pot until its move, and once [P1](#the-lifting-lemma) gives each
+move a payment, the order of play is a topological order.  A map as in the statement is a payment scheme of S's own
+instance, so part 1 gives "if" and part 2 "only if".  *Time i* is the moment just before the i-th move of the order at
+hand.
 
 1. *A topological order is a game.*  Let x₁, …, x_t be a topological order of the precedence of pay, played in turn.  At
    time i, x_i is in the pot, since the taxman takes it with an earlier x_j only if x_i divides x_j, an edge x_i → x_j
@@ -97,9 +98,9 @@ precedence, which is therefore acyclic.  ∎
 
 ### The flat-cycle lemma
 
-The cycles that make a scheme fail have a special shape, which peel and the core theorem exploit.  A cycle of the
-precedence of a map pay is *flat* when its members lie in one layer and, on each of its edges a → b, pay(a) is a maximal
-factor of b.
+The cycles that make a scheme fail have a special shape, which peel and [the core theorem](#the-core-theorem) exploit.
+A cycle of the precedence of a map pay is *flat* when its members lie in one layer and, on each of its edges a → b,
+pay(a) is a maximal factor of b.
 
 **Lemma P3 (the flat-cycle lemma).**  Let pay give each member x of a finite set S of numbers ≥ 2 a maximal factor of x
 that is not in S.  Then every cycle of the precedence of pay is flat.  In particular, on each edge a → b of a cycle of
@@ -127,9 +128,9 @@ the only factor that x lists; a *back move* removes a pair (x, f) in which x is 
 
 *Peel.*  A *run of peel* makes front and back moves, one at a time and in any order, until none is left.  It *pairs
 every member* if no member is left at its end, and *stalls* otherwise.  An instance *peels completely* when a run of
-peel pairs every member; by P4 every run then does.  The instance left after some moves is their *remainder*, and its
-members and factors are *live*.  A live member lists the live factors that it listed at the start, since a factor leaves
-a list only when some member pays with it.
+peel pairs every member; by [P4](#the-peel-theorem) every run then does.  The instance left after some moves is their
+*remainder*, and its members and factors are *live*.  A live member lists the live factors that it listed at the start,
+since a factor leaves a list only when some member pays with it.
 
 *Example.*  On the board of 21, the own instance of the sources U\* = {12, 14, 15, 16, 18, 19, 20, 21} that [descending
 greedy](sources.md#descending-greedy) keeps has the pool 1 to 10: 12 lists 4 and 6, 14 lists 2 and 7, 15 lists 3 and 5,
@@ -160,10 +161,11 @@ payment scheme; and where every factor is wanted at least twice, every scheme ha
 
 1. *Soundness.*  Let a run pair x₁, …, x_t with f₁, …, f_t, in that order, and let pay(x_i) = f_i.  Each x_i lists f_i,
    and the f_i are distinct, since a factor leaves the pool when paid with; so pay is a payment scheme.  Suppose its
-   precedence has a cycle, and let x_i be the member of it paired first, with a → x_i → b on the cycle.  By P3, x_i
-   lists pay(a) and b lists f_i.  As a and b are paired after x_i, at the i-th move they and their payments are live.
-   If the move is a front move, f_i is the only live factor that x_i lists, so pay(a) = f_i, and a and x_i pay with one
-   factor.  If it is a back move, x_i is the only live member that lists f_i, yet b lists it.  Both are impossible.
+   precedence has a cycle, and let x_i be the member of it paired first, with a → x_i → b on the cycle.  By
+   [P3](#the-flat-cycle-lemma), x_i lists pay(a) and b lists f_i.  As a and b are paired after x_i, at the i-th move
+   they and their payments are live.  If the move is a front move, f_i is the only live factor that x_i lists, so pay(a)
+   = f_i, and a and x_i pay with one factor.  If it is a back move, x_i is the only live member that lists f_i, yet b
+   lists it.  Both are impossible.
 2. *Front and back moves.*  Let (x, f) be a front or back move, and pay a scheme with acyclic precedence.  No other
    member pays with f: for a front move because x lists f alone, so pay(x) = f, and for a back move because no other
    member lists f.  So pay restricted to the other members is a payment scheme of the remainder, whose precedence is the
@@ -219,7 +221,8 @@ outside T that lists a factor f which no member of T lists.  Then T ∪ {x} is p
 
 *Proof.*  Extend a payment scheme of T with acyclic precedence by pay(x) = f.  It is a payment scheme, since no member
 of T lists f and so none pays with it.  The edges among members of T are the old ones, so a cycle would pass through x,
-and by P3 the member z of T that follows x on it would list pay(x) = f.  None does, so the precedence is acyclic.  ∎
+and by [P3](#the-flat-cycle-lemma) the member z of T that follows x on it would list pay(x) = f.  None does, so the
+precedence is acyclic.  ∎
 
 ### The core theorem
 
@@ -229,12 +232,13 @@ particular, a set S ⊆ {2, …, n} is playable iff the residual of its own inst
 *Proof.*  A core puts a cycle in the precedence of every payment scheme, and a dismantling read backwards builds a
 scheme without one.
 
-1. Let T be a core.  In the instance it induces every listed factor is listed at least twice, so by P4 that instance is
-   unplayable, and so is the whole instance, in which T would be playable.
+1. Let T be a core.  In the instance it induces every listed factor is listed at least twice, so by
+   [P4](#the-peel-theorem) that instance is unplayable, and so is the whole instance, in which T would be playable.
 2. Let the residual be empty, and let x₁, …, x_t be the members in the order a dismantling deletes them: each x_i lists
-   a factor that none of x_{i+1}, …, x_t lists.  The empty set is playable, and by P6, if {x_{i+1}, …, x_t} is playable
-   in the instance, so is {x_i, …, x_t}.  So all the members are playable.
-3. The residual is empty iff there is no core, by P5, and S is playable iff its own instance is, by P2.  ∎
+   a factor that none of x_{i+1}, …, x_t lists.  The empty set is playable, and by [P6](#the-extension-lemma), if
+   {x_{i+1}, …, x_t} is playable in the instance, so is {x_i, …, x_t}.  So all the members are playable.
+3. The residual is empty iff there is no core, by [P5](#the-residual-theorem), and S is playable iff its own instance
+   is, by [P2](#the-playability-theorem).  ∎
 
 The statement about S needs no hypothesis: step 2 takes the sets {x_i, …, x_t} in S's own instance, with its pool, not
 in their own instances, whose pools can differ, as [the exclusion theorem (P8)](#the-exclusion-theorem) shows.
@@ -260,12 +264,13 @@ subset of S holds every member outside R: a search for it may keep those and cho
 
 *Proof.*  A core that survives the exclusion of E ∩ R lies in R, so it survives the exclusion of E too.
 
-1. If S ∖ (E ∩ R) is not playable in the instance, by P7 it holds a core T, which with the same lists is a core of the
-   whole instance and so lies in R by P5.  As T lies in R and avoids E ∩ R, it avoids E: T ⊆ S ∖ E.  By P7 the core T
-   makes S ∖ E unplayable, against the hypothesis.
+1. If S ∖ (E ∩ R) is not playable in the instance, by [P7](#the-core-theorem) it holds a core T, which with the same
+   lists is a core of the whole instance and so lies in R by [P5](#the-residual-theorem).  As T lies in R and avoids E ∩
+   R, it avoids E: T ⊆ S ∖ E.  By P7 the core T makes S ∖ E unplayable, against the hypothesis.
 2. Let T ⊆ S.  A member x of T lists mf(x) less S in S's own instance, and mf(x) less T in its own; both are all of
    mf(x), as no member of S is a maximal factor of x.  So the two instances of T have the same schemes and precedences,
-   and by P2 T is playable iff it is playable in S's own instance: part 2 is part 1 for that instance.
+   and by [P2](#the-playability-theorem) T is playable iff it is playable in S's own instance: part 2 is part 1 for that
+   instance.
 3. If E is an exclusion set, so is E ∩ R, by part 1 or 2, so a minimal one lies in R.  If T is a playable subset of S,
    then by part 1 or 2 so is T together with the members outside R, which is heavier unless T held them all.  ∎
 
@@ -273,8 +278,9 @@ subset of S holds every member outside R: a search for it may keep those and cho
 own instance but not of S's, so T can be playable on the board and not in S's instance.  On the board of 4, the own
 instance of S = {2, 4} has the pool {1}, in which 2 lists 1 and 4 lists nothing; dismantling deletes 2, so R = {4}.
 With E = {2}, S ∖ E = {4} is playable on the board, paying with 2, but S ∖ (E ∩ R) = S is not: whichever of 2 and 4 is
-played first takes what the other needs.  P6 read on the board fails the same way: {8} is playable, and 4 has the
-maximal factor 2, which 8 lacks, yet {4, 8} is not, since 8's only maximal factor, 4, is then a move.
+played first takes what the other needs.  [P6](#the-extension-lemma) read on the board fails the same way: {8} is
+playable, and 4 has the maximal factor 2, which 8 lacks, yet {4, 8} is not, since 8's only maximal factor, 4, is then a
+move.
 
 ## Independence
 
@@ -338,9 +344,10 @@ rows are neither upper nor lower triangular, and in the lemma's order they are u
 own coordinates over 𝔽: the vectors v(s), s in S, together with the e_s of its members s ≤ n/2, are linearly
 independent, and so are the u(s), s in S.  For a set of sources, the v(s) themselves are independent.
 
-*Proof.*  By P2 and P4 the own instance of S peels completely.  At the factors of its pool, v(s) is 1 exactly where s
-lists, so P9 applies with ρ(s) = v(s), and the members s ≤ n/2 are coordinates outside the pool; P9 (2) gives the first
-family, and the equivalence above the u(s).  Sources exceed n/2, so for them nothing is deleted and no e_s appears.  ∎
+*Proof.*  By [P2](#the-playability-theorem) and [P4](#the-peel-theorem) the own instance of S peels completely.  At the
+factors of its pool, v(s) is 1 exactly where s lists, so [P9](#the-peel-order-lemma) applies with ρ(s) = v(s), and the
+members s ≤ n/2 are coordinates outside the pool; P9 (2) gives the first family, and the equivalence above the u(s).
+Sources exceed n/2, so for them nothing is deleted and no e_s appears.  ∎
 
 By P9 the same holds with any nonzero values in place of the 1s.  The parity bound uses the case of GF(2).
 Independence lies strictly between playability and the existence of a payment scheme: [the counting theorem
@@ -376,12 +383,13 @@ its leaves.
    edges.  A multigraph with an edge and every degree even holds a cycle: a walk that never reuses an edge can leave
    every vertex it enters, until it returns to one it has visited.  Conversely, a cycle meets each vertex an even
    number of times, so its members' lists sum to 0; a loop's list is 0 by itself.
-2. *1 ⇒ 2.*  A playable instance peels completely by P4, so its lists are independent over every field, by P9.
+2. *1 ⇒ 2.*  A playable instance peels completely by [P4](#the-peel-theorem), so its lists are independent over every
+   field, by [P9](#the-peel-order-lemma).
 3. *3 ⇒ 1.*  In a forest with an edge, a tree with an edge has two leaves or more, vertices of degree 1, and at most one
    of them is the ground; so some factor is listed by one member alone, and peel has a back move.  The move leaves a
    forest, so a run of such moves pairs every member, and the instance is playable by P4.
-4. *Sets.*  By P2, S is playable iff its own instance is, whose members list at most two factors and have the lists
-   u(s); so by 1 ⇔ 2 it is playable iff the u(s) are independent.  ∎
+4. *Sets.*  By [P2](#the-playability-theorem), S is playable iff its own instance is, whose members list at most two
+   factors and have the lists u(s); so by 1 ⇔ 2 it is playable iff the u(s) are independent.  ∎
 
 On the board of 21, the cycle of four edges is a cycle of the graph: unplayable, with v(10) + v(14) + v(15) + v(21) = 0.
 The hypothesis is needed: on the board of 45, in {12, 18, 20, 30, 45}, 30 lists the three factors 6, 10 and 15, and the
@@ -402,9 +410,10 @@ independent over GF(2).  The name comes from a count: the lists are independent 
 on as many factors as members, is nonsingular over GF(2), and its determinant is, mod 2, its permanent, the number of
 payment schemes onto those factors ([the primer](primer.md#matchings-permanents-and-determinants)).
 
-Odd cores are what the independence lemma cannot see: an unplayable set S whose vectors u(s) are independent over GF(2)
-passes P10, and it holds an odd core of its own instance, a core by P7 whose lists are part of an independent family.
-These sets are [what the parity bound misses](parity-bound.md#what-the-parity-bound-misses).  By P11, a core whose
-members each list at most two factors is not odd, since it is unplayable by P7.  The first board with an odd core is 45,
-where {12, 18, 20, 30, 45} is an odd core of its own instance ([the first-odd-core proposition
+Odd cores are what [the independence lemma](#the-independence-lemma) cannot see: an unplayable set S whose vectors u(s)
+are independent over GF(2) passes P10, and it holds an odd core of its own instance, a core by [P7](#the-core-theorem)
+whose lists are part of an independent family.  These sets are [what the parity bound
+misses](parity-bound.md#what-the-parity-bound-misses).  By [P11](#the-two-factor-proposition), a core whose members each
+list at most two factors is not odd, since it is unplayable by P7.  The first board with an odd core is 45, where {12,
+18, 20, 30, 45} is an odd core of its own instance ([the first-odd-core proposition
 (C3)](franklin-moniot.md#the-first-odd-core)).

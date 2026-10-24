@@ -276,10 +276,10 @@ subtree does not repay the pricing.
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
 applied, its frame keeps a stuck set of moves, so it is not winnable ([the peel theorem
 (P4)](../../../docs/theory/playability.md#the-peel-theorem)), and a stuck set survives every larger set of promotions
-(P5), so no completion holding the whole conflict is promotable ([the exactness theorem
-(X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  `conflicts_ordered` checks each with the whole peel.
-Since it only chooses among true conflicts, the tactic may change between a search's units: a checkpoint resumes with
-it on or off, and a lab may switch it while the search runs ([lab.md](lab.md)).
+([P5](../../../docs/theory/playability.md#the-residual-theorem)), so no completion holding the whole conflict is
+promotable ([the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  `conflicts_ordered`
+checks each with the whole peel.  Since it only chooses among true conflicts, the tactic may change between a search's
+units: a checkpoint resumes with it on or off, and a lab may switch it while the search runs ([lab.md](lab.md)).
 
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
 default's steps and 0.26 and 0.27 of its CPU; a step costs more than a default one, the excess mostly in the pricing.
@@ -315,7 +315,7 @@ nothing is pushed and the workspace keeps the node's tableau; the split's bound 
 duality), so it cuts only children that the solve would cut, and the look chooses as it would with the solve.  The
 conflict that cuts the child is learned as a nogood of the root, which holds at every node, as the search learns its
 own.  No node's list of known conflicts gains anything from it.  So the look may change between a search's units, as the
-choice may ([lab.md](lab.md)).
+choice may (lab.md).
 
 *What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it; on the whole
 games 3000, 3200, 3500 and 4050 it takes 0.975 of them together.  Games of the chain decided it: a game of 4918 to 4948 with the look took 0.79 to 0.97 of its

@@ -29,7 +29,7 @@ home](sweep.md#launch-watch-stop-bring-the-results-home):
 INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=ledger MAX_PRICE=1.0
 ```
 
-Pass `--user-data file://ledger-user-data.sh` in place of the `--user-data` argument of [launch.md](launch.md#launch):
+Pass `--user-data file://ledger-user-data.sh` in place of the `--user-data` argument of launch.md:
 the file sets the timer itself, so `TIMER_MINUTES` is not needed.  `ledger-user-data.sh` is, with `COMMIT` the pushed
 master that has the ledger, `DATE` the day and `FIRST-LAST` the stretch:
 

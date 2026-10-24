@@ -69,8 +69,10 @@ facts shown by example or by a computation.  The standings are these, and the th
 * *measured*: observed on the data that [evidence.md](evidence.md) names, with no proof;
 * *open*: neither proved nor refuted; *false*: refuted by a counterexample.
 
-The theory has four open statements: statement U, the sources conjecture (S1), and the two that keep their symbols, (★)
-(S4) and (♦) (S5).  [evidence.md](evidence.md) has the computations behind every standing but *proved*, and
+The theory has four open statements: [statement U](exactness.md#statement-u), [the sources conjecture
+(S1)](sources.md#the-sources-conjecture), and the two that keep their symbols, (★)
+([S4](sources.md#the-cardinality-conjecture)) and (♦) ([S5](sources.md#the-span-conjecture)).  evidence.md has the
+computations behind every standing but *proved*, and
 [results/README.md](../../results/README.md#what-supports-the-scores) says how far the proofs of the committed chain
 reach.
 
@@ -169,7 +171,7 @@ reach.
 | label | result | statement | standing |
 |---|---|---|---|
 | W1 | [the parity bound](parity-bound.md#the-parity-bound) | a playable set is independent in both parity matroids, so the heaviest set independent in both bounds opt(n), and with picks and bars the playable sets that hold the picks and avoid the bars | proved |
-| W2 | [the barred bound](parity-bound.md#the-barred-bound) | for a number b that is not a pick of F4, if b's barred bound is at most V, every playable set that obeys F4 and weighs more than V holds b | proved |
+| W2 | [the barred bound](parity-bound.md#the-barred-bound) | for a number b that is not a pick of [F4](frame-model.md#the-bottom-layers-theorem), if b's barred bound is at most V, every playable set that obeys F4 and weighs more than V holds b | proved |
 | | [the exactness of the parity bound to 77](parity-bound.md#what-the-parity-bound-misses) | the parity bound equals opt(n) for every n ≤ 77, and exceeds it at 78 | measured |
 
 ### Franklín and Moniot's paper

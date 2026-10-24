@@ -77,7 +77,7 @@ the backstop.  Launch as [Launch](launch.md#launch) says, with `ZONE` the zone o
 INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=sweep MAX_PRICE=1.0
 ```
 
-Pass `--user-data file://sweep-user-data.sh` in place of the `--user-data` argument of [launch.md](launch.md#launch):
+Pass `--user-data file://sweep-user-data.sh` in place of the `--user-data` argument of launch.md:
 the file sets the timer itself, so `TIMER_MINUTES` is not needed.  `sweep-user-data.sh` is, with `COMMIT` the id of the
 pushed master, `HOURS` the deadline, `MINUTES` the timer (60 × (`HOURS` + 1)) and `PREFIX` the run's own prefix of the
 bucket (`sweep-FIRST-LAST`):

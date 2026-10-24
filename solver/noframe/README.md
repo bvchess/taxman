@@ -31,7 +31,7 @@ bounds, and every exact method in it is tested against brute force.  The theorem
 * [the bottom-layers theorem (F4)](../../docs/theory/frame-model.md#the-bottom-layers-theorem), the bottom layers of
   every optimal set, in the proofs that start from its roles, which is the default of `exact`.
 
-[proofs.md](docs/proofs.md) lists what each proof rests on.  This document says *pick* for a
+proofs.md lists what each proof rests on.  This document says *pick* for a
 [move](../../docs/GLOSSARY.md#the-game), *forced picks* for the numbers fixed in at a node (the frame solver's [forced
 member](../../docs/GLOSSARY.md#the-search) is the same idea for its own search), and [upper
 part](../../docs/GLOSSARY.md#the-frame-model) for a set's sources.

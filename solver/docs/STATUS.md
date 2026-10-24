@@ -8,8 +8,9 @@ chain reaches in [results/README.md](../../results/README.md), and the research 
 
 ## The priority: a larger n
 
-The end of the committed chain pushed past 5000, with the least computation.  Certifying statement U, for particular
-games or in general, is not a priority.  Nothing is published: `optimal.json` stays at 1300.
+The end of the committed chain pushed past 5000, with the least computation.  Certifying [statement
+U](../../docs/theory/exactness.md#statement-u), for particular games or in general, is not a priority.  Nothing is
+published: `optimal.json` stays at 1300.
 
 ## In flight
 

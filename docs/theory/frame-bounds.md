@@ -6,13 +6,14 @@ The frame model's promotions obey linear algebra frame by frame, as the moves of
 (W1)](parity-bound.md#the-parity-bound).  In a [frame](frame-model.md#frames), give the factors coordinates, each move
 and each number promoted into the frame a vector of its maximal factors there, with any nonzero entries, and each number
 promoted out of it its unit vector.  A promotion set makes these vectors linearly independent in every frame, over every
-field: the signed frame theorem (B1).  With every entry 1 over GF(2), the even frames and the odd frames make two
-matroids on the candidates, and their heaviest common independent set bounds the best promotion set, at the root and at
-every node of a search: the frame bound (B2).  The same holds for the extended problem (B3), whose searches make the
-certificates of [statement U](exactness.md#statement-u).  These three are load-bearing: proofs of scores rest on them.
-Two more results serve studies of stronger bounds, and no proof of a score rests on them: signed matroids join
-the frame bound through Lagrange multipliers in the decomposition bound (B4), and over GF(3) the signings together lose
-nothing that winnability keeps (the GF(3) proposition, B5, explanatory).  All five are proved.
+field: [the signed frame theorem (B1)](#the-signed-frame-theorem).  With every entry 1 over GF(2), the even frames and
+the odd frames make two matroids on the candidates, and their heaviest common independent set bounds the best promotion
+set, at the root and at every node of a search: [the frame bound (B2)](#the-frame-bound).  The same holds for the
+extended problem ([B3](#the-frame-bound-for-the-extended-problem)), whose searches make the certificates of [statement
+U](exactness.md#statement-u).  These three are load-bearing: proofs of scores rest on them.  Two more results serve
+studies of stronger bounds, and no proof of a score rests on them: signed matroids join the frame bound through Lagrange
+multipliers in [the decomposition bound (B4)](#the-decomposition-bound), and over GF(3) the signings together lose
+nothing that winnability keeps ([the GF(3) proposition, B5](#the-gf3-proposition), explanatory).  All five are proved.
 
 *Words.*  Frames, their numbering, [candidates, homes, winnable frames and promotion
 sets](frame-model.md#the-frame-model), and [nodes, completions, state(P) and the promotion
@@ -120,8 +121,8 @@ no more members than the node's promotion limit, so
     ΣX ≤ max { ΣI : I ⊆ C independent in A/P and in B/P, with no more members than the node's promotion limit }.
 
 The right side plus ΣP is the node's *frame bound*; at the root, where P is empty, it is the first right side.  By
-B1 (2), A/P and B/P are the frame matroids of state(P) on its candidates, and every candidate outside P that state(P)
-has taken out of its home is a loop of one of them.
+[B1](#the-signed-frame-theorem) (2), A/P and B/P are the frame matroids of state(P) on its candidates, and every
+candidate outside P that state(P) has taken out of its home is a loop of one of them.
 
 *Proof.*  B1 with the plain signing over GF(2) makes a promotion set's part L ∩ T_h independent in N_h, for every frame
 h.  A set is independent in a direct sum exactly when its part in each block is, and L's part in the block N_h is
@@ -181,21 +182,23 @@ candidates in C.
 
 *Proof.*
 
-1. *Each frame.*  It is the proof of B1 with the plain signing over GF(2) and one more kind of mover.  Frame h of
-   Π⁺(O) is winnable with K ∪ L applied: its instance has as members the fixed sources of the frame, which are its
-   moves, the members of K whose own frame it is, and the members of L of home h + 1, and as pool its factors less the
-   members of L of home h.  By P4 and P9 their vectors, with the unit vectors of L's members of home h, are independent,
-   so the part of K ∪ L in the block of frame h is independent modulo the moves.
+1. *Each frame.*  It is the proof of [B1](#the-signed-frame-theorem) with the plain signing over GF(2) and one more kind
+   of mover.  Frame h of Π⁺(O) is winnable with K ∪ L applied: its instance has as members the fixed sources of the
+   frame, which are its moves, the members of K whose own frame it is, and the members of L of home h + 1, and as pool
+   its factors less the members of L of home h.  By [P4](playability.md#the-peel-theorem) and
+   [P9](playability.md#the-peel-order-lemma) their vectors, with the unit vectors of L's members of home h, are
+   independent, so the part of K ∪ L in the block of frame h is independent modulo the moves.
 2. *The direct sums.*  A member of K touches no frame but its own, so in the other matroid it is a coloop, which joins
    any independent set.  So K ∪ L is independent in both direct sums: part 1.  Part 2 follows by the definition of
    contraction, as in B1, step 5.
-3. *The count.*  Let r_h be the freedoms of root frame h with P applied, and let (K ∪ L) ∖ P have x_h two-sided
-   members of home h and g_h one-sided members whose own frame is h.  Applying them to that frame adds g_h + x_{h+1}
-   moves and removes x_h factors, and it stays winnable, so it keeps at least as many factors as moves:
-   x_h + x_{h+1} + g_h ≤ r_h.  No candidate has the home 0, so x_0 = 0, and with no frame beyond the last the sequence
-   (x_h) is one of those that the promotion limit of the freedoms r_h ranges over, as in the proof of F9, part 2.  So
-   Σx_h is at most that limit, and g_h ≥ 1 only if r_h ≥ 1.  The bound at a node follows from parts 2 and 3, since a
-   completion's one-sided members are among the one-sided candidates of C.  ∎
+3. *The count.*  Let r_h be the freedoms of root frame h with P applied, and let (K ∪ L) ∖ P have x_h two-sided members
+   of home h and g_h one-sided members whose own frame is h.  Applying them to that frame adds g_h + x_{h+1} moves and
+   removes x_h factors, and it stays winnable, so it keeps at least as many factors as moves: x_h + x_{h+1} + g_h ≤ r_h.
+   No candidate has the home 0, so x_0 = 0, and with no frame beyond the last the sequence (x_h) is one of those that
+   the promotion limit of the freedoms r_h ranges over, as in the proof of
+   [F9](frame-model.md#the-promotion-limit-lemma), part 2.  So Σx_h is at most that limit, and g_h ≥ 1 only if r_h ≥ 1.
+   The bound at a node follows from parts 2 and 3, since a completion's one-sided members are among the one-sided
+   candidates of C.  ∎
 
 [The certificate theorem (E2)](extended-problem.md#the-certificate-theorem) searches Π⁺(O), and its search cuts by this
 bound ([solver/docs/design/extended-mode.md](../../solver/docs/design/extended-mode.md)).
@@ -220,17 +223,17 @@ promotions P, it holds for ΣX of every completion P ∪ X, with the contraction
 the node's promotion limit.
 
 *Proof.*  Split the weight: ΣL = (w − Σ_j λ_j)(L) + Σ_j λ_j(L ∩ T_{h_j}).  L is independent in A and B with no more
-members than the promotion limit (B2), so the first term is at most MI(w − Σ_j λ_j).  L ∩ T_{h_j} is independent in
-N_{h_j}^{σ_j} (B1), so the j-th term of the sum is at most max_j λ_j.  L holds no loop of any N_{h_j}^{σ_j} (B1 (1)), so
-leaving the loops out of the sets I keeps L among them.  At a node, the same argument runs with X in place of L, by
-B1 (2) and B2.  ∎
+members than the promotion limit ([B2](#the-frame-bound)), so the first term is at most MI(w − Σ_j λ_j).  L ∩ T_{h_j} is
+independent in N_{h_j}^{σ_j} ([B1](#the-signed-frame-theorem)), so the j-th term of the sum is at most max_j λ_j.  L
+holds no loop of any N_{h_j}^{σ_j} (B1 (1)), so leaving the loops out of the sets I keeps L among them.  At a node, the
+same argument runs with X in place of L, by B1 (2) and B2.  ∎
 
 Each term is a standard computation: MI is a weighted matroid intersection, and max_j the greedy algorithm of
 N_{h_j}^{σ_j} ([the primer](primer.md#the-greedy-algorithm-of-a-matroid)).  At λ = 0 the sum is 0 and dec(0) is the
 frame bound, so the best multipliers do at least as well.  The least value of dec over the multipliers is that of a
-linear program over the matroids' polytopes ([the primer](primer.md#weak-duality-and-lagrangian-relaxation), the
-paragraph "The best bound"), whose parts have the polytopes that [the
-primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "For matroids", describes.  That says what the
+linear program over the matroids' polytopes (the primer, the
+paragraph "The best bound"), whose parts have the polytopes that the
+primer, the paragraph "For matroids", describes.  That says what the
 bound can reach; it holds at every λ, so nothing rests on how the multipliers are found.
 [solver/docs/design/gf2-bound.md, "The decomposition
 bound"](../../solver/docs/design/gf2-bound.md#the-decomposition-bound) says how a study's code evaluates it exactly.
@@ -248,11 +251,12 @@ frame h over GF(3).
 *Proof.*  The idea: the members that a peel cannot pair list each of their remaining factors at least twice, so values
 that cancel at every such factor make the vectors dependent.
 
-1. *Only if.*  This is B1's argument, steps 1 to 3, which uses only that frame h is winnable with L applied.
+1. *Only if.*  This is [B1](#the-signed-frame-theorem)'s argument, steps 1 to 3, which uses only that frame h is
+   winnable with L applied.
 2. *The stall.*  Suppose frame h is not winnable with L applied.  Run peel on its instance (the moves and L's members of
-   home h + 1, over the pool Q_h less L's members of home h) until it stalls.  By P4 some members are left unpaired: the
-   *stalled* members, with the factors still live.  Each live factor that a stalled member lists is listed by at least
-   two of them, or peel would make a back move.
+   home h + 1, over the pool Q_h less L's members of home h) until it stalls.  By [P4](playability.md#the-peel-theorem)
+   some members are left unpaired: the *stalled* members, with the factors still live.  Each live factor that a stalled
+   member lists is listed by at least two of them, or peel would make a back move.
 3. *The signing.*  For each live factor listed by stalled members, give their incidences with it values in GF(3) that
    sum to 0: 1 and 2 for two members, 1, 1 and 1 for three, and for more, values 1 and 2 by twos with at most one triple
    of 1s.  Give every other incidence the value 1.

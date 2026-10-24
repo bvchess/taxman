@@ -210,9 +210,9 @@ at n: some optimal set plays U\*_{≥3}, the members of U\* with three or more p
 ([statement U](../../../docs/theory/exactness.md#statement-u)).  `src/bin/upper.rs` (`src/upper.rs`) asks the parity
 bound which of those members every set beating the recorded score V must play.
 
-* It fixes layers 1 and 2 as F4 says every optimal set has them: the largest prime and no other; U\*_2 among the
-  sources of layer 2; and, where U\*_2 spans every prime up to n/2, which it decides for each board, no number of layer
-  2 up to n/2.
+* It fixes layers 1 and 2 as [F4](../../../docs/theory/frame-model.md#the-bottom-layers-theorem) says every optimal set
+  has them: the largest prime and no other; U\*_2 among the sources of layer 2; and, where U\*_2 spans every prime up to
+  n/2, which it decides for each board, no number of layer 2 up to n/2.
 * It bars one member u at a time, and calls u *certified* when the bound is then at most V.  Every set that beats V
   and obeys F4 then plays u, so if opt(n) > V, every optimal set plays every certified member.
 * The members it does not certify are *open*, with the bound's margin over V.

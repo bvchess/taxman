@@ -36,7 +36,8 @@ The theory, in [the uniqueness theorem
 worth at most its target, so after a playable set P is found the search goes on: it partitions the rest of P's node by
 the first number on which a set disagrees with P.  With the target V(n) − 1, the recorded score minus one, it lists
 every playable set worth at least V(n), so every optimal set; it would stop on one worth more, refuting V(n).  The games
-at their ceiling and the prime games take their sets from the predecessor's by N6 (`derive_optimal_sets`).
+at their ceiling and the prime games take their sets from the predecessor's by
+[N6](../../../docs/theory/neighbors.md#the-step-theorem) (`derive_optimal_sets`).
 
 Optionally (`--upper fixed` / `other`) the question splits in two:
 

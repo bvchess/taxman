@@ -33,8 +33,8 @@ numbers can hold ([solver/docs/design/architecture.md](../docs/design/architectu
 dispatch").
 
 [results/README.md](../../results/README.md) gives how far the chain reaches and how each game is proven: within the
-frame model, given statement U (below, "What optimal means"), and up to a smaller n also on the whole board, by the
-prover.
+frame model, given [statement U](../../docs/theory/exactness.md#statement-u) (below, "What optimal means"), and up to a
+smaller n also on the whole board, by the prover.
 
 *What a game costs.*  Finding an optimal game can turn into a search over an enormous tree, and its cost comes in waves
 of cheap and dear games.  How fast it grows with n depends on the range.  The first 2175 games of the committed chain
@@ -356,7 +356,7 @@ reaching the ceiling ([the cost curve](../notebook/search/benchmarks-the-probe-p
 |---|---|---|
 | `optimal.json` (built in) | the table of optimal games, n ≤ 1300 | nothing but the table's word: the line records that it assumes the game optimal |
 | `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes |
-| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | statement U at the games its upper bound rests on (`rests_on`), one assumption each |
+| `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | [statement U](../../docs/theory/exactness.md#statement-u) at the games its upper bound rests on (`rests_on`), one assumption each |
 
 Of a game that several sources hold, the solver takes the committed chain's, then the store's, then the table's.  What
 it does with them:

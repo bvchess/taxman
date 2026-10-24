@@ -14,10 +14,11 @@ costs](#what-it-costs) says ([rules for every launch](launch.md#rules-for-every-
 ## What it costs
 
 **Price the lists from the plan.**  `solver/tools/certify/plan.jsonl` prices each game's certificate at a multiple of
-the plain search of its problem, by its nodes at the cost of a node in the chain's own run, and `plan.md` says how.  A
-game that repeats a search which the rule of the same problem settles costs nothing; a repeat that the rule cannot
-settle is searched like any other.  A list's thread-hours, over the threads it runs on, give its hours, at the spot
-price of the hour ([Quota, prices and spot interruptions](machine.md#quota-prices-and-spot-interruptions)).
+the plain search of its problem, by its nodes at the cost of a node in the chain's own run, and
+[`plan.md`](../../tools/certify/plan.md) says how.  A game that repeats a search which the rule of the same problem
+settles costs nothing; a repeat that the rule cannot settle is searched like any other.  A list's thread-hours, over the
+threads it runs on, give its hours, at the spot price of the hour ([Quota, prices and spot
+interruptions](machine.md#quota-prices-and-spot-interruptions)).
 
 * **Measure the overhead first.**  The multiple is the plan's guess; the certificates of eight games of 1400..2156
   took a median of 1.55 times the plain search ([one-sided candidates in the
@@ -34,7 +35,7 @@ price of the hour ([Quota, prices and spot interruptions](machine.md#quota-price
 A pilot certifies a few games of the campaign one after the other on all the threads, so that each game's time per node
 is measured cleanly, and `solver/tools/certify_pilot.py` (its header defines the quantities) compares them with the
 plan.  For each game that was searched, with N its nodes in the chain (`plan.jsonl`, `cost_nodes`) and c the cost of a
-node in its stretch of the chain (the table of eras in `plan.md`):
+node in its stretch of the chain (the table of eras in [`plan.md`](../../tools/certify/plan.md)):
 
 * **R** = the certificate's thread-seconds (`seconds_all_runs` x `threads`) / (N x c), against the plan's multiple;
 * **R_nodes** = the certificate's nodes / N, and **R_node** = its thread-microseconds per node / c, so that R = R_nodes
@@ -56,8 +57,8 @@ COUNTEREXAMPLE, and 4 for UNFINISHED: a game has no verdict yet.
   to run on another build starts with its checkpoint directory deleted.  The build is `setup.sh` with the tests skipped
   (they run on the laptop), which builds the solver and the prover for the CPU of the machine and runs its smoke checks.
 * **Inputs,** all committed: `results/strict.jsonl` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
-  prover's barred bounds), `solver/tools/certify/plan.jsonl` and `plan.md`, and the lists in
-  `solver/tools/certify/lists/`.  `certify.sh` takes them from the checkout.
+  prover's barred bounds), `solver/tools/certify/plan.jsonl` and [`plan.md`](../../tools/certify/plan.md), and the lists
+  in `solver/tools/certify/lists/`.  `certify.sh` takes them from the checkout.
 
 ## The lists
 

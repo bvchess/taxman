@@ -329,7 +329,7 @@ onto one payment set are its lozenge tilings.  Conjecture: in a region without h
 same sign, so its determinant is ± its number of schemes, and GF(p) sees it exactly when p divides that number.  The
 smallest odd core, {12, 18, 20, 30, 45} on the primes 2, 3, 5, has three schemes, all of one sign: determinant 3.  This
 would be the combinatorics of the weak Lefschetz property of monomial ideals in characteristic p, where the
-multiplication map's determinant counts lozenge tilings ([agenda-ideas.md](agenda-ideas.md); to check).  *Why it
+multiplication map's determinant counts lozenge tilings (agenda-ideas.md; to check).  *Why it
 matters:* it would say which fields to add for which cores, and why GF(3) sees so many.  *Test:* enumerate the minimal
 odd cores of three primes to 8 members (`heuristics/evaluation/fm_relation.py`'s `odd_cores`, restricted) and compare
 |determinant| with the count of schemes; then regions with holes.
@@ -347,7 +347,7 @@ certificates.
 
 **Conjecture C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is
 within one of the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets
-have one size ([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)).  The heaviest set has the size of an
+have one size (solver/noframe/docs/uniqueness.md).  The heaviest set has the size of an
 optimal set at all 361 roots of 880-1300 ([the anatomy of the
 gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1), and at 758 of the 760 searched and repeated games
 of 1301-2175 (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s

@@ -124,7 +124,7 @@ apart.  The build of the test executables comes first, in the release profile wi
 then the test executables side by side.  The release of 260e74f took 16 minutes from the launch to the start of its job,
 with the build of the examples (5 minutes), the build of the tests and the suite ([the A1
 measurement](../../notebook/search/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).  The
-suite's times on a laptop are in [solver/docs/design/testing.md](../design/testing.md).
+suite's times on a laptop are in solver/docs/design/testing.md.
 
 ## What was tested
 

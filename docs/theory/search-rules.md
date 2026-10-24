@@ -4,7 +4,7 @@ Part of [the theory](../THEORY.md).
 
 A search of the frame model looks for a heaviest promotion set of a game's root problem Π_n.  Its answer ΣU\* + P\*(Π_n)
 is opt(n) given [statement U](exactness.md#statement-u) at n, that some optimal set of n contains the sources
-U\*_{≥3} ([the corollary of U (X8)](exactness.md#statement-u)), but only if no part of the tree that the search leaves
+U\*_{≥3} (the corollary of U (X8)), but only if no part of the tree that the search leaves
 unexplored holds a heavier set.  This file defines the searches that meet that condition, [exact
 searches](#exact-searches), and proves every rule by which they may leave a part unexplored: [the state lemma
 (R1)](#the-state-lemma), [the prime-exchange theorem (R2)](#the-prime-exchange-theorem) and [the exchange-pruning lemma
@@ -21,8 +21,10 @@ C, completions and state(P) under [Searching the frame model](frame-model.md#sea
 
 Throughout, Π is a root problem of the frame model: Π_n, or Π(B) of a board B with holes ([the holes theorem
 (X9)](exactness.md#boards-with-holes)).  Of [the extended problem](extended-problem.md#the-extended-problem) Π⁺(O),
-which a certificate of U searches, the file claims the state lemma (R1), and the dual-bound and floor lemmas (R4, R5)
-with no symmetric pair; it claims nothing of R2, R3, R6 or R7 there.
+which a certificate of U searches, the file claims [the state lemma (R1)](#the-state-lemma), and the dual-bound and
+floor lemmas ([R4](#the-dual-bound-lemma), [R5](#the-floor-lemma)) with no symmetric pair; it claims nothing of
+[R2](#the-prime-exchange-theorem), [R3](#pruning-by-prime-exchanges), [R6](#the-repeat-lemma) or
+[R7](#the-near-repeat-lemma) there.
 
 A *search* of Π looks for a heaviest promotion set by exploring nodes.  At each moment it holds its *incumbent*, a value
 V that only rises: the larger of the value that it started from (a *floor*, R5) and the weight of the best promotion
@@ -61,17 +63,18 @@ pruning and the tests attack ([trust.md](../../solver/docs/design/trust.md)).
 and 28 and the factors 4, 10 and 14.  Its candidates 4, 10 and 14 have home 1, and the promotion limit is 1, so its
 promotion sets are ∅, {4}, {10} and {14}, and P\* = 14.  A search that first promotes 14 replaces the root with ({14},
 {4, 10}) and (∅, {4, 10}), and offers {14}.  The two nodes' completions are {14}, ∅, {4} and {10}, none of them
-heavier than the incumbent 14, so steps may end both, and the search completes at P\*.  The root is drawn [under the
-prime-exchange theorem](#the-prime-exchange-theorem).
+heavier than the incumbent 14, so steps may end both, and the search completes at P\*.  The root is drawn under the
+prime-exchange theorem.
 
 ## The state lemma
 
 A node's promotions matter only through the frames they leave: its state decides which of its completions can be
-promoted, and a larger set's state is built from it.  So a search may keep each node as its state, and the near-repeat
-lemma (R7) compares states.  A frame j of a state *with X applied* gains the members of X of home j + 1 as moves and
-loses those of home j as factors, as a root frame does.  In Π⁺(O) a promotion set (K, L) is written as the set K ∪ L,
-which determines it, since its one-sided members are sources and its two-sided ones factors; applying it also adds each
-one-sided member to the moves of its own frame, and state(P) is again the root frames with P applied, then reduced.
+promoted, and a larger set's state is built from it.  So a search may keep each node as its state, and [the near-repeat
+lemma (R7)](#the-near-repeat-lemma) compares states.  A frame j of a state *with X applied* gains the members of X of
+home j + 1 as moves and loses those of home j as factors, as a root frame does.  In Π⁺(O) a promotion set (K, L) is
+written as the set K ∪ L, which determines it, since its one-sided members are sources and its two-sided ones factors;
+applying it also adds each one-sided member to the moves of its own frame, and state(P) is again the root frames with P
+applied, then reduced.
 
 **Lemma R1 (the state lemma).**  Let P be a promotion set of a root problem Π, and X a set of candidates of Π outside
 P.  Then P ∪ X is a promotion set of Π exactly when every member of X is a factor of its home in state(P), and every
@@ -180,8 +183,8 @@ exchange π_{5,7}.  Gray, dashed: the closed frame.*
 itself: it exchanges frame 0's moves 14 and 21 and its factors 2 and 3, and frame 1's moves 12 and 18 and its candidates
 4 and 9, and fixes 7 and 6.  But 4 = 2² and 9 = 3², and exchanging {4} for {9} gains 5, not (3 − 2)(c₂ − c₃) = 2.
 
-The solver finds the symmetric pairs of the root and prunes by R3 ([solver/docs/design/gf2-bound.md, "Prime
-exchanges"](../../solver/docs/design/gf2-bound.md#prime-exchanges)).
+The solver finds the symmetric pairs of the root and prunes by [R3](#pruning-by-prime-exchanges)
+([solver/docs/design/gf2-bound.md, "Prime exchanges"](../../solver/docs/design/gf2-bound.md#prime-exchanges)).
 
 ## Pruning by prime exchanges
 
@@ -205,10 +208,10 @@ only.  ∎
 not see the promotion limit.  Once the root has tried 14 and goes on as (∅, {4, 10}), c₇ of its candidates is 0, and 10
 is dropped.
 
-*Non-example.*  The cuts are unsound for a search of one node's best completion, which starts from that node.  R2
-speaks of the promotion sets of Π, and the image of a completion can change a member of P or leave C.  Searched for its
-own best completion, the node (∅, {4, 10}) of game 28 would drop 10 and find {4}, though {10} is heavier: its image {14}
-is no completion of the node.
+*Non-example.*  The cuts are unsound for a search of one node's best completion, which starts from that node.
+[R2](#the-prime-exchange-theorem) speaks of the promotion sets of Π, and the image of a completion can change a member
+of P or leave C.  Searched for its own best completion, the node (∅, {4, 10}) of game 28 would drop 10 and find {4},
+though {10} is heavier: its image {14} is no completion of the node.
 
 ## The dual-bound lemma
 
@@ -237,13 +240,14 @@ answer: those no heavier than the incumbent, and those that a heavier mirror ima
    step.  The incumbent only rises, so L was heavier than it before the step too, and so a completion of an open unit.
    If the step replaced that unit, it did not give L up, since L is heavier than the incumbent and keeps the
    inequalities.  So L is a completion of a node that replaced the unit.
-3. *Part 2.*  A heaviest promotion set L\* keeps every symmetric pair's inequality (R2).  If ΣL\* > V, part 1 makes it
-   P_i ∪ X for an open unit i and some X ⊆ C_i outside P_i, so P\*(Π) = ΣP_i + ΣX ≤ ΣP_i + β_i.
+3. *Part 2.*  A heaviest promotion set L\* keeps every symmetric pair's inequality ([R2](#the-prime-exchange-theorem)).
+   If ΣL\* > V, part 1 makes it P_i ∪ X for an open unit i and some X ⊆ C_i outside P_i, so P\*(Π) = ΣP_i + ΣX ≤ ΣP_i +
+   β_i.
 4. *Part 3* is part 2 with no open unit, and a promotion set weighs at most P\*(Π).  ∎
 
-A search stopped before its first step has the dual bound max(V, the root's frame bound).  R4 and R5 use nothing of Π
-but its candidates, promotion sets and weights, which is why they hold in Π⁺(O), with the second kind left out since R2
-is not proved there.  The solver reads the dual bound from a stopped search's last checkpoint.
+A search stopped before its first step has the dual bound max(V, the root's frame bound).  R4 and [R5](#the-floor-lemma)
+use nothing of Π but its candidates, promotion sets and weights, which is why they hold in Π⁺(O), with the second kind
+left out since R2 is not proved there.  The solver reads the dual bound from a stopped search's last checkpoint.
 
 ## The floor lemma
 
@@ -256,7 +260,8 @@ with no promotion set behind it.
 1. If the search completes having found no promotion set heavier than V₀, then P\*(Π) ≤ V₀.
 2. Each promotion set that raises the incumbent is worth more than V₀, and if the search completes having found one,
    the last one found is worth P\*(Π).
-3. If a limit stops the search, R4 holds with its incumbent, the larger of V₀ and the weight of the heaviest set found.
+3. If a limit stops the search, [R4](#the-dual-bound-lemma) holds with its incumbent, the larger of V₀ and the weight of
+   the heaviest set found.
 
 *Proof.*  Exactness speaks only of the incumbent's value, so R4 applies.  The incumbent rises from V₀, and only a
 heavier set raises it, so the last set that raised it is worth the final incumbent V.  If the search completes, R4
@@ -281,10 +286,11 @@ problem of the game.  Below, U\*(n) is the set U\* of board n, and the game of n
 2. Given U at n, opt(n) − ΣU\*(n) ≤ opt(m) − ΣU\*(m).
 3. Given U at n, if the game of m made from a promotion set L is optimal, so is the game of n made from L.
 
-*Proof.*  X7 and X8 hold for every root problem of a game, since all of a game's root problems have the same promotion
-sets and the same P\*.  Part 1 is X7 at n.  Equal problems have the same promotion sets, so P\*(Π) = P\*(Π′).  By X8 at
-m, ΣU\*(m) + P\*(Π′) ≤ opt(m), and given U at n, opt(n) = ΣU\*(n) + P\*(Π), by X8 at n; together these give part 2.
-For part 3, opt(m) = ΣU\*(m) + ΣL and part 2 give opt(n) ≤ ΣU\*(n) + ΣL, which the game of n made from L scores by part
+*Proof.*  X7 and [X8](exactness.md#statement-u) hold for every root problem of a game, since all of a game's root
+problems have the same promotion sets and the same P\*.  Part 1 is X7 at n.  Equal problems have the same promotion
+sets, so P\*(Π) = P\*(Π′).  By X8 at m, ΣU\*(m) + P\*(Π′) ≤ opt(m), and given U at n, opt(n) = ΣU\*(n) + P\*(Π), by X8
+at n; together these give part 2.  For part 3, opt(m) = ΣU\*(m) + ΣL and part 2 give opt(n) ≤ ΣU\*(n) + ΣL, which the
+game of n made from L scores by part
 1.  ∎
 
 Given U at m as well, part 2 is an equality.  Part 3 asks only that m's game made from L be optimal, however that was
@@ -323,8 +329,8 @@ search of Π_n.  Suppose that
 Then every completion of the node is a promotion set of Π_m, and so is worth at most Z.  If the incumbent is worth at
 least Z, an exact search may end the node (the first kind).
 
-*Proof.*  By the state lemma it is enough to compare the two states on the frames that C touches, and there a winning
-order of n's frame, kept to m's moves, wins m's frame.
+*Proof.*  By [the state lemma](#the-state-lemma) it is enough to compare the two states on the frames that C touches,
+and there a winning order of n's frame, kept to m's moves, wins m's frame.
 
 1. *Two facts suffice.*  Let P ∪ X be a completion, X ⊆ C.  By R1 in Π_n, each member of X is a factor of its home h
    in state_n(P), and each frame of state_n(P) is winnable with X applied.  By conditions 1 and 2, X is a set of
@@ -333,7 +339,7 @@ order of n's frame, kept to m's moves, wins m's frame.
 2. *Each member x of X is a factor of its home h in state_m(P).*  The set C touches frame h, and x is in F^n and in C,
    so condition 3 puts x in F^m.
 3. *A frame that X does not touch* is as state_m(P) has it, and winnable, since P is a promotion set of Π_m and
-   reducing keeps a frame winnable (F8).
+   reducing keeps a frame winnable ([F8](frame-model.md#the-reduction-lemma)).
 4. *A frame j that X touches* is touched by C too.  Let X_in be the members of X of home j + 1, which become moves of
    frame j, and X_out those of home j, which leave its factors.  Some order wins n's frame, the moves Y^n ∪ X_in against
    the factors F^n less X_out.  Keep in it only the moves Y^m ∪ X_in, all of them in n's frame since Y^m ⊆ Y^n.
@@ -346,20 +352,20 @@ order of n's frame, kept to m's moves, wins m's frame.
 So P ∪ X is a promotion set of Π_m, and Σ(P ∪ X) ≤ P\*(Π_m) ≤ Z.  ∎
 
 *What it rests on.*  The proof compares the two problems' frames, candidates and homes, and nothing else: it needs no
-statement U, and a completion is worth the sum of its members in either game.  So any root problem whose P\* has a
-proven bound can stand in for Π_m, that of a board with holes say; the one-sided candidates of [the extended
-problem](extended-problem.md#the-extended-problem) are not treated.  The incumbent may be a floor (R5).  An answer that
-uses the lemma rests on what Z rests on.  If Z is P\*(Π_m) as a completed search of the same problem proved it, the
-lemma adds nothing.  If Z is hi(m) − ΣU\*(m), for an upper bound hi(m) on opt(m) such as m's optimal score, then Z ≥
-P\*(Π_m) by X8, and the answer rests on m's upper bound too: on what m's proof assumes, and on U at the games that bound
-came through.
+[statement U](exactness.md#statement-u), and a completion is worth the sum of its members in either game.  So any root
+problem whose P\* has a proven bound can stand in for Π_m, that of a board with holes say; the one-sided candidates of
+[the extended problem](extended-problem.md#the-extended-problem) are not treated.  The incumbent may be a floor
+([R5](#the-floor-lemma)).  An answer that uses the lemma rests on what Z rests on.  If Z is P\*(Π_m) as a completed
+search of the same problem proved it, the lemma adds nothing.  If Z is hi(m) − ΣU\*(m), for an upper bound hi(m) on
+opt(m) such as m's optimal score, then Z ≥ P\*(Π_m) by X8, and the answer rests on m's upper bound too: on what m's
+proof assumes, and on U at the games that bound came through.
 
 *Why each condition is needed.*  In the examples below, every condition holds but the one named, and the conclusion
 fails.
 
 * *Candidates of Π_m.*  The bound Z covers only the promotion sets of Π_m, which are sets of its candidates, and
   winnable frames do not make a number a candidate: at n = 98 the frames stay winnable with 22 promoted, but 22 is no
-  candidate, and U\* ∪ {22} is not playable (X7).
+  candidate, and U\* ∪ {22} is not playable ([X7](exactness.md#the-exactness-theorem)).
 * *The same home.*  A promoted number leaves its home for the frame in front of it; with another home in Π_m it would
   change frames that condition 3 does not compare.  P's members need no such check: condition 2 and the state carry
   what P does in Π_m.
@@ -386,31 +392,33 @@ cut"](../../solver/docs/design/search.md#the-near-repeat-cut)).
 
 ## Bounds carried between games
 
-The lemmas of [neighbors.md](neighbors.md) and the repeat lemma carry bounds on opt(n) between games, both ways: a
-computation can keep a lower bound lo(n) and an upper bound hi(n) for many games at once, and prove a game when they
-meet.  The two kinds of bound rest on different things.
+The lemmas of [neighbors.md](neighbors.md) and [the repeat lemma](#the-repeat-lemma) carry bounds on opt(n) between
+games, both ways: a computation can keep a lower bound lo(n) and an upper bound hi(n) for many games at once, and prove
+a game when they meet.  The two kinds of bound rest on different things.
 
 *Lower bounds are games.*  Each lo(n) is the score of a [finished](neighbors.md#finished-games) game of n, legal, over
 and opening with [q(n)](statements.md#notation), that a replay has checked, so lo(n) ≤ opt(n) rests on the replay
-alone.  Every optimal game is finished ([the finished-game lemma (N2)](neighbors.md#finished-games)), so such bounds can
+alone.  Every optimal game is finished (the finished-game lemma (N2)), so such bounds can
 reach opt(n).  They cross between games by constructions, each counted once a replay finds its game finished:
 
 * [monotonicity (N3)](neighbors.md#monotonicity) extends a finished game of n − 1 to one of a composite n;
-* the ceiling lemma (N4) cuts a finished game of a composite n down to one of n − 1 that loses at most n;
+* [the ceiling lemma (N4)](neighbors.md#the-ceiling-lemma) cuts a finished game of a composite n down to one of n − 1
+  that loses at most n;
 * [the prime formula (N5)](neighbors.md#the-prime-formula) exchanges the first move between a prime p and p − 1, both
   ways;
 * the repeat lemma (R6) carries a promotion set L from the game of m made from L to the game of n made from L, played on
   with legal moves until it is over.
 
-*Upper bounds rest on the frame model.*  Each hi(n) starts from a bound on P\*(Π_m) at some game m: the root's frame
-bound (B2), a dual bound (R4), the value of a completed search (R4), or a floor under which a search completed having
-found nothing (R5).  Each holds without statement U, but for one case: a search that ended nodes by the near-repeat
-lemma with Z = hi(m′) − ΣU\*(m′), for an earlier game m′, rests on what hi(m′) rests on (R7).  ΣU\*(m) + P\*(Π_m) is
-opt(m) given U at m (X8).  An upper bound passes from n − 1 to n by adding n (N4), from n to n − 1 unchanged (N3),
-between p − 1 and a prime p by adding or taking away p − q(p − 1) (N5), and from m to n by taking away ΣU\*(m) and
-adding ΣU\*(n) when root problems of n and m are equal (R6).  All of these passages hold without U but the last, which needs U at n.  So hi(n)
-≥ opt(n) rests on U at the game where its bound was made, at every game that a repeat carried it to, and at the games
-behind any hi(m′) that the near-repeat lemma used.
+*Upper bounds rest on the frame model.*  Each hi(n) starts from a bound on P\*(Π_m) at some game m: the root's [frame
+bound (B2)](frame-bounds.md#the-frame-bound), a dual bound ([R4](#the-dual-bound-lemma)), the value of a completed
+search (R4), or a floor under which a search completed having found nothing ([R5](#the-floor-lemma)).  Each holds
+without [statement U](exactness.md#statement-u), but for one case: a search that ended nodes by [the near-repeat
+lemma](#the-near-repeat-lemma) with Z = hi(m′) − ΣU\*(m′), for an earlier game m′, rests on what hi(m′) rests on (R7).
+ΣU\*(m) + P\*(Π_m) is opt(m) given U at m (X8).  An upper bound passes from n − 1 to n by adding n (N4), from n to n − 1
+unchanged (N3), between p − 1 and a prime p by adding or taking away p − q(p − 1) (N5), and from m to n by taking away
+ΣU\*(m) and adding ΣU\*(n) when root problems of n and m are equal (R6).  All of these passages hold without U but the
+last, which needs U at n.  So hi(n) ≥ opt(n) rests on U at the game where its bound was made, at every game that a
+repeat carried it to, and at the games behind any hi(m′) that the near-repeat lemma used.
 
 So a game whose bounds meet is proven within the frame model, given U at the games its upper bound came through.  A
 lower bound above an upper bound would be a bug, or a counterexample to U at one of those games: the lower bound is the

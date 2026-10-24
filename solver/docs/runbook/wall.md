@@ -125,7 +125,7 @@ sets the capacity to 1, which starts the first machine.  Each machine runs `setu
 ([build-cache.md](build-cache.md)) it builds nothing, and every machine of the run, the replacements after an
 interruption included, takes the same binary.  Without them it builds the solver (a few minutes on 64 vCPUs, untested,
 nothing stored).  Two settings in the environment of `launch`, `RELEASE_TESTS` and `REQUIRE_CACHED`, go into the config
-for `setup.sh` on each machine ([build-cache.md](build-cache.md)); neither is on by default.
+for `setup.sh` on each machine (build-cache.md); neither is on by default.
 
 * **Release first,** once for the commit on the CPU of the run (any `c8g` will do: the key is the CPU, not the size).
   Either run `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` on one machine, as [The release: the suite, then the
@@ -263,7 +263,8 @@ solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "
   searches the game after it from it, with its ceiling and seed.  The games the store has not proven still help: the
   lower bound's game seeds the search, and the upper bound stops it, which can shorten the game that sets the wall (the
   wall is then a game whose store bounds leave a gap, or that the store lacks).
-* **What the lines assume.**  A game that rests on the store assumes statement U at the boards its upper bound rests on
+* **What the lines assume.**  A game that rests on the store assumes [statement
+  U](../../../docs/theory/exactness.md#statement-u) at the boards its upper bound rests on
   (`"statement U holds at n=B"`), and so do the games that rest on it, by the ceiling or the prime formula.  The results
   are therefore not "assumptions: none" past the first proven board of the store, and `verify.sh` counts them.
 * **Both referees check the file against the same files.**  `taxman verify-results` and `solver/tools/check_results.py`

@@ -11,6 +11,6 @@ run.  These two scripts launch a run and read it.
 | `events.py` | `solver/tools/ledger/events.py DIR [CHAIN.jsonl]` | what a run spent its time on, beyond the report: setup, maps and searches, stopped searches and their dual bounds, the finder's runs and the games that seeded the searches, the searches by whether n − 1 and n + 1 were proven when they began, the relations' changes by rule, the main thread's busy time, the CPU over the run's wall time; with the chain's results file over the same stretch, its seconds beside |
 
 `cloud.sh` needs the release `ledger` example, which `solver/tools/cloud/setup.sh` builds (or takes from the build
-cache: solver/docs/runbook/build-cache.md); on a laptop, `LEDGER_BIN=solver/frame/target/debug/examples/ledger` names
-the non-release build that `cargo build --profile test --example ledger --bin taxman` makes in `solver/frame` (opt-level
-2, debug assertions on).
+cache: [solver/docs/runbook/build-cache.md](../../docs/runbook/build-cache.md)); on a laptop,
+`LEDGER_BIN=solver/frame/target/debug/examples/ledger` names the non-release build that
+`cargo build --profile test --example ledger --bin taxman` makes in `solver/frame` (opt-level 2, debug assertions on).

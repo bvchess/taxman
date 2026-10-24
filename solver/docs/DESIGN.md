@@ -55,7 +55,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | the engine, the per-game pipeline | [engine.md](design/engine.md) | change how the threads share a search, how one game goes from its board to its result, or the window of games in flight |
 | results and the trust model | [trust.md](design/trust.md) | see why a result can be trusted: what a window changes, past limits, known games, the ledger |
 | same search | [same-search.md](design/same-search.md) | see why a game whose search problem an earlier game posed needs no search |
-| certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of statement U |
+| certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of [statement U](../../docs/theory/exactness.md#statement-u) |
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
 | performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |

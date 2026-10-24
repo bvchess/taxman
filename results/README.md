@@ -1,11 +1,11 @@
 # Results of the solver
 
 This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
-the games at the chain's end and past it, and the certificates of statement U.  This page says what each file holds,
-how far it reaches, how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the
-terms; [the frame model](../docs/theory/frame-model.md#the-frame-model) and [statement
-U](../docs/theory/exactness.md#statement-u), on which the frame solver's scores rest, are defined in the theory, and the
-prover in [its README](../solver/noframe/README.md).
+the games at the chain's end and past it, and the certificates of [statement
+U](../docs/theory/exactness.md#statement-u).  This page says what each file holds, how far it reaches, how it was made
+and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; [the frame
+model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame solver's scores rest, are
+defined in the theory, and the prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
@@ -18,7 +18,7 @@ counts on this page are pinned by `tests/results.rs`, so changing a file means u
 | `strict.jsonl` | the committed chain: an optimal game for every n, each built from the one before | 1–4949 | six runs of `taxman solve` ([below](#strictjsonl)) |
 | `optimal.json` | the table of optimal games, built into the frame solver | 1–1300 | the Java solver for 1–1000, the chain for 1001–1300 ([below](#optimaljson)) |
 | `bounds.jsonl` | the bounds store: bounds on opt(n) for the games from 3915 on, one line a bound | 3915–8191 | the ledger's exports ([below](#boundsjsonl)) |
-| `certificates/` | certificates of statement U | 600–1300 | `taxman certify` ([below](#certificates)) |
+| `certificates/` | certificates of [statement U](../docs/theory/exactness.md#statement-u) | 600–1300 | `taxman certify` ([below](#certificates)) |
 
 How far each kind of proof reaches:
 
@@ -118,9 +118,10 @@ differ from the earlier files' in these games:
 
 ## What supports the scores
 
-"Optimal" here means optimal within the frame model, given that the solver is right.  That is opt(n) wherever statement
-U holds ([DESIGN.md](../solver/docs/design/frame-model.md#what-optimal-means)), and ["The files"](#the-files), above,
-says how far each kind of proof reaches.
+"Optimal" here means optimal within the frame model, given that the solver is right.  That is opt(n) wherever [statement
+U](../docs/theory/exactness.md#statement-u) holds
+([DESIGN.md](../solver/docs/design/frame-model.md#what-optimal-means)), and ["The files"](#the-files), above, says how
+far each kind of proof reaches.
 
 Two verifiers check the files.  From the top of the repository:
 
@@ -154,10 +155,11 @@ What that evidence amounts to:
 3. **Standalone solves.**  Some games were solved again on their own, with no seed and no ceiling:
    * `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for
      every game of 1001–1231 that is not prime (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads,
-     commit e710d16; see `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`).  All of them
-     finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other game.  So
-     every game of 1001–1231 that is not prime is proven without the chain, and every prime one by the prime formula
-     from a game so proven.
+     commit e710d16; see
+     [`solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`](../solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
+     All of them finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other
+     game.  So every game of 1001–1231 that is not prime is proven without the chain, and every prime one by the prime
+     formula from a game so proven.
    * There is no such solve for 1232–1300.  Of those 69 games, 24 are proven by an exhausted search of their own, and
      the 7 proofs at the ceiling, the 9 prime ones and the 29 repeats rest on the game before them or on the game they
      repeat, so on the chain from n = 1 (see 5).
@@ -196,7 +198,7 @@ What that evidence amounts to:
      from this file and did not solve them again, and the verifiers pass the whole file.
    * n = 4548–4874: no other chain reaches here either.  The evidence is the fifth run's own ([runs.md](runs.md)),
      which took games 1–4547 from this file and did not solve them again, and the verifiers pass the whole file.
-   * n = 4875–4949: no other chain reaches here either.  The evidence is the sixth run's own ([runs.md](runs.md)),
+   * n = 4875–4949: no other chain reaches here either.  The evidence is the sixth run's own (runs.md),
      which took games 1–4874 from this file and did not solve them again, and the verifiers pass the whole file.
    * 1001–1231: the scores of `strict.jsonl`, the cost-curve study's chain (commit e710d16, 8 threads, a chain with the
      unproven tactics off) and `default.jsonl` (the earlier solver, with unproven tactics on) are equal in all 231
@@ -299,7 +301,7 @@ flag.
 | `from` | the relations | the game the bound came from |
 | `from_value` | an upper bound by a relation; a lower bound whose game is cited | the value of the upper bound of `from` it was derived from; the lower bound of `from` whose game the line carries across |
 | `bag`, `from_bag` | an upper bound by `repeat` | `in_the_bag` of `n` and of `from` |
-| `rests_on` | an upper bound | the games at which statement U is assumed, ascending |
+| `rests_on` | an upper bound | the games at which [statement U](../docs/theory/exactness.md#statement-u) is assumed, ascending |
 | `checkpoint` | a `dual` upper bound | where the checkpoint of the search that gave it is, if the export was told |
 | `source`, `date` | every line | the run (`--source`) and the day of the export, `YYYY-MM-DD` |
 | `promotions` or `moves` | a lower bound with its game | the game: the promotions it was made from, or its moves |

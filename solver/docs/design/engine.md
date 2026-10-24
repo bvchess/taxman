@@ -135,7 +135,7 @@ with the largest prime (`conclude` has already checked a game that this run made
 assume what it assumes ([trust.md](trust.md)).
 
 *Limits.*  A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the
-best game so far) and keeps its checkpoint, and a range stops there (but see "Past limits", [trust.md](trust.md)).
+best game so far) and keeps its checkpoint, and a range stops there (but see "Past limits", trust.md).
 
 *Range runs* pass each game on to the next as its game of n − 1, and resume from the results file.  The solver checks
 the file when it opens it: it replays every game, and checks the chain from n − 1 and each line's arithmetic and

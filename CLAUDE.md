@@ -1,37 +1,39 @@
 # Working notes
 
-The rules for all work on this project.  Rules for the Rust programs are in solver/CLAUDE.md.  How-to lives
-in the docs listed at the end.
+The rules for all work on this project.  Rules for the Rust programs are in [solver/CLAUDE.md](solver/CLAUDE.md).
+How-to lives in the docs listed at the end.
 
 * **Commits.**  Never cite yourself in a commit message: no `Co-Authored-By: Claude` trailer and no Claude or
   Anthropic mention, whatever a harness default says.
 * **Delegation.**  Don't write code on the main model: delegate it to subagents on the cheapest model that suits the
   task (Haiku for mechanical edits, Sonnet for routine work, Opus for hard reasoning).  Give each a precise spec and
-  verify its work before merging (solver/docs/design/testing.md).  Brief each with the files and sections its task
-  needs, never a whole long document.  Parallel agents work in their own git worktrees.  Experimental branches are never
-  pushed: harvest what works onto master, record the rest, delete the branch.
+  verify its work before merging ([solver/docs/design/testing.md](solver/docs/design/testing.md)).  Brief each with the
+  files and sections its task needs, never a whole long document.  Parallel agents work in their own git worktrees.
+  Experimental branches are never pushed: harvest what works onto master, record the rest, delete the branch.
 * **Computation.**  Heavy runs go to EC2; this laptop's load stays light.  Long runs write results as they go and
   resume after an interruption.  Prefer small, fast tests that capture the heart of a large-n problem; run large n
   only when the question needs it.
 * **Money.**  Anything that costs money or changes the AWS account needs the explicit approval of whoever owns the AWS
-  account, with a cost estimate first, and nothing is left running (solver/docs/runbook/launch.md has the rules for a
-  launch).
+  account, with a cost estimate first, and nothing is left running
+  ([solver/docs/runbook/launch.md](solver/docs/runbook/launch.md) has the rules for a launch).
 * **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
   moniot/Makefile, not edited.
 * **Branch.**  Work on master; commit and push there.
-* **Writing.**  Docs follow docs/WRITING.md.
+* **Writing.**  Docs follow [docs/WRITING.md](docs/WRITING.md).
 
 ## Where things are
 
 * **solver/frame/**: the frame solver, an exact solver in Rust.  **solver/noframe/**: the prover, a separate program
-  that shares no code with the frame solver and proves its results independently, without the frame model.  Their
-  docs, tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in solver/CLAUDE.md.
+  that shares no code with the frame solver and proves its results independently, without the frame model.  Their docs,
+  tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in
+  [solver/CLAUDE.md](solver/CLAUDE.md).
 * **results/**: the committed chain of proven games, the table of optimal games (optimal.json, built into the Rust
   frame solver), the bounds store and the certificates.
-* **docs/THEORY.md**: the theorems both programs rest on, the index of docs/theory/; **docs/GLOSSARY.md**: the terms;
-  **docs/WRITING.md**: how docs are written.
-* **A long document is a folder with an index** (docs/WRITING.md, rule 8): the old file, such as solver/docs/RUNBOOK.md,
-  says which file of its folder serves which task.  Read the index, then the one file the task needs.
+* **[docs/THEORY.md](docs/THEORY.md)**: the theorems both programs rest on, the index of docs/theory/;
+  **[docs/GLOSSARY.md](docs/GLOSSARY.md)**: the terms; **[docs/WRITING.md](docs/WRITING.md)**: how docs are written.
+* **A long document is a folder with an index** (docs/WRITING.md, rule 8): the old file, such as
+  [solver/docs/RUNBOOK.md](solver/docs/RUNBOOK.md), says which file of its folder serves which task.  Read the index,
+  then the one file the task needs.
 * **heuristics/**: Python heuristic strategies, which play good but not provably optimal games, and the tools that
   measured them.  Finished work, not under active development.
 * **moniot/**: Robert Moniot's C++ heuristic strategies (see above).

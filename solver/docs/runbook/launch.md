@@ -182,7 +182,7 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
 
 Its output is also in `~/taxman-work/logs/setup.log`.  Run it again to pick up later commits; a reboot loses nothing it
 made.  `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries into the cache
-([build-cache.md](build-cache.md)).
+(build-cache.md).
 
 ### Cost guardrails
 

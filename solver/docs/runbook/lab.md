@@ -78,12 +78,12 @@ machine's home.
 
 The chain tells a program when a game's search passes `--hook-after` seconds, and when that game ends (`--hook`, [the
 lab channel](../design/lab.md#the-hook)).  The program is `solver/tools/lab/on-event.sh`, and it starts a study: an
-agent session that follows `study.md`.  A study first estimates the work left from the game's units, and decides whether
-to steer the search through the command folder (`--lab-dir`, the lab's `channel`); the solver validates every
-command.  It steers on evidence: it solves about 40 of the game's units under the setting in force and under one or two
-candidates, and reads [the record of past searches](#the-record-of-past-searches).  Then it studies what it judges most
-likely to make the searches faster, from the standing requests to ideas of its own, and writes a report, with its
-recommendations ranked, and an entry in a journal.
+agent session that follows [`study.md`](../../tools/lab/study.md).  A study first estimates the work left from the
+game's units, and decides whether to steer the search through the command folder (`--lab-dir`, the lab's `channel`); the
+solver validates every command.  It steers on evidence: it solves about 40 of the game's units under the setting in
+force and under one or two candidates, and reads [the record of past searches](#the-record-of-past-searches).  Then it
+studies what it judges most likely to make the searches faster, from the standing requests to ideas of its own, and
+writes a report, with its recommendations ranked, and an entry in a journal.
 
 To set the branching of the games to come as well as of the game in flight, send `{"command": "policy", "from": N,
 "conflict_branching": "on", "conflict_look": "on", "gate": 150}` in the same way, with any of the three settings ([the

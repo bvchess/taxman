@@ -2,13 +2,13 @@
 
 Part of [the theory](../THEORY.md).
 
-These are the computations behind the statements that are not proved, and behind those proved by a computation: statement
-U, the three open statements about the sources, and the observations.  Each row names the statement, what was checked,
-by which program, on which input and in how long, and what one must trust to accept it.  Where the program was never
-committed, the row says *record only*: the result stands on the record of its run, and cannot be repeated.  [The table
-of statements](statements.md#the-statements) gives each one's standing.  A result proved in its file needs no evidence;
-the tests that check the programs against the proved results are in [the solver's
-design](../../solver/docs/design/tests.md#the-theorys-results).
+These are the computations behind the statements that are not proved, and behind those proved by a computation:
+[statement U](exactness.md#statement-u), the three open statements about the sources, and the observations.  Each row
+names the statement, what was checked, by which program, on which input and in how long, and what one must trust to
+accept it.  Where the program was never committed, the row says *record only*: the result stands on the record of its
+run, and cannot be repeated.  [The table of statements](statements.md#the-statements) gives each one's standing.  A
+result proved in its file needs no evidence; the tests that check the programs against the proved results are in [the
+solver's design](../../solver/docs/design/tests.md#the-theorys-results).
 
 ## Statement U
 
@@ -33,7 +33,7 @@ tables, the data and the programs.
 |---|---|---|
 | [the span conjecture (♦)](sources.md#the-span-conjecture) | The prover's check of (♦) (`src/span.rs`) is descending greedy with Gaussian elimination over GF(2), on the components of the residual.  It found no violation in every game n = 2..100,000, in 61 minutes, nor in 902 sampled games from 101,000 to 2,000,000, in 3.7 hours (`solver/noframe/data/span_2_100000.jsonl.gz`, `span_samples_101000_2000000.jsonl.gz`). | the check's program, whose descending greedy equals the heuristics' on every game to 1000 and on 62 samples to 6000 |
 | [no rejection by an odd core](sources.md#the-span-conjecture) | A rejection forced only by an odd core is a rejected source whose vector is not a sum of kept ones, so it is exactly what the check of (♦) looks for: the row above. | the check of (♦) |
-| [the cardinality conjecture (★)](sources.md#the-cardinality-conjecture) | Certified wherever (♦) is, by S6.  Separately, the prover's `src/star.rs` settles every threshold of every game n = 2..20,000 with no search, in 98 minutes summed (`solver/noframe/data/star_2_20000.jsonl.gz`).  Where descending greedy leaves g members of a jam out, it shows that every playable subset of the jam leaves out g or more, by the first of four bounds that suffices: g = 1, since a jam holds a core; the matching number of the jam's members and factors, since a playable set's members have distinct factors (P2); the rank of Lorea's hypergraphic matroid, in which, once a *ground* factor is added to every list of one entry, a set is independent when each nonempty part of it lists more factors than it has members, as every playable set does; and the GF(2) rank of the members' vectors (P10). | the check of (♦), or the check by thresholds |
+| [the cardinality conjecture (★)](sources.md#the-cardinality-conjecture) | Certified wherever (♦) is, by S6.  Separately, the prover's `src/star.rs` settles every threshold of every game n = 2..20,000 with no search, in 98 minutes summed (`solver/noframe/data/star_2_20000.jsonl.gz`).  Where descending greedy leaves g members of a jam out, it shows that every playable subset of the jam leaves out g or more, by the first of four bounds that suffices: g = 1, since a jam holds a core; the matching number of the jam's members and factors, since a playable set's members have distinct factors ([P2](playability.md#the-playability-theorem)); the rank of Lorea's hypergraphic matroid, in which, once a *ground* factor is added to every list of one entry, a set is independent when each nonempty part of it lists more factors than it has members, as every playable set does; and the GF(2) rank of the members' vectors ([P10](playability.md#the-independence-lemma)). | the check of (♦), or the check by thresholds |
 | [the sources conjecture (S1)](sources.md#the-sources-conjecture) | Certified wherever (♦) is, by S6. | the check of (♦) |
 | [the component of 2873](sources.md#what-a-proof-must-use) | (★) at 2873, which the check of (♦) certifies, says that descending greedy's six exclusions from the component, of its 377 members, are the fewest possible.  An earlier exact search over the 70 members of its residual found the same, in 12.4 million checks of playability. | the check of (♦); the search, record only (commit e04f7c4) |
 

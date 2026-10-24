@@ -8,8 +8,8 @@ between their characterization of playable sets and their bound.  A set is playa
 exactly one of its payment schemes, independent with its own coordinates over GF(2) when some set receives an odd
 number, and admitted by their bound when some set receives at least one ([the counting theorem
 (C2)](#the-counting-theorem)).  This file ties the theory to the published paper, and nothing in the theory rests on it:
-its three results, the bridge lemma (C1), the counting theorem (C2) and the first-odd-core proposition (C3), are
-explanatory.
+its three results, [the bridge lemma (C1)](#the-bridge-lemma), the counting theorem (C2) and [the first-odd-core
+proposition (C3)](#the-first-odd-core), are explanatory.
 
 The paper is A. F. Franklín and R. K. Moniot, "The difficulty of beating the Taxman", *Discrete Applied Mathematics* 339
 (2023) 166–171 (arXiv:2211.00461; the theorem numbers below are the arXiv version's).  Its upper bound is one of those
@@ -84,10 +84,11 @@ the precedence; and flipping the cycle hands each member the factor of the one b
    member b ≠ a of which it is a maximal factor.
 2. *1 ⇒ 2.*  Read a flat alternating cycle as a, pay(a), b, pay(b), ….  By step 1, pay(a) divides b, which is an edge a
    → b of the precedence.  So the members of the cycle, in order, close a cycle of the precedence.
-3. *2 ⇒ 1.*  By P3, every cycle of the precedence lies in one layer k, and on each of its edges a → b, b lists pay(a).
-   So a cycle a₁ → a₂ → ⋯ → a_t → a₁ of distinct members gives the cycle a₁, pay(a₁), a₂, pay(a₂), …, a_t, pay(a_t) of
-   the graph.  Its edges a_i–pay(a_i) are in pay, and its edges pay(a_i)–a_{i+1} are not, since a_{i+1} is paired with
-   its own payment.  So it alternates, and it lies in the ranks k − 1 and k.
+3. *2 ⇒ 1.*  By [P3](playability.md#the-flat-cycle-lemma), every cycle of the precedence lies in one layer k, and on
+   each of its edges a → b, b lists pay(a).  So a cycle a₁ → a₂ → ⋯ → a_t → a₁ of distinct members gives the cycle a₁,
+   pay(a₁), a₂, pay(a₂), …, a_t, pay(a_t) of the graph.  Its edges a_i–pay(a_i) are in pay, and its edges
+   pay(a_i)–a_{i+1} are not, since a_{i+1} is paired with its own payment.  So it alternates, and it lies in the ranks k
+   − 1 and k.
 4. *1 ⇒ 3.*  Exchange the edges of pay on a flat alternating cycle for the cycle's other edges.  Each member of the cycle
    is then paired with the payment before it, a factor of the pool that it lists by step 1, and the other members keep
    theirs.  So this is a payment scheme other than pay, with the same payments T.
@@ -100,12 +101,13 @@ the precedence; and flipping the cycle hands each member the factor of the one b
 ### Their Theorem 1 is the playability theorem
 
 By C1, a scheme with no flat alternating cycle is a scheme with an acyclic precedence.  So their Theorem 1, read set by
-set, and P2 are the same statement about the same objects, and their proof takes P2's steps.  Their play-to-matching
-direction is the argument of [the lifting lemma (P1)](playability.md#the-lifting-lemma): they take the largest number a
-move taxes, P2 a maximal factor above the divisor the move surrenders.  Their matching-to-play direction repeatedly plays
-a member with no other payment below it, which is a topological order of the precedence.  Their rank count is the
-flat-cycle lemma (P3).  Theirs is the more general statement, for every finite graded poset; P2 adds that every
-topological order of the precedence is a legal game.
+set, and [P2](playability.md#the-playability-theorem) are the same statement about the same objects, and their proof
+takes P2's steps.  Their play-to-matching direction is the argument of [the lifting lemma
+(P1)](playability.md#the-lifting-lemma): they take the largest number a move taxes, P2 a maximal factor above the
+divisor the move surrenders.  Their matching-to-play direction repeatedly plays a member with no other payment below it,
+which is a topological order of the precedence.  Their rank count is [the flat-cycle lemma
+(P3)](playability.md#the-flat-cycle-lemma).  Theirs is the more general statement, for every finite graded poset; P2
+adds that every topological order of the precedence is a legal game.
 
 ## The counting theorem
 
@@ -116,8 +118,8 @@ topological order of the precedence is a legal game.
 3. S is playable iff per(S, T) = 1 for some T.
 
 So a playable set is independent with its own coordinates over GF(2), and such a set has a payment scheme.  The
-Franklín–Moniot bound, the parity bound (W1) and opt(n) are the weights of the heaviest subsets of {2, …, n} that meet
-the three conditions in turn.
+Franklín–Moniot bound, [the parity bound (W1)](parity-bound.md#the-parity-bound) and opt(n) are the weights of the
+heaviest subsets of {2, …, n} that meet the three conditions in turn.
 
 *Proof.*  Each condition is a demand on the count of schemes onto some T: at least one, an odd number, exactly one.
 
@@ -127,8 +129,9 @@ the three conditions in turn.
    nonsingular square matrix, since the row rank is the column rank.  Over GF(2) the determinant of a matrix of 0s and
    1s is its permanent mod 2 ([the primer](primer.md#matchings-permanents-and-determinants)), and the permanent here is
    per(S, T).
-3. *Playability.*  By P2, S is playable iff some payment scheme has an acyclic precedence.  By C1, a scheme has one iff
-   no other scheme has its payments T, that is, iff per(S, T) = 1.
+3. *Playability.*  By [P2](playability.md#the-playability-theorem), S is playable iff some payment scheme has an acyclic
+   precedence.  By [C1](#the-bridge-lemma), a scheme has one iff no other scheme has its payments T, that is, iff per(S,
+   T) = 1.
 4. *The bounds.*  The Franklín–Moniot bound is the heaviest set with a payment scheme, as above.  The parity bound is
    the heaviest set independent in both parity matroids, which are the sets independent with their own coordinates
    ([what the parity bound misses](parity-bound.md#what-the-parity-bound-misses)).  And opt(n) is the heaviest playable
@@ -162,8 +165,8 @@ maximal-factor graph these four and the primes form the 8-cycle 2–10–5–15�
 and alternating for both schemes.  So by their Theorem 1 the set is not playable, per = 2 is even, and v(10) + v(14) +
 v(15) + v(21) = 0: the parity bound excludes it.
 
-*A second proof of the independence lemma.*  The counting theorem proves [the independence lemma
-(P10)](playability.md#the-independence-lemma) over GF(2) from the paper: their Theorem 1, the bridge lemma and the
+*A second proof of the independence lemma.*  The counting theorem proves the independence lemma
+(P10) over GF(2) from the paper: their Theorem 1, the bridge lemma and the
 determinant mod 2.  P10's own proof, through [the peel-order lemma (P9)](playability.md#the-peel-order-lemma), holds over
 every field.
 
@@ -193,12 +196,12 @@ member, and below 45 no number can.
    factor 15 of 30 is a maximal factor of no other number up to 44, the next being 45, and the maximal factor 21 of 42
    of none, the next being 63.  So neither can be the member of step 3, and no independent S ⊆ {2, …, 44} fails to be
    playable.  The parity bound is the weight of an independent set, which is then playable, so it is at most opt(n);
-   it is at least opt(n) by W1.
+   it is at least opt(n) by [W1](parity-bound.md#the-parity-bound).
 5. *The board of 45.*  The members of {12, 18, 20, 30, 45} list, among the factors 4, 6, 9, 10 and 15, none of which is
    a member: 12 lists 4 and 6, 18 lists 6 and 9, 20 lists 4 and 10, 30 lists 6, 10 and 15, and 45 lists 9 and 15.
    Every factor is listed twice or more, so the set is a core, and not playable (P7).  Its only possible set of payments
    is all five factors.  If 30 pays 6, 10 or 15, the path 10–4–6–9–15 of the edges 20, 12, 18 and 45 then pays in one
-   way, so per = 3, which is odd: by C2 the lists are independent, and the core is odd.  ∎
+   way, so per = 3, which is odd: by [C2](#the-counting-theorem) the lists are independent, and the core is odd.  ∎
 
 In their language, every scheme of {12, 18, 20, 30, 45} has two flat alternating cycles, both through 30 and never
 disjoint, so the sets of disjoint cycles are three: none, and either one.
@@ -216,18 +219,18 @@ matching on its vertices (M. C. Golumbic, T. Hirst and M. Lewenstein, "Uniquely 
 The parity bound extends to their game.  On a graded poset, give each element the vector of the elements it covers, and
 each element that something covers its unit vector, and split the coordinates by the parity of their rank.  By their
 Theorem 1, a playable set has a matching of its members to elements they cover with no flat alternating cycle, and step
-5 of C1's proof, which uses only the ranks, makes it the only matching onto its lower ends.  So its count is 1, its
-determinant odd, and its family independent over GF(2), as in Taxman.  The heaviest set independent in both parity
-matroids therefore bounds their game, and weighted matroid intersection computes it in polynomial time.  On two ranks
-with unit weights the bound is the GF(2) rank of the bipartite adjacency matrix, which lies between the uniquely
-restricted matching number and the matching number.  Three consequences follow.
+5 of [C1](#the-bridge-lemma)'s proof, which uses only the ranks, makes it the only matching onto its lower ends.  So its
+count is 1, its determinant odd, and its family independent over GF(2), as in Taxman.  The heaviest set independent in
+both parity matroids therefore bounds their game, and weighted matroid intersection computes it in polynomial time.  On
+two ranks with unit weights the bound is the GF(2) rank of the bipartite adjacency matrix, which lies between the
+uniquely restricted matching number and the matching number.  Three consequences follow.
 
 * Unless P = NP, no bound computable in polynomial time equals the best score on every graded poset.  For the parity
   bound the difference is the odd cores.
-* The bound is exact on posets in which every element covers at most two others, since the two-factor proposition (P11)
-  holds there with the same proof, and their game is then solved in polynomial time.  So, unless P = NP, the hardness
-  needs elements that cover three or more others: in Taxman, the numbers with three or more distinct primes, which is
-  where the odd cores live.
+* The bound is exact on posets in which every element covers at most two others, since [the two-factor proposition
+  (P11)](playability.md#the-two-factor-proposition) holds there with the same proof, and their game is then solved in
+  polynomial time.  So, unless P = NP, the hardness needs elements that cover three or more others: in Taxman, the
+  numbers with three or more distinct primes, which is where the odd cores live.
 * The complexity of Taxman itself is open, and nothing here settles it.  But the sources' instance and the frames,
   members above the factors they list, are instances of the two-rank problem that their Theorem 2 shows hard in general.
   A proof that (♦) holds on every two-rank instance, under every order, would make descending greedy keep a largest

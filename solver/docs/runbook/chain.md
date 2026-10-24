@@ -76,14 +76,13 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
   solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
   ```
 
-  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` games
-  assume statement U, and its lines keep the builds that made them ([results/README.md](../../../results/README.md)
-  names them), as
-  the lines added will keep the cloud's.  The comparison of `verify.sh` with the committed file is then trivial for the
-  games it holds, so the referees alone check the games above them (each game replayed, the chain bounds,
-  Franklín–Moniot, the heuristic chain); a run from n = 1 is the cross-check of the machine and the build.  On a
-  replacement machine, restore the saved state instead ([Surviving a spot
-  interruption](launch.md#surviving-a-spot-interruption)), never the committed file over it.
+  `chain.sh` checks the file when it opens it.  The file holds no incomplete line, its `known` games assume [statement
+  U](../../../docs/theory/exactness.md#statement-u), and its lines keep the builds that made them
+  ([results/README.md](../../../results/README.md) names them), as the lines added will keep the cloud's.  The
+  comparison of `verify.sh` with the committed file is then trivial for the games it holds, so the referees alone check
+  the games above them (each game replayed, the chain bounds, Franklín–Moniot, the heuristic chain); a run from n = 1 is
+  the cross-check of the machine and the build.  On a replacement machine, restore the saved state instead ([Surviving a
+  spot interruption](launch.md#surviving-a-spot-interruption)), never the committed file over it.
 * **Stop on purpose** with Ctrl-C in tmux, or `kill -TERM $(cat ~/taxman-work/chain.pid)`.  The solver writes a final
   checkpoint, and `chain.sh` ends with status 143.  **Start again** by running the same command: it skips every
   completed game and resumes the game with a checkpoint.  The thread count, the window, `S3_DEST`, `DEADLINE_HOURS` and
@@ -153,9 +152,9 @@ committed file's line has the proof it was made with.  Both referees accept that
 and the assumptions are the line's.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
-committed `results/`: put a
-file next to them (say `results/strict-1-N.jsonl`) and update `results/README.md` and the list of results files in
-`tests/results.rs`.  Logs that a measurement needs go to its notebook entry.
+committed `results/`: put a file next to them (say `results/strict-1-N.jsonl`) and update
+[`results/README.md`](../../../results/README.md) and the list of results files in `tests/results.rs`.  Logs that a
+measurement needs go to its notebook entry.
 
 To extend the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
 `taxman extend-optimal results-from-cloud/strict.jsonl --out /tmp/optimal.json`.  It appends the games past the table's

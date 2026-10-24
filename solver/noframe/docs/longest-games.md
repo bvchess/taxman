@@ -37,7 +37,8 @@ pick weighing 1 ([`Prover::weighted`](../src/game.rs)), in a mode that raises it
 recorded one exists, the heaviest longest game comes from the same search with the pick of c weighing K + c, where K is
 above every sum, so that a set's weight orders by moves, then by sum.  That search starts from the heaviest longest game
 with the recorded game's upper part, found with the sources fixed, which is cheap.  Every longest game written is
-replayed by the rules, in the order P2 gives from peel's payments (`play_order`).
+replayed by the rules, in the order [P2](../../../docs/theory/playability.md#the-playability-theorem) gives from peel's
+payments (`play_order`).
 
 The checks: M(n) and the heaviest longest game against brute force for n <= 22, ν(n) against the matching solver for
 every board to 400, and `play_order` against the recorded games to 400.

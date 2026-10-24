@@ -85,13 +85,13 @@ The code's tests against the theory's:
   frames counts how far the second reaches (`merged_away`).
 
 **The root problem setup builds.**  The theory's root problem Π_n makes the claims of each frame h in one canonical
-order ([the frame model](../../../docs/theory/frame-model.md#the-frame-model)), with its exact rules.  Setup makes its
+order (the frame model), with its exact rules.  Setup makes its
 claims in rounds, before and after merging, and its first rounds see the frames behind a frame unsimplified, which
 counts them as having freedoms and can block a back claim until a later round.  A check that builds Π_n apart from the
 frames code and compares root frames found setup's root problem equal to Π_n on every board from 2 to 1000 except six: on
 8, 12, 13, 16, 17 and 27, frame 0 has a move with two factors that it alone wants, and setup claims the larger where Π_n
 claims the smaller (at 8, (6, 3) for (6, 2)).  Setup's is then another root problem of game n, with the same promotion
-sets and P\* ([the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem) holds for every root
+sets and P\* (the exactness theorem (X7) holds for every root
 problem).  The front claims that setup's outside test blocks are dropped by its final reduction, which leaves the root
 frames as Π_n's.
 
@@ -107,13 +107,14 @@ alike by the breadth-first rule, and without 4 the board of 32 has a layer with 
 freedoms.
 
 **The census** (`examples/structure.rs`) checks the theory's facts against what setup builds, on every board to 8191:
-check A the frame lemma (F1), C clean numbering (F6), D that no candidate lists a back claim's factor (X5), E that no
-candidate is a factor of frame 0, F that every candidate has a home of at least 1 ([the reduction-step lemma
-(X6)](../../../docs/theory/exactness.md#the-exactness-theorem)), G that the sources kept are those of a descending
-greedy written apart from the frames code (X1), and H that the extended problem with nothing open and the claims poses
-the frame model's problem (the formulation corollary, E5).  The theory proves all of these, so the census checks the
-code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the promotion sets:
-27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
+check A [the frame lemma (F1)](../../../docs/theory/frame-model.md#the-frame-lemma), C [clean numbering
+(F6)](../../../docs/theory/frame-model.md#clean-numbering), D that no candidate lists a back claim's factor (X5), E that
+no candidate is a factor of frame 0, F that every candidate has a home of at least 1 (the reduction-step lemma (X6)), G
+that the sources kept are those of a descending greedy written apart from the frames code (X1), and H that the extended
+problem with nothing open and the claims poses the frame model's problem ([the formulation corollary,
+E5](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)).  The theory proves all of these, so the census
+checks the code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the
+promotion sets: 27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
 
 ## Promotions and the score
 
@@ -136,7 +137,8 @@ problem](../../../docs/GLOSSARY.md#the-frame-model) Π exactly).  The answer is 
 [docs/theory/exactness.md](../../../docs/theory/exactness.md) proves what that is:
 
 * The sources that setup keeps are [U\*](../../../docs/GLOSSARY.md#the-frame-model), chosen greedily from the largest on
-  each frame, and in_the_bag = ΣU\* (the kept-sources lemma, X1).
+  each frame, and in_the_bag = ΣU\* ([the kept-sources lemma,
+  X1](../../../docs/theory/exactness.md#the-exactness-theorem)).
 * **Completeness and soundness** ([the exactness theorem
   (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)): a set U\* ∪ L, with L a set of numbers up to n/2, is
   playable exactly when L is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So no step of setup loses a

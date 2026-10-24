@@ -31,10 +31,11 @@ A person reads your report later: write for someone who knows the project and wa
   units on one thread each, `reports [N]` shows reports.  Tune's arguments include `--node-limit L`,
   `--cpu-limit SECONDS`, `--tactic NAME=VALUE` and `--gate GAP`, the gap from which conflict branching chooses.
 * **The project.**  `~/taxman_work/lab/src` is a clone of the repository: its docs, notebook and sources are there, and
-  `git fetch origin` brings it up to date.  `solver/docs/STATUS.md` says what matters now, and
-  `solver/docs/design/lab.md` describes the command folder.  The programs `taxman` and `tune` are built in
-  `src/solver/frame/target/release` (`tune` in `examples/`); build other variants there with `cargo build --release
-  --features studies --example tune` in `src/solver/frame`.  Cargo's files are in `work/cargo-home`.
+  `git fetch origin` brings it up to date.  [`solver/docs/STATUS.md`](../../docs/STATUS.md) says what matters now, and
+  [`solver/docs/design/lab.md`](../../docs/design/lab.md) describes the command folder.  The programs `taxman` and
+  `tune` are built in `src/solver/frame/target/release` (`tune` in `examples/`); build other variants there with
+  `cargo build --release --features studies --example tune` in `src/solver/frame`.  Cargo's files are in
+  `work/cargo-home`.
 * **The journal**, `~/taxman_work/lab/work/journal.md`: what earlier studies found and predicted.
 * **The record of past searches**, `~/taxman_work/lab/work/history/`: `games.jsonl`, a line for each game that ended
   on this chain, and `units.jsonl`, a line for each unit or game that a study solved to compare settings.  The hook adds
@@ -80,10 +81,10 @@ Take the steps in order.
      `jq . CHECKPOINT_DIR/nNNNN.lab`.  The gate is 300 unless one of them says another.
    * *The history.*  `games.jsonl` has a line for each game that ended on this chain, with the setting it ran under (its
      `lab` key) and its steps, and a `line_ratio` line for each game whose end a study compared with its snapshot.
-     `units.jsonl` has the units that earlier studies solved, under which setting, and in how many steps.  Both are
-     in `~/taxman_work/lab/work/history/`, and the fields are in `solver/docs/runbook/lab.md`, "The record of past
-     searches" (in the chain's checkout, `~/taxman_work/chain`).  A line that is not JSON is skipped.  For example, the
-     settings and line ratios of the latest games:
+     `units.jsonl` has the units that earlier studies solved, under which setting, and in how many steps.  Both are in
+     `~/taxman_work/lab/work/history/`, and the fields are in [`solver/docs/runbook/lab.md`](../../docs/runbook/lab.md),
+     "The record of past searches" (in the chain's checkout, `~/taxman_work/chain`).  A line that is not JSON is
+     skipped.  For example, the settings and line ratios of the latest games:
 
      ```text
      jq -c 'select(.kind == "game") | {n, nodes, tactics, lab}' ~/taxman_work/lab/work/history/games.jsonl | tail -n 20
@@ -152,15 +153,14 @@ Take the steps in order.
      too, unless its own record holds over it).
    * **Otherwise** send nothing, and say in the report what the history would have to show.
 
-   The formats are in `solver/docs/design/lab.md`: write a command as a file with a name starting with a dot in
-   `channel/in/`, rename it into place, and read the answer in `channel/out/` (the chain looks at each progress tick).
-   `~/taxman_work/lab/channel/` exists only when the chain runs with `--lab-dir`.  If it is not there, observe and
-   report.
-   A gate comes with `conflict_branching` on or left out, never off, and `conflict_look` acts only where
-   `conflict_branching` is on.  You may use `checkpoint`, `finder`, `branching`, `offer` and `policy` (on the condition
-   above), and `restart` only when your estimate says a fresh search is at least 3 times cheaper than finishing the
-   one in flight.  Do not use `threads` or `redeploy`.  An `offer` must be a game that a search of yours found, never
-   one you wrote.  Write each action down with its reason, the command and the answer.
+   The formats are in [`solver/docs/design/lab.md`](../../docs/design/lab.md): write a command as a file with a name
+   starting with a dot in `channel/in/`, rename it into place, and read the answer in `channel/out/` (the chain looks at
+   each progress tick).  `~/taxman_work/lab/channel/` exists only when the chain runs with `--lab-dir`.  If it is not
+   there, observe and report.  A gate comes with `conflict_branching` on or left out, never off, and `conflict_look`
+   acts only where `conflict_branching` is on.  You may use `checkpoint`, `finder`, `branching`, `offer` and `policy`
+   (on the condition above), and `restart` only when your estimate says a fresh search is at least 3 times cheaper than
+   finishing the one in flight.  Do not use `threads` or `redeploy`.  An `offer` must be a game that a search of yours
+   found, never one you wrote.  Write each action down with its reason, the command and the answer.
 
 ### Then: research
 

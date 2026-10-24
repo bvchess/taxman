@@ -107,5 +107,6 @@ integers protects descending greedy and not their sizes:
   sharing a factor agrees with the ranking of the primes that also decides which products lie in the window (n/2, n].
   Generalized primes, which rebuild the members and factors from the perturbed primes, never fail, even perturbed by
   50%.
-* So the sources conjecture can be sharpened to a statement without magnitudes beyond the window: **(♦) for
-  multiplicatively generated instances under any order obeying their window law.**
+* So [the sources conjecture](../../../docs/theory/sources.md#the-sources-conjecture) can be sharpened to a statement
+  without magnitudes beyond the window: **(♦) for multiplicatively generated instances under any order obeying their
+  window law.**

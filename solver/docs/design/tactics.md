@@ -48,10 +48,10 @@ header and no row above, so a checkpoint resumes with any value, and a result li
 `tactic_switches`.
 
 **The frame model's own rules are not tactics.**  They define the search space, and cannot be switched off inside the
-model: the greedy removal of impossible sources inside frames; the mandatory moves;
-freedoms = factors − sources; closed frames
-taking no part in the search; and a promoted number paying tax only from the frame one forward.  [frame-model.md, “What
-"optimal" means”](frame-model.md#what-optimal-means) says what is proven of them, and what remains: statement U.
+model: the greedy removal of impossible sources inside frames; the mandatory moves; freedoms = factors − sources; closed
+frames taking no part in the search; and a promoted number paying tax only from the frame one forward.  [frame-model.md,
+“What "optimal" means”](frame-model.md#what-optimal-means) says what is proven of them, and what remains: [statement
+U](../../../docs/theory/exactness.md#statement-u).
 
 **Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from
 the defaults (such as `lagrange=on,gf2=off`), and `tactic_switches`, every tactic's value.  A line of a build before

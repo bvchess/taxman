@@ -2,16 +2,17 @@
 
 Part of [the theory](../THEORY.md).
 
-Linear algebra over GF(2) bounds the best score of a game from above.  Every playable set is independent in two
-matroids over GF(2), one for each parity of the number of prime factors, so the heaviest set independent in both bounds
-opt(n): the parity bound (W1).  Weighted matroid intersection computes it in polynomial time, and a weight split checks
-its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out, it bounds the
-sets that make the same choices.  The barred bound (W2) fixes the bottom two layers as every optimal set has them and
-leaves out one more number: when it is at most a score, every set that beats the score plays that number.  Both results
-are proved.  The prover bounds its searches by W1.  W2 settles most of [statement U](exactness.md#statement-u), the
-open statement that some optimal set plays every member of U\* with three or more prime factors, game by game, and
-[the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) rests on it.  The same construction, frame
-by frame, bounds the frame model's promotions ([bounds on the promotions](frame-bounds.md)).
+Linear algebra over GF(2) bounds the best score of a game from above.  Every playable set is independent in two matroids
+over GF(2), one for each parity of the number of prime factors, so the heaviest set independent in both bounds opt(n):
+[the parity bound (W1)](#the-parity-bound).  Weighted matroid intersection computes it in polynomial time, and a weight
+split checks its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out,
+it bounds the sets that make the same choices.  [The barred bound (W2)](#the-barred-bound) fixes the bottom two layers
+as every optimal set has them and leaves out one more number: when it is at most a score, every set that beats the score
+plays that number.  Both results are proved.  The prover bounds its searches by W1.  W2 settles most of [statement
+U](exactness.md#statement-u), the open statement that some optimal set plays every member of U\* with three or more
+prime factors, game by game, and [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) rests on
+it.  The same construction, frame by frame, bounds the frame model's promotions ([bounds on the
+promotions](frame-bounds.md)).
 
 *Words.*  Playable sets, maximal factors, layers and sources are the [glossary's](../GLOSSARY.md), and U\* is defined in
 [sources.md](sources.md#descending-greedy).  The incidence vector v(s) of a number s, the unit vector e_s of s ≤ n/2,
@@ -152,9 +153,9 @@ freedom, so the numbers of layer 2 up to 10 are not barred, and the optimal set 
 barred bound of b is at most V, every playable set that obeys F4 and weighs more than V holds b.  In particular, if
 opt(n) > V, every optimal set of n holds b.
 
-*Proof.*  Let S be playable, obey F4, and miss b.  Then S holds the picks of F4 and avoids its bars and b, so by W1, ΣS
-is at most the barred bound of b, which is at most V.  So a playable set that obeys F4 and weighs more than V cannot
-miss b.  If opt(n) > V, every optimal set weighs more than V, and it obeys F4.  ∎
+*Proof.*  Let S be playable, obey F4, and miss b.  Then S holds the picks of F4 and avoids its bars and b, so by
+[W1](#the-parity-bound), ΣS is at most the barred bound of b, which is at most V.  So a playable set that obeys F4 and
+weighs more than V cannot miss b.  If opt(n) > V, every optimal set weighs more than V, and it obeys F4.  ∎
 
 W2 is applied to the members of U\*_{≥3}, the sources that [statement U](exactness.md#statement-u) asks some optimal
 set to play.  Its conclusion is what [the certificate theorem (E2)](extended-problem.md#the-certificate-theorem) asks of
@@ -165,10 +166,10 @@ game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 
 ## What the parity bound misses
 
-The parity bound admits exactly the sets independent with their own coordinates (step 1 of the proof of W1), so it
-exceeds opt(n) only through an unplayable set of that kind, which holds an [odd core](playability.md#odd-cores).  It
-equals opt(n) on every board below 45, which has no odd core ([the first-odd-core proposition
-(C3)](franklin-moniot.md#the-first-odd-core)), and, as measured, on every board up to 77
+The parity bound admits exactly the sets independent with their own coordinates (step 1 of the proof of
+[W1](#the-parity-bound)), so it exceeds opt(n) only through an unplayable set of that kind, which holds an [odd
+core](playability.md#odd-cores).  It equals opt(n) on every board below 45, which has no odd core ([the first-odd-core
+proposition (C3)](franklin-moniot.md#the-first-odd-core)), and, as measured, on every board up to 77
 ([evidence.md](evidence.md#observations)).
 
 Between it and the bounds it is compared with:

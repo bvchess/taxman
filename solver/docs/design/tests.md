@@ -239,18 +239,18 @@ every second line of the Java fixtures), and the comment on each says what the w
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
   naming the line; a torn last line is dropped; the committed results pass the verifier with the counts that
-  `results/README.md` quotes; a game stopped by a node limit and resumed reads back assuming nothing; a game's line
-  has its own search time (`seconds.own`, zero for a game that runs no search), and its summary line ends with that time
-  and its best promotion sum.  Both verifiers
-  refuse forged repeats (another game named; the digests, promotions or promotion sum changed; the game repeated
-  unfinished, after the repeat, or settling no search; its assumptions dropped), and `verify-results` refuses two more
-  that only setting the problems up again can catch (the Python referee accepts them, as its docstring says).  A search
-  that took no step is the method `start`: `verify-results` still reads the `search` line of an older build, and the
-  Python referee refuses it, and a `start` line that took a node or did not finish.  The line of a search armed with
-  the near-repeat cut counts the nodes it cut (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is
-  armed and cuts none, and the first game of a run and a run without the tactic have no such key), both verifiers
-  accept the files and count the shortened search, and both refuse the key on a prime game or with a value that is no
-  count; the committed chain has no search that the cut shortened.
+  [`results/README.md`](../../../results/README.md) quotes; a game stopped by a node limit and resumed reads back
+  assuming nothing; a game's line has its own search time (`seconds.own`, zero for a game that runs no search), and its
+  summary line ends with that time and its best promotion sum.  Both verifiers refuse forged repeats (another game
+  named; the digests, promotions or promotion sum changed; the game repeated unfinished, after the repeat, or settling
+  no search; its assumptions dropped), and `verify-results` refuses two more that only setting the problems up again can
+  catch (the Python referee accepts them, as its docstring says).  A search that took no step is the method `start`:
+  `verify-results` still reads the `search` line of an older build, and the Python referee refuses it, and a `start`
+  line that took a node or did not finish.  The line of a search armed with the near-repeat cut counts the nodes it cut
+  (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is armed and cuts none, and the first game of
+  a run and a run without the tactic have no such key), both verifiers accept the files and count the shortened search,
+  and both refuse the key on a prime game or with a value that is no count; the committed chain has no search that the
+  cut shortened.
 * **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tests/sweep.rs`,
   `solver/tools/test_sweep_plan.py`, `solver/tools/cloud/test/run.sh sweep`):
   * a range whose games all stop at a limit goes on, each game built on the best game of the one before it, with no

@@ -2,14 +2,15 @@
 
 Part of [the theory](../THEORY.md).
 
-The frame solver's answer for game n is ΣU\* + P\*: the sources U\* plus the heaviest promotion set of the root
-problem Π_n.  This file proves what that answer is.  The exactness theorem (X7) shows that the promotion sets of every
-root problem of game n are exactly the sets L of numbers up to n/2 for which U\* ∪ L is
+The frame solver's answer for game n is ΣU\* + P\*: the sources U\* plus the heaviest promotion set of the root problem
+Π_n.  This file proves what that answer is.  [The exactness theorem (X7)](#the-exactness-theorem) shows that the
+promotion sets of every root problem of game n are exactly the sets L of numbers up to n/2 for which U\* ∪ L is
 [playable](../GLOSSARY.md#the-game).  With [the bottom-layers theorem (F4)](frame-model.md#the-bottom-layers-theorem),
-it leaves one open statement between the model and the game, statement U: the answer is
+it leaves one open statement between the model and the game, [statement U](#statement-u): the answer is
 [opt(n)](../GLOSSARY.md#the-game) exactly when some [optimal set](../GLOSSARY.md#the-game) contains every member of U\*
-in layers 3 and up (X8).  The holes theorem (X9) carries the result to boards with numbers taken off.  The proof of X7
-does not need two of the lemmas, X1 and the third part of X5; they show that setup's longer route computes the model.
+in layers 3 and up (X8).  [The holes theorem (X9)](#boards-with-holes) carries the result to boards with numbers taken
+off.  The proof of X7 does not need two of the lemmas, X1 and the third part of X5; they show that setup's longer route
+computes the model.
 
 *Words.*  [Sources](../GLOSSARY.md#the-frame-model), [layers](../GLOSSARY.md#the-frame-model) and [maximal
 factors](../GLOSSARY.md#the-game) are the glossary's.  [U\*](sources.md#descending-greedy) is what descending greedy
@@ -36,14 +37,15 @@ After the claims of a claim sequence of D or of frame h, descending greedy over 
 left, keeps them all.  So setup plays U\* when it promotes nothing.
 
 *Proof.*  1.  The sources of the frames are the components of the sources' instance.  So by the items "Playability
-splits over the components" and "So does descending greedy" of sources.md ([components and
+splits over the components" and "So does descending greedy" of [sources.md](sources.md) ([components and
 truncations](sources.md#components-and-truncations)), descending greedy over the sources of D keeps U\* ∩ D.
 
 2.  The claims are front and back moves of the instance with members U\* ∩ D and pool F_D: a front claim's move lists
-only its factor once the earlier claims are out, and a back claim's factor is listed by its move alone.  By P4 their
-remainder, the sources left against the factors left, is playable, and so is every subset of it (restriction), so
-descending greedy keeps them all.  For frame h the same holds, since U\* ∩ frame h is playable against F_h: by F2, as
-each frame's moves list only that frame's factors.  ∎
+only its factor once the earlier claims are out, and a back claim's factor is listed by its move alone.  By
+[P4](playability.md#the-peel-theorem) their remainder, the sources left against the factors left, is playable, and so is
+every subset of it (restriction), so descending greedy keeps them all.  For frame h the same holds, since U\* ∩ frame h
+is playable against F_h: by [F2](frame-model.md#the-joining-lemma), as each frame's moves list only that frame's
+factors.  ∎
 
 In game 21, after the back claim (15, 5), frame 0 has the sources 14 and 21 left against the factors 2, 3 and 7, and a
 second pass of descending greedy keeps both.
@@ -57,9 +59,9 @@ In every scheme of S, the factors of D pay exactly the members of U\* ∩ D: non
 Every member x of L is a factor of a frame numbered h ≥ 1, and pay(x) is a factor of frame h − 1.  Every member of U\*
 pays with a factor of its own frame.
 
-*Proof.*  The member x is a factor of a frame D (F1), not closed (X2), so numbered h.  Its payer pay(x), a maximal
-factor of x, lies in a frame D′ in front of D (F1), not closed (X2), so numbered h − 1 (F6), and h ≥ 1.  A source's
-maximal factors lie in its frame.  ∎
+*Proof.*  The member x is a factor of a frame D ([F1](frame-model.md#the-frame-lemma)), not closed (X2), so numbered h.
+Its payer pay(x), a maximal factor of x, lies in a frame D′ in front of D (F1), not closed (X2), so numbered h − 1
+([F6](frame-model.md#clean-numbering)), and h ≥ 1.  A source's maximal factors lie in its frame.  ∎
 
 In game 21 the optimal set is U\* ∪ {9}, and 9, a factor of frame 1, pays with 3, a factor of frame 0.
 
@@ -137,7 +139,7 @@ before: a front claim.  So the claims and the drops form one claim sequence, and
 candidate: a candidate of a frame numbered h stays a factor of root frame h.  Since homes are frame numbers, applying L
 to root frame h is applying L to frame h and then removing the claims and the drops.  By X5 (part 2) these are front
 and back moves of frame h with L applied, which keep it playable and keep it unplayable (P4), and a pair is winnable
-iff it is playable (F5).  ∎
+iff it is playable ([F5](frame-model.md#the-winnability-lemma)).  ∎
 
 **Theorem X7 (the exactness theorem).**  Take a root problem of game n.  For every L ⊆ {2, …, ⌊n/2⌋}, U\* ∪ L is
 playable iff L is a promotion set of the root problem, and then Σ(U\* ∪ L) = ΣU\* + ΣL.
@@ -158,8 +160,9 @@ playable iff L is a promotion set of the root problem, and then Σ(U\* ∪ L) = 
    applied, against F_h ∖ L.  Each member lists only factors of its own part's pool and of the closed frames' pools,
    which come first, so the joint scheme is acyclic.
 5. It pays every member of U\* ∪ L, each source in its frame's part and each member of L in the part of the frame in
-   front of its home, with a maximal factor outside U\* ∪ L.  So it is an acyclic scheme of the own instance of
-   U\* ∪ L, which is therefore playable (P2).  Its weight is ΣU\* + ΣL, since L holds only factors.  ∎
+   front of its home, with a maximal factor outside U\* ∪ L.  So it is an acyclic scheme of the own instance of U\* ∪ L,
+   which is therefore playable ([P2](playability.md#the-playability-theorem)).  Its weight is ΣU\* + ΣL, since L holds
+   only factors.  ∎
 
 ## Statement U
 
@@ -174,9 +177,9 @@ opt(n):
 *Proof.*  1.  Every playable set S ⊇ U\* is U\* ∪ L with L ⊆ {2, …, ⌊n/2⌋}: descending greedy rejected each other
 source s because the kept sources above s with s are unplayable, and so is any set that contains them.
 
-2. By X7, ΣU\* + P\* is the largest weight of a playable set containing U\*, at most opt(n).
+2. By [X7](#the-exactness-theorem), ΣU\* + P\* is the largest weight of a playable set containing U\*, at most opt(n).
 3. U\*_1 = {q(n)}, since descending greedy keeps the largest of the primes above n/2, which all need the factor 1.  So
-   by F4 every optimal set contains U\*_1 and U\*_2.
+   by [F4](frame-model.md#the-bottom-layers-theorem) every optimal set contains U\*_1 and U\*_2.
 4. If U holds, an optimal set contains all of U\*, so opt(n) ≤ ΣU\* + P\*.  If not, no optimal set contains U\*, so
    every playable set that contains U\* weighs less than opt(n).  ∎
 
@@ -186,10 +189,10 @@ are](../../results/README.md#what-supports-the-scores)), and [the certificate th
 
 ### Where a proof stops
 
-This is a sketch.  Let an optimal S miss a member of U\*_{≥3}, and let d be the largest source where S and U\*
-disagree; by F4 it lies in a layer k ≥ 3.  If d were in S, S would hold d with the members of U\* above d in its
-frame, which descending greedy found unplayable together; so d ∈ U\* ∖ S.  The set S ∪ {d} is heavier than S, so it
-is unplayable, and adding the source d changes only the layer instance at k ([the layer theorem
+This is a sketch.  Let an optimal S miss a member of U\*_{≥3}, and let d be the largest source where S and U\* disagree;
+by [F4](frame-model.md#the-bottom-layers-theorem) it lies in a layer k ≥ 3.  If d were in S, S would hold d with the
+members of U\* above d in its frame, which descending greedy found unplayable together; so d ∈ U\* ∖ S.  The set S ∪ {d}
+is heavier than S, so it is unplayable, and adding the source d changes only the layer instance at k ([the layer theorem
 (F3)](frame-model.md#the-layer-theorem)).  So S_k ∪ {d} is unplayable in S's layer instance at k, it holds a
 [core](playability.md#the-core-theorem), and every core holds d, since S_k is playable.
 
@@ -222,8 +225,9 @@ U\*(Y).
 
 *Proof.*  Two things change on Y.  A frame alone, a number up to n/2 that joins no source, has no moves and one factor,
 so one freedom: it is never closed, it can set k₀, it can hold a candidate (test (a) asks nothing of it, since it has no
-moves), and its factor can pay for a promoted number.  And the rule of play changes, so P2 must be checked again.  Then
-the proofs of X1 to X7 go through with U\*(Y) for U\*, since they use only these facts, each checked on Y:
+moves), and its factor can pay for a promoted number.  And the rule of play changes, so
+[P2](playability.md#the-playability-theorem) must be checked again.  Then the proofs of [X1](#the-exactness-theorem) to
+X7 go through with U\*(Y) for U\*, since they use only these facts, each checked on Y:
 
 * *P2 on Y,* with the own instance's pool the maximal factors outside S that lie in Y.  A legal game pays each move with
   a maximal factor in the pot, by the rule itself, distinct and outside S, and plays a before b when pay(a) divides b
@@ -232,11 +236,13 @@ the proofs of X1 to X7 go through with U\*(Y) for U\*, since they use only these
 * *P3, P4, restriction, F2 and F5* are about instances and pairs, and hold as they stand.
 * *F1:* every number of Y lies in one frame, by construction; a frame alone lies in its layer by definition; and step 3
   of the proof holds, since a maximal factor in Y of a factor of a frame is a factor of the frame that holds it.
-* *F6* follows from F1, and F7 and F8 from F2, F5 and P4.
+* *F6* follows from F1, and [F7](frame-model.md#the-take-on-lemma) and [F8](frame-model.md#the-reduction-lemma) from F2,
+  F5 and P4.
 * *A set that holds an unplayable set is unplayable,* by restriction.
 
-The last sentence is X8's argument without its step 3.  ∎
+The last sentence is [X8](#statement-u)'s argument without its step 3.  ∎
 
-The bottom-layers theorem (F4) is not claimed on Y, since [the prime lemma (N1)](neighbors.md#the-prime-lemma) is about
-the full board; so Y needs all of U\*(Y) played, not only its part in layers 3 and up.  On Y a layer between k₀ and the
-highest with freedoms can hold only closed frames; its frame h is then empty, and nothing is promoted through it.
+[The bottom-layers theorem (F4)](frame-model.md#the-bottom-layers-theorem) is not claimed on Y, since [the prime lemma
+(N1)](neighbors.md#the-prime-lemma) is about the full board; so Y needs all of U\*(Y) played, not only its part in
+layers 3 and up.  On Y a layer between k₀ and the highest with freedoms can hold only closed frames; its frame h is then
+empty, and nothing is promoted through it.

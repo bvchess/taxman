@@ -41,14 +41,14 @@ the minimal conflicts that `FrameGraph::conflicts_ordered` makes, each checked u
 (P5)](../../../docs/theory/playability.md#the-residual-theorem) and [the exactness theorem
 (X7)](../../../docs/theory/exactness.md#the-exactness-theorem); [search.md, "Conflict
 branching"](search.md#conflict-branching)).  The look that `conflict_look` makes chooses between two of them, the
-search's own conflict and the one `conflict_branching` chose, and leaves the node's state as it found it ([search.md,
-"Conflict branching"](search.md#conflict-branching), the paragraph "Why the look is exact").  The gate is the gap from
+search's own conflict and the one `conflict_branching` chose, and leaves the node's state as it found it (search.md,
+"Conflict branching", the paragraph "Why the look is exact").  The gate is the gap from
 which a node chooses at all: below it the node branches on the search's own conflict, from it on the conflict chosen,
 both true conflicts, so any gate keeps the search exhaustive.  The lab only switches the two on or off and sets the gate
 (from 0 to 4,000), and a searcher reads the switches and the gate when it starts a unit.  A unit is a node with the
 candidates it has left, whose subtree its searcher explores to the end, so a search whose units branched differently is
 exhaustive unit by unit.  The nogoods learned on the way are conflicts whichever conflict a node chose, and they hold at
-every node ([search.md, "The default step"](search.md#the-default-step), fact 4).  A policy for the games to come only
+every node (search.md, "The default step", fact 4).  A policy for the games to come only
 moves this choice from one game to the games after it ([a policy](#a-policy-for-the-games-to-come)).
 
 **(c) The incumbent.**  An offer becomes the incumbent only through `search::offer_found`: the set must be a set of

@@ -21,12 +21,13 @@ The [glossary](../../docs/GLOSSARY.md) defines the terms, and
 
 * **What to read.**  Before proposing an experiment, read the register's file of its subject, or search the register
   (`grep -ri WORD solver/notebook/register/`), and read only the entries a task needs.
-* **One folder an entry.**  An experiment, or a round of them, is one folder with a README.md in it, the entry, named
-  by its title's anchor (`the-frontier-chain-to-3440-2026-10/` for "The frontier chain to 3440 (2026-10)"): a folder of
+* **One folder an entry.**  An experiment, or a round of them, is one folder with a README.md in it, the entry, named by
+  its title's anchor (`the-frontier-chain-to-3440-2026-10/` for "The frontier chain to 3440 (2026-10)"): a folder of
   `search/` for an experiment on the search (its bounds, branching, learning and tactics), a folder of this directory
-  for any other.  A date in the folder's name is the month the work started.  The README.md opens with `# Title
-  (YYYY-MM)`, the line `Part of the [lab notebook](../README.md).` (`../../README.md` in `search/`), and, after a blank
-  line, `Started YYYY-MM-DD.`, to which `Concluded YYYY-MM-DD.` is added when the work ends.
+  for any other.  A date in the folder's name is the month the work started.  The README.md opens with
+  `# Title (YYYY-MM)`, the line `Part of the [lab notebook](../README.md).` (`[../../README.md](../../README.md)` in
+  `search/`), and, after a blank line, `Started YYYY-MM-DD.`, to which `Concluded YYYY-MM-DD.` is added when the work
+  ends.
 * **A log while the work runs, a record when it ends.**  While the work runs, the entry is a working log: it opens with
   its question, gains dated sections (`## YYYY-MM-DD: ...`), and nothing in it is rewritten.  When the work concludes,
   the entry is rewritten as a record for posterity: its question in a sentence and its answer in a sentence or two, then

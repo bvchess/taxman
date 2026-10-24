@@ -32,19 +32,20 @@ steps, each a claim with its reason, so that a reader who doubts one step can re
 
 A statement holds all of its hypotheses, so that it can be quoted alone in [the table of statements](statements.md):
 never "under this section's standing hypothesis".  Each hypothesis earns its place: say what fails without it, with the
-smallest example that shows the failure.  The exclusion theorem, read on the board, needs separated sets, and the set
-{2, 4} on the board of 4 shows why.  Pair an example with a non-example where the line between them teaches something.
+smallest example that shows the failure.  [The exclusion theorem](playability.md#the-exclusion-theorem), read on the
+board, needs separated sets, and the set {2, 4} on the board of 4 shows why.  Pair an example with a non-example where
+the line between them teaches something.
 
 ## 5. Give each thing one name, and the standard name where there is one
 
-Each result has a name that says what it is about, such as the ceiling lemma, and a short label: the letter of its
-file and its number there, as in N4.  The first mention of a result in a file gives its name and its label; later
-mentions may use the label alone where the result is cited often, and the name where it is not.  Links follow [the
-rule for all the docs](../WRITING.md#8-give-each-task-one-file): a result is linked to its heading at its first mention
-in each section, and not again in that section.  The open statements that have symbols keep them: U, (★) and (♦).
-Each symbol keeps one meaning across the theory, and the notation table in [statements.md](statements.md) lists them;
-a letter that serves one proof only must not be one of those.  Introduce a symbol only for what the text uses again and
-again, and use words for the rest.
+Each result has a name that says what it is about, such as [the ceiling lemma](neighbors.md#the-ceiling-lemma), and a
+short label: the letter of its file and its number there, as in N4.  The first mention of a result in a file gives its
+name and its label; later mentions may use the label alone where the result is cited often, and the name where it is
+not.  Links follow [the rule for all the docs](../WRITING.md#8-give-each-task-one-file): a result is linked to its
+heading at its first mention in each section, and not again in that section.  The open statements that have symbols keep
+them: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and the notation table in
+[statements.md](statements.md) lists them; a letter that serves one proof only must not be one of those.  Introduce a
+symbol only for what the text uses again and again, and use words for the rest.
 
 Where mathematics has a standard term, such as topological order or matroid intersection, use it, or give it beside
 the project's word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2,

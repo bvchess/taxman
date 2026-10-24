@@ -5,12 +5,13 @@ Part of [the theory](../THEORY.md).
 The [sources](../GLOSSARY.md#the-frame-model) of game n, its numbers above n/2, are each a move or nothing, and the
 frame model fixes them to U\*: the set that descending greedy keeps, taking the sources from the largest down and
 keeping each one that still fits with those kept before it.  This file asks whether U\* is the heaviest playable set of
-sources.  That is the sources conjecture, and it is open.
+sources.  That is [the sources conjecture](#the-sources-conjecture), and it is open.
 
 ## What is open
 
-The theory has four open statements: statement U, which concerns the frame model, and three about the sources.  Each is
-checked game by game, and [statements.md](statements.md#the-statements) gives each one's standing.
+The theory has four open statements: [statement U](exactness.md#statement-u), which concerns the frame model, and three
+about the sources.  Each is checked game by game, and [statements.md](statements.md#the-statements) gives each one's
+standing.
 
 * **[The sources conjecture (S1)](#the-sources-conjecture):** no playable set of sources outweighs U\*.
 * **[The cardinality conjecture (★) (S4)](#the-cardinality-conjecture):** the same with sizes in place of weights, on
@@ -23,10 +24,10 @@ The certificates run the other way.  The check of (♦) in a game is descending 
 every weighting that increases with value.  A proof of (★) for every game would settle the sources conjecture, and a
 proof of (♦) for every game would prove (★).  A refutation would be a game with a playable set of sources heavier than
 U\*, or, for (★), a component and a threshold where descending greedy keeps fewer sources than fit.  A failure of (♦)
-alone would refute neither, since (♦) is the stronger statement.  The uniqueness theorem
-([Q1](uniqueness-and-longest-games.md#the-uniqueness-theorem)) and part of the length lemma
-([Q3](uniqueness-and-longest-games.md#the-length-lemma)) assume (★).  The scores of the frame solver do not: they rest
-on [statement U](exactness.md#statement-u).
+alone would refute neither, since (♦) is the stronger statement.  [The uniqueness
+theorem](uniqueness-and-longest-games.md#the-uniqueness-theorem) (Q1) and part of [the length
+lemma](uniqueness-and-longest-games.md#the-length-lemma) (Q3) assume (★).  The scores of the frame solver do not: they
+rest on statement U.
 
 The rest of the file is explanatory, and follows the ways a proof has been tried.  The textbook proof that a procedure
 like descending greedy finds a heaviest set needs the exchange property of a matroid, which playable sets can lack
@@ -68,7 +69,8 @@ only the factor 1, which makes {17, 19} a core; it keeps 16, 15 and 14, rejects 
 The *incidence graph* of an instance joins each member to the factors it lists, and a *component* is the set of members
 of one of its connected pieces.  Game 21's sources have four: {11, 13, 17, 19} on the factor 1, {12, 18, 20} on 4, 6, 9
 and 10, {14, 15, 21} on 2, 3, 5 and 7, and {16} on 8.  The *truncation* of a set H at t is H ∩ [t, n], its members of
-value t or more, where [t, n] is the integers from t to n.  Two facts follow from the core theorem.
+value t or more, where [t, n] is the integers from t to n.  Two facts follow from [the core
+theorem](playability.md#the-core-theorem).
 
 * *Playability splits over the components.*  A set of sources is playable exactly when its part in each component is.
   A member's factors are listed only by members of its own component, so the part of a core in a component is a core
@@ -135,16 +137,18 @@ the true order puts 1573 below both.
 
 ## The victim law
 
-The victim law is explanatory: the frontier theorem uses it, and nothing else rests on it.  A jam is repaired by
-removing one member exactly when that member lies in every minimal core of the jam, a core that holds no smaller core.
+The victim law is explanatory: [the frontier theorem](#the-frontier-theorem) uses it, and nothing else rests on it.  A
+jam is repaired by removing one member exactly when that member lies in every minimal core of the jam, a core that holds
+no smaller core.
 
 **Lemma S2 (the victim law).**  Let H be a set of members of an instance, and s a member of H, with H ∖ {s} keeping the
 instance's pool and lists.  Then H ∖ {s} is playable if and only if s lies in every core in H, and if and only if s lies
 in every minimal one.  In particular, a member of T is a victim of a jam (T, d) exactly when it lies in every minimal
 core in T ∪ {d}.
 
-*Proof.*  By the core theorem (P7) the cores are the only obstructions to playability, and removing s clears them all
-exactly when s is in each.  The lists are the instance's, so whether a set is a core depends on the set alone.
+*Proof.*  By [the core theorem (P7)](playability.md#the-core-theorem) the cores are the only obstructions to
+playability, and removing s clears them all exactly when s is in each.  The lists are the instance's, so whether a set
+is a core depends on the set alone.
 
 1. *If H ∖ {s} is playable, s lies in every core Q in H.*  Otherwise Q ⊆ H ∖ {s}, and a set that holds a core is not
    playable, by the core theorem.
@@ -179,10 +183,10 @@ while removing 4913 or 5491 leaves the other.
 
 ## The frontier theorem
 
-The frontier theorem is explanatory: it shows how far a direct proof of the sources conjecture gets, and nothing rests
-on it.  Compare descending greedy's set with a heavier playable set at the largest member on which they disagree, the
-*frontier*.  The comparison proves descending greedy right wherever the obstruction at the frontier is made of members
-with at most two maximal factors.
+The frontier theorem is explanatory: it shows how far a direct proof of [the sources
+conjecture](#the-sources-conjecture) gets, and nothing rests on it.  Compare descending greedy's set with a heavier
+playable set at the largest member on which they disagree, the *frontier*.  The comparison proves descending greedy
+right wherever the obstruction at the frontier is made of members with at most two maximal factors.
 
 **Theorem S3 (the frontier theorem).**  Let H be a set of sources of game n, weighted by their values, and G the set
 that descending greedy keeps when run on H.  Let T be a playable subset of H other than G, and d the largest member in
@@ -200,8 +204,8 @@ The idea of the proof: above d, T agrees with G, and descending greedy's accepta
 stays playable with d, so every obstruction to adding d to T reaches below d.  When the obstruction is a single cycle, a
 member below d on it can be traded for d.  The proof is at [the end of the file](#proof-of-the-frontier-theorem).  It
 uses of the weights only that they are positive and increase with the value.  It looks only at the residual R of T ∪
-{d}, and rightly: by the exclusion theorem (P8), if removing a set E of members repairs the jam, so does removing E's
-part in R.
+{d}, and rightly: by [the exclusion theorem (P8)](playability.md#the-exclusion-theorem), if removing a set E of members
+repairs the jam, so does removing E's part in R.
 
 ### Where the frontier theorem stops
 
@@ -219,25 +223,27 @@ all six, and in every later game sampled up to 9825, the last in which 4913 is a
 and 5491 and keeps 6137, 6647, 6859, 7429 and 8303.  The five sources 5491, 6647, 6859, 7429 and 8303 form a core, so a
 playable set that agrees with U\* above 6137 cannot hold 5491, and the second minimal core of T ∪ {6137}, the one
 through 5491, is out of its reach.  The check of (♦) passes in these games, so U\* is the heaviest playable set of
-sources there (S6 and Q1).  Whether descending greedy is right thus depends on members outside the jam: a proof must
-charge the members a heavier set keeps for what they lock out elsewhere in the component, not only at the frontier.
-That is the open problem in its irreducible form, and any proof must handle this configuration.
+sources there ([S6](#the-span-theorem) and [Q1](uniqueness-and-longest-games.md#the-uniqueness-theorem)).  Whether
+descending greedy is right thus depends on members outside the jam: a proof must charge the members a heavier set keeps
+for what they lock out elsewhere in the component, not only at the frontier.  That is the open problem in its
+irreducible form, and any proof must handle this configuration.
 
 ## The cardinality conjecture
 
-The weights can be dropped from the sources conjecture, for a statement about sizes alone.  Say that *(★) holds in game
-n* when, for every component H of the sources' instance of game n and every t, no playable subset of the truncation H ∩
-[t, n] has more members than U\* ∩ H ∩ [t, n]: descending greedy, run on the truncation, keeps a largest playable subset
-of it.
+The weights can be dropped from [the sources conjecture](#the-sources-conjecture), for a statement about sizes alone.
+Say that *(★) holds in game n* when, for every component H of the sources' instance of game n and every t, no playable
+subset of the truncation H ∩ [t, n] has more members than U\* ∩ H ∩ [t, n]: descending greedy, run on the truncation,
+keeps a largest playable subset of it.
 
 **Conjecture S4 (the cardinality conjecture (★)).**  Statement (★) holds in every game n.
 
 Statement (★) in game n is equivalent to the sources conjecture holding in game n for every weighting of the sources
-that is positive and strictly increasing in value.  It suffices, by the uniqueness theorem (Q1), which proves more.  It
-is needed: if a playable subset S of a truncation H ∩ [t, n] has more members than U\* ∩ H ∩ [t, n], then S ∪ (U\* ∖ H)
-is playable, since playability splits over the components, and it has more members of value t or more than U\* has.  So
-by the paragraph "The converse" of [sums over thresholds](primer.md#sums-over-thresholds), some positive, strictly
-increasing weighting makes it heavier than U\*.
+that is positive and strictly increasing in value.  It suffices, by [the uniqueness theorem
+(Q1)](uniqueness-and-longest-games.md#the-uniqueness-theorem), which proves more.  It is needed: if a playable subset S
+of a truncation H ∩ [t, n] has more members than U\* ∩ H ∩ [t, n], then S ∪ (U\* ∖ H) is playable, since playability
+splits over the components, and it has more members of value t or more than U\* has.  So by the paragraph "The converse"
+of [sums over thresholds](primer.md#sums-over-thresholds), some positive, strictly increasing weighting makes it heavier
+than U\*.
 
 ## The span conjecture
 
@@ -270,15 +276,16 @@ conjecture, for every weighting of the sources that is positive and strictly inc
 basis, and no playable set has more members than a basis.  Fix a component H and a threshold t, and let W = U\* ∩ H ∩
 [t, n].
 
-1. *W is independent.*  It is playable, as part of U\*, so its incidence vectors are independent over GF(2), by the
-   independence lemma (P10).
+1. *W is independent.*  It is playable, as part of U\*, so its incidence vectors are independent over GF(2), by [the
+   independence lemma (P10)](playability.md#the-independence-lemma).
 2. *W spans H ∩ [t, n].*  A member of H ∩ [t, n] that descending greedy keeps is in W.  For a member x that it
    rejects, (♦) gives a set of kept sources above x whose vectors sum to v(x).  Members of other components list none
    of H's factors, so the vectors of the members of that set outside H sum to zero, and the independence of U\*'s
    vectors allows that only if there are none.  So the set lies in H, above x ≥ t, and in W.
 3. *Sizes.*  So W is a basis of the space spanned by the vectors of H ∩ [t, n], and |W| is its rank.  A playable subset
    of H ∩ [t, n] has independent vectors (P10), so it has at most |W| members: that is (★) for H and t.
-4. *Weights.*  The uniqueness theorem (Q1) turns (★) into the weighted statement.  ∎
+4. *Weights.*  [The uniqueness theorem (Q1)](uniqueness-and-longest-games.md#the-uniqueness-theorem) turns (★) into the
+   weighted statement.  ∎
 
 ## What a proof must use
 
@@ -293,15 +300,17 @@ These are observations from computation, with their evidence in [evidence.md](ev
   the true order has is the *window law*: among the sources f·p that share a maximal factor f, with p prime, the order
   of value is the order of p.  At game 2873 the window law puts 1573 = 143·11 below 1859 = 143·13, so 1859 and 2197
   cannot both be last: the window law is the property that rules out these traps.
-* **The component is the unit.**  Descending greedy can fail on part of a component and hold on the whole, as it does
-  on the sources built from 17, 19 and 23.  An exact search of a component need only cover its residual, by the
-  exclusion theorem (P8): the component of game 2873 that holds its six sources has 377 members, 70 of them in its
-  residual, and an exact search there finds descending greedy's six exclusions the fewest possible.
-* **A matching certifies most thresholds.**  A playable set's members have distinct maximal factors (P2), so a playable
-  subset of H has at most ν(H) members, the matching number of H's incidence graph.  Where descending greedy meets this
-  bound, (★) holds there with no search, as it does at most thresholds.  Where the bound overshoots, the surplus is
-  sets whose members have distinct factors but are not playable, such as the sources 22, 26, 33 and 39 of game 39: they
-  list 2 and 11, 2 and 13, 3 and 11, and 3 and 13, a cycle, so they form a core.
+* **The component is the unit.**  Descending greedy can fail on part of a component and hold on the whole, as it does on
+  the sources built from 17, 19 and 23.  An exact search of a component need only cover its residual, by [the exclusion
+  theorem (P8)](playability.md#the-exclusion-theorem): the component of game 2873 that holds its six sources has 377
+  members, 70 of them in its residual, and an exact search there finds descending greedy's six exclusions the fewest
+  possible.
+* **A matching certifies most thresholds.**  A playable set's members have distinct maximal factors
+  ([P2](playability.md#the-playability-theorem)), so a playable subset of H has at most ν(H) members, the matching
+  number of H's incidence graph.  Where descending greedy meets this bound, (★) holds there with no search, as it does
+  at most thresholds.  Where the bound overshoots, the surplus is sets whose members have distinct factors but are not
+  playable, such as the sources 22, 26, 33 and 39 of game 39: they list 2 and 11, 2 and 13, 3 and 11, and 3 and 13, a
+  cycle, so they form a core.
 * **The monomial-impossibility criterion.**  Two products of primes p < q < r, p^a q^b r^c and p^a′ q^b′ r^c′, are
   ordered alike by every choice of the primes, the first below, exactly when c ≤ c′, b + c ≤ b′ + c′ and a + b + c ≤
   a′ + b′ + c′, not all with equality.  The condition suffices: with log q = log p + u and log r = log q + u′, where u
@@ -313,12 +322,12 @@ These are observations from computation, with their evidence in [evidence.md](ev
   that compete for their factors, to eight members.  A *trap order* of a shape is an order of its members under which
   descending greedy keeps fewer than fit, and a *realization* is a choice of the primes and of n that puts the shape's
   members among the sources of game n in that order.  A shape that is a minimal core cannot trap descending greedy:
-  every one of its members is a victim (S2), so descending greedy keeps all but the smallest, as many as fit.  Padded
-  shapes trap exactly when their maximal playable subsets come in two adjacent sizes, as the six sources of game 2873
-  do.  Each trap order found had one of three fates: it asks for an order of two members that no primes realize, by the
-  sufficient condition above; it was never realized in the search; or it is one of seven realizable ones.  Each of the
-  seven was defeated at every realization tested by a *window guard*: a source, q³ or q²r, that the shape's own members
-  force into (n/2, n].  That the guard always suffices is measured, not proved.
+  every one of its members is a victim ([S2](#the-victim-law)), so descending greedy keeps all but the smallest, as many
+  as fit.  Padded shapes trap exactly when their maximal playable subsets come in two adjacent sizes, as the six sources
+  of game 2873 do.  Each trap order found had one of three fates: it asks for an order of two members that no primes
+  realize, by the sufficient condition above; it was never realized in the search; or it is one of seven realizable
+  ones.  Each of the seven was defeated at every realization tested by a *window guard*: a source, q³ or q²r, that the
+  shape's own members force into (n/2, n].  That the guard always suffices is measured, not proved.
 * **The window law, for the primes that make the window.**  In the prover's adversarial runs, (♦) held under every
   order of the real incidence structure that obeys the window law, random or chosen adversarially, and also under the
   window law reversed.  It failed often under the window law taken for a random ranking of the primes, or for the primes
@@ -335,7 +344,7 @@ that obeys its window law.
 
 ## Proof of the frontier theorem
 
-We prove the frontier theorem (S3), in the notation of its statement.
+We prove [the frontier theorem (S3)](#the-frontier-theorem), in the notation of its statement.
 
 1. *The frontier is in G.*  The members of T above d are those of G above d.  If d were in T and not in G, descending
    greedy would have rejected d, so the members of G above d, together with d, would not be playable.  But they are
@@ -343,17 +352,17 @@ We prove the frontier theorem (S3), in the notation of its statement.
 2. *Every obstruction reaches below d.*  Let Q be a core in T ∪ {d}.  It holds d, since T is playable and so holds no
    core.  The members of T ∪ {d} of value d or more are those of G, by step 1, and they are playable, so Q is not among
    them: it holds a member below d, which is a member of T.
-3. *One cycle.*  Suppose T ∪ {d} is not playable, and let R be its residual, which is the union of the cores in it
-   ([the residual theorem (P5)](playability.md#the-residual-theorem)).  Its members have at most two maximal factors, so
-   draw R as the graph of [where exchange breaks](#where-exchange-breaks).  The set R ∖ {d} is part of T, so it is
-   playable, and by the two-factor proposition (P11) its edges form a forest.  Adding the one edge d to a forest makes
-   at most one cycle; call it Z.
+3. *One cycle.*  Suppose T ∪ {d} is not playable, and let R be its residual, which is the union of the cores in it ([the
+   residual theorem (P5)](playability.md#the-residual-theorem)).  Its members have at most two maximal factors, so draw
+   R as the graph of [where exchange breaks](#where-exchange-breaks).  The set R ∖ {d} is part of T, so it is playable,
+   and by [the two-factor proposition (P11)](playability.md#the-two-factor-proposition) its edges form a forest.  Adding
+   the one edge d to a forest makes at most one cycle; call it Z.
 4. *Z is the only minimal core.*  A core in T ∪ {d} lies in R and is not playable, so by P11 its edges hold a cycle,
    which can only be Z.  And Z is a core: at each factor on a cycle two of its edges meet, so each factor that a member
-   of Z lists is listed by another member of Z.  The set T ∪ {d} is not playable, so it holds a core, by the core
-   theorem (P7); so Z exists, and every core in T ∪ {d} holds it.
-5. *A trade.*  By step 2, Z holds a member s of T below d.  It lies in every minimal core in T ∪ {d}, so by the victim
-   law (S2) it is a victim.  The set (T ∪ {d}) ∖ {s} outweighs T by d − s > 0.
+   of Z lists is listed by another member of Z.  The set T ∪ {d} is not playable, so it holds a core, by [the core
+   theorem (P7)](playability.md#the-core-theorem); so Z exists, and every core in T ∪ {d} holds it.
+5. *A trade.*  By step 2, Z holds a member s of T below d.  It lies in every minimal core in T ∪ {d}, so by [the victim
+   law (S2)](#the-victim-law) it is a victim.  The set (T ∪ {d}) ∖ {s} outweighs T by d − s > 0.
 6. *The conclusion.*  If T is a heaviest playable subset of H, with T ≠ G, then T ∪ {d} is not playable, since it would
    outweigh T.  By steps 3 to 5, if every member of its residual had at most two maximal factors, a trade would outweigh
    T; so some member has three or more.  ∎

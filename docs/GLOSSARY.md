@@ -156,7 +156,7 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **P\***: the best promotion sum, the largest sum of a promotion set.  The best promotion sum of a problem Π is P\*(Π),
   and P\* alone means P\*(Π_n).  The frame solver's answer for game n is `in_the_bag` + P\*.  Game 21 has P\* = 9.
 * **the frame model**: this decomposition of the game into frames and promotions ([definition](theory/frame-model.md#the-frame-model)).
-  It is exact given statement U: then
+  It is exact given [statement U](theory/exactness.md#statement-u): then
   `in_the_bag` + P\* = opt(n) ([the exactness theorem (X7)](theory/exactness.md#the-exactness-theorem) and [its
   corollary (X8)](theory/exactness.md#statement-u); [solver/docs/design/frame-model.md, “What
   "optimal" means”](../solver/docs/design/frame-model.md#what-optimal-means)).  `model::FrameGraph` is the immutable
@@ -347,7 +347,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
 * **assumes**: what a proof rests on beyond the frame model, inherited down the chain.  A game of n − 1, or of n, taken
-  from `optimal.json` is assumed optimal.  A bound of the bounds store assumes statement U at the games it rests on.
+  from `optimal.json` is assumed optimal.  A bound of the bounds store assumes [statement
+  U](theory/exactness.md#statement-u) at the games it rests on.
 * **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from
   `optimal.json`, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
 * **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
@@ -385,12 +386,13 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
   moves beats a recorded score ([its README](../solver/noframe/README.md)).
 * **brute force** (`src/brute.rs`): the frame solver's exhaustive search, the test oracle for small games.
-* **the sources conjecture (S1)**: no playable set of sources outweighs U\*.  The *sources' instance* has the sources
-  as members, each listing all its maximal factors, and its *components*, *truncations*, *jams* and *victims* are
-  defined with the conjecture ([definitions](theory/sources.md#definitions)).  **Conjecture (★)**, the cardinality
-  conjecture: on every component of the sources' incidence graph, and every truncation of it, descending greedy keeps a
-  playable set of the largest size ([S4](theory/sources.md#the-cardinality-conjecture)).  It implies the sources
-  conjecture, and is equivalent to it for every weighting that increases with value.  **(♦)**, the span conjecture:
+* **the sources conjecture (S1)**: no playable set of sources outweighs U\*.  The *sources' instance* has the sources as
+  members, each listing all its maximal factors, and its *components*, *truncations*, *jams* and *victims* are defined
+  with the conjecture ([definitions](theory/sources.md#definitions)).  **Conjecture (★)**, [the cardinality
+  conjecture](theory/sources.md#the-cardinality-conjecture): on every component of the sources' incidence graph, and
+  every truncation of it, descending greedy keeps a playable set of the largest size
+  ([S4](theory/sources.md#the-cardinality-conjecture)).  It implies the sources conjecture, and is equivalent to it for
+  every weighting that increases with value.  **(♦)**, [the span conjecture](theory/sources.md#the-span-conjecture):
   every source that descending greedy rejects is a GF(2) combination of sources it kept above it
   ([S5](theory/sources.md#the-span-conjecture)).  Statement (♦) implies (★) ([the span theorem
   (S6)](theory/sources.md#the-span-theorem)).
@@ -420,11 +422,12 @@ it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
 * **Study numbers** (study E1, study E6, study E9(a), ...): the experiments of one plan, numbered within it.  The
   same number means different experiments in different plans; the entry or document that uses one defines it.  Refits
   R1 to R3 likewise name the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.
-* **Results of the theory** (P2, N5, X7, R4, statement U, and so on): a letter for the file and a number in one
-  sequence through it: P [playability](theory/playability.md), N [neighbors](theory/neighbors.md), S
-  [sources](theory/sources.md), Q [uniqueness and longest games](theory/uniqueness-and-longest-games.md), W [the
-  parity bound](theory/parity-bound.md), C [Franklín and Moniot](theory/franklin-moniot.md), F [the frame
-  model](theory/frame-model.md), X [its exactness](theory/exactness.md), E [the extended
-  problem](theory/extended-problem.md), B [the bounds on the promotions](theory/frame-bounds.md) and R [the rules of a
-  search](theory/search-rules.md).  The letters C, E and R also head the numbers above, so a label of the theory comes
-  with its name, and a label of a plan with its kind: conjecture C2, study E6, refit R3.
+* **Results of the theory** (P2, N5, X7, R4, [statement U](theory/exactness.md#statement-u), and so on): a letter for
+  the file and a number in one sequence through it: P [playability](theory/playability.md), N
+  [neighbors](theory/neighbors.md), S [sources](theory/sources.md), Q [uniqueness and longest
+  games](theory/uniqueness-and-longest-games.md), W [the parity bound](theory/parity-bound.md), C [Franklín and
+  Moniot](theory/franklin-moniot.md), F [the frame model](theory/frame-model.md), X [its
+  exactness](theory/exactness.md), E [the extended problem](theory/extended-problem.md), B [the bounds on the
+  promotions](theory/frame-bounds.md) and R [the rules of a search](theory/search-rules.md).  The letters C, E and R
+  also head the numbers above, so a label of the theory comes with its name, and a label of a plan with its kind:
+  conjecture C2, study E6, refit R3.

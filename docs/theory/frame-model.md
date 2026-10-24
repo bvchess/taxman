@@ -81,9 +81,9 @@ acyclic payment scheme of each T_i against F_i.  Suppose that each member of T_j
 of F_1, …, F_j.  Then the union of the schemes is an acyclic payment scheme of T_1 ∪ ⋯ ∪ T_r against F_1 ∪ ⋯ ∪ F_r.
 
 *Proof.*  The union pays each member with a factor it lists, no two the same, since the pools are disjoint.  On each
-edge a → b of a cycle of its precedence, pay(a) is a maximal factor of b (P3).  If a ∈ T_i, then pay(a) ∈ F_i, so b
-lists a factor of F_i, and b ∈ T_j for some j ≥ i.  Around a cycle the index never falls, so it never changes: the
-cycle lies in the scheme of one T_i, which has none.  ∎
+edge a → b of a cycle of its precedence, pay(a) is a maximal factor of b ([P3](playability.md#the-flat-cycle-lemma)).
+If a ∈ T_i, then pay(a) ∈ F_i, so b lists a factor of F_i, and b ∈ T_j for some j ≥ i.  Around a cycle the index never
+falls, so it never changes: the cycle lies in the scheme of one T_i, which has none.  ∎
 
 ### The layer theorem
 
@@ -92,11 +92,11 @@ n/2 that are not in S.
 
 **Theorem F3 (the layer theorem).**  A set S ⊆ {2, …, n} is playable iff every layer instance of S is playable.
 
-*Proof.*  The maximal factors of a member of layer k lie in layer k − 1 and are at most n/2.  So a member of S_k has
-the same list in S's own instance as in the layer instance at k, and it lists only factors of that instance's pool.  If
-every layer instance is playable, the joining lemma (F2) joins their schemes into an acyclic scheme of S's own
-instance.  Conversely, a scheme of S's own instance pays S_k with factors of the pool at k, so by restriction each layer
-instance is playable.  P2 finishes the proof.  ∎
+*Proof.*  The maximal factors of a member of layer k lie in layer k − 1 and are at most n/2.  So a member of S_k has the
+same list in S's own instance as in the layer instance at k, and it lists only factors of that instance's pool.  If
+every layer instance is playable, [the joining lemma (F2)](#the-joining-lemma) joins their schemes into an acyclic
+scheme of S's own instance.  Conversely, a scheme of S's own instance pays S_k with factors of the pool at k, so by
+restriction each layer instance is playable.  [P2](playability.md#the-playability-theorem) finishes the proof.  ∎
 
 A game is thus a chain of layer games, coupled only through the numbers up to n/2 that it plays, and the frame model
 is this chain with the sources fixed to U\*.  The [parity bound](parity-bound.md#the-parity-bound) groups the same
@@ -127,11 +127,11 @@ independent set of the graphic matroid [spans](primer.md#matroids) an edge when 
    every prime up to n/2.
 2. A set of numbers of layer 2 is playable against those primes iff it is a forest in G_n, by [the two-factor
    proposition (P11)](playability.md#the-two-factor-proposition): these sets are the independent sets of the graphic
-   matroid of G_n ([matroids](primer.md#matroids)).
-3. Adding a source s of layer 2 to the kept sources changes only their layer instance at 2 (F3), so descending greedy
-   keeps s iff s closes no cycle with the kept sources of layer 2: on these sources it is the scan.  By part (b), the
-   elements the scan keeps before an element x span all the elements above x, so it keeps x iff x closes no cycle with
-   the elements above x.
+   matroid of G_n (matroids).
+3. Adding a source s of layer 2 to the kept sources changes only their layer instance at 2 ([F3](#the-layer-theorem)),
+   so descending greedy keeps s iff s closes no cycle with the kept sources of layer 2: on these sources it is the scan.
+   By part (b), the elements the scan keeps before an element x span all the elements above x, so it keeps x iff x
+   closes no cycle with the elements above x.
 4. Let I be what the scan keeps of W = S_2 ∪ U\*_2.  The members of W above a source x of W are sources of layer 2.  If
    x ∈ U\*_2, x closes no cycle with them, since it closes none with all the sources of layer 2 above x (step 3).  If
    x ∉ U\*_2, it closes a cycle with the members of U\*_2 above it.  So I = U\*_2 ∪ E, with E made of numbers of S_2 up
@@ -141,8 +141,8 @@ independent set of the graphic matroid [spans](primer.md#matroids) an edge when 
 6. S′ = (S ∖ S_2) ∪ I is playable by F3: at layer 2 it has the forest I against the same pool; at layer 3 the pool
    only grows, since S plays the numbers E too; the other layers do not change.  So ΣS′ ≤ ΣS, which forces
    S_2 = I = U\*_2 ∪ E.
-7. The frames of layer 2 hold the primes up to n/2 as factors (F1).  When they are closed, U\*_2 has one edge for each
-   of these primes, one fewer than G_n has vertices: it is a spanning tree, so E is empty.  ∎
+7. The frames of layer 2 hold the primes up to n/2 as factors ([F1](#the-frame-lemma)).  When they are closed, U\*_2 has
+   one edge for each of these primes, one fewer than G_n has vertices: it is a spanning tree, so E is empty.  ∎
 
 In game 21, G_n has the vertices 2, 3, 5, 7 and g, and U\*_2 = {14, 15, 21} is the forest of the edges 2–7, 3–5 and
 3–7, which leaves g alone.  So one more edge fits.  The edge 4 = 2² (2–g) or 9 = 3² (3–g) closes no cycle, while
@@ -184,7 +184,7 @@ games 2 to 7, 9 to 11 and 15, there is no frame h, the root problem below is emp
 
 **Proposition F6 (clean numbering).**  Every frame with freedoms in front of a frame numbered h is numbered h − 1.
 
-*Proof.*  It lies one layer lower (F1), and the numbers follow the layers.  ∎
+*Proof.*  It lies one layer lower ([F1](#the-frame-lemma)), and the numbers follow the layers.  ∎
 
 The proof of exactness uses nothing else about the numbering: a promoted number pays one layer down (F1), and F6 puts
 the frames there that can pay for it in frame h − 1.
@@ -203,8 +203,8 @@ so peel stalls.
 x on, take an acyclic scheme, and let D be the frame of frame h that holds pay(x).  The moves of D pay with factors of
 D, since a move's maximal factors lie in its own frame, and so does x: by restriction, D can take x on.  Conversely, let
 a frame D of frame h take x on.  The moves of each other frame of frame h list only factors of that frame, and are
-playable against them.  The joining lemma (F2), with those frames first and D with x last, joins the schemes into an
-acyclic scheme of the moves of frame h with x against F_h.  ∎
+playable against them.  [The joining lemma (F2)](#the-joining-lemma), with those frames first and D with x last, joins
+the schemes into an acyclic scheme of the moves of frame h with x against F_h.  ∎
 
 **Candidates.**  A *candidate* is a factor x of a frame D numbered h ≥ 1 that passes two tests: (a) U\* ∩ D is
 playable against F_D ∖ {x}; (b) frame h − 1 can take x on.  Test (a) asks that D can spare x, and test (b) that the
@@ -249,12 +249,12 @@ until no such move is left; each step is a *drop*.
 claim sequence of it, then reduced; and it has the candidates.  *The root problem* Π_n uses the claims of frame h,
 which leave no move with one live factor, so its root frame h is frame h less its claims.  The *root* is the root frames
 before any promotion.  A number's *home* is the number h of the root frame whose factors hold it, if one does; every
-candidate of a frame numbered h has the home h ([the reduction-step lemma (X6)](exactness.md#the-exactness-theorem)).
-ΣU\* is the score with no promotions ([the kept-sources lemma (X1)](exactness.md#the-exactness-theorem)).  In game 21,
+candidate of a frame numbered h has the home h (the reduction-step lemma (X6)).
+ΣU\* is the score with no promotions (the kept-sources lemma (X1)).  In game 21,
 root frame 0 has the moves 14 and 21 and the factors 2, 3 and 7, and root frame 1 has the moves 12 and 18 and the
 factors 4, 6 and 9; the candidates 4 and 9 have the home 1.  In game 8, the claim (6, 3) in place of (6, 2) would give
-another root problem, with root frame 0 holding the factor 2 instead of 3.  [The exactness theorem
-(X7)](exactness.md#the-exactness-theorem) holds for every root problem of game n, so they all have the same promotion
+another root problem, with root frame 0 holding the factor 2 instead of 3.  The exactness theorem
+(X7) holds for every root problem of game n, so they all have the same promotion
 sets, and P\* does not depend on the claims.
 
 **Promotion sets.**  *Applying* a set L to frame h adds to its moves the members of L in F_{h+1} and removes from its
@@ -287,9 +287,9 @@ stays.
    and Z removed from its factors is winnable iff W less x and f, edited alike, is.
 2. If W is winnable, reducing it ends at the same pair whatever the order of the drops.
 
-*Proof of part 1.*  After the edits x still has the single live factor f: added moves change no move's live factors,
-and Z leaves f.  So (x, f) is a front move of the edited pair, which keeps it playable and keeps it unplayable (P4), and
-a pair is winnable iff it is playable (F5).
+*Proof of part 1.*  After the edits x still has the single live factor f: added moves change no move's live factors, and
+Z leaves f.  So (x, f) is a front move of the edited pair, which keeps it playable and keeps it unplayable
+([P4](playability.md#the-peel-theorem)), and a pair is winnable iff it is playable ([F5](#the-winnability-lemma)).
 
 *Proof of part 2.*  The idea is the diamond argument.  Two different drops available at once commute: each leaves the
 other available, and doing both in either order reaches the same pair.  An induction spreads this local agreement to
@@ -313,10 +313,11 @@ In game 21 the drops of root frame 0 with 9 applied can come in no other order, 
 Winnability is needed in part 2: against the factor 3, the moves 6 and 9 reduce to 9 alone or to 6 alone.
 
 Setup builds the root problem by a longer route, which [the design of the frame
-model](../../solver/docs/design/frame-model.md#setup-in-the-code) follows step by step: it makes claims in rounds
-before and after merging, runs descending greedy again after each round, tests (a) after its first claims, and reduces
-at the end.  X1 and part 3 of X5 show that these steps change neither the sources nor the candidates.  On a few small
-boards its order of claims gives another root problem of game n than Π_n; the design doc says which.
+model](../../solver/docs/design/frame-model.md#setup-in-the-code) follows step by step: it makes claims in rounds before
+and after merging, runs descending greedy again after each round, tests (a) after its first claims, and reduces at the
+end.  [X1](exactness.md#the-exactness-theorem) and part 3 of X5 show that these steps change neither the sources nor the
+candidates.  On a few small boards its order of claims gives another root problem of game n than Π_n; the design doc
+says which.
 
 ## Searching the frame model
 
@@ -325,9 +326,9 @@ cuts, and [frame-bounds.md](frame-bounds.md) the bounds it cuts with.  A *node* 
 *candidates* C, a set of candidates disjoint from P that it may still promote.  Its *completions* are the promotion sets
 P ∪ X with X ⊆ C; the root node, with no promotions and every candidate, has a heaviest completion worth P\*.  The
 *state* state(P) is the root frames with P applied, then [reduced](#the-frame-model).  These frames are winnable, so by
-the reduction lemma (F8) the reduced frames do not depend on the order of the drops.  [The state lemma
-(R1)](search-rules.md#the-state-lemma) shows that state(P) decides which completions are promotion sets.  In game 21,
-state({9}) has two empty frames, by the drops above.
+[the reduction lemma (F8)](#the-reduction-lemma) the reduced frames do not depend on the order of the drops.  [The state
+lemma (R1)](search-rules.md#the-state-lemma) shows that state(P) decides which completions are promotion sets.  In game
+21, state({9}) has two empty frames, by the drops above.
 
 Claims and drops keep a pair's freedoms, and a promotion into or out of a frame spends one.  So frame h of state(P)
 has the freedoms of the frames numbered h, less the members of P promoted into or out of it.  For a node, let ρ_h be
@@ -347,13 +348,13 @@ which spends a freedom of frame h and one of frame h − 1.  The promotion limit
 
 *Proof of part 2.*  Let x_h be the number of members of X whose home is h; x_0 = 0, since no candidate has the home 0.
 
-1. *Each member of X is a factor of its home's frame in state(P).*  Otherwise a drop of the reduction that made frame
-   h of state(P) took one; take the first drop whose factor X removes.  The drops before it keep their factors under
-   X, so by F8, part 1, root frame h with P ∪ X applied is winnable iff the pair after those drops, with X applied, is.
-   There the drop's move has its one live factor removed, so the pair is unwinnable, and P ∪ X is no promotion set.  So
-   x_h ≤ κ_h.
+1. *Each member of X is a factor of its home's frame in state(P).*  Otherwise a drop of the reduction that made frame h
+   of state(P) took one; take the first drop whose factor X removes.  The drops before it keep their factors under X, so
+   by [F8](#the-reduction-lemma), part 1, root frame h with P ∪ X applied is winnable iff the pair after those drops,
+   with X applied, is.  There the drop's move has its one live factor removed, so the pair is unwinnable, and P ∪ X is
+   no promotion set.  So x_h ≤ κ_h.
 2. *The freedoms.*  Root frame h with P ∪ X applied has the freedoms ρ_h − x_h − x_{h+1}, and it is winnable, so it
-   has at least as many factors as moves (F5): x_h + x_{h+1} ≤ ρ_h.
+   has at least as many factors as moves ([F5](#the-winnability-lemma)): x_h + x_{h+1} ≤ ρ_h.
 3. So (x_h) is one of the sequences that the promotion limit ranges over, and |X| = Σx_h is at most the limit.  If
    x_h ≥ 1, the conditions at h and h − 1 give ρ_h ≥ 1 and ρ_{h−1} ≥ 1.
 

@@ -7,12 +7,13 @@ Taxman but not this solver.  These rules get them there; the sources at the end 
 
 Each document serves one need, and the kinds stay apart, linked to each other.  A *how-to* gives the steps of a task
 (the RUNBOOK, the README's commands).  A *reference* describes, neutrally, for looking up (the glossary, the file
-formats).  An *explanation* says how something works and why (DESIGN.md, THEORY.md).  A *tutorial* teaches by doing.
-Two more kinds sit outside these four: the lab notebook is the record of what was tried, and STATUS and AGENDA are
-time-bound.  A passage in the wrong kind of document moves, or becomes a link.  A how-to gives the advice that holds for
-every run; the plan, the values and the record of one campaign belong to its notebook entry, and the how-to links it as
-an example.  A checklist of what to do every time is a how-to (the rules for every launch); a list of what is done and
-what remains is a scratchpad, not a doc, and STATUS holds the state of the work.
+formats).  An *explanation* says how something works and why ([DESIGN.md](../solver/docs/DESIGN.md),
+[THEORY.md](THEORY.md)).  A *tutorial* teaches by doing.  Two more kinds sit outside these four: the lab notebook is the
+record of what was tried, and STATUS and AGENDA are time-bound.  A passage in the wrong kind of document moves, or
+becomes a link.  A how-to gives the advice that holds for every run; the plan, the values and the record of one campaign
+belong to its notebook entry, and the how-to links it as an example.  A checklist of what to do every time is a how-to
+(the rules for every launch); a list of what is done and what remains is a scratchpad, not a doc, and STATUS holds the
+state of the work.
 
 ## 2. Lead with the point
 
@@ -31,10 +32,10 @@ a mechanical split.  Use one parenthesis at most, and never nest them.  Put thre
 
 ## 4. Define each term before using it
 
-Say what a word means where it first appears, or link the [glossary](GLOSSARY.md).  Give each
-idea one name and keep to it: two names make the reader wonder whether they are two ideas.  Internal labels (A1, N3,
-R4, statement U) appear only after the text has said in words what they stand for.  Put a small example beside a
-general statement: "12 has the maximal factors 6 and 4."
+Say what a word means where it first appears, or link the [glossary](GLOSSARY.md).  Give each idea one name and keep to
+it: two names make the reader wonder whether they are two ideas.  Internal labels (A1, N3, R4, [statement
+U](theory/exactness.md#statement-u)) appear only after the text has said in words what they stand for.  Put a small
+example beside a general statement: "12 has the maximal factors 6 and 4."
 
 ## 5. Give every fact that can change one home
 
@@ -68,10 +69,10 @@ rules for filing it.
 A reader should be able to read what one task needs and little else.  A file stays under 6,000 words, and should stay
 under 5,000.  A longer document becomes a folder of files, split by task rather than by size: a file holds what one kind
 of task needs, whole, and two files a task always needs together are one.  The file that bears the document's name,
-beside its folder (RUNBOOK.md for runbook/), stays as its index, under 1,000 words, with a line a file saying which task
-it serves.  Files have plain names (`runbook/prover.md`), and a citation names the file and, where it needs one, the
-heading, never a section number.  A split copies nothing: a passage that two tasks need lives in one file, and the
-other links it (rule 5).  The notebook's entries are records and keep their length.
+beside its folder ([RUNBOOK.md](../solver/docs/RUNBOOK.md) for runbook/), stays as its index, under 1,000 words, with a
+line a file saying which task it serves.  Files have plain names (`runbook/prover.md`), and a citation names the file
+and, where it needs one, the heading, never a section number.  A split copies nothing: a passage that two tasks need
+lives in one file, and the other links it (rule 5).  The notebook's entries are records and keep their length.
 
 A citation in a doc is a link at its first mention in each section (the text under one heading), so that a reader who
 needs to look something up finds the link nearby, and it is not linked again in that section, where more links would

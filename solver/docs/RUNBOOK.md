@@ -29,5 +29,5 @@ launch.md, and ends with the campaigns that used it, whose notebook entries hold
 | the sweep (`sweep.sh`) | [sweep.md](runbook/sweep.md) | prove as many games of a long stretch as a cheap machine allows |
 | the ledger (`ledger/cloud.sh`) | [ledger.md](runbook/ledger.md) | run the ledger over a stretch of games for a budget of CPU |
 | the prover (`prover.sh`) | [prover.md](runbook/prover.md) | prove opt(n) on the whole board with the prover |
-| certificates of U (`certify.sh`) | [certify.md](runbook/certify.md) | certify statement U game by game |
+| certificates of U (`certify.sh`) | [certify.md](runbook/certify.md) | certify [statement U](../../docs/theory/exactness.md#statement-u) game by game |
 | the lab (`lab/lab.sh`) | [lab.md](runbook/lab.md) | study the largest units of a live search on a machine's spare threads, by hand or in a sandboxed agent session |

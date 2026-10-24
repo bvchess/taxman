@@ -141,12 +141,13 @@ sets only the first, so that it takes just the game before its range, from the t
   (`StoreCap`, `search_cap`: the engine is given the lower of it and the ceiling of the game before, at the start and
   when the game before is concluded).  A search whose best promotion sum reaches the store's bound, when it is not the
   chain's ceiling that it reached, is proven by the bound: proof `known`, method `search` (or `start`, if the starting
-  game reached the bound before a step), `known` citing the upper line alone, `reached_cap` false and `setup.cap` as
-  for any search.  Such a game settles its search problem, as an exhausted search or one at the ceiling does: its
-  promotions are a promotable set of that sum, and no promotable set weighs more than the bound allows (a game of the
-  frame model is a game of the board, so it scores at most opt(n), which the bound bounds).  So a later game that poses
-  the same problem repeats it, and assumes what the bound does.  A search that finds a game above the store's bound
-  fails the run at that game: the store is wrong, or statement U fails at a game that its bound rests on.
+  game reached the bound before a step), `known` citing the upper line alone, `reached_cap` false and `setup.cap` as for
+  any search.  Such a game settles its search problem, as an exhausted search or one at the ceiling does: its promotions
+  are a promotable set of that sum, and no promotable set weighs more than the bound allows (a game of the frame model
+  is a game of the board, so it scores at most opt(n), which the bound bounds).  So a later game that poses the same
+  problem repeats it, and assumes what the bound does.  A search that finds a game above the store's bound fails the run
+  at that game: the store is wrong, or [statement U](../../../docs/theory/exactness.md#statement-u) fails at a game that
+  its bound rests on.
 * *`force_search`* leaves out the known games and the store's help, since a forced search is the chain's own.  A game
   with a checkpoint is resumed, never replaced.
 
@@ -229,9 +230,10 @@ format, the commands and the referees.
   which `solution_for_promotions` turns into moves; cited (`from` and `from_value`) where a relation made it from the
   game of another line; else its moves.
 * An upper bound has its rule, the bound and game it was derived from (`from`, `from_value`, and for a repeat the two
-  bags), and `rests_on`, the games at which it assumes statement U: its own game for a bound of the frame model, what
-  the bound it comes from rests on for a relation, and its own game added for a repeat ([the repeat lemma
-  (R6)](../../../docs/theory/search-rules.md#the-repeat-lemma)'s inequality between upper bounds).
+  bags), and `rests_on`, the games at which it assumes [statement U](../../../docs/theory/exactness.md#statement-u): its
+  own game for a bound of the frame model, what the bound it comes from rests on for a relation, and its own game added
+  for a repeat ([the repeat lemma (R6)](../../../docs/theory/search-rules.md#the-repeat-lemma)'s inequality between
+  upper bounds).
 * `ledger export` appends a run's improvements, and `ledger run --bounds` starts a run from the file's best bounds (a
   game with both needs no map).  `ledger verify-bounds` is the Rust referee: it replays every game, computes again every
   root bound and every repeat's bags and search problem, and checks every relation's arithmetic against the line it
