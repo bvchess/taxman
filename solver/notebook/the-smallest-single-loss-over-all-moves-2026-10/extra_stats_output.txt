@@ -1,0 +1,6 @@
+1125 {'x_min dropped': 729, 'dropped - added = 0': 544, 'largest dropped >= x_min': 1092, 'sum(dropped) - sum(added) = delta': 1125, 'every added < x_min': 467, '1-for-1 exchange (one dropped, one added besides n)': 158, 'pure drop (nothing added besides n)': 0, 'gap<=10': 63, 'gap>100': 714, 'dropped - added = 1': 581, 'x_min kept': 396, 'all dropped < x_min': 33}
+moves dropped: median 3 max 20
+alternatives: Counter({'D': 944, 'F': 175, 'B': 3, 'C': 2, 'A': 1})
+D by n range: n<=990: [800, 805, 950, 954, 975, 984, 988, 990]
+F+A+B+C+E count n<=990: Counter({'F': 175, 'D': 8, 'B': 2, 'C': 1, 'A': 1})
+violations with 425<=n<=780 (non-unique era) and their classes: Counter({'F': 80, 'C': 1, 'A': 1})
