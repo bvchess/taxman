@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="470" viewBox="0 0 780 470" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<title>Game 21&#x27;s root frames 1 and 0, with the candidates 4 and 9 (double outline) as factors of frame 1 and dashed arrows to the factors 2 and 3 of frame 0, where they would be movers: each candidate touches one odd and one even frame.</title>
+<rect x="0" y="0" width="780" height="470" fill="#ffffff"/>
+<rect x="50" y="62" width="360" height="170" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<rect x="50" y="272" width="360" height="170" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<line x1="142.6" y1="138.8" x2="122.1" y2="170.9" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="161.4" y1="138.8" x2="184.3" y2="174.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="226.6" y1="138.8" x2="203.7" y2="174.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="245.4" y1="138.8" x2="265.9" y2="170.9" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="142.6" y1="348.8" x2="119.7" y2="384.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="161.4" y1="348.8" x2="184.3" y2="384.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="245.4" y1="348.8" x2="268.3" y2="384.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="226.6" y1="348.8" x2="203.7" y2="384.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="110" y1="210" x2="110" y2="375.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<polygon points="110,384.5 105.4,373.5 114.6,373.5" fill="#666666"/>
+<line x1="278" y1="210" x2="278" y2="375.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<polygon points="278,384.5 273.4,373.5 282.6,373.5" fill="#666666"/>
+<rect x="91.5" y="171.5" width="37" height="37" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<rect x="96" y="176" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="190" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">4</text>
+<rect x="180" y="176" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="194" y="190" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">6</text>
+<rect x="259.5" y="171.5" width="37" height="37" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<rect x="264" y="176" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="278" y="190" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
+<circle cx="152" cy="124" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="152" y="124" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">12</text>
+<circle cx="236" cy="124" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="236" y="124" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">18</text>
+<rect x="96" y="386" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="400" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">2</text>
+<rect x="180" y="386" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="194" y="400" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">7</text>
+<rect x="264" y="386" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="278" y="400" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">3</text>
+<circle cx="152" cy="334" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="152" y="334" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">14</text>
+<circle cx="236" cy="334" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="236" y="334" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">21</text>
+<text x="400" y="84" text-anchor="end" dy=".35em" font-size="14" font-weight="bold" fill="#111111">Frame 1: B = N₁ (odd)</text>
+<text x="400" y="294" text-anchor="end" dy=".35em" font-size="14" font-weight="bold" fill="#111111">Frame 0: A = N₀ (even)</text>
+<text x="440" y="112" text-anchor="start" dy=".35em" font-size="14" font-weight="bold" fill="#111111">In frame 1, 4 and 9 are factors</text>
+<text x="440" y="138" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">Unit vectors e₄ and e₉.  The moves span</text>
+<text x="440" y="156" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">e₄ + e₆ and e₆ + e₉, so 4 and 9 are</text>
+<text x="440" y="174" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">parallel in B: rank 1.</text>
+<text x="440" y="322" text-anchor="start" dy=".35em" font-size="14" font-weight="bold" fill="#111111">In frame 0, they are movers</text>
+<text x="440" y="348" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">Vectors e₂ and e₃.  The moves span</text>
+<text x="440" y="366" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">e₂ + e₇ and e₃ + e₇, so 4 and 9 are</text>
+<text x="440" y="384" text-anchor="start" dy=".35em" font-size="13" font-weight="normal" fill="#666666">parallel in A: rank 1.</text>
+<text x="390" y="458" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Dashed arrow: a candidate to the maximal factor that would pay for it in the frame in front.</text>
+</svg>

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="640" viewBox="0 0 780 640" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<title>The numbers 2 to 10 in the middle with the coordinates 1 to 5 in two boxes, E0 = {1, 4} on the left and E1 = {2, 3, 5} on the right: each number&#x27;s solid lines to its maximal factors land in one box and its dashed line to its own coordinate in the other; the numbers above 5 have no own coordinate.</title>
+<rect x="0" y="0" width="780" height="640" fill="#ffffff"/>
+<rect x="55" y="121" width="80" height="350" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<rect x="645" y="207.3" width="80" height="226" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
+<line x1="368.8" y1="87.8" x2="110.4" y2="158.8" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="410.9" y1="158.9" x2="669.6" y2="244.2" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="410.8" y1="205.3" x2="669.6" y2="295.9" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="411.7" y1="201.8" x2="669.5" y2="246.6" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="407.2" y1="247.3" x2="669.5" y2="298.3" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="373.1" y1="239.4" x2="110.4" y2="167.2" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="412" y1="290.8" x2="669.5" y2="300.7" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="410.8" y1="297.1" x2="669.6" y2="386" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="368.6" y1="365" x2="110.5" y2="425.4" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="372.6" y1="407.4" x2="110.5" y2="427.8" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="405.5" y1="397.8" x2="669.7" y2="257.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="372.6" y1="450.6" x2="110.5" y2="430.2" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="405.6" y1="444" x2="669.7" y2="309.2" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="373" y1="494" x2="110.5" y2="432.6" stroke="#666666" stroke-width="1.4" fill="none"/>
+<line x1="406.5" y1="492" x2="669.6" y2="396.9" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<rect x="81" y="149" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="95" y="163" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">4</text>
+<rect x="81" y="415" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="95" y="429" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">1</text>
+<rect x="671" y="235.3" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="685" y="249.3" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">3</text>
+<rect x="671" y="287.3" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="685" y="301.3" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">2</text>
+<rect x="671" y="377.3" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="685" y="391.3" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">5</text>
+<circle cx="390" cy="82" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="390" cy="82" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="2.8"/>
+<text x="390" y="82" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">8</text>
+<circle cx="390" cy="152" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="390" cy="152" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="2.8"/>
+<text x="390" y="152" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
+<circle cx="390" cy="198" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="390" cy="198" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="2.8"/>
+<text x="390" y="198" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">6</text>
+<circle cx="390" cy="244" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="390" y="244" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">4</text>
+<circle cx="390" cy="290" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="390" cy="290" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="2.8"/>
+<text x="390" y="290" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
+<circle cx="390" cy="360" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
+<circle cx="390" cy="360" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="2.8"/>
+<text x="390" y="360" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">7</text>
+<circle cx="390" cy="406" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="390" y="406" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">3</text>
+<circle cx="390" cy="452" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="390" y="452" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">2</text>
+<circle cx="390" cy="498" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="390" y="498" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">5</text>
+<text x="95" y="105" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">E₀: Ω even</text>
+<text x="685" y="191.3" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">E₁: Ω odd</text>
+<text x="390" y="44" text-anchor="middle" dy=".35em" font-size="13" font-weight="bold" fill="#666666" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke">Ω = 3</text>
+<text x="390" y="114" text-anchor="middle" dy=".35em" font-size="13" font-weight="bold" fill="#666666" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke">Ω = 2</text>
+<text x="390" y="322" text-anchor="middle" dy=".35em" font-size="13" font-weight="bold" fill="#666666" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke">Ω = 1</text>
+<text x="390" y="560" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Solid line: from a number to each maximal factor.</text>
+<text x="390" y="578" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Dashed line: from a number up to 5 to its own coordinate.</text>
+<text x="390" y="596" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: a number above 5, with no coordinate of its own.</text>
+<text x="390" y="614" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Gray and bold: the heaviest set independent in both matroids, {6, 7, 8, 9, 10}.</text>
+</svg>

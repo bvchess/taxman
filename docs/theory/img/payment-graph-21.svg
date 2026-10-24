@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="470" viewBox="0 0 760 470" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<title>The eight-cycle joining 10, 14, 15 and 21 to the primes of their maximal factors, with a matching of three edges that cannot be extended and a perfect matching of four.</title>
+<rect x="0" y="0" width="760" height="470" fill="#ffffff"/>
+<line x1="171.5" y1="103" x2="100.5" y2="103" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="208.5" y1="103" x2="279.5" y2="103" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="295" y1="189.5" x2="295" y2="118.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="295" y1="226.5" x2="295" y2="297.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="208.5" y1="313" x2="279.5" y2="313" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="171.5" y1="313" x2="100.5" y2="313" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="85" y1="226.5" x2="85" y2="297.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="85" y1="189.5" x2="85" y2="118.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="551.5" y1="103" x2="480.5" y2="103" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="588.5" y1="103" x2="659.5" y2="103" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="675" y1="189.5" x2="675" y2="118.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="675" y1="226.5" x2="675" y2="297.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="588.5" y1="313" x2="659.5" y2="313" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="551.5" y1="313" x2="480.5" y2="313" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="465" y1="226.5" x2="465" y2="297.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="465" y1="189.5" x2="465" y2="118.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<rect x="71" y="89" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="85" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">2</text>
+<rect x="281" y="89" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="295" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">5</text>
+<rect x="281" y="299" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="295" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">3</text>
+<rect x="71" y="299" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="85" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">7</text>
+<circle cx="190" cy="103" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="190" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
+<circle cx="295" cy="208" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="295" y="208" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">15</text>
+<circle cx="190" cy="313" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="190" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">21</text>
+<circle cx="85" cy="208" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="85" y="208" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">14</text>
+<rect x="451" y="89" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="465" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">2</text>
+<rect x="661" y="89" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="675" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">5</text>
+<rect x="661" y="299" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="675" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">3</text>
+<rect x="451" y="299" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="465" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">7</text>
+<circle cx="570" cy="103" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="570" y="103" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
+<circle cx="675" cy="208" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="675" y="208" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">15</text>
+<circle cx="570" cy="313" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="570" y="313" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">21</text>
+<circle cx="465" cy="208" r="17" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="465" y="208" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">14</text>
+<text x="190" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">A: a matching that cannot be extended</text>
+<text x="570" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">B: a perfect matching</text>
+<text x="190" y="355" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">21: no edge left</text>
+<text x="190" y="385" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">No other edge can be added:</text>
+<text x="190" y="403" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">each shares a number or a</text>
+<text x="190" y="421" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">prime with the matching.</text>
+<text x="570" y="385" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">Four edges: every number is paid,</text>
+<text x="570" y="403" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">each with a different prime.</text>
+<text x="380" y="450" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">Thick: the edges of the matching.   Dashed: the other edges.</text>
+</svg>

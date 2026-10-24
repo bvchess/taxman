@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="666" viewBox="0 0 780 666" font-family="Helvetica, Arial, sans-serif" font-size="14">
+<title>Game 2873&#x27;s six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with the source 2431 joined to three factors: the playable set A of four sources that nothing can join, and the playable set B of five.</title>
+<rect x="0" y="0" width="780" height="666" fill="#ffffff"/>
+<line x1="167.5" y1="70" x2="129.5" y2="70" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="212.5" y1="70" x2="250.5" y2="70" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="327.5" y1="70" x2="289.5" y2="70" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="372.5" y1="70" x2="410.5" y2="70" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="110" y1="122.5" x2="110" y2="89.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="110" y1="167.5" x2="110" y2="200.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="497.5" y1="70" x2="449.5" y2="70" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="542.5" y1="70" x2="601.5" y2="70" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="430" y1="122.5" x2="430" y2="89.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="430" y1="167.5" x2="430" y2="200.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="270" y1="152.5" x2="270" y2="89.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="248.3" y1="181.1" x2="129.4" y2="214.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="291.7" y1="181.1" x2="410.6" y2="214.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="167.5" y1="390" x2="129.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="212.5" y1="390" x2="250.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="327.5" y1="390" x2="289.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="372.5" y1="390" x2="410.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="110" y1="442.5" x2="110" y2="409.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="110" y1="487.5" x2="110" y2="520.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="497.5" y1="390" x2="449.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="542.5" y1="390" x2="601.5" y2="390" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="430" y1="442.5" x2="430" y2="409.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="430" y1="487.5" x2="430" y2="520.5" stroke="#111111" stroke-width="3.6" fill="none"/>
+<line x1="270" y1="472.5" x2="270" y2="409.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="248.3" y1="501.1" x2="129.4" y2="534.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<line x1="291.7" y1="501.1" x2="410.6" y2="534.5" stroke="#666666" stroke-width="1.5" fill="none" stroke-dasharray="6 4"/>
+<rect x="92" y="52" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="70" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">121</text>
+<rect x="252" y="52" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="270" y="70" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">143</text>
+<rect x="412" y="52" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="70" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">169</text>
+<rect x="92" y="202" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="220" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">187</text>
+<rect x="412" y="202" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="220" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">221</text>
+<rect x="603" y="63" width="14" height="14" fill="#111111"/>
+<circle cx="190" cy="70" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="190" y="70" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">1573</text>
+<circle cx="350" cy="70" r="21" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
+<text x="350" y="70" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">1859</text>
+<circle cx="520" cy="70" r="21" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
+<text x="520" y="70" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2197</text>
+<circle cx="110" cy="145" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="145" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2057</text>
+<circle cx="430" cy="145" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="145" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2873</text>
+<circle cx="270" cy="175" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="270" y="175" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2431</text>
+<rect x="92" y="372" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="390" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">121</text>
+<rect x="252" y="372" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="270" y="390" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">143</text>
+<rect x="412" y="372" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="390" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">169</text>
+<rect x="92" y="522" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="540" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">187</text>
+<rect x="412" y="522" width="36" height="36" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="540" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">221</text>
+<rect x="603" y="383" width="14" height="14" fill="#111111"/>
+<circle cx="190" cy="390" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="190" y="390" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">1573</text>
+<circle cx="350" cy="390" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="350" y="390" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">1859</text>
+<circle cx="520" cy="390" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="520" y="390" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2197</text>
+<circle cx="110" cy="465" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="110" y="465" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2057</text>
+<circle cx="430" cy="465" r="21" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<text x="430" y="465" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2873</text>
+<circle cx="270" cy="495" r="21" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
+<text x="270" y="495" text-anchor="middle" dy=".35em" font-size="12.5" font-weight="normal" fill="#111111">2431</text>
+<text x="390" y="22" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">A = {1573, 2057, 2431, 2873}: playable, stuck at four</text>
+<text x="610" y="51" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">ground</text>
+<text x="390" y="268" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">1859 would make the core {1573, 1859, 2057, 2431, 2873}, and 2197 would make a core by itself:</text>
+<text x="390" y="286" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">no member of B fits into A.</text>
+<text x="390" y="342" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">B = {1573, 1859, 2057, 2197, 2873}: playable, with five</text>
+<text x="610" y="371" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">ground</text>
+<text x="390" y="588" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">So the playable sets are not the independent sets of a matroid:</text>
+<text x="390" y="606" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">one maximal set has four members and another five.</text>
+<text x="390" y="646" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Circles: sources, each joined to its maximal factors (squares).  Solid: in the set.  Dashed: not in it.</text>
+</svg>
