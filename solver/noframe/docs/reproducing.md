@@ -39,9 +39,9 @@ tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_par
     --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
 ./target/release/upper --from 3315 --to 3440 --results ../../results/strict.jsonl \
     --out data/upper_3315_3440.jsonl          # the committed chain's games 3315 to 3440 (5 minutes)
-./target/release/exact --list 1575,1584 --out B.jsonl                   # E6: the sources of layer >= 3 free
+./target/release/exact --list 1575,1584 --out B.jsonl                   # study E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
-tools/summarize.py sources B.jsonl D.jsonl          # E6's table and criterion (its entry for the cloud run)
+tools/summarize.py sources B.jsonl D.jsonl          # study E6's table and criterion (its entry for the cloud run)
 tools/summarize.py span|star|exact|cost|adversary|optsets|moves FILE...
 tools/crosscheck_optsets.py data/optsets_2_989.jsonl --max 57 --budget 120     # theory-free, about 8 minutes
 tools/crosscheck_greedy.py data/span_2_100000.jsonl.gz --max 1000
@@ -51,6 +51,6 @@ cargo run --release --example exactdiag 990 310049 --parity 1   # the search's c
 
 Every campaign appends one JSON line per game and skips the games already in its output, so a stopped run is resumed by
 running it again; `exact` also checkpoints the searches in progress (`work/checkpoints`).  The committed data is gzipped
-where large (`gunzip -k` to resume into it).  The commands marked E6 measure whether leaving the sources of layer 3 or
-more free costs the prover's search anything, the theory track's measurement E6 ([its
+where large (`gunzip -k` to resume into it).  The commands marked study E6 measure whether leaving the sources of layer
+3 or more free costs the prover's search anything, the theory track's measurement E6 ([its
 entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)).

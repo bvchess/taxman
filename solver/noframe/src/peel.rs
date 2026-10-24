@@ -161,7 +161,8 @@ pub fn greedy(inst: &Instance, peeler: &mut Peeler) -> Vec<bool> {
     let mut kept = vec![false; inst.len()];
     let mut listed = vec![0u32; inst.num_factors()];
     for x in 0..inst.len() {
-        // A factor no kept member lists makes x safe (the extension lemma, P6); otherwise dismantle.
+        // A factor no kept member lists makes x safe (the extension lemma, P6, docs/theory/playability.md); otherwise
+        // dismantle.
         let safe = inst.factors[x].iter().any(|&f| listed[f as usize] == 0);
         let accept = safe || {
             kept[x] = true;

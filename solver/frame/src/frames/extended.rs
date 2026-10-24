@@ -86,11 +86,12 @@ pub struct ExtendedFrames<const W: usize> {
     /// The lowest layer of a component with freedoms, which frame 0 lies in; `None` (and no frames) when no
     /// component has freedoms.
     pub lowest_layer: Option<u32>,
-    /// The claims kept (E4), in the order of the claims given: their pairs are not in `frames`.
+    /// The claims kept (E4, docs/theory/extended-problem.md), in the order of the claims given: their pairs are not in
+    /// `frames`.
     pub claims: Vec<Claim>,
-    /// The claims of the components that hold no member of O ∪ R but have a back claim that fails the check of
-    /// E4, in the order of the claims given: claims of Π_n that Π⁺(O) does not keep.  (The claims of a component
-    /// that holds a member of O ∪ R are kept by neither list.)
+    /// The claims of the components that hold no member of O ∪ R but have a back claim that fails the check of E4,
+    /// docs/theory/extended-problem.md, in the order of the claims given: claims of Π_n that Π⁺(O) does not keep.  (The
+    /// claims of a component that holds a member of O ∪ R are kept by neither list.)
     pub refused: Vec<Claim>,
 }
 
@@ -204,9 +205,9 @@ pub fn extended_frame_count<const W: usize>(t: &Tables, open: &Bits<W>) -> Resul
 }
 
 /// The extended problem Π⁺(O) of the board `1..=t.n`, with the open sources `open`, keeping the pairs of `claims` that
-/// the kept-claims lemma (E4) allows (see the module documentation).  `claims` is the frame model's
-/// (`SearchFrames::claims` of [`build_frames`](super::build_frames) on the same tables: for each of its frames, the
-/// pairs in the order made), or empty for the problem with nothing claimed.
+/// the kept-claims lemma (E4, docs/theory/extended-problem.md) allows (see the module documentation).  `claims` is the
+/// frame model's (`SearchFrames::claims` of [`build_frames`](super::build_frames) on the same tables: for each of its
+/// frames, the pairs in the order made), or empty for the problem with nothing claimed.
 ///
 /// # Errors
 ///
@@ -288,7 +289,7 @@ pub fn build_extended<const W: usize>(
     extended.one_sided.sort_unstable();
 
     // The claims, each with the component of its source; a component keeps them if it holds no member of O ∪ R and
-    // its back claims pass the check of E4.
+    // its back claims pass the check of E4, docs/theory/extended-problem.md.
     let component_of = |&(s, f, _): &Claim| {
         let i = board.frame_index_of(s).filter(|&i| components[i].sources().contains(s) && has_freedoms[i]);
         let i = i.unwrap_or_else(|| panic!("n={}: the claiming {s} is no source of a component with freedoms", t.n));
@@ -356,7 +357,8 @@ mod tests {
         assert_eq!(extended.lowest_layer.is_some(), !extended.frames.is_empty(), "n={n}: the lowest layer");
         assert!(extended.claims.is_empty() && extended.refused.is_empty(), "n={n}: claims given none");
 
-        // With the frame model's claims (E4), every one is kept and the frames are the search's.
+        // With the frame model's claims (E4, docs/theory/extended-problem.md), every one is kept and the frames are the
+        // search's.
         let with_claims = build_extended::<W>(&board.tables, &Bits::EMPTY, &found.claims).unwrap();
         assert_eq!(with_claims.frames, found.frames, "n={n}: the frames with claims");
         assert_eq!(with_claims.candidates, found.candidates, "n={n}: the candidates with claims");
@@ -400,13 +402,13 @@ mod tests {
     }
 
     /// The board of 24 with 16, 20 and 24 open, all of U\*_{≥3} but 18: the smallest board where a back claim fails the
-    /// check of E4 for some O (the candidates only grow with O, so a frame's claims fail for some O free of it
-    /// exactly when they fail for all of U\*_{≥3} but its sources; a scan of the boards to 400 found 24-26 and 343-349,
-    /// none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted by 18 alone, and 12, its
-    /// other composite, is a factor of the closed frame of 16 and 24).  With 16 and 24 open that frame has freedoms, 12
-    /// becomes a candidate (the frame of 20, 20 open, can take it on with 4) and lists 6: the frame of 18 keeps
-    /// nothing, and the frame of layer 3 holds 18 and 6.  Taking the pair out anyway would lose the promotion set
-    /// {8, 12}, in which 12 pays with 6 (`tests/model_extended.rs` catches it).
+    /// check of E4 (docs/theory/extended-problem.md) for some O (the candidates only grow with O, so a frame's claims
+    /// fail for some O free of it exactly when they fail for all of U\*_{≥3} but its sources; a scan of the boards to
+    /// 400 found 24-26 and 343-349, none with every source open).  The frame model claims 6 for 18 (back: 6 is wanted
+    /// by 18 alone, and 12, its other composite, is a factor of the closed frame of 16 and 24).  With 16 and 24 open
+    /// that frame has freedoms, 12 becomes a candidate (the frame of 20, 20 open, can take it on with 4) and lists 6:
+    /// the frame of 18 keeps nothing, and the frame of layer 3 holds 18 and 6.  Taking the pair out anyway would lose
+    /// the promotion set {8, 12}, in which 12 pays with 6 (`tests/model_extended.rs` catches it).
     #[test]
     fn a_back_claim_that_fails_the_check_is_refused() {
         let board = Board::<1>::for_n(24);

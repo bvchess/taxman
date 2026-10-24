@@ -28,9 +28,9 @@ enum Move {
 /// The members are `set` (distinct numbers of `2..=t.n`).  The pool is the maximal factors of the members that are not
 /// members themselves, and each member's list is its maximal factors in the pool.  A *front move* pairs a live member
 /// that has exactly one live (unpaired) factor in its list with that factor; a *back move* pairs a live factor that
-/// exactly one live member lists with that member.  The peel theorem (P4) says that the pairs are a payment scheme with
-/// an acyclic precedence if the peel finishes, and that a playable set is never left stuck, so the set is playable
-/// exactly when the peel finishes, in whatever order its moves are made.
+/// exactly one live member lists with that member.  The peel theorem (P4, docs/theory/playability.md) says that the
+/// pairs are a payment scheme with an acyclic precedence if the peel finishes, and that a playable set is never left
+/// stuck, so the set is playable exactly when the peel finishes, in whatever order its moves are made.
 ///
 /// Linear time in the size of the lists: per member the count of its live factors, per factor the count of the live
 /// members that list it and the exclusive or of their numbers (so a factor with a count of one names its member), and
@@ -111,8 +111,8 @@ pub fn playable(t: &Tables, set: &[u32]) -> bool {
 }
 
 /// A legal game that plays exactly `set`, if it is playable: the topological order of the precedence of the peel's
-/// pairs (P2 and P4), where `a` comes before `b` whenever the payment of `a` divides `b`, or `a` divides `b`
-/// (and `a` is not `b`).  Quadratic in the size of the set.
+/// pairs (P2 and P4, docs/theory/playability.md), where `a` comes before `b` whenever the payment of `a` divides `b`,
+/// or `a` divides `b` (and `a` is not `b`).  Quadratic in the size of the set.
 ///
 /// # Panics
 ///

@@ -11,8 +11,8 @@
     summarize.py check A B FILE...  FILEs prove every n in 2..B, with the recorded scores in A..B
     summarize.py order A B        the games A..B, dearest first by the solver's nodes (the order prover.sh runs them)
     summarize.py cost [--band N] FILE...  its cost curve: the searches made with the parity bound from scratch, by band
-    summarize.py sources B_FILE D_FILE  E6: the search with the sources of layer 3 and up free (exact, from the roles
-                                  of F4) against the same search with the whole upper part fixed to U*
+    summarize.py sources B_FILE D_FILE  study E6: the search with the sources of layer 3 and up free (exact, from the
+                                  roles of F4) against the same search with the whole upper part fixed to U*
                                   (--fix-upper 1)
     summarize.py optsets FILE...  every optimal pick set per game (bin/optsets.rs): tables, exchanges, canonical sets
     summarize.py moves FILE...    the longest games against the optimal ones (bin/moves.rs)
@@ -202,8 +202,8 @@ def exact_cost(args):
               f"(R² {r2:.2f})")
 
 
-# The criterion of E6, fixed before the measurement: the integrated search, which leaves the sources of layer 3 and up
-# free, is worth building in full if it is not much dearer than the search with the whole upper part fixed.
+# The criterion of study E6, fixed before the measurement: the integrated search, which leaves the sources of layer 3
+# and up free, is worth building in full if it is not much dearer than the search with the whole upper part fixed.
 E6_RATIO = 1.2  # B/D at most this on ...
 E6_SHARE = 0.9  # ... at least this share of the games,
 E6_WORST = 2.0  # B/D never above this, and
@@ -211,15 +211,15 @@ E6_BRANCHING = 0.05  # B's nodes branching on a source of layer 3 or up at most 
 
 
 def exact_sources(args):
-    """sources B_FILE D_FILE: E6, what the sources of layer 3 and up cost.  B_FILE holds the searches from the roles of
-    F4 (`exact`, whose default is `--fix-low 1`: `fix_low` 1, no `fix_upper`, `"search":"proven"`, so each is
+    """sources B_FILE D_FILE: study E6, what the sources of layer 3 and up cost.  B_FILE holds the searches from the
+    roles of F4 (`exact`, whose default is `--fix-low 1`: `fix_low` 1, no `fix_upper`, `"search":"proven"`, so each is
     a proof of opt(n) <= V with the sources of layer 3 and up free); D_FILE the same searches with the whole upper
     part fixed to U* (`--fix-upper 1`: `fix_upper` 1, `"search":"upper_fixed"`, which is the frame model's problem on
     the whole board and proves nothing).  For each game with a finished search in both files, a row: n, the root's
     parity gap (`parity_bound - score`), the nodes of B and of D, B/D, the seconds of B and of D, and B's counters
     `branched_on_sources` (nodes that branched on a free source of layer 3 or up) and `barred_upper` (nodes whose roles
     bar a member of U*_{>=3}) as percentages of B's nodes.  The games finished in only one file are listed.  Then
-    the criterion of E6, printed part by part with its figure and PASS or FAIL:
+    the criterion of study E6, printed part by part with its figure and PASS or FAIL:
 
         B/D at most 1.2 on at least 90% of the games, B/D never above 2, and the nodes of B branching on a source of
         layer 3 or up at most 5% of all B's nodes (summed over the games).
@@ -258,9 +258,9 @@ def exact_sources(args):
     for what, ok, figure in parts:
         print(f"{'PASS' if ok else 'FAIL'}  {what}: {figure}")
     if all(ok for _, ok, _ in parts):
-        print("E6: PASS (build the integrated search's stages 2-3)")
+        print("study E6: PASS (build the integrated search's stages 2-3)")
     else:
-        print("E6: FAIL (build stage 1 only and measure stage 2 on two games first)")
+        print("study E6: FAIL (build stage 1 only and measure stage 2 on two games first)")
 
 
 def adversary(paths):

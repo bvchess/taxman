@@ -94,7 +94,7 @@ def upper_by(referee, rule, source, target, value, bags=None):
 def carries(referee, rule, source, target):
     """Whether the relation `rule` (named for the lemma that carries a game) carries a game from the board `source` to
     the board `target`: monotone up a board to a composite, the ceiling down a board from a composite, the prime
-    formula across a prime, either way (N3 to N5)."""
+    formula across a prime, either way (N3 to N5, docs/theory/neighbors.md)."""
     prime = referee.is_prime
     if rule == "monotone":
         return source + 1 == target and not prime(target)

@@ -428,8 +428,8 @@ fn check_extended_is_frame_model<const W: usize>(t: &Tables, frames: &SearchFram
     Ok(items)
 }
 
-/// What the check of the kept-claims lemma (E4) could do to the back claims of the search's frames, as `(s, f)` pairs
-/// in the order the claims were made (see the module comment).
+/// What the check of the kept-claims lemma (E4, docs/theory/extended-problem.md) could do to the back claims of the
+/// search's frames, as `(s, f)` pairs in the order the claims were made (see the module comment).
 struct ClaimRisk {
     /// The back claims whose factor fails the check against the two-sided candidates of Π⁺(U\*_{≥3}).
     at_risk: Vec<(u32, u32)>,
@@ -591,8 +591,8 @@ fn census<const W: usize>(n: u32) -> Result<Json, String> {
     let frame_count = |value: fn(&NumberedFrame<W>) -> i64| by_layer(&numbered, &layers, max_layer, value);
     let (reached, answered) = numbered.merged_away_reach;
 
-    // The extended problem with every source of three or more prime factors open, and what E4's check does to
-    // the back claims there, where it can be built.
+    // The extended problem with every source of three or more prime factors open, and what the check of E4
+    // (docs/theory/extended-problem.md) does to the back claims there, where it can be built.
     let from_layer_3 = numbered.frames.iter().zip(&layers).filter(|&(_, &layer)| layer >= 3);
     let upper = from_layer_3.fold(Bits::<W>::EMPTY, |acc, (frame, _)| acc | frame.sources);
     let (extended, span) = extended_frame_count::<W>(&t, &upper)?;
@@ -658,9 +658,10 @@ fn pair_of(line: &Json, key: &str) -> (u64, u64) {
     (at(0), at(1))
 }
 
-/// What a line says of a count of back claims for E4's check (`key`: `m5_at_risk_count` or `m5_refused_count`):
-/// `None` if the line lacks the field (an earlier version of the census wrote it), `Some(None)` if it is `null`
-/// (Π⁺ of every source of three or more prime factors cannot be built), else `Some(Some(count))`.
+/// What a line says of a count of back claims for the check of E4 (docs/theory/extended-problem.md) (`key`:
+/// `m5_at_risk_count` or `m5_refused_count`): `None` if the line lacks the field (an earlier version of the census
+/// wrote it), `Some(None)` if it is `null` (Π⁺ of every source of three or more prime factors cannot be built), else
+/// `Some(Some(count))`.
 fn claims_reported(line: &Json, key: &str) -> Option<Option<u64>> {
     line.get(key).map(Json::as_u64)
 }
@@ -820,7 +821,7 @@ fn summary(lines: &[Json], from: u32, to: u32) -> (String, bool) {
         first(&beyond, 10)
     ));
 
-    // E4's check on the back claims; a line without the fields is left out.
+    // The check of E4 (docs/theory/extended-problem.md) on the back claims; a line without the fields is left out.
     let reported = |line: &Json, key: &str| claims_reported(line, key).flatten().filter(|&count| count > 0);
     let number = |line: &Json| number_of(line, "n") as u32;
     let at_risk: Vec<(u32, u64)> =

@@ -11,7 +11,7 @@
 //! lambda               per signing, its positive multipliers as `dw::multipliers_to_json` writes them
 //! support, columns     the final master's columns, each a list of candidates (common independent sets of the two
 //!                      GF(2) matroids; at most `dw::SAVED_COLUMNS`), the first `support` of them its support (null
-//!                      in the E3 pilot's two fits, written before the format had it)
+//!                      in the pilot study E3's two fits, written before the format had it)
 //! cuts                 the final master's rank inequalities [signing, [candidates], rank]; the signing is an index
 //!                      into `signings` (cuts of a matroid the fit does not have are left out), the rank that in the
 //!                      final family: a reader takes the ranks again in the signings it loads

@@ -302,9 +302,9 @@ impl SearchTactics {
     /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search needs the
     /// GF(2) bound (`gf2`; the matching bound, `gf2=off`, gives a one-sided candidate no vertex, so it is no bound
     /// there), and refuses the Lagrangian bound (`lagrange`, built on the matching bound) and the rule of symmetric
-    /// pairs (`symmetry`: the prime-exchange theorem (R2) is proven for the frame model, and for the extended problem
-    /// would need each prime exchange to map the one-sided candidates of each frame onto themselves, which nothing
-    /// checks yet).
+    /// pairs (`symmetry`: the prime-exchange theorem (R2, docs/theory/search-rules.md) is proven for the frame model,
+    /// and for the extended problem would need each prime exchange to map the one-sided candidates of each frame onto
+    /// themselves, which nothing checks yet).
     pub fn refusal_with_one_sided(&self) -> Option<String> {
         let mut why = Vec::new();
         if !self.gf2 {
@@ -326,14 +326,14 @@ impl SearchTactics {
     /// defaults are `0xFB9`.  (Bits 9 to 12 record the settings the search began with and bind nothing
     /// ([`BRANCHING_BITS`](Self::BRANCHING_BITS) and [`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT)): a checkpoint of a
     /// build before `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and likewise bit 10
-    /// and `conflict_look`, and bit 11 and `near_repeat`, and bit 12 and `price_reuse`.  A build before a tactic refuses a checkpoint with its bit
-    /// set, as "unknown tactics".)  The knobs of the nogood table's policy (`nogood_period`, `nogood_keep`,
-    /// `nogood_limit`) are not recorded: they change the tree, never the answer, and a resumed search starts with an
-    /// empty table whichever policy made the first run's.  (A checkpoint of a build before `gf2` has bit 7 clear: it
-    /// resumes with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which
-    /// the default no longer is, so a run resumes it only with `--tactic symmetry=off`.  A build before `symmetry`
-    /// refuses a checkpoint with the tactic on, as "unknown tactics": it would resume the search without a rule that
-    /// shaped the tree it wrote.)
+    /// and `conflict_look`, and bit 11 and `near_repeat`, and bit 12 and `price_reuse`.  A build before a tactic
+    /// refuses a checkpoint with its bit set, as "unknown tactics".)  The knobs of the nogood table's policy
+    /// (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a
+    /// resumed search starts with an empty table whichever policy made the first run's.  (A checkpoint of a build
+    /// before `gf2` has bit 7 clear: it resumes with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it
+    /// resumes with `symmetry` off, which the default no longer is, so a run resumes it only with
+    /// `--tactic symmetry=off`.  A build before `symmetry` refuses a checkpoint with the tactic on, as "unknown
+    /// tactics": it would resume the search without a rule that shaped the tree it wrote.)
     pub(super) fn bits(self) -> u16 {
         u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
             | u16::from(self.fix_forced) << 3

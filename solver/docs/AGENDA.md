@@ -181,9 +181,9 @@ signed frame theorem (B1)](../../docs/theory/frame-bounds.md#the-signed-frame-th
 (B4)](../../docs/theory/frame-bounds.md#the-decomposition-bound)), closes a large share of the root's gap ([the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound
 its trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost
-is, so every policy of computing it loses ([the E3
-pilot](../notebook/search/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), [R3 and the slope
-test](../notebook/search/r3-and-the-slope-test-u4-of-a1-2026-10/README.md), [the bound at the
+is, so every policy of computing it loses ([the E3 pilot
+study](../notebook/search/the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md), [the R3 study and the
+slope test](../notebook/search/r3-and-the-slope-test-u4-of-a1-2026-10/README.md), [the bound at the
 nodes](../notebook/search/the-a1-bound-at-the-nodes-of-the-node-choice-measurement-2026-10/README.md)).
 
 ### A2. Certify the frame model, then prove with its facts (a change of slope for the proven wall)
@@ -229,9 +229,9 @@ grows with n: A2's premise.
 *What remains.*  The campaign of certificates of 2176..3440, and the claim-by-claim rule ([the kept-claims lemma
 (E4)](../../docs/theory/extended-problem.md#the-kept-claims-lemma)), which would settle its last phase without a search;
 both are paused, since certifying U is not the priority ([STATUS](STATUS.md)).  The prover's search with the certified
-members forced, on five games of 1302-2100 (killed if the dear games take fewer than half the nodes), has not run; E6,
-the measurement of the sources left free against the upper part fixed to U\*, was prepared and then superseded by the
-certificates.
+members forced, on five games of 1302-2100 (killed if the dear games take fewer than half the nodes), has not run; study
+E6, the measurement of the sources left free against the upper part fixed to U\*, was prepared and then superseded by
+the certificates.
 
 *Payoff.*  The proofs on the whole board move with the solver's chain instead of falling behind tenfold per 1000 n.
 With a general proof of the model, the prover becomes a cross-check that can lag.
@@ -313,9 +313,9 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
 
 Each opens with where it stands; a settled one keeps its result in a few lines.
 
-**C1 (fields).**  *Tested at the roots: not killed, but the share falls with the gap; A1, the avenue it served, is
-closed.*  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0/1 entries, Koszul signs, and the
-signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  At the roots of
+**Conjecture C1 (fields).**  *Tested at the roots: not killed, but the share falls with the gap; A1, the avenue it
+served, is closed.*  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0/1 entries, Koszul signs, and
+the signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  At the roots of
 2200-3400 it closes 0.46 of the gap, flat in n there, against 0.62 at 1700-2175, and over 900-3333 the share falls 1.0 ±
 0.34 points per 100 n, and 3.8 ± 1.1 per 100 points of gap ([E2 of the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#e2-past-2175-2026-10)).
@@ -323,19 +323,19 @@ study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10
 300-1300, rising (measurements 7.2), and the signed GF(3) family is complete (Hershkowitz and Schneider,
 [agenda-ideas.md](agenda-ideas.md)).
 
-**C2 (sign coherence of three-prime cores).**  *Open; not tested.*  On numbers p^a q^b r^c of three primes, movers of
-degree d + 1 over factors of degree d form the honeycomb graph of a triangular region, and a set's schemes onto one
-payment set are its lozenge tilings.  Conjecture: in a region without holes all of a core's schemes have the same sign,
-so its determinant is ± its number of schemes, and GF(p) sees it exactly when p divides that number.  The smallest odd
-core, {12, 18, 20, 30, 45} on the primes 2, 3, 5, has three schemes, all of one sign: determinant 3.  This would be the
-combinatorics of the weak Lefschetz property of monomial ideals in characteristic p, where the multiplication map's
-determinant counts lozenge tilings ([agenda-ideas.md](agenda-ideas.md); to check).  *Why it matters:* it would say which
-fields to add for which cores, and why GF(3) sees so many.  *Test:* enumerate the minimal odd cores of three primes to 8
-members (`heuristics/evaluation/fm_relation.py`'s `odd_cores`, restricted) and compare |determinant| with the count of
-schemes; then regions with holes.
+**Conjecture C2 (sign coherence of three-prime cores).**  *Open; not tested.*  On numbers p^a q^b r^c of three primes,
+movers of degree d + 1 over factors of degree d form the honeycomb graph of a triangular region, and a set's schemes
+onto one payment set are its lozenge tilings.  Conjecture: in a region without holes all of a core's schemes have the
+same sign, so its determinant is ± its number of schemes, and GF(p) sees it exactly when p divides that number.  The
+smallest odd core, {12, 18, 20, 30, 45} on the primes 2, 3, 5, has three schemes, all of one sign: determinant 3.  This
+would be the combinatorics of the weak Lefschetz property of monomial ideals in characteristic p, where the
+multiplication map's determinant counts lozenge tilings ([agenda-ideas.md](agenda-ideas.md); to check).  *Why it
+matters:* it would say which fields to add for which cores, and why GF(3) sees so many.  *Test:* enumerate the minimal
+odd cores of three primes to 8 members (`heuristics/evaluation/fm_relation.py`'s `odd_cores`, restricted) and compare
+|determinant| with the count of schemes; then regions with holes.
 
-**C3 (the upper part).**  *Open.*  Every optimal game plays U\*, and game by game barred parity bounds and small
-searches could certify it.  This strong form holds in every game whose optimal sets were enumerated (954 games of
+**Conjecture C3 (the upper part).**  *Open.*  Every optimal game plays U\*, and game by game barred parity bounds and
+small searches could certify it.  This strong form holds in every game whose optimal sets were enumerated (954 games of
 2..989).  The weak form, U, that some optimal set contains U\*_{≥3}, holds wherever the prover has proven opt(n), every
 n up to 2175, and certificates prove it game by game for 600..1300 ([statement
 U](../../docs/theory/exactness.md#statement-u); [results/README.md](../../results/README.md#what-supports-the-scores)).
@@ -345,19 +345,19 @@ certified at the root by one bound each (measurements 7.3).  *Attack:* a frontie
 sketches it after [the frontier theorem (S3)](../../docs/theory/sources.md#the-frontier-theorem), for a proof; A2 for
 certificates.
 
-**C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is within one of
-the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets have one size
-([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)).  The heaviest set has the size of an optimal set
-at all 361 roots of 880-1300 ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1),
-and at 758 of the 760 searched and repeated games of 1301-2175
-(`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s promotions).
-At 1320 and 1322 it has 77 members and the optimal set 78, which is the promotion limit (`max_total`): a tie of weights,
-or a heavier set of the wrong size, which is not known.  So the strict form, the same size, is false or rests on ties.
-*Why it mattered:* with it, A3 would have searched two values of k at most (it was not needed for A3's soundness); A3 is
-closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
+**Conjecture C4 (one size, near the relaxation's).**  *Open.*  All optimal sets of a game have one size, and it is
+within one of the size of the GF(2) bound's heaviest set at the root.  *Evidence:* every enumerated game's optimal sets
+have one size ([solver/noframe/docs/uniqueness.md](../noframe/docs/uniqueness.md)).  The heaviest set has the size of an
+optimal set at all 361 roots of 880-1300 ([the anatomy of the
+gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1), and at 758 of the 760 searched and repeated games
+of 1301-2175 (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s
+promotions).  At 1320 and 1322 it has 77 members and the optimal set 78, which is the promotion limit (`max_total`): a
+tie of weights, or a heavier set of the wrong size, which is not known.  So the strict form, the same size, is false or
+rests on ties.  *Why it mattered:* with it, A3 would have searched two values of k at most (it was not needed for A3's
+soundness); A3 is closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
 
-**C5 (the gap law).**  *Measured (2026-10-15): both forms hold, and neither regime.*  The true root gap of the searched
-games grows linearly in n past 2175, at a rate between the two regimes of [The diagnosis of the
+**Conjecture C5 (the gap law).**  *Measured (2026-10-15): both forms hold, and neither regime.*  The true root gap of
+the searched games grows linearly in n past 2175, at a rate between the two regimes of [The diagnosis of the
 wall](#2-the-diagnosis-of-the-wall); or, in the form the fit of 1301-2175 prefers, G/n stays bounded.  Everything about
 where the wall is rests on it.  Over the EC2 chain's 509 searched games of 2176-3312 (measurements 7.4), the gap's
 growth is section 2's.  Beside it: the gap is 341 to 1,443 with a mean of 818, against 391 at 1301-2175, risen from
@@ -365,32 +365,33 @@ about 450 at 2100 to 650 at 2160-2200; G/n was 224 at 1301-2175, and drifts down
 below 2150, and +57, the unseeded start's upper bound, is not the gap's growth.  The waves are partly arithmetic: counts
 of numbers of three or more distinct primes by tier predict a third of their variance out of sample.
 
-**C6 (runs).**  *Refuted as stated* (2026-10-15, by A4).  The cost per unit of gap is a function of the root's core
-structure (the number and size of the odd cores, the frames holding them), which changes in blocks of n.  The cost's
-residuals do run (lag-1 autocorrelation +0.84: consecutive boards pose nearly one problem), but what runs is the gap, in
-waves, and the root's cores, conflicts and forced members add nothing to it.  The runs of dear games are runs of high
-gaps ([The diagnosis of the wall](#2-the-diagnosis-of-the-wall)): the 47 searches of gap 1,100 or more are 12% of the
-exhausted ones, the 11 of 1,300 or more hold 53% of the chain's nodes, and all of the 18 dearest have a gap of 1,094 or
-more.  What stays unexplained is a factor of 3 (sd 0.48 decades) in a game's tree at its gap.
+**Conjecture C6 (runs).**  *Refuted as stated* (2026-10-15, by A4).  The cost per unit of gap is a function of the
+root's core structure (the number and size of the odd cores, the frames holding them), which changes in blocks of n.
+The cost's residuals do run (lag-1 autocorrelation +0.84: consecutive boards pose nearly one problem), but what runs is
+the gap, in waves, and the root's cores, conflicts and forced members add nothing to it.  The runs of dear games are
+runs of high gaps ([The diagnosis of the wall](#2-the-diagnosis-of-the-wall)): the 47 searches of gap 1,100 or more are
+12% of the exhausted ones, the 11 of 1,300 or more hold 53% of the chain's nodes, and all of the 18 dearest have a gap
+of 1,094 or more.  What stays unexplained is a factor of 3 (sd 0.48 decades) in a game's tree at its gap.
 
-**C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([the span conjecture
+**Conjecture C7 (♦).**  *Open; certified in every game to 100,000, and in 902 games to 2,000,000* ([the span conjecture
 (S5)](../../docs/theory/sources.md#the-span-conjecture)).  Every source that descending greedy rejects on the sources'
 instance is a GF(2) combination of the sources it kept above it; it would prove [the sources conjecture
-(S1)](../../docs/theory/sources.md#the-sources-conjecture) in general.  It is not on the critical path of the wall; C3
-is.
+(S1)](../../docs/theory/sources.md#the-sources-conjecture) in general.  It is not on the critical path of the wall;
+conjecture C3 is.
 
 ## 5. What the cloud runs should measure
 
-The chain past 2175 and the prover's proofs of 1301-2175 were to decide C5 and A2's premise: C5 is decided, and A2's
-premise needs a rerun (below).  Most of what follows needs only the runs' output files, analyzed afterwards on one
-thread; what needs the machine is marked.
+The chain past 2175 and the prover's proofs of 1301-2175 were to decide conjecture C5 and A2's premise: C5 is decided,
+and A2's premise needs a rerun (below).  Most of what follows needs only the runs' output files, analyzed afterwards on
+one thread; what needs the machine is marked.
 
 * **The true root gap of every searched game** past 2175, from the chain's own scores
-  (`examples/wall.rs nodes --nodes 1` over the results file, as in measurements 7.1): the gap's trend (C5, the two
-  regimes of [The diagnosis of the wall](#2-the-diagnosis-of-the-wall)) and the residuals of the cost model, with the
-  thread count in the fit.  *Done* for a snapshot of the EC2 chain at game 3314 (509 searched games: measurements 7.4,
-  [the gap past 2175](../notebook/search/the-gap-past-2175-2026-10/README.md)).  It can be repeated on the committed
-  chain with `solver/notebook/search/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep their level.
+  (`examples/wall.rs nodes --nodes 1` over the results file, as in measurements 7.1): the gap's trend (conjecture C5,
+  the two regimes of [The diagnosis of the wall](#2-the-diagnosis-of-the-wall)) and the residuals of the cost model,
+  with the thread count in the fit.  *Done* for a snapshot of the EC2 chain at game 3314 (509 searched games:
+  measurements 7.4, [the gap past 2175](../notebook/search/the-gap-past-2175-2026-10/README.md)).  It can be repeated on
+  the committed chain with `solver/notebook/search/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep
+  their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, to
   convert 192-thread trees to one-thread equivalents in that fit.  *Measured* for 2170 and 2172 (1 to 192 threads) and
   2184 (16 to 192): the trees differ by up to 18% with no trend in the threads, on proofs of a second or ten, not dear

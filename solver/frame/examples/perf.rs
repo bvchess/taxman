@@ -13,28 +13,28 @@
 //! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936 and 1215 by default: W = 16,
 //! and the hardest games):
 //!
-//! * `nNNNN.nodes` (F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded with
-//!   an optimal set), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a node's
-//!   state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
+//! * `nNNNN.nodes` (fixture F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded
+//!   with an optimal set), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a
+//!   node's state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
 //!   `can_promote_using`, the minimal conflict and the one from the residual (the `core` line) of the heaviest
-//!   matching, the matching from scratch
-//!   and warm-started from the root's, the bounds without each member of the heaviest matching from the
-//!   potentials, the exact ones without each member of the conflict (strong branching), children pushed and
-//!   evaluated, and lookups and rule-outs in a nogood table learned from the nodes' conflicts.
-//! * F2, frame checks, made from F1 on the fly: the two frames that promoting each candidate of each node changes
-//!   (one gains the move, one loses the factor), each checked by `FrameGraph::winnable_using`.
-//! * `nNNNN.window.ckpt` (F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof after
-//!   some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
-//!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its
-//!   fingerprint is the search's counters (steps, promotions, children, matching bounds, ...), less the GF(2)
-//!   bound's counts of solves and augmentations, which measure work rather than the tree.  The checkpoint
-//!   is read-only.  The window searches with the tactics the checkpoint records, the matching path's, the defaults when
-//!   the windows were first made (`make-window 936 4500` and `make-window 1215 600000`, with `--tactic gf2=off --tactic
-//!   lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe does, on top of the
-//!   defaults, so the windows record the default window of the forced members, `force_window=all`, as a header of
-//!   version 6), which `--tactic` changes (the search tactics only, as for the ladder): `--tactic lagrange=off`, say,
-//!   searches the same window without the Lagrangian bound.  A game in `--fixtures` with a window and no nodes (a
-//!   copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has only the window.
+//!   matching, the matching from scratch and warm-started from the root's, the bounds without each member of the
+//!   heaviest matching from the potentials, the exact ones without each member of the conflict (strong branching),
+//!   children pushed and evaluated, and lookups and rule-outs in a nogood table learned from the nodes' conflicts.
+//! * Fixture F2, frame checks, made from F1 on the fly: the two frames that promoting each candidate of each node
+//!   changes (one gains the move, one loses the factor), each checked by `FrameGraph::winnable_using`.
+//! * `nNNNN.window.ckpt` (fixture F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof
+//!   after some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
+//!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its fingerprint is
+//!   the search's counters (steps, promotions, children, matching bounds, ...), less the GF(2) bound's counts of solves
+//!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The window searches
+//!   with the tactics the checkpoint records, the matching path's, the defaults when the windows were first made
+//!   (`make-window 936 4500` and `make-window 1215 600000`, with
+//!   `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe
+//!   does, on top of the defaults, so the windows record the default window of the forced members, `force_window=all`,
+//!   as a header of version 6), which `--tactic` changes (the search tactics only, as for the ladder):
+//!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.  A game in `--fixtures` with
+//!   a window and no nodes (a copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has
+//!   only the window.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
@@ -191,7 +191,7 @@ fn seed<const W: usize>(p: &Prepared<W>, optimal: &Optimal) -> Bits<W> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// F1 and F2: the kernels on the captured nodes
+// Fixtures F1 and F2: the kernels on the captured nodes
 
 /// One captured node, rebuilt: its state, the heaviest matching's candidates and their minimal conflict.
 struct Node<const W: usize> {
@@ -367,7 +367,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
     });
     report.line("Nogoods::ruled_out(x, P + x, C), 8 largest of Q*", pushes, cost, fp);
 
-    // F2: the frame checks of promoting each candidate.
+    // Fixture F2: the frame checks of promoting each candidate.
     let mut checks: Vec<(Bits<W>, Bits<W>)> = Vec::new();
     for x in &nodes {
         for c in x.cands.iter() {
@@ -390,7 +390,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// F4: the GF(2) bound's kernels (with `--tactic gf2=on`)
+// Fixture F4: the GF(2) bound's kernels (with `--tactic gf2=on`)
 
 /// The GF(2) bound's kernels at the nodes of the F1 fixture `path` ([`taxman::gf2::Gf2Bound`]), each over all the
 /// nodes: a node's level from the root and its bound from scratch; the same with its forced members (the weight
@@ -492,7 +492,7 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, window: ForceWindow, repo
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// F3: the search window
+// Fixture F3: the search window
 
 /// The window of the checkpoint `path` of game `n`: `steps` steps, with the tactics the checkpoint records changed
 /// by `changes` (`name=value`, search tactics only).

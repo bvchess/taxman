@@ -112,7 +112,8 @@ struct Args {
     from: u32,
     to: u32,
     compare: bool,
-    /// The formulation of Π⁺ (`Board::extended`): with the claims of `unzip` that E4 keeps unless `--no-claims`.
+    /// The formulation of Π⁺ (`Board::extended`): with the claims of `unzip` that E4 (docs/theory/extended-problem.md)
+    /// keeps unless `--no-claims`.
     claims: bool,
     known: Option<PathBuf>,
     out: Option<PathBuf>,

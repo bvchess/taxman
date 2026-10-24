@@ -358,7 +358,7 @@ impl Family {
 }
 
 /// A fit: signings and multipliers, which together give a valid bound at the state they were fitted at (and at its
-/// nodes: B1 and B4).
+/// nodes: B1 and B4, docs/theory/frame-bounds.md).
 #[derive(Clone, Debug, Default)]
 pub struct Fit {
     pub signings: Vec<Signing>,
@@ -481,13 +481,13 @@ pub fn evaluate<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, lam: &[Vec<f64>]
 
 /// `L` at integer multipliers `lhat` (scaled by [`SCALE`], at least 0).
 ///
-/// The multipliers proposed can lie far beyond every weight (an R2 master whose basis broke down proposed some above
-/// `10^50`, which [`grid`] takes as `i64::MAX`), so the sums saturate instead of wrapping around: each is exact
-/// unless its true value lies beyond `i64`.  A reweighted weight `x·S − Σ_k λ̂_{k,x}` is then `i64::MIN`, not
+/// The multipliers proposed can lie far beyond every weight (a master of the R2 refit whose basis broke down proposed
+/// some above `10^50`, which [`grid`] takes as `i64::MAX`), so the sums saturate instead of wrapping around: each is
+/// exact unless its true value lies beyond `i64`.  A reweighted weight `x·S − Σ_k λ̂_{k,x}` is then `i64::MIN`, not
 /// positive either, so the intersection gets exactly the elements of positive reweighted weight, with their weights.
 /// Those are at most `x·S < 2^29` (`n < 2^13`, the solver's largest board), as the crate needs: it packs a path's
-/// length, at most the sum of the weights (below `2^42`), times `2^16` with the path's number of arcs into one
-/// `i64`.  A greedy's value and `L` are then `i64::MAX`, still a bound, since every promotion set weighs less than
+/// length, at most the sum of the weights (below `2^42`), times `2^16` with the path's number of arcs into one `i64`.
+/// A greedy's value and `L` are then `i64::MAX`, still a bound, since every promotion set weighs less than
 /// `n²·S < 2^42`.  Wrapping around instead gave an element with two or more such multipliers a positive weight (near
 /// `2^63`, or a wrong one just above `x·S`), on which the crate's distances overflowed, and could make `L` wrong.
 pub fn evaluate_grid<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, lhat: &[Vec<i64>], stats: &mut Stats) -> Eval {
@@ -1748,9 +1748,9 @@ fn refit_end<const W: usize>(f: Fitter<'_, '_, W>, before: u64) -> (i64, Trace) 
     (r.bound, Trace { pricings: (r.stats.pricings_mi - before) as usize, stop: r.stop })
 }
 
-/// R2, the warm master (design S3.2): the column generation of [`bound`] in search mode from `warm` at the node
-/// ([`warm_fitter`]), at most `k` pricings after Tier 1, stopping at the target (if the context stops there), the
-/// budget, `settings.seconds`, a breakdown, or when nothing prices out and no cheap cut is violated.  Returns the
+/// The R2 refit, the warm master (design step S3.2): the column generation of [`bound`] in search mode from `warm` at
+/// the node ([`warm_fitter`]), at most `k` pricings after Tier 1, stopping at the target (if the context stops there),
+/// the budget, `settings.seconds`, a breakdown, or when nothing prices out and no cheap cut is violated.  Returns the
 /// lowest ⌊L⌋ (with Tier 1's) and how it ended.
 pub fn refit_r2<const W: usize>(
     ctx: &Ctx<'_, W>,
@@ -1902,8 +1902,8 @@ mod tests {
         eprintln!("the intersection checked at block vectors of {words:?} words");
     }
 
-    /// The fits of `testdata/fits` give their bounds again at the roots they were fitted at: the study's own
-    /// numbers (E1, E2, the pilot), computed by its code with the intersection checked against a reference.  Among
+    /// The fits of `testdata/fits` give their bounds again at the roots they were fitted at: the study's own numbers
+    /// (studies E1 and E2, the pilot), computed by its code with the intersection checked against a reference.  Among
     /// them 2700 and 3300, with frame matroids of more than 64 and more than 128 coordinates.
     #[test]
     fn the_study_fits_give_their_bounds_again() {

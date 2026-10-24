@@ -462,12 +462,13 @@ impl Book {
         let t = &self.entries[&target];
         let (t_bag, t_prime, t_value) = (t.bag, t.prime, t.lower.as_ref().map_or(0, |l| l.value));
         // The relation that carries a game across the link, and the rule that names the upper bound (up a board it is
-        // the ceiling, down a board monotonicity).  N5 (prime): U(p) <= U(p - 1) + p - q, and the game's exchange
-        // of the opening q for p scores that much more, and the same down; N4 (the ceiling): U(n) <= U(n - 1) +
-        // n; N3 (monotone): the game of n - 1 scores as it did, or n more, and U(n - 1) <= U(n); R6 (repeat): U(n) -
-        // bag(n) <= U(m) - bag(m), and the promotions of the source's game on the target's board score its bag and
-        // their sum (a game that was not made from promotions is made only if it has more to give than the target's,
-        // on the same terms).  `upper_by` has the arithmetic, which bounds the score of a game too, except down a board.
+        // the ceiling, down a board monotonicity).  N5 (the prime formula, docs/theory/neighbors.md): U(p) <= U(p - 1)
+        // + p - q, and the game's exchange of the opening q for p scores that much more, and the same down; N4 (the
+        // ceiling lemma): U(n) <= U(n - 1) + n; N3 (monotonicity): the game of n - 1 scores as it did, or n more, and
+        // U(n - 1) <= U(n); R6 (the repeat lemma, docs/theory/search-rules.md): U(n) - bag(n) <= U(m) - bag(m), and the
+        // promotions of the source's game on the target's board score its bag and their sum (a game that was not made
+        // from promotions is made only if it has more to give than the target's, on the same terms).  `upper_by` has
+        // the arithmetic, which bounds the score of a game too, except down a board.
         let (relation, upper_rule) = match link {
             Link::Up if t_prime => (Rule::Prime, Rule::Prime),
             Link::Up => (Rule::Monotone, Rule::Ceiling),

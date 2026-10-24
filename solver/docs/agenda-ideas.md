@@ -33,8 +33,8 @@ the relevant pages, the others were seen in abstracts.
 * **Random XORSAT and hypergraph 2-cores.**  For random 3-XORSAT the 2-core appears at density about 0.818 and full rank
   lasts to about 0.918 (Dubois and Mandler, FOCS 2002; Pittel and Sorkin, CPC 25 (2016)): in between, a non-empty core
   of full GF(2) rank, an odd core, is the typical case.  *Transfers:* a density-evolution model of the frames (movers
-  per factor, the share with three live factors) to predict how the cores, and so the gap, grow with n (C5); and the
-  lesson that the odd-core gap is generic, not an accident of a few boards.
+  per factor, the share with three live factors) to predict how the cores, and so the gap, grow with n (conjecture C5);
+  and the lesson that the odd-core gap is generic, not an accident of a few boards.
 * **Uniquely restricted matchings.**  The maximum uniquely restricted matching is NP-hard on bipartite graphs (Golumbic,
   Hirst, Lewenstein, Algorithmica 31 (2001); Müller, Order 7 (1990)), not approximable within n^(1/3 − ε) unless NP =
   ZPP (Mishra, 2011), and fixed-parameter tractable in treewidth in 2^O(tw²) n (Chaudhary, Sau, Zehavi,
@@ -43,8 +43,8 @@ the relevant pages, the others were seen in abstracts.
   the treewidth recursion could close small components exactly after branching.
 * **Algebraic combinatorics.**  The weak Lefschetz property of monomial ideals in three variables: the multiplication
   map between degrees has a determinant that counts lozenge tilings, and fails in characteristic p when p divides the
-  count.  *Transfers:* product formulas for those counts, to predict which primes see the three-prime cores (C2).  Not
-  surveyed: the statement is to check before relying on it.
+  count.  *Transfers:* product formulas for those counts, to predict which primes see the three-prime cores (conjecture
+  C2).  Not surveyed: the statement is to check before relying on it.
 * **Matroid optimization.**  Lagrangian decomposition (Guignard and Kim, Math. Programming 39 (1987)) reaches the LP
   over the intersection of the matroid polytopes with two-matroid subproblems; for three matroids that LP's integrality
   gap is 2 (Linhares, Olver, Swamy, Zenklusen, Math. Programming 2020), so it is a bound, not the integer optimum.  The

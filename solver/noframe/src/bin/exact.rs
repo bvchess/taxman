@@ -36,17 +36,17 @@
 //! alone.  A proof's `"matching_nodes"` are its nodes searched without the parity bound (a search resumed from a
 //! checkpoint of such a run); its `"nodes"` count all of them.
 //!
-//! What the sources of layer 3 and up cost (E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole upper
-//! part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem on the
-//! whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open statement U
-//! of docs/theory/exactness.md), so a finished search of that kind is written `"search":"upper_fixed"` and no tool
-//! counts it as a proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a real
-//! game whatever the roles, so a search that finds one stops with an error in every mode.  Two counters show where B
-//! spends on the sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the
+//! What the sources of layer 3 and up cost (study E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole
+//! upper part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem
+//! on the whole board.  It proves nothing about opt(n) (that some optimal set has the upper part U\* is the open
+//! statement U of docs/theory/exactness.md), so a finished search of that kind is written `"search":"upper_fixed"` and
+//! no tool counts it as a proof; it is a measurement, and its line has `"fix_upper":1`.  A playable set beating V is a
+//! real game whatever the roles, so a search that finds one stops with an error in every mode.  Two counters show where
+//! B spends on the sources of layer 3 and up, in every search (0 for a game not searched): `branched_on_sources`, the
 //! nodes that branched on a set holding a free source of layer 3 or up, and `barred_upper`, the nodes whose roles, as
 //! the node received them, bar a member of U\*_{>=3} (`game::Prover::watch`; they change nothing in the search).
-//! `fm_bound`, `parity_bound` and the choice of the games to search stay the whole board's.  `tools/summarize.py
-//! sources` compares B with D.
+//! `fm_bound`, `parity_bound` and the choice of the games to search stay the whole board's.
+//! `tools/summarize.py sources` compares B with D.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -150,7 +150,7 @@ fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget) = (1usize, f64::INFINITY, u64::MAX);
     let (mut all, mut parity, mut segments, mut lagrangian) = (false, true, false, None);
-    // The roles of F4 are the default; --fix-low 0 starts from the plain root.
+    // The roles of F4 (docs/theory/frame-model.md) are the default; --fix-low 0 starts from the plain root.
     let (mut fix_low, mut fix_upper) = (true, false);
     let mut optimal = root.join("../../results/optimal.json");
     let mut results = root.join("../../results/strict.jsonl");
@@ -217,7 +217,7 @@ fn main() {
                 panic!("n={n}: the root's parity bound is not certified")
             };
             assert!(root_bound.value >= *score as i64, "n={n}: the parity bound is below a legal game's {score}");
-            // The recorded game's moves are independent in both parity matroids (W1).
+            // The recorded game's moves are independent in both parity matroids (W1, docs/theory/parity-bound.md).
             moves.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             let independent = parity_at(&roles);
             assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded game is dependent");
@@ -229,8 +229,8 @@ fn main() {
         let skip = bounded || (relation != "none" && !all);
         // U* fixes the roles and names the numbers the counters watch; a game that is left alone needs neither.
         let ustar = if fix_low || !skip { recorded_ustar(n, moves, &spf) } else { Vec::new() };
-        // The roles the search starts from (those of F4 unless --fix-low 0 says the plain root): the recorded
-        // game obeys them, so their parity bound is at least its score.
+        // The roles the search starts from (those of F4, docs/theory/frame-model.md, unless --fix-low 0 says the plain
+        // root): the recorded game obeys them, so their parity bound is at least its score.
         let unit = if fix_upper {
             upper_fixed_roles(n as u32, &spf, &ustar)
         } else if fix_low {

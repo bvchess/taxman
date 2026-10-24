@@ -95,8 +95,9 @@ pub fn payments(board: &Board, set: &[u32]) -> Option<Vec<(u32, u32)>> {
     (paid.len() == set.len()).then_some(paid)
 }
 
-/// A legal order of the moves of a playable `set` (the playability theorem, P2): a topological order of the precedence
-/// "a before b when a's payment divides b, or a divides b", with the payments of [`payments`].  None if unplayable.
+/// A legal order of the moves of a playable `set` (the playability theorem, P2, docs/theory/playability.md): a
+/// topological order of the precedence "a before b when a's payment divides b, or a divides b", with the payments of
+/// [`payments`].  None if unplayable.
 pub fn play_order(board: &Board, set: &[u32]) -> Option<Vec<u32>> {
     let paid = payments(board, set)?;
     let k = paid.len();

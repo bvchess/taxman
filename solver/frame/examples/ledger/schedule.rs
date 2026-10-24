@@ -1120,7 +1120,8 @@ impl Scheduler {
         }
         // The upper bound the job proved: a search that reached its ceiling proves its game by the bound that was its
         // ceiling, which stands; a floor step that completed having found nothing proves its floor, and one that
-        // completed having found a set proves that set (the floor lemma, R5); a floor step that stopped proves nothing.
+        // completed having found a set proves that set (the floor lemma, R5, docs/theory/search-rules.md); a floor step
+        // that stopped proves nothing.
         let upper = match done.kind {
             _ if a.reached_cap => None,
             Kind::Floor if a.held => done.floor,

@@ -107,10 +107,11 @@ pub fn low_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     roles
 }
 
-/// The roles of the frame model's problem on the whole board: [`low_roles`] (F4), and above n/2 every member of `ustar`
-/// forced and every other number barred, so that nothing above n/2 is free.  A search from these roles proves nothing
-/// about opt(n): it looks only for sets whose upper part is U\*, and that some optimal set has that upper part is the
-/// open statement U (docs/theory/exactness.md).  It is a measurement of what the frame model's problem costs.
+/// The roles of the frame model's problem on the whole board: [`low_roles`] (F4, docs/theory/frame-model.md), and above
+/// n/2 every member of `ustar` forced and every other number barred, so that nothing above n/2 is free.  A search from
+/// these roles proves nothing about opt(n): it looks only for sets whose upper part is U\*, and that some optimal set
+/// has that upper part is the open statement U (docs/theory/exactness.md).  It is a measurement of what the frame
+/// model's problem costs.
 pub fn upper_fixed_roles(n: u32, spf: &[u32], ustar: &[u32]) -> Vec<Role> {
     let mut roles = low_roles(n, spf, ustar);
     let member = in_ustar(n, ustar);
@@ -234,8 +235,8 @@ mod tests {
 
     /// One board and one claim T below its recorded score V, for the tests of the certificates: the barred bounds
     /// recomputed at T (a member certified against V says nothing of the sets worth V − 4), those at V, and every
-    /// playable set that obeys the roles of F4 and is worth more than T, enumerated by the matching bound alone
-    /// so that the check does not rest on the parity bound under test.
+    /// playable set that obeys the roles of F4 (docs/theory/frame-model.md) and is worth more than T, enumerated by the
+    /// matching bound alone so that the check does not rest on the parity bound under test.
     struct Case {
         n: u64,
         claim: u64,
@@ -282,8 +283,8 @@ mod tests {
     }
 
     /// Every claim T below the recorded score V, with certification recomputed at T: the members certified at T are
-    /// certified at V, and every playable set that obeys the roles of F4 and is worth more than T holds each
-    /// of them.  Boards 2..=60.
+    /// certified at V, and every playable set that obeys the roles of F4 (docs/theory/frame-model.md) and is worth more
+    /// than T holds each of them.  Boards 2..=60.
     #[test]
     fn certified_members_are_held_by_every_set_beating_the_claim() {
         let (mut checks, mut certified, mut open) = (0usize, 0usize, 0usize);
@@ -333,8 +334,8 @@ mod tests {
         assert!(caught > 0, "the wrong rule was caught on no board: the test cannot see an over-generous rule");
     }
 
-    /// Every optimal set of a game obeys the roles of F4, found by enumeration from the plain root (the
-    /// sets worth more than V − 1).  Boards 2..=60.
+    /// Every optimal set of a game obeys the roles of F4, docs/theory/frame-model.md, found by enumeration from the
+    /// plain root (the sets worth more than V − 1).  Boards 2..=60.
     #[test]
     fn every_optimal_set_obeys_the_roles() {
         let (known, spf) = (optimal(), smallest_prime_factors(*SMALL.end() as usize));
@@ -475,9 +476,10 @@ mod tests {
         assert!(checked > 0, "the test checked nothing");
     }
 
-    /// Fixing the two bottom layers by F4 keeps the proofs and opt(n): from `low_roles`, with the target
-    /// the score nothing beats it, and with the target one below a playable set obeying the roles is found, worth
-    /// the score.  Every 3rd game that needs a search in 187..=700 (all of them take three times the time).
+    /// Fixing the two bottom layers by F4 (docs/theory/frame-model.md) keeps the proofs and opt(n): from `low_roles`,
+    /// with the target the score nothing beats it, and with the target one below a playable set obeying the roles is
+    /// found, worth the score.  Every 3rd game that needs a search in 187..=700 (all of them take three times the
+    /// time).
     #[test]
     fn fixing_the_bottom_layers_keeps_the_proofs() {
         let started = Instant::now();

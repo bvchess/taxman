@@ -1,6 +1,7 @@
 //! The `exact` binary's modes: every line records whether the search started from the roles of F4
-//! (`fix_low`, on by default), and the roles change what is searched from, not what is proven or which games are
-//! searched.  Boards 187..=300 (their frames of layer 2 are closed, and the games that need a search take a second).
+//! (docs/theory/frame-model.md) (`fix_low`, on by default), and the roles change what is searched from, not what is
+//! proven or which games are searched.  Boards 187..=300 (their frames of layer 2 are closed, and the games that need a
+//! search take a second).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -28,8 +29,8 @@ fn lines_of(tag: &str, args: &[&str]) -> BTreeMap<u64, String> {
     lines
 }
 
-/// The default starts from the roles of F4 and says so on every line; `--fix-low 0` is the plain root and
-/// says so; the games searched and their verdicts are the same, and a game that was searched has its
+/// The default starts from the roles of F4 (docs/theory/frame-model.md) and says so on every line; `--fix-low 0` is the
+/// plain root and says so; the games searched and their verdicts are the same, and a game that was searched has its
 /// `fixed_bound` (the parity bound at the roles) at least the score.
 #[test]
 fn every_line_records_whether_the_roles_of_theorem_b_were_used() {

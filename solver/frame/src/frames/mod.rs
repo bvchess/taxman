@@ -215,8 +215,8 @@ pub struct SearchFrames<const W: usize> {
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
     /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`) and the
-    /// extended problem, which keeps those the kept-claims lemma (E4) allows ([`build_extended`]); the solver's search
-    /// does not read them.
+    /// extended problem, which keeps those the kept-claims lemma (E4, docs/theory/extended-problem.md) allows
+    /// ([`build_extended`]); the solver's search does not read them.
     pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected

@@ -215,7 +215,8 @@ pub struct Certificate {
     /// The set width the search ran at, in words: the board's own, or the widest where the GF(2) bound needs it.
     pub width: usize,
     /// The formulation Π⁺(O) was set up in ([`Board::extended`]): true with the claims of `unzip` that E4
-    /// keeps, false with none, as every certificate made before it (whose lines have no `claims`, and read as false).
+    /// (docs/theory/extended-problem.md) keeps, false with none, as every certificate made before it (whose lines have
+    /// no `claims`, and read as false).
     pub claims: bool,
     pub verdict: Verdict,
     /// The digest of Π⁺(O) in that formulation, as the search was given it ([`search::Problem::digest`]).
@@ -336,11 +337,11 @@ impl Certificate {
     }
 }
 
-/// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1`
-/// (the results files, over the table of optimal games), `upper` the open members; the search runs with `opts`'
-/// threads, checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.
-/// `claims` is the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E4 keeps, or without
-/// any.
+/// Certifies the recorded game of `n` (see the module docs): `known` gives the scores and games of `n` and `n − 1` (the
+/// results files, over the table of optimal games), `upper` the open members; the search runs with `opts`' threads,
+/// checkpoint (resumed if it exists), limits and progress, in extended mode whatever `opts`' tactics say.  `claims` is
+/// the formulation of Π⁺(O) ([`Board::extended`]): with the claims of `unzip` that E4 (docs/theory/extended-problem.md)
+/// keeps, or without any.
 ///
 /// # Errors
 ///

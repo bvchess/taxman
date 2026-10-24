@@ -15,17 +15,17 @@ load on the machine moves wall times by up to 3×.  Five tools measure it:
 * **The probe** (`cargo run --release --example perf`) replays the hot paths of the hardest games from fixtures in
   `testdata/perf/` (0.2 MB), and measures them in cycles and instructions retired of the process (`proc_pid_rusage`).
   Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
-  * F1: 300 search nodes from each of the proofs of 936 and 1215, every kernel over all of them (the rebuild of a node,
-    the promotion of every candidate, conflicts, the matching from scratch and warm-started, the bounds without each
-    member, strong branching's exact solves, children, nogood lookups and rule-outs);
-  * F2: the frame checks of those promotions;
-  * F3: a checkpoint of each proof (`perf make-window 936 4500`, `perf make-window 1215 600000`, each with
+  * Fixture F1: 300 search nodes from each of the proofs of 936 and 1215, every kernel over all of them (the rebuild of
+    a node, the promotion of every candidate, conflicts, the matching from scratch and warm-started, the bounds without
+    each member, strong branching's exact solves, children, nogood lookups and rule-outs);
+  * Fixture F2: the frame checks of those promotions;
+  * Fixture F3: a checkpoint of each proof (`perf make-window 936 4500`, `perf make-window 1215 600000`, each with
     `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`), resumed on one thread
     for 50,000 steps, one period of forgetting nogoods: the search itself, fingerprinted by its counters, with the
     tactics its checkpoint records, the matching path's (`--tactic` changes them; a search that ends inside the window
     is costed by the steps it took);
-  * F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the F1 nodes (the bound from scratch; with its weight
-    split and forced members; without each member of its heaviest set's conflict, solved, and as strong branching
+  * Fixture F4, with `--tactic gf2=on`: the GF(2) bound's kernels at the nodes of F1 (the bound from scratch; with its
+    weight split and forced members; without each member of its heaviest set's conflict, solved, and as strong branching
     reads them, certified or solved), and the windows resumed with the GF(2) bound, which finish both searches.  A
     window's fingerprint leaves out the GF(2) bound's counts of solves and augmentations, which measure work.  The
     kernels and the windows search the forced members as `--tactic force_window` says (the default, `all`).

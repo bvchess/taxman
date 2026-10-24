@@ -344,7 +344,7 @@ mod tests {
 
     /// The extended problem with no open source poses the search what the frame model does on every board to 300 that
     /// has something to promote: without the claims of `unzip`, the same `max_total` and candidates, and the same
-    /// `in_the_bag`; with them (E4), the very problem.
+    /// `in_the_bag`; with them (E4, docs/theory/extended-problem.md), the very problem.
     #[test]
     fn the_extended_problem_without_open_sources_is_posed_as_the_frame_model_is() {
         for n in 2..=300 {

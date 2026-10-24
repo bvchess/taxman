@@ -168,10 +168,10 @@ impl<const W: usize> Case<W> {
 // ---------------------------------------------------------------------------------------------------------
 // Every set, on small boards
 
-/// The exactness theorem (X7) on the board `1..=n`, on every set: the sets L with U\* ∪ L playable (family A) and the
-/// promotion sets (family B), each found by depth first search, are equal; the sets of A are promotion sets that make
-/// games of the right score; the sets of B are playable with U\*; and the largest ΣL is what the table of optimal games
-/// has for `n` less `in_the_bag`.  Returns the number of sets.
+/// The exactness theorem (X7, docs/theory/exactness.md) on the board `1..=n`, on every set: the sets L with U\* ∪ L
+/// playable (family A) and the promotion sets (family B), each found by depth first search, are equal; the sets of A
+/// are promotion sets that make games of the right score; the sets of B are playable with U\*; and the largest ΣL is
+/// what the table of optimal games has for `n` less `in_the_bag`.  Returns the number of sets.
 fn check_every_set(n: u32) -> usize {
     let case = Case::<8>::new(n);
     let mut scratch = Scratch::new();
@@ -216,14 +216,16 @@ fn check_every_board(boards: std::ops::RangeInclusive<u32>) {
     assert!(total > boards.count(), "no board has a set but the empty one");
 }
 
-/// The exactness theorem (X7) on every set of every board from 2 to 100.  Below 70 few numbers can be promoted (the
-/// boards to 50 have 318 sets in all); the boards 98 to 100 hold the first near misses (below).
+/// The exactness theorem (X7, docs/theory/exactness.md) on every set of every board from 2 to 100.  Below 70 few
+/// numbers can be promoted (the boards to 50 have 318 sets in all); the boards 98 to 100 hold the first near misses
+/// (below).
 #[test]
 fn theorem_m_on_every_board_to_100() {
     check_every_board(2..=100);
 }
 
-/// The exactness theorem (X7) on every set of every board from 101 to 120, where the sets become many (75,000 at 114).
+/// The exactness theorem (X7, docs/theory/exactness.md) on every set of every board from 101 to 120, where the sets
+/// become many (75,000 at 114).
 #[test]
 #[ignore = "takes ten seconds; the boards to 100 are in the default test"]
 fn theorem_m_on_every_board_101_to_120() {
@@ -248,7 +250,8 @@ impl Tally {
     }
 }
 
-/// The exactness theorem (X7) on the board `1..=n` at width `W`, on `sets` random sets of each of two kinds.
+/// The exactness theorem (X7, docs/theory/exactness.md) on the board `1..=n` at width `W`, on `sets` random sets of
+/// each of two kinds.
 ///
 /// *Soundness*: a random promotion set (the candidates in a random order, promoted one after the other from the root
 /// where they still can be, until a length drawn at random from `0..=max_total` is reached) is at most `max_total`
@@ -325,8 +328,8 @@ fn check_random<const W: usize>(n: u32, sets: usize, rng: &mut Rng) -> Tally {
     tally
 }
 
-/// The exactness theorem (X7) on `sets` random sets of each kind on each of `boards`, each at the width the solver
-/// picks, from the random stream seeded with `seed`.
+/// The exactness theorem (X7, docs/theory/exactness.md) on `sets` random sets of each kind on each of `boards`, each at
+/// the width the solver picks, from the random stream seeded with `seed`.
 fn check_random_boards(boards: &[u32], sets: usize, seed: u64) {
     let mut rng = Rng(seed);
     let start = Instant::now();
@@ -338,20 +341,21 @@ fn check_random_boards(boards: &[u32], sets: usize, seed: u64) {
     println!("{} boards, {sets} sets of each kind: {:.1?}", boards.len(), start.elapsed());
 }
 
-/// The exactness theorem (X7) on a few random sets of the boards 60 to 500.
+/// The exactness theorem (X7, docs/theory/exactness.md) on a few random sets of the boards 60 to 500.
 #[test]
 fn theorem_m_on_a_few_random_sets_to_500() {
     check_random_boards(&[60, 100, 200, 300, 500], 20, 0xE220_A839_7B1D_CDAF);
 }
 
-/// The exactness theorem (X7) on random sets of the boards from 60 to 1300.
+/// The exactness theorem (X7, docs/theory/exactness.md) on random sets of the boards from 60 to 1300.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_m_on_a_few_random_sets_to_500")]
 fn theorem_m_on_random_sets_to_1300() {
     check_random_boards(&[60, 100, 200, 300, 500, 760, 1000, 1300], 100, 0x9E37_79B9_7F4A_7C15);
 }
 
-/// The exactness theorem (X7) on random sets of the boards from 2000 to 8191, 10 sets of each kind.
+/// The exactness theorem (X7, docs/theory/exactness.md) on random sets of the boards from 2000 to 8191, 10 sets of each
+/// kind.
 #[test]
 #[ignore = "takes a while; the boards to 1300 are in the default test"]
 fn theorem_m_on_random_sets_past_1300() {
@@ -380,9 +384,9 @@ const NEAR_MISS_CYCLE: [u32; 8] = [22, 57, 62, 65, 77, 91, 93, 95];
 /// and the frame stays winnable.  On the board, though, 22 and 77 close the path into a cycle on eight factors: the
 /// eight numbers list each of the eight factors 2, 3, 5, 7, 11, 13, 19 and 31 twice, so no member has one live factor
 /// and no factor one live member, and the peel of the eight stalls (the peel theorem, P4, docs/theory/playability.md):
-/// no order of them is a game, and all of them but 22 are in U\*.  So 22 is no candidate (the "only if" of X7 needs
-/// that: U\* ∪ {22} is unplayable), the model alone would accept it (so the "if" would fail without the filter), and
-/// the filter is the only guard there.
+/// no order of them is a game, and all of them but 22 are in U\*.  So 22 is no candidate (the "only if" of X7
+/// (docs/theory/exactness.md) needs that: U\* ∪ {22} is unplayable), the model alone would accept it (so the "if" would
+/// fail without the filter), and the filter is the only guard there.
 #[test]
 fn the_candidate_filter_keeps_out_what_a_back_claim_hides() {
     let (n, s, f, c) = NEAR_MISS;
@@ -441,10 +445,10 @@ fn sightings<const W: usize>(n: u32) -> Vec<Sighting> {
     found
 }
 
-/// Every board from 2 to 2000, for the back claims that a number up to n/2 could hide a use of the factor behind.
-/// No such number is a candidate (check D of `examples/structure.rs`), and none makes U\* ∪ {c} playable (X7);
-/// where the model alone would accept it, only the candidate filter keeps it out.  Prints what it finds; the first of
-/// them is [`NEAR_MISS`].
+/// Every board from 2 to 2000, for the back claims that a number up to n/2 could hide a use of the factor behind.  No
+/// such number is a candidate (check D of `examples/structure.rs`), and none makes U\* ∪ {c} playable (X7,
+/// docs/theory/exactness.md); where the model alone would accept it, only the candidate filter keeps it out.  Prints
+/// what it finds; the first of them is [`NEAR_MISS`].
 #[test]
 #[ignore = "takes ten seconds; it found the board of the near-miss test"]
 fn the_scan_for_near_misses() {

@@ -1218,9 +1218,9 @@ mod tests {
         );
     }
 
-    /// The parity bound (W1) on small boards: every playable set of 2..=n is independent in both parity matroids, so
-    /// the heaviest common independent set is at least opt(n); and with random roles the bound is at least the heaviest
-    /// playable set with those roles, and the intersection is exact against enumeration.
+    /// The parity bound (W1, docs/theory/parity-bound.md) on small boards: every playable set of 2..=n is independent
+    /// in both parity matroids, so the heaviest common independent set is at least opt(n); and with random roles the
+    /// bound is at least the heaviest playable set with those roles, and the intersection is exact against enumeration.
     #[test]
     fn playable_sets_are_independent_in_both_parity_matroids() {
         let spf = smallest_prime_factors(64);

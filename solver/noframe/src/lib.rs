@@ -8,9 +8,9 @@
 //!
 //! This crate shares no code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only on the
 //! theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
-//! confinement, P8; the parity bound, W1; and the bottom layers of every optimal set, the bottom-layers theorem F4,
-//! which the proofs of `exact` start from by default) and on elementary bounds.  The report is `README.md` next to this
-//! file.
+//! confinement, P8; the parity bound, W1, in docs/theory/parity-bound.md; and the bottom layers of every optimal set,
+//! the bottom-layers theorem F4 of docs/theory/frame-model.md, which the proofs of `exact` start from by default) and
+//! on elementary bounds.  The report is `README.md` next to this file.
 //!
 //! * [`primes`]: the sieve.
 //! * [`instance`]: reduction instances (members, their maximal factors) and the sources' instance of a game

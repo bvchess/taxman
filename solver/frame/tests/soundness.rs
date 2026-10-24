@@ -444,9 +444,9 @@ impl<'a, const W: usize> Searched<'a, W> {
 
 /// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
 /// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
-/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (R2:
-/// the root's heaviest set keeps the inequalities, so a search from the root loses nothing).  For the boards to 40
-/// opt(n) is also checked against the exhaustive search without the frame model.
+/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (R2,
+/// docs/theory/search-rules.md: the root's heaviest set keeps the inequalities, so a search from the root loses
+/// nothing).  For the boards to 40 opt(n) is also checked against the exhaustive search without the frame model.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -592,10 +592,10 @@ fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
 /// Units on the path to an optimal promotion set `S*` of game `n` at width `W`: the promotions are `S*` less a random
 /// 30, 50 or 70 percent of its members, the candidates what the search leaves them, searched under each of `configs`
 /// from an incumbent one below P*, with the near-repeat cut by a game before ([`game_after`]).  Such a unit holds `S*`,
-/// which keeps every symmetric pair's inequality (R2), so the search with the rule of the pairs (tactic
-/// `symmetry`) must find P*; a rule that cuts a node on the path to `S*`, or drops a candidate `S*` needs, does not.
-/// The nodes of such a search are deep enough that the promotions and the candidates leave the pairs' inequalities
-/// open, which a game searched from its root rarely does.  Returns the number of searches.
+/// which keeps every symmetric pair's inequality (R2, docs/theory/search-rules.md), so the search with the rule of the
+/// pairs (tactic `symmetry`) must find P*; a rule that cuts a node on the path to `S*`, or drops a candidate `S*`
+/// needs, does not.  The nodes of such a search are deep enough that the promotions and the candidates leave the pairs'
+/// inequalities open, which a game searched from its root rarely does.  Returns the number of searches.
 fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units: usize, configs: &[Config]) -> usize {
     let truth = optimal_sum::<W>(optimal, n).expect("a known game");
     let game = game_after::<W>(optimal, n, truth - 1).expect("a game");

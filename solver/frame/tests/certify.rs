@@ -92,7 +92,7 @@ fn needing(range: RangeInclusive<u32>) -> Vec<u32> {
 }
 
 /// Certifies the recorded game of `n` with the committed data and `opts`, in the default formulation (with the claims
-/// of `unzip` that the kept-claims lemma (E4) keeps).
+/// of `unzip` that the kept-claims lemma (E4, docs/theory/extended-problem.md) keeps).
 fn certify(n: u32, opts: &SolveOptions) -> Certificate {
     certify_in(n, true, opts)
 }

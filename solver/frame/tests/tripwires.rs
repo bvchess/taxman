@@ -117,9 +117,9 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
 
 /// (board, tactics, promotion sum, nodes): the search of the extended problem Π⁺(∅) of the board in its formulation
 /// without the claims of `unzip`, set up by `Board::prepare_extended_with` with no source open and `claims` unset, on
-/// one thread.  (With the claims that the kept-claims lemma (E4) allows, which with no source open are all of them,
-/// Π⁺(∅) is the frame model's problem and its trees are those of [`EXPECTED`], node for node:
-/// [`extended_search_with_claims`].)  The tactics are `default` and `extended` ([`SearchTactics::extended`]: the
+/// one thread.  (With the claims that the kept-claims lemma (E4, docs/theory/extended-problem.md) allows, which with no
+/// source open are all of them, Π⁺(∅) is the frame model's problem and its trees are those of [`EXPECTED`], node for
+/// node: [`extended_search_with_claims`].)  The tactics are `default` and `extended` ([`SearchTactics::extended`]: the
 /// default without the rule of the symmetric pairs, the tactics of a search with one-sided candidates, which refuses
 /// the rule).  The promotion sums are those of [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is
 /// the answer.  The rows `extended` are the frame model's trees, node for node, where [`EXPECTED`] has the same tactics
@@ -229,8 +229,9 @@ fn extended_tree(n: u32, assignments: &str) -> (u64, u64) {
 
 /// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` with the claims of
 /// `unzip` (set up by `Board::prepare_extended_with` with no source open and `claims` set).  With no source open the
-/// kept-claims lemma (E4) keeps every claim, so Π⁺(∅) is the frame model's problem: it must pose the problem
-/// `Board::prepare` poses (the roots, candidates, greedy sets and `max_total` too), and its search is that search.
+/// kept-claims lemma (E4, docs/theory/extended-problem.md) keeps every claim, so Π⁺(∅) is the frame model's problem: it
+/// must pose the problem `Board::prepare` poses (the roots, candidates, greedy sets and `max_total` too), and its
+/// search is that search.
 fn extended_search_with_claims<const W: usize>(n: u32, tactics: SearchTactics) -> (u64, u64) {
     let board = Board::<W>::for_n(n);
     let (ext, prepared) = board.prepare_extended_with(&Bits::EMPTY, true, tactics).unwrap();

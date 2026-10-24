@@ -4,23 +4,23 @@
 
 """Franklín and Moniot's characterization of playability against the parity matroids, by brute force.
 
-docs/theory/franklin-moniot.md, has the statements and the proofs this module checks.  A *payment
+docs/theory/franklin-moniot.md has the statements and the proofs this module checks.  A *payment
 scheme* of a pick set S pays each member s with a distinct maximal factor of s outside S: a matching of the
 maximal-factor graph whose upper ends are exactly S.  per(S, T) counts the schemes whose payments are exactly the set
 T, the permanent of S's rows on the columns T.  The section proves
 
-    S is matchable (the relaxation of the F-M upper bound)       iff  per(S, T) >= 1 for some T,
-    S is independent (the independence lemma, P10)               iff  per(S, T) is odd for some T,
-    S is playable (F-M Theorem 1; the playability theorem, P2)   iff  per(S, T) == 1 for some T,
+    S is matchable (the relaxation of the F-M upper bound)                      iff  per(S, T) >= 1 for some T,
+    S is independent (the independence lemma, P10, docs/theory/playability.md)  iff  per(S, T) is odd for some T,
+    S is playable (F-M Theorem 1; the playability theorem, P2)                  iff  per(S, T) == 1 for some T,
 
 so playable => independent => matchable, and an independent set that is not playable is an *odd core*.
 
-* `exhaustive` checks every pick set of the boards up to --max-n.  Playability is decided by the rule alone (some
-  order of S is legal); Franklín and Moniot's condition literally (a scheme with no flat alternating cycle in the
-  maximal-factor graph); independence twice (the independence lemma's family, and the two parity matroids of the
-  parity bound, W1); and each is compared with the permanents and with `core.peel`.  It also prints, board by board,
-  the heaviest playable, independent and matchable sets: opt(n), the parity bound and the F-M bound.  Below 30 every
-  number has at most two distinct primes, so these boards test the graph-like regime only.
+* `exhaustive` checks every pick set of the boards up to --max-n.  Playability is decided by the rule alone (some order
+  of S is legal); Franklín and Moniot's condition literally (a scheme with no flat alternating cycle in the
+  maximal-factor graph); independence twice (the independence lemma's family, and the two parity matroids of the parity
+  bound, W1, docs/theory/parity-bound.md); and each is compared with the permanents and with `core.peel`.  It also
+  prints, board by board, the heaviest playable, independent and matchable sets: opt(n), the parity bound and the F-M
+  bound.  Below 30 every number has at most two distinct primes, so these boards test the graph-like regime only.
 * `sampled` makes the same comparisons on random dense sets of the boards 30..--sample-max, grown around members
   with three or more distinct primes, where the hierarchy is strict.
 * `odd_cores` searches the boards --core-boards for odd cores of at most --core-size members.  Every odd core has a
@@ -201,7 +201,7 @@ def gf2_independent(vectors: Iterable[int]) -> bool:
 
 
 def lemma_independent(board: Board, picks: Iterable[int]) -> bool:
-    """The family of the independence lemma (P10): v(s) for every pick, e_s for every pick s <= n/2."""
+    """The family of the independence lemma (P10, docs/theory/playability.md): v(s) per pick, e_s per pick s <= n/2."""
     picks = list(picks)
     family = [mask_of(board.mf[s]) for s in picks] + [1 << s for s in picks if s <= board.half]
     return gf2_independent(family)

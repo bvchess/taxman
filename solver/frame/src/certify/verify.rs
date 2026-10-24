@@ -6,18 +6,19 @@
 //! ([`Certificate::from_json`]) or whose `build` lacks the commit of 40 hexadecimal digits or the `dirty` flag.  A line
 //! with a final verdict (`certified` or `beaten`; the `incomplete` ones are counted and skipped) is then checked
 //! against the data it was made from: the prover's barred bounds (the board needs a certificate, with the line's open
-//! members and the line's score), the results' game (its score, the checks `certify` makes of the recorded game, at
-//! the set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce
-//! the line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
-//! formulation, the one it records (`claims`: with the claims of `unzip` that E4 keeps, or without), for the
-//! width and for the problem.  A `certified` line has no `beaten_by` and no line for its board in the counterexample
-//! file beside the certificates ([`counterexample_path`]); a `certified` line with `same_problem` rests on the last
-//! final line of the game it names before it in the same file, which must be `certified` and among the last
-//! `SAME_SEARCH_WINDOW` games, and the rule of the same problem ([`apply_rule`], the one `certify` applies) must
-//! give what the line records, with the two problems equal whole, in the formulation of the line that rests on the
-//! other (the game it rests on is set up again in that formulation if its own line is of the other); a `beaten` line
-//! has a finished legal game scoring more than the recorded score, and an identical line in the counterexample file.  A
-//! board with final lines in several places must have only `certified` ones.  The first line to fail ends the check.
+//! members and the line's score), the results' game (its score, the checks `certify` makes of the recorded game, at the
+//! set width [`certificate_width`] gives, [`check_recorded_game`]), and Π⁺(O) set up again, which must reproduce the
+//! line's digest and sizes ([`Posed::reproduces`](super::Posed::reproduces)).  Each line is set up in its own
+//! formulation, the one it records (`claims`: with the claims of `unzip` that E4 (docs/theory/extended-problem.md)
+//! keeps, or without), for the width and for the problem.  A `certified` line has no `beaten_by` and no line for its
+//! board in the counterexample file beside the certificates ([`counterexample_path`]); a `certified` line with
+//! `same_problem` rests on the last final line of the game it names before it in the same file, which must be
+//! `certified` and among the last `SAME_SEARCH_WINDOW` games, and the rule of the same problem ([`apply_rule`], the one
+//! `certify` applies) must give what the line records, with the two problems equal whole, in the formulation of the
+//! line that rests on the other (the game it rests on is set up again in that formulation if its own line is of the
+//! other); a `beaten` line has a finished legal game scoring more than the recorded score, and an identical line in the
+//! counterexample file.  A board with final lines in several places must have only `certified` ones.  The first line to
+//! fail ends the check.
 //!
 //! What it cannot check is that a search explored its whole tree: a `certified` line made by a search is taken on
 //! trust, as an exhausted proof is.

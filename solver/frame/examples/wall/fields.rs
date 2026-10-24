@@ -15,13 +15,13 @@
 //!   within a budget in seconds.  It is the one fit a game has, `choice-prepare` writes it beside the game's prepared
 //!   file (`nNNNN.fit.json`, [`SavedFit`]'s format, which `testdata/fits` has for the games the study fitted) and
 //!   `choice` reads it back ([`Root`]).
-//! * [`Node::warm_refit`], the study's *R2* at a node: the root fit's multipliers (Tier 1: one evaluation of `L`), then
-//!   a column generation of at most `pricings` evaluations from the root's master columns and rank inequalities that
-//!   still hold at the node (`Warm::child`), with no exact check and no separation: what a branch and bound can
-//!   afford at every node it leaves open.
-//! * [`Node::full`], the study's *reference* (`nodes` mode of E1, the audit of E3): the node's own master from the root
-//!   fit's multipliers and frozen signings, with the exact checks and the separation of the node's own cores, within
-//!   a budget in seconds.
+//! * [`Node::warm_refit`], the study's *R2* refit at a node: the root fit's multipliers (Tier 1: one evaluation of
+//!   `L`), then a column generation of at most `pricings` evaluations from the root's master columns and rank
+//!   inequalities that still hold at the node (`Warm::child`), with no exact check and no separation: what a branch and
+//!   bound can afford at every node it leaves open.
+//! * [`Node::full`], the study's *reference* (`nodes` mode of study E1, the audit of study E3): the node's own master
+//!   from the root fit's multipliers and frozen signings, with the exact checks and the separation of the node's own
+//!   cores, within a budget in seconds.
 //!
 //! Every bound returned is `⌊L⌋` at some multipliers and signings, valid whatever the master proposes (B1 and B4, at a
 //! node by B1 (2)): the node's completions weigh at most that.  A node is *cut* when it is at most the `target` the
@@ -188,8 +188,8 @@ impl<'a, const W: usize> Node<'a, W> {
         Ctx::new(self.n, self.model, self.state, &self.fm, self.cap, self.target, true)
     }
 
-    /// The study's R2: Tier 1 at the root fit's multipliers, and unless that cuts the node, a warm column generation of
-    /// at most `limits.pricings` more evaluations.
+    /// The study's R2 refit: Tier 1 at the root fit's multipliers, and unless that cuts the node, a warm column
+    /// generation of at most `limits.pricings` more evaluations.
     pub fn warm_refit(&self, root: &Root, limits: &Limits) -> Found {
         let ctx = self.ctx();
         let warm = root.warm.child(&self.promoted, &self.removed, &self.fm.elems, self.cap);

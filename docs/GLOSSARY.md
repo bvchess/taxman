@@ -415,10 +415,11 @@ it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
 * **A1 to A7**: the research avenues of [solver/docs/AGENDA.md, "Ranked
   avenues"](../solver/docs/AGENDA.md#3-ranked-avenues), such as A1, the multi-field bound, and A3, splitting the search
   by the number of promotions.
-* **C1 to C7**: the conjectures of [solver/docs/AGENDA.md, "Conjectures"](../solver/docs/AGENDA.md#4-conjectures).
-* **E-numbers** (E1, E6, E9(a), ...): the experiments of one plan, numbered within it.  The same number means
-  different experiments in different plans; the entry or document that uses one defines it.  R1 to R3 likewise name
-  the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.
+* **Conjectures C1 to C7**: the conjectures of [solver/docs/AGENDA.md,
+  "Conjectures"](../solver/docs/AGENDA.md#4-conjectures).
+* **Study numbers** (study E1, study E6, study E9(a), ...): the experiments of one plan, numbered within it.  The
+  same number means different experiments in different plans; the entry or document that uses one defines it.  Refits
+  R1 to R3 likewise name the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.
 * **Results of the theory** (P2, N5, X7, R4, statement U, and so on): a letter for the file and a number in one
   sequence through it: P [playability](theory/playability.md), N [neighbors](theory/neighbors.md), S
   [sources](theory/sources.md), Q [uniqueness and longest games](theory/uniqueness-and-longest-games.md), W [the
@@ -426,4 +427,4 @@ it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
   model](theory/frame-model.md), X [its exactness](theory/exactness.md), E [the extended
   problem](theory/extended-problem.md), B [the bounds on the promotions](theory/frame-bounds.md) and R [the rules of a
   search](theory/search-rules.md).  The letters C, E and R also head the numbers above, so a label of the theory comes
-  with its name.
+  with its name, and a label of a plan with its kind: conjecture C2, study E6, refit R3.
