@@ -16,8 +16,8 @@ home `h` touches frames `h` and `h − 1`, one even and one odd.  So the even fr
 The heaviest common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial
 time), the node's *heaviest set* `I*`, bounds its completions.
 
-[THEORY.md](../../../docs/theory/bounds.md#the-frame-matroids-a-bound-on-the-promotions), Theorem 11, has the proof; the
-theorem is the frame model's form of Theorem 10, the parity matroids' bound on the whole game, which the prover uses.
+[The frame bound](../../../docs/theory/frame-bounds.md#the-frame-bound) has the proof; it is the frame model's form of
+[the parity bound](../../../docs/theory/parity-bound.md#the-parity-bound), the prover's bound on the whole game.
 The module comments of `src/gf2.rs` and `src/gf2/meet.rs` have the algorithms.  The GF(2) bound is never above the
 matching bound, since independent vectors have a system of distinct representatives, which is a matching.  What it
 misses are the *odd* cores of movers with three or more factors.
@@ -121,6 +121,19 @@ misses are the *odd* cores of movers with three or more factors.
   nogoods, or a cover LP with this intersection as its inner problem, as the nogoods study suggests) relabels them by
   increasing weight first, with `Gf2Graph::reweighted`.  The levels, the contraction and the split do not depend on the
   order.
+
+## The decomposition bound
+
+[The decomposition bound](../../../docs/theory/frame-bounds.md#the-decomposition-bound) joins the GF(2) bound and signed
+GF(3) frame matroids through Lagrange multipliers.  It is no tactic of the search: the study of the multi-field bound
+computed it ([a bound over GF(2) and GF(3) signed frame
+matroids](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and `wall choice`
+evaluates it at nodes with that study's code, `examples/wall/fields/`.  The code evaluates the bound exactly in
+integers, so that its floor bounds every promotion sum whatever produced the multipliers: the weights are `x·2^16` and
+the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3) matroid's term
+is its greedy algorithm, all in 64-bit integers, and a sum that would leave them saturates, which keeps the bound valid.
+A floating-point linear program proposes the multipliers by column generation and is no part of the proof.  The
+module comment of `examples/wall/fields/dw.rs` has the details.
 
 ## Prime exchanges
 
