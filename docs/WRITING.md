@@ -50,7 +50,8 @@ no other home stays, among the details.
 ## 6. Mathematics
 
 Define notation before using it.  State the result first, then the proof.  Never start a sentence with a symbol.  Say
-where each statement stands: proved, proved given U, measured on some games, or open.
+where each statement stands: proved, proved given U, measured on some games, or open.  The theory has rules of its own
+besides these, in [its guide](theory/writing.md).
 
 ## 7. The notebook is the record
 
