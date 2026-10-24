@@ -174,9 +174,14 @@ of [the frame model](frame-model.md#the-frame-model), the optimal game of 833 pr
 game 49, so a search of the frame model cannot prune a promotion set for having fewer promotions than the freedoms
 allow.
 
-*How far an optimal game falls short* (measured).  In every game the prover has checked, the recorded optimal game of
-[results/optimal.json](../../results/optimal.json) is a longest game, except in games 833, 834 and 835, where it is one
-move short; [evidence.md](evidence.md) gives the range.  Whether the shortfall is bounded in general is open.
+*How far an optimal game falls short* (measured).  In every game checked, the recorded optimal game is a longest game,
+except in games 833, 834 and 835, where it is one move short.  In all but a few games the certificate of the length
+lemma (Q3) shows it: the recorded game has ν(n) moves and replays by the rules, whether or not [statement
+U](exactness.md#statement-u) holds.  That the recorded game is optimal is proved on the whole board for the games the
+prover has proved, and for the rest given U.  Only the recorded game is measured, and a game may have other optimal
+games.  [evidence.md](evidence.md) gives the range and what one must trust, and [a notebook
+entry](../../solver/notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md) the run.  Whether
+the shortfall is bounded in general is open.
 
 The sets of games 21, 425 and 833 above are replayed by the rules with `heuristics/core.py`, which also gives the
 payments at 833.
