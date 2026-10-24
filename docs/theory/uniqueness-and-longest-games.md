@@ -2,144 +2,176 @@
 
 Part of [the theory](../THEORY.md).
 
+Two questions about optimal games go beyond their scores.  Can two different sets of moves both be optimal?  Many
+orders play one set, so the question is about sets.  And does an optimal game play as many moves as a game of its board
+can?  On the sources alone, the heaviest playable set is unique wherever the cardinality conjecture (★) holds; on the
+whole board it is not, from game 425 on.  An optimal game need not be a longest one: at game 833 it plays one move
+fewer.
+
+The words of the game are the [glossary's](../GLOSSARY.md#the-game), and U\*, descending greedy, components and
+truncations are defined in [sources.md](sources.md#definitions).  ΣS is the sum of a set S, and [t, n] the integers
+from t to n.
+
 ## Uniqueness of the optimal set
 
-On the sources the optimal set is unique, given (★); on the whole board it is not, from game 425 on.  Many move orders
-play the same set; the question here is whether different *sets* can be optimal.  Two statements must be kept apart: the
-sources' instance on its own, where the theory above settles it, and the whole game, where only measurement does.
+Two statements are kept apart: one about the sources on their own, which (★) settles, and one about the whole board,
+where game 425 has two optimal sets.
 
-**Theorem 8 (the heaviest playable set of sources is unique).**  Suppose (★) holds in game n, as it does wherever (♦)
-holds (Theorem 7), so in every game n ≤ 100,000.  Then every playable subset S of the sources' instance satisfies |S ∩
-{≥ t}| ≤ |U\* ∩ {≥ t}| for every t: listed in decreasing order, the i-th member of S is at most the i-th member of U\*.
-Consequently, for every strictly increasing positive weighting w (the values themselves among them), w(S) < w(U\*)
-unless S = U\*.
+### The uniqueness theorem
 
-*Proof.*  Playability splits over the components of the incidence graph: a member's factors are listed only by members
-of its own component, so the part of a self-covering set in each component is self-covering, and by Theorem 5 a set is
-playable iff its part in every component is.  So descending greedy restricted to a component K is descending greedy run
-on K, and U\* ∩ K ∩ {≥ t} is its set on the truncation K_{≥t}.  The set S ∩ K ∩ {≥ t} is playable (a subset of S), so
-(★) bounds its size by that set's; summing over the components gives the count inequality.  (If S's i-th member s_i
-exceeded U\*'s i-th, the threshold t = s_i would hold i members of S and at most i − 1 of U\*.)  Now index the values of
-the members c₁ > c₂ > … > c_m and put w(c_{m+1}) = 0.  Layer by layer,
+**Theorem Q1 (the uniqueness theorem).**  Suppose [the cardinality conjecture (★)
+(S4)](sources.md#the-cardinality-conjecture) holds in game n.  Then every playable set S of sources of game n has, for
+every t, at most as many members of value t or more as U\* has:
 
-    w(S) = Σ_j (w(c_j) − w(c_{j+1})) · |S ∩ {≥ c_j}|,
+    |S ∩ [t, n]| ≤ |U* ∩ [t, n]|.
 
-with every coefficient positive, so term by term w(S) ≤ w(U\*), and equality needs |S ∩ {≥ c_j}| = |U\* ∩ {≥ c_j}| for
-every j.  The jump of that count at c_j says whether c_j is a member, so then S = U\*.  ∎
+So S has at most as many members as U\*, and, each listed in decreasing order, the i-th member of S is at most the i-th
+member of U\*.  And for every weighting w of the sources that is positive and strictly increasing in value, the values
+themselves among them, w(S) < w(U\*) unless S = U\*: U\* is the only heaviest playable set of sources.
 
-This is the textbook fact that distinct weights give a matroid a single heaviest basis, transplanted.  The playable sets
-are not a matroid (n = 2873, above), but under (♦) they lie inside the GF(2) linear matroid of Theorem 7, of which U\*
-is the greedy basis; the count form needs only (★).  So the optimal set of sources is unique in every game to 100,000,
-where the brute force of `evaluation/certify.py` had reached 62.
+The hypothesis holds wherever the span conjecture (♦) holds ([the span theorem (S6)](sources.md#the-span-theorem)),
+and (♦) is checked game by game ([statements.md](statements.md#the-statements)).
 
-What Theorem 8 does not say is that every optimal *game* has upper part U\*.  An optimal game's upper part is a playable
-set of sources (a subset of a playable set is playable), so it is either U\* or strictly lighter above n/2; a game with
-a lighter upper part would have to win the difference back below n/2, where the payments of the moves above n/2 compete
-with the moves up to n/2.  Whether that ever happens is the strong form of what `evaluation/verify.py` measures, and it
-is open; the enumerations below never find it.  For the members of U\* with one or two prime factors it never happens
-(Theorem B, in "The frame model: what is proven and what remains"), and the weaker statement that some optimal game
-plays the rest of U\* is the one the frame solver's answers rest on (U, there).
+*Proof.*  Statement (★) bounds the count above every threshold, component by component.  Summing over the components
+gives the count inequality, and summing the counts over the thresholds gives the weights.
 
-Two elementary facts tie a game's optimal sets to its predecessor's.
+1. *Counts.*  Fix t, and a component K of the sources.  The set S ∩ K ∩ [t, n] is playable, as part of S, so by (★)
+   it has at most |U\* ∩ K ∩ [t, n]| members.  Summing over the components gives |S ∩ [t, n]| ≤ |U\* ∩ [t, n]|.
+2. *Member by member.*  At the smallest source, t = ⌊n/2⌋ + 1, step 1 gives |S| ≤ |U\*|.  If the i-th member s of S
+   exceeded the i-th member of U\*, the threshold t = s would hold i members of S and at most i − 1 of U\*.
+3. *Weights.*  List the values of the sources c₁ > c₂ > … > c_m, and put w(c_{m+1}) = 0.  By the layer-cake identity
+   ([sums over thresholds](primer.md#sums-over-thresholds)),
 
-**Lemma (the prime of every optimal set).**  Every optimal set of a game n ≥ 2 contains q, the largest prime ≤ n, and no
-other prime.
+       w(S) = Σ_j (w(c_j) − w(c_{j+1})) · |S ∩ [c_j, n]|,
 
-*Proof.*  A prime's only maximal factor is 1, so a playable set holds at most one prime (Theorem 1: distinct payments).
-The prime q > n/2 (Bertrand) divides no other number of the board, so it is nobody's maximal factor.  Let S be playable
-without q, and S′ = S minus its prime, if any.  The set S′ is playable and none of its members lists 1, so S′ ∪ {q} is
-playable (q pays with 1; adding a number that is nobody's factor removes nothing from anyone's list) and outweighs S,
-since any prime in S is below q.  ∎
+   since a member c_k is counted in the terms j ≥ k, whose coefficients sum to w(c_k).  Every coefficient is positive,
+   since w is positive and strictly increasing, so step 1 gives w(S) ≤ w(U\*) term by term.
+4. *Only one.*  Equality needs |S ∩ [c_j, n]| = |U\* ∩ [c_j, n]| for every j.  These counts determine a set: c_j is in
+   it exactly when its count at c_j exceeds its count at c_{j−1}, or is 1 when j = 1.  So then S = U\*.  ∎
 
-**Theorem 9 (optimal sets from the game before).**  Let p be the largest prime below n.
+This is the textbook fact that distinct weights give a matroid only one heaviest basis, transplanted.  The playable sets
+of sources are not a matroid's independent sets ([where exchange breaks](sources.md#where-exchange-breaks)).  They are
+always independent in the GF(2) matroid of their incidence vectors ([the independence lemma
+(P10)](playability.md#the-independence-lemma)), and where (♦) holds U\* is that matroid's greedy basis; the count form
+needs only (★).
 
-* (At the ceiling.)  If opt(n) = n + opt(n−1), the most opt(n) can be (the *ceiling*), the optimal sets of n are exactly
-  the playable sets T ∪ {n} with T an optimal set of n−1.  In particular opt(n) = n + opt(n−1) iff some optimal set of
-  n−1 stays playable with n added.
-* (Prime.)  If n is prime, opt(n) = n + opt(n−1) − p, and T ↦ T − p + n is a bijection from the optimal sets of n−1 onto
-  those of n.
+### Optimal sets on the whole board
 
-*Proof.*  A playable set of n without n is a playable set of n−1 (n is nobody's factor), worth at most opt(n−1).  At the
-ceiling: an optimal S of n is worth more than opt(n−1), so it holds n, and S − n, playable as a subset, is worth
-opt(n−1): an optimal set of n−1.  Conversely a playable T ∪ {n} with T optimal for n−1 is worth opt(n).  Prime: let T be
-optimal for n−1; by the lemma it holds p and no other prime.  The primes p and n are nobody's maximal factor on either
-board (2p > n − 1, and 2p ≠ n), and both pay only with 1, so swapping one for the other preserves playability: T − p + n
-is playable, and opt(n) ≥ opt(n−1) − p + n.  Conversely an optimal S of n holds n (it is worth more than opt(n−1), as
-n > p), hence no other prime, and S − n + p is a playable set of n−1, so opt(n) − n + p ≤ opt(n−1).  Equality holds
-throughout, both maps are well defined between optimal sets, and they are inverse to each other.  ∎
+The uniqueness theorem does not say that every optimal game plays U\* above n/2.  The upper part of an optimal set is a
+playable set of sources, so given (★) it is U\* or lighter.  An optimal game with a lighter upper part would have to win
+the difference back below n/2, where the factors that pay for the sources compete with the moves up to n/2.  Whether
+that ever happens is open, and the enumerations below never find it.  Among the sources of layers 1 and 2 it never
+happens: every optimal set holds exactly U\*_1 and U\*_2 there ([the bottom-layers
+theorem (F3)](frame-model.md#the-bottom-layers-theorem)).  The weaker claim that some optimal set holds the rest of U\*
+is [statement U](frame-model.md#statement-u), on which the frame solver's scores rest.
 
-So the number of optimal sets is the same at a prime n as at n−1, can only fall at a game at its ceiling, and can grow
-only at a composite n below its ceiling.  For a solver this is reuse made exact: when the optimal set of n−1 is unique,
-one peel of T ∪ {n} decides whether n is at its ceiling (if not, opt(n) < n + opt(n−1)), and when it is, the optimal set
-of n is known with no search.
+On the whole board the optimal set need not be unique.  Game 425 has two optimal sets, which differ by an exchange of
+three numbers up to n/2 of equal sum, {110, 132, 168} ↔ {98, 150, 162}, each summing to 410; both sets replay by the
+rules and score opt(425) = 57,010.  A second optimal set rules out an exact matroid relaxation of the whole game.
 
-**Remark (no exact matroid relaxation of the whole game).**  Game 425 has two optimal sets (they differ by {110, 132,
-168} ↔ {98, 150, 162}; both replay by the rules).  So no matroid on {2, …, n} in which every playable set is independent
-can have an optimal set as its heaviest independent set, values as weights: both optimal sets would be heaviest
-independent sets, and distinct positive weights allow only one (Theorem 8's layer-cake argument, for any matroid).  The
-certificate that settles the sources has no analogue that is exact for the whole game.
+**Proposition Q2 (the matroid proposition).**  Let n be a game with two or more optimal sets, such as 425.  In every
+matroid on the numbers 2 to n in which every playable set of game n is independent, some independent set weighs more
+than opt(n), with the values as weights.  So no matroid relaxation of the whole game is exact.
 
-What is measured (`solver/noframe`, "Is the optimal set unique?"): the prover enumerates every optimal set in 954 of the
-games 2..989 (the other 34, the most expensive, with the sources fixed to U\*).  The optimal set is unique in every game
-n ≤ 424; 30 games between 425 and 779 have two or three, always with the same upper part, U\*, and the same number of
-members, differing by an exchange of equally many numbers up to n/2, of equal sum, each a maximal factor of a member of
-U\*.  At 686, a game at its ceiling, the recorded optimal game of 685 cannot take 686, while another optimal set of 685
-can: a step to the ceiling needs all the optimal sets of n−1, not one.
+*Proof.*  A matroid whose weights are positive and distinct has only one heaviest independent set, and every optimal
+set would be a heaviest one.
+
+1. *One heaviest independent set.*  In a matroid M on 2, …, n, let G be the set that [the greedy algorithm of a
+   matroid](primer.md#the-greedy-algorithm-of-a-matroid) keeps, taking the elements in decreasing order.  Its part of
+   value t or more is a maximal independent subset of the elements of value t or more: an element there that it rejects
+   makes a dependent set with the elements kept before it, and so also with the larger set G ∩ [t, n].  In a
+   matroid all the maximal independent subsets of a set have the same size, so every independent set I has |I ∩ [t,
+   n]| ≤ |G ∩ [t, n]| for every t.  Steps 3 and 4 of the proof of the uniqueness theorem then give w(I) < w(G) unless I
+   = G.
+2. *Every optimal set would be it.*  Every optimal set is playable, so independent in M, and the heaviest independent
+   set weighs at least opt(n).  If it weighed exactly opt(n), every optimal set would be a heaviest independent set, and
+   so equal to G; but there are two.  ∎
+
+So the certificate that settles the sources, a matroid whose greedy basis is U\*, has no analogue that is exact for the
+whole game.
+
+*The uniqueness of the optimal set to 424* (measured).  The prover enumerates the optimal sets of the games it has
+proved.  The optimal set is unique in every game n ≤ 424, and from 425 on some games have two or three.  In every game
+enumerated, the optimal sets all have the same upper part, U\*, and the same number of members, and they differ by an
+exchange of equally many numbers up to n/2, of equal sum, each a maximal factor of a member of U\*.
+[solver/noframe/docs/uniqueness.md](../../solver/noframe/docs/uniqueness.md) has the method and the data, and
+[evidence.md](evidence.md) the range.  How the number of optimal sets moves from one game to the next is in [the step
+theorem (N6)](neighbors.md#the-step-theorem).
 
 ## Longest games
 
-An optimal game need not play as many moves as a game of the board can: at n = 833 it plays one fewer.  The wiki's
-"Questions" page asks whether it must (its third question), and the Java solver's revision of the freedoms rested on a
-form of it (it stated, as a theorem it had no proof of, that the promotion set with the largest
-sum also has the most promotions).  The most moves of a game of n, M(n), is the size of the largest playable subset of
-{2, …, n}.  (A game that ends with no legal move left can still be shorter than M(n): maximal playable sets can have
-different sizes, as n = 2873 shows above.)
+An optimal game need not play as many moves as a game of its board can: at game 833 it plays one fewer.  The wiki's
+"Questions" page asks whether it must, as its third question.  Write ℓ(n) for the most moves of a game of n, the size of
+the largest playable subset of 2, …, n, and ν(n) for the matching number of the board's maximal-factor graph, which
+joins each number to its maximal factors.  A game that is over can still have fewer than ℓ(n) moves, since the maximal
+playable sets can have different sizes ([where exchange breaks](sources.md#where-exchange-breaks)).
 
-**Lemma (bounds on the most moves).**
+### The length lemma
 
-* M(n) ≤ ν(n), the matching number of the board's maximal-factor graph (each number joined to its maximal factors).
-* M(n−1) ≤ M(n) ≤ M(n−1) + 1, and M(n) = M(n−1) for a prime n ≥ 3.
-* Given (★) in game n, a playable set has at most |U\*| members above n/2.
+**Lemma Q3 (the length lemma).**
 
-*Proof.*  Theorem 1 pays the moves of a playable set with distinct maximal factors outside it: a matching whose move
-side is the set.  A playable set of n−1 is one of n, and a playable set of n less the number n is one of n−1 (n is
-nobody's factor).  For a prime n, a playable set holds at most one prime (primes pay only with 1), and one that holds n
-becomes, with n swapped for p, the largest prime below n, a playable set of n−1 as large (p is nobody's maximal factor
-there and pays with 1, as in Theorem 9).  The part above n/2 of a playable set is a playable set of sources, which
-Theorem 8's count inequality at t = n/2 bounds by |U\*|.  ∎
+* ℓ(n) ≤ ν(n).
+* For n ≥ 2, ℓ(n − 1) ≤ ℓ(n) ≤ ℓ(n − 1) + 1, and ℓ(n) = ℓ(n − 1) for a prime n ≥ 3.
+* If (★) holds in game n, a playable set of game n has at most |U\*| members above n/2.
 
-So a legal game of ν(n) moves is a longest game, a certificate that costs one matching.  The bound ν(n) can overshoot
-M(n), since a matchable set need not be playable (the n = 21 phenomenon above, counted in moves): first at n = 51, where
-ν = 23 and M = 22.
+*Proof.*  Each bound is a count form of a result already proved.
 
-**Proposition (an optimal game need not be a longest one).**  At n = 833 = 7²·17 every optimal game has 362 moves, and a
-legal game has 363.  The heaviest game of 363 moves scores 218,197, 29 less than opt(833) = 218,226; it keeps the
-optimal game's upper part, U\*, and differs from it below n/2 alone, by four of the optimal game's moves for five
-lighter ones:
+1. *The matching.*  [The playability theorem (P2)](playability.md#the-playability-theorem) pays the moves of a playable
+   set with distinct maximal factors outside it.  Joining each move to the factor it is paid with gives as many disjoint
+   edges of the maximal-factor graph as the set has members.
+2. *The neighbors.*  A game of n − 1 is a game of n, by [monotonicity (N3)](neighbors.md#monotonicity), so ℓ(n − 1) ≤
+   ℓ(n).  A longest game of n without the move n is a game of n − 1, by [the ceiling lemma
+   (N4)](neighbors.md#the-ceiling-lemma), so ℓ(n − 1) ≥ ℓ(n) − 1.  For a prime n ≥ 3, a longest game of n that plays n
+   plays it first, and the exchange of [the prime formula (N5)](neighbors.md#the-prime-formula) makes it a game of n − 1
+   with as many moves; a longest game that does not play n is a game of n − 1.  So ℓ(n) ≤ ℓ(n − 1).
+3. *The sources.*  The part above n/2 of a playable set is a playable set of sources, which the count inequality of the
+   uniqueness theorem (Q1), at t = ⌊n/2⌋ + 1, bounds by |U\*|.  ∎
 
-    optimal game:            {250, 252, 294, 400}         sum 1,196
-    heaviest longest game:   {116, 180, 200, 320, 351}    sum 1,167
+So a legal game of ν(n) moves is a longest game, a certificate that costs one matching.  The bound can overshoot, since
+moves that can be given distinct maximal factors outside their set need not be playable, as with the set that keeps game
+21 below its ceiling ([the step theorem (N6)](neighbors.md#the-step-theorem)).  It overshoots first at game 51, where
+ν(51) = 23 and ℓ(51) = 22.
 
-*Proof (computational, by the prover).*  The prover finds opt(833) = 218,226, and the optimal set unique, with 362
-members (`solver/noframe/docs/proofs.md` and `uniqueness.md`).  The longer set replays by the rules, and ν(833) = 363,
-so M(833) = 363.  The branch and bound of `solver/noframe`, weighting the move c by K + c with K above every sum, proves
-that no playable set of 363 members sums to more than 218,197.  ∎
+### The length proposition
 
-The mechanism is a trade of weight for count below n/2.  Every payment is a maximal factor, so at most n/2; a move above
-n/2 uses one number up to n/2 (its payment), and a move up to n/2 uses two (itself and its payment), so a playable S has
-|S| + |S ∩ [1, n/2]| ≤ ⌊n/2⌋.  At 833 the optimal game's 48 moves up to n/2 and 362 payments use 410 of the 416 numbers
-up to n/2; the longest game's 49 and 363 use 412.  The optimal game leaves two more of those numbers idle, and gives up
-a move for heavier moves up to n/2: 1,196 against 1,167.
+**Proposition Q4 (the length proposition).**  In game 833 = 7²·17 every optimal game has 362 moves, and some legal game
+has 363.  The heaviest game of 363 moves scores 218,197, which is 29 less than opt(833) = 218,226.  It plays the optimal
+game's moves above n/2, which are U\*, and differs from it below n/2 alone, by five lighter moves in place of four:
 
-The same exchange is a promotion set of the frame model: the optimal game promotes 48 numbers and the longer one 49,
-which is `max_total`, so that "theorem" is false for the whole frame game of 833
-(`solver/frame/tests/soundness.rs`).  The Java applied it only to the two-frame game of frames 0 and
-1, where it stayed unproven; the frame solver had it as the tactic `revise_freedoms`, measured that it no longer paid,
-and removed it.
+    optimal game:            250, 252, 294, 400          sum 1,196
+    heaviest longest game:   116, 180, 200, 320, 351     sum 1,167
 
-What is measured (`solver/noframe`, "Does an optimal game play the most moves?"): to n = 1300 the recorded optimal game
-is a longest game in every game but 833, 834 and 835, where it is one move short.  In 1,293 of the 1,299 games its moves
-meet ν(n), the certificate above; at 51, 182 and 183 ν(n) overshoots by one and a search shows that M(n) is the optimal
-game's.  So to 1300 an optimal game is at most one move short of a longest one.  A search that pruned the branches
-unable to reach M(n) moves would be unsound: at 833 it would return 218,197.  Whether the gap is bounded in general is
-open.
+*Proof (computational).*
+
+1. The prover proves opt(833) = 218,226 and finds the optimal set unique, with 362 members
+   ([solver/noframe/docs/proofs.md](../../solver/noframe/docs/proofs.md),
+   [uniqueness.md](../../solver/noframe/docs/uniqueness.md)).  So every optimal game has 362 moves.
+2. The optimal set with 250, 252, 294 and 400 exchanged for 116, 180, 200, 320 and 351 replays by the rules, a legal
+   game of 363 moves.  Since ν(833) = 363, the length lemma (Q3) gives ℓ(833) = 363.
+3. The prover's branch and bound, weighing the move c as K + c with K above every sum, so that a set's weight orders it
+   by its number of moves and then by its sum, proves that no playable set of 363 members sums to more than 218,197.
+
+The method and the data are in [solver/noframe/docs/longest-games.md](../../solver/noframe/docs/longest-games.md): the
+run of the games 2 to 1300 takes seven minutes on one thread, nearly all of it the searches at 833 to 835.  Steps 1 and
+3 rest on the prover's correctness, and step 2 on the rules alone.  ∎
+
+The mechanism is a trade of weight for moves below n/2.  Every payment is a maximal factor, so at most n/2.  A move
+above n/2 uses one number up to n/2, its payment, and a move up to n/2 uses two, itself and its payment, so a playable
+set S has |S| + |S ∩ [1, n/2]| ≤ ⌊n/2⌋.  In game 833 the optimal game's 48 moves up to n/2 and 362 payments use 410 of
+the 416 numbers up to n/2, and the longest game's 49 and 363 use 412.  The optimal game leaves two more of those numbers
+idle, and gives up a move for heavier moves up to n/2: 1,196 against 1,167.
+
+A search may not cut the branches that cannot reach the most moves: at 833 it would return 218,197.  In the terms of
+[the frame model](frame-model.md#the-frame-model), the optimal game of 833 promotes 48 factors and the heaviest longest
+game 49, so a search of the frame model may not prune a promotion set for having fewer promotions than the freedoms
+allow.
+
+*How far an optimal game falls short* (measured).  In every game to 1300 the recorded optimal game is a longest game,
+except at 833, 834 and 835, where it is one move short.  In all but six of those games its moves meet ν(n), the
+certificate above; at 51, 182 and 183, ν(n) overshoots by one, and a search shows that ℓ(n) is the optimal game's
+number of moves.  So to 1300 an optimal game is at most one move short of a longest one
+([solver/noframe/docs/longest-games.md](../../solver/noframe/docs/longest-games.md)).  Whether the shortfall is bounded
+in general is open.
+
+The sets of games 425 and 833 above are replayed by the rules with `heuristics/core.py`.  The values of ν(n) and ℓ(n) at
+51 and 833 are from the prover's run of longest-games.md, which settles ℓ(n) for every game to 1300.
