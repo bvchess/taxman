@@ -4,33 +4,28 @@ Part of [the theory](../THEORY.md).
 
 Linear algebra over GF(2) bounds the best score of a game from above.  Every playable set is independent in two
 matroids over GF(2), one for each parity of the number of prime factors, so the heaviest set independent in both bounds
-opt(n) (the parity bound, W1).  Weighted matroid intersection computes it in polynomial time, and a weight split checks
-its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out it bounds the
-sets that obey those choices, and the barred bound (W2), with the bottom two layers fixed and one source left out, tells
-which sources every set beating a score must play.  Both results are proved.  The prover bounds its searches by W1, and
-the certificates of statement U use W2.  The same construction frame by frame bounds the frame model's promotions
-([bounds on the promotions](frame-bounds.md)).
+opt(n): the parity bound (W1).  Weighted matroid intersection computes it in polynomial time, and a weight split checks
+its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out, it bounds the
+sets that make the same choices.  The barred bound (W2) fixes the bottom two layers as every optimal set has them and
+leaves out one more number: when it is at most a score, every set that beats the score plays that number.  Both results
+are proved.  The prover bounds its searches by W1.  W2 settles most of [statement U](exactness.md#statement-u), the
+open statement that some optimal set plays every member of U\* with three or more prime factors, game by game, and
+[the certificate theorem (E4)](extended-problem.md#the-certificate-theorem) rests on it.  The same construction, frame
+by frame, bounds the frame model's promotions ([bounds on the promotions](frame-bounds.md)).
 
-The terms of the game ([playable](../GLOSSARY.md), maximal factor, layer, source, U\*) are the glossary's; GF(2),
-matroids, contraction, deletion and coloops are explained in [the primer](primer.md#matroids).
+*Words.*  Playable sets, maximal factors, layers and sources are the [glossary's](../GLOSSARY.md), and U\* is defined in
+[sources.md](sources.md#descending-greedy).  The incidence vector v(s) of a number s, the unit vector e_s of s ≤ n/2,
+and a set *independent with its own coordinates* (its members' v(s) together with the e_s of its members up to n/2) are
+those of [playability.md](playability.md#independence).  GF(2) is explained in [the
+primer](primer.md#finite-fields-and-gf2), and matroids, parallel elements, coloops, contraction and deletion in [its
+section on matroids](primer.md#matroids).
 
 ## The parity matroids
 
-Fix a board n ≥ 2.  The coordinates are the numbers 1 to ⌊n/2⌋, since every maximal factor of a number up to n is at
-most n/2.  Each number s of 2..n has the vector v(s) over GF(2) with a 1 at each of its maximal factors, and each
-s ≤ n/2 also has its unit vector e_s, at its own coordinate.  For a set S ⊆ {2, …, n}, the family
-
-    F(S) = {v(s) : s ∈ S} ∪ {e_s : s ∈ S, s ≤ n/2}
-
-holds the vectors of S's members together with their own coordinates.  It is independent exactly when the vectors u(s),
-the v(s) with the coordinates of S's members deleted, are.  Restricted to the coordinates outside S, a vanishing
-combination of F(S) loses its unit vectors and leaves a vanishing combination of the u(s); and a vanishing combination
-of the u(s) is, before the deletion, a combination of the v(s) that lives on S's own coordinates, which the unit vectors
-of F(S) cancel.
-
-Split the coordinates by the parity of their layer Ω (1 has Ω(1) = 0, even): E₀ holds the coordinates with Ω even, E₁
-those with Ω odd.  A maximal factor f of s has Ω(f) = Ω(s) − 1, so v(s) lies in the part of the parity other than
-Ω(s)'s, and e_s in the part of Ω(s)'s own parity.  Each number thus has at most one vector in each part.
+Fix a board n ≥ 2, with the coordinates 1 to ⌊n/2⌋.  Split them by the parity of their layer Ω, with Ω(1) = 0 even:
+E₀ holds the coordinates with Ω even, and E₁ those with Ω odd.  A maximal factor f of s has Ω(f) = Ω(s) − 1, so v(s)
+lies in the part whose parity is not Ω(s)'s, and e_s in the part of Ω(s)'s own parity.  Each number has at most one
+vector in each part.
 
 **Definition (the parity matroids).**  For i = 0 and i = 1, the parity matroid M_i is the linear matroid on {2, …, n}
 over GF(2) in which s is represented by its vector in E_i:
@@ -62,125 +57,131 @@ their own (double outline); gray and bold: the heaviest set independent in both.
 
 ## The parity bound
 
-**Theorem W1 (the parity bound).**  Let n ≥ 2, and let P and X be disjoint sets of numbers of 2..n.  Every playable set
-S ⊆ {2, …, n} is independent in both parity matroids M₀ and M₁.  Hence, if P is independent in both, every playable S
-with P ⊆ S and S ∩ X = ∅ satisfies
+**Theorem W1 (the parity bound).**  Let n ≥ 2, and let Y and Z be disjoint sets of numbers of 2..n, the *picks* and the
+*bars*.  Every playable set S ⊆ {2, …, n} is independent in both parity matroids M₀ and M₁.  Hence, if Y is independent
+in both, every playable S with Y ⊆ S and S ∩ Z = ∅ satisfies
 
-    ΣS ≤ ΣP + max { ΣI : I independent in M₀/P ∖ X and in M₁/P ∖ X },
+    ΣS ≤ ΣY + max { ΣI : I independent in M₀/Y ∖ Z and in M₁/Y ∖ Z },
 
-and if P is dependent in either matroid, there is no such S.  In particular (P = X = ∅), opt(n) is at most the heaviest
-sum ΣI of a set I independent in M₀ and in M₁.
+and if Y is dependent in either matroid, there is no such S.  In particular, with no picks and no bars, opt(n) is at
+most the heaviest sum ΣI of a set I independent in M₀ and in M₁.
 
-The right side is the *parity bound of n with the picks P and the bars X*, taken as −∞ when P is dependent in either
+The right side is the *parity bound of n with the picks Y and the bars Z*, taken as −∞ when Y is dependent in either
 matroid; with no picks and no bars it is *the parity bound of n*.
 
-*Proof.*  The idea: a playable set's vectors with its own coordinates are independent, and since each of them lies in
-one parity's part, the family splits into two independent halves, which are the set's representations in M₀ and M₁.
+*Proof.*  The idea: a playable set is independent with its own coordinates, each of those vectors lies in one parity's
+part, and the two halves are exactly the set's representations in M₀ and M₁.
 
-1. *F(S) is independent.*  This is [the independence lemma (P10)](playability.md#the-independence-lemma), over GF(2).
-2. *F(S) splits by parity.*  Every vector of F(S) lies in E₀ or in E₁, and GF(2)^{⌊n/2⌋} is the direct sum of the two
-   parts.  A vanishing combination of F(S) therefore vanishes in each part separately, so F(S) is independent if and
-   only if its vectors in E₀ are and its vectors in E₁ are.
-3. *S is independent in M_i.*  The vectors of F(S) in E_i are exactly the vectors that represent in M_i the members of S
-   that are not coloops of M_i: v(s) when Ω(s) and i differ in parity, and e_s when they agree and s ≤ n/2.  By steps 1
-   and 2 they are independent, and adding coloops to an independent set keeps it independent.
-4. *The bound.*  The moves of a game form a playable set, and a playable set can be played and the game continued, so
-   opt(n) is the largest sum of a playable set; by step 3 it is at most the heaviest sum of a common independent set.
-5. *Picks and bars.*  Let S be playable, with P ⊆ S and S ∩ X = ∅.  By step 3, S is independent in M_i, so its subset
-   P is, and S ∖ P is independent in the contraction M_i/P, by the definition of contraction
-   ([primer](primer.md#matroids)).  It avoids X, so it is independent in M_i/P ∖ X, for i = 0 and 1, and
-   ΣS = ΣP + Σ(S ∖ P).  If P is dependent in either matroid, no playable set contains it.  ∎
+1. *A set S is independent in M₀ and in M₁ iff it is independent with its own coordinates.*  Every vector of that
+   family lies in E₀ or in E₁, and GF(2)^{⌊n/2⌋} is the direct sum of the two parts, so the family is independent iff
+   its vectors in E₀ are and its vectors in E₁ are ([direct sums](primer.md#deletion-contraction-and-direct-sums)).  Its
+   vectors in E_i are exactly those that represent in M_i the members of S that are not coloops of M_i: v(s) when Ω(s)
+   and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is independent in M_i iff its members that
+   are not coloops are, since a coloop joins any independent set ([the primer](primer.md#matroids)).
+2. *A playable set is independent with its own coordinates,* by [the independence lemma
+   (P10)](playability.md#the-independence-lemma), over GF(2).
+3. *The bound.*  The moves of a game form a playable set, and a playable set can be played and the game continued, so
+   opt(n) is the largest sum of a playable set; by steps 1 and 2 it is at most the heaviest sum of a common independent
+   set.
+4. *Picks and bars.*  Let S be playable, with Y ⊆ S and S ∩ Z = ∅.  By steps 1 and 2, S is independent in M_i, so its
+   subset Y is, and S ∖ Y is independent in the contraction M_i/Y, by the definition of contraction.  It avoids Z, so
+   it is independent in M_i/Y ∖ Z, for i = 0 and 1, and ΣS = ΣY + Σ(S ∖ Y).  If Y is dependent in either matroid, no
+   playable set contains it.  ∎
 
-The bound is never above the [Franklín–Moniot bound](franklin-moniot.md), the heaviest set whose members can be given
-distinct maximal factors outside the set: a set whose family is independent can be given them, which is part of [the
-counting theorem (C2)](franklin-moniot.md#the-counting-theorem).  And the bound joins two matroids, not one, so [the
-matroid proposition (Q2)](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board), by which no single matroid
-is exact for the whole game, does not apply to it.
+By step 1, the sets independent in both parity matroids are exactly the sets independent with their own coordinates:
+the parity bound is the heaviest of these.
 
 ### Computing and checking the bound
 
 Three properties make the bound useful.
 
-* **It takes polynomial time.**  The heaviest common independent set of two matroids is a weighted matroid
-  intersection ([primer](primer.md#matroid-intersection); E. L. Lawler, "Matroid intersection algorithms",
-  *Mathematical Programming* 9 (1975) 31–56; A. Frank, "A weighted matroid intersection algorithm", *Journal of
-  Algorithms* 2 (1981) 328–336), and the matroids here are given by sparse vectors over GF(2).
-* **Its value can be checked without trusting the algorithm.**  Split the weights as w = w₀ + w₁, and write max_{M_i}
-  w_i for the heaviest weight w_i(J) of a set J independent in M_i, of any size, for weights of either sign.  By weak
-  duality ([primer](primer.md#weak-duality-and-lagrangian-relaxation)), every set T independent in both matroids has
-  w(T) = w₀(T) + w₁(T) ≤ max_{M₀} w₀ + max_{M₁} w₁.  So a common independent set I that is heaviest in M₀ for w₀ and in
-  M₁ for w₁ has the largest weight, whatever produced it, and the optimality criterion of [the greedy algorithm of a
-  matroid](primer.md#the-greedy-algorithm-of-a-matroid) checks each of those two conditions one exchange at a time.
-  Every heaviest common independent set has such a split, since the intersection of the two matroids' polytopes has
-  integral vertices (J. Edmonds, "Submodular functions, matroids, and certain polyhedra", in *Combinatorial Structures
-  and their Applications*, Gordon and Breach, New York, 1970, 69–87), and Frank's algorithm finds one.  Nothing rests
-  on that existence: a value is accepted only with its split.
+* **It takes polynomial time.**  The heaviest common independent set of two matroids is found by weighted matroid
+  intersection ([the primer](primer.md#matroid-intersection)), and the matroids here are given by sparse vectors over
+  GF(2).
+* **Its value can be checked without trusting the algorithm.**  A split w = w₀ + w₁ of the weights under which a common
+  independent set I is heaviest in M₀ for w₀ and in M₁ for w₁ proves w(I) the maximum, whatever produced I ([the
+  primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "Certificates"), and for two matroids such a
+  split always exists ([the primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "For matroids").
+  The prover accepts a value only with its split.
 * **The same split bounds the sets that avoid a member x of I.**  Such a set weighs at most the heaviest independent set
-  of M₀ ∖ x for w₀ plus that of M₁ ∖ x for w₁, by the same weak duality, and each term is one exchange from I: *in a
-  matroid with I heaviest for weights w of either sign, and x ∈ I, a heaviest independent set avoiding x is I − x, or
-  I − x + y for the heaviest y ∉ I with I − x + y independent.*  For the proof, add as many coloops of weight 0, the
-  dummies, as the matroid's rank r, and truncate to rank r.  The bases of the result are the independent sets padded
-  with dummies, at the same weights, so I padded is a heaviest basis B, and the claim is about a heaviest basis B′ that
-  avoids x.  By the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in dependence structures",
-  *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), some y ∈ B′ ∖ B makes both B − x + y and
-  B′ − y + x bases.  Since B is heaviest, w(B′ − y + x) ≤ w(B), that is w(B′) ≤ w(B − x + y).  So the basis
-  B − x + y, which avoids x, is at least as heavy as B′; it is I − x + y when y is a number, and I − x when y is a
-  dummy.
+  of M₀ ∖ x for w₀ plus that of M₁ ∖ x for w₁, by the same weak duality, and each term is one exchange from I.  The
+  prover's search relies on this: a member whose bound without it is at most the value to beat is held by every set
+  that beats it, so the search picks it.
 
-The prover bounds every node of its searches by W1, with the node's picks and bars, and reports a value only with its
-split ([solver/noframe/docs/proofs.md, "With the parity bound (to
-1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
+**The exchange from a heaviest set.**  Let I be a heaviest independent set of a matroid for weights w of either sign,
+and x a member of I.  Let y be the heaviest element outside I with I − x + y independent, if there is one.  Then a
+heaviest independent set that avoids x is I − x + y if y exists and w(y) > 0, and I − x otherwise; it weighs
+w(I) − w(x) + max(0, w(y)).
+
+*Proof.*  Add as many coloops of weight 0, the *dummies*, as the matroid's rank r, and truncate to rank r.  The bases of
+the result are the independent sets padded with dummies, at the same weights, so I padded is a heaviest basis B.  Let
+B′ be any basis that avoids x.  By the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in
+dependence structures", *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), some y′ ∈ B′ ∖ B makes
+both B − x + y′ and B′ − y′ + x bases.  Since B is heaviest, w(B′ − y′ + x) ≤ w(B), that is w(B′) ≤ w(B − x + y′).
+If y′ is a dummy, B − x + y′ is I − x padded, worth w(I) − w(x).  If y′ is an element, I − x + y′ is independent, so
+y exists and w(y′) ≤ w(y), and B − x + y′ is worth at most w(I) − w(x) + w(y).  Either way
+w(B′) ≤ w(I) − w(x) + max(0, w(y)), and the set named in the statement avoids x, is independent, and has that weight.  ∎
+
+The prover bounds every node of its searches by W1, with the node's picks and bars ([solver/noframe/docs/proofs.md,
+"With the parity bound (to 1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
 
 ## The barred bound
 
 The barred bound fixes what [the bottom-layers theorem (F3)](frame-model.md#the-bottom-layers-theorem) says every
-optimal set plays in layers 1 and 2, and bars one source of a higher layer.
+optimal set plays in layers 1 and 2, and bars one more number.
 
-**Definition.**  Let q(n) be the largest prime ≤ n.  A set S ⊆ {2, …, n} *obeys F3* when it holds q(n) and no other
-prime, and holds exactly U\*_2 among the sources of layer 2.  The *roles of F3* are the picks {q(n)} ∪ U\*_2 and the
-bars: every prime other than q(n), every source of layer 2 outside U\*_2, and, when U\*_2 spans every prime up to n/2 in
-the graph of F3, every number of layer 2 up to n/2.  For a member u of U\*_{≥3}, the *barred bound* of u is the parity
-bound of n with the picks of F3 and with the bars of F3 and u.
+**Definition.**  A set S ⊆ {2, …, n} *obeys F3* when it holds [q(n)](neighbors.md#neighboring-games), the largest
+prime ≤ n, and no other prime, and holds exactly U\*_2 among the sources of layer 2.  The *picks of F3* are q(n) and the
+members of U\*_2.  The *bars of F3* are the other primes, the sources of layer 2 outside U\*_2, and, when the frames of
+layer 2 are closed, every number of layer 2 up to n/2.  The frames of layer 2 are closed when U\*_2 has one member for
+each prime up to n/2, which makes it a spanning tree of F3's graph G_n with its ground vertex.  For a number b of 2..n
+that is not a pick of F3, the *barred bound* of b is the parity bound of n with the picks of F3 and with the bars of F3
+and b.
 
-By F3, every optimal set of n obeys F3.  A playable set obeys F3 exactly when it holds the picks and none of the bars.
-The only bars that the definition of obeying does not name are the numbers of layer 2 up to n/2 when U\*_2 spans every
-prime up to n/2, and a playable set that obeys F3 holds none of them.  Such a number would close a cycle with U\*_2 in
-the graph of F3 (pq is the edge p–q, and p² the edge from p to a ground vertex).  A cycle's numbers list each of its
-primes twice, and the primes up to n/2 are no members of the set, so the cycle is self-covering, which no playable set
-contains ([the core theorem (P7)](playability.md#the-core-theorem)).
+By F3, every optimal set of n obeys F3.  A playable set obeys F3 exactly when it holds the picks of F3 and none of its
+bars.  The only bars that the definition of obeying leaves unnamed are the numbers of layer 2 up to n/2 when the frames
+of layer 2 are closed, and a playable set that obeys F3 holds none of them.  Such a number is an edge of G_n, so it
+closes a cycle with the spanning tree U\*_2.  The cycle's members list each of its primes twice, and the set holds no
+prime up to n/2, so the cycle is [self-covering](playability.md#cores-and-the-residual), and no playable set contains a
+self-covering set ([the core theorem (P7)](playability.md#the-core-theorem)).
 
-**Corollary W2 (the barred bound).**  Let n ≥ 2, V a number, and u a member of U\*_{≥3}.  If the barred bound of u is at
-most V, every playable set that obeys F3 and weighs more than V holds u.  In particular, if opt(n) > V, every optimal
-set of n holds u.
+In game 21, U\*_2 = {14, 15, 21} has three members for the four primes 2, 3, 5 and 7: the frame of layer 2 has a
+freedom, so the numbers of layer 2 up to 10 are not barred, and the optimal set of 21, which plays 9 = 3², obeys F3.
 
-*Proof.*  Let S be playable, obey F3, and miss u.  Then S holds the picks of F3 and avoids its bars and u, so by W1, ΣS
-is at most the barred bound of u, which is at most V.  So a playable set that obeys F3 and weighs more than V cannot
-miss u.  If opt(n) > V, every optimal set weighs more than V, and it obeys F3.  ∎
+**Corollary W2 (the barred bound).**  Let n ≥ 2, V a number, and b a number of 2..n that is not a pick of F3.  If the
+barred bound of b is at most V, every playable set that obeys F3 and weighs more than V holds b.  In particular, if
+opt(n) > V, every optimal set of n holds b.
 
-The proof uses of u only that it is not a pick of F3, so W2 holds for every such number, with its barred bound defined
-the same way; statement U asks about the members of U\*_{≥3}.
+*Proof.*  Let S be playable, obey F3, and miss b.  Then S holds the picks of F3 and avoids its bars and b, so by W1, ΣS
+is at most the barred bound of b, which is at most V.  So a playable set that obeys F3 and weighs more than V cannot
+miss b.  If opt(n) > V, every optimal set weighs more than V, and it obeys F3.  ∎
 
-W2's conclusion is the condition that [the certificate theorem (E4)](extended-problem.md#the-certificate-theorem) asks
-of a certified member, so a member whose barred bound is at most V is certified for V.  The barred bound does not
-depend on V, so a member certified for one score is certified for every higher one.  E4 fixes the certified members in
-a search of the extended problem and leaves the others open; the prover computes the barred bounds game by game
-([solver/noframe/docs/proofs.md, "The upper part, game by
+W2 is applied to the members of U\*_{≥3}, the sources that [statement U](exactness.md#statement-u) asks some optimal
+set to play.  Its conclusion is what [the certificate theorem (E4)](extended-problem.md#the-certificate-theorem) asks of
+a member *certified against* V, so a member whose barred bound is at most V is certified against V.  The barred bound
+does not depend on V, so a member certified against one score is certified against every higher one.  The prover
+computes the barred bounds game by game ([solver/noframe/docs/proofs.md, "The upper part, game by
 game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 
 ## What the parity bound misses
 
-The parity bound admits exactly the sets whose family F(S) is independent, since steps 2 and 3 of the proof of W1 hold
-in both directions.  So it exceeds opt(n) only through the unplayable sets whose families are independent over GF(2),
-each of which holds an [odd core](playability.md#odd-cores).  By the counting theorem (C2), F(S) is independent exactly
-when, for some set T of maximal factors outside S, the payment schemes of S onto T are odd in number, while S is
-playable exactly when, for some T, there is only one; the bound keeps the count mod 2 and drops the rest.  An odd core
-has a member with three or more maximal factors outside it ([the two-factor proposition
-(C3)](franklin-moniot.md#the-two-factor-proposition)), and the first is on the board of 45 ([the first-odd-core
-proposition (C4)](franklin-moniot.md#the-first-odd-core)).  As measured, the bound equals opt(n) for every n up to 77
-([the table of statements](statements.md#the-statements)).
+The parity bound admits exactly the sets independent with their own coordinates (step 1 of the proof of W1), so it
+exceeds opt(n) only through an unplayable set of that kind, which holds an [odd core](playability.md#odd-cores).  It
+equals opt(n) on every board below 45, which has no odd core ([the first-odd-core proposition
+(C3)](franklin-moniot.md#the-first-odd-core)), and, as measured, on every board up to 77
+([evidence.md](evidence.md#observations)).
 
-GF(2) is the field for the count mod 2, and another field would miss more.  The triangle {6, 10, 15} is unplayable on
-every board that has it: its members' maximal factors are 2, 3 and 5, each listed by two of them, so whichever member is
-played first takes two of the three, and the other two members share the one left.  Over GF(2) its vectors sum to 0, so
-the parity bound excludes it.  Over the rationals the determinant of its three vectors is −2, and over GF(3) it is 1, so
-with entries 1 the triangle is independent over either field, and a bound built there would admit it.
+Between it and the bounds it is compared with:
+
+* It is never above the [Franklín–Moniot bound](franklin-moniot.md#what-the-paper-proves), the heaviest set whose
+  members can be paid with distinct maximal factors outside it, since a set independent with its own coordinates has
+  such a payment ([playability.md](playability.md#the-independence-lemma), the paragraph "Between playability and
+  payment").
+* A bound built the same way over the rationals would admit every set that the parity bound admits ([the
+  primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and more.  The triangle {6, 10, 15} is
+  unplayable, since whichever member is played first leaves at most one of the factors 2, 3 and 5 for the other two,
+  and its vectors are dependent over GF(2) but independent over the rationals ([the
+  primer](primer.md#finite-fields-and-gf2), the paragraph "Example").
+* The bound joins two matroids, not one, so [the matroid proposition
+  (Q2)](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board), by which no single matroid is exact for the
+  whole game, does not apply to it.
