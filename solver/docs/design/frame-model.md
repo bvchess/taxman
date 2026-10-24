@@ -20,8 +20,9 @@ of a game, and they share no code with the solver.
 On a board, the [sources](../../../docs/GLOSSARY.md#the-frame-model) are the numbers above n/2 and the
 [factors](../../../docs/GLOSSARY.md#the-frame-model) the rest.  A move is paid for by one of its [maximal
 factors](../../../docs/GLOSSARY.md#the-game), and a factor pays for one move.  Although a move takes every divisor of
-it, maximal factors are enough: see the lifting argument of `numtheory` and [THEORY.md](../../../docs/THEORY.md)
-(Theorem 1), which the [README](../../frame/README.md#how-the-solver-sees-the-game-the-frame-model) summarizes.
+it, maximal factors are enough: see the lifting argument of `numtheory` and [the lifting lemma
+(P1)](../../../docs/theory/playability.md#the-lifting-lemma), which the
+[README](../../frame/README.md#how-the-solver-sees-the-game-the-frame-model) summarizes.
 
 `frames::BoardFrames` forms the [frames](../../../docs/GLOSSARY.md#the-frame-model) of a board, in playing order: the
 frames [in front of](../../../docs/GLOSSARY.md#the-frame-model) a frame are played before it.  Setup simplifies each
@@ -51,9 +52,10 @@ where the code asks more than the theory's rules.
 2. `finish_setup` runs `remove_impossible`, descending greedy over a frame's remaining sources against its remaining
    factors, on every frame.  Then, round after round over the frames that changed and their neighbors, `finish_frame`
    runs `unzip`, which makes the claims, and `remove_impossible` again, until nothing changes.  The later passes of
-   `remove_impossible` keep every source (the kept-sources lemma, F6), so a frame's `swept` flag skips them.  `unzip`
-   makes back claims (`ClaimKind::Back`) in a loop over the factors, ascending, and front claims (`ClaimKind::Front`)
-   in a loop over the sources, descending, which starts again after each claim.
+   `remove_impossible` keep every source ([the kept-sources lemma
+   (X1)](../../../docs/theory/exactness.md#the-exactness-theorem)), so a frame's `swept` flag skips them.  `unzip` makes
+   back claims (`ClaimKind::Back`) in a loop over the factors, ascending, and front claims (`ClaimKind::Front`) in a
+   loop over the sources, descending, which starts again after each claim.
 3. `frames::build_frames` numbers the frames with freedoms by layer (`numbered_frames`, `layer_of`).  Number by number,
    it collects the candidates of each frame (`promotion_candidates_of`) and then merges the frames of that number
    (`merge`).  After the last merge it calls `finish_setup` again, since a merged frame starts with nothing found.
@@ -63,24 +65,24 @@ where the code asks more than the theory's rules.
 
 The code's tests against the theory's:
 
-* **Test (a).**  `promotion_candidates_of` tests a frame's remaining sources against its remaining factors less x,
-  after the claims of step 2.  The claims lemma (F10, part 3) shows that this picks the candidates of the theory, which
-  tests the whole frame.
+* **Test (a).**  `promotion_candidates_of` tests a frame's remaining sources against its remaining factors less x, after
+  the claims of step 2.  [The claims lemma (X5)](../../../docs/theory/exactness.md#the-exactness-theorem), part 3, shows
+  that this picks the candidates of the theory, which tests the whole frame.
 * **Test (b).**  `promotion_candidates_of` asks whether some frame that holds a maximal factor of x can take x on
-  (`can_add_source`).  It asks once the frames of the number below are merged, so it asks the theory's question
-  whether frame h − 1 can take x on; a closed frame can take nothing on.
+  (`can_add_source`).  It asks once the frames of the number below are merged, so it asks the theory's question whether
+  frame h − 1 can take x on; a closed frame can take nothing on.
 * **Back claims.**  `unzip` asks that a single remaining source want f, that f cannot go forward
   (`factor_can_go_forward`: no frame that holds a maximal factor of f can take f on), and that f has no outside move
-  (`has_outside_move_using`: no composite of f in another frame with freedoms can be taken on by f's frame).  Before
-  the merges the frames asked are frames; after them, merged frames, which can take a number on iff one of their frames
-  can.  Every factor of a frame with freedoms that has f as a maximal factor is such a composite, so every back claim
-  meets the theory's rule.
-* **Front claims.**  `unzip` asks too that f have no outside move.  The theory's rule does not need it: a front claim
-  is a front move whatever is promoted into its frame (F10).
-* **Two quirks of the Java**, kept for parity.  A frame not yet simplified counts as having freedoms (`Frame::new`),
-  and an impossible source of a frame merged away keeps a stale home that counts as an outside move
-  (`Home::MergedAway`).  Both can only make `unzip` claim less, and the theory covers every claim that meets its rules.
-  The census of the frames counts how far the second reaches (`merged_away`).
+  (`has_outside_move_using`: no composite of f in another frame with freedoms can be taken on by f's frame).  Before the
+  merges the frames asked are frames; after them, merged frames, which can take a number on iff one of their frames can.
+  Every factor of a frame with freedoms that has f as a maximal factor is such a composite, so every back claim meets
+  the theory's rule.
+* **Front claims.**  `unzip` asks too that f have no outside move.  The theory's rule does not need it: a front claim is
+  a front move whatever is promoted into its frame (X5).
+* **Two quirks of the Java**, kept for parity.  A frame not yet simplified counts as having freedoms (`Frame::new`), and
+  an impossible source of a frame merged away keeps a stale home that counts as an outside move (`Home::MergedAway`).
+  Both can only make `unzip` claim less, and the theory covers every claim that meets its rules.  The census of the
+  frames counts how far the second reaches (`merged_away`).
 
 **The Java's numbering.**  The Java numbered the frames breadth first from the front: 0 for those with no frame with
 freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
@@ -94,12 +96,13 @@ alike by the breadth-first rule, and without 4 the board of 32 has a layer with 
 freedoms.
 
 **The census** (`examples/structure.rs`) checks the theory's facts against what setup builds, on every board to 8191:
-check A the frame lemma (F1), C clean numbering (F4), D that no candidate lists a back claim's factor (F10), E that no
-candidate is a factor of frame 0, F that every candidate has a home of at least 1 (F11), G that the sources kept are
-those of a descending greedy written apart from the frames code (F6), and H that the extended problem with nothing
-open and the claims poses the frame model's problem (E3).  The theory proves all of these, so the census checks the
-code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an unplayable set out of the promotion sets:
-27 boards to 2000, all in 98–120 and 182–186, the first the theory's example at 98.
+check A the frame lemma (F1), C clean numbering (F4), D that no candidate lists a back claim's factor (X5), E that no
+candidate is a factor of frame 0, F that every candidate has a home of at least 1 ([the reduction-step lemma
+(X6)](../../../docs/theory/exactness.md#the-exactness-theorem)), G that the sources kept are those of a descending
+greedy written apart from the frames code (X1), and H that the extended problem with nothing open and the claims poses
+the frame model's problem (E3).  The theory proves all of these, so the census checks the code.  `tests/model_exact.rs`
+finds the boards where test (b) alone keeps an unplayable set out of the promotion sets: 27 boards to 2000, all in
+98–120 and 182–186, the first the theory's example at 98.
 
 ## Promotions and the score
 
@@ -119,19 +122,22 @@ and the game of n − 1 is optimal.
 **Within the frame model.**  The search finds [P\*](../../../docs/GLOSSARY.md#the-frame-model)(Π_n), the largest sum of
 a promotion set of the root problem Π_n ([same-search.md](same-search.md), defines the [search
 problem](../../../docs/GLOSSARY.md#the-frame-model) Π exactly).  The answer is in_the_bag + P\*(Π_n).
-[docs/theory/frame-model.md](../../../docs/theory/frame-model.md) proves what that is:
+[docs/theory/exactness.md](../../../docs/theory/exactness.md) proves what that is:
 
 * The sources that setup keeps are [U\*](../../../docs/GLOSSARY.md#the-frame-model), chosen greedily from the largest on
-  each frame, and in_the_bag = ΣU\* (Theorem M, M1).
-* **Completeness and soundness** (Theorem M): a set U\* ∪ L, with L a set of numbers up to n/2, is playable exactly when
-  L is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So no step of setup loses a game that plays U\*, and
-  none admits a set that is not a game.  The steps are `unzip`'s mandatory moves, freedoms = factors − sources, closed
-  frames taking no part, a promotion paying one frame forward, the numbering, the candidate filter and the root's
-  reduction.  What the proof needs of the numbering is that it is [clean](../../../docs/GLOSSARY.md#the-frame-model),
-  which the numbering by layer is by construction.
-* Every optimal game plays the members of U\* with one or two prime factors (Theorem B).
+  each frame, and in_the_bag = ΣU\* (the kept-sources lemma, X1).
+* **Completeness and soundness** ([the exactness theorem
+  (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)): a set U\* ∪ L, with L a set of numbers up to n/2, is
+  playable exactly when L is a promotion set of Π_n, and then it scores in_the_bag + ΣL.  So no step of setup loses a
+  game that plays U\*, and none admits a set that is not a game.  The steps are `unzip`'s mandatory moves, freedoms =
+  factors − sources, closed frames taking no part, a promotion paying one frame forward, the numbering, the candidate
+  filter and the root's reduction.  What the proof needs of the numbering is that it is
+  [clean](../../../docs/GLOSSARY.md#the-frame-model), which the numbering by layer is by construction.
+* Every optimal game plays the members of U\* with one or two prime factors ([the bottom-layers theorem
+  (F3)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem)).
 * So in_the_bag + P\*(Π_n) = opt(n) exactly when [statement U](../../../docs/GLOSSARY.md#the-frame-model) holds at n:
-  some optimal game plays the members of U\* with three or more prime factors.
+  some optimal game plays the members of U\* with three or more prime factors ([the corollary of U
+  (X8)](../../../docs/theory/exactness.md#statement-u)).
 
 The statement U is open in general.  It holds at every game that the
 [prover](../../../docs/GLOSSARY.md#programs-files-and-documents) has proven, since the prover proves opt(n) on the whole
@@ -145,23 +151,24 @@ n.  Proving U at such an n takes two steps, which the command `taxman certify` c
 certificates.
 
 First, the prover's [barred bounds](../../../docs/GLOSSARY.md#bounds) settle most members of U\*: each member that a
-barred bound certifies is played by every set of moves that beats the recorded score and obeys Theorem B, and the
-members it does not certify are *open*.  It certifies most members in each game, within the prover's proofs and past
-them, but closes no game alone
-([solver/noframe/docs/proofs.md](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the
-method, and [the entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the
-shares).
+barred bound certifies is played by every set of moves that beats the recorded score and obeys the bottom-layers
+theorem, and the members it does not certify are *open*.  It certifies most members in each game, within the prover's
+proofs and past them, but closes no game alone
+([solver/noframe/docs/proofs.md](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the method, and [the
+entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the shares).
 
 Second, a search settles the open members.  It is the search of the [extended
-problem](../../../docs/GLOSSARY.md#the-frame-model) Π⁺(O), with the set O of open members optional (THEORY.md, Theorem
-M⁺; `frames::build_extended`, research code).  The extended problem is exact like Π_n, so a search of it that finds
-nothing better, with the other members certified, proves opt(n) on the whole board.  The search takes the open members
-as one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_extended_with`).
+problem](../../../docs/GLOSSARY.md#the-frame-model) Π⁺(O), with the set O of open members optional ([the extended
+exactness theorem (E1)](../../../docs/theory/extended-problem.md#the-extended-exactness-theorem);
+`frames::build_extended`, research code).  The extended problem is exact like Π_n, so a search of it that finds nothing
+better, with the other members certified, proves opt(n) on the whole board.  The search takes the open members as
+one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_extended_with`).
 
-Details of the extended problem: it keeps the claims of `unzip` that Lemma M5⁺ (THEORY.md) allows.  With nothing open
-that is all of them, so Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back
-(`examples/extended.rs --no-claims`).  A hunt for a counterexample on the boards without each open member, the example
-`hunt`, was prepared and never run.  It is removed from master, and [its
+Details of the extended problem: it keeps the claims of `unzip` that [the kept-claims lemma
+(E2)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows.  With nothing open that is all of them, so
+Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (`examples/extended.rs
+--no-claims`).  A hunt for a counterexample on the boards without each open member, the example `hunt`, was prepared and
+never run.  It is removed from master, and [its
 entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) says where it builds
 ("the program removed from master").
 
@@ -173,23 +180,24 @@ What each kind of proof needs of the frame model, beyond the code's correctness 
 | `cap` | nothing of the model: the game is replayed, and reaches the ceiling n + score(n − 1) ≥ opt(n) given that score(n − 1) = opt(n − 1) |
 | `exhausted`, `trivial` | completeness at n, so U at n |
 | `same_search` of an exhausted game m | U at n, and Π_n = Π_m (checked) |
-| `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (Theorem M), which makes m's ceiling P\*(Π_m) |
+| `same_search` of a `cap` game m | U at n, Π_n = Π_m (checked), and soundness at m (X7), which makes m's ceiling P\*(Π_m) |
 | `known` | nothing of the model at n: what the cited game or bound assumes (for the bounds store, U at the games its bounds rest on) |
 
 The tests tie the theorems to the code:
 
-* `tests/model_exact.rs` checks Theorem M both ways, on every set of every board to 100 and on random sets to 8191,
-  against a playability oracle that shares no code with `frames` or `model`.
-* `tests/model_extended.rs` checks Theorem M⁺ the same way, with sources open.
-* `tests/bottom_layers.rs` checks Theorem B on every recorded and enumerated optimal set.
+* `tests/model_exact.rs` checks the exactness theorem (X7) both ways, on every set of every board to 100 and on random
+  sets to 8191, against a playability oracle that shares no code with `frames` or `model`.
+* `tests/model_extended.rs` checks the extended exactness theorem (E1) the same way, with sources open.
+* `tests/bottom_layers.rs` checks the bottom-layers theorem (F3) on every recorded and enumerated optimal set.
 * Two exhaustive searches agree with the frame model's games on small boards: `brute`, the solver's own, to 40 in the
   test suite, and `heuristics/evaluation/certify.py`, to 62.  The example `sacrifice`, removed from master, once ran
   `brute` to 52 ([the entry](../../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md) has the
   run).
 
 The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route: games on punctured boards, boards
-with holes, where Theorem M holds too.  But U and Theorem B are statements about the board 1..n, so the bound rests on
-the upper part of each punctured board.  It proves game 1133 and disagrees with nothing.
+with holes, where the exactness theorem holds too ([the holes theorem
+(X9)](../../../docs/theory/exactness.md#boards-with-holes)).  But U and F3 are statements about the board 1..n, so the
+bound rests on the upper part of each punctured board.  It proves game 1133 and disagrees with nothing.
 
 **Given the pruning is exact.**  Every [tactic](../../../docs/GLOSSARY.md#the-search) is proven or sound;
 [tactics.md](tactics.md) grades each.  The Java used two shortcuts that rest on conjectures, `reuse_prev` and

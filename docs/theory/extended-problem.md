@@ -7,10 +7,11 @@ is exact as the frame model is: the extended exactness theorem (E1).  So a searc
 a recorded score proves the score optimal, once the other members of U\*_{≥3} are certified: the certificate theorem
 (E4).  That is how a certificate of statement U is made, game by game.
 
-*Words.*  Frames, their moves and factors, frame h, taking a number on, the tests (a) and (b), claims, reduction,
-homes, applying a set, winnable pairs and promotion sets are those of [the frame model](frame-model.md#the-frame-model),
-and so are the lemmas cited by label F.  A frame is a component of the frame graph, which lies in one layer ([the
-frame lemma (F1)](frame-model.md#the-frame-lemma)), and a frame h is a union of frames.
+*Words.*  Frames, their moves and factors, frame h, taking a number on, the tests (a) and (b), claims, reduction, homes,
+applying a set, winnable pairs and promotion sets are those of [the frame model](frame-model.md#the-frame-model), and
+the results cited by label F or X are those of that file and of [exactness.md](exactness.md).  A frame is a component of
+the frame graph, which lies in one layer ([the frame lemma (F1)](frame-model.md#the-frame-lemma)), and a frame h is a
+union of frames.
 
 ## The extended problem
 
@@ -47,7 +48,7 @@ nothing claimed.  The formulation corollary (E3) shows that it has Π_n's promot
 Write K for the sources of S outside Φ and L = S ∩ {2, …, ⌊n/2⌋}.  Then S is playable iff (K, L) is a promotion set of
 Π⁺(O), and then ΣS = ΣΦ + ΣK + ΣL.
 
-*Proof.*  It is the proof of [the exactness theorem (F12)](frame-model.md#the-exactness-theorem) and its lemmas, read
+*Proof.*  It is the proof of [the exactness theorem (X7)](exactness.md#the-exactness-theorem) and its lemmas, read
 with Φ for U\*, freedoms⁺ for freedoms, inert frames for closed ones and the numbering of Π⁺(O).  The new piece is K,
 whose members are moves of their own frames.
 
@@ -56,25 +57,25 @@ whose members are moves of their own frames.
 1. K ⊆ O ∪ J.  A source s of K is open, or descending greedy rejected it in its frame D.  If D held no open source,
    U\* ∩ D would lie in Φ ⊆ S.  Descending greedy found s and the members of U\* ∩ D above it unplayable against F_D,
    yet in S they pay with factors of D, and restriction would make them playable.  So D holds an open source: s ∈ J.
-2. As in [the closed-frames lemma (F7)](frame-model.md#the-exactness-theorem), the factors of an inert frame D pay the
+2. As in [the closed-frames lemma (X2)](exactness.md#the-exactness-theorem), the factors of an inert frame D pay the
    members of Φ ∩ D: none is in S or pays for another member, and no member of K lies in D.
-3. As in F8, each member of L is a factor of a frame numbered h ≥ 1 and pays in frame h − 1; each member of Φ or K pays
-   in its own frame.
-4. As in F9, each member x of L, a factor of a frame D numbered h, is a two-sided candidate: restrict to Φ ∩ D for (a),
-   and to x and the moves of frame h − 1 for (b).
+3. As in [the one-frame-forward lemma (X3)](exactness.md#the-exactness-theorem), each member of L is a factor of a frame
+   numbered h ≥ 1 and pays in frame h − 1; each member of Φ or K pays in its own frame.
+4. As in [the candidate lemma (X4)](exactness.md#the-exactness-theorem), each member x of L, a factor of a frame D
+   numbered h, is a two-sided candidate: restrict to Φ ∩ D for (a), and to x and the moves of frame h − 1 for (b).
 5. The reduction of frame h drops pairs (m, f), m ∈ Φ, with f the only maximal factor of m not taken before.  As for a
-   front claim in [the claims lemma (F10)](frame-model.md#the-exactness-theorem), f fails (a): the earlier drops in f's
+   front claim in [the claims lemma (X5)](exactness.md#the-exactness-theorem), f fails (a): the earlier drops in f's
    frame are front moves of the instance with members Φ ∩ D and pool F_D ∖ {f}, after which m would list nothing.  So
    every two-sided candidate has a home, and root frame h with (K, L) applied is frame h with (K, L) applied less front
    moves, which keep it playable or unplayable (P4).
-6. As in F12, the members of frame h with (K, L) applied pay with factors of frame h outside L: by restriction and by
+6. As in X7, the members of frame h with (K, L) applied pay with factors of frame h outside L: by restriction and by
    step 5, root frame h with (K, L) applied is winnable.
 
 *If.*  Let (K, L) be a promotion set.
 
 7. Each frame h with (K, L) applied is playable (step 5).  Join acyclic schemes of these, and of Φ ∩ D against F_D for
    each inert frame D.  The joint scheme pays every member of S with distinct factors outside S.  A member of K is a
-   source of its own frame and pays there, so steps 4 to 6 of F12's proof apply as they stand: a cycle through a
+   source of its own frame and pays there, so steps 4 to 6 of X7's proof apply as they stand: a cycle through a
    source of an inert frame lies in that frame's scheme, and any other cycle in one frame h's scheme.  So S is
    playable, and ΣS = ΣΦ + ΣK + ΣL.  ∎
 
@@ -86,7 +87,7 @@ problem (B3)](frame-bounds.md#the-frame-bound-for-the-extended-problem) apply wi
 
 The claims of Π_n shrink its frames, and let consecutive games pose the same problem more often (E5), so the extended
 problem keeps those it safely can.  It cannot keep them all.  A back claim (s, f) of Π_n is safe because no candidate
-of Π_n has f among its maximal factors (F10), and Π⁺(O) has more candidates: opening sources gives frames more
+of Π_n has f among its maximal factors (X5), and Π⁺(O) has more candidates: opening sources gives frames more
 freedoms⁺, so that a closed frame can be numbered and a frame can take more on.  At n = 24 with O = {16, 20, 24}, the
 factor 12 = 2²·3 becomes a two-sided candidate, and its maximal factor 6 is the factor of Π_24's back claim (18, 6).
 Kept, that claim would leave 8 and 12 both needing the factor 4 in frame 1, and lose the promotion set (∅, {8, 12}),
@@ -107,11 +108,11 @@ holds no open source, and the members of L promoted into frame h.  No member of 
 of O ∪ J, and a member of K lists only factors of its own frame.  Claims of other frames touch none of D's moves and
 factors.  Take D's claims in order, the earlier ones made.
 
-* A front claim (s, f): s lists only f.  And f ∉ L: as in F10, the claims of D before it are front and back moves of
+* A front claim (s, f): s lists only f.  And f ∉ L: as in X5, the claims of D before it are front and back moves of
   the instance with members U\* ∩ D and pool F_D ∖ {f}, after which s would list nothing, so f fails (a).
 * A back claim (s, f): s is the only move of D left with f as a maximal factor, by the claim's rule, since the moves
   left are U\* ∩ D less those of the earlier claims ([the kept-sources lemma
-  (F6)](frame-model.md#the-exactness-theorem)).  By the check no member of L lists f, and f ∉ L.  ∎
+  (X1)](exactness.md#the-exactness-theorem)).  By the check no member of L lists f, and f ∉ L.  ∎
 
 **Corollary E3 (the formulation corollary).**  Π⁺(O) and Π⁺(O) with claims have the same promotion sets: in both,
 they are the pairs (K, L), K ⊆ O ∪ J and L a set of two-sided candidates, with every frame h with (K, L) applied
@@ -122,7 +123,7 @@ claims are front and back moves of frame h with (K, L) applied, none taking a me
 are front moves taking no two-sided candidate, as in step 5 of E1's proof, with the kept claims among the earlier
 moves.  So in both formulations every two-sided candidate has a home, and root frame h with (K, L) applied is winnable
 iff frame h with (K, L) applied is playable (P4).  With O = ∅, Π⁺(∅) has Π_n's frames h and candidates, and every
-frame keeps its claims, since a back claim's factor passes the check (F10).  So the frames h of Π⁺(∅) with claims are
+frame keeps its claims, since a back claim's factor passes the check (X5).  So the frames h of Π⁺(∅) with claims are
 those of Π_n less its claims, which are winnable and reduce to Π_n's root frames in any order ([the reduction lemma
 (F5)](frame-model.md#the-reduction-lemma)).  ∎
 

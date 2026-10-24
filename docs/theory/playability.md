@@ -176,8 +176,7 @@ scheme; and where every factor is wanted twice, every scheme has a cycle.
 5. *The conclusions.*  If the instance peels completely, it is playable by soundness.  If it is playable, then by steps
    2 and 3 so is every remainder of a run.  The run ends with no back move left, so every factor that a live member
    lists is listed by at least two live members; by step 4 a playable remainder of that kind has no members.  Last, if
-   the
-   remainder of a move is playable, it peels completely, and the move followed by that run pairs every member of the
+   the remainder of a move is playable, it peels completely, and the move followed by that run pairs every member of the
    instance.  ∎
 
 Completeness uses only that the lists hold proper divisors.  Soundness also needs, through P3, maximal factors: if 6

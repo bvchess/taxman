@@ -39,15 +39,9 @@ gives the count inequality, and summing the counts over the thresholds gives the
    it has at most |U\* ∩ K ∩ [t, n]| members.  Summing over the components gives |S ∩ [t, n]| ≤ |U\* ∩ [t, n]|.
 2. *Member by member.*  At the smallest source, t = ⌊n/2⌋ + 1, step 1 gives |S| ≤ |U\*|.  If the i-th member s of S
    exceeded the i-th member of U\*, the threshold t = s would hold i members of S and at most i − 1 of U\*.
-3. *Weights.*  List the values of the sources c₁ > c₂ > … > c_m, and put w(c_{m+1}) = 0.  By the layer-cake identity
-   ([sums over thresholds](primer.md#sums-over-thresholds)),
-
-       w(S) = Σ_j (w(c_j) − w(c_{j+1})) · |S ∩ [c_j, n]|,
-
-   since a member c_k is counted in the terms j ≥ k, whose coefficients sum to w(c_k).  Every coefficient is positive,
-   since w is positive and strictly increasing, so step 1 gives w(S) ≤ w(U\*) term by term.
-4. *Only one.*  Equality needs |S ∩ [c_j, n]| = |U\* ∩ [c_j, n]| for every j.  These counts determine a set: c_j is in
-   it exactly when its count at c_j exceeds its count at c_{j−1}, or is 1 when j = 1.  So then S = U\*.  ∎
+3. *Weights, and only one.*  By step 1, U\* has at least as many members as S above every threshold.  By the primer's
+   dominance fact (the paragraph "Dominance" of [sums over thresholds](primer.md#sums-over-thresholds)), w(S) ≤ w(U\*)
+   for every positive, strictly increasing weighting w, with equality only if S = U\*.  ∎
 
 This is the textbook fact that distinct weights give a matroid only one heaviest basis, transplanted.  The playable sets
 of sources are not a matroid's independent sets ([where exchange breaks](sources.md#where-exchange-breaks)).  They are
@@ -63,7 +57,7 @@ the difference back below n/2, where the factors that pay for the sources compet
 that ever happens is open, and the enumerations below never find it.  Among the sources of layers 1 and 2 it never
 happens: every optimal set holds exactly U\*_1 and U\*_2 there ([the bottom-layers
 theorem (F3)](frame-model.md#the-bottom-layers-theorem)).  The weaker claim that some optimal set holds the rest of U\*
-is [statement U](frame-model.md#statement-u), on which the frame solver's scores rest.
+is [statement U](exactness.md#statement-u), on which the frame solver's scores rest.
 
 On the whole board the optimal set need not be unique.  Game 425 has two optimal sets, which differ by an exchange of
 three numbers up to n/2 of equal sum, {110, 132, 168} ↔ {98, 150, 162}, each summing to 410; both sets replay by the
@@ -77,12 +71,9 @@ than opt(n), with the values as weights.  So no matroid relaxation of the whole 
 set would be a heaviest one.
 
 1. *One heaviest independent set.*  In a matroid M on 2, …, n, let G be the set that [the greedy algorithm of a
-   matroid](primer.md#the-greedy-algorithm-of-a-matroid) keeps, taking the elements in decreasing order.  Its part of
-   value t or more is a maximal independent subset of the elements of value t or more: an element there that it rejects
-   makes a dependent set with the elements kept before it, and so also with the larger set G ∩ [t, n].  In a
-   matroid all the maximal independent subsets of a set have the same size, so every independent set I has |I ∩ [t,
-   n]| ≤ |G ∩ [t, n]| for every t.  Steps 3 and 4 of the proof of the uniqueness theorem then give w(I) < w(G) unless I
-   = G.
+   matroid](primer.md#the-greedy-algorithm-of-a-matroid) keeps, taking the elements in decreasing order.  The values
+   are positive and distinct, so by part (d) of the primer's paragraph "What the scan finds", G is the only heaviest
+   independent set: every other independent set I has w(I) < w(G).
 2. *Every optimal set would be it.*  Every optimal set is playable, so independent in M, and the heaviest independent
    set weighs at least opt(n).  If it weighed exactly opt(n), every optimal set would be a heaviest independent set, and
    so equal to G; but there are two.  ∎

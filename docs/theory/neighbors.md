@@ -220,6 +220,5 @@ ceiling, and if it is, the optimal set of n is known with no search.
 
 The examples of this file are replayed by the rules with `heuristics/core.py`.  The optimal sets of games 18 to 24 are
 each unique, by the exhaustive search of `heuristics/evaluation/certify.py`, which takes under a second for these
-boards.
-The three optimal sets of 685 are the recorded one and its exchanges listed in
+boards.  The three optimal sets of 685 are the recorded one and its exchanges listed in
 [solver/noframe/docs/uniqueness.md](../../solver/noframe/docs/uniqueness.md), which enumerates them all.

@@ -72,9 +72,7 @@ matroid; with no picks and no bars it is *the parity bound of n*.
 *Proof.*  The idea: a playable set's vectors with its own coordinates are independent, and since each of them lies in
 one parity's part, the family splits into two independent halves, which are the set's representations in M₀ and M₁.
 
-1. *F(S) is independent.*  This is [the independence lemma (P10)](playability.md#the-independence-lemma): in a legal
-   order of S, each move pays with a maximal factor still in the pot, which no earlier move lists and which is no member
-   of S, and these factors make the vectors triangular.
+1. *F(S) is independent.*  This is [the independence lemma (P10)](playability.md#the-independence-lemma), over GF(2).
 2. *F(S) splits by parity.*  Every vector of F(S) lies in E₀ or in E₁, and GF(2)^{⌊n/2⌋} is the direct sum of the two
    parts.  A vanishing combination of F(S) therefore vanishes in each part separately, so F(S) is independent if and
    only if its vectors in E₀ are and its vectors in E₁ are.
@@ -125,8 +123,8 @@ Three properties make the bound useful.
   dummy.
 
 The prover bounds every node of its searches by W1, with the node's picks and bars, and reports a value only with its
-split ([solver/noframe/docs/proofs.md, "With the parity
-bound"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
+split ([solver/noframe/docs/proofs.md, "With the parity bound (to
+1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
 
 ## The barred bound
 
@@ -167,13 +165,14 @@ game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 ## What the parity bound misses
 
 The parity bound admits exactly the sets whose family F(S) is independent, since steps 2 and 3 of the proof of W1 hold
-in both directions.  So it exceeds opt(n) only through an *[odd core](playability.md#odd-cores)*: an unplayable set
-whose family is independent over GF(2).  By the counting theorem (C2), F(S) is independent exactly when, for some set T
-of maximal factors outside S, the payment schemes of S onto T are odd in number, while S is playable exactly when, for
-some T, there is only one; the bound keeps the count mod 2 and drops the rest.  An odd core has a member with three or
-more maximal factors outside it ([the two-factor proposition (C3)](franklin-moniot.md#the-two-factor-proposition)), and
-the first is on the board of 45 ([the first-odd-core proposition (C4)](franklin-moniot.md#the-first-odd-core)).  As
-measured, the bound equals opt(n) for every n up to 77 ([the table of statements](statements.md#the-statements)).
+in both directions.  So it exceeds opt(n) only through the unplayable sets whose families are independent over GF(2),
+each of which holds an [odd core](playability.md#odd-cores).  By the counting theorem (C2), F(S) is independent exactly
+when, for some set T of maximal factors outside S, the payment schemes of S onto T are odd in number, while S is
+playable exactly when, for some T, there is only one; the bound keeps the count mod 2 and drops the rest.  An odd core
+has a member with three or more maximal factors outside it ([the two-factor proposition
+(C3)](franklin-moniot.md#the-two-factor-proposition)), and the first is on the board of 45 ([the first-odd-core
+proposition (C4)](franklin-moniot.md#the-first-odd-core)).  As measured, the bound equals opt(n) for every n up to 77
+([the table of statements](statements.md#the-statements)).
 
 GF(2) is the field for the count mod 2, and another field would miss more.  The triangle {6, 10, 15} is unplayable on
 every board that has it: its members' maximal factors are 2, 3 and 5, each listed by two of them, so whichever member is

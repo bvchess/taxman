@@ -35,13 +35,15 @@ game, the claims that some O refuses (`m5_refused`).
   frame (`own`), and the factor graph lists its maximal factors there, as it does a move's.  Promoting one adds it to
   that frame's moves if the frame stays winnable; it takes no factor, and spends one freedom of that frame only
   (`frames_touched`).  The frame-by-frame check of a set, the reduction, conflicts and nogoods need nothing more: a
-  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted
-  two-sided candidate is no longer a factor of its home), so each is promoted once along a path, which the search's
-  candidates ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
+  one-sided member is one more move of its frame.  The state does not record which were promoted (a promoted two-sided
+  candidate is no longer a factor of its home), so each is promoted once along a path, which the search's candidates
+  ensure.  `FrameGraph::narrow` keeps a one-sided candidate while its frame has a freedom, and
   `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
-* **The GF(2) bound** (`gf2`, "One-sided candidates"; THEORY.md, Theorem 11 for Π⁺).  A one-sided candidate's element
-  has the vector of its maximal factors in its own frame's matroid, and is a coloop of the other: its own unit vector,
-  in a *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no vector.
+* **The GF(2) bound** (`gf2`, "One-sided candidates"; [the frame bound for the extended problem
+  (B3)](../../../docs/theory/frame-bounds.md#the-frame-bound-for-the-extended-problem)).  A one-sided candidate's
+  element has the vector of its maximal factors in its own frame's matroid, and is a coloop of the other: its own unit
+  vector, in a *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no
+  vector.
 * **The search.**  `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the
   search.  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header
   (format 5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for
@@ -49,10 +51,12 @@ game, the claims that some O refuses (`m5_refused`).
 * **What it refuses** (`SearchTactics::refusal_with_one_sided`).  With one-sided candidates the search needs `gf2`: the
   matching bound gives a one-sided candidate no vertex, so it is no bound there (the dive, which rounds the root's
   matching for a starting incumbent, still runs and never picks one).  It refuses `lagrange`, which is built on the
-  matching bound, and `symmetry`: Theorem 13 is proven for the frame model, and for Π⁺ each prime exchange would have
-  to map the one-sided candidates of each frame onto themselves, which nothing checks.  `SearchTactics::extended` is
-  the default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics, and its search is the
-  default engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its own).
+  matching bound, and `symmetry`: [the prime-exchange theorem
+  (R2)](../../../docs/theory/search-rules.md#the-prime-exchange-theorem) is proven for the frame model, and for Π⁺ each
+  prime exchange would have to map the one-sided candidates of each frame onto themselves, which nothing checks.
+  `SearchTactics::extended` is the default without `symmetry`.  Π⁺(∅) has no one-sided candidate and takes any tactics,
+  and its search is the default engine's on the same problem, node for node (`tests/tripwires.rs` has a table of its
+  own).
 * **Its frames.**  Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest: nine at most up to
   4095 (layers 3 to 11), whatever O is.  From 4096 it has ten with every source open, which `build_extended` refuses
   (`MAX_FRAMES`), naming the game and the layers.  The census of the frames records the count with every such source

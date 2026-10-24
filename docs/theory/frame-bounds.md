@@ -13,10 +13,10 @@ and the certificates of statement U rest on B3.  Two further results serve studi
 lose nothing that winnability keeps (the GF(3) proposition, B4, explanatory), and signed matroids join the frame bound
 through Lagrange multipliers in the decomposition bound (B5).  All five are proved.
 
-The frame model's terms, from frames and their numbering to [candidates, homes, winnable frames, promotion sets and the
-cap](frame-model.md#the-frame-model) and [nodes, completions and state(P)](frame-model.md#searching-the-frame-model),
-are defined in frame-model.md.  Fields, linear matroids, contraction, deletion, direct sums and loops are explained in
-[the primer](primer.md#matroids).
+The frame model's terms, from frames and their numbering to [candidates, homes, winnable frames and promotion
+sets](frame-model.md#the-frame-model) and [nodes, completions, state(P) and the promotion
+limit](frame-model.md#searching-the-frame-model), are defined in frame-model.md.  Fields, linear matroids, contraction,
+deletion, direct sums and loops are explained in [the primer](primer.md#matroids).
 
 ## Signed frame matroids
 
@@ -98,30 +98,31 @@ bound](../../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 ## The frame bound
 
 **Corollary B2 (the frame bound).**  Let Π be a root problem of the frame model and A and B its frame matroids.  Every
-promotion set of Π is independent in A and in B, and it has at most the cap members, so
+promotion set of Π is independent in A and in B, and it has no more members than the promotion limit, so
 
-    P*(Π) ≤ max { ΣI : I independent in A and in B, with at most the cap members }.
+    P*(Π) ≤ max { ΣI : I independent in A and in B, with no more members than the promotion limit }.
 
 At a node with the promotions P and the candidates C, every completion P ∪ X has X independent in A/P and in B/P, so
 
-    ΣX ≤ max { ΣI : I ⊆ C independent in A/P and in B/P, with at most the cap less |P| members },
+    ΣX ≤ max { ΣI : I ⊆ C independent in A/P and in B/P, with no more members than the promotion limit less |P| },
 
 and by B1 (2), A/P and B/P are the frame matroids of state(P) on the candidates still at their homes.  The right side
 plus ΣP is the node's *frame bound*; at the root, where P is empty, it is the first right side.
 
 *Proof.*  B1 with the plain signing over GF(2) makes a promotion set's part L ∩ T_h independent in N_h, for every frame
 h.  A set is independent in a direct sum exactly when its part in each block is, and L's part in the block N_h is L ∩
-T_h, so L is independent in A and in B.  A promotion set has at most the cap members.  At a node, P ∪ X is a promotion
-set, so it is independent in A and B with at most the cap members; X is then independent in A/P and B/P, by B1 (2) or
-the definition of contraction, and has at most the cap less |P| members.  ∎
+T_h, so L is independent in A and in B.  A promotion set has no more members than the promotion limit ([the
+promotion-limit lemma (F6)](frame-model.md#the-promotion-limit-lemma)).  At a node, P ∪ X is a promotion set, so it is
+independent in A and B with no more members than the promotion limit; X is then independent in A/P and B/P, by B1 (2) or
+the definition of contraction, and has no more members than the promotion limit less |P|.  ∎
 
 *What it misses.*  When each member of a frame's instance, with a set applied, lists at most two factors of the pool,
 the members are the edges of a graph on the pool, with a ground vertex for a member that lists one.  Then both
 winnability and independence over GF(2) say that the edges form a forest, as in [the two-factor proposition
 (C3)](franklin-moniot.md#the-two-factor-proposition), and on such frames the frame bound loses nothing.  What it misses
-are the [odd cores](playability.md#odd-cores) of movers with three or more factors: unwinnable frames whose vectors are
-independent over GF(2).  The cores it misses at large roots are measured in [matroid intersection
-bounds](../../solver/notebook/search/matroid-intersection-bounds-2026-10/README.md).
+are the unwinnable frames whose vectors are independent over GF(2), each of which holds an [odd
+core](playability.md#odd-cores), with a mover of three or more factors.  The cores it misses at large roots are measured
+in [matroid intersection bounds](../../solver/notebook/search/matroid-intersection-bounds-2026-10/README.md).
 
 *Against the matching bound.*  The frame bound is never above [the matching
 bound](../../solver/docs/design/search.md#the-matching-bound), which asks only that every move and every promoted number
@@ -236,29 +237,30 @@ allows ([primer](primer.md#weak-duality-and-lagrangian-relaxation)).
 **Theorem B5 (the decomposition bound).**  Let Π be a root problem of the frame model, A and B its frame matroids, and
 N_1, …, N_t signed frame matroids of Π, each N_j of one frame h_j and one signing over some field (several may share a
 frame).  For weights c on the candidates, let MI(c) be the largest c(I) of a set I independent in A and in B with at
-most the cap members (I = ∅ included); for weights μ on T_{h_j}, let G_j(μ) be the largest μ(J) of a set J independent
-in N_j.  Then for all real vectors λ_1, …, λ_t, with λ_j on T_{h_j} and 0 off it, every promotion set L of Π satisfies
+most as many members as the promotion limit (I = ∅ included); for weights μ on T_{h_j}, let G_j(μ) be the largest μ(J)
+of a set J independent in N_j.  Then for all real vectors λ_1, …, λ_t, with λ_j on T_{h_j} and 0 off it, every promotion
+set L of Π satisfies
 
     ΣL ≤ MI(w − Σ_j λ_j) + Σ_j G_j(λ_j) = D(λ),
 
 where w(x) = x.  The same holds with the loops of every N_j left out of the sets I.  At a node with the promotions P, it
-holds for ΣX of every completion P ∪ X, with the contractions by P of A, B and the N_j and the cap less |P|.
+holds for ΣX of every completion P ∪ X, with the contractions by P of A, B and the N_j and the promotion limit less |P|.
 
-*Proof.*  Split the weight: ΣL = (w − Σ_j λ_j)(L) + Σ_j λ_j(L ∩ T_{h_j}).  L is independent in A and B with at most the
-cap members (B2), so the first term is at most MI(w − Σ_j λ_j).  L ∩ T_{h_j} is independent in N_j (B1), so the j-th
-term of the sum is at most G_j(λ_j).  L holds no loop of any N_j (B1 (1)), so leaving the loops out of the sets I keeps
-L among them.  At a node, the same argument runs with X in place of L, by B1 (2) and B2.  ∎
+*Proof.*  Split the weight: ΣL = (w − Σ_j λ_j)(L) + Σ_j λ_j(L ∩ T_{h_j}).  L is independent in A and B with no more
+members than the promotion limit (B2), so the first term is at most MI(w − Σ_j λ_j).  L ∩ T_{h_j} is independent in N_j
+(B1), so the j-th term of the sum is at most G_j(λ_j).  L holds no loop of any N_j (B1 (1)), so leaving the loops out of
+the sets I keeps L among them.  At a node, the same argument runs with X in place of L, by B1 (2) and B2.  ∎
 
 Each term is a standard computation: MI is a weighted matroid intersection, and G_j the greedy algorithm of N_j
 ([primer](primer.md#the-greedy-algorithm-of-a-matroid)).  At λ = 0 every G_j is 0 and D(0) is the frame bound, so the
-best multipliers do at least as well.  The least value of D over the multipliers is the largest w·z over the points z
-of the convex hull of the sets independent in A and B with at most the cap members whose restriction to each T_{h_j}
-lies in the convex hull of N_j's independent sets.  This is Lagrangian decomposition (M. Guignard and S. Kim,
-"Lagrangean decomposition: a model yielding stronger Lagrangean bounds", *Mathematical Programming* 39 (1987)
-215–228).  J. Edmonds' theorems on the polytope of a matroid and on the intersection of two describe both hulls by
-rank inequalities, which makes the least value a linear program ("Submodular functions, matroids, and certain
-polyhedra", 1970, cited in full in [the parity bound](parity-bound.md#computing-and-checking-the-bound)).  That says
-what the bound can reach; the bound holds at every λ, so nothing rests on how the multipliers are found.
+best multipliers do at least as well.  The least value of D over the multipliers is the largest w·z over the points z of
+the convex hull of the sets independent in A and B with no more members than the promotion limit, whose restriction to
+each T_{h_j} lies in the convex hull of N_j's independent sets.  This is Lagrangian decomposition (M. Guignard and S.
+Kim, "Lagrangean decomposition: a model yielding stronger Lagrangean bounds", *Mathematical Programming* 39 (1987)
+215–228).  J. Edmonds' theorems on the polytope of a matroid and on the intersection of two describe both hulls by rank
+inequalities, which makes the least value a linear program ("Submodular functions, matroids, and certain polyhedra",
+1970, cited in full in [the parity bound](parity-bound.md#computing-and-checking-the-bound)).  That says what the bound
+can reach; the bound holds at every λ, so nothing rests on how the multipliers are found.
 
 The study of the multi-field bound measured it ([a bound over GF(2) and GF(3) signed frame
 matroids](../../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and

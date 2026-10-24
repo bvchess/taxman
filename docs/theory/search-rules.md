@@ -3,7 +3,7 @@
 Part of [the theory](../THEORY.md).
 
 A search of the frame model looks for a heaviest promotion set of a game's root problem Π_n, and its answer
-ΣU\* + P\*(Π_n) is opt(n) given statement U at n ([the corollary of U (F13)](frame-model.md#statement-u)).  The answer
+ΣU\* + P\*(Π_n) is opt(n) given statement U at n ([the corollary of U (X8)](exactness.md#statement-u)).  The answer
 is proven only if no part of the tree that the search leaves unexplored holds a heavier set.  This file defines the
 searches that prove their answers, [exact searches](#exact-searches), and proves every rule by which they may leave a
 part unexplored: [the state lemma (R1)](#the-state-lemma), [the prime-exchange theorem
@@ -21,7 +21,7 @@ and under [Searching the frame model](frame-model.md#searching-the-frame-model).
 ## Exact searches
 
 Throughout, Π is a root problem of the frame model: Π_n, or that of a board with holes ([the holes theorem
-(F14)](frame-model.md#boards-with-holes)).  A node (P, C) has a promotion set P and a set C of candidates outside P.
+(X9)](exactness.md#boards-with-holes)).  A node (P, C) has a promotion set P and a set C of candidates outside P.
 Its completions are the promotion sets P ∪ X with X ⊆ C, so every promotion set is a completion of the root (∅, every
 candidate).
 
@@ -33,10 +33,9 @@ search's incumbent and open units at one moment.
 
 A step replaces an open unit (P, C) with other nodes, or with none, which ends the unit.  Typically they are the child
 (P ∪ {x}, C ∖ {x}) that promotes a candidate x, when P ∪ {x} is a promotion set, and the node (P, C ∖ {x}) that goes on
-without x.  A step may also offer
-a promotion set that it has found, which becomes the incumbent if it is heavier than V.  A step *gives up* each
-completion of its unit that is a completion of none of the nodes that replace the unit.  The search *completes* when no
-open unit is left.
+without x.  A step may also offer a promotion set that it has found, which becomes the incumbent if it is heavier than
+V.  A step *gives up* each completion of its unit that is a completion of none of the nodes that replace the unit.  The
+search *completes* when no open unit is left.
 
 A promotion set L *keeps* the inequality of a symmetric pair of primes (p, q), as R2 defines them, when c_p(L) ≤
 c_q(L), where c_r(L) is the sum of x/r over the members x of L divisible by r.
@@ -86,11 +85,11 @@ that frame of state(P) with X applied, then reduced.
 with X applied is winnable before reduction exactly when it is after; if X takes one away, both sides fail.
 
 1. *Frame by frame.*  The set P ∪ X is a promotion set exactly when every frame of the root is winnable with P ∪ X
-   applied: its members are candidates with homes h ≥ 1, and winnability keeps it within the promotion limit
-   ([frame-model.md](frame-model.md#the-frame-model)).  Fix a frame j, and let G₀ be frame j of the root with P applied,
-   so that frame j with P ∪ X applied is G₀ with X applied.  Each member of X has one home, so it is enough to show
-   that G₀ with X applied is winnable exactly when the members of X of home j are factors of frame j of state(P) and
-   that frame is winnable with X applied.
+   applied: its members are candidates with homes h ≥ 1, and winnability keeps it within the promotion limit ([the
+   promotion-limit lemma (F6)](frame-model.md#the-promotion-limit-lemma)).  Fix a frame j, and let G₀ be frame j of the
+   root with P applied, so that frame j with P ∪ X applied is G₀ with X applied.  Each member of X has one home, so it
+   is enough to show that G₀ with X applied is winnable exactly when the members of X of home j are factors of frame j
+   of state(P) and that frame is winnable with X applied.
 2. *The drops.*  The frame G₀ is winnable, since P is a promotion set, so by [the reduction lemma
    (F5)](frame-model.md#the-reduction-lemma) every order of drops reduces it to frame j of state(P).  Take one, the
    drops (a₁, y₁), …, (a_k, y_k): the move a_i has the single live factor y_i in the frame G_{i−1}, and G_i is G_{i−1}
@@ -261,7 +260,7 @@ The number that a board adds often lands in the part of the game that the frame 
 leaves the problem as it was.  Game n is a *repeat* of game m when Π_n = Π_m: the same frames, numbered alike, with the
 same moves and factors, and the same candidates with the same homes.  Below, U\*(n) is the set U\* of board n.  The game
 of n *made from* a promotion set L of Π_n plays U\*(n) ∪ L, which is playable and worth ΣU\*(n) + ΣL by [the exactness
-theorem (F12)](frame-model.md#the-exactness-theorem).
+theorem (X7)](exactness.md#the-exactness-theorem).
 
 **Lemma R6 (the repeat lemma).**  Let n and m be games with Π_n = Π_m.
 
@@ -269,13 +268,13 @@ theorem (F12)](frame-model.md#the-exactness-theorem).
 2. Given U at n, opt(n) − ΣU\*(n) ≤ opt(m) − ΣU\*(m).
 3. Given U at n, if the game of m made from a promotion set L is optimal, so is the game of n made from L.
 
-*Proof.*  Part 1 is F12 at n.  Equal problems have the same promotion sets, so P\*(Π_n) = P\*(Π_m).  By F12 at m,
+*Proof.*  Part 1 is X7 at n.  Equal problems have the same promotion sets, so P\*(Π_n) = P\*(Π_m).  By X7 at m,
 ΣU\*(m) + P\*(Π_m) ≤ opt(m), and given U at n, opt(n) = ΣU\*(n) + P\*(Π_n) by [the corollary of U
-(F13)](frame-model.md#statement-u); together these give part 2.  For part 3, opt(m) = ΣU\*(m) + ΣL and part 2 give
+(X8)](exactness.md#statement-u); together these give part 2.  For part 3, opt(m) = ΣU\*(m) + ΣL and part 2 give
 opt(n) ≤ ΣU\*(n) + ΣL, which the game of n made from L scores by part 1.  ∎
 
 Given U at m as well, part 2 is an equality.  Part 3 asks only that m's game made from L be optimal, however that was
-proven: by a search, or at m's ceiling.  Such an L is a heaviest promotion set, by F12 at m.
+proven: by a search, or at m's ceiling.  Such an L is a heaviest promotion set, by X7 at m.
 
 *Example.*  Games 21 and 22 pose the same problem: two frames, the candidates 4 and 9, the promotion limit 1, and
 P\* = 9.  Board 22 adds the source 22 = 2·11 and turns 11 into a factor that pays for 22 alone, which leaves the
@@ -341,7 +340,7 @@ root, since other rules drop some: the lemma speaks of the completions that are 
 
 *Standing.*  Proved.  An answer that uses it rests on what Z rests on.  If Z is the value of P\*(Π_m) that a completed
 search of the same problem proved, the lemma adds nothing to what the answer rests on.  If Z is hi(m) − ΣU\*(m), for an
-upper bound hi(m) on opt(m) such as m's optimal score, then Z ≥ opt(m) − ΣU\*(m) ≥ P\*(Π_m) by F12.  The answer then
+upper bound hi(m) on opt(m) such as m's optimal score, then Z ≥ opt(m) − ΣU\*(m) ≥ P\*(Π_m) by X7.  The answer then
 rests on m's upper bound too: on what m's proof assumes, and on U at the games that bound came through, as a game's
 ceiling rests on the game before it.
 
@@ -349,7 +348,7 @@ ceiling rests on the game before it.
 
 * *Candidates of Π_m.*  The bound Z covers only the promotion sets of Π_m, which are sets of its candidates, and
   winnable frames do not make a number a candidate.  At n = 98 the frames stay winnable with 22 promoted, but 22 is no
-  candidate, and U\* ∪ {22} is not playable (F12).
+  candidate, and U\* ∪ {22} is not playable (X7).
 * *The same home.*  A promoted number leaves its home for the frame in front of it.  With another home in Π_m it would
   change frames that condition 3 does not compare.  The homes of P's members need no check, since condition 2 and the
   state carry what P does in Π_m.
@@ -400,7 +399,7 @@ between games by constructions, each replayed before it counts:
 
 *Upper bounds rest on the frame model.*  Each hi(n) starts from a bound on P\*(Π_m) at some game m: the root's frame
 bound (B2), a dual bound (R4), the value of a completed search (R4), or a floor under which a search completed having
-found nothing (R5).  Each holds without statement U, and ΣU\*(m) + P\*(Π_m) is opt(m) given U at m (F13).  An upper
+found nothing (R5).  Each holds without statement U, and ΣU\*(m) + P\*(Π_m) is opt(m) given U at m (X8).  An upper
 bound passes from n − 1 to n by adding n (N4), from n to n − 1 unchanged (N3), between p − 1 and a prime p by adding or
 taking away p − q(p − 1) (N5), and from m to n by taking away ΣU\*(m) and adding ΣU\*(n) when Π_n = Π_m (R6).  All of
 these passages hold without U but the last, which needs U at n.  So hi(n) ≥ opt(n) rests on U at the game where its

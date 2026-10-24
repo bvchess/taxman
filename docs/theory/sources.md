@@ -24,7 +24,7 @@ A refutation would be a game with a playable set of sources heavier than U\*, or
 where descending greedy keeps fewer sources than fit.  A failure of (♦) alone would refute neither, since (♦) is the
 stronger statement.  The uniqueness theorem ([Q1](uniqueness-and-longest-games.md#the-uniqueness-theorem)) and part of
 the length lemma ([Q3](uniqueness-and-longest-games.md#the-length-lemma)) assume (★).  The scores of the frame solver
-do not: they rest on [statement U](frame-model.md#statement-u).
+do not: they rest on [statement U](exactness.md#statement-u).
 
 The file follows the ways a proof has been tried.  The textbook proof that a procedure like descending greedy finds a
 heaviest set needs the exchange property of a matroid, which playable sets lack (where exchange breaks).  A direct
@@ -318,8 +318,8 @@ These are observations from computation, with their evidence in [evidence.md](ev
   that obeys the window law, random or chosen adversarially, and under the window law reversed.  It failed about as
   often as a random order under the window law for a random ranking of the primes, or for the primes perturbed by more
   than a few percent, while generalized primes, perturbed by up to 50% with the members and factors rebuilt from them,
-  never failed ([star.md, "Adversarial
-  search"](../../solver/noframe/docs/star.md#adversarial-search-what-protects-greedy)).
+  never failed ([star.md, "Adversarial search: what protects
+  greedy"](../../solver/noframe/docs/star.md#adversarial-search-what-protects-greedy)).
 
 So a proof of (★) must show that within one component's residual the order of the integers makes descending greedy's
 exclusions the fewest possible, with the window law as its engine.  Stated without magnitudes, the target is (♦) for

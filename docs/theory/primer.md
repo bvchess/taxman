@@ -113,7 +113,7 @@ heaviest independent set, for any weights, and a set is heaviest exactly when no
 
 *Not the other greedy procedures.*  This is the greedy algorithm of a matroid, which the primer also calls the scan.  It
 is not the Taxman strategy that is often called greedy, taking the largest legal move, and not the theory's *descending
-greedy* ([sources.md](sources.md#the-sources-conjecture)), which runs the same scan on playable sets.  Those are not the
+greedy* ([sources.md](sources.md#descending-greedy)), which runs the same scan on playable sets.  Those are not the
 independent sets of a matroid: in the game of 4, {2} and {3, 4} are playable, but neither 3 nor 4 can join 2, since both
 then need the 1 that 2 needs.  So the theorem below does not cover descending greedy.
 
