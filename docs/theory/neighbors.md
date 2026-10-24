@@ -200,6 +200,11 @@ theorem says why: no optimal set of game 20 stays playable with 21 added.  The o
 
     10: 2, 5      15: 5, 3      21: 3, 7      14: 7, 2
 
+![The numbers 10, 14, 15 and 21 as the four sides of a square on the primes 2, 5, 3, 7, with each payment scheme's arrows and its precedence cycle](img/cycle-21.svg)
+
+*Each of the two ways to pay the four numbers with their primes forces an order of play that runs round the square,
+so neither is an order.*
+
 These four moves come after 19, which takes 1, so each must be paid with one of its maximal factors still in the pot
 (the [lifting lemma (P1)](playability.md#the-lifting-lemma)), that is with 2, 3, 5 or 7.  A move takes every divisor it
 has in the pot.  So the first of the four to be played takes both of its maximal factors, or whichever of them is left,

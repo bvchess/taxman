@@ -196,6 +196,11 @@ closed, and frame 0 cannot take on 10, the one factor of frame 1 with the maxima
 on 9, which has it; and only 18 has the maximal factor 9, but frame 0 can take 9 on.  The claim (21, 3) or (18, 9)
 would lose the promotion set {9} (below).
 
+![Game 21's four frames stacked by layer, with their claims, closed frames dashed, the candidates 4 and 9, and links to the frame in front](img/frames-21.svg)
+
+*The frames of 21 by layer, layer 4 at the top.  Double outline: the candidates 4 and 9.  Thick pair: a claim, lighter
+in a closed (dashed) frame.  Dotted arrow: a factor to its maximal factor in the frame in front.*
+
 **Reduction.**  To *reduce* a pair of Taxman Mini is to drop a move with one live factor, with that factor, until no
 such move is left.
 
@@ -231,6 +236,11 @@ with 3, 21 with 7 and 14 with 2; root frame 1 has the moves 12 and 18 against 4 
 So is {4}, but not {4, 9}, which would leave root frame 0 four moves for three factors.  So P\* = 9, and
 ΣU\* + P\* = 135 + 9 = 144 = opt(21), the score of the game 19; 9, 15, 21, 14; 18, 12, 20; 16, which plays the frames
 one after another from the front.
+
+![Game 21's root frames before and after promoting 9, which becomes a move of frame 0 paid by 3, with the numbered drops that empty both frames](img/promotion-21.svg)
+
+*Promoting 9 moves it from the factors of frame 1 to the moves of frame 0.  Numbered square tags: the drops of each
+frame, in order.*
 
 ### The reduction lemma
 

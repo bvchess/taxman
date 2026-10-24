@@ -47,6 +47,11 @@ one end of its edge, so there are two, around the cycle each way.  The scheme 10
 10 → 14 → 21 → 15 → 10, since 2 divides 14, 7 divides 21, 3 divides 15 and 5 divides 10; the other has the reverse
 cycle.  So the instance is unplayable, and by P2 no game of 21 plays all four numbers.
 
+![The numbers 10, 14, 15 and 21 as the four sides of a square on the primes 2, 5, 3, 7, with each payment scheme's arrows and its precedence cycle](img/cycle-21.svg)
+
+*The two payment schemes of {10, 14, 15, 21}.  Thick arrows: what each number pays with.  Dashed arrows: the
+precedence, labeled by the divisibility behind each edge (2 | 14 reads 2 divides 14).*
+
 ### The lifting lemma
 
 **Lemma P1 (the lifting lemma).**  At any point of a game, if a proper divisor d of a number x is in the pot, then so is
@@ -143,6 +148,11 @@ since a factor leaves a list only when some member pays with it.
 (15, 5) and (18, 9), for factors that one member alone lists.  After these 6 is listed by 12 alone, then 4 by 20 alone
 and 3 by 21 alone: (12, 6), (20, 4) and (21, 3) pair every member.  Add the sources 11, 13 and 17, which like 19 list 1
 alone: once one of the four primes pays with 1, the other three list nothing, and every run stalls.
+
+![The sources 11 to 21 of game 21 above the factors 1 to 10 in four components, and below them a run of peel numbered 1 to 8](img/sources-21.svg)
+
+*The sources of 21 by component, gray where U\* keeps them (upper panel), and the run of peel numbered 1 to 8 on the
+pairs it makes (lower panel).  A square tag marks a front move, a round tag a back move.*
 
 ### The peel theorem
 

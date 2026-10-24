@@ -55,6 +55,11 @@ factor of 8.  In M₁, {4, 6, 9} is dependent (v(4) + v(9) = v(6)), though M₀ 
 unplayable: its three members have only the two maximal factors 2 and 3 between them.  The heaviest set independent in
 both is {6, 7, 8, 9, 10}, worth 40.  It is playable, in the order 7, 9, 6, 10, 8, so here the bound is opt(10) = 40.
 
+![The numbers 2 to 10 between two boxes of coordinates, E₀ = {1, 4} on the left and E₁ = {2, 3, 5} on the right, with solid lines to maximal factors and dashed lines to own coordinates](img/parity-10.svg)
+
+*A number's solid lines land in one box and its dashed line in the other.  The numbers above 5 have no coordinate of
+their own (double outline); gray and bold: the heaviest set independent in both.*
+
 ## The parity bound
 
 **Theorem W1 (the parity bound).**  Let n ≥ 2, and let P and X be disjoint sets of numbers of 2..n.  Every playable set

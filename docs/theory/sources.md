@@ -72,6 +72,11 @@ value t or more, where [t, n] is the integers from t to n.  Two facts follow fro
   fact they stay playable with x exactly when their part in K does.  Its decision on x therefore depends only on the
   members of K kept above x, as it does in the run on K, and stopping at t changes nothing above t.
 
+![The sources 11 to 21 of game 21 above the factors 1 to 10 in four components, and below them a run of peel numbered 1 to 8](img/sources-21.svg)
+
+*The four components of 21's sources (upper panel).  Gray circles: U\*; hollow: the rejected 11, 13 and 17.  The lower
+panel is a run of [peel](playability.md#peel) on U\*.*
+
 ### Jams and victims
 
 A *jam* is a set T ∪ {d} that is not playable, with T playable and d ∉ T.  A *victim* of the jam is a member t of T
@@ -112,6 +117,11 @@ into A: A ∪ {1859} holds the core {1573, 1859, 2057, 2431, 2873}, and A ∪ {2
 sources A is a maximal playable set of size 4 and B one of size 5, and the playable sets are not the independent sets of
 any matroid.  The textbook proof does not apply.
 
+![Game 2873's six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with 2431 joined to three factors, showing the maximal playable sets A and B](img/exchange-2873.svg)
+
+*The six sources of the table, each joined to its maximal factors; 2431 is a hub with three.  Solid: the members of A
+(upper panel) and of B (lower).*
+
 Descending greedy still gets these six right.  It keeps {1859, 2057, 2197, 2431, 2873}, of size 5 and sum 11,417, the
 heaviest of the five maximal playable sets, and A, where it could be stuck, is the lightest.  The order of the values is
 what saves it.  Of the 720 orders of the six sources, the 48 that put 1859 and 2197 last lead descending greedy to A;
@@ -151,6 +161,11 @@ The six sources of game 9170 built from the primes 17, 19 and 23 show the law at
 The set T = {4913, 5491, 6647, 7429, 8303} is playable, and T ∪ {6137} is a jam with two minimal cores, {4913, 6137,
 6647, 7429, 8303} and {5491, 6137, 6647, 7429, 8303}.  So its victims are 6647, 7429 and 8303, which lie in both, while
 removing 4913 or 5491 leaves the other.
+
+![Game 9170's six sources as edges on the factors 289, 323, 361, 391, 437 and the ground, with the two minimal cores of T and 6137, and the third core that 6859 adds](img/cores-9170.svg)
+
+*Upper panel: the two minimal cores, with d = 6137 in both; long dashes mark the one through 4913, dots the one through
+5491.  Lower panel: 6859 added, closing a core without 6137.*
 
 ## The frontier theorem
 
@@ -209,8 +224,8 @@ of T ∪ {6137} have the parts {4913} and {5491} below d, which share nothing, s
 victims 6647, 7429 and 8303 are heavier than d, and a repair from below d must remove both 4913 and 5491, which sum to
 10,404, more than d.
 
-In game 9170 the six sources lie in a larger component, which also holds 6859 = 19³, whose only maximal factor is 361.
-Descending greedy keeps 6859, which is above 6137, and the five sources 5491, 6647, 6859, 7429 and 8303 form a core.
+In game 9170 the six sources lie in a larger component, which also holds 6859 = 19³, whose only maximal factor is 361
+(the lower panel of [the figure](#the-victim-law)).  Descending greedy keeps 6859, which is above 6137, and the five sources 5491, 6647, 6859, 7429 and 8303 form a core.
 So a playable set that agrees with U\* above 6137 cannot hold 5491, and the second minimal core of T ∪ {6137}, the one
 through 5491, is out of its reach.  In game 9170 the check of (♦) passes, so U\* is the heaviest playable set of sources
 there (S6 and Q1).  Whether descending greedy is right thus depends on members outside the jam: a proof must charge the

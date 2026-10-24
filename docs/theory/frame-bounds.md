@@ -52,6 +52,11 @@ and 4 and 9 are parallel in N₁, which is B.  Each frame has one freedom, and e
 independent in both are ∅, {4} and {9}, and the heaviest, {9}, is worth P\* = 9: on this board the frame bound is
 exact.
 
+![Game 21's root frames 1 and 0, with the candidates 4 and 9 as factors of frame 1 and, by dashed arrows, as movers of frame 0](img/frame-matroids-21.svg)
+
+*Each candidate touches one odd and one even frame: a factor of frame 1 (B = N₁) and a mover of frame 0 (A = N₀).
+Dashed arrow: a candidate to the maximal factor that would pay for it in frame 0.*
+
 ## The signed frame theorem
 
 **Theorem B1 (the signed frame theorem).**  Let L be a promotion set of a root problem Π of the frame model, h a frame
@@ -228,6 +233,10 @@ fails: the plain signing is the only one there, and an odd core is independent u
 or, for 6, three.  With the values 1 in every pair, the determinant of the five vectors is 3, odd, so over GF(2) they
 are independent.  With the values of step 3, 1 and 2 on the pairs at 4, 9, 10 and 15 and 1, 1, 1 at 6, the five
 vectors sum to 0 over GF(3).
+
+![The odd core {12, 18, 20, 30, 45} as members joined to the factors 4, 6, 9, 10 and 15, with an entry of 1 or 2 on each edge so that the entries at every factor add up to 0 modulo 3](img/gf3-45.svg)
+
+*The core with one choice of the values of step 3: the entries at every factor sum to 0 (mod 3).*
 
 ## The decomposition bound
 

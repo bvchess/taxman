@@ -63,7 +63,8 @@ tests attack each one ([trust.md](../../solver/docs/design/trust.md)).
 and 28 and the factors 4, 10 and 14.  Its candidates 4, 10 and 14 have home 1, and the promotion limit is 1, so its
 promotion sets are ∅, {4}, {10} and {14}, and P\* = 14.  A search that first promotes 14 replaces the root with ({14},
 {4, 10}) and (∅, {4, 10}), and offers {14}.  The two nodes' completions are {14}, ∅, {4} and {10}, none of them
-heavier than the incumbent 14, so steps may end both, and the search completes at P\*.
+heavier than the incumbent 14, so steps may end both, and the search completes at P\*.  The root is drawn [under the
+prime-exchange theorem](#the-prime-exchange-theorem).
 
 ## The state lemma
 
@@ -111,6 +112,10 @@ with X applied is winnable before reduction exactly when it is after; if X takes
 *Example.*  On game 28, promoting 14 leaves frame 1 with the moves 20 and 28 and the factors 4 and 10, and frame 0 with
 the move 14 and the factor 2.  Reducing drops 28 with 4, then 20 with 10, and 14 with 2, so state({14}) has two empty
 frames.  By R1 no candidate can join 14, since neither 4 nor 10 is a factor of its home there.
+
+![Game 28 after promoting 14, the drops (28, 4), (20, 10) and (14, 2), and the two empty frames that remain](img/state-28.svg)
+
+*Promoting 14 (left), and state({14}) after the drops (right).  Numbered square tags: the drops, in order.*
 
 The search keeps each node's state and makes a child's state from its parent's ([solver/docs/design/search.md, "Search
 state and order"](../../solver/docs/design/search.md#search-state-and-order)).
@@ -163,6 +168,11 @@ the factors 4 and 2.  No candidate is divisible by 35, 25 or 49, so (5, 7) is a 
 {10} to {14}, worth (7 − 5)·(2 − 0) = 4 more, and the heaviest set {14} keeps c₅ = 0 ≤ c₇ = 2.  It would send the
 source 25 = 5² off the board, to 49, but 25 lies in a closed frame, with 15, 21 and the factors 3, 5 and 7, which takes
 no part in the problem.
+
+![Game 28's root problem: frame 1 with the moves 20 and 28 and the candidates 4, 10 and 14, each paid by the 2 of frame 0, with the exchange of 5 and 7 as dotted arrows](img/game-28.svg)
+
+*The root of game 28.  Double outline: the candidates, with dashed arrows to their payer 2.  Dotted double arrows: the
+exchange π_{5,7}.  Gray, dashed: the closed frame.*
 
 The solver finds the symmetric pairs of the root and prunes by R3 ([solver/docs/design/gf2-bound.md, "Prime
 exchanges"](../../solver/docs/design/gf2-bound.md#prime-exchanges)).

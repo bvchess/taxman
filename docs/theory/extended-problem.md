@@ -93,6 +93,11 @@ factor 12 = 2²·3 becomes a two-sided candidate, and its maximal factor 6 is th
 Kept, that claim would leave 8 and 12 both needing the factor 4 in frame 1, and lose the promotion set (∅, {8, 12}),
 although Φ ∪ {8, 12} is playable.
 
+![Frame 1 of game 24 with the numbers 8 and 12 promoted into it, winnable without the claim (18, 6) and unplayable with it kept](img/extended-24.svg)
+
+*Frame 1 of Π⁺(O) at n = 24 with 8 and 12 (double outline) promoted into it.  With the claim (18, 6) taken out first
+(light dashed pair), 8 and 12 both need 4.*
+
 So the claims are kept frame by frame, with a check.  Take the claims of Π_n's frames h, not its drops, and give each
 the frame D of its move, which holds its factor too.  D *keeps* its claims if it holds no member of O ∪ J, and each of
 its back claims (s, f) passes the *check*: f is not a two-sided candidate of Π⁺(O), and no two-sided candidate has f

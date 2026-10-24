@@ -124,6 +124,11 @@ any order.  Start with B empty, and for each element x in turn, put x in B if B 
 (the edge 3–7), 15 (3–5) and 14 (2–7).  It rejects 10, which would close the 4-cycle, and 6, which would close the
 triangle {6, 14, 21}.  So B = {21, 15, 14}, which weighs 50; the other seven bases weigh 30, 35, 37, 39, 42, 45 and 46.
 
+![The edges 6, 10, 14, 15 and 21 on the primes 2, 3, 5, 7, with the scan keeping 21, 15 and 14 and rejecting 10 and 6](img/graphic-21.svg)
+
+*The graph, each edge a number between its two primes.  Thick: the edges the scan keeps.  Dashed: the edges it
+rejects.*
+
 **What the scan finds.**  Let M be a matroid on E, w a real weight function on E, and B the scan's set for any order of
 ties.
 
@@ -207,6 +212,10 @@ factor of m, form the 8-cycle 10–2–14–7–21–3–15–5–10, which has 
 I = {(10, 2), (14, 7), (15, 3)} cannot be extended: each of the other five edges shares a number or a factor with an
 edge of I, and paying 15 with 3 strands 21.  So the matchings have maximal sets of 3 and of 4 edges, and augmentation
 fails for I and a perfect matching: *common independent sets are in general not a matroid*.
+
+![The eight-cycle joining 10, 14, 15 and 21 to the primes of their maximal factors, with a matching of three edges that cannot be extended and a perfect matching of four](img/payment-graph-21.svg)
+
+*The 8-cycle drawn on the square of 21.  Thick: the matching I (left) and a perfect matching (right).*
 
 **What can be computed.**
 

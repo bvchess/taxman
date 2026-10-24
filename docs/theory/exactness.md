@@ -112,6 +112,11 @@ board, though, 22 and 77 close the path into a [core](playability.md#cores-and-t
 factors, each listed twice, so U\* ∪ {22} is not playable.  Only test (b) keeps 22 out: frame 0 cannot take 22 on, so
 22 is no candidate, and the back claim's last condition holds.
 
+![Game 98's sixteen-cornered cycle of eight numbers and eight factors, closed on the board and opened into a path in the model by the claim (77, 11)](img/cycle-98.svg)
+
+*The cycle of game 98 on the board (left) and in the model (right), where the claim (77, 11) is taken out.  Double
+outline: the number 22.*
+
 **Lemma X6 (the reduction-step lemma).**  The drops that reduce a root frame are front claims, so the claims lemma (X5)
 holds for frame h's claims followed by its drops.  So every candidate of a frame numbered h has the home h, and for
 every set L of candidates, root frame h with L applied is winnable iff frame h with L applied is playable.
