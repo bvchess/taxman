@@ -38,8 +38,9 @@ smallest example that shows the failure.  The exclusion theorem, read on the boa
 ## 5. Give each thing one name, and the standard name where there is one
 
 Each result has a name that says what it is about, such as the ceiling lemma, and a short label: the letter of its
-file and its number there, as in N4.  The first mention of a result in a file gives its name, its label and a link
-to its heading; later mentions may use the label alone where the result is cited often, and the name where it is not.
+file and its number there, as in N4.  Every mention of a result is a link to its heading.  The first mention in a file
+gives its name and its label; later mentions may use the label alone where the result is cited often, and the name
+where it is not.
 The open statements that have symbols keep them: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and the
 notation table in [statements.md](statements.md) lists them; a letter that serves one proof only must not be one of
 those.  Introduce a symbol only for what the text uses again and again, and use words for the rest.
