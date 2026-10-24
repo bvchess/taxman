@@ -101,13 +101,13 @@
 <text x="585" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">In the model</text>
 <text x="195" y="218" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">8 numbers on 8 factors,</text>
 <text x="195" y="236" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">each factor listed twice:</text>
-<text x="195" y="254" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">a core, so U* + 22</text>
+<text x="195" y="254" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">a core, so U* ∪ {22}</text>
 <text x="195" y="272" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">is not playable</text>
 <text x="585" y="218" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">without 77 and 11,</text>
 <text x="585" y="236" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">22 joins only 2:</text>
 <text x="585" y="254" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">a path, which peel</text>
 <text x="585" y="272" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#111111">empties</text>
-<text x="390" y="428" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Circles: numbers.  Squares: factors.  Double outline: the candidate 22.</text>
+<text x="390" y="428" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Circles: numbers, gray for members of U*.  Squares: factors.  Double outline: 22, no candidate.</text>
 <text x="390" y="446" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Light dashed pair: the claim (77, 11), taken out.</text>
 <text x="390" y="464" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Only test (b) keeps 22 out: with 77 and 11 gone the model cannot see the cycle the board holds.</text>
 </svg>

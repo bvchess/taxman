@@ -27,11 +27,11 @@
 <text x="251" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
 <rect x="315" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
 <text x="329" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
-<circle cx="56" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
-<circle cx="56" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<circle cx="56" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-dasharray="4 3"/>
+<circle cx="56" cy="150" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
 <text x="56" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">8</text>
-<circle cx="134" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
-<circle cx="134" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<circle cx="134" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-dasharray="4 3"/>
+<circle cx="134" cy="150" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
 <text x="134" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">12</text>
 <circle cx="212" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
 <text x="212" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">18</text>
@@ -49,11 +49,11 @@
 <text x="636" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">9</text>
 <rect x="700" y="216" width="28" height="28" fill="#ffffff" stroke="#111111" stroke-width="1.7"/>
 <text x="714" y="230" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">10</text>
-<circle cx="441" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
-<circle cx="441" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<circle cx="441" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-dasharray="4 3"/>
+<circle cx="441" cy="150" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
 <text x="441" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">8</text>
-<circle cx="519" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4"/>
-<circle cx="519" cy="150" r="16" fill="#cdcdcd" stroke="#111111" stroke-width="1.7"/>
+<circle cx="519" cy="150" r="20.5" fill="#ffffff" stroke="#111111" stroke-width="1.4" stroke-dasharray="4 3"/>
+<circle cx="519" cy="150" r="16" fill="#ffffff" stroke="#111111" stroke-width="1.7" stroke-dasharray="4 3"/>
 <text x="519" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#111111">12</text>
 <circle cx="597" cy="150" r="16" fill="#cdcdcd" stroke="#b4b4b4" stroke-width="1.7"/>
 <text x="597" y="150" text-anchor="middle" dy=".35em" font-size="14" font-weight="normal" fill="#b4b4b4">18</text>
@@ -63,7 +63,7 @@
 <text x="590" y="28" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">With the claim (18, 6) kept</text>
 <text x="424" y="72" text-anchor="start" dy=".35em" font-size="14" font-weight="bold" fill="#111111">Frame 1</text>
 <text x="590" y="262" text-anchor="middle" dy=".35em" font-size="14" font-weight="bold" fill="#111111">8 and 12 both need 4: unplayable</text>
-<text x="390" y="330" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: 8 and 12, promoted into frame 1 from frame 2.  In frame 1, 8 lists 4 and 12 lists 6, 4.</text>
-<text x="390" y="348" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">The claim (18, 6), light dashed pair, takes 18 and 6 out first, which leaves 8 and 12 one factor, 4.</text>
-<text x="390" y="366" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">The promotion set {8, 12} would be lost, though 8 and 12 with the rest of the set are playable.</text>
+<text x="390" y="330" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: 8 and 12, promoted from frame 2.  Gray: the fixed source 18, a member of Φ.</text>
+<text x="390" y="348" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Numbered square tags: the front moves of a run of peel, in order.  The claim (18, 6), light dashed,</text>
+<text x="390" y="366" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">takes 18 and 6 out first: (∅, {8, 12}) is lost, though Φ ∪ {8, 12} is playable.</text>
 </svg>

@@ -568,9 +568,9 @@ def frames_21():
         "frames-21",
         780,
         730,
-        "Game 21's four frames, one box per layer with layer 4 at the top: sources above factors, the claims as thick "
-        "pairs, the closed frames dashed, the candidates 4 and 9 with a double outline, and dotted arrows from a "
-        "factor to its maximal factor in the frame in front.",
+        "Game 21's four frames, one box per layer with layer 4 at the top: sources above factors, the claims of "
+        "frames 0 and 1 as thick pairs, the closed frames dashed, the candidates 4 and 9 with a double outline, and "
+        "dotted arrows for some of the links from a factor to its maximal factor in the frame in front.",
     )
     d, x0 = 60, 170
     box_h, y_s, y_f = 126, 32, 98
@@ -579,10 +579,10 @@ def frames_21():
     # the pair that setup claims, with its kind.  Layer 1's four sources fan out around its one factor.
     fan = [(s, 1 + k * FAN / d) for s, k in zip((11, 13, 17, 19), (-1.5, -0.5, 0.5, 1.5))]
     layers = {  # layer -> top of its box, and its frame
-        4: dict(top=40, factors={8: 1}, moves={16: 1}, claim=(16, 8, "front")),
+        4: dict(top=40, factors={8: 1}, moves={16: 1}, claim=None),
         3: dict(top=196, factors={10: 0, 4: 1, 6: 2, 9: 3}, moves={20: 0.5, 12: 1.5, 18: 2.5}, claim=(20, 10, "back")),
         2: dict(top=352, factors={2: 1, 7: 2, 3: 3, 5: 4}, moves={14: 1.5, 21: 2.5, 15: 3.5}, claim=(15, 5, "back")),
-        1: dict(top=508, factors={1: 1}, moves=dict(fan), claim=(19, 1, "back")),
+        1: dict(top=508, factors={1: 1}, moves=dict(fan), claim=None),
     }
     candidates = {4, 9}
     frame_number = 0  # frames with freedoms are numbered from the lowest layer up
@@ -598,17 +598,19 @@ def frames_21():
         xs = [x0 + c * d for c in list(spec["factors"].values()) + list(spec["moves"].values())]
         left, right = min(xs) - 40, max(xs) + 40
         fig.box(left, spec["top"], right - left, box_h, dashed=closed, stroke=MID if closed else INK)
-        s, f, kind = spec["claim"]
+        claim = spec["claim"]  # the theory claims only in the frames h, so a closed frame shows none
         nodes.update(
             draw_frame(
                 fig, spec["moves"], spec["factors"], spec["top"] + y_s, spec["top"] + y_f, d, x0,
                 rings=candidates & set(spec["factors"]), hollow_moves={m for m in spec["moves"] if m not in USTAR_21},
-                styles={(s, f): "lightthick" if closed else "thick"},
+                styles={claim[:2]: "thick"} if claim else None,
             )
         )
         # a name for each box, on its right
         title = f"Layer {layer}" + ("" if closed else f": frame {spec['frame']}")
-        rows = ["closed: no freedom" if closed else f"{spec['freedoms']} freedom", f"{kind} claim ({s}, {f})"]
+        rows = ["closed: no freedom"] if closed else [
+            f"{spec['freedoms']} freedom", f"{claim[2]} claim ({claim[0]}, {claim[1]})"
+        ]
         if candidates & set(spec["factors"]):
             rows.append("candidates " + " and ".join(map(str, sorted(candidates))))
         fig.text(480, spec["top"] + 24, title, anchor="start", weight="bold")
@@ -622,8 +624,8 @@ def frames_21():
         680,
         [
             "Circles: sources, gray where descending greedy keeps them.  Squares: factors.",
-            "Double outline: candidates.  Thick pair: a claim, lighter in a closed frame.",
-            "Dotted arrow: a factor to its maximal factor in the frame in front.",
+            "Double outline: candidates.  Thick pair: a claim of frame 0 or 1.  Dashed box: a closed frame.",
+            "Dotted arrows: some of the links from a factor to its maximal factor in the frame in front.",
         ],
         size=12,
         fill=MID,
@@ -796,7 +798,7 @@ def cycle_98():
     fig.lines(
         195,
         238 - 20,
-        ["8 numbers on 8 factors,", "each factor listed twice:", "a core, so U* + 22", "is not playable"],
+        ["8 numbers on 8 factors,", "each factor listed twice:", "a core, so U* \u222a {22}", "is not playable"],
         size=13,
         gap=18,
     )
@@ -811,7 +813,7 @@ def cycle_98():
         390,
         428,
         [
-            "Circles: numbers.  Squares: factors.  Double outline: the candidate 22.",
+            "Circles: numbers, gray for members of U*.  Squares: factors.  Double outline: 22, no candidate.",
             "Light dashed pair: the claim (77, 11), taken out.",
             "Only test (b) keeps 22 out: with 77 and 11 gone the model cannot see the cycle the board holds.",
         ],
@@ -1195,7 +1197,8 @@ def extended_24():
         moves = {8: -0.5, 12: 0.5, 18: 1.5}
         factors = {4: 0, 6: 1, 9: 2, 10: 3}
         n = draw_frame(
-            fig, moves, factors, 150, 230, d, x0, rings={8, 12}, hidden={18, 6} if kept_claim else (),
+            fig, moves, factors, 150, 230, d, x0, rings={8, 12}, hollow_moves={8, 12},
+            hidden={18, 6} if kept_claim else (),
             styles={e: "faintdashed" for e in ((18, 9), (12, 6), (18, 6))} if kept_claim else None,
         )
         if kept_claim:
@@ -1212,9 +1215,9 @@ def extended_24():
         390,
         330,
         [
-            "Double outline: 8 and 12, promoted into frame 1 from frame 2.  In frame 1, 8 lists 4 and 12 lists 6, 4.",
-            "The claim (18, 6), light dashed pair, takes 18 and 6 out first, which leaves 8 and 12 one factor, 4.",
-            "The promotion set {8, 12} would be lost, though 8 and 12 with the rest of the set are playable.",
+            "Double outline: 8 and 12, promoted from frame 2.  Gray: the fixed source 18, a member of \u03a6.",
+            "Numbered square tags: the front moves of a run of peel, in order.  The claim (18, 6), light dashed,",
+            "takes 18 and 6 out first: (\u2205, {8, 12}) is lost, though \u03a6 \u222a {8, 12} is playable.",
         ],
         size=12,
         fill=MID,
