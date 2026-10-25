@@ -146,7 +146,7 @@ independent set of the graphic matroid [spans](primer.md#matroids) an edge when 
 
 In game 21, G_n has the vertices 2, 3, 5, 7 and g, and U\*_2 = {14, 15, 21} is the forest of the edges 2–7, 3–5 and
 3–7, which leaves g alone.  So one more edge fits.  The edge 4 = 2² (2–g) or 9 = 3² (3–g) closes no cycle, while
-6 = 2·3 and 10 = 2·5 would, and 4 and 9 together close the cycle 2–g–3–7–2.  The optimal set takes the heavier, 9.  The
+6 = 2·3 and 10 = 2·5 would, and 4 and 9 together close the cycle 2–g–3–7–2.  The optimal set takes the larger, 9.  The
 frames of layer 2 are closed from game 187 on ([the square theorem (F10)](#the-square-theorem)).  [The barred bound
 (W2)](parity-bound.md#the-barred-bound) fixes layers 1 and 2 by this theorem.
 

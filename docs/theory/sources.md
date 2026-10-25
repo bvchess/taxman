@@ -214,7 +214,7 @@ built from 17, 19 and 23 show it.  Take d = 6137 and T = {4913, 5491, 6647, 7429
 three maximal factors.  On these six alone, descending greedy keeps {6137, 6647, 7429, 8303}, of sum 28,516, while T is
 playable and sums to 32,783: on the six alone descending greedy keeps four where five fit, and is wrong in weight too.
 The two minimal cores of T ∪ {6137} have the parts {4913} and {5491} below d, which share nothing, so no member below d
-is a victim.  The victims 6647, 7429 and 8303 are heavier than d, and a repair from below d must remove both 4913 and
+is a victim.  The victims 6647, 7429 and 8303 are larger than d, and a repair from below d must remove both 4913 and
 5491, which sum to 10,404, more than d.
 
 In a game the six sources lie in a larger component, which also holds 6859 = 19³, whose only maximal factor is 361 (the

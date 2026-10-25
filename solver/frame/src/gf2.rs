@@ -1570,7 +1570,7 @@ impl Losses {
         }
     }
 
-    /// The longest cycle that can certify: no longer than what the larger sets lose, nor than the lightest member
+    /// The longest cycle that can certify: no longer than what the larger sets lose, nor than the smallest member
     /// of the heaviest set `last`, which is all that the heaviest set less it loses.
     fn reach<const W: usize>(&self, last: &Bits<W>) -> i64 {
         self.larger.min(last.min().map_or(0, i64::from))

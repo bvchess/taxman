@@ -38,7 +38,7 @@
 //! `b + w(x) > r`, until nothing changes over all the constraints the path holds ([`Constraint`]).
 //!
 //! **The samples** (`--sample K`), not sound: at an exchange swap (a node went on without the member `x` and its
-//! heaviest set took the member's image `y`) whose reduced check failed and whose image is the lighter, `K` random
+//! heaviest set took the member's image `y`) whose reduced check failed and whose image is the smaller, `K` random
 //! maximal completions of the node that hold `y` are tried with `y` exchanged for `x`.  If every one can be promoted,
 //! the pair's dominance *held*: an estimate of where the node might go on without `y` as well.
 //!
@@ -659,17 +659,17 @@ impl<const W: usize> Local<W> {
         }
     }
 
-    /// Whether, on `--sample` random maximal completions `F` of the node `state` among `cands` that hold `lighter`,
-    /// `F` with `lighter` exchanged for `heavier` can be promoted too: an estimate, not a proof, that the node may go
-    /// on without `lighter` once it goes on without `heavier`.  (A set is promotable when a maximal one holding it is
+    /// Whether, on `--sample` random maximal completions `F` of the node `state` among `cands` that hold `smaller`,
+    /// `F` with `smaller` exchanged for `larger` can be promoted too: an estimate, not a proof, that the node may go
+    /// on without `smaller` once it goes on without `larger`.  (A set is promotable when a maximal one holding it is
     /// with the exchange, so the maximal sets are the ones to try.)
-    fn dominated(&mut self, state: &FrameSet<W>, cands: &Bits<W>, heavier: u32, lighter: u32) -> bool {
+    fn dominated(&mut self, state: &FrameSet<W>, cands: &Bits<W>, larger: u32, smaller: u32) -> bool {
         let model = &self.game.model;
         for _ in 0..self.game.sample {
-            let Some(set) = completion(model, &mut self.promote, &mut self.rng, state, cands, Some(lighter)) else {
+            let Some(set) = completion(model, &mut self.promote, &mut self.rng, state, cands, Some(smaller)) else {
                 return true;
             };
-            if !promotable(model, &mut self.promote, state, &set.without(lighter).with(heavier)) {
+            if !promotable(model, &mut self.promote, state, &set.without(smaller).with(larger)) {
                 return false;
             }
         }
@@ -689,7 +689,7 @@ impl<const W: usize> Local<W> {
         let price = before.0 as i64 - now.0 as i64;
         let gained = now.1 - before.1;
         let swap = pending.tried.iter().find(|tried| gained.contains(tried.image)).copied();
-        // Where the check failed and the image is the lighter: did the pair's dominance hold on the samples?
+        // Where the check failed and the image is the smaller: did the pair's dominance hold on the samples?
         let held = match swap {
             Some(tried) if self.game.sample > 0 && !tried.passed.reduced && tried.image < pending.member => {
                 Some(self.dominated(state, cands, pending.member, tried.image))

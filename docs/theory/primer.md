@@ -7,9 +7,12 @@ it names, so that a proof elsewhere links the one section it uses.  A reader who
 linear algebra can follow all of it, but for one quoted fact, linear programming duality.
 
 *Conventions.*  For a set Y and an element x, Y + x is Y ∪ {x} and Y − x is Y ∖ {x}.  A weight function w on a set E
-gives Y ⊆ E the weight w(Y), the sum of w(y) over y in Y.  A number s has a *vector* v(s) over a list of coordinates,
-with a 1 at each of its [maximal factors](../GLOSSARY.md#the-game) in the list and a 0 elsewhere (6 has the maximal
-factors 3 and 2); the theory calls it the incidence vector ([independence](playability.md#independence)).
+gives Y ⊆ E the weight w(Y), the sum of w(y) over y in Y.  A set is *heavier* than another if its weight is larger, and
+a *heaviest* set among some sets has the largest weight of them: a maximum-weight set, in the standard term.  Where the
+theory names no other weights, a number's weight is its value, so a heaviest set is one of largest sum, never one of
+most members.  A number s has a *vector* v(s) over a list of coordinates, with a 1 at each of its [maximal
+factors](../GLOSSARY.md#the-game) in the list and a 0 elsewhere (6 has the maximal factors 3 and 2); the theory calls it
+the incidence vector ([independence](playability.md#independence)).
 
 ## Finite fields and GF(2)
 
@@ -232,9 +235,9 @@ I ∩ {w ≥ t}, and (I ∩ {w ≥ t}) + y holds H and is dependent.  So the cla
 w(I⁺) = w(I).  ∎
 
 **Example.**  In the graphic matroid above, with w the number itself, I = {21, 15, 14} meets the criterion.  Condition
-(1) holds and (2) is empty, since I is a basis.  For (3), the circuits of I + 10 and I + 6 are {10, 14, 15, 21} and
-{6, 14, 21}, and their members in I outweigh 10 and 6.  The basis I′ = {10, 15, 21} fails (3): the circuit of I′ + 14
-holds 10, which weighs less than 14, and I′ − 10 + 14 = I is heavier.
+(1) holds and (2) is empty, since I is a basis.  For (3), the circuits of I + 10 and I + 6 are {10, 14, 15, 21} and {6,
+14, 21}, and their members in I are larger than 10 and 6.  The basis I′ = {10, 15, 21} fails (3): the circuit of I′ + 14
+holds 10, which is less than 14, and I′ − 10 + 14 = I is heavier.
 
 *Dummy coloops.*  Equivalently, add rk(M) coloops of weight 0 to M and truncate the result to rk(M).  The independent
 sets of M, padded with dummies, are the bases of the result, and (1), (2) and (3) are the exchanges of an element for a

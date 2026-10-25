@@ -34,6 +34,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   takes whatever remains.
 * **score**: the sum of a game's moves.  **opt(n)**: the best score of game n.  **optimal game**: a game that scores
   opt(n).  Game 6 has the optimal game 5, 4, 6 (the taxman takes 1, then 2, then 3), so opt(6) = 15.
+* **weight**, **heaviest**: the weight of a set of numbers is the sum of its members, the score it earns as moves,
+  unless other weights are named.  A *heaviest* set has the largest weight among the sets in question (a
+  maximum-weight set, in the standard term), never the most members.  Of single numbers the docs say larger and
+  smaller.  The definitions are in [the primer](theory/primer.md).
 * **Taxman sequence**: opt(1), opt(2), opt(3), ..., which is [OEIS A019312](https://oeis.org/A019312).
 * **optimal set**: the set of moves of an optimal game, written S\*, or S\*(n) where the game must be named.  Many
   orders play one set.  From game 425 on, some games have two or three optimal sets

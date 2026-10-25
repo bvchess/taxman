@@ -47,11 +47,13 @@ them: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and 
 [statements.md](statements.md) lists them; a letter that serves one proof only must not be one of those.  Introduce a
 symbol only for what the text uses again and again, and use words for the rest.
 
-Where mathematics has a standard term, such as topological order or matroid intersection, use it, or give it beside
-the project's word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2,
-a role on the board, while in ordinary mathematics a factor is a divisor of some given number.  And in Taxman *greedy*
-usually means the strategy that takes the largest legal move, so the theory never says greedy alone: *descending
-greedy* is the procedure that builds U\*, and the primer's greedy algorithm is a matroid's.
+Where mathematics has a standard term, such as topological order or matroid intersection, use it, or give it beside the
+project's word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2, a role
+on the board, while in ordinary mathematics a factor is a divisor of some given number.  And in Taxman *greedy* usually
+means the strategy that takes the largest legal move, so the theory never says greedy alone: *descending greedy* is the
+procedure that builds U\*, and the primer's greedy algorithm is a matroid's.  *Heaviest* means of largest weight, a
+maximum-weight set in the standard term ([the primer](primer.md)): say it of sets, and say *larger* and *smaller* of
+single numbers, whose weight is their value.
 
 ## 6. Define each term before using it, in one place
 

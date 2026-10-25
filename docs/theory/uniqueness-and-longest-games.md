@@ -141,7 +141,7 @@ cannot be played together.  There the bound still holds with equality, ν(21) = 
 
 **Proposition Q4 (the length proposition).**  In game 833 = 7²·17 every optimal game has 362 moves, and ℓ(833) = 363.
 A heaviest longest game scores 218,197, which is 29 less than opt(833) = 218,226.  One of them plays the optimal game's
-moves above n/2, which are U\*, and differs from it below n/2 alone, by five lighter moves in place of four:
+moves above n/2, which are U\*, and differs from it below n/2 alone, by five smaller moves in place of four:
 
     optimal game:             250, 252, 294, 400          sum 1,196
     a heaviest longest game:  116, 180, 200, 320, 351     sum 1,167
@@ -165,8 +165,8 @@ bipartite, since a number and its maximal factor differ by one prime factor.  Th
 
 The mechanism is a trade below n/2.  Each of the nine exchanged numbers is a maximal factor of a member of U\*: 250 of
 500 and 750, for instance.  A number played as a move is gone from the pot, so it cannot pay for a source.  The optimal
-game plays the four heavy numbers and pays for those sources otherwise; a heaviest longest game leaves them to pay (in
-one of its payment schemes, 250, 252, 294 and 400 pay for 500, 756, 588 and 800) and plays five lighter numbers instead,
+game plays the four large numbers and pays for those sources otherwise; a heaviest longest game leaves them to pay (in
+one of its payment schemes, 250, 252, 294 and 400 pay for 500, 756, 588 and 800) and plays five smaller numbers instead,
 one more move for 29 points less.
 
 A search cannot cut the branches that cannot reach the most moves: in game 833 it would return 218,197.  In the terms

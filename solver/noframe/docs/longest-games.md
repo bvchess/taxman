@@ -86,7 +86,7 @@ What the data shows:
 
 * **An optimal game need not be a longest one.**  The first counterexample is n = 833.  Its optimal set is unique
   ([uniqueness.md](uniqueness.md)) and has 362 members, and a legal game has 363.  The heaviest 363-move game keeps the
-  optimal game's upper part, U\*, and exchanges four of its picks below n/2 for five lighter ones, 29 points for one
+  optimal game's upper part, U\*, and exchanges four of its picks below n/2 for five smaller ones, 29 points for one
   move.  That needs nothing of the frame model: the longer game replays by the rules, ν(833) = 363 bounds every game,
   and the search proves no 363-move game worth more than 218,197, less than the recorded game's 218,226.
 * **The difference is at most one move to 4949, and one only at 833-835.**  Every other recorded optimal game is a
@@ -96,8 +96,8 @@ What the data shows:
   unique.  Past 989 the sets are not enumerated, so the claim there is about the recorded game.
 * **The mechanism is a trade of weight for moves below n/2.**  A pick above n/2 uses one number up to n/2, its payment;
   a pick below uses two, itself and its payment.  At 833 the optimal game's 48 picks below n/2 and 362 payments use 410
-  of the 416 numbers up to n/2, and the longest game's 49 and 363 use 412.  Four heavy picks below n/2 (1,196)
-  outweigh five light ones (1,167).
+  of the 416 numbers up to n/2, and the longest game's 49 and 363 use 412.  Four large picks below n/2 (1,196)
+  outweigh five small ones (1,167).
 * **ν(n) is a tight bound on moves.**  To 4949 it exceeds M(n) only at 51, 182 and 183, by one, where every maximum
   matching is precedence-cyclic.  The Franklín–Moniot bound, weighted by value, is off by hundreds of points.
 

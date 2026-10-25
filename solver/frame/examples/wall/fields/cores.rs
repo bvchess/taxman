@@ -174,7 +174,7 @@ pub fn breaking(model: &FrameGraph, core: &Core) -> Vec<u32> {
 
 /// The cores of `q` in `state`: for each frame of the state (all frames) whose frame-with-q has a nonempty residual,
 /// up to `per_frame` minimal cores, found as follows.  R := the residual; repeat: C := minimal(R); record core_of(C);
-/// then *un-apply* the lightest of C's *breaking candidates* ([`breaking`]) and recompute R as the residual of the
+/// then *un-apply* the smallest of C's *breaking candidates* ([`breaking`]) and recompute R as the residual of the
 /// frame with all the un-applications so far (they accumulate); stop when R is empty or when `per_frame` cores are
 /// recorded.  C has a breaking candidate, since the state's frames are winnable, so a core depends on Q (asserted).
 /// Un-applying a breaking candidate destroys C, so the cores recorded for a frame are distinct.  The cores found after
@@ -190,8 +190,8 @@ pub fn cores_of<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, q: &[u3
                 break;
             }
             let core = core_of(model, state, h, minimal(model, &stuck, &pool), &pool, &applied);
-            let lightest = *breaking(model, &core).first().expect("a core of a winnable frame depends on q");
-            applied.retain(|&x| x != lightest);
+            let smallest = *breaking(model, &core).first().expect("a core of a winnable frame depends on q");
+            applied.retain(|&x| x != smallest);
             cores.push(core);
         }
     }

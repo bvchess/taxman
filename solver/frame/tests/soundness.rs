@@ -1017,7 +1017,7 @@ fn promotion_order_conflicts_and_nogoods_on_perturbed_frame_sets() {
 /// The conjecture that the promotion set with the largest sum also has the most promotions is false for the whole frame
 /// game of n = 833, the first board whose optimal game is not a longest one (`solver/noframe/docs/longest-games.md`):
 /// the optimal set promotes 48 numbers, as many as `max_total` allows less one, and a set the model accepts promotes
-/// 49, four heavy promotions of the optimal set exchanged for five light ones; both games are over, the second one move
+/// 49, four large promotions of the optimal set exchanged for five small ones; both games are over, the second one move
 /// longer and 29 points lighter.  (The Java solver's revision of the freedoms assumed the conjecture of the two-frame
 /// game of frames 0 and 1, which this does not decide.)
 #[test]
