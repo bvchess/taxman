@@ -102,6 +102,8 @@ reach.
 | N4 | [the ceiling lemma](neighbors.md#the-ceiling-lemma) | a game of n without the move n is a game of n − 1, so opt(n) ≤ opt(n − 1) + n | proved |
 | N5 | [the prime formula](neighbors.md#the-prime-formula) | opt(p) = opt(p − 1) + p − q(p − 1) at a prime p, by exchanging the first move | proved |
 | N6 | [the step theorem](neighbors.md#the-step-theorem) | game n is at its ceiling iff some optimal set of n − 1 stays playable with n added, and its optimal sets are then exactly those; at a prime p, the optimal sets are those of p − 1 with q(p − 1) exchanged for p | proved |
+| | [the shadow law](neighbors.md#the-shadow-law) | when the recorded optimal sets of n − 1 and n have the same promotion set and differ by n replacing one move x, x is the shadow of n for odd n and n/2 for even n | measured; proved at a prime, by [N6](neighbors.md#the-step-theorem) |
+| | [the cofactor rule](neighbors.md#the-cofactor-rule) | for n ≥ 188, game n has the root problem of game n − 1 (of n − 2 when n − 1 is prime) if n divided by its largest prime factor is a prime or twice a prime, and is at its ceiling if it is 9 | measured |
 
 ### The heaviest playable set of sources
 

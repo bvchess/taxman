@@ -4,12 +4,14 @@ Part of the [lab notebook](../../README.md).
 
 Started 2026-10-24.  Concluded 2026-10-24.
 
-**Question.**  Can we tell in advance which games of the chain need no search?  **Answer.**  Mostly, from n alone.  Write
-n = c · P with P the largest prime factor of n, and call c the *cofactor*.  Whether a game was searched depends almost
-only on c.  A game whose cofactor is 1, a prime, twice a prime or 9 was never searched.  This rule names 1,816 of the
-2,126 games of 1301–4979 that were settled without a search (85.4%), and none of the games that were searched.  The other
-310 are mostly settled at the start, by the ceiling, which no cofactor predicts.  The rule forecasts the chain's work and
-settles no game: the solver still settles each game by its own checks.
+**Question.**  Can we tell in advance which games of the chain need no search?  **Answer.**  Mostly, from n alone.
+Write n = c · P with P the largest prime factor of n, and call c the *cofactor*.  Whether a game was searched depends
+almost only on c.  A game whose cofactor is 1, a prime, twice a prime or 9 was never searched.  This rule names 1,816 of
+the 2,126 games of 1301–4979 that were settled without a search (85.4%), and none of the games that were searched.  The
+other 310 are mostly settled at the start, by the ceiling, which no cofactor predicts.  The rule forecasts the chain's
+work and settles no game: the solver still settles each game by its own checks.  Its conditions (a repeated search
+problem for a prime or twice a prime, the ceiling for 9) hold in every recorded game from 188 to 4949, and the theory
+states the rule there ([the cofactor rule](../../../../docs/theory/neighbors.md#the-cofactor-rule)).
 
 ## Method
 
@@ -127,6 +129,19 @@ digest names the [search problem](../../../../docs/GLOSSARY.md#the-frame-model).
 So the data agree with the guess, and no more than agree: nothing here shows why c, rather than something else about n,
 leaves the problem as it was.
 
+### The rule's conditions, from 188
+
+Added 2026-10-24.  The rule's families stand for checkable conditions: a game whose cofactor is a prime or twice a prime
+poses the search problem of game n − 1, or of n − 2 when n − 1 is prime, and a game of cofactor 9 is at its ceiling.
+`conditions.py` checks them on every game of the committed chain (to 4949), below 1301 too, from the digest of each
+game's setup and the scores, in a second; `conditions.txt` is its output.
+
+* **From 188 on, no game breaks them.**  Every recorded game of the four families obeys, outside the 382 copies of
+  3984–4783, which record no setup.  From 188 the four families hold 2,481 of the 2,856 games settled without a
+  search (86.9%), and none that was searched.
+* **Below 188, 38 games break them**, the last 187 = 11·17, which was searched.  The small games settled by the trivial
+  case (4 to 26) count as breaks, since they have no setup to compare.
+
 ## Decision
 
 No change to the solver.  Its own checks (the prime formula, the repeat check and the ceiling) already settle these games
@@ -153,4 +168,6 @@ What would reopen it:
 
   Each file supplies the games past the last game of the file before it.  Once `results/strict.jsonl` holds the games to
   4979, it can run alone.
-* `cofactor.txt`: its output, the source of every number above.
+* `cofactor.txt`: its output, the source of every number above but those of the conditions.
+* `conditions.py`: the check of the rule's conditions, from the top of the repository with no argument (the committed
+  chain); `--from N` starts at N.  `conditions.txt`: its output.

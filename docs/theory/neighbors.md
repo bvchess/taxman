@@ -5,11 +5,12 @@ Part of [the theory](../THEORY.md).
 Game n differs from game n − 1 by one number, and much passes between them.  The best score never falls, and never rises
 by more than n.  At a prime it rises by an exact amount, and at its ceiling a game's optimal sets are those of the game
 before that stay playable with n added.  The proofs rest on the rules alone and two facts about primes; only one example
-below draws on the rest of the theory.  Monotonicity, [the ceiling lemma](#the-ceiling-lemma) and the prime formula each
-come with a construction that turns a game of one board into a game of the other, and needs of that game only that it be
-finished, not that it be optimal.  So the lower bounds carried between games are the scores of real games, which anyone
-can replay by the rules ([search-rules.md](search-rules.md#bounds-carried-between-games)); an upper bound crosses by the
-inequalities alone.
+below, and the two measured laws at the end, [the shadow law](#the-shadow-law) and [the cofactor
+rule](#the-cofactor-rule), draw on the rest of the theory.  Monotonicity, [the ceiling lemma](#the-ceiling-lemma) and
+the prime formula each come with a construction that turns a game of one board into a game of the other, and needs of
+that game only that it be finished, not that it be optimal.  So the lower bounds carried between games are the scores of
+real games, which anyone can replay by the rules ([search-rules.md](search-rules.md#bounds-carried-between-games)); an
+upper bound crosses by the inequalities alone.
 
 The words of the game (board, pot, move, tax, score, opt(n), optimal set, playable, ceiling) are the
 [glossary's](../GLOSSARY.md#the-game), and so is the notation S\* for an optimal set.  A *game of n* is a legal sequence
@@ -221,3 +222,56 @@ The games of this file are replayed by the rules with `heuristics/core.py`.  The
 each unique, by the exhaustive search of `heuristics/evaluation/certify.py`, which takes under a second for these
 boards.  The three optimal sets of 685 are listed, with the exchanges between them, in
 [solver/noframe/docs/uniqueness.md](../../solver/noframe/docs/uniqueness.md), which enumerates them all.
+
+## The shadow law
+
+Two neighboring games often differ by a single exchanged move, and the move that n replaces then follows from the
+factorization of n.  At a prime this is the exchange of the step theorem; elsewhere it is measured.
+
+The *shadow* of an odd number n is the number made from n by replacing each of its prime factors with the prime just
+below it, counted with multiplicity.  The shadow of 39 = 3·13 is 2·11 = 22, that of 49 = 7² is 5² = 25, and that of a
+prime p is q(p − 1).  An even number has no shadow, since no prime lies below 2.
+
+*The shadow law* (measured).  Let n ≥ 3.  If the recorded optimal sets of games n − 1 and n have the same [promotion
+set](frame-model.md#the-frame-model), and the set of n is that of n − 1 with one move x exchanged for n, then x is the
+shadow of n when n is odd, and n/2 when n is even.
+
+Game 39 plays the optimal set of game 38 with 22 exchanged for 39, and game 49 that of game 48 with 25 exchanged for 49.
+Such an exchange is rare at an even n, and each even n where it happens is a power of 2 or three times one: game 8
+exchanges 4 for 8, and game 12 exchanges 6 for 12.  At a prime n, [the step theorem (N6)](#the-step-theorem) proves the
+law for every optimal set, with x = q(n − 1).  For an odd semiprime pq the law gives up p′q′, the product of the primes
+below p and q, which [an earlier study](../../solver/notebook/the-wikis-open-questions-2026-10/README.md#7-which-n)
+had found.
+
+The law says which move an exchange gives up, not when the exchange happens.  It covers only the recorded optimal sets,
+and a game may have others.  That a recorded game is optimal is proved on the whole board for the games the prover has
+proved, and for the rest given [statement U](exactness.md#statement-u).  [evidence.md](evidence.md#observations) gives
+the range and what one must trust, and [the notebook entry on the corner of a near
+repeat](../../solver/notebook/search/the-corner-of-a-near-repeat-2026-10/README.md#how-often-it-happens) the count.  A
+proof would say why the shadow is the one move of game n − 1 that n displaces.
+
+## The cofactor rule
+
+Many games need no search of their own, since they pose the root problem of the game before them or reach their ceiling,
+and which ones do is told mostly by n divided by its largest prime factor.
+
+The *cofactor* of n is n divided by its largest prime factor: 3002 = 2·19·79 has the cofactor 38, and a prime has the
+cofactor 1.  It is the cofactor x/r of [the prime-exchange theorem](search-rules.md#the-prime-exchange-theorem), with
+x = n and r its largest prime factor.
+
+*The cofactor rule* (measured).  Let n ≥ 188.  If the cofactor of n is a prime or twice a prime, the [root
+problem](frame-model.md#the-frame-model) of game n is that of game n − 1, or of game n − 2 when n − 1 is prime.  If the
+cofactor is 9, game n is at its ceiling.
+
+Game 3002, of cofactor 38 = 2·19, has the root problem of game 3000, since 3001 is prime, and game 1341 = 9·149 is at
+its ceiling.  With the cofactor 1, n is prime and [the prime formula (N5)](#the-prime-formula) gives opt(n).  So a game
+whose cofactor is 1, a prime, twice a prime or 9 needs no search of its own: [the repeat lemma
+(R6)](search-rules.md#the-repeat-lemma) carries over the score of the game whose root problem it shares, given U, and
+at the ceiling the step theorem gives its optimal sets.  The rule fails below 188, last at 187 = 11·17, whose root
+problem is not that of 186.
+
+The rule is measured on the games whose root problem the chain records, and nothing yet shows why the cofactor, rather
+than something else about n, decides.  [evidence.md](evidence.md#observations) gives the range and what one must trust,
+and [the notebook entry on the cofactor of
+n](../../solver/notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) the counts, with the
+cofactors that are always searched.
