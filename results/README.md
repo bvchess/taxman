@@ -80,6 +80,13 @@ and 3933's took 7,175, 2,826, 5,366, 5,530 and 3,093.  A repeat takes the promot
 posed the same search problem: the game of n − 1 for 1719 of the 1932 repeats, and of n − 2 for the other 213, where
 n − 1 is prime.
 
+**Most games that need no search can be told from n alone.**  Write n = c · P with P the largest prime factor of n, and
+call c the cofactor.  A game whose cofactor is 1, a prime, twice a prime or 9 was settled with no search: a prime by the
+prime formula, nearly all the others as repeats, and the rest at the start.  Over games 1301–4979, the chain's games past
+4949 included, this rule names about 85% of the games settled with no search, and none of the games it names has the
+method `search`.  [The lab notebook's entry](../solver/notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md)
+has the tables and the cofactors that are always searched.
+
 *The proofs by range, in detail:*
 
 * 1–1000: 311 exhausted, 92 at the ceiling, 168 prime, 13 trivial and 416 repeats.
