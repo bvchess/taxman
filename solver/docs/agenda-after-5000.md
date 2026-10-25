@@ -83,8 +83,13 @@ puts an answer at risk.
    with freedoms are untouched, so game n poses the root problem of game n − 1, and [the repeat
    lemma (R6)](../../docs/theory/search-rules.md#the-repeat-lemma) settles it with no search: opt(n) = opt(n − 1) + n −
    x, where x is the source that drops out, which [the shadow law](../../docs/theory/neighbors.md#the-shadow-law) names
-   as the shadow of n.  An even n changes a second thing: n/2 turns from a source into a factor, so the frame of n/2
-   must be closed too.  When n − 1 is prime, the comparison is with game n − 2, as in the cofactor rule.  If a frame
+   as the shadow of n.  That one source drops out, and no more, follows from [the span conjecture
+   (♦)](../../docs/theory/sources.md#the-span-conjecture) by [the greedy-basis proposition
+   (W3)](../../docs/theory/parity-bound.md#the-greedy-basis-proposition) and [the contraction theorem
+   (B6)](../../docs/theory/frame-bounds.md#the-contraction-theorem); that the claims and candidates outside the merged frame do not change is the step a proof
+   still owes.  An even n works otherwise: n/2 turns from a source into a factor that only n can use, so nothing drops,
+   and when some optimal game of n − 1 does not play n/2, game n is at its ceiling, opt(n) = opt(n − 1) + n (play n/2,
+   then n paid with it).  When n − 1 is prime, the comparison is with game n − 2, as in the cofactor rule.  If a frame
    that n touches has a freedom, n joins it and the problem changes, so the game needs a search unless something else
    settles it, such as the ceiling.  The cofactor rule (item 5) is the case of n in layer 2, where that layer is one
    closed frame from 188 on; the general form would reach every layer, and setup could test it from the frames alone,
