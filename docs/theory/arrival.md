@@ -3,11 +3,11 @@
 Part of [the theory](../THEORY.md).
 
 Game n has the numbers of game n − 1 and one more, n, and much of the frame model passes from one game to the next
-unchanged.  [The arrival lemma (J1)](#the-arrival-lemma) gives conditions, read in the frames of game n alone, under
-which the root problem does not change: the frame that holds n is closed, and stays closed without n for odd n, while
-for even n the frames that hold the maximal factors of n/2 are closed too.  For a number with two prime factors, [its
-corollary (J2)](#the-layer-2-corollary) needs only the first, with no conjecture.  Three measured laws describe what is
-seen: [the shadow law](#the-shadow-law), which move an exchange gives up, [the half law](#the-half-law), which even
+unchanged.  In plain words, [the arrival lemma (J1)](#the-arrival-lemma) says: *if n joins only closed frames, and they
+stay closed, then opt(n) can quickly be derived from opt(n − 1).*  The root problem does not change, so opt(n) = opt(n −
+1) + ΣU\*(n) − ΣU\*(n − 1), with no search.  [Its corollary (J2)](#the-layer-2-corollary) says that a number with two
+prime factors that joins only closed frames leaves them closed, with no conjecture.  Three measured laws describe what
+is seen: [the shadow law](#the-shadow-law), which move an exchange gives up, [the half law](#the-half-law), which even
 games keep the root problem of the game before, and [the cofactor rule](#the-cofactor-rule), which games pose it.  The
 facts about neighboring games that rest on the rules alone, the ceiling and the half lemma among them, are in
 [neighbors.md](neighbors.md).
@@ -19,8 +19,11 @@ sources.md's.  Ω(x) is the number of prime factors of x, counted with multiplic
 
 ## The arrival lemma
 
-Only the frames that hold a maximal factor of n feel its arrival, and the frames of game n around n give conditions
-under which the root problem has not changed.
+Only the frames that hold a maximal factor of n feel its arrival.  In plain words: *if n joins only closed frames, and
+they stay closed, then opt(n) can quickly be derived from opt(n − 1).*  The frames that n *joins* are those of game n −
+1 that hold a maximal factor of n, n/2 included for even n, which is still a source there.  Once n has arrived they are
+the frame that holds n and, for even n, what is left of the frame of n/2.  The lemma states the condition in the frames
+of game n alone.
 
 The maximal factors of n have one prime factor fewer than n.  When n is odd they are factors of game n − 1 too, since
 ⌊n/2⌋ does not change.  When n is even, n/2 is a source of game n − 1, and in game n it is a factor that only n uses,
@@ -88,9 +91,9 @@ that held n/2, and the hypotheses say that both were closed in game n − 1 and 
    all.  The values are distinct and positive, so B′ is the one heaviest basis, the greedy basis.  So U\*(n) ∩ M = B′,
    and with step 3, U\*(n) = U\*(n − 1) + n − x.  ∎
 
-Read in game n − 1, the hypotheses say that the frames holding the maximal factors of n there, the frames that n
-*joins*, are closed, and for even n that n/2 was not a move (steps 3 to 5).  Conversely, these give back the hypotheses,
-for odd n given (♦) in game n, which makes M closed (below).
+Read in game n − 1, the hypotheses say that the frames that n joins are closed, and for even n that n/2 was not a move
+(steps 3 to 5).  Conversely, these give back the hypotheses, for odd n given (♦) in game n, which makes M closed
+(below).
 
 The first two hypotheses earn their place.
 
@@ -117,20 +120,21 @@ dependencies: in a sum of edges, the coordinate of g is the sum of the others, s
 
 ### The layer-2 corollary
 
-**Corollary J2 (the layer-2 corollary).**  Let n have two prime factors, counted with multiplicity, and let M be the
-frame of game n that holds n.  If n is odd and M is closed without n, or n is even and M is closed, then game n has the
-root problem of game n − 1, and U\*(n) = U\*(n − 1) + n − x for odd n, with x as in J1, and U\*(n) = U\*(n − 1) + n for
-even n.  No conjecture is needed.
+**Corollary J2 (the layer-2 corollary).**  Let n have two prime factors, counted with multiplicity.  If n joins only
+closed frames, they stay closed: game n has the root problem of game n − 1, and U\*(n) = U\*(n − 1) + n − x for odd n,
+with x as in J1, and U\*(n) = U\*(n − 1) + n for even n.  No conjecture is needed.
 
-*Proof.*  M lies in layer 2, where descending greedy agrees with the greedy basis (the paragraph above), which is all
-that step 7 and the remark on M closed use of (♦).  For odd n, M closed without n therefore makes M closed, and J1's odd
-case applies, with x as in J1.  For even n = 2p, the half p is a prime, whose one maximal factor 1 lies in the frame of
-layer 1; that frame is always closed, with the one factor 1, so J1's even case applies.  ∎
+*Proof.*  For odd n = pp′, n joins the frames of layer 2 that hold p and p′, and with them closed, M is closed without n
+(step 3).  M lies in layer 2, where descending greedy agrees with the greedy basis (the paragraph above), which is all
+that step 7 and the remark on M closed use of (♦); so M is closed, and x is as in J1.  For even n = 2p, n joins the
+frame of layer 2 that holds 2 and the frame of layer 1, which holds p as a source.  The frame of layer 1 has the one
+factor 1 and keeps only the largest prime, which exceeds p by Bertrand's postulate, so p is no move; what is left of it
+in game n holds p's one maximal factor 1 and is closed.  M has the freedoms of the frame that holds 2, none (step 5).  ∎
 
-The condition holds on every board from 188 on, by [the square theorem (F10)](frame-model.md#the-square-theorem): from
-187 on layer 2 is one closed frame, so M less n, a part of layer 2 of game n − 1, is closed for odd n, and M, which has
-the freedoms of the frame of game n − 1 that holds 2, is closed for even n.  Below 188 it holds wherever the frames that
-n joins are closed, as at 49 = 7², whose frame of 7 in game 48 is closed though another frame of layer 2 is not.
+A number with two prime factors joins only closed frames on every board from 188 on, by [the square theorem
+(F10)](frame-model.md#the-square-theorem), since from 187 on layer 2 is one closed frame.  Below 188 it does wherever
+the frames it joins are closed, as at 49 = 7², whose frame of 7 in game 48 is closed though another frame of layer 2 is
+not.
 
 Game 39 = 3·13 lies in the one frame of layer 2 of game 39, which is closed, and closed without 39, since the frame of
 layer 2 of game 38 is.  There v(39) is the sum of v(22), v(26) and v(33), the path 3–11–2–13 in G_38, and game 39 gives
