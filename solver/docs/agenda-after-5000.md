@@ -75,7 +75,23 @@ puts an answer at risk.
    the layers from 3 on are unchanged too, the root problem repeats, and the rule's first case is a theorem.  The cases
    2pP and 9P add a source of layer 3 and need more.  It is theory work, with no computation; [the notebook
    entry](../notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) has the counts.
-6. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
+6. **No search where n joins only closed frames.**  A general form of the cofactor rule, proposed on 2026-10-24 and not
+   yet checked.  The search works only on the frames with freedoms; a closed frame takes no part.  From game n − 1 to
+   game n, an odd n changes one thing: the source n arrives, and every number up to n/2 stays as it was.  Suppose every
+   frame that n touches, the frames of all of its maximal factors, is closed in game n − 1.  Then n joins them with a
+   move and no factor, so one of their sources can no longer be paid and drops out, and they stay closed.  The frames
+   with freedoms are untouched, so game n poses the root problem of game n − 1, and [the repeat
+   lemma (R6)](../../docs/theory/search-rules.md#the-repeat-lemma) settles it with no search: opt(n) = opt(n − 1) + n −
+   x, where x is the source that drops out, which [the shadow law](../../docs/theory/neighbors.md#the-shadow-law) names
+   as the shadow of n.  An even n changes a second thing: n/2 turns from a source into a factor, so the frame of n/2
+   must be closed too.  When n − 1 is prime, the comparison is with game n − 2, as in the cofactor rule.  If a frame
+   that n touches has a freedom, n joins it and the problem changes, so the game needs a search unless something else
+   settles it, such as the ceiling.  The cofactor rule (item 5) is the case of n in layer 2, where that layer is one
+   closed frame from 188 on; the general form would reach every layer, and setup could test it from the frames alone,
+   before any search.  The first step is a check on the committed chain: for each game, whether every frame that n
+   (and n/2 for even n) touches is closed in the game before, against whether the game was a repeat.  Then a proof,
+   as a lemma beside the repeat lemma.
+7. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's
    learning](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md), results 3 to 5 and the
    decision), so replaying the old search does not pay.  Two angles are untested.  The first is to amortize the core's
@@ -86,16 +102,16 @@ puts an answer at risk.
    tree and every lookup scans it: 1227 from 1225's nogoods took 10% fewer nodes and 3% more time, at 59k nodes a
    second against 67k ([carrying nogoods
    over](../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).
-7. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
+8. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
    Bringing home 49 games on 2026-10-23 took over an hour: a fresh debug build of the ledger, a rebase, and a wait loop
    that never ended.
-8. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
+9. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
    limit on master itself.  Scale the limits by a calibration workload's slowdown, capped near 4 times, from a
    baseline taken without the chain ([testing.md](design/testing.md)).  The limits are the project owner's decision.
-9. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
+10. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
    four jobs, the shared target directories, the quick check, named release tests only), allowed by the agents'
    permissions, and a check when an agent finishes that stops it while its waiting loops or background jobs still run.
    A guard hook already refuses `pgrep -f`, `pkill -f` and the full release suite, but it sees only the command line,
    not a script an agent writes for itself.
-10. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
+11. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
    only with a cheaper way to steer ([lab.md](design/lab.md)).
