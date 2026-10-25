@@ -26,15 +26,22 @@ pub struct RootProblem {
     pub frames: Vec<(Vec<u32>, Vec<u32>)>,
 }
 
-/// A frame of the board: the sources that descending greedy keeps, its factors, and its layer.
-struct Frame {
-    kept: Vec<u32>,
-    factors: Vec<u32>,
-    layer: u32,
+/// A frame of the board: its sources, the ones that descending greedy keeps, its factors, and its layer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Frame {
+    /// The layer of the frame: Ω of its sources.
+    pub layer: u32,
+    /// Its sources, the numbers of the frame above n/2, ascending.
+    pub sources: Vec<u32>,
+    /// Its moves, the sources that descending greedy keeps, ascending.
+    pub kept: Vec<u32>,
+    /// Its factors, the numbers of the frame up to n/2, ascending.
+    pub factors: Vec<u32>,
 }
 
 impl Frame {
-    fn has_freedoms(&self) -> bool {
+    /// Whether the frame has a freedom: more factors than moves.
+    pub fn has_freedoms(&self) -> bool {
         self.factors.len() > self.kept.len()
     }
 }
@@ -88,7 +95,7 @@ fn frames_of(t: &Tables) -> Vec<Frame> {
             }
         }
         kept.sort_unstable();
-        frames.push(Frame { kept, factors, layer: t.omega(sources[0]) });
+        frames.push(Frame { layer: t.omega(sources[0]), sources, kept, factors });
     }
     frames
 }
@@ -99,8 +106,23 @@ fn frames_of(t: &Tables) -> Vec<Frame> {
 ///
 /// If the board has holes.
 pub fn build(t: &Tables) -> RootProblem {
+    build_with_frames(t).0
+}
+
+/// Π_n of the board of `t` and the frames of the board it is built from, in no meaningful order: for each frame its
+/// layer, all its sources, the sources it keeps and its factors (`build` is the first part alone).
+///
+/// # Panics
+///
+/// If the board has holes.
+pub fn build_with_frames(t: &Tables) -> (RootProblem, Vec<Frame>) {
     assert!(t.holes.is_empty(), "the root problem of a board with holes is not built here");
     let frames = frames_of(t);
+    (root_problem_of(t, &frames), frames)
+}
+
+/// Π_n of the board of `t` from its frames.
+fn root_problem_of(t: &Tables, frames: &[Frame]) -> RootProblem {
     let ustar: BTreeSet<u32> = frames.iter().flat_map(|frame| frame.kept.iter().copied()).collect();
     let ustar: Vec<u32> = ustar.into_iter().collect();
 
@@ -111,7 +133,7 @@ pub fn build(t: &Tables) -> RootProblem {
     let number = |frame: &Frame| frame.has_freedoms().then(|| (frame.layer - k0) as usize);
     let top = frames.iter().filter_map(number).max().expect("a frame has freedoms");
     let mut frame_h: Vec<(Vec<u32>, Vec<u32>)> = vec![(Vec::new(), Vec::new()); top + 1];
-    for frame in &frames {
+    for frame in frames {
         if let Some(h) = number(frame) {
             frame_h[h].0.extend(&frame.kept);
             frame_h[h].1.extend(&frame.factors);
@@ -135,7 +157,7 @@ pub fn build(t: &Tables) -> RootProblem {
     // The candidates: a factor of a frame D numbered h ≥ 1 that D can spare (test (a)) and frame h − 1 can take on
     // (test (b)).
     let mut candidates = Vec::new();
-    for frame in &frames {
+    for frame in frames {
         if number(frame).is_some_and(|h| h >= 1) {
             let spared = |x: u32| playable_against(t, &frame.kept, &without(&frame.factors, x));
             candidates.extend(frame.factors.iter().copied().filter(|&x| taken_on[x as usize] && spared(x)));

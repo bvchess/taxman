@@ -43,7 +43,7 @@ puts an answer at risk.
    when the optimal games of n − 1 and n differ by one move and promote the same numbers, the move given up is the
    *shadow* of n, n with each prime factor replaced by the prime just below it (2486 = 2·11·113 for 4953 = 3·13·127), or
    n/2 for even n, in all 1,729 such pairs of games 1 to 4955 ([the shadow
-   law](../../docs/theory/neighbors.md#the-shadow-law)).  Why, and whether it says when such a swap happens, are open.
+   law](../../docs/theory/arrival.md#the-shadow-law)).  Why, and whether it says when such a swap happens, are open.
    Giving up the smallest move that makes room for n is not such a rule: it falls short at 1,125 of 4,954 games ([the
    smallest single loss](../notebook/the-smallest-single-loss-over-all-moves-2026-10/README.md)).  What the law gives
    the corner:
@@ -61,42 +61,24 @@ puts an answer at risk.
      can be checked would prove those swaps without a search.  No route to it is known.
    * **The lemma needs room.**  It would go in [the theory](../../docs/THEORY.md), but search-rules.md is at 5,952 of
      its 6,000 words, so it needs a file of its own or a split.
-5. **A proof of the cofactor rule from the square theorem.**  The cofactor rule, measured, says that game n poses the
-   root problem of the game m before it (n − 2 when n − 1 is prime) when n divided by its largest prime factor is a
-   prime or twice a prime, and is at its ceiling when it is 9, wherever layer 2 has no freedom in game n and in game m
-   ([the cofactor rule](../../docs/theory/neighbors.md#the-cofactor-rule)).  That holds in all 1,946 such games from 28
-   to 4949, and from 188 on in every game, since 186 is the last board whose layer 2 has a freedom, by [the square
-   theorem](../../docs/theory/frame-model.md#the-square-theorem): the source 187 = 11·17 joins the frame of 11 and 13,
-   which holds the squares 121 and 169, to the rest.  Every game that breaks the rule has a freedom in layer 2.  Read in
-   layers, the first case is every n with two prime factors, a number of layer 2, and the second every even n with
-   three. A sketch, not checked: where layer 2 has no freedom in either game, the frames with freedoms lie in layers 3
-   and up.  An odd n of layer 2 adds only a source to the closed layer, and no number up to n/2, since ⌊n/2⌋ does not
-   change.  An even n = 2P adds the prime P up to n/2, in layer 1, which no frame with freedoms uses.  If the claims of
-   the layers from 3 on are unchanged too, the root problem repeats, and the rule's first case is a theorem.  The cases
-   2pP and 9P add a source of layer 3 and need more.  It is theory work, with no computation; [the notebook
-   entry](../notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) has the counts.
-6. **No search where n joins only closed frames.**  A general form of the cofactor rule, proposed on 2026-10-24 and not
-   yet checked.  The search works only on the frames with freedoms; a closed frame takes no part.  From game n − 1 to
-   game n, an odd n changes one thing: the source n arrives, and every number up to n/2 stays as it was.  Suppose every
-   frame that n touches, the frames of all of its maximal factors, is closed in game n − 1.  Then n joins them with a
-   move and no factor, so one of their sources can no longer be paid and drops out, and they stay closed.  The frames
-   with freedoms are untouched, so game n poses the root problem of game n − 1, and [the repeat
-   lemma (R6)](../../docs/theory/search-rules.md#the-repeat-lemma) settles it with no search: opt(n) = opt(n − 1) + n −
-   x, where x is the source that drops out, which [the shadow law](../../docs/theory/neighbors.md#the-shadow-law) names
-   as the shadow of n.  That one source drops out, and no more, follows from [the span conjecture
-   (♦)](../../docs/theory/sources.md#the-span-conjecture) by [the greedy-basis proposition
-   (W3)](../../docs/theory/parity-bound.md#the-greedy-basis-proposition) and [the contraction theorem
-   (B6)](../../docs/theory/frame-bounds.md#the-contraction-theorem); that the claims and candidates outside the merged frame do not change is the step a proof
-   still owes.  An even n works otherwise: n/2 turns from a source into a factor that only n can use, so nothing drops,
-   and when some optimal game of n − 1 does not play n/2, game n is at its ceiling, opt(n) = opt(n − 1) + n (play n/2,
-   then n paid with it).  When n − 1 is prime, the comparison is with game n − 2, as in the cofactor rule.  If a frame
-   that n touches has a freedom, n joins it and the problem changes, so the game needs a search unless something else
-   settles it, such as the ceiling.  The cofactor rule (item 5) is the case of n in layer 2, where that layer is one
-   closed frame from 188 on; the general form would reach every layer, and setup could test it from the frames alone,
-   before any search.  The first step is a check on the committed chain: for each game, whether every frame that n
-   (and n/2 for even n) touches is closed in the game before, against whether the game was a repeat.  Then a proof,
-   as a lemma beside the repeat lemma.
-7. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
+5. **What the arrival lemma leaves open.**  [The arrival lemma (J1)](../../docs/theory/arrival.md#the-arrival-lemma),
+   proved on 2026-10-24 from the idea of a no-search rule where n joins only closed frames, says that game n poses the
+   root problem of game n − 1 when every frame that n joins is closed, given (♦) for odd n and when U\*(n − 1) leaves
+   n/2 out for even n; [its corollary (J2)](../../docs/theory/arrival.md#the-layer-2-corollary) proves the cofactor
+   rule's first case with no (♦).  A run that builds the root problems from the definitions on every board to 8191 found
+   no exception ([the arrival of n](../notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).  Four questions
+   remain, all theory work with no computation needed to start:
+   * **The half law.**  An even n poses the root problem of game n − 1 iff n/2 ∉ U\*(n − 1), on every even board to 8190
+     but 14 ([the half law](../../docs/theory/arrival.md#the-half-law)).  J1 proves 555 of the 1,840 repeats; the other
+     1,285, the numbers 2pP of the cofactor rule among them, join frames with freedoms.  A guess to test: n pays with
+     its private factor n/2, and the claims take the two out together.
+   * **The 21 odd repeats outside J1**, from 2197 = 13³ on, each with a prime factor 13, 17 or 19: they join a frame of
+     layer 3 with 49 to 110 freedoms and still repeat, giving up the shadow.
+   * **Why the shadow.**  Where J1 applies, the move given up is the smallest member of the circuit of v(n); in all
+     2,651 odd repeats to 8191 it is the shadow of n ([the shadow law](../../docs/theory/arrival.md#the-shadow-law)).  A
+     proof would explain why that circuit's smallest member is n with each prime replaced by the prime below it.
+   * **The numbers 9P**, which reach their ceiling while their root problem changes.
+6. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's
    learning](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md), results 3 to 5 and the
    decision), so replaying the old search does not pay.  Two angles are untested.  The first is to amortize the core's
@@ -107,16 +89,16 @@ puts an answer at risk.
    tree and every lookup scans it: 1227 from 1225's nogoods took 10% fewer nodes and 3% more time, at 59k nodes a
    second against 67k ([carrying nogoods
    over](../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).
-8. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
+7. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
    Bringing home 49 games on 2026-10-23 took over an hour: a fresh debug build of the ledger, a rebase, and a wait loop
    that never ended.
-9. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
+8. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
    limit on master itself.  Scale the limits by a calibration workload's slowdown, capped near 4 times, from a
    baseline taken without the chain ([testing.md](design/testing.md)).  The limits are the project owner's decision.
-10. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
+9. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
    four jobs, the shared target directories, the quick check, named release tests only), allowed by the agents'
    permissions, and a check when an agent finishes that stops it while its waiting loops or background jobs still run.
    A guard hook already refuses `pgrep -f`, `pkill -f` and the full release suite, but it sees only the command line,
    not a script an agent writes for itself.
-11. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
+10. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
    only with a cheaper way to steer ([lab.md](design/lab.md)).

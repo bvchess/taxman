@@ -11,7 +11,7 @@ the 2,126 games of 1301–4979 that were settled without a search (85.4%), and n
 other 310 are mostly settled at the start, by the ceiling, which no cofactor predicts.  The rule forecasts the chain's
 work and settles no game: the solver still settles each game by its own checks.  Its conditions (a repeated search
 problem for a prime or twice a prime, the ceiling for 9) hold in every recorded game from 188 to 4949, and the theory
-states the rule there ([the cofactor rule](../../../../docs/theory/neighbors.md#the-cofactor-rule)).
+states the rule there ([the cofactor rule](../../../../docs/theory/arrival.md#the-cofactor-rule)).
 
 ## Method
 

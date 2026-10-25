@@ -1,0 +1,45 @@
+boards 3..=8191: 8189 lines; missing 0
+seconds, summed over the boards: 909.8
+boards with a maximal factor (n/2 aside) held by no frame as a factor: 0
+
+== odd n from 3: 4095 boards, 2630 with cond
+repeat:         cond and repeat 2630; cond and not repeat 0; not cond and repeat 21; neither 1444
+partner repeat: cond and repeat 2629; cond and not repeat 0; not cond and repeat 21; neither 1444; no comparison for 1
+with cond, exactly one source dropped: 2630 of 2630 (100.0%)
+with cond, a merged frame with no freedom: 2630 of 2630 (100.0%)
+with cond, dropped exactly the shadow: 2630 of 2630 (100.0%)
+with cond, all three: 2630 of 2630 (100.0%)
+
+== odd n from 188: 4002 boards, 2571 with cond
+repeat:         cond and repeat 2571; cond and not repeat 0; not cond and repeat 21; neither 1410
+partner repeat: cond and repeat 2571; cond and not repeat 0; not cond and repeat 21; neither 1410
+with cond, exactly one source dropped: 2571 of 2571 (100.0%)
+with cond, a merged frame with no freedom: 2571 of 2571 (100.0%)
+with cond, dropped exactly the shadow: 2571 of 2571 (100.0%)
+with cond, all three: 2571 of 2571 (100.0%)
+
+== even n from 3: 4094 boards, 555 with cond
+repeat:         cond and repeat 555; cond and not repeat 0; not cond and repeat 1285; neither 2254
+partner repeat: cond and repeat 555; cond and not repeat 0; not cond and repeat 1285; neither 2254
+with cond, dropped nothing: 555 of 555 (100.0%)
+with cond, added n alone: 555 of 555 (100.0%)
+with cond, both: 555 of 555 (100.0%)
+
+== even n from 188: 4002 boards, 540 with cond
+repeat:         cond and repeat 540; cond and not repeat 0; not cond and repeat 1258; neither 2204
+partner repeat: cond and repeat 540; cond and not repeat 0; not cond and repeat 1258; neither 2204
+with cond, dropped nothing: 540 of 540 (100.0%)
+with cond, added n alone: 540 of 540 (100.0%)
+with cond, both: 540 of 540 (100.0%)
+
+== Where cond holds and repeat does not (all n of the range)
+0 boards
+
+== The first 30 odd n where repeat holds and cond does not
+2197 (13^3), 2873 (13^2*17), 3211 (13^2*19), 3887 (13^2*23), 3971 (11*19^2), 4199 (13*17*19), 5083 (13*17*23), 5239 (13^2*31), 5491 (17^2*19), 5681 (13*19*23), 6137 (17*19^2), 6253 (13^2*37), 6409 (13*17*29), 6851 (13*17*31), 6859 (19^3), 6877 (13*23^2), 6929 (13^2*41), 7163 (13*19*29), 7267 (13^2*43), 7429 (17*19*23), 7657 (13*19*31)
+
+== The first 30 even n where repeat holds and cond does not
+22 (2*11), 34 (2*17), 44 (2^2*11), 46 (2*23), 50 (2*5^2), 52 (2^2*13), 66 (2*3*11), 68 (2^2*17), 74 (2*37), 76 (2^2*19), 82 (2*41), 92 (2^2*23), 102 (2*3*17), 106 (2*53), 110 (2*5*11), 116 (2^2*29), 118 (2*59), 124 (2^2*31), 130 (2*5*13), 142 (2*71), 148 (2^2*37), 154 (2*7*11), 164 (2^2*41), 170 (2*5*17), 172 (2^2*43), 174 (2*3*29), 186 (2*3*31), 188 (2^2*47), 190 (2*5*19), 212 (2^2*53)
+
+== Against the committed chain, 4947 boards of the range up to n = 4949
+compared 3920: agree 3920, disagree 0; left out: method known 382, no setup digest 629, partner game without a digest 16, no repeat_prev2 0

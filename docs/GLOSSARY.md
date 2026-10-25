@@ -432,6 +432,6 @@ it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
   games](theory/uniqueness-and-longest-games.md), W [the parity bound](theory/parity-bound.md), C [Franklín and
   Moniot](theory/franklin-moniot.md), F [the frame model](theory/frame-model.md), X [its
   exactness](theory/exactness.md), E [the extended problem](theory/extended-problem.md), B [the bounds on the
-  promotions](theory/frame-bounds.md) and R [the rules of a search](theory/search-rules.md).  The letters C, E and R
-  also head the numbers above, so a label of the theory comes with its name, and a label of a plan with its kind:
-  conjecture C2, study E6, refit R3.
+  promotions](theory/frame-bounds.md), R [the rules of a search](theory/search-rules.md) and J [the arrival of
+  n](theory/arrival.md).  The letters C, E and R also head the numbers above, so a label of the theory comes with its
+  name, and a label of a plan with its kind: conjecture C2, study E6, refit R3.

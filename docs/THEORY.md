@@ -1,11 +1,10 @@
 # The theory, with proofs
 
 The theory proves what the project's programs rest on: the frame solver, which finds optimal games; the prover, which
-proves them optimal on the whole board; and the claims of the heuristics.  Each result is stated in words, then
-formally, then proved.  It has a name, such as [the ceiling lemma](theory/neighbors.md#the-ceiling-lemma), and a label:
-the letter of its file and its number there, as in N4.  [statements.md](theory/statements.md) lists every result with
-its standing, in the words its legend defines, together with the notation and the open questions.  Four statements are
-open: [statement U](theory/exactness.md#statement-u), [the sources
+proves them optimal on the whole board; and the claims of the heuristics.  Each result has a name, such as [the ceiling
+lemma](theory/neighbors.md#the-ceiling-lemma), and a label: the letter of its file and its number there, as in N4.
+[statements.md](theory/statements.md) lists every result with its standing, with the notation and open questions. Four
+statements are open: [statement U](theory/exactness.md#statement-u), [the sources
 conjecture](theory/sources.md#the-sources-conjecture), (★) and (♦).  [evidence.md](theory/evidence.md) gives the
 computations behind the standings that rest on computation, and the heuristics' table of claims
 ([heuristics/README.md](../heuristics/README.md)) cites the theory.
@@ -20,7 +19,7 @@ places.
 
 | file | letter | read it for |
 |---|---|---|
-| [primer.md](theory/primer.md) | | the standard mathematics the theory uses: GF(2), matroids, matroid intersection, Lagrangian relaxation, permanents |
+| [primer.md](theory/primer.md) | | the standard mathematics: GF(2), matroids, matroid intersection, Lagrangian relaxation, permanents |
 | [statements.md](theory/statements.md) | | every result with its standing and a link to it, the notation, and the open questions |
 | [playability.md](theory/playability.md) | P | when a set of moves can be played: payment schemes, peel, cores, linear independence |
 | [neighbors.md](theory/neighbors.md) | N | what passes from game n − 1 to game n: [the prime lemma](theory/neighbors.md#the-prime-lemma), monotonicity, the ceiling, the prime formula |
@@ -33,24 +32,25 @@ places.
 | [extended-problem.md](theory/extended-problem.md) | E | the extended problem, and the certificates of statement U that search it |
 | [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: signed frame matroids, the frame bound, the decomposition bound |
 | [search-rules.md](theory/search-rules.md) | R | what a search of the frame model proves, every rule it may cut by, and the bounds carried between games |
+| [arrival.md](theory/arrival.md) | J | the frame model from game n − 1 to game n: the arrival lemma, the shadow law, the cofactor rule |
 | [evidence.md](theory/evidence.md) | | the computations behind the statements that are not proved |
 | [writing.md](theory/writing.md) | | how the theory is written, for those who write it |
 
 ## What rests on what
 
 One open statement, U, stands between the frame model and opt(n), and the frame solver's scores rest on it wherever no
-other proof has reached.  The open statements about the sources concern the sources alone: the frame model fixes them to
-U\* by construction, its exactness is proved without (★) or (♦), and no score rests on them.
+other proof has reached.  The open statements about the sources bear on no score: the frame model fixes the sources to
+U\*, and its exactness needs neither (★) nor (♦).
 
-* **Proved outright:** playability (P1 to P11); neighboring games (N1 to N6); the frame model and its exactness (F1 to
+* **Proved outright:** playability (P1 to P11); neighboring games (N1 to N7); the frame model and its exactness (F1 to
   F10, X1 to X7, [the holes theorem X9](theory/exactness.md#boards-with-holes), and the inequality of [the corollary of
   U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
   certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
   to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); the matroid and length propositions (Q2, Q4) and the first two
-  parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence in [the
-  cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
-  law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 for even n, and J2; the matroid and length propositions (Q2,
+  Q4) and the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the
+  equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory
+  [victim law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
   theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
 * **Given statement U at n:** the equality of the corollary of U (X8), and the inequality and last part of the repeat
   lemma (R6).
@@ -58,7 +58,7 @@ U\* by construction, its exactness is proved without (★) or (♦), and no scor
   the last part of the length lemma (Q3), and through Q1 [the sources
   conjecture](theory/sources.md#the-sources-conjecture) there.
 * **Given (♦) in game n:** (★) and the sources conjecture there, by the span theorem (S6), so the check of (♦) certifies
-  both game by game; and the last part of B6.
+  both game by game; the last part of B6; and J1 for odd n.
 
 What the programs' answers rest on:
 
@@ -77,7 +77,7 @@ What the programs' answers rest on:
   [the barred bound (W2)](theory/parity-bound.md#the-barred-bound) certifies most members of U\*_{≥3}, and a search of
   the extended problem, by [the state lemma (R1)](theory/search-rules.md#the-state-lemma), the dual-bound and floor
   lemmas (R4, R5) and [the frame bound for the extended problem
-  (B3)](theory/frame-bounds.md#the-frame-bound-for-the-extended-problem), finds nothing above the score.  A search that
-  stops at the ceiling, by the ceiling-stop corollary (E3), rests also on the recorded score of game n − 1 being
-  optimal.  A game that the prover or a certificate has proven does not rest on U;
-  [results/README.md](../results/README.md#what-supports-the-scores) says which games those are.
+  (B3)](theory/frame-bounds.md#the-frame-bound-for-the-extended-problem), finds nothing above the score.  A search
+  stopped at the ceiling (E3) rests also on the recorded score of game n − 1.  A game that the prover or a certificate
+  has proven does not rest on U; [results/README.md](../results/README.md#what-supports-the-scores) says which games
+  those are.
