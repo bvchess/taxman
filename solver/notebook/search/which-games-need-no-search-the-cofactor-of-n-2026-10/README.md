@@ -134,13 +134,19 @@ leaves the problem as it was.
 Added 2026-10-24.  The rule's families stand for checkable conditions: a game whose cofactor is a prime or twice a prime
 poses the search problem of game n − 1, or of n − 2 when n − 1 is prime, and a game of cofactor 9 is at its ceiling.
 `conditions.py` checks them on every game of the committed chain (to 4949), below 1301 too, from the digest of each
-game's setup and the scores, in a second; `conditions.txt` is its output.
+game's setup and the scores, in a few seconds; `conditions.txt` is its output.
 
 * **From 188 on, no game breaks them.**  Every recorded game of the four families obeys, outside the 382 copies of
   3984–4783, which record no setup.  From 188 the four families hold 2,481 of the 2,856 games settled without a
   search (86.9%), and none that was searched.
 * **Below 188, 38 games break them**, the last 187 = 11·17, which was searched.  The small games settled by the trivial
   case (4 to 26) count as breaks, since they have no setup to compare.
+* **Layer 2 marks the boundary.**  Board 186 is the last whose layer 2 has a frame with a freedom ([the square
+  theorem](../../../../docs/theory/frame-model.md#the-square-theorem)): its frame of 11 and 13 holds the squares 121 and
+  169, and the frame of every other prime up to 89 holds none.  The source 187 = 11·17 joins them.  From 28 on, every
+  game whose layer 2 has no freedom, in its own game and in the game it is compared with, keeps the conditions (1,946
+  games, below 188 too); the 25 games that break them all have a freedom there; and 19 games with one keep them.  The
+  script forms the frames of layer 2 itself, and finds the square theorem's 80 boards with a freedom.
 
 ## Decision
 

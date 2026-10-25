@@ -62,17 +62,18 @@ puts an answer at risk.
    * **The lemma needs room.**  It would go in [the theory](../../docs/THEORY.md), but search-rules.md is at 5,952 of
      its 6,000 words, so it needs a file of its own or a split.
 5. **A proof of the cofactor rule from the square theorem.**  The cofactor rule, measured, says that game n poses the
-   root problem of the game before it when n divided by its largest prime factor is a prime or twice a prime, and is at
-   its ceiling when it is 9, in every recorded game from 188 to 4949 ([the cofactor
-   rule](../../docs/theory/neighbors.md#the-cofactor-rule)).  Read in layers, the first case is every n with two prime
-   factors, a number of layer 2, and the second every even n with three.  The rule starts one game after 187, from which
-   layer 2 is one frame with no freedom, by [the square theorem](../../docs/theory/frame-model.md#the-square-theorem);
-   below 188 the last game that breaks it is 187 itself, whose game before, 186, still has a freedom in layer 2.  A
-   sketch, not checked: from 188 on the frames with freedoms lie in layers 3 and up, for n and for the game before.  An
-   odd n of layer 2 adds only a source to the closed layer, and no number up to n/2, since ⌊n/2⌋ does not change.  An
-   even n = 2P adds the prime P up to n/2, in layer 1, which no frame with freedoms uses.  If the claims of the layers
-   from 3 on are unchanged too, the root problem repeats, and the rule's first case is a theorem for every n ≥ 188.  The
-   cases 2pP and 9P add a source of layer 3 and need more.  It is theory work, with no computation; [the notebook
+   root problem of the game m before it (n − 2 when n − 1 is prime) when n divided by its largest prime factor is a
+   prime or twice a prime, and is at its ceiling when it is 9, wherever layer 2 has no freedom in game n and in game m
+   ([the cofactor rule](../../docs/theory/neighbors.md#the-cofactor-rule)).  That holds in all 1,946 such games from 28
+   to 4949, and from 188 on in every game, since 186 is the last board whose layer 2 has a freedom, by [the square
+   theorem](../../docs/theory/frame-model.md#the-square-theorem): the source 187 = 11·17 joins the frame of 11 and 13,
+   which holds the squares 121 and 169, to the rest.  Every game that breaks the rule has a freedom in layer 2.  Read in
+   layers, the first case is every n with two prime factors, a number of layer 2, and the second every even n with
+   three. A sketch, not checked: where layer 2 has no freedom in either game, the frames with freedoms lie in layers 3
+   and up.  An odd n of layer 2 adds only a source to the closed layer, and no number up to n/2, since ⌊n/2⌋ does not
+   change.  An even n = 2P adds the prime P up to n/2, in layer 1, which no frame with freedoms uses.  If the claims of
+   the layers from 3 on are unchanged too, the root problem repeats, and the rule's first case is a theorem.  The cases
+   2pP and 9P add a source of layer 3 and need more.  It is theory work, with no computation; [the notebook
    entry](../notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) has the counts.
 6. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's

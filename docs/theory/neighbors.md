@@ -252,26 +252,38 @@ proof would say why the shadow is the one move of game n − 1 that n displaces.
 
 ## The cofactor rule
 
-Many games need no search of their own, since they pose the root problem of the game before them or reach their ceiling,
-and which ones do is told mostly by n divided by its largest prime factor.
+Many games need no search of their own, since they pose the root problem of the game before them or reach their
+ceiling.  Wherever layer 2 has no freedom, which ones do is told by n divided by its largest prime factor.
 
 The *cofactor* of n is n divided by its largest prime factor: 3002 = 2·19·79 has the cofactor 38, and a prime has the
 cofactor 1.  It is the cofactor x/r of [the prime-exchange theorem](search-rules.md#the-prime-exchange-theorem), with
-x = n and r its largest prime factor.
+x = n and r its largest prime factor.  A cofactor that is a prime means that n has two prime factors, counted with
+multiplicity, so that n lies in layer 2; one that is twice a prime means that n is even with three.
 
-*The cofactor rule* (measured).  Let n ≥ 188.  If the cofactor of n is a prime or twice a prime, the [root
-problem](frame-model.md#the-frame-model) of game n is that of game n − 1, or of game n − 2 when n − 1 is prime.  If the
-cofactor is 9, game n is at its ceiling.
+*The cofactor rule* (measured).  Let n ≥ 28, and let m be n − 1, or n − 2 when n − 1 is prime.  Suppose that no frame
+of layer 2 has a freedom in game n or in game m.  If the cofactor of n is a prime or twice a prime, the [root
+problem](frame-model.md#the-frame-model) of game n is that of game m.  If the cofactor is 9, game n is at its ceiling.
+
+By [the square theorem (F10)](frame-model.md#the-square-theorem), the hypothesis holds for every n ≥ 188.  On the board
+of 186, layer 2 has two frames: one of 11 and 13, which holds the only prime squares between 93 and 186, 121 and 169,
+and one of every other prime up to 89, which holds no square and so has a freedom.  The source 187 = 11·17 joins them,
+and from 187 on layer 2 is one frame with a square, and has no freedom.
 
 Game 3002, of cofactor 38 = 2·19, has the root problem of game 3000, since 3001 is prime, and game 1341 = 9·149 is at
 its ceiling.  With the cofactor 1, n is prime and [the prime formula (N5)](#the-prime-formula) gives opt(n).  So a game
-whose cofactor is 1, a prime, twice a prime or 9 needs no search of its own: [the repeat lemma
-(R6)](search-rules.md#the-repeat-lemma) carries over the score of the game whose root problem it shares, given U, and
-at the ceiling the step theorem gives its optimal sets.  The rule fails below 188, last at 187 = 11·17, whose root
-problem is not that of 186.
+whose layer 2 has no freedom, and whose cofactor is 1, a prime, twice a prime or 9, needs no search of its own: [the
+repeat lemma (R6)](search-rules.md#the-repeat-lemma) carries over the score of the game whose root problem it shares,
+given U, and at the ceiling the step theorem gives its optimal sets.
 
-The rule is measured on the games whose root problem the chain records, and nothing yet shows why the cofactor, rather
-than something else about n, decides.  [evidence.md](evidence.md#observations) gives the range and what one must trust,
-and [the notebook entry on the cofactor of
+The hypothesis is needed.  Every game from 28 on that breaks the rule has a freedom in layer 2, in game n or in game
+m: 25 games, the last 187, whose root problem is not that of 186.  A freedom does not force a break, since 19 games
+with one keep the rule.  For the first case a reason is in sight, though not a proof: a number with two prime factors
+is a source of layer 2, so where layer 2 has no freedom it joins a frame that the root problem leaves out.  A proof
+would also have to show that nothing else the root problem holds changes: the numbers up to n/2 when n is even, and the
+claims of the layers above.
+
+The rule is measured on the games whose root problem the chain records, and the boards up to 27 record none.  Nothing
+yet shows why these cofactors, rather than others, decide.  [evidence.md](evidence.md#observations) gives the range and
+what one must trust, and [the notebook entry on the cofactor of
 n](../../solver/notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) the counts, with the
 cofactors that are always searched.
