@@ -45,9 +45,9 @@ law](../../../docs/theory/arrival.md#the-shadow-law)).
 * **Under the hypothesis**, every odd game gave up exactly one source, the shadow of n, from a joined frame, and the
   frame that holds n came out closed: 2,630 of 2,630, 1,027 of them primes.  Every even game added n and gave up
   nothing: 555 of 555.
-* **Odd repeats outside the hypothesis**: 21, all from 2197 = 13³ on, each with a prime factor 13, 17 or 19 (2197, 2873,
-  3211, 3887, 3971, 4199, 5083, 5239, 5491, 5681, 6137, 6253, 6409, 6851, 6859, 6877, 6929, 7163, 7267, 7429, 7657).
-  Each joins a frame of layer 3 with 49 to 110 freedoms, and each gives up the shadow.
+* **Odd games that repeat though `cond` fails**: 21, all from 2197 = 13³ on, each with a prime factor 13, 17 or 19
+  (2197, 2873, 3211, 3887, 3971, 4199, 5083, 5239, 5491, 5681, 6137, 6253, 6409, 6851, 6859, 6877, 6929, 7163, 7267,
+  7429, 7657). Each joins a frame of layer 3 with 49 to 110 freedoms, and each gives up the shadow.
 * **Even games**: the 1,841 whose half U\*(n − 1) leaves out repeat but for 14, which joins a frame of layer 2 with a
   freedom; the 2,253 whose half it keeps never repeat.
 * **Odd games with neither**: 1,444, among them 16 that join a frame with exactly one freedom and use it, so that

@@ -154,9 +154,10 @@ U\*(n) = U\*(n − 1) + n − x, with x the shadow of n.
 
 Where [the arrival lemma (J1)](#the-arrival-lemma) applies, it makes x the smallest member of the circuit of v(n), and
 this form says that member is the shadow.  At a prime both are q(n − 1), with no measurement.  The form holds in all
-2,651 odd games to 8191 whose root problem is that of the game before: 1,027 primes, 1,603 composites under J1's
-hypothesis, and 21 composites outside it, from 2197 = 13³ on, each with a prime factor 13, 17 or 19, which join a frame
-of layer 3 with freedoms and still give up the shadow.
+2,651 odd games to 8191 whose root problem is that of the game before: 1,027 primes, 1,603 composites whose joined
+frames are closed, so that J1 applies, and 21 composites that J1 does not cover: each joins a frame of layer 3 with
+freedoms, yet poses the root problem of game n − 1 and gives up the shadow.  These 21 start at 2197 = 13³, and each has
+a prime factor 13, 17 or 19.
 
 The law says which move an exchange gives up, not when the exchange happens.  It covers only the recorded optimal sets,
 and a game may have others.  That a recorded game is optimal is proved on the whole board for the games the prover has
@@ -220,7 +221,7 @@ closed layer 2 rejects, so the half lemma puts game n at its ceiling, given that
 out, and the half law gives the repeat, though the frames of layer 3 it joins have freedoms.  A number 9P joins a frame
 of layer 3 with freedoms, and its root problem changes; that it reaches its ceiling is measured.  On every board from
 188 to 8191 the root problems built from the definitions agree: the 1,585 odd numbers with two prime factors and the 540
-numbers 2P repeat, as J2 says, and so do the 1,092 numbers 2pP, outside the arrival lemma's hypothesis ([the notebook
+numbers 2P repeat, as J2 says, and so do the 1,092 numbers 2pP, which the arrival lemma does not cover ([the notebook
 entry on the arrival of n](../../solver/notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).
 
 The rule's last two cases are measured on the games whose root problem the chain records, and the boards up to 27 record

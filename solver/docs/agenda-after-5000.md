@@ -72,8 +72,8 @@ puts an answer at risk.
      but 14 ([the half law](../../docs/theory/arrival.md#the-half-law)).  J1 proves 555 of the 1,840 repeats; the other
      1,285, the numbers 2pP of the cofactor rule among them, join frames with freedoms.  A guess to test: n pays with
      its private factor n/2, and the claims take the two out together.
-   * **The 21 odd repeats outside J1**, from 2197 = 13³ on, each with a prime factor 13, 17 or 19: they join a frame of
-     layer 3 with 49 to 110 freedoms and still repeat, giving up the shadow.
+   * **21 odd games that J1 does not cover**, from 2197 = 13³ on, each with a prime factor 13, 17 or 19: each joins a
+     frame of layer 3 with 49 to 110 freedoms, yet poses the root problem of game n − 1 and gives up the shadow.
    * **Why the shadow.**  Where J1 applies, the move given up is the smallest member of the circuit of v(n); in all
      2,651 odd repeats to 8191 it is the shadow of n ([the shadow law](../../docs/theory/arrival.md#the-shadow-law)).  A
      proof would explain why that circuit's smallest member is n with each prime replaced by the prime below it.
