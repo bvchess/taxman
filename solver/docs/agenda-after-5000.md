@@ -36,17 +36,45 @@ puts an answer at risk.
 4. **The corner of a near repeat.**  Two consecutive games sometimes differ by one swapped move, and then the proof of
    game n could be a short proof about that move's corner of the game, reusing the proof of game n − 1 for the rest.  A
    sketch reduces it to the ways of playing n that use up every factor that can pay for the old move, which the
-   near-repeat cut cannot reach.  Near repeats were 10% of the nodes searched from 4850 to 4955, and 8.4% beyond what the
-   cut already settles.  The next step is to prove the reduction as a lemma, then to measure the short proof on 1209,
-   1833 and 2301 ([the corner of a
-   near repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).  A related law, measured and not
-   proven: when the optimal games of n − 1 and n differ by one move and promote the same numbers, the move given up is
-   the *shadow* of n, n with each prime factor replaced by the prime just below it (2486 = 2·11·113 for 4953 =
-   3·13·127), or n/2 for even n, in all 1,729 such pairs of games 1 to 4955.  Why, and whether it says when such a swap
-   happens, are open; a proof could make some swaps provable without a search.  Giving up the smallest move that makes
-   room for n is not such a rule: it falls short at 1,125 of 4,954 games ([the smallest single
-   loss](../notebook/the-smallest-single-loss-over-all-moves-2026-10/README.md)).
-5. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
+   near-repeat cut cannot reach.  Near repeats were 10% of the nodes searched from 4850 to 4955, and 8.4% beyond what
+   the cut already settles.  The next step is to prove the reduction as a lemma, then to measure the short proof on
+   1209, 1833 and 2301 ([the corner of a near
+   repeat](../notebook/search/the-corner-of-a-near-repeat-2026-10/README.md)).  A related law, measured and not proven:
+   when the optimal games of n − 1 and n differ by one move and promote the same numbers, the move given up is the
+   *shadow* of n, n with each prime factor replaced by the prime just below it (2486 = 2·11·113 for 4953 = 3·13·127), or
+   n/2 for even n, in all 1,729 such pairs of games 1 to 4955 ([the shadow
+   law](../../docs/theory/neighbors.md#the-shadow-law)).  Why, and whether it says when such a swap happens, are open.
+   Giving up the smallest move that makes room for n is not such a rule: it falls short at 1,125 of 4,954 games ([the
+   smallest single loss](../notebook/the-smallest-single-loss-over-all-moves-2026-10/README.md)).  What the law gives
+   the corner:
+   * **The search already starts from the swap.**  The seed, game n − 1, survives whole in a swap, since the
+     promotions are the same, so every searched swap starts from its optimal set and spends all its nodes on the
+     proof that nothing beats it.  Believing the law would skip no search: it gives a lower bound, which the seed
+     already has, and a game needs an upper bound.  The 78 searched swaps of the committed chain took 5.85 × 10⁹
+     nodes, 6.9% of all the nodes searched to 4949, and from 4500 on 6 of the 71 searched games and 8.5% of their
+     nodes, 4953 alone 505 million.
+   * **It names the corner before the search.**  The old move is the shadow, known from n alone, so a cheap test that
+     the shadow swap is playable (a peel) can arm the short proof before setup.  For odd n the old move's largest
+     prime factor is the prime just below n's, so a proof of the law, or of the reduction, could compare the
+     corners of those two primes.
+   * **A theorem would settle games.**  One that bounds opt(n) by opt(n − 1) + n − shadow(n) under conditions that
+     can be checked would prove those swaps without a search.  No route to it is known.
+   * **The lemma needs room.**  It would go in [the theory](../../docs/THEORY.md), but search-rules.md is at 5,952 of
+     its 6,000 words, so it needs a file of its own or a split.
+5. **A proof of the cofactor rule from the square theorem.**  The cofactor rule, measured, says that game n poses the
+   root problem of the game before it when n divided by its largest prime factor is a prime or twice a prime, and is at
+   its ceiling when it is 9, in every recorded game from 188 to 4949 ([the cofactor
+   rule](../../docs/theory/neighbors.md#the-cofactor-rule)).  Read in layers, the first case is every n with two prime
+   factors, a number of layer 2, and the second every even n with three.  The rule starts one game after 187, from which
+   layer 2 is one frame with no freedom, by [the square theorem](../../docs/theory/frame-model.md#the-square-theorem);
+   below 188 the last game that breaks it is 187 itself, whose game before, 186, still has a freedom in layer 2.  A
+   sketch, not checked: from 188 on the frames with freedoms lie in layers 3 and up, for n and for the game before.  An
+   odd n of layer 2 adds only a source to the closed layer, and no number up to n/2, since ⌊n/2⌋ does not change.  An
+   even n = 2P adds the prime P up to n/2, in layer 1, which no frame with freedoms uses.  If the claims of the layers
+   from 3 on are unchanged too, the root problem repeats, and the rule's first case is a theorem for every n ≥ 188.  The
+   cases 2pP and 9P add a source of layer 3 and need more.  It is theory work, with no computation; [the notebook
+   entry](../notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) has the counts.
+6. **Carry the hard core, not the search.**  Consecutive games refute the same core along different paths, and their
    trees share 0.15% of their nodes ([carrying a search's
    learning](../notebook/search/carrying-a-searchs-learning-to-the-next-game-2026-10/README.md), results 3 to 5 and the
    decision), so replaying the old search does not pay.  Two angles are untested.  The first is to amortize the core's
@@ -57,16 +85,16 @@ puts an answer at risk.
    tree and every lookup scans it: 1227 from 1225's nogoods took 10% fewer nodes and 3% more time, at 59k nodes a
    second against 67k ([carrying nogoods
    over](../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).
-6. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
+7. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
    Bringing home 49 games on 2026-10-23 took over an hour: a fresh debug build of the ledger, a rebase, and a wait loop
    that never ended.
-7. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
+8. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
    limit on master itself.  Scale the limits by a calibration workload's slowdown, capped near 4 times, from a
    baseline taken without the chain ([testing.md](design/testing.md)).  The limits are the project owner's decision.
-8. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
+9. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
    four jobs, the shared target directories, the quick check, named release tests only), allowed by the agents'
    permissions, and a check when an agent finishes that stops it while its waiting loops or background jobs still run.
    A guard hook already refuses `pgrep -f`, `pkill -f` and the full release suite, but it sees only the command line,
    not a script an agent writes for itself.
-9. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
+10. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
    only with a cheaper way to steer ([lab.md](design/lab.md)).
