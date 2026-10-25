@@ -62,12 +62,13 @@ puts an answer at risk.
    * **The lemma needs room.**  It would go in [the theory](../../docs/THEORY.md), but search-rules.md is at 5,952 of
      its 6,000 words, so it needs a file of its own or a split.
 5. **What the arrival lemma leaves open.**  [The arrival lemma (J1)](../../docs/theory/arrival.md#the-arrival-lemma),
-   proved on 2026-10-24 from the idea of a no-search rule where n joins only closed frames, says that game n poses the
-   root problem of game n − 1 when every frame that n joins is closed, given (♦) for odd n and when U\*(n − 1) leaves
-   n/2 out for even n; [its corollary (J2)](../../docs/theory/arrival.md#the-layer-2-corollary) proves the cofactor
-   rule's first case with no (♦).  A run that builds the root problems from the definitions on every board to 8191 found
-   no exception ([the arrival of n](../notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).  Four questions
-   remain, all theory work with no computation needed to start:
+   proved on 2026-10-24 from the idea of a no-search rule where n joins only closed frames, says, from the frames of
+   game n alone, when game n poses the root problem of game n − 1: when the frame that holds n is closed, and closed
+   without n for odd n, or, for even n, the frames that hold the maximal factors of n/2 are closed too; [its corollary
+   (J2)](../../docs/theory/arrival.md#the-layer-2-corollary) proves the cofactor rule's first case.  A run that builds
+   the root problems from the definitions on every board to 8191 found no exception ([the arrival of
+   n](../notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).  Four questions remain, all theory work with
+   no computation needed to start:
    * **The half law.**  An even n poses the root problem of game n − 1 iff n/2 ∉ U\*(n − 1), on every even board to 8190
      but 14 ([the half law](../../docs/theory/arrival.md#the-half-law)).  J1 proves 555 of the 1,840 repeats; the other
      1,285, the numbers 2pP of the cofactor rule among them, join frames with freedoms.  A guess to test: n pays with

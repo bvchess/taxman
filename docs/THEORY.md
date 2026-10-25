@@ -47,10 +47,10 @@ U\*, and its exactness needs neither (★) nor (♦).
   U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
   certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
   to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 for even n, and J2; the matroid and length propositions (Q2,
-  Q4) and the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the
-  equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory
-  [victim law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 and J2; the matroid and length propositions (Q2, Q4) and the
+  first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence
+  in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
+  law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
   theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
 * **Given statement U at n:** the equality of the corollary of U (X8), and the inequality and last part of the repeat
   lemma (R6).
@@ -58,7 +58,7 @@ U\*, and its exactness needs neither (★) nor (♦).
   the last part of the length lemma (Q3), and through Q1 [the sources
   conjecture](theory/sources.md#the-sources-conjecture) there.
 * **Given (♦) in game n:** (★) and the sources conjecture there, by the span theorem (S6), so the check of (♦) certifies
-  both game by game; the last part of B6; and J1 for odd n.
+  both game by game; the last part of B6; and J1's value of x.
 
 What the programs' answers rest on:
 

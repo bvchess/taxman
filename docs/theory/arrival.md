@@ -3,9 +3,10 @@
 Part of [the theory](../THEORY.md).
 
 Game n has the numbers of game n − 1 and one more, n, and much of the frame model passes from one game to the next
-unchanged.  [The arrival lemma (J1)](#the-arrival-lemma) says when the root problem does not change at all: when the
-frames that n joins are closed, given (♦) for odd n and provided U\* left n/2 out for even n.  Its corollary for the
-numbers with two prime factors ([J2](#the-layer-2-corollary)) needs no (♦).  Three measured laws describe what is
+unchanged.  [The arrival lemma (J1)](#the-arrival-lemma) gives conditions, read in the frames of game n alone, under
+which the root problem does not change: the frame that holds n is closed, and stays closed without n for odd n, while
+for even n the frames that hold the maximal factors of n/2 are closed too.  For a number with two prime factors, [its
+corollary (J2)](#the-layer-2-corollary) needs only the first, with no conjecture.  Three measured laws describe what is
 seen: [the shadow law](#the-shadow-law), which move an exchange gives up, [the half law](#the-half-law), which even
 games keep the root problem of the game before, and [the cofactor rule](#the-cofactor-rule), which games pose it.  The
 facts about neighboring games that rest on the rules alone, the ceiling and the half lemma among them, are in
@@ -18,24 +19,25 @@ sources.md's.  Ω(x) is the number of prime factors of x, counted with multiplic
 
 ## The arrival lemma
 
-Only the frames that hold a maximal factor of n feel its arrival.  When they are closed, game n poses the root problem
-of game n − 1, given (♦) for odd n and provided U\*(n − 1) leaves n/2 out for even n.
+Only the frames that hold a maximal factor of n feel its arrival, and the frames of game n around n give conditions
+under which the root problem has not changed.
 
 The maximal factors of n have one prime factor fewer than n.  When n is odd they are factors of game n − 1 too, since
-⌊n/2⌋ does not change, and they lie in frames of layer Ω(n) ([the frame lemma (F1)](frame-model.md#the-frame-lemma)).
-When n is even, n/2 is a source of game n − 1 and lies in a frame of layer Ω(n) − 1.  The frames of game n − 1 that
-hold a maximal factor of n, as a factor or, for n/2, as a source, are the frames that n *joins*.  U\*(n) is U\* of game
-n, and v(s) the [incidence vector](playability.md#independence) of a source s.
+⌊n/2⌋ does not change.  When n is even, n/2 is a source of game n − 1, and in game n it is a factor that only n uses,
+since its other multiples exceed n.  So n/2 always lies in the frame that holds n.  U\*(n) is U\* of game n, and v(s)
+the [incidence vector](playability.md#independence) of a source s.
 
-**Lemma J1 (the arrival lemma).**  Let n ≥ 3, and suppose that every frame that n joins is closed in game n − 1.
+**Lemma J1 (the arrival lemma).**  Let n ≥ 3, let M be the frame of game n that holds n, and suppose that M is closed.
 
-1. *Odd n.*  If [(♦)](sources.md#the-span-conjecture) holds in game n, game n has the root problem of game n − 1, and
-   the frame of game n that holds n is closed.  If (♦) holds in game n − 1 too, U\*(n) = U\*(n − 1) + n − x, where x
-   is the smallest of the members of U\*(n − 1) whose vectors sum, over GF(2), to v(n).
-2. *Even n.*  If n/2 is not in U\*(n − 1), game n has the root problem of game n − 1, and U\*(n) = U\*(n − 1) + n.
+1. *Odd n.*  If M is closed without n too, that is, if descending greedy keeps as many of the other sources of M as M
+   has factors, then game n has the root problem of game n − 1.  If [(♦)](sources.md#the-span-conjecture) holds in
+   games n − 1 and n, then U\*(n) = U\*(n − 1) + n − x, where x is the smallest of the sources that M keeps without n
+   whose vectors sum, over GF(2), to v(n).
+2. *Even n.*  If the frames of game n that hold the maximal factors of n/2 are closed, then game n has the root problem
+   of game n − 1, and U\*(n) = U\*(n − 1) + n.
 
-*Proof.*  The idea: the root problem sees only the frames with freedoms, and n merges only the frames it joins, which
-stay closed.
+*Proof.*  The idea: the root problem sees only the frames with freedoms, n changes only M and, for even n, the frame
+that held n/2, and the hypotheses say that both were closed in game n − 1 and are closed in game n.
 
 1. *The root problem sees only the frames with freedoms.*  By its definition, Π_n is fixed by the frames with
    freedoms, with their layers, moves and factors.  The numbering reads their layers, and frame h their moves and
@@ -47,85 +49,107 @@ stay closed.
    (F2)](frame-model.md#the-joining-lemma).  So descending greedy keeps a source of a frame D iff it is playable with
    the sources it kept before it in D: U\* ∩ D is descending greedy on the sources of D alone (sources.md, the paragraph
    "So does descending greedy").
-3. *Odd n: the frames.*  The two boards have the same numbers up to n/2, and game n has the one more source n, whose
-   maximal factors lie in the frames D_1, …, D_r that n joins.  So in the frame graph of game n, n merges D_1, …, D_r
-   into one frame M, with the factors F_M = F_{D_1} ∪ ⋯ ∪ F_{D_r}, and every other frame keeps its sources and factors,
-   so its moves too (step 2).
-4. *Odd n: M is closed.*  The moves of each D_i are playable, so their vectors are independent ([the independence lemma
-   (P10)](playability.md#the-independence-lemma)), and there are |F_{D_i}| of them, since D_i is closed.  The D_i have
-   disjoint factors, so the union B of their moves is |F_M| independent vectors on the coordinates F_M, which span
-   every vector of a source of M.  Given (♦) in game n, U\*(n) is the greedy basis of the sources' linear matroid ([the
-   greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition)), which is the direct sum of the frames'
-   parts, since the frames have disjoint factors; so U\*(n) ∩ M is the greedy basis of the sources of M, and has |F_M|
-   members.  So M is closed, the frames with freedoms are those of game n − 1, with the same moves, and step 1 gives
-   Π_n = Π_{n−1}.
-5. *Odd n: the move given up.*  Given (♦) in game n − 1 too, B is likewise the greedy basis of the old sources of M.
-   The vectors of U\*(n − 1) are independent (P10), so at most one set of them sums to v(n); B spans v(n), so that set
-   is a C ⊆ B.  Let x be the smallest member of C.  Then B′ = B + n − x is a basis, and it meets [the optimality
-   criterion](primer.md#the-optimality-criterion): for a source y of M outside B′, the members of the circuit of
-   B′ + y all exceed y.  For y = x that circuit is C + n, whose other members exceed x.  For y ≠ x, the members of the
-   circuit H of B + y exceed y, since B is heaviest.  If x ∉ H, H is the circuit of B′ + y.  If x ∈ H, adding v(n) and
-   the vectors of C to those of H − y gives v(y) as the sum over ((H − y) △ C) + n ⊆ B′, the circuit of B′ + y less y:
-   the members of H − y exceed y, those of C exceed x, which exceeds y, and n exceeds them all.  The values are distinct
-   and positive, so B′ is the one heaviest basis, the greedy basis.  So U\*(n) ∩ M = B′, and with step 3,
-   U\*(n) = U\*(n − 1) + n − x.
-6. *Even n: the frames.*  Game n has the factor n/2 more and the source n/2 less, and the source n.  The number n/2 is
-   a maximal factor of n alone, since its other multiples exceed n.  Let D′ be the frame of game n − 1 that holds n/2,
-   and D_1, …, D_r those that hold the other maximal factors of n.  No edge of game n leaves D′ less n/2: n's other
-   maximal factors lie in the D_i, one layer up, and n/2, now a factor, is joined to n alone.  So D′ less n/2 is a union
-   of frames of game n, its *pieces*.  Each factor of D′ keeps a source besides n/2 (F1 on the board of n), one of D′,
-   since a factor of D′ lies in layer Ω(n) − 2 and so is no maximal factor of n.  And n merges D_1, …, D_r and n/2 into
-   one frame M, with the factors F_{D_1} ∪ ⋯ ∪ F_{D_r} + n/2.  The other frames are unchanged.
-7. *Even n: the moves.*  In D′, n/2 is the smallest source and not kept, so descending greedy decided every other
-   source before reaching it, against sets that split by pieces: each piece keeps its moves of game n − 1, and the
-   pieces' freedoms add up to those of D′, none.  In M, a set T of old sources is playable with n against F_M iff T is
-   playable against F_{D_1} ∪ ⋯ ∪ F_{D_r}.  Indeed n can pay with n/2, which divides no member of T, so the joining
-   lemma puts n after a scheme of T; and no member of T lists n/2, so restriction gives the converse.  So descending
-   greedy keeps n, then decides the old sources as in game n − 1: U\*(n) ∩ M is n with the moves of the D_i, and M has
-   their freedoms together, none.  Step 1 finishes the proof, and U\*(n) = U\*(n − 1) + n, since n/2 ∉ U\*(n − 1).  ∎
+3. *Odd n: what changes.*  The two boards have the same numbers up to n/2, and game n has the one more source n.  Its
+   maximal factors lie in frames D_1, …, D_r of game n − 1, all of layer Ω(n) ([the frame lemma
+   (F1)](frame-model.md#the-frame-lemma)), and n joins them into M, with the factors F_{D_1} ∪ ⋯ ∪ F_{D_r}.  Every other
+   frame keeps its sources and factors, so its moves too (step 2).  M less n is the D_i, with their sources and factors,
+   so descending greedy, which splits over them by the argument of step 2, keeps on it the moves of the D_i in game n −
+   1.  Their freedoms are never negative and add up to those of M without n, none; so every D_i is closed.
+4. *Even n: what changes.*  Game n has the factor n/2 more and the source n/2 less, and the source n.  Let D′ be the
+   frame of game n − 1 that holds n/2, and D_1, …, D_r those that hold the other maximal factors of n.  No edge of game
+   n leaves D′ less n/2: n's other maximal factors lie in the D_i, one layer up, and n/2, now a factor, is joined to n
+   alone.  So D′ less n/2 is a union of frames of game n, its *pieces*.  Every maximal factor of n/2 lies in one, and
+   each holds at least one, since D′ was joined through n/2: the pieces are exactly the frames of game n that hold a
+   maximal factor of n/2.  And n joins D_1, …, D_r and n/2 into M.  The other frames are unchanged.
+5. *Even n: the moves.*  In D′, n/2 is the smallest source, so descending greedy decided every other source before
+   reaching it, against sets that split by pieces: each piece keeps its moves of game n − 1, and the pieces' freedoms
+   add up to those of D′, plus one if n/2 was a move.  They are closed, so D′ was closed and n/2 ∉ U\*(n − 1).  In M, a
+   set T of old sources is playable with n against the factors of M iff T is playable against F_{D_1} ∪ ⋯ ∪ F_{D_r}.
+   Indeed n can pay with n/2, which divides no member of T, so the joining lemma puts n after a scheme of T; and no
+   member of T lists n/2, so restriction gives the converse.  So descending greedy keeps n, then decides the old sources
+   as in game n − 1: U\*(n) ∩ M is n with the moves of the D_i, M has their freedoms together, and since M is closed, so
+   is every D_i.  And U\*(n) = U\*(n − 1) + n.
+6. *The root problem.*  In both cases the frames that change are closed before and after: the D_i, and D′ for even n,
+   in game n − 1; M, and the pieces for even n, in game n.  The other frames are the same, with the same moves.  So the
+   frames with freedoms are those of game n − 1, with the same moves, and step 1 gives Π_n = Π_{n−1}.
+7. *Odd n: the move given up.*  Let B be the moves of the D_i, |F_M| of them by step 3, and independent vectors on the
+   coordinates F_M ([the independence lemma (P10)](playability.md#the-independence-lemma)), which span every vector of a
+   source of M. Given (♦) in games n − 1 and n, U\* is in each game the greedy basis of the sources' linear matroid
+   ([the greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition)), the direct sum of the frames'
+   parts, since the frames have disjoint factors; so B is the greedy basis of the old sources of M, and U\*(n) ∩ M that
+   of all its sources.  These two facts are all that the step uses of (♦): by step 2 and the direct sum, they say that
+   descending greedy agrees with the greedy basis on each D_i in game n − 1 and on M in game n.  B spans v(n), and its
+   vectors are independent, so exactly one C ⊆ B sums to v(n); let x be its smallest member.  Then B′ = B + n − x is a
+   basis, and it meets [the optimality criterion](primer.md#the-optimality-criterion): for a source y of M outside B′,
+   the members of the circuit of B′ + y all exceed y.  For y = x that circuit is C + n, whose other members exceed x.
+   For y ≠ x, the members of the circuit H of B + y exceed y, since B is heaviest.  If x ∉ H, H is the circuit of B′ +
+   y.  If x ∈ H, adding v(n) and the vectors of C to those of H − y gives v(y) as the sum over ((H − y) △ C) + n ⊆ B′,
+   the circuit of B′ + y less y: the members of H − y exceed y, those of C exceed x, which exceeds y, and n exceeds them
+   all.  The values are distinct and positive, so B′ is the one heaviest basis, the greedy basis.  So U\*(n) ∩ M = B′,
+   and with step 3, U\*(n) = U\*(n − 1) + n − x.  ∎
 
-Each hypothesis earns its place.  Without n/2 ∉ U\*(n − 1) the even case fails at 12: every frame of game 11 is closed,
-and 12 joins only closed frames, but 6 is a move of game 11; in game 12 the frame of 10, with the factors 2 and 5, has a
-freedom, so Π_12 has a root frame and Π_11 has none.  The closed frame D′ is more than the proof needs: it serves only
-to keep the pieces closed, and an open D′ that stays in one piece would do.
+Read in game n − 1, the hypotheses say that the frames holding the maximal factors of n there, the frames that n
+*joins*, are closed, and for even n that n/2 was not a move (steps 3 to 5).  Conversely, these give back the hypotheses,
+for odd n given (♦) in game n, which makes M closed (below).
 
-The odd case uses (♦) only on the frame that holds n and on the frames it joins: descending greedy must agree there
-with the greedy basis.  In layers 1 and 2 it always does.  In layer 1 every source has the vector e₁ and each game keeps
-one.  In layer 2 descending greedy is the scan of the graphic matroid of the graph G_n of [the bottom-layers
+The first two hypotheses earn their place.
+
+* *M closed without n (odd n).*  In game 25 the frame of layer 2 that holds 25 = 5² is closed, but not without 25: 25
+  fills the frame's last freedom instead of taking the place of a move.  The optimal game of 24 used that freedom to
+  promote 9, and in game 25 the edge 3–g of 9 would close the cycle 3–g–5–3 with 25 and 15, so 9 cannot be promoted:
+  opt(25) = opt(24) + 25 − 9.  To 4949, n closes its frame by filling a freedom in 15 odd games, and the best promotions
+  change in 10 of them.
+* *The frames of n/2's maximal factors closed (even n).*  In game 12 the frame that holds 12 is closed, but 6 = 12/2
+  was a move of game 11, so its old frame loses a move: the frame of 10, with the factors 2 and 5, has a freedom in
+  game 12, and Π_12 has a root frame while Π_11 has none.  At 128 the same loss of the move 64 lets the promotions
+  grow: opt(128) = opt(127) + 128 − 64 + 32.
+
+The third, M closed for odd n, follows from M closed without n given (♦) in game n alone: B spans every vector of a
+source of M, so the greedy basis of M's sources has |F_M| members, and with (♦) in game n that greedy basis is U\*(n) ∩
+M (step 7).  Without (♦) the proof needs the hypothesis, and no game is known where it fails.
+
+The odd case uses (♦) only on M and the D_i: descending greedy must agree there with the greedy basis.  In layers 1 and
+2 it always does.  In layer 1 every source has the vector e₁ and each game keeps one.  In layer 2 descending greedy is
+the scan of the graphic matroid of the graph G_n of [the bottom-layers
 theorem](frame-model.md#the-bottom-layers-theorem), its step 3, and the incidence vectors are that matroid's vectors
 over GF(2) ([the primer](primer.md#linear-and-graphic-matroids)) with the coordinate of g left out, which keeps their
 dependencies: in a sum of edges, the coordinate of g is the sum of the others, since each edge has two ends.
 
 ### The layer-2 corollary
 
-**Corollary J2 (the layer-2 corollary).**  Let n ≥ 5 have two prime factors, counted with multiplicity, and suppose that
-layer 2 has no frame with a freedom in game n − 1.  Then game n has the root problem of game n − 1.  For odd n, U\*(n) =
-U\*(n − 1) + n − x, with x as in J1; for even n, U\*(n) = U\*(n − 1) + n.  By [the square theorem
-(F10)](frame-model.md#the-square-theorem), this holds for every such n ≥ 188.
+**Corollary J2 (the layer-2 corollary).**  Let n have two prime factors, counted with multiplicity, and let M be the
+frame of game n that holds n.  If n is odd and M is closed without n, or n is even and M is closed, then game n has the
+root problem of game n − 1, and U\*(n) = U\*(n − 1) + n − x for odd n, with x as in J1, and U\*(n) = U\*(n − 1) + n for
+even n.  No conjecture is needed.
 
-*Proof.*  An odd n = pr joins only the frames of layer 2 that hold p and r, which are closed, and J1's odd case applies
-with no (♦), by the paragraph above.  An even n = 2r joins the frame of layer 2 that holds 2, which is closed, and the
-frame of layer 1, which holds r as a source; that frame is always closed, with the one factor 1, and it keeps only
-q(n − 1), which exceeds r, by Bertrand's postulate.  So r ∉ U\*(n − 1), and J1's even case applies.  From n = 188 on,
-game n − 1 is a board of 187 or more, where layer 2 is one closed frame.  ∎
+*Proof.*  M lies in layer 2, where descending greedy agrees with the greedy basis (the paragraph above), which is all
+that step 7 and the remark on M closed use of (♦).  For odd n, M closed without n therefore makes M closed, and J1's odd
+case applies, with x as in J1.  For even n = 2p, the half p is a prime, whose one maximal factor 1 lies in the frame of
+layer 1; that frame is always closed, with the one factor 1, so J1's even case applies.  ∎
 
-Game 39 = 3·13 joins the one frame of layer 2 of game 38, which is closed.  There v(39) is the sum of v(22), v(26) and
-v(33), the path 3–11–2–13 in G_38, and game 39 gives up the smallest, x = 22.  Game 58 = 2·29 joins the closed frame of
-layer 1, which holds 29 as a source that descending greedy rejected, and the closed frame of layer 2 of game 57, which
-holds 2.  So game 58 has the root problem of game 57, and U\*(58) = U\*(57) + 58.
+The condition holds on every board from 188 on, by [the square theorem (F10)](frame-model.md#the-square-theorem): from
+187 on layer 2 is one closed frame, so M less n, a part of layer 2 of game n − 1, is closed for odd n, and M, which has
+the freedoms of the frame of game n − 1 that holds 2, is closed for even n.  Below 188 it holds wherever the frames that
+n joins are closed, as at 49 = 7², whose frame of 7 in game 48 is closed though another frame of layer 2 is not.
 
-The lemma generalizes the prime formula.  A prime n has the one maximal factor 1, which lies in the frame of layer 1,
-always closed, with the one move q(n − 1).  So game n has the root problem of game n − 1, with no need of (♦), and
-x = q(n − 1): U\*(n) = U\*(n − 1) + n − q(n − 1).  With the repeat lemma this is [the prime formula
-(N5)](neighbors.md#the-prime-formula), which neighbors.md proves from the rules alone, without U.
+Game 39 = 3·13 lies in the one frame of layer 2 of game 39, which is closed, and closed without 39, since the frame of
+layer 2 of game 38 is.  There v(39) is the sum of v(22), v(26) and v(33), the path 3–11–2–13 in G_38, and game 39 gives
+up the smallest, x = 22.  Game 58 = 2·29 lies in the frame of layer 2 that holds 2 and 29, which is closed, and its half
+29 has the maximal factor 1, in the closed frame of layer 1.  So game 58 has the root problem of game 57, and
+U\*(58) = U\*(57) + 58.
+
+The lemma generalizes the prime formula.  A prime n has the one maximal factor 1, and lies in the frame of layer 1,
+always closed, with the one factor 1 and one move, which is q(n − 1) without n.  So game n has the root problem of game
+n − 1, with no need of (♦), and x = q(n − 1): U\*(n) = U\*(n − 1) + n − q(n − 1).  With the repeat lemma this is [the
+prime formula (N5)](neighbors.md#the-prime-formula), which neighbors.md proves from the rules alone, without U.
 
 When the lemma applies, [the repeat lemma (R6)](search-rules.md#the-repeat-lemma) carries the score over.  Given
-[statement U](exactness.md#statement-u) at n and at n − 1, and for odd n the formula for U\*(n) (from (♦) in both games,
-or from J2), opt(n) = opt(n − 1) + n − x for odd n and opt(n) = opt(n − 1) + n for even n.  For even n, U at n − 1 alone
-suffices: the optimal game that a heaviest promotion set makes plays U\*(n − 1) ∪ L, which leaves n/2 out, and [the half
-lemma (N7)](neighbors.md#the-half-lemma) applies.  Whether x is always the shadow of n is [the shadow
-law](#the-shadow-law), measured.  Nothing that proves a score rests on these results: the solver finds a repeated root
-problem by comparing the problems themselves.
+[statement U](exactness.md#statement-u) at n and at n − 1, opt(n) − opt(n − 1) = ΣU\*(n) − ΣU\*(n − 1), which is n − x
+for odd n, given (♦) or by J2, and n for even n.  For even n, U at n − 1 alone suffices: the optimal game that a
+heaviest promotion set makes plays U\*(n − 1) ∪ L, which leaves n/2 out, and [the half lemma
+(N7)](neighbors.md#the-half-lemma) applies.  Whether x is always the shadow of n is [the shadow law](#the-shadow-law),
+measured.  Nothing that proves a score rests on these results: the solver finds a repeated root problem by comparing
+the problems themselves.
 
 ## The shadow law
 
