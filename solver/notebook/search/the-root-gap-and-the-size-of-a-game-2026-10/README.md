@@ -528,6 +528,103 @@ heaviest sets tie, so it needs a measurement of steps; it is the next thing to t
 worth a build: a per-element summary of the circuits' slots in front of the arcs from members (a third of the scanned
 elements miss, for about 1%), and copying and contracting only a child's live vectors (at most 2%).
 
+## 2026-10-27: a sweep of the settings on game 4984
+
+**Question.**  Which settings of the search take the fewest steps and the least CPU on the units of game 4984?  The
+earlier gate study found gate 300 with the look best on games 4920-4949
+([Q3](#2026-10-23-a-lower-gate-for-conflict-branching-in-hard-games-q3)), and the gaps of 4984's units run higher, to
+1,672.  **Answer.**  Conflict branching off, the same search as a gate of 2,200: it took 0.41 of the steps and 0.37 of
+the CPU of the chain's setting on a fresh set of 30 units, and 0.60 and 0.48 on 12 hard units.  No other setting did as
+well: the other gates cut fewer steps, and the rest changed them by 3% or less or raised them.
+
+**Why a gate of 2,200 is conflict branching off.**  At gates of 1,600 and 2,200 the search tree is the same on all 12
+hard units, since no check on them has a gap above 1,600.  So a gate of 2,200 never uses conflict branching, and the
+default strong branching chooses every conflict.  The two spellings gave the same steps and CPU on 8 units checked
+directly.  That off closes deep units in a small share of the steps agrees with [the study of game
+4895](../when-a-node-should-use-conflict-branching-2026-10/README.md).
+
+**Method.**  Units of game 4984's checkpoint (`units-4984.jsonl`), each solved to the end on one thread by `tune solve`
+at `nice -n 19`, 12 solves at once, the settings interleaved per unit.  The baseline B is the chain's setting then:
+conflict branching on, price reuse on, gate 300, the look on.  Ratios are against B on the same units.  On this machine,
+at a load of about 90, a unit's CPU drifts by 10 to 30% between runs, so the steps are the measure and a CPU ratio
+within 15% of 1 means nothing: settings that cannot change the tree (`nogood_period` of 25k and 100k, `more_forced`
+off, `strong_limit` 4) showed CPU ratios of 0.83 to 0.91 at 1.00 of the steps, and B solved twice on the 12 hard units
+took the same steps and 1.13 of the CPU the second time.  Run 1 solved 52 units of gap 300 to 1,500 (node limit 60,000,
+all solved under B) under 17 settings.  Run 2 solved 12 hard units of gap 1,215 to 1,498 (limit 200,000; B capped on
+6), and run 3 a fresh set of 30 of gap 306 to 1,672 (limit 150,000; B capped on 6), each under the gates.
+
+**Results.**  Steps and CPU relative to B, the gate in each row:
+
+| setting | 52 units: steps, CPU | 12 hard units: steps, CPU | 30 fresh units: steps, CPU |
+|---|---|---|---|
+| gate 150 | 0.98, 1.12 | - | - |
+| gate 200 | 0.92, 1.06 | - | - |
+| gate 450 | 1.01, 0.86 | - | - |
+| gate 600 | 0.84, 0.69 | 0.93, 0.76 | 1.00, 0.92 |
+| gate 900 | 0.55, 0.43 | 0.64, 0.52 | 0.71, 0.70 |
+| gate 1,200 | - | 0.58, 0.44 | 0.61, 0.56 |
+| gate 1,600 | - | 0.60, 0.47 | - |
+| conflict branching off (gate 2,200) | - | 0.60, 0.48 | 0.41, 0.37 |
+
+On the fresh set, off took fewer steps than B on 27 units and more on 3, and capped on none, where B capped on 6.  The
+gap between gate 1,200 and off comes from the units of gap 1,450 to 1,670, which B and the gates of 600 and 900 cap on
+and off finishes in 13,000 to 92,000 steps.  On the 12 hard units gate 1,200 and off are within noise of each other.
+Below a gap of 1,200 the settings differ little, and the units there cost almost nothing under any of them.
+
+The other settings, all on the 52 units, did not help.  The look off took 1.97 of the steps (3 units capped); the
+forcing window of 80 and of 25% took 2.1 and 3.1; deep strong branching with a split (`strong_depth` 40,
+`deep_branching=split`) and `branching=forced` took 1.4 each.  Price reuse off, the Lagrangian bound, `more_forced` off,
+`strong_limit` 4 and the two nogood periods took 0.99 to 1.03, and price reuse still does nothing for the steps here.
+`match_refine` was left out, since it has no effect with the GF(2) bound.
+
+**Caveats.**  The steps are exact, and the fresh set agrees with the hard one.  The samples are capped, which works
+against off, so its gain is probably larger than shown: the hardest units, of gaps 1,500 to 2,000, are
+under-represented, and unit 4984-0 (gap 1,407) took B 13 minutes.  Off was not measured at gaps well above 1,700,
+because no unit's checks reach them.  These are units; the effect on the whole game shows as fewer steps for the CPU
+once the setting is applied.
+
+**Decision.**  Kept.  The lab channel applied it to the running chain at 07:19 PDT: `branching` with conflict branching
+off for game 4984 and `policy` with it off from game 4985.  The redeploy at 07:47 PDT on 2f124a6 kept it, and the
+chain's run script no longer passes `--tactic conflict_branching=on`.  Gate 1,200, within noise of off on the hard
+units, would be the hedge.
+
+## 2026-10-27: 88 threads against 44
+
+**Question.**  Does the chain take more steps a second with 44 workers than with 88?  The machine has 44 cores of two
+hardware threads each.  **Answer.**  No: 44 workers took 0.80 of the steps a second that 88 did, in both of two pairs of
+blocks, and the chain stays at 88.
+
+**Method.**  On the live chain, in game 4984 with conflict branching still on, the lab channel's `threads` command
+([the commands](../../../docs/design/lab.md#the-command-folder)) set the run's budget of threads to 88, 44, 88, 44 and
+88 again, in blocks of about 12 minutes from 05:38 to 06:29 PDT.  The rate of a block is the growth of the search's
+steps over its steady window, 9 minutes that start about 3 minutes into the block (the switch took effect within 12
+seconds), from the one-minute `nodes` counters of the chain's `chain.err`.  Every engine thread was at idle priority
+(`SCHED_IDLE`); the 88 blocks showed 88 engine threads and the 44 blocks 44.
+
+**Results.**
+
+| block | workers | steady window (PDT) | steps in it | steps a second |
+|---|---|---|---|---|
+| 1 | 88 | 05:41:26 to 05:50:26 | 24,578,000 | 45.5k |
+| 2 | 44 | 05:53:26 to 06:02:26 | 19,515,629 | 36.1k |
+| 3 | 88 | 06:05:26 to 06:14:26 | 26,374,130 | 48.8k |
+| 4 | 44 | 06:17:26 to 06:26:26 | 21,187,181 | 39.2k |
+
+The 88 blocks average 47.2k a second and the 44 blocks 37.7k.  Block 2 is 0.79 of block 1 and block 4 is 0.80 of block
+3.  The 44 workers did not sit one to a core: at 05:57 PDT they were on 35 distinct physical cores, 9 of them holding
+two workers, and at 06:21 on 36, 8 of them holding two.  A core in use does more with one worker than with two, 0.82k
+to 0.89k steps a second against 0.63k, but 88 workers use more of the machine (70.9 and 77.4 cores of the chain's
+against 44.2 and 44.1) and get more done.
+
+**What could mislead.**  Other jobs at `nice -n 19` ran throughout, mostly `tune` (the sweep above among them),
+`tune-carry`, `rustc` and `certify`, sampled with `top` every 27 s: 16.4 busy cores in block 1 (from 05:44), 18.9 in
+block 2, 10.2 in block 3 and 16.7 in block 4.  The load was heavier in both 44 blocks than in block 3, but block 1 held
+45.5k a second at a similar load, so the 20% is not an artifact of the load.
+
+**Decision.**  The setting stays at 88 and was restored at 06:29:46 PDT, with 88 engine threads confirmed.  The
+switches are the outcome files `20261027T1250Z-threads-44`, `20261027T1302Z-threads-88`, `20261027T1314Z-threads-44`
+and `20261027T1329Z-threads-88` in the channel's `out/` folder, named in UTC; the load sample was not kept.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -550,3 +647,9 @@ paired runner (`pair.sh`) and its summary (`psumm.py`), the unpaired runner (`ab
 `set6.txt`, `cand40*.txt`); and a file a solve in `probe*/` (the units timed), `prof1/` and `prof2/` (the profiles),
 `ab1/` (unpaired), `pair1/` (the lists alone), `pair2/` (the change), `pair3/` (the change, conflict branching off),
 `prof3/` (the profile with conflict branching off) and `ident/` (game 3000).
+`~/taxman_work/lab/work/patch/sweep/` has the settings sweep of game 4984 (2026-10-27) on the units of
+`~/taxman_work/lab/work/patch/units-4984.jsonl`: the runner (`run.sh SETFILE SAMPLEFILE OUTDIR NODELIMIT`, resumable),
+the settings (`settings.txt` for run 1, `settings2.txt` and `settings3.txt` for runs 2 and 3, `settings4.txt` for the
+check of conflict branching off against a gate of 2,200), the unit ids (`sample1.txt` to `sample4.txt`, and
+`sample3b.txt`), a file a solve in `out1/` to `out4/` (a directory a run), the screening (`screen.sh`, `screen.json` and
+`screen/`) and the summaries (`analyze.py`, `summ.py`).
