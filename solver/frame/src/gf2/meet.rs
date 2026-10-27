@@ -126,6 +126,21 @@ fn each_bit<const R: usize>(mask: &Vector<R>, mut f: impl FnMut(usize)) {
     }
 }
 
+/// The weight split's bound on the common independent sets without a member of the heaviest set (see the module docs,
+/// "The weight split"): `value`, the heaviest set's weight, less what each matroid's heaviest independent set loses
+/// without the member, its weight there (`w1`, `w2`) less that of its heaviest replacement there (`repl`, 0 for none),
+/// in each matroid where it weighs more than 0.
+fn bound_without(value: i64, (w1, w2): (i64, i64), repl: [i64; 2]) -> i64 {
+    let mut bound = value;
+    if w1 > 0 {
+        bound -= w1 - repl[0];
+    }
+    if w2 > 0 {
+        bound -= w2 - repl[1];
+    }
+    bound
+}
+
 /// Whether the live element `i` is free in matroid `m` of the workspace `meet`'s tableau (its residue is not zero):
 /// the flag kept with the residue, checked against it in debug builds.  A macro, so that it reads the two fields alone
 /// while others are borrowed.
@@ -364,6 +379,8 @@ pub struct Meet<const R: usize> {
     by_w2: Vec<u32>,
     sorted_for: u64,
     flip: Vec<u32>,
+    /// [`flipped_independent`](Self::flipped_independent)'s rows: the circuits of the elements entering a block.
+    entering_rows: Vec<Vector<R>>,
     /// The element that closed the cycle the last [`has_cycle_within`](Self::has_cycle_within) found (`NONE` for
     /// none).
     found: u32,
@@ -650,6 +667,7 @@ impl<const R: usize> Meet<R> {
             by_w2: Vec::with_capacity(n),
             sorted_for: 0,
             flip: Vec::with_capacity(n),
+            entering_rows: Vec::new(),
             found: NONE,
             dummy_back: [NONE; 2],
             withouts: 0,
@@ -1965,10 +1983,8 @@ impl<const R: usize> Meet<R> {
     }
 
     /// [`split_bounds`](Self::split_bounds), its Bellman–Ford started from the potentials of an earlier split `start`
-    /// where they still hold ([`warm_start`](Self::warm_start)): the same split, since the shortest distances are
-    /// the same from any potentials that are lengths of paths and no lower (debug builds check it against the split
-    /// from all zero).  If `p` is `start`'s problem contracted by the members `contracted`, the first round relaxes
-    /// fewer arcs ([`pull_into_broken`](Self::pull_into_broken)).
+    /// where they still hold ([`split_from`](Self::split_from)), with the bound without each member in one pass over
+    /// the circuits.
     pub fn split_bounds_from(
         &mut self,
         p: &Problem<'_, R>,
@@ -1977,8 +1993,87 @@ impl<const R: usize> Meet<R> {
         contracted: Option<&[u32]>,
         mut f: impl FnMut(u32, i64),
     ) -> bool {
-        debug_assert!(self.settled);
+        if !self.split_from(p, live, start, contracted) {
+            return false;
+        }
         let w = p.weight;
+        // In each matroid the members of positive weight there, B_m, are a heaviest basis of the elements of
+        // positive weight; without a member x of B_m the heaviest independent set is B_m − x plus the heaviest
+        // positive element whose circuit with respect to B_m holds x (one exchange), if any.  That circuit is the
+        // element's circuit with respect to I*, its mask: an element's circuit holds only members at least as heavy
+        // as it in the matroid (the split's arcs, `w1(y) ≤ w1(x)` in A and `w2(y) ≤ w2(x)` in B for a member x of
+        // y's circuit), so a positive element's circuit holds members of B_m alone.
+        for m in 0..2 {
+            let (pot, repl) = (&self.pot, &mut self.repl[m]);
+            let weight_in = |i: usize| if m == 0 { pot[i] } else { w[i] - pot[i] };
+            for &e in live {
+                repl[e as usize] = 0;
+            }
+            for &e in live {
+                let i = e as usize;
+                let wy = weight_in(i);
+                if wy <= 0 || self.inside[i] {
+                    continue;
+                }
+                debug_assert!(is_zero(&self.res[m][i]), "an element of positive weight is free of I*");
+                let elems = &self.slot_elem[m][usize::from(p.block[m][i])];
+                each_bit(&self.mask[m][i], |s| {
+                    let x = elems[s] as usize;
+                    debug_assert!(weight_in(x) >= wy, "a member of a circuit lighter than its element");
+                    repl[x] = repl[x].max(wy);
+                });
+            }
+        }
+        for &e in live {
+            let i = e as usize;
+            if self.inside[i] {
+                let split = (self.pot[i], w[i] - self.pot[i]);
+                f(e, bound_without(self.value, split, [self.repl[0][i], self.repl[1][i]]));
+            }
+        }
+        true
+    }
+
+    /// After [`split_from`](Self::split_from) on the tableau the workspace holds, with `pot` its split (`w1` by
+    /// element, as [`potentials`](Self::potentials) has it): the split's bound without the member `x` alone, as
+    /// [`split_bounds_from`](Self::split_bounds_from) finds it for every member.  The positive elements whose
+    /// circuits hold `x` are those of its column in A, and in B those of its block whose masks hold its slot.
+    pub fn split_bound_without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32) -> i64 {
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
+        let w = p.weight;
+        let i = x as usize;
+        let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+        let repl_a = self.columns[column].iter().map(|&y| pot[y as usize]).filter(|&v| v > 0).max().unwrap_or(0);
+        let s = usize::from(self.slot[1][i]);
+        let repl_b = self.block_live[1][usize::from(p.block[1][i])]
+            .iter()
+            .map(|&y| y as usize)
+            .filter(|&y| !self.inside[y] && bit(&self.mask[1][y], s))
+            .map(|y| w[y] - pot[y])
+            .filter(|&v| v > 0)
+            .max()
+            .unwrap_or(0);
+        bound_without(self.value, (pot[i], w[i] - pot[i]), [repl_a, repl_b])
+    }
+
+    /// The weight split of the tableau's set, the heaviest of all sizes (see the module docs, "The weight split"):
+    /// `w1` by element in [`potentials`](Self::potentials), the bounds without its members left to
+    /// [`split_bound_without`](Self::split_bound_without); false if the constraints have no solution.  Its
+    /// Bellman–Ford starts from the potentials of an earlier split `start` where they still hold
+    /// ([`warm_start`](Self::warm_start)): the same split, since the shortest distances are the same from any
+    /// potentials that are lengths of paths and no lower (debug builds check it against the split from all zero).  If
+    /// `p` is `start`'s problem contracted by the members `contracted`, the first round relaxes fewer arcs
+    /// ([`pull_into_broken`](Self::pull_into_broken)).
+    pub fn split_from(
+        &mut self,
+        p: &Problem<'_, R>,
+        live: &[u32],
+        start: Option<&SplitStart>,
+        contracted: Option<&[u32]>,
+    ) -> bool {
+        debug_assert!(self.settled);
         if self.columns_for != self.tableau {
             self.build_columns();
         }
@@ -2004,77 +2099,6 @@ impl<const R: usize> Meet<R> {
         let base = self.pot[zero];
         for &e in live {
             self.pot[e as usize] -= base;
-        }
-        // In each matroid the members of positive weight there, B_m, are a heaviest basis of the elements of
-        // positive weight; without a member x of B_m the heaviest independent set is B_m − x plus the heaviest
-        // positive element whose circuit with respect to B_m holds x (one exchange), if any.  In a block where
-        // every member has positive weight, B_m is I* there and the circuits are the tableau's masks; in a block
-        // with a member of weight 0 the circuits with respect to I* would miss the replacements through it, so
-        // B_m's span there is built and the elements reduced by it.
-        for m in 0..2 {
-            let weight_in = |i: usize, pot: &[i64]| if m == 0 { pot[i] } else { w[i] - pot[i] };
-            let mut has_zero = [false; 8];
-            for &e in live {
-                let i = e as usize;
-                self.repl[m][i] = 0;
-                if self.inside[i] && weight_in(i, &self.pot) <= 0 {
-                    has_zero[usize::from(p.block[m][i])] = true;
-                }
-            }
-            for (b, span) in self.spans[m].iter_mut().enumerate() {
-                if has_zero[b] {
-                    span.clear();
-                }
-            }
-            for &e in live {
-                let i = e as usize;
-                let b = usize::from(p.block[m][i]);
-                if has_zero[b] && self.inside[i] && weight_in(i, &self.pot) > 0 {
-                    let inserted = self.spans[m][b].insert(p.vector[m][i], e);
-                    debug_assert!(inserted, "a member of a common independent set is dependent");
-                }
-            }
-            for &e in live {
-                let i = e as usize;
-                let wy = weight_in(i, &self.pot);
-                if wy <= 0 || self.inside[i] {
-                    continue;
-                }
-                let b = usize::from(p.block[m][i]);
-                let repl = &mut self.repl[m];
-                if has_zero[b] {
-                    let span = &self.spans[m][b];
-                    let (r, c) = span.reduce(p.vector[m][i]);
-                    // A positive element independent of B_m would make B_m + y heavier: the split rules it out.
-                    debug_assert!(is_zero(&r), "an element of positive weight is free of a heaviest basis");
-                    each_bit(&c, |slot| {
-                        let x = span.elem[slot] as usize;
-                        repl[x] = repl[x].max(wy);
-                    });
-                } else {
-                    debug_assert!(is_zero(&self.res[m][i]), "an element of positive weight is free of I*");
-                    let elems = &self.slot_elem[m][b];
-                    each_bit(&self.mask[m][i], |s| {
-                        let x = elems[s] as usize;
-                        repl[x] = repl[x].max(wy);
-                    });
-                }
-            }
-        }
-        for &e in live {
-            let i = e as usize;
-            if !self.inside[i] {
-                continue;
-            }
-            let (w1, w2) = (self.pot[i], w[i] - self.pot[i]);
-            let mut bound = self.value;
-            if w1 > 0 {
-                bound -= w1 - self.repl[0][i];
-            }
-            if w2 > 0 {
-                bound -= w2 - self.repl[1][i];
-            }
-            f(e, bound);
         }
         true
     }
@@ -2102,7 +2126,7 @@ impl<const R: usize> Meet<R> {
     /// than the best found can pass.
     pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
-        let (length, end) = self.shortest_cycle::<false>(p, pot, x, limit, banned, false)?;
+        let (length, end) = self.shortest_cycle::<false>(p, pot, x, limit, banned, false, 0)?;
         // The cycle's elements, and the set flipped along it checked common independent in the blocks it touches
         // (the others hold the same members as before).
         self.flip.clear();
@@ -2145,7 +2169,7 @@ impl<const R: usize> Meet<R> {
     /// search.
     pub fn without_any_size(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
-        let (length, end) = self.shortest_cycle::<true>(p, pot, x, p.weight[x as usize], banned, false)?;
+        let (length, end) = self.shortest_cycle::<true>(p, pot, x, p.weight[x as usize], banned, false, 0)?;
         // The cycle's elements: from the one that closes it, its predecessors back to x, the two vertices that stand
         // for no element left out.
         self.flip.clear();
@@ -2174,8 +2198,12 @@ impl<const R: usize> Meet<R> {
     /// long (the search stops at the first it finds, and the set it flips to is not checked): if it has none, the
     /// sets without `x` of the heaviest set's size lose more than `limit` against it.
     /// Where the search cannot be made (no settled solve's tableau holding `x`, or a limit out of range), the answer
-    /// is yes, which claims nothing.
-    pub fn has_cycle_within(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64) -> bool {
+    /// is yes, which claims nothing.  `closing` is at most the length of every arc into `x` (0 if nothing is known,
+    /// see [`closing_lengths`](Self::closing_lengths)): a cycle that closes from a vertex at distance `d` is at least
+    /// `d + closing` long, so no vertex is offered a distance above `limit − closing`.  The vertices the search
+    /// leaves out come after every vertex from which a cycle within `limit` closes, so it finds the cycle that it finds
+    /// without the bound.
+    pub fn has_cycle_within(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, closing: i64) -> bool {
         let searchable = self.settled
             && self.tableau == self.solves
             && self.inside[x as usize]
@@ -2184,9 +2212,60 @@ impl<const R: usize> Meet<R> {
         if !searchable {
             return true;
         }
-        let Some((_, end)) = self.shortest_cycle::<false>(p, pot, x, limit, &[], true) else { return false };
+        let Some((_, end)) = self.shortest_cycle::<false>(p, pot, x, limit, &[], true, closing) else { return false };
         self.found = end;
         true
+    }
+
+    /// For the searches for cycles through the members of the tableau's set, with its weight split `pot` (`w1` by
+    /// element): in `closing`, for each member, the least length of an arc into it, `i64::MAX` where there is none.
+    /// The arcs into a member come from the elements free in B and from those whose circuit in B holds it, each `w2`
+    /// of the member less that of the element, so one pass over the circuits of B finds them all.
+    pub fn closing_lengths(&self, p: &Problem<'_, R>, pot: &[i64], closing: &mut [i64]) {
+        let w = p.weight;
+        let w2 = |i: usize| w[i] - pot[i];
+        // First the heaviest element in `w2` with an arc into each member, then the arc.
+        for &x in &self.members {
+            closing[x as usize] = i64::MIN;
+        }
+        let mut free_b = i64::MIN;
+        for &y in self.out_a.iter().flatten() {
+            let i = y as usize;
+            if free!(self, 1, i) {
+                free_b = free_b.max(w2(i));
+            } else {
+                let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
+                each_bit(&self.mask[1][i], |s| {
+                    let x = elems[s] as usize;
+                    closing[x] = closing[x].max(w2(i));
+                });
+            }
+        }
+        for &x in &self.members {
+            let i = x as usize;
+            let heaviest = closing[i].max(free_b);
+            closing[i] = if heaviest == i64::MIN { i64::MAX } else { w2(i) - heaviest };
+        }
+    }
+
+    /// The least length of an arc out of the member `x` of the tableau's set, with its weight split `pot`:
+    /// `w1` of `x` less that of the heaviest element in `w1` free in A or whose circuit in A holds `x`; `i64::MAX` if
+    /// there is none.  A cycle through `x` is at least this plus its [closing length](Self::closing_lengths) long:
+    /// it leaves `x` by one of these arcs and comes back by one of those (two arcs even where it has two vertices).
+    pub fn opening_length(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32) -> i64 {
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
+        self.sort_by_split(p, pot);
+        let i = x as usize;
+        let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+        let free_a = self.free_a.first().map_or(i64::MIN, |&y| pot[y as usize]);
+        let heaviest = self.columns[column].iter().map(|&y| pot[y as usize]).fold(free_a, i64::max);
+        if heaviest == i64::MIN {
+            i64::MAX
+        } else {
+            pot[i] - heaviest
+        }
     }
 
     /// After a [`has_cycle_within`](Self::has_cycle_within) through `x` that found a cycle: that cycle, added to
@@ -2236,7 +2315,9 @@ impl<const R: usize> Meet<R> {
     }
 
     /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,
-    /// or with `first` the first cycle found within `limit`.
+    /// or with `first` the first cycle found within `limit`, every arc into `x` at least `closing` long (see
+    /// [`has_cycle_within`](Self::has_cycle_within); 0 for nothing known).
+    #[allow(clippy::too_many_arguments)]
     fn shortest_cycle<const SIZES: bool>(
         &mut self,
         p: &Problem<'_, R>,
@@ -2245,6 +2326,7 @@ impl<const R: usize> Meet<R> {
         limit: i64,
         banned: &[u32],
         first: bool,
+        closing: i64,
     ) -> Option<(i64, u32)> {
         if !self.settled || self.tableau != self.solves || !self.inside[x as usize] {
             debug_assert!(false, "the bound without a member needs the tableau of a settled solve holding it");
@@ -2264,8 +2346,10 @@ impl<const R: usize> Meet<R> {
         let settled = self.next_generation(2);
         let reached = settled - 1;
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
-        // Distances from `limit + 1` on cannot lead to a cycle that certifies.
+        // Distances from `limit + 1` on cannot lead to a cycle that certifies, and with the arcs into x at least
+        // `closing` long, nor can a vertex's from `limit + 1 − closing` on.
         let bound = (limit + 1) * HOPS;
+        let offered = bound - closing.clamp(0, limit + 1) * HOPS;
         let (heap, offered_at, by_w2) = (&mut self.heap, &mut self.offered_at, &self.by_w2);
         heap.start(bound, self.pos.len());
         // A banned element counts as settled: never offered, nor reached as an element free in A.
@@ -2297,7 +2381,7 @@ impl<const R: usize> Meet<R> {
             ($v:expr, $d:expr, $from:expr) => {{
                 let (v, d): (u32, Dist) = ($v, $d);
                 let i = v as usize;
-                if d < cycle.0 && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
+                if d < cycle.0 && d < offered && stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
                     seen[i] = reached;
                     reach[i] = d;
                     back[i] = $from;
@@ -2314,7 +2398,7 @@ impl<const R: usize> Meet<R> {
                 }
                 if let (Some(&z), true) = (by_w2.get(next_member), hub.0 != INF) {
                     let dz = hub.0 + w2(z) * HOPS;
-                    if dz < bound {
+                    if dz < offered {
                         heap.push(dz, z);
                     }
                 }
@@ -2328,7 +2412,7 @@ impl<const R: usize> Meet<R> {
                 }
                 if let Some(&y) = self.free_a.get(next_free) {
                     let dy = through.0 - w1(y) * HOPS + 1;
-                    if dy < bound {
+                    if dy < offered {
                         heap.push(dy, FREE_A);
                     }
                 }
@@ -2638,7 +2722,9 @@ impl<const R: usize> Meet<R> {
     }
 
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
-    /// element belongs to, the members there that stay and the outside elements that come in, inserted in a span.
+    /// element belongs to, the members there that stay and the outside elements that come in.  Where every element
+    /// that comes in is in the span of the set, its circuit decides
+    /// ([`independent_by_circuits`](Self::independent_by_circuits)); elsewhere they are inserted in a span.
     fn flipped_independent(&mut self, p: &Problem<'_, R>) -> bool {
         self.next_generation(1);
         for &e in &self.flip {
@@ -2651,21 +2737,79 @@ impl<const R: usize> Meet<R> {
                     continue;
                 }
                 self.dirty[m][b] = true;
-                let span = &mut self.spans[m][b];
-                span.clear();
-                let stay = self.slot_elem[m][b][..self.next_slot[m][b]]
-                    .iter()
-                    .filter(|&&z| z != NONE && self.seen[z as usize] != self.generation);
-                let enter =
-                    self.flip.iter().filter(|&&y| !self.inside[y as usize] && usize::from(p.block[m][y as usize]) == b);
-                for &e in stay.chain(enter) {
-                    if !span.insert(p.vector[m][e as usize], e) {
-                        self.dirty[m].fill(false);
-                        return false;
+                let independent = match self.independent_by_circuits(p, m, b) {
+                    Some(independent) => {
+                        debug_assert_eq!(independent, self.independent_by_span(p, m, b), "block {b} of {m}");
+                        independent
                     }
+                    None => self.independent_by_span(p, m, b),
+                };
+                if !independent {
+                    self.dirty[m].fill(false);
+                    return false;
                 }
             }
             self.dirty[m].fill(false);
+        }
+        true
+    }
+
+    /// Whether the members of block `b` of matroid `m` that stay (those not on `self.flip`, which `seen` marks with
+    /// the current stamp) and the elements of the flip that come in are independent, if every one coming in is in
+    /// the span of the set (`None` otherwise).  An element `y` in the span is the sum of the members of its circuit,
+    /// and the members are independent, so a sum of elements coming in lies in the span of the members that stay
+    /// exactly when the sum of their circuits holds no slot of a member that leaves: the elements come in
+    /// independently exactly when their circuits, cut to the slots of the members leaving, are independent.  A few
+    /// rows of `R` words are eliminated, where a span would take every member of the block.
+    fn independent_by_circuits(&mut self, p: &Problem<'_, R>, m: usize, b: usize) -> Option<bool> {
+        let mut leaving = [0u64; R];
+        self.entering_rows.clear();
+        for &e in &self.flip {
+            let i = e as usize;
+            if usize::from(p.block[m][i]) != b {
+                continue;
+            }
+            if self.inside[i] {
+                let s = usize::from(self.slot[m][i]);
+                leaving[s / 64] |= 1 << (s % 64);
+            } else if free!(self, m, i) {
+                return None;
+            } else {
+                self.entering_rows.push(self.mask[m][i]);
+            }
+        }
+        let rows = &mut self.entering_rows;
+        for row in rows.iter_mut() {
+            for (c, l) in row.iter_mut().zip(&leaving) {
+                *c &= l;
+            }
+        }
+        // Gaussian elimination by the lowest bit of each row: a row that comes to nothing is a dependence.
+        for k in 0..rows.len() {
+            let row = rows[k];
+            let Some(pivot) = lowest(&row) else { return Some(false) };
+            for later in &mut rows[k + 1..] {
+                if bit(later, pivot) {
+                    xor(later, &row);
+                }
+            }
+        }
+        Some(true)
+    }
+
+    /// [`independent_by_circuits`](Self::independent_by_circuits)'s question answered from the vectors: the members
+    /// that stay and the elements that come in, inserted in a span.
+    fn independent_by_span(&mut self, p: &Problem<'_, R>, m: usize, b: usize) -> bool {
+        let span = &mut self.spans[m][b];
+        span.clear();
+        let stay = self.slot_elem[m][b][..self.next_slot[m][b]]
+            .iter()
+            .filter(|&&z| z != NONE && self.seen[z as usize] != self.generation);
+        let enter = self.flip.iter().filter(|&&y| !self.inside[y as usize] && usize::from(p.block[m][y as usize]) == b);
+        for &e in stay.chain(enter) {
+            if !span.insert(p.vector[m][e as usize], e) {
+                return false;
+            }
         }
         true
     }
@@ -3120,6 +3264,68 @@ mod tests {
 
     /// The first `trials` problems of [`heaviest_set_without_a_member_with_free_blocks_against_brute_force`], which must
     /// reach `percent` percent of the counts that it asks.
+    /// On random problems of one to three blocks a matroid, with tied weights, for each member `x` of the heaviest
+    /// set: its least arcs out and in ([`Meet::opening_length`], [`Meet::closing_lengths`]) are those of the arcs of
+    /// the exchange graph found one by one (`x → y` where `I − x + y` is independent in A, `y → x` where it is in B);
+    /// a search for a cycle through `x` within a limit, bounded by its least arc in, answers as the unbounded search
+    /// does and keeps the same cycle, and finds none where its two least arcs are longer than the limit; and the
+    /// split's bound without `x` found alone ([`Meet::split_bound_without`]) is the one found for every member in one
+    /// pass.
+    #[test]
+    fn a_members_least_arcs_bound_its_cycles_and_its_split_bound_is_found_alone() {
+        let mut rng = Rng(0x1EA5_7A2C_0000_0001);
+        let (mut members, mut found, mut cut) = (0, 0, 0);
+        for trial in 0..300 {
+            let n = 2 + rng.below(11) as usize;
+            let owned = random(&mut rng, n, 4);
+            let p = owned.problem();
+            let w = &owned.weight;
+            let live: Vec<u32> = (0..n as u32).collect();
+            let mut meet = Meet::<1>::new(n, owned.blocks());
+            meet.solve(&p, &live, &[], n, i64::MAX, |_| {});
+            let mut bounds = Vec::new();
+            if !(meet.settled && meet.split_bounds(&p, &live, |x, b| bounds.push((x, b)))) {
+                continue;
+            }
+            let pot = meet.potentials().to_vec();
+            let set: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
+            let mut closing = vec![0; n];
+            meet.closing_lengths(&p, &pot, &mut closing);
+            for &(x, bound) in &bounds {
+                members += 1;
+                assert_eq!(meet.split_bound_without(&p, &pot, x), bound, "trial {trial}: the bound without {x}");
+                let (xi, mut opening, mut closing_x) = (x as usize, i64::MAX, i64::MAX);
+                for y in live.iter().copied().filter(|y| !set.contains(y)) {
+                    let mut exchanged: Vec<u32> = set.iter().copied().filter(|&z| z != x).collect();
+                    exchanged.push(y);
+                    let yi = y as usize;
+                    if independent(&owned.block[0], &owned.vector[0], &exchanged) {
+                        opening = opening.min(pot[xi] - pot[yi]);
+                    }
+                    if independent(&owned.block[1], &owned.vector[1], &exchanged) {
+                        closing_x = closing_x.min((w[xi] - pot[xi]) - (w[yi] - pot[yi]));
+                    }
+                }
+                assert_eq!(meet.opening_length(&p, &pot, x), opening, "trial {trial}: the arcs out of {x}");
+                assert_eq!(closing[xi], closing_x, "trial {trial}: the arcs into {x}");
+                for limit in [0, 2, 5, 10, 20, 40] {
+                    let plain = meet.has_cycle_within(&p, &pot, x, limit, 0);
+                    let plain_cycle = meet.keep_cycle(x, &mut Cycles::default()).to_vec();
+                    let bounded = meet.has_cycle_within(&p, &pot, x, limit, closing_x);
+                    let bounded_cycle = meet.keep_cycle(x, &mut Cycles::default()).to_vec();
+                    assert_eq!((bounded, bounded_cycle), (plain, plain_cycle), "trial {trial}: {x} within {limit}");
+                    found += usize::from(plain);
+                    if opening.saturating_add(closing_x) > limit {
+                        assert!(!plain, "trial {trial}: a cycle through {x} within {limit} shorter than its arcs");
+                        cut += 1;
+                    }
+                }
+            }
+        }
+        println!("{members} members, {found} cycles within a limit, {cut} limits below the least arcs");
+        assert!(members > 500 && found > 500 && cut > 500, "{members} {found} {cut}");
+    }
+
     fn heaviest_set_without_a_member_with_free_blocks(trials: usize, percent: usize) {
         let mut rng = Rng(0x7A3C_91E5_B0D2_4F68);
         let mut counts = Counts::default();
@@ -3162,7 +3368,7 @@ mod tests {
         let members: Vec<u32> = live.iter().copied().filter(|&e| meet.contains(e)).collect();
         for &x in &members {
             for limit in [0, 3, 10, 40] {
-                out.push(i64::from(meet.has_cycle_within(&p, &pot, x, limit)));
+                out.push(i64::from(meet.has_cycle_within(&p, &pot, x, limit, 0)));
             }
             out.push(meet.without(&p, &pot, x, loss.min(1000), &[]).unwrap_or(-1));
         }

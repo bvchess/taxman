@@ -68,10 +68,12 @@
 //!
 //! # Forced members, and the bound without a member
 //!
-//! With the heaviest set `I*` of all sizes, [`meet::Meet::split_bounds`] bounds the problem without each member of
-//! `I*` from a weight split, in one pass; a member without which the bound is below what the node needs is forced:
-//! every completion that beats the incumbent promotes it.  For the members the split leaves free near the need,
-//! `I*`'s exchange graph decides exactly (`Levels::force_by_cycles`), and strong branching reads the bound without
+//! With the heaviest set `I*` of all sizes, a weight split bounds the problem without each member of `I*`
+//! ([`meet::Meet::split_bounds`]); a member without which the bound is below what the node needs is forced: every
+//! completion that beats the incumbent promotes it.  `I*`'s exchange graph decides exactly
+//! (`Levels::force_by_cycles`), every member with the window `all` of `force_window`, which finds the split's forced
+//! members too: so the split's bounds are found only where the graph cannot decide, or one at a time where strong
+//! branching orders a conflict's members by them ([`Gf2Bound::split_without`]).  Strong branching reads the bound without
 //! each member of a conflict off it ([`Gf2Bound::certified_excluding`]), solving only where it is not certified (see
 //! [`meet`], "The heaviest set without a member").  A level's heaviest set may come from such a certificate too: the
 //! node's without the member it branched on, and a child's that lost one member of its parent's heaviest set
@@ -370,6 +372,12 @@ impl Gf2Graph {
 /// version 5 implies this window.
 pub const LEGACY_FORCE_WINDOW: u32 = 80;
 
+/// The fewest members left to search for being forced (`Levels::force_by_cycles`) for which the least arcs into
+/// each member are found, in one pass over the circuits of `B`, to bound the searches: at game 4984 the pass costs about
+/// as much as five searches that prove a member forced, and the bound halves those searches (the notebook's entry on the
+/// root gap, 2026-10-27).
+const BOUNDED_SEARCHES_FROM: usize = 4;
+
 /// Which members of the heaviest set that the weight split leaves free [`Gf2Bound::evaluate`] searches for being
 /// forced after all (`Levels::force_by_cycles`; the tactic `force_window`): any choice is sound, since a member is
 /// called forced only where the search shows it.  The default is [`All`](ForceWindow::All).
@@ -487,7 +495,8 @@ pub struct Gf2Stats {
     /// Members of a pricing ([`Gf2Bound::prices_excluding`]) whose shortest cycle came from the parent's pricing,
     /// with no search.
     pub carried: u64,
-    /// Members found forced by `Levels::force_by_cycles` where the split left them free.
+    /// Members found forced by `Levels::force_by_cycles`: where the split's bounds were found first (another window
+    /// of `force_window` than all), those the bounds left free.
     pub forced_by_cycles: u64,
     /// Children bounded with no solve ([`Gf2Bound::child_bound`]).
     pub child_bounds: u64,
@@ -664,10 +673,7 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// The weight split's bound on the top level without its member `x`, if the last evaluation asked for forced
     /// members and the level has a split.
     pub fn split_without(&mut self, x: u32) -> Option<i64> {
-        dispatch!(self, l => {
-            let level = &l.levels[l.depth];
-            level.has_split.then(|| level.split.iter().find(|p| p.0 == x).map(|p| p.1)).flatten()
-        })
+        dispatch!(self, l => l.split_without(x))
     }
 
     /// In tests: from here on every tableau derived instead of built ([`meet::Meet::derive`]) is checked against the
@@ -721,10 +727,13 @@ struct Level<const W: usize, const R: usize> {
     cap: usize,
     settled: bool,
     value: u64,
-    /// The bounds without each member of the heaviest set, from the weight split, once asked for, and the split
-    /// itself (`w1` by element) if one was found.
+    /// The members of the heaviest set once a weight split was asked for, each with the split's bound without it
+    /// where `bounds`, else with the level's value (no lower); and the split itself (`w1` by element) if one was found.
+    /// The bounds are found with the split where `force_window` searches the members by them, else where the searches
+    /// for forced members cannot run ([`Levels::find_bounds`]).
     split: Vec<(u32, i64)>,
     has_split: bool,
+    bounds: bool,
     pot: Vec<i64>,
     has_pot: bool,
     /// A lower bound on what the common independent sets smaller than the heaviest set (of all sizes) lose against
@@ -788,6 +797,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             value: 0,
             split: Vec::new(),
             has_split: false,
+            bounds: false,
             pot: vec![0; n],
             has_pot: false,
             loss_floor: 0,
@@ -868,6 +878,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     /// ([`warm_child`]); and its scratch, a weight split.
     warm: bool,
     warm_pot: Vec<i64>,
+    /// Scratch of [`force_by_cycles`](Self::force_by_cycles): the least length of an arc into each member.
+    closing: Vec<i64>,
     stats: Gf2Stats,
     /// Which free members are searched for being forced ([`ForceWindow`]).
     force_window: ForceWindow,
@@ -914,6 +926,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             contracted_idx: Vec::with_capacity(n),
             warm: false,
             warm_pot: vec![0; n],
+            closing: vec![0; n],
             stats: Gf2Stats::default(),
             force_window: ForceWindow::default(),
             cycles: Vec::new(),
@@ -1111,14 +1124,25 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         // A bound below the need cuts the node, which then needs neither its split nor its forced members.
         if let Some(need) = need.filter(|&need| level.value >= need) {
             self.ensure_split();
-            let level = &mut self.levels[d];
-            if level.has_split {
+            let level = &self.levels[d];
+            // Without its bounds, the split's forced members are found by the searches for forced members, which find
+            // every member forced that a bound shows forced: every cycle through a member leaves it by an arc and comes
+            // back by another, at least what the split's bound takes off without it.  So the bounds are needed only
+            // where the searches cannot run.
+            if level.has_split && level.bounds {
                 for &(x, bound) in &level.split {
                     if bound < need as i64 {
                         forced.insert(x);
                     }
                 }
                 self.force_by_cycles(cap, need, &mut forced);
+            } else if level.has_split && !self.force_by_cycles(cap, need, &mut forced) {
+                self.find_bounds();
+                for &(x, bound) in &self.levels[d].split {
+                    if bound < need as i64 {
+                        forced.insert(x);
+                    }
+                }
             }
         }
         let level = &self.levels[d];
@@ -1153,7 +1177,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         };
         let contracted = same_problem.then_some(&contracted[..]);
         let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
-        split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted);
+        let bounds = self.force_window != ForceWindow::All;
+        split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted, bounds);
         if level.has_pot {
             self.meet.save_split(&mut self.starts[d].0);
             self.starts[d].1 = node;
@@ -1164,7 +1189,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// the workspace's), at `need`, added to `forced`: a member is forced when every set without it weighs less than
     /// `need`, which holds when the sets of other sizes than the heaviest set's lose more than the slack `value −
     /// need` and its exchange graph has no cycle through the member that short (see `meet`'s module docs).  Only the
-    /// members whose split bound the window admits are searched (the tactic `force_window`, [`ForceWindow`]).
+    /// members whose split bound the window admits are searched (the tactic `force_window`, [`ForceWindow`]).  False
+    /// if the searches cannot run (nothing added).
     ///
     /// A cycle within the slack shows every member on it free, so the cycles that the last searches at the parent's
     /// depth, at this one and at the child's found are tried first: each that is still a cycle of this exchange graph
@@ -1173,14 +1199,21 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// and no cycle within the slack passes through a forced member, so a child that inherits its parent's heaviest
     /// set finds nearly all its members free on its parent's cycles.  The forced members are those a search for each
     /// would find: a member is free exactly when some cycle within the slack passes through it.
-    fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) {
+    ///
+    /// Where many members are left to search ([`BOUNDED_SEARCHES_FROM`]), the least length of an arc out of each
+    /// member ([`Meet::opening_length`]) and into it ([`Meet::closing_lengths`], one pass over the circuits of `B`)
+    /// show forced, with no search, the members whose two arcs alone are longer than the slack (the split's forced
+    /// members among them), and bound the search for each of the others ([`Meet::has_cycle_within`]), which finds
+    /// the cycle it would find without the bound.
+    fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) -> bool {
         let graph = self.graph;
         let level = &mut self.levels[self.depth];
         let size = level.history.last().map_or(0, |last| last.len() as usize);
         let held = level.meet_solve == self.meet.solves;
         if !(level.has_pot && level.settled && held && size <= cap && level.value >= need) {
-            return;
+            return false;
         }
+        debug_assert!(level.bounds || self.force_window == ForceWindow::All, "a window but no split bounds");
         let slack = (level.value - need) as i64;
         let problem = Problem {
             block: [&graph.block[0], &graph.block[1]],
@@ -1189,7 +1222,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         };
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         if !losses.certify(slack + 1, &mut self.meet, &problem, &level.pot) {
-            return;
+            return false;
         }
         level.loss_floor = losses.smaller;
         // The members of the cycles within the slack, each of which passes through them: the cycles kept first, then
@@ -1214,16 +1247,28 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         #[cfg(debug_assertions)]
         for x in free.iter() {
-            let found = self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack);
+            let found = self.meet.has_cycle_within(&problem, &level.pot, graph.index[x as usize], slack, 0);
             assert!(found, "{x} is on a cycle kept within the slack {slack}, which the search does not find");
         }
+        let window = self.force_window;
+        let admitted = |bound: i64| window.admits(bound - need as i64, slack);
+        let left =
+            level.split.iter().filter(|&&(x, bound)| admitted(bound) && !forced.contains(x) && !free.contains(x));
+        let bounded = left.count() >= BOUNDED_SEARCHES_FROM;
+        if bounded {
+            self.meet.closing_lengths(&problem, &level.pot, &mut self.closing);
+        }
         for &(x, bound) in &level.split {
-            let near = self.force_window.admits(bound - need as i64, slack);
-            if !near || forced.contains(x) || free.contains(x) {
+            if !admitted(bound) || forced.contains(x) || free.contains(x) {
                 continue;
             }
             let e = graph.index[x as usize];
-            if self.meet.has_cycle_within(&problem, &level.pot, e, slack) {
+            let closing = if bounded { self.closing[e as usize] } else { 0 };
+            let short = !bounded || {
+                let opening = self.meet.opening_length(&problem, &level.pot, e);
+                closing.saturating_add(opening) <= slack
+            };
+            if short && self.meet.has_cycle_within(&problem, &level.pot, e, slack, closing) {
                 free_members(graph, &self.meet, self.meet.keep_cycle(e, &mut within), &mut free);
             } else {
                 forced.insert(x);
@@ -1231,6 +1276,49 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             }
         }
         self.next_cycles = std::mem::replace(&mut self.cycles[d], within);
+        true
+    }
+
+    /// The weight split's bound without each member of the top level's heaviest set, where its split left them to be
+    /// found ([`Level::split`]): one at a time, from the level's tableau.
+    fn find_bounds(&mut self) {
+        let graph = self.graph;
+        let level = &mut self.levels[self.depth];
+        if level.bounds || level.split.is_empty() {
+            return;
+        }
+        if level.meet_solve != self.meet.solves {
+            resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        }
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: &graph.weight,
+        };
+        for (x, bound) in &mut level.split {
+            *bound = self.meet.split_bound_without(&problem, &level.pot, graph.index[*x as usize]);
+        }
+        level.bounds = true;
+    }
+
+    /// The weight split's bound on the top level without its member `x`, if the level has a split: the one found
+    /// with the split, or else found now from the level's tableau.
+    fn split_without(&mut self, x: u32) -> Option<i64> {
+        let graph = self.graph;
+        let level = &mut self.levels[self.depth];
+        let &(_, bound) = level.split.iter().find(|p| p.0 == x).filter(|_| level.has_split)?;
+        if level.bounds {
+            return Some(bound);
+        }
+        if level.meet_solve != self.meet.solves {
+            resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        }
+        let problem = Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&level.vec[0], &level.vec[1]],
+            weight: &graph.weight,
+        };
+        Some(self.meet.split_bound_without(&problem, &level.pot, graph.index[x as usize]))
     }
 
     fn value_excluding(&mut self, x: u32, cap: usize, stop: u64) -> u64 {
@@ -1659,7 +1747,7 @@ fn warm_child<const W: usize, const R: usize>(
         banned.clear();
         banned.extend(contract.take().unwrap_or(Bits::EMPTY).iter().map(index));
         meet.derive(&child_problem, live, start, banned);
-        if !meet.split_bounds_from(&child_problem, live, None, None, |_, _| {}) {
+        if !meet.split_from(&child_problem, live, None, None) {
             return None;
         }
         pot.copy_from_slice(meet.potentials());
@@ -1831,10 +1919,10 @@ fn resolve<const W: usize, const R: usize>(
     level.meet_solve = meet.solves;
 }
 
-/// The bounds without each member of `level`'s heaviest set (settled), from a weight split, its Bellman–Ford started
-/// from `start`, an earlier split, whose problem the level's is contracted by `contracted` if that is known
-/// ([`Meet::split_bounds_from`]).  Unless the workspace still holds the level's last solve, the level's heaviest set
-/// is solved again from itself first ([`resolve`]).
+/// The weight split of `level`'s heaviest set (settled), its Bellman–Ford started from `start`, an earlier split,
+/// whose problem the level's is contracted by `contracted` if that is known ([`Meet::split_from`]), and with `bounds`
+/// the bounds without each member ([`Meet::split_bounds_from`]; see [`Level::split`]).  Unless the workspace still
+/// holds the level's last solve, the level's heaviest set is solved again from itself first ([`resolve`]).
 #[allow(clippy::too_many_arguments)]
 fn split<const W: usize, const R: usize>(
     graph: &Gf2Graph,
@@ -1845,6 +1933,7 @@ fn split<const W: usize, const R: usize>(
     stats: &mut Gf2Stats,
     start: Option<&SplitStart>,
     contracted: Option<&[u32]>,
+    bounds: bool,
 ) {
     if level.meet_solve != meet.solves {
         resolve(graph, level, meet, live_idx, start_idx);
@@ -1861,12 +1950,21 @@ fn split<const W: usize, const R: usize>(
     let out = &mut level.split;
     out.clear();
     level.has_pot = meet.settled
-        && meet.split_bounds_from(&problem, live_idx, start, contracted, |e, bound| {
-            out.push((graph.elems[e as usize], bound))
-        });
+        && if bounds {
+            meet.split_bounds_from(&problem, live_idx, start, contracted, |e, bound| {
+                out.push((graph.elems[e as usize], bound))
+            })
+        } else {
+            meet.split_from(&problem, live_idx, start, contracted)
+        };
     if level.has_pot {
         level.pot.copy_from_slice(meet.potentials());
+        if !bounds {
+            let value = level.value as i64;
+            out.extend(level.history.last().iter().flat_map(|last| last.iter()).map(|x| (x, value)));
+        }
     }
+    level.bounds = bounds;
     stats.split_rounds = meet.split_rounds;
     level.has_split = true;
 }

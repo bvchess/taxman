@@ -841,6 +841,99 @@ same, so a checkpoint records the tactic (bit 14) and does not bind it, and a ru
 The solves are gone from these units, so the bound's cost is now its splits, its searches for forced members and the
 deletions themselves; a profile of the new build is the next measurement.
 
+## 2026-10-27: a cheaper search for forced members
+
+**Question.**  With the warm start, where does a step of game 4984 spend its CPU under the chain's settings, and can
+the largest part be made cheaper with the same trees?  **Answer.**  The weight splits and the searches for forced
+members take half of a step.  Finding the split's bounds only where they are read, and bounding the searches by each
+member's cheapest arcs, with two smaller changes, take 24 units of 4984 to 0.868 of the CPU, with every tree the same.
+
+**Method.**  The 24 units of the sections above, each solved by `tune solve` under the chain's tactics: conflict
+branching off, price reuse, the warm start, and the store of 144 units of 4983 (`carried_nogoods`), 127,434 steps in
+all.  A scratch build with cycle counters around the bound's functions gave each part's share of the steps' cycles,
+with what it calls.  Its switches turned each change on in the same binary, and every unit took the same steps under
+every switch.  Then the old build (88b1228) and the final one solved each unit at the same time on the two hyperthreads
+of one core, as in the sections above.
+
+**Where the time goes.**  At 1.93 M cycles a step:
+
+| part | share of a step |
+|---|---|
+| the bound's evaluations, a node's own check and its children's | 62.9% |
+| the weight splits | 32.3% |
+| of which the split's Bellman–Ford | 9.8% |
+| of which the bounds without each member | 9.0% |
+| of which the tableaux made again for them | 9.1% |
+| of which the columns of `A` | 5.4% |
+| the searches for forced members | 23.0% |
+| of which those that prove a member forced, 11.0 a step | 8.3% |
+| of which those that find a cycle, 4.8 a step | 14.2% |
+| what the sets of other sizes lose (`Losses`) | 5.0% |
+| strong branching's bounds without 3.4 members of a conflict | 7.8% |
+| the copy of the tableau a node keeps for itself (`keep_certified`) | 3.2% |
+| the children's warm starts | 7.7% |
+| the child's promotion, a peel of two frames | 5.5% |
+
+Two findings decided the change:
+
+* *The split's bounds are a pass over every circuit, and little of it is read.*  The pass costs 205,000 cycles a split.
+  Its bounds force about 6 members an evaluation, which the searches would find forced anyway (below), and they order
+  the 3.4 members of a conflict that strong branching tries.
+* *The searches come from the level a node keeps for itself.*  That level is the node without the member strong
+  branching chose, the one whose loss lowers the bound most, so its slack is the least.  Its next check costs 2.1 M
+  cycles, 38.7% of a step, of which 12.4 searches a step prove a member forced and 3.8 find a cycle (21% of a step).  A
+  warm child takes 3.0 and 0.9 a step; an inherited child almost none, since its parent's cycles hold.
+
+**The change.**  Four parts, each leaving every result the same:
+
+1. *The split's bounds where they are read.*  With the window `all` of `force_window` (the default), the searches find
+   every member forced that a split bound shows forced: a cycle through a member leaves it by one arc and comes back
+   by another, which together are at least what the bound takes off without it.  So a split finds its potentials
+   alone (`Meet::split_from`).  Strong branching finds the bound of each member it orders one at a time, from the
+   member's column of `A` and its block of `B` (`Meet::split_bound_without`, 5,700 cycles).  All of them are found
+   where the searches cannot run: at 248 of 97,220 evaluations, where the other sizes do not lose enough.
+2. *The searches bounded by each member's cheapest arcs.*  Where four or more members are left to search, one pass
+   over the circuits of `B` finds the least arc into each member (`Meet::closing_lengths`, 65,000 cycles), and a
+   member's column the least arc out of it (`Meet::opening_length`).  A member whose two arcs alone are longer than
+   the slack is forced with no search: 4.5 a step, the members the split's bounds forced before.  The search for each
+   other member offers no vertex a distance from which no cycle within the slack can close.  Those vertices come after
+   every vertex from which such a cycle closes, so the search finds the cycle it finds without the bound.  A search
+   that proves a member forced falls from 13,600 cycles to 7,400.
+3. *The flip by circuits.*  `Meet::without` checks that `I*` flipped along its cycle is common independent, by
+   inserting the members of each block the cycle touches in a span.  Where every element that comes in is in the span
+   of `I*`, as in 86% of those blocks, its circuit decides.  An element in the span is the sum of its circuit, so the
+   elements that come in are independent of the members that stay exactly when their circuits, cut to the slots of the
+   members that leave, are independent: a few rows of four words.  Debug builds check every answer against the span.
+4. *Warm children's splits without bounds,* which the children never read.
+
+Besides, the pass that finds every bound reads the tableau's circuits in every block.  It used to build a span of the
+members of positive weight where a member weighs 0, against a case that cannot arise: the split gives every member of
+an element's circuit at least the element's weight in the matroid (an arc of the exchange graph), so a positive
+element's circuit holds no member of weight 0.  Alone, this took 1.2% off a step, with the same trees.
+
+**Results.**  In the scratch build a step fell from 1.93 M cycles to 1.79 M with the first, third and fourth parts,
+and to 1.72 M with all four.  Paired, the final build against 88b1228:
+
+| units | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios | steps |
+|---|---|---|---|---|---|
+| the 24 above | 2, the hyperthreads swapped | 0.868 | 0.869 ± 0.4% | 0.855 to 0.889 | the same at every unit |
+| 24 others, gaps 500 to 1,300 | 1 | 0.867 | 0.889 ± 1.4% | 0.849 to 0.967 | the same at every unit |
+
+The two runs of a unit agree within 3%; the smallest units gain least.  The whole game 3000 keeps its 117,197 steps
+under the default tactics and its 161,460 under the chain's, with every counter of `tune`, at 0.871 and 0.842 of the
+CPU (unpaired).
+
+**Tried and not kept.**  The copy of the tableau a node keeps for itself, made by copying the workspace's arrays whole
+instead of element by element: 1.79 M cycles a step either way, the whole copies as slow as the gather.
+
+**What is left.**  After the change, a step of these units spends 16% in the searches that find a cycle, 4.8 a step
+at 57,000 cycles each, three quarters of them at the levels nodes keep for themselves; the bound by the arcs into a
+member does not shorten them.  A search from both ends, with the circuits of `B` listed by member, or cycles for the
+kept level made from the node's own, are the next things to try.  The split's Bellman–Ford (10%) and the tableaux
+made again (10%) come next.
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -881,3 +974,10 @@ summary for trees that may differ (`wsumm.py`), the runner of one build (`solo.s
 (`wip-with-prof.patch`) and source (`prof-src/`); and a file a solve in `prof0/` (where the solves come from), `prof2w/`
 (the solves left by the first build), `pair1-v1/` (the first build), `pair2/` (the final one), `pair3-cbon/`
 (conflict branching on) and `ident/` (game 3000).
+`~/taxman_work/lab/work/step-2026-10-27/` has the runs of the cheaper search for forced members: in `tools/` the runner
+of one build (`solo.sh`), the paired runner with the chain's tactics and store (`pair.sh`), the summaries (`profsum.py`
+for the counters, `wsumm.py` for the pairs), the unit picker (`pick.py`), game 3000's runs (`ident.sh`) and the edits of
+the scratch builds (`edit_*.py`); the scratch build's counters and switches as a patch against 88b1228
+(`prof-switches.patch`, with its module `prof.rs`); the unit lists (`set24.txt`, `setB.txt`); and a file a solve in
+`base0/` (the old build), `prof1/` to `prof6/` (the profiles, with each switch), `pair1/` and `pair2/` (the paired runs)
+and `ident/` (game 3000).

@@ -46,20 +46,21 @@ misses are the *odd* cores of movers with three or more factors.
   every derived tableau against the one a solve builds.  The trees are the same.
 * **The heaviest set without a member, with no solve.**  In practice the heaviest set without a member `x` of `I*` is
   `I*` flipped along one cycle through `x` of its exchange graph.  `Meet::without` finds the shortest such cycle by
-  Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent,
-  and certifies it the heaviest when what the sets of other sizes lose against `I*` is at least the cycle's length.  The
-  proof: the symmetric difference of `I*` and any set without `x` splits into cycles and paths of the exchange graph,
-  all of non-negative length but the one through `x` (the module comment of `src/gf2/meet.rs`).  What the smaller sets
-  lose comes from the level's history (a dominant set one smaller), from a floor carried along the path, or from a
-  search for the shortest path between members; what the larger sets lose is the solve's last shortest path.  A child
-  that loses one member of its parent's heaviest set besides those it promotes gets its own the same way, from the
-  parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a hundred members
-  of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's heaviest set
-  carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the elements it
-  promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle of the child's graph
-  is one of the parent's, as long, and a member's shortest cycle at the parent that is still a cycle of the child
-  (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches, nearly
-  all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees
+  Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent
+  (in a block where every element that comes in is in the span of `I*`, by a few rows of their circuits, else by a span
+  of the block's members), and certifies it the heaviest when what the sets of other sizes lose against `I*` is at least
+  the cycle's length.  The proof: the symmetric difference of `I*` and any set without `x` splits into cycles and paths
+  of the exchange graph, all of non-negative length but the one through `x` (the module comment of `src/gf2/meet.rs`).
+  What the smaller sets lose comes from the level's history (a dominant set one smaller), from a floor carried along the
+  path, or from a search for the shortest path between members; what the larger sets lose is the solve's last shortest
+  path.  A child that loses one member of its parent's heaviest set besides those it promotes gets its own the same way,
+  from the parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a hundred
+  members of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's
+  heaviest set carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the
+  elements it promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle of the
+  child's graph is one of the parent's, as long, and a member's shortest cycle at the parent that is still a cycle of
+  the child (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches,
+  nearly all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees
   ([cheaper steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
 * **Warm starts across deletions** (tactic `warm_start`, off by default).  A child that drops members of its parent's
   `I*` keeps only the dominant sets from before those members came in, a few members in the hardest games, and solves
@@ -78,23 +79,32 @@ misses are the *odd* cores of movers with three or more factors.
   duality, and a member without which that bound is below the need is forced, as the matching's are.  The split is
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by
   Bellman–Ford, each round from the vertices that changed.  It starts from the last split of the same node, or else of
-  its parent, wherever the path of predecessors that gave a potential is still a path (`Meet::split_bounds_from`), and
-  reaches the same split, the shortest distances.  Where the level's set is the start's less the members promoted
-  since, as in a child that inherits its parent's heaviest set, the arcs among the vertices the start had are the
-  start's: the walks then check only vertices, and a potential whose path holds is the distance among those vertices,
-  so the first round relaxes only the arcs into and out of the others.  Its bound is loose, so for the members it
-  leaves free within the tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A
-  member is forced too when no cycle through it is shorter than the slack `value − need` and the sets of other sizes
-  lose more than that (`Meet::has_cycle_within`).  A member on a cycle that the search for another found within the
-  slack is not searched, since that cycle passes through it.  Nor is a member on a cycle that the last searches at the
-  parent's depth, the node's own or its child's found, if it is still a cycle of this exchange graph within the slack
-  (`Meet::cycle_length`, a bit test an arc).  A child's exchange graph is its parent's less what it promoted or
-  dropped, so a child that inherits its parent's heaviest set finds nearly all its members free on its parent's cycles
-  ([what a GF(2) step carries from the
+  its parent, wherever the path of predecessors that gave a potential is still a path (`Meet::split_from`), and reaches
+  the same split, the shortest distances.  Where the level's set is the start's less the members promoted since, as in a
+  child that inherits its parent's heaviest set, the arcs among the vertices the start had are the start's: the walks
+  then check only vertices, and a potential whose path holds is the distance among those vertices, so the first round
+  relaxes only the arcs into and out of the others.  Its bound is loose, so for the members it leaves free within the
+  tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too when
+  no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
+  (`Meet::has_cycle_within`).  With the window `all` the searches find every member forced that the split's bound shows
+  forced, since a cycle through a member leaves it by one arc and comes back by another, which together are at least
+  what the bound takes off without it.  So the bounds are found only where the searches cannot run, and else one member
+  at a time where strong branching orders a conflict's members by them (`Meet::split_bound_without`, from the member's
+  column of `A` and its block of `B`), which saves a pass over every circuit.  Where many members are left to search,
+  one pass over the circuits of `B` finds the least arc into each (`Meet::closing_lengths`), and a member's column the
+  least arc out of it (`Meet::opening_length`): a member whose two arcs are longer than the slack is forced with no
+  search, and the search for each other offers no vertex a distance from which no cycle within the slack can close, so
+  it finds the cycle it finds without the bound ([the root
+  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-cheaper-search-for-forced-members)
+  has the measurements).  A member on a cycle that the search for another found within the slack is not searched, since
+  that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the node's own
+  or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`, a bit test
+  an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that inherits its
+  parent's heaviest set finds nearly all its members free on its parent's cycles ([what a GF(2) step carries from the
   last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  The forced members
-  are the same.  The window `all` costs each node more, since every member is checked exactly, and
-  the trees fall by more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the
-  former window, 80 (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
+  are the same.  The window `all` costs each node more, since every member is checked exactly, and the trees fall by
+  more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the former window, 80
+  (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
   campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
   the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
   least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of
