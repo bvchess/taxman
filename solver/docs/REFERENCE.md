@@ -79,12 +79,12 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   RESULTS completed, up to the first that is missing or only an unfinished search, and says which and why.  A game that
   assumes a game of the table optimal is taken too: it assumes nothing the table does not stand for.  The old games are
   written back byte for byte, FILE is written whole or not at all, and RESULTS can never be FILE.  The table stays at
-  1300, so the command adds every game of `results/strict.jsonl` past it; on 2026-10-23 it said:
+  1300, so the command adds every game of `results/strict.jsonl` past it; on 2026-10-27 it said:
 
   ```
   $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
-  added 3649 games (n = 1301..=4949); the table has 4949 games, n up to 4949; wrote /tmp/optimal.json
-  stopped at n = 4950: the results end at n = 4949
+  added 3683 games (n = 1301..=4983); the table has 4983 games, n up to 4983; wrote /tmp/optimal.json
+  stopped at n = 4984: the results end at n = 4983
   ```
 
   Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `results/optimal.json`.  The
