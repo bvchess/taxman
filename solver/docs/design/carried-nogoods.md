@@ -55,7 +55,12 @@ run that resumes a search says whether it has a store ([trust.md](trust.md)).
 
 `taxman solve --carried-dir DIR` turns the tactic on and gives each game's search a store: at its start and at each
 resume, the search reads the files `DIR/nogoods-N.txt` of its own game and the games before it, the latest game's
-first and at most 20,000 sets (`CarriedNogoods::from_dir`), and checks them at its root.  `tune solve --carried FILE`,
+first and at most 20,000 sets (`CarriedNogoods::from_dir`), and checks them at its root.  It writes its own store
+there too, `DIR/nogoods-n.txt` for game n (`model::Harvest`): each searcher hands on the nogoods of its table when it
+forgets them and when it ends a unit, and the store keeps them once each, the latest 20,000.  The search writes it
+before each checkpoint and at its end, to a file beside it that it then renames, so that a search that reads it
+meanwhile reads a whole store; and a resumed search starts from the store of its earlier runs, so that its own keeps
+them.  `tune solve --carried FILE`,
 with `--tactic carried_nogoods=on`, gives the units it solves the store of one file.  Without a store the tactic does
 nothing.  What it is worth, measured on
 units of game 4984 with the nogoods that units of 4983 learned, is in [the root gap and the size of a

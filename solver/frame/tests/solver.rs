@@ -150,25 +150,34 @@ fn every_tactic_gives_the_same_scores_at_a_few_games() {
 }
 
 /// Games solved with a directory of stores of carried nogoods (`--carried-dir`, with the tactic `carried_nogoods`)
-/// find the scores of `optimal.json`: the store there is what a search of game 110 learns in its first steps, which
-/// each of the games 111..=120 checks at its own root and searches with.
+/// find the scores of `optimal.json`: the store there is what a search of game 499 learns in its first steps, which
+/// each of the games 500..=510 checks at its own root and searches with, with the stores that the games before it in
+/// the range wrote there.
 #[test]
 fn games_with_a_directory_of_stores_find_their_scores() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("carried-dir");
-    let game = common::Game::<8>::of_board(110).expect("game 110 has candidates");
+    let game = common::Game::<8>::of_board(499).expect("game 499 has candidates");
     let lines: String = game
         .learned(common::LEARNING_STEPS)
         .iter()
         .map(|n| n.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(" ") + "\n")
         .collect();
-    assert!(!lines.is_empty(), "the search of 110 learned no nogood");
-    fs::write(taxman::model::store_file(&dir, 110), lines).unwrap();
+    assert!(!lines.is_empty(), "the search of 499 learned no nogood");
+    fs::write(taxman::model::store_file(&dir, 499), lines).unwrap();
     let mut opts = SolveOptions { force_search: true, carried_dir: Some(dir.to_path_buf()), ..options(1) };
     opts.tactics.search.carried_nogoods = true;
-    for r in solve_all(111, 120, &opts) {
+    for r in solve_all(500, 510, &opts) {
         assert!(r.completed, "n={}", r.n);
         assert_eq!(Some(r.score), optimal.score(r.n), "n={}", r.n);
+    }
+    // Each game that searched wrote its own store there, of what its searchers learned, for the games after it.
+    let written: Vec<u32> = (500..=510).filter(|&n| taxman::model::store_file(&dir, n).exists()).collect();
+    assert!(!written.is_empty(), "no game wrote a store");
+    for n in written {
+        let text = fs::read_to_string(taxman::model::store_file(&dir, n)).unwrap();
+        let sets = taxman::model::CarriedNogoods::<8>::parse(&text).unwrap();
+        assert!(!sets.is_empty(), "n={n}: an empty store");
     }
 }
 

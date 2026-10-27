@@ -32,14 +32,16 @@
 //! A store's file is text, one nogood a line, its members in decimal separated by spaces; blank lines are skipped.  A
 //! *directory of stores* holds the file of each game whose search wrote one, `nogoods-N.txt` for game N
 //! ([`store_file`]), and a search reads those of its own game and the games before it
-//! ([`CarriedNogoods::from_dir`]).
+//! ([`CarriedNogoods::from_dir`]).  A search writes its own as its searchers learn ([`Harvest`]).
 
 use super::{FrameGraph, FrameSet, Scratch};
 use crate::bits::Bits;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
+use std::io;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, PoisonError};
 
 /// Most sets a search reads from a directory of stores ([`CarriedNogoods::from_dir`]): checking each at the root takes a
 /// fraction of a millisecond, and the search starts after it.
@@ -64,6 +66,81 @@ fn stores_in(dir: &Path) -> Vec<(u32, PathBuf)> {
         .collect();
     found.sort_by_key(|&(n, _)| std::cmp::Reverse(n));
     found
+}
+
+/// The nogoods a search's searchers learn, which it writes as its game's store ([`store_file`]): each searcher hands
+/// the nogoods of its table on when it forgets them and when it ends a unit ([`add`](Self::add)), and the harvest keeps
+/// them distinct, the latest [`DIR_CAP`] of them.  Every nogood a searcher learns is a nogood of the search's root, so
+/// the store is facts of that root; a later search checks them at its own root anyway.
+pub struct Harvest<const W: usize> {
+    sets: Mutex<(VecDeque<Bits<W>>, HashSet<Bits<W>>)>,
+}
+
+impl<const W: usize> Harvest<W> {
+    /// An empty harvest.
+    pub fn new() -> Self {
+        Harvest { sets: Mutex::new((VecDeque::new(), HashSet::new())) }
+    }
+
+    /// The harvest that starts with the sets of the store `path` whose members are all among `candidates` (a store the
+    /// game's search wrote in an earlier run of it, so that the store it writes keeps them), or an empty one.
+    pub fn resumed(path: &Path, candidates: &Bits<W>) -> Self {
+        let harvest = Self::new();
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        if let Ok(sets) = CarriedNogoods::<W>::parse(&text) {
+            let kept: Vec<Bits<W>> =
+                sets.iter().filter_map(|set| CarriedNogoods::candidates_of(set, candidates)).collect();
+            harvest.add(&kept);
+        }
+        harvest
+    }
+
+    /// Adds `nogoods`, those it does not hold yet, as the latest; past [`DIR_CAP`] the earliest go.
+    pub fn add(&self, nogoods: &[Bits<W>]) {
+        let mut guard = self.sets.lock().unwrap_or_else(PoisonError::into_inner);
+        let (order, seen) = &mut *guard;
+        for n in nogoods {
+            if !n.is_empty() && seen.insert(*n) {
+                order.push_back(*n);
+                if order.len() > DIR_CAP {
+                    let earliest = order.pop_front().expect("a full harvest");
+                    seen.remove(&earliest);
+                }
+            }
+        }
+    }
+
+    /// The nogoods held, the earliest first.
+    pub fn sets(&self) -> Vec<Bits<W>> {
+        self.sets.lock().unwrap_or_else(PoisonError::into_inner).0.iter().copied().collect()
+    }
+
+    /// Writes the nogoods held to `path` as a store (see the module docs): to a file beside it first, then renamed onto
+    /// it, so that a search that reads it meanwhile reads the old store or the new one, whole.  Nothing is written
+    /// while the harvest is empty.
+    pub fn write(&self, path: &Path) -> io::Result<()> {
+        let sets = self.sets();
+        if sets.is_empty() {
+            return Ok(());
+        }
+        let mut text = String::new();
+        for n in &sets {
+            let members: Vec<String> = n.iter().map(|x| x.to_string()).collect();
+            text.push_str(&members.join(" "));
+            text.push('\n');
+        }
+        let mut name = path.as_os_str().to_owned();
+        name.push(".tmp");
+        let partial = PathBuf::from(name);
+        std::fs::write(&partial, text)?;
+        std::fs::rename(&partial, path)
+    }
+}
+
+impl<const W: usize> Default for Harvest<W> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// The nogoods carried into a search, validated at its root (see the module docs).

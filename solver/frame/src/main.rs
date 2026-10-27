@@ -83,7 +83,8 @@ commands:
                                {profile_depth})
       --carried-dir DIR        carry nogoods into each game's search (the tactic carried_nogoods, which this
                                turns on): the stores DIR/nogoods-N.txt of its game and the games before it, the
-                               latest first, checked at its root.  They only prune, and change no result
+                               latest first, checked at its root; each search writes its own there.  They only
+                               prune, and change no result
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: optimal.json's, the committed chain's

@@ -35,7 +35,7 @@ use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{
-    CarriedNogoods, ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch, Watches,
+    CarriedNogoods, ConflictCache, FrameGraph, FrameSet, Harvest, Lookup, NogoodStats, Nogoods, Scratch, Watches,
 };
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
@@ -155,6 +155,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// children, and to end a node whose forced members complete one.  `None` for a search without a store, as
     /// [`SearchSpace::new`] makes it: a caller that has one, and the tactic, sets it.
     pub carried: Option<&'a CarriedNogoods<W>>,
+    /// Where the searchers hand on the nogoods they learn, for the search to write as its game's store, if it writes
+    /// one ([`Harvest`]): at each forgetting and at the end of each unit.  `None` as [`SearchSpace::new`] makes it.
+    pub harvest: Option<&'a Harvest<W>>,
     /// The search's profile, if it keeps one ([`SearchProfile`]): each searcher counts its steps by node, and tags the
     /// nodes it makes near the root.  It observes the search and changes nothing of it.
     pub profile: Option<&'a SearchProfile>,
@@ -209,6 +212,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             near_repeat: None,
             price_reuse: tactics.price_reuse.then_some(Reuse::STANDARD),
             carried: None,
+            harvest: None,
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,
@@ -1612,6 +1616,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forgetting.period) {
             self.steps_since_clear += 1;
             if self.steps_since_clear >= period {
+                if let Some(harvest) = self.space.harvest {
+                    harvest.add(table.sets());
+                }
                 table.forget(self.space.forgetting.keep);
                 self.steps_since_clear = 0;
             }
@@ -1633,6 +1640,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// Adds this searcher's counts to the worker's statistics (and diagnostics) and resets them.
     fn flush(&mut self, stats: &mut Stats) {
         self.publish_nogood_stats();
+        if let (Some(harvest), Some(table)) = (self.space.harvest, &self.nogoods) {
+            harvest.add(table.sets());
+        }
         let counts = std::mem::take(&mut self.counts);
         let extra = [
             (stat::PROMOTE_ATTEMPTS, counts.attempts),

@@ -721,6 +721,36 @@ on units, so the next step is the chain's: the solver writing and reading a stor
 patch with it against their neighbors without it, as the look was tested ([the live
 lab](../the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).
 
+## 2026-10-27: the store in the solver, and a store from the game's own units (Q7, continued)
+
+**Question.**  Does a store learned from units of 4984 itself help other units of 4984 more than 4983's store does, so
+that the searchers of a game should share what they learn as they go?  **Answer.**  No: a store learned from 144 units
+of 4984 takes 0.60 of the steps and 0.78 of the CPU, 4983's 0.57 and 0.74, and their union 0.56 and 0.74.  So the
+solver carries each game's store to the games after it, and its searchers do not share theirs as they go.
+
+**Method.**  144 units of 4984 that neither unit set above holds (gaps 300 to 1,500), solved with the logging patch under
+the chain's settings, at most 30,000 steps each (711,119 steps in all), learned 6,702 nogoods, 2,364 distinct, 843 of
+them in 4983's store of 144 units.  The 48 units of the first set were solved under each store and without one, the four
+settings of a unit at the same time, by a build on 2f124a6.
+
+| store | nogoods | steps | CPU | geometric mean over 29 units of 1,000 steps or more: steps, CPU |
+|---|---|---|---|---|
+| none: 595,494 steps, 904 s | | 1 | 1 | |
+| 144 units of 4983 | 6,560 | 0.566 | 0.739 | 0.578, 0.785 |
+| 144 units of 4984 | 2,364 | 0.601 | 0.782 | 0.644, 0.870 |
+| both | 8,081 | 0.564 | 0.739 | 0.574, 0.789 |
+
+The store of 4984's own units is smaller, since a search with conflict branching off learns fewer distinct nogoods, and
+it prunes less; the union prunes as 4983's does.  On this build 4983's store takes 0.74 of the CPU, against 0.75 on the
+build before the cheaper search for augmenting paths.
+
+**The solver.**  `taxman solve --carried-dir DIR` turns the tactic on: each game's search reads the stores of its game
+and the games before it in DIR, checks them at its root, and writes its own there, of what its searchers learn
+([carried-nogoods.md](../../../docs/design/carried-nogoods.md)).  Games 1001 to 1010 solved so, with a store that game
+1000's search learned, all match `optimal.json` (1001 in 1,663 steps against 1,790), and game 3000 from the root with no
+store takes its 117,197 steps.  The runs are in `~/taxman_work/lab/work/carry/b1/` (the learning) and `b2/` (the
+measurement).
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.

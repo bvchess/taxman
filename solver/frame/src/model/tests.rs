@@ -1440,3 +1440,34 @@ fn a_directory_of_stores_gives_the_stores_of_the_game_and_the_games_before_it() 
     assert!(CarriedNogoods::from_dir(&dir, 4, &model, &root, &candidates).0.is_empty());
     assert_eq!(store_file(&dir, 9), dir.join("nogoods-9.txt"));
 }
+
+/// A harvest keeps the nogoods handed to it once each, the latest `DIR_CAP` of them, and writes them as a store that
+/// reads back as the same sets, by way of a file it renames; an empty one writes nothing, and one resumed from a store
+/// starts with the sets of it whose members are candidates.
+#[test]
+fn a_harvest_keeps_the_latest_nogoods_and_writes_them_as_a_store() {
+    let pairs: Vec<Bits<4>> = (0..256u32).flat_map(|a| (a + 1..256).map(move |b| Bits::from_slice(&[a, b]))).collect();
+    assert!(pairs.len() > DIR_CAP + 100);
+    let dir = crate::test_support::TempDir::new("harvest");
+    let path = store_file(&dir, 7);
+    let harvest = Harvest::<4>::new();
+    harvest.write(&path).unwrap();
+    assert!(!path.exists(), "an empty harvest wrote a store");
+    harvest.add(&pairs[..10]);
+    harvest.add(&pairs[5..20]);
+    assert_eq!(harvest.sets(), pairs[..20]);
+    harvest.add(&pairs[..DIR_CAP + 100]);
+    assert_eq!(harvest.sets(), pairs[100..DIR_CAP + 100], "the earliest go past the cap");
+    harvest.write(&path).unwrap();
+    let names: Vec<_> = std::fs::read_dir(&*dir).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(names, ["nogoods-7.txt"], "the file written beside it is renamed onto it");
+    let read = CarriedNogoods::<4>::parse(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let read: Vec<Bits<4>> = read.iter().map(|set| Bits::from_slice(set)).collect();
+    assert_eq!(read, harvest.sets());
+    let candidates = Bits::<4>::from_range(0, 99);
+    let resumed = Harvest::<4>::resumed(&path, &candidates);
+    let within: Vec<Bits<4>> = harvest.sets().into_iter().filter(|n| n.is_subset(&candidates)).collect();
+    assert!(!within.is_empty());
+    assert_eq!(resumed.sets(), within);
+    assert!(Harvest::<4>::resumed(&dir.join("none.txt"), &candidates).sets().is_empty());
+}

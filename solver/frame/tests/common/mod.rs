@@ -579,6 +579,7 @@ impl<const W: usize> Game<W> {
             near_repeat: cfg.near_repeat.then_some(&self.near),
             price_reuse: cfg.price_reuse,
             carried: cfg.carried.then(|| self.carried()),
+            harvest: None,
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,

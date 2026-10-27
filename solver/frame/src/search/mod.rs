@@ -131,9 +131,11 @@ pub use setup::{
 pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
 
 use crate::bits::Bits;
-use crate::engine::{self, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
+use crate::engine::{
+    self, CheckpointEvent, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Start, Stats,
+};
 use crate::matchbound::MatchGraph;
-use crate::model::{CarriedNogoods, NogoodStats};
+use crate::model::{store_file, CarriedNogoods, Harvest, NogoodStats};
 use header::Header;
 use incumbent::{distinct, dive, surviving};
 use profile::Begin;
@@ -322,7 +324,8 @@ pub fn search_beside<const W: usize>(
 ///
 /// With the tactic `carried_nogoods` and a directory of stores `carried`, the search carries the nogoods of the stores
 /// there of its game and the games before it, validated at its root, at its start and at each resume
-/// ([`CarriedNogoods::from_dir`]); they only prune (solver/docs/design/carried-nogoods.md).
+/// ([`CarriedNogoods::from_dir`]); they only prune (solver/docs/design/carried-nogoods.md).  It writes its own store
+/// there too, of the nogoods its searchers learn ([`Harvest`]), before each checkpoint and at its end.
 #[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
@@ -445,12 +448,18 @@ fn search_forgetting<const W: usize>(
         );
         store
     });
+    // What the searchers learn, written as this game's store (the store of an earlier run of its search kept).
+    let harvest = carried.as_ref().zip(carried_dir).map(|(_, dir)| {
+        let path = store_file(dir, prepared.n);
+        (Arc::new(Harvest::resumed(&path, &prepared.candidates)), path)
+    });
     let space = SearchSpace {
         forgetting,
         diagnostics,
         began: t0,
         near_repeat,
         carried: carried.as_ref(),
+        harvest: harvest.as_ref().map(|(h, _)| &**h),
         ..SearchSpace::new(prepared, &match_graph)
     };
     let space = match branching {
@@ -482,11 +491,25 @@ fn search_forgetting<const W: usize>(
     // The progress lines tell what the nogood tables have done.
     let totals = Arc::clone(&space.nogood_totals);
     let note = ProgressNote(Arc::new(move || totals.lock().unwrap_or_else(PoisonError::into_inner).summary()));
-    // A profile is written at each checkpoint, before the engine writes it.
+    // A profile is written at each checkpoint, before the engine writes it, and so is the game's store.
     let hook = profile.as_ref().map(|profile| {
         let profile = Arc::clone(profile);
         CheckpointHook(Arc::new(move |event| profile.checkpoint(event)))
     });
+    let hook = match &harvest {
+        None => hook,
+        Some((harvest, path)) => {
+            let (harvest, path) = (Arc::clone(harvest), path.clone());
+            Some(CheckpointHook(Arc::new(move |event| {
+                if matches!(event, CheckpointEvent::Writing { .. }) {
+                    write_store(&harvest, &path);
+                }
+                if let Some(CheckpointHook(inner)) = &hook {
+                    inner(event);
+                }
+            })))
+        }
+    };
     let cfg = &EngineConfig { progress_note: Some(note), checkpoint_hook: hook, ..cfg.clone() };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
@@ -537,6 +560,9 @@ fn search_forgetting<const W: usize>(
             ran
         }),
     };
+    if let Some((harvest, path)) = &harvest {
+        write_store(harvest, path);
+    }
     let outcome = outcome?;
     // The engine's elapsed time includes the runs before a resume; what it counts beyond this call is theirs.
     let earlier_runs = outcome.elapsed.saturating_sub(engine_start.elapsed());
@@ -564,6 +590,13 @@ fn search_forgetting<const W: usize>(
         finder,
         start: incumbent,
     })
+}
+
+/// Writes the store of `harvest` to `path`, saying on stderr if it cannot: a store is only ever a help.
+fn write_store<const W: usize>(harvest: &Harvest<W>, path: &Path) {
+    if let Err(e) = harvest.write(path) {
+        eprintln!("warning: carried nogoods: {} not written: {e}", path.display());
+    }
 }
 
 /// The incumbent a search starts from, made as [`search`] makes it (its documentation has the steps): a start from
