@@ -126,6 +126,17 @@ fn each_bit<const R: usize>(mask: &Vector<R>, mut f: impl FnMut(usize)) {
     }
 }
 
+/// Whether the live element `i` is free in matroid `m` of the workspace `meet`'s tableau (its residue is not zero):
+/// the flag kept with the residue, checked against it in debug builds.  A macro, so that it reads the two fields alone
+/// while others are borrowed.
+macro_rules! free {
+    ($meet:expr, $m:expr, $i:expr) => {{
+        let (m, i): (usize, usize) = ($m, $i);
+        debug_assert_eq!($meet.free[m][i], !is_zero(&$meet.res[m][i]), "the flag of element {} in matroid {}", i, m);
+        $meet.free[m][i]
+    }};
+}
+
 /// The two matroids: for each element, its block in `A` and in `B` and its vectors there.  An element whose vector
 /// is zero in either is a loop: no common independent set holds it.
 pub struct Problem<'a, const R: usize> {
@@ -252,6 +263,9 @@ const FREE_A: u32 = u32::MAX - 1;
 pub struct Meet<const R: usize> {
     mask: [Vec<Vector<R>>; 2],
     res: [Vec<Vector<R>>; 2],
+    /// Whether each live element's residue is not zero (it is free: `I + e` is independent there), kept with `res`
+    /// wherever a residue is written, so that the searches read a byte instead of a vector (the macro `free!`).
+    free: [Vec<bool>; 2],
     /// The slot of each member of the tableau's set, [`NO_SLOT`] for the others.
     slot: [Vec<u16>; 2],
     /// Per block: the member in each slot ([`NONE`] for a slot freed in a derived tableau), and the slots in use.
@@ -281,6 +295,19 @@ pub struct Meet<const R: usize> {
     changed_slots: [Vec<Vector<R>>; 2],
     seen: Vec<u32>,
     generation: u32,
+    /// Bellman–Ford's elements outside the set by their block of `A`, as `out_a` lists them, apart: those free in `A`
+    /// and those in its span (see [`shortest_path`](Self::shortest_path)).
+    free_out: Vec<Vec<u32>>,
+    span_out: Vec<Vec<u32>>,
+    /// In tests: every [`shortest_path`](Self::shortest_path) checked against a scan of every outside element of a
+    /// block in each round ([`shortest_path_by_scan`](Self::shortest_path_by_scan)), the searches checked, and the
+    /// blocks where only the elements free in `A`, and only those in its span, were visited.
+    #[cfg(test)]
+    pub check_paths: bool,
+    #[cfg(test)]
+    pub paths_checked: u64,
+    #[cfg(test)]
+    pub lists_visited: [u64; 2],
     /// The blocks a path's changes left to rebuild.
     dirty: [Vec<bool>; 2],
     /// Whether the last solve ended because no augmentation gains (rather than at the size limit): then the set is
@@ -548,6 +575,7 @@ impl<const R: usize> Meet<R> {
         Meet {
             mask: [vec![[0; R]; n], vec![[0; R]; n]],
             res: [vec![[0; R]; n], vec![[0; R]; n]],
+            free: [vec![false; n], vec![false; n]],
             slot: [vec![NO_SLOT; n], vec![NO_SLOT; n]],
             slot_elem: blocks.map(|b| vec![vec![NONE; 64 * R]; b]),
             next_slot: blocks.map(|b| vec![0; b]),
@@ -565,6 +593,14 @@ impl<const R: usize> Meet<R> {
             changed_slots: blocks.map(|b| vec![[0; R]; b]),
             seen: vec![0; n],
             generation: 0,
+            free_out: vec![Vec::with_capacity(n); blocks[0]],
+            span_out: vec![Vec::with_capacity(n); blocks[0]],
+            #[cfg(test)]
+            check_paths: false,
+            #[cfg(test)]
+            paths_checked: 0,
+            #[cfg(test)]
+            lists_visited: [0; 2],
             dirty: blocks.map(|b| vec![false; b]),
             settled: false,
             stopped: false,
@@ -902,6 +938,7 @@ impl<const R: usize> Meet<R> {
             let z = z as usize;
             self.mask[m][z] = [0; R];
             self.res[m][z] = p.vector[m][z];
+            self.free[m][z] = !is_zero(&p.vector[m][z]);
             self.slot[m][z] = NO_SLOT;
         }
         for k in 0..self.block_live[m][b].len() {
@@ -1129,6 +1166,7 @@ impl<const R: usize> Meet<R> {
                     let e = s.elems[m][k];
                     list.push(e);
                     (self.mask[m][e as usize], self.res[m][e as usize]) = s.rows[m][k];
+                    self.free[m][e as usize] = !is_zero(&s.rows[m][k].1);
                     self.slot[m][e as usize] = NO_SLOT;
                 }
                 at = s.ends[m][b];
@@ -1199,6 +1237,7 @@ impl<const R: usize> Meet<R> {
         for &e in self.fresh.iter().filter(|&&e| usize::from(p.block[m][e as usize]) == b).chain(&unsure) {
             let i = e as usize;
             (self.res[m][i], self.mask[m][i]) = span.reduce(p.vector[m][i]);
+            self.free[m][i] = !is_zero(&self.res[m][i]);
             self.slot[m][i] = NO_SLOT;
         }
         self.unsure[m][b] = unsure;
@@ -1248,6 +1287,7 @@ impl<const R: usize> Meet<R> {
                 own[k / 64] |= 1 << (k % 64);
                 self.mask[m][z] = own;
                 self.res[m][z] = [0; R];
+                self.free[m][z] = false;
             }
         }
     }
@@ -1265,7 +1305,7 @@ impl<const R: usize> Meet<R> {
         let mut my = self.mask[m][yi];
         my[s / 64] |= 1 << (s % 64);
         // Branchless: the bit selects all ones or all zeros, which the row and the mask are anded with.
-        let (mask, res) = (&mut self.mask[m], &mut self.res[m]);
+        let (mask, res, free) = (&mut self.mask[m], &mut self.res[m], &mut self.free[m]);
         let (word, shift) = (p / 64, p % 64);
         for &z in &self.block_live[m][b] {
             let z = z as usize;
@@ -1274,9 +1314,11 @@ impl<const R: usize> Meet<R> {
                 res[z][k] ^= ry[k] & select;
                 mask[z][k] ^= my[k] & select;
             }
+            free[z] = !is_zero(&res[z]);
         }
         // y itself: its residue cleared by its own row, its mask now just its slot.
         self.res[m][yi] = [0; R];
+        self.free[m][yi] = false;
         let mut own = [0; R];
         own[s / 64] |= 1 << (s % 64);
         self.mask[m][yi] = own;
@@ -1393,7 +1435,51 @@ impl<const R: usize> Meet<R> {
     /// through one minimum, offered again only when it improves.  A pull into an outside element reads only the
     /// circuit members that changed: its mask and the mask of the block's changed slots (a block of `A` with none
     /// is skipped).  The best sink is kept as distances fall.
+    ///
+    /// Only an element free in `A` takes the hub's offer, which is new only in a round where a member improved, and
+    /// only one in the span of `A` an offer from its circuit, only where a member of the block changed.  So the
+    /// outside elements of each block of `A` are listed apart at the start by kind, in the order of the block's
+    /// list, and where only one kind can gain, only its list is visited: the others would be left as they are, so
+    /// the same elements change, in the same order, as in a scan of the whole list (tests check it against one,
+    /// [`shortest_path_by_scan`](Self::shortest_path_by_scan)).
     fn shortest_path(&mut self, p: &Problem<'_, R>) -> Option<u32> {
+        #[cfg(test)]
+        if self.check_paths {
+            return self.checked_shortest_path(p);
+        }
+        self.bellman_ford::<true>(p)
+    }
+
+    /// In tests: the search of [`shortest_path`](Self::shortest_path) without the lists by kind, every outside element
+    /// of a block visited in each round where it is.
+    #[cfg(test)]
+    fn shortest_path_by_scan(&mut self, p: &Problem<'_, R>) -> Option<u32> {
+        self.bellman_ford::<false>(p)
+    }
+
+    /// In tests: [`shortest_path`](Self::shortest_path) checked against
+    /// [`shortest_path_by_scan`](Self::shortest_path_by_scan): the same sink, rounds, and distance and predecessor
+    /// of every member and outside element.
+    #[cfg(test)]
+    fn checked_shortest_path(&mut self, p: &Problem<'_, R>) -> Option<u32> {
+        let before = self.rounds;
+        let scanned = self.shortest_path_by_scan(p);
+        let (dist, pred, rounds) = (self.dist.clone(), self.pred.clone(), self.rounds - before);
+        self.rounds = before;
+        let found = self.bellman_ford::<true>(p);
+        assert_eq!(found, scanned, "the sink differs from the scan's");
+        assert_eq!(self.rounds - before, rounds, "the rounds differ from the scan's");
+        for &e in self.members.iter().chain(self.out_a.iter().flatten()) {
+            let i = e as usize;
+            assert_eq!((self.dist[i], self.pred[i]), (dist[i], pred[i]), "element {e} differs from the scan's");
+        }
+        self.paths_checked += 1;
+        found
+    }
+
+    /// The search of [`shortest_path`](Self::shortest_path), visiting only the outside elements of the kind that can
+    /// gain where one kind can (`LISTS`), or every outside element of a block visited.
+    fn bellman_ford<const LISTS: bool>(&mut self, p: &Problem<'_, R>) -> Option<u32> {
         let w = p.weight;
         for &x in &self.members {
             self.dist[x as usize] = INF;
@@ -1401,17 +1487,26 @@ impl<const R: usize> Meet<R> {
         }
         self.changed_out.clear();
         let mut sink = (INF, NONE);
-        for list in &self.out_a {
+        for (ba, list) in self.out_a.iter().enumerate() {
+            let (free_out, span_out) = (&mut self.free_out[ba], &mut self.span_out[ba]);
+            free_out.clear();
+            span_out.clear();
             for &y in list {
                 let i = y as usize;
                 self.pred[i] = NONE;
-                if is_zero(&self.res[0][i]) {
+                if !free!(self, 0, i) {
                     self.dist[i] = INF;
+                    if LISTS {
+                        span_out.push(y);
+                    }
                 } else {
                     let d = -w[i] * HOPS;
                     self.dist[i] = d;
                     self.changed_out.push(y);
-                    if !is_zero(&self.res[1][i]) && d < sink.0 {
+                    if LISTS {
+                        free_out.push(y);
+                    }
+                    if free!(self, 1, i) && d < sink.0 {
                         sink = (d, y);
                     }
                 }
@@ -1431,7 +1526,7 @@ impl<const R: usize> Meet<R> {
                 let y = self.changed_out[k];
                 let i = y as usize;
                 let d = self.dist[i];
-                if !is_zero(&self.res[1][i]) {
+                if free!(self, 1, i) {
                     if d < best_free.0 {
                         best_free = (d, y);
                         free_improved = true;
@@ -1484,46 +1579,77 @@ impl<const R: usize> Meet<R> {
                 }
             }
             self.changed_out.clear();
-            for (ba, list) in self.out_a.iter().enumerate() {
+            for ba in 0..self.out_a.len() {
                 let changed = self.changed_slots[0][ba];
                 let any_changed = !is_zero(&changed);
                 if !any_changed && !member_improved {
                     continue;
                 }
                 let elems = &self.slot_elem[0][ba];
-                for &y in list {
-                    let i = y as usize;
-                    let ly = 1 - w[i] * HOPS;
-                    let mut best = self.dist[i];
-                    let mut from = NONE;
-                    if !is_zero(&self.res[0][i]) {
-                        if member_improved && best_member.0 + ly < best {
-                            (best, from) = (best_member.0 + ly, best_member.1);
+                // The offer to the outside element `y`, free in A (`free`) or not: the hub's, or the least of the
+                // changed members' of its circuit.
+                macro_rules! visit {
+                    ($y:expr, $free:expr) => {{
+                        let y: u32 = $y;
+                        let i = y as usize;
+                        let ly = 1 - w[i] * HOPS;
+                        let mut best = self.dist[i];
+                        let mut from = NONE;
+                        if $free {
+                            if member_improved && best_member.0 + ly < best {
+                                (best, from) = (best_member.0 + ly, best_member.1);
+                            }
+                        } else if any_changed {
+                            let mut m = self.mask[0][i];
+                            let mut any = false;
+                            for (a, c) in m.iter_mut().zip(&changed) {
+                                *a &= c;
+                                any |= *a != 0;
+                            }
+                            if any {
+                                let dist = &self.dist;
+                                each_bit(&m, |s| {
+                                    let x = elems[s];
+                                    let d = dist[x as usize];
+                                    if d + ly < best {
+                                        (best, from) = (d + ly, x);
+                                    }
+                                });
+                            }
                         }
-                    } else if any_changed {
-                        let mut m = self.mask[0][i];
-                        let mut any = false;
-                        for (a, c) in m.iter_mut().zip(&changed) {
-                            *a &= c;
-                            any |= *a != 0;
+                        if from != NONE {
+                            self.dist[i] = best;
+                            self.pred[i] = from;
+                            self.changed_out.push(y);
+                            if best < sink.0 && free!(self, 1, i) {
+                                sink = (best, y);
+                            }
                         }
-                        if any {
-                            let dist = &self.dist;
-                            each_bit(&m, |s| {
-                                let x = elems[s];
-                                let d = dist[x as usize];
-                                if d + ly < best {
-                                    (best, from) = (d + ly, x);
-                                }
-                            });
+                    }};
+                }
+                match (LISTS, member_improved, any_changed) {
+                    (true, true, false) => {
+                        #[cfg(test)]
+                        {
+                            self.lists_visited[0] += 1;
+                        }
+                        for k in 0..self.free_out[ba].len() {
+                            visit!(self.free_out[ba][k], true);
                         }
                     }
-                    if from != NONE {
-                        self.dist[i] = best;
-                        self.pred[i] = from;
-                        self.changed_out.push(y);
-                        if best < sink.0 && !is_zero(&self.res[1][i]) {
-                            sink = (best, y);
+                    (true, false, true) => {
+                        #[cfg(test)]
+                        {
+                            self.lists_visited[1] += 1;
+                        }
+                        for k in 0..self.span_out[ba].len() {
+                            visit!(self.span_out[ba][k], false);
+                        }
+                    }
+                    _ => {
+                        for k in 0..self.out_a[ba].len() {
+                            let y = self.out_a[ba][k];
+                            visit!(y, free!(self, 0, y as usize));
                         }
                     }
                 }
@@ -1686,14 +1812,14 @@ impl<const R: usize> Meet<R> {
                 let s = usize::from(self.slot[1][vi]);
                 for &y in &self.block_live[1][usize::from(p.block[1][vi])] {
                     let yi = y as usize;
-                    if !self.inside[yi] && is_zero(&self.res[1][yi]) && bit(&self.mask[1][yi], s) {
+                    if !self.inside[yi] && !free!(self, 1, yi) && bit(&self.mask[1][yi], s) {
                         let d = self.pot[yi] + w[vi] - w[yi];
                         if d < best {
                             (best, from) = (d, y);
                         }
                     }
                 }
-            } else if !is_zero(&self.res[0][vi]) {
+            } else if free!(self, 0, vi) {
                 // Free in A: from the zero node.
                 if pz < best {
                     (best, from) = (pz, zero as u32);
@@ -1800,7 +1926,7 @@ impl<const R: usize> Meet<R> {
                     for &y in &self.columns[column] {
                         relax!(y as usize, pu, u);
                     }
-                } else if !is_zero(&self.res[1][u]) {
+                } else if free!(self, 1, u) {
                     relax!(zero, pu - w[u], u);
                 } else {
                     let elems = &self.slot_elem[1][usize::from(p.block[1][u])];
@@ -2197,7 +2323,7 @@ impl<const R: usize> Meet<R> {
                     through = (d + w1(v) * HOPS, v);
                     queue_free!();
                 }
-            } else if !is_zero(&self.res[1][i]) {
+            } else if free!(self, 1, i) {
                 // Free in B: arcs to every member, x's closing a cycle, the others' through the hub.
                 if d + (w2(x) - w2(v)) * HOPS + 1 < cycle.0 {
                     cycle = (d + (w2(x) - w2(v)) * HOPS + 1, v);
@@ -2306,7 +2432,7 @@ impl<const R: usize> Meet<R> {
                     through = d + w1(v) * HOPS;
                     queue_free!();
                 }
-            } else if !is_zero(&self.res[1][i]) {
+            } else if free!(self, 1, i) {
                 // Free in B: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least `w2(z) + 1` (the
                 // distances are not negative, and the split makes `w2(v) ≤ 0` for an element free in B), while each
                 // member started at `w2(z)`: none is an improvement.
@@ -2337,7 +2463,7 @@ impl<const R: usize> Meet<R> {
         for (b, list) in self.out_a.iter().enumerate() {
             for &y in list {
                 let i = y as usize;
-                if is_zero(&self.res[0][i]) {
+                if !free!(self, 0, i) {
                     each_bit(&self.mask[0][i], |s| columns[b * 64 * R + s].push(y));
                 } else {
                     self.free_a.push(y);
@@ -2670,6 +2796,34 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The search for a shortest augmenting path, which visits only the outside elements of the kind that can gain
+    /// where only one kind can, against a scan of every outside element of the block: the same sink, rounds, and
+    /// distance and predecessor of every element, at every augmentation and gap of solves of random problems, whose
+    /// weights tie often (where the order of the offers decides the predecessors).  Both lists must be used.
+    #[test]
+    fn shortest_paths_by_kind_against_a_scan() {
+        let mut rng = Rng(0x5D1C_E0F3_A2B4_9687);
+        let mut meet_checked = (0, [0; 2]);
+        for _ in 0..200 {
+            let n = 10 + rng.below(60) as usize;
+            let owned = random(&mut rng, n, 16);
+            let p = owned.problem();
+            let live: Vec<u32> = (0..n as u32).collect();
+            let mut meet = Meet::<1>::new(n, owned.blocks());
+            meet.check_paths = true;
+            meet.solve(&p, &live, &[], usize::MAX, i64::MAX, |_| {});
+            if meet.settled {
+                meet.find_gap(&p);
+            }
+            meet_checked.0 += meet.paths_checked;
+            for (total, visits) in meet_checked.1.iter_mut().zip(meet.lists_visited) {
+                *total += visits;
+            }
+        }
+        let (paths, [free, span]) = meet_checked;
+        assert!(paths >= 1_000 && free >= 100 && span >= 100, "{paths} searches, {free} and {span} lists visited");
     }
 
     /// Against brute force: the heaviest set under every size limit, from the empty start and from every set

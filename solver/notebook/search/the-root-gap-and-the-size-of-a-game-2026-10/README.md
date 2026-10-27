@@ -437,6 +437,97 @@ gate is no flag of `taxman solve`: it is set by the lab's `policy` or `branching
 lab channel](../../../docs/design/lab.md#a-policy-for-the-games-to-come), `{"command": "policy", "from": N, "gate": 150}`
 in the channel folder), and kept in `run.lab`.
 
+## 2026-10-27: the GF(2) bound at a node, and a cheaper search for augmenting paths
+
+**Question.**  In the hardest games the GF(2) bound takes most of a step.  Does it still carry the frames that close as
+promotions are made below the root, and can its inner loop be made cheaper with the same trees?  **Answer.**  It
+carries no closed frame: a frame closed at a node leaves no live element and no part of a block behind.  Half of these
+units' CPU is the search for augmenting paths in the bound's solves, and two exact changes to it take 8.4% off the CPU
+of 24 units of game 4984 under the chain's settings, with every tree the same.
+
+**Method.**  Units of game 4984's checkpoint (`~/taxman_work/lab/work/patch/units-4984.jsonl`): 24 that take under a
+second to 95 seconds on one thread (gaps 676 to 1,401), solved by `tune solve` with `price_reuse=on`, and with conflict
+branching both on (the chain's setting until 2026-10-27 07:19 PDT) and off (its setting since, for 4984 and after).  A
+scratch build with cycle counters around the bound's functions profiled six of them, with conflict branching on.  For
+the comparison, the old build and the new solve each unit at the same time on the two hyperthreads of one physical core
+(`taskset`, four cores at once).  Both see the same core, caches and clock, and no thread of the chain runs beside
+either.  Paired so, the unit ratios of a 1.4% change fall between 0.979 and 0.996.  Unpaired runs, interleaved but each
+beside a thread of the chain, spread from 0.71 to 1.43 on the same units.
+
+**Closed frames carry nothing.**  The bound's matroids at a node are the root's contracted by the node's promotions
+(the module docs of `gf2`), and a block holds a whole layer's frames.
+
+* *Their candidates leave.*  When a frame closes, the promotions' vectors have used up its coordinates.  A candidate
+  whose vector lay in that frame alone becomes a loop, a zero vector, and leaves the node's live elements; one that
+  also joins an open frame keeps only the coordinates there.  The tableaux, lists and searches of a solve hold live
+  elements only.
+* *No block splits.*  At 1,485 sampled evaluations on six units, the coordinates that the live elements' vectors join
+  formed one piece in every block of both matroids: the sum of the squared sizes of the pieces equals that of the blocks
+  to 0.005%.  So no part of a block closes off at a node, to be dropped or solved apart.
+* *What remains is small.*  The eliminated coordinates stay as zero bits of four-word vectors, a width set by the root's
+  largest rank (197 at 4984).  A child's vectors are copied and contracted over all the root's elements, dead ones too,
+  for 0.8% and 1.2% of the CPU.
+
+At 4984 the root has nine frames, of ranks 77, 197, 158, 88, 45, 21, 7, 3 and 1, and 1,349 elements: the blocks of `A`
+hold 564, 606, 148, 28 and 3 of them, those of `B` 959, 312, 68 and 10.
+
+**Where the time goes.**  On the six profiled units (110,205 steps, 4.9 M cycles a step, conflict branching on), as
+shares of their CPU:
+
+| part | share |
+|---|---|
+| the GF(2) bound, all its calls | 91.5% |
+| its solves (`evaluate`) | 54% |
+| of which the search for augmenting paths | 46.5% |
+| of which its first pass over the elements | 10% |
+| of which the arcs from outside elements to members | 13% |
+| of which the arcs from members to outside elements | 24% |
+| the paths applied (pivots, blocks rebuilt) | 7.3% |
+| the weight splits, with tableaux made again | 11.4% |
+| the searches for forced members | 9.7% |
+| the bounds without a member, for the choice of the conflict | 12.5% |
+
+A solve starts from a dominant set of 30 members on average and ends at 103: 72 augmentations, each a Bellman–Ford
+search from scratch of 2.9 rounds on average.  The 14,238 solves, 0.13 a step, are 54% of the CPU.
+
+With conflict branching off, the same six units (63,761 steps, 3.9 M cycles a step) spend 93% of their CPU in the
+bound: 60.5% in its solves and 52% in the search for augmenting paths.  There a solve starts from 3.3 members on
+average, nearly from nothing, and ends at 108, after 105 augmentations; the 6,001 solves are 0.09 a step.
+
+**The change.**  Both parts are exact: the searches visit the same vertices in the same order.
+
+1. *Flags of the free elements.*  The workspace keeps, for each live element and matroid, whether its residue is not
+   zero (the element is free: the set plus it is independent there).  The flag is written wherever a residue is: a
+   block built, a pivot, a derived tableau's slots and reduced rows, a restored snapshot.  The searches read a byte
+   instead of a vector of four words: the augmenting path's Bellman–Ford, the split's rounds, the cycle and loss
+   searches, the columns.  Debug builds check each flag read against its residue.
+2. *Outside elements by kind.*  In a round of the Bellman–Ford, an element free in `A` can gain only from the hub (the
+   best member), whose offer is new only when a member improved; an element in the span of `A` gains only from a
+   member of its circuit that changed.  So the search lists each block's outside elements apart by kind at its start,
+   in the order of the block's list, and where only one kind can gain it visits only that list.  The same elements
+   change in the same order as in a scan of the whole list; a test checks every search of 200 random problems with
+   tied weights against such a scan (sink, rounds, and every distance and predecessor).
+
+**Results.**  Every unit's steps and best are the same in every run.  The new build's CPU, as a share of the old's:
+
+| conflict branching | runs a unit | total | geometric mean of the units' ratios | the units' ratios |
+|---|---|---|---|---|
+| off (the chain's setting since 2026-10-27) | 2, the hyperthreads swapped | 0.916 | 0.912 ± 0.5% | 0.898 to 0.935 |
+| on | 1 | 0.934 | 0.936 ± 0.5% | 0.919 to 0.971 |
+| on, the lists alone | 1 | 0.986 | 0.986 ± 0.2% | 0.979 to 0.996 |
+
+With conflict branching off there is no pricing, so the solves are a larger share of a step and the change gains more.
+With the bound at 93% of the CPU with conflict branching off and 91.5% with it on, the change takes about 9% and 7%
+off the bound's.  The whole game 3000 keeps its 117,197 steps, 115,973 with conflict branching and price reuse, and
+every counter of `tune`.
+
+**Decision.**  Kept, for the chain's next build.  The solves remain the largest part: with conflict branching off, a
+solve's 105 augmentations start from almost nothing.  A start near the end, such as the parent's heaviest set less what
+the child dropped, with its weight split to keep it extreme, would cut most of them, but it can change the trees where
+heaviest sets tie, so it needs a measurement of steps; it is the next thing to try.  Two exact changes were judged not
+worth a build: a per-element summary of the circuits' slots in front of the arcs from members (a third of the scanned
+elements miss, for about 1%), and copying and contracting only a child's live vectors (at most 2%).
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -452,3 +543,10 @@ with a file a solve) and the finder run (`finder-4950.jsonl`); `cheapchoice/` ha
 each.
 `reuse/` has the price-reuse runs (Q6): the runners (`run.sh`, `irun.sh` with the config files `cfg*.txt`, `final.sh`),
 `analyze.py` and `counts.py`, the id lists, the builds of `tune` of each stage, and `out/` with a result file a solve.
+`~/taxman_work/lab/work/bound-2026-10-27/` has the runs of the GF(2) bound at a node (2026-10-27): in `tools/` the
+paired runner (`pair.sh`) and its summary (`psumm.py`), the unpaired runner (`ab.sh`, `summ.py`), the counters' summary
+(`profsum.py`) and the unit picker (`pick.py`); the counters as patches against 93e486b, each with its module
+`gf2::prof` (`prof.patch` with `prof.rs`, and the finer `prof2.patch` with `prof2.rs`); the unit lists (`set24.txt`,
+`set6.txt`, `cand40*.txt`); and a file a solve in `probe*/` (the units timed), `prof1/` and `prof2/` (the profiles),
+`ab1/` (unpaired), `pair1/` (the lists alone), `pair2/` (the change), `pair3/` (the change, conflict branching off),
+`prof3/` (the profile with conflict branching off) and `ident/` (game 3000).
