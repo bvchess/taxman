@@ -328,6 +328,8 @@ pub struct Config {
     pub price_reuse: Option<Reuse>,
     /// The game's store of carried nogoods (tactic `carried_nogoods`, [`Game::carried`]).
     pub carried: bool,
+    /// The warm start of a child's GF(2) bound from its parent's heaviest set (tactic `warm_start`).
+    pub warm_start: bool,
 }
 
 impl Config {
@@ -361,6 +363,7 @@ impl Config {
             near_repeat: t.near_repeat,
             price_reuse: t.price_reuse.then_some(Reuse::STANDARD),
             carried: t.carried_nogoods,
+            warm_start: t.warm_start,
         }
     }
 }
@@ -569,6 +572,7 @@ impl<const W: usize> Game<W> {
             gf2_strong_depth: u32::MAX,
             gf2_deep_branching: Gf2Branching::Split,
             gf2_force_window: ForceWindow::default(),
+            gf2_warm_start: cfg.warm_start,
             branching: Arc::new(Branching::new(BranchSettings {
                 conflict_branching: cfg.conflict_branching.is_some(),
                 gate: cfg.conflict_branching.unwrap_or(CONFLICT_BRANCHING_GAP),

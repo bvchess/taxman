@@ -112,6 +112,13 @@ pub struct SearchTactics {
     /// search is given a store ([`SearchSpace::carried`](super::SearchSpace::carried); `tune solve --carried FILE`).
     /// Off by default.
     pub carried_nogoods: bool,
+    /// With `gf2`: a child whose parent's heaviest set holds the members it promotes but also members it dropped finds
+    /// its heaviest set from its parent's, deleting those members one at a time along the shortest cycle through each
+    /// in an exchange graph that takes in every size, instead of solving from a smaller set (`crate::gf2`'s
+    /// `warm_child`; sound: the bound is the same heaviest weight, found exactly, and only which heaviest set is found
+    /// where several weigh the same can differ, which changes the conflicts branched on, not the answer).  Off by
+    /// default.
+    pub warm_start: bool,
 }
 
 impl Default for SearchTactics {
@@ -138,6 +145,7 @@ impl Default for SearchTactics {
             near_repeat: true,
             price_reuse: false,
             carried_nogoods: false,
+            warm_start: false,
         }
     }
 }
@@ -244,19 +252,30 @@ impl SearchTactics {
     /// tactic on or off, those of the builds before it, whose bit is clear, included.
     pub const CARRIED_NOGOODS_BIT: u16 = 1 << 13;
 
+    /// The bit of [`bits`](Self::bits) of `warm_start` (bit 14).  A checkpoint records it, as the search began with it,
+    /// but it binds nothing: the bound of every node is the same with it and without it, and only the heaviest set
+    /// found among several of the same weight, whose conflicts are branched on, can differ.  So a checkpoint resumes
+    /// with the tactic on or off, those of the builds before it, whose bit is clear, included.
+    pub const WARM_START_BIT: u16 = 1 << 14;
+
     /// The bits of [`bits`](Self::bits) that a checkpoint records and that bind nothing:
     /// [`BRANCHING_BITS`](Self::BRANCHING_BITS), [`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT),
-    /// [`PRICE_REUSE_BIT`](Self::PRICE_REUSE_BIT) and [`CARRIED_NOGOODS_BIT`](Self::CARRIED_NOGOODS_BIT).
-    const UNBOUND_BITS: u16 =
-        Self::BRANCHING_BITS | Self::NEAR_REPEAT_BIT | Self::PRICE_REUSE_BIT | Self::CARRIED_NOGOODS_BIT;
+    /// [`PRICE_REUSE_BIT`](Self::PRICE_REUSE_BIT), [`CARRIED_NOGOODS_BIT`](Self::CARRIED_NOGOODS_BIT) and
+    /// [`WARM_START_BIT`](Self::WARM_START_BIT).
+    const UNBOUND_BITS: u16 = Self::BRANCHING_BITS
+        | Self::NEAR_REPEAT_BIT
+        | Self::PRICE_REUSE_BIT
+        | Self::CARRIED_NOGOODS_BIT
+        | Self::WARM_START_BIT;
 
     /// Whether `other` is the same search as these tactics make, as a checkpoint tells ([`bits`](Self::bits) and
     /// [`tuning`](Self::tuning)): the tactics a checkpoint does not record, the policy of keeping and forgetting
     /// nogoods, may differ (a resumed search starts with no nogoods whichever policy made the first run's), and so may
     /// those it records but that only choose how a node branches ([`BRANCHING_BITS`](Self::BRANCHING_BITS)), the
     /// near-repeat cut ([`NEAR_REPEAT_BIT`](Self::NEAR_REPEAT_BIT)), the reuse of prices
-    /// ([`PRICE_REUSE_BIT`](Self::PRICE_REUSE_BIT)) and the carried nogoods
-    /// ([`CARRIED_NOGOODS_BIT`](Self::CARRIED_NOGOODS_BIT)).
+    /// ([`PRICE_REUSE_BIT`](Self::PRICE_REUSE_BIT)), the carried nogoods
+    /// ([`CARRIED_NOGOODS_BIT`](Self::CARRIED_NOGOODS_BIT)) and the warm start of the GF(2) bound
+    /// ([`WARM_START_BIT`](Self::WARM_START_BIT)).
     pub fn same_recorded(&self, other: &SearchTactics) -> bool {
         let bound = |t: &SearchTactics| t.bits() & !Self::UNBOUND_BITS;
         bound(self) == bound(other) && self.tuning() == other.tuning()
@@ -264,7 +283,7 @@ impl SearchTactics {
 
     /// These tactics with what of `run`'s a checkpoint does not bind ([`same_recorded`](Self::same_recorded)): its
     /// policy of keeping and forgetting nogoods, its branching switches `conflict_branching` and `conflict_look`,
-    /// `near_repeat`, `price_reuse` and `carried_nogoods`.  The run that resumes a search says them.
+    /// `near_repeat`, `price_reuse`, `carried_nogoods` and `warm_start`.  The run that resumes a search says them.
     #[must_use]
     pub fn with_unbound_of(self, run: &SearchTactics) -> SearchTactics {
         SearchTactics {
@@ -273,6 +292,7 @@ impl SearchTactics {
             near_repeat: run.near_repeat,
             price_reuse: run.price_reuse,
             carried_nogoods: run.carried_nogoods,
+            warm_start: run.warm_start,
             ..self.with_forgetting_of(run)
         }
     }
@@ -339,11 +359,12 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
     /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10), `near_repeat` (11), `price_reuse` (12) and
-    /// `carried_nogoods` (13); the defaults are `0xFB9`.  (Bits 9 to 13 record the settings the search began with and
-    /// bind nothing ([`same_recorded`](Self::same_recorded)): a checkpoint of a build before `conflict_branching` has
-    /// bit 9 clear, and resumes with the tactic on or off, and likewise bit 10 and `conflict_look`, bit 11 and
-    /// `near_repeat`, bit 12 and `price_reuse`, and bit 13 and `carried_nogoods`.  A build before a tactic
+    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10), `near_repeat` (11), `price_reuse` (12),
+    /// `carried_nogoods` (13) and `warm_start` (14); the defaults are `0xFB9`.  (Bits 9 to 14 record the settings the
+    /// search began with and bind nothing ([`same_recorded`](Self::same_recorded)): a checkpoint of a build before
+    /// `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and likewise bit 10 and
+    /// `conflict_look`, bit 11 and `near_repeat`, bit 12 and `price_reuse`, bit 13 and `carried_nogoods`, and bit 14 and
+    /// `warm_start`.  A build before a tactic
     /// refuses a checkpoint with its bit set, as "unknown tactics".)  The knobs of the nogood table's policy
     /// (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a
     /// resumed search starts with an empty table whichever policy made the first run's.  (A checkpoint of a build
@@ -364,6 +385,7 @@ impl SearchTactics {
             | u16::from(self.near_repeat) << 11
             | u16::from(self.price_reuse) << 12
             | u16::from(self.carried_nogoods) << 13
+            | u16::from(self.warm_start) << 14
     }
 
     /// The length of [`tuning`](Self::tuning).
@@ -407,6 +429,7 @@ impl SearchTactics {
             near_repeat: other.near_repeat,
             price_reuse: other.price_reuse,
             carried_nogoods: other.carried_nogoods,
+            warm_start: other.warm_start,
             ..self.with_forgetting_of(other)
         }
     }
@@ -458,7 +481,7 @@ impl SearchTactics {
     /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
     /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
-        if bits >> 14 != 0 {
+        if bits >> 15 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
@@ -474,6 +497,7 @@ impl SearchTactics {
             near_repeat: bits & 1 << 11 != 0,
             price_reuse: bits & 1 << 12 != 0,
             carried_nogoods: bits & 1 << 13 != 0,
+            warm_start: bits & 1 << 14 != 0,
             ..SearchTactics::legacy_tuning()
         })
     }

@@ -120,6 +120,10 @@ The carried nogoods, `carried_nogoods`, prune with facts of the root, and are no
 records the tactic (bit 13) and does not bind it, and the run that resumes a search says whether it has a store
 ([carried-nogoods.md](carried-nogoods.md)).
 
+The warm start of the GF(2) bound, `warm_start`, finds the same bound at every node and may find another of several
+heaviest sets of the same weight, and is no lever of the lab either: a checkpoint records it (bit 14) and does not bind
+it.
+
 The policy of the nogood tables, `forget_nogoods`, `nogood_period`, `nogood_keep` and `nogood_limit`, is a cache's,
 sound whatever it says, and was free already: no checkpoint records it, and the run that resumes a search sets it.  The
 lab does not switch it during a search, since a searcher's table is its own and nothing needs it.  The tactics outside

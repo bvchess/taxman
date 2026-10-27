@@ -53,10 +53,11 @@ which records how the search began and binds nothing, since the switches only ch
 on ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs)): a checkpoint resumes with them on or off, those of
 the builds before them, whose bits are clear, included.  So does `near_repeat`, whose bit binds nothing either: each run
 of a search sets the cut up again from the game before, as it takes its ceiling.  So does `price_reuse` (bit 12), which
-only changes how the prices that rank the conflicts are made, and so does `carried_nogoods` (bit 13), whose store holds
-only nogoods checked at the root ([carried-nogoods.md](carried-nogoods.md)).  A build before one of these tactics
+only changes how the prices that rank the conflicts are made, so does `carried_nogoods` (bit 13), whose store holds
+only nogoods checked at the root ([carried-nogoods.md](carried-nogoods.md)), and so does `warm_start` (bit 14), which
+only changes which of several heaviest sets of the same weight a node finds.  A build before one of these tactics
 refuses a checkpoint with it on, as unknown tactics: the default of the first three, and what a run that turns
-`price_reuse` or `carried_nogoods` on writes.
+`price_reuse`, `carried_nogoods` or `warm_start` on writes.
 
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header

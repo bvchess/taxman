@@ -48,17 +48,17 @@ use taxman::search::{search, Gf2Branching, Reuse, SearchTactics};
 /// its prices (tactic `price_reuse`), under the standard schedule, under one that never makes the prices again, on two
 /// threads, and under one that takes none (48 to 51), then the nogoods carried into the search (tactic
 /// `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three and
-/// four, [`Game::carried`](common::Game::carried)): on the GF(2) bound, on two threads, with conflict branching at every
-/// check and the reuse of its prices, with the search's own conflict everywhere, and on the matching path, where it only
-/// rules candidates out (52 to 56).  The
-/// matching path with the forgetting of nogoods at the
-/// production period, every step, every third, and never; on one thread and two; and the GF(2) bound with each way of
-/// choosing the branch, with and without the matching bound as a first check, forced members, nogoods and the
-/// Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000
-/// steps, which most of these searches never take, so some configurations refit them after the first few steps and
-/// every few steps after that (with and without forgetting at the same time, refinement, and a second thread), and one
-/// turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with the nogoods forgotten at every
-/// step.
+/// four, [`Game::carried`](common::Game::carried)): on the GF(2) bound, on two threads, with conflict branching at
+/// every check and the reuse of its prices, with the search's own conflict everywhere, and on the matching path, where
+/// it only rules candidates out (52 to 56), then the GF(2) bound with the warm start of its children (tactic
+/// `warm_start`), and with it and the search's own conflict everywhere on two threads (57 and 58).  The matching path
+/// with the forgetting of nogoods at the production period, every step, every third, and never; on one thread and two;
+/// and the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
+/// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits
+/// its multipliers only after 2,000 steps, which most of these searches never take, so some configurations refit them
+/// after the first few steps and every few steps after that (with and without forgetting at the same time, refinement,
+/// and a second thread), and one turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with
+/// the nogoods forgotten at every step.
 fn configs() -> Vec<Config> {
     let (base, g) = (Config::matching(), Config::standard());
     // The schedules of `price_reuse`, with conflict branching at every check: the standard one; one that takes the
@@ -124,6 +124,8 @@ fn configs() -> Vec<Config> {
         Config { carried: true, conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
         Config { carried: true, conflict_branching: None, ..g },
         Config { carried: true, ..base },
+        Config { warm_start: true, ..g },
+        Config { conflict_branching: None, warm_start: true, threads: 2, period: Some(3), ..g },
     ]
 }
 

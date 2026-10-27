@@ -61,6 +61,19 @@ misses are the *odd* cores of movers with three or more factors.
   (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches, nearly
   all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees
   ([cheaper steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
+* **Warm starts across deletions** (tactic `warm_start`, off by default).  A child that drops members of its parent's
+  `I*` keeps only the dominant sets from before those members came in, a few members in the hardest games, and solves
+  from there; so does a node that goes on without a member of its own `I*` with no level kept for it.  With the tactic,
+  such a level deletes the members from `I*` one at a time instead, with no augmentation.  `Meet::without_any_size`
+  finds the shortest cycle through the member in the exchange graph of `I*` with two elements of weight 0 added, each
+  independent of everything: one outside the set, through which a cycle is a path that makes a set one smaller, and one
+  in it, through which a cycle is a path that makes a set one larger.  `I*` flipped along that cycle is the heaviest set
+  without the member of every size, with no bound needed on what the other sizes lose (the comment of
+  `without_any_size` has the proof).  A child's second member is deleted in its own problem, from the tableau of the
+  set so far, derived from the parent's, and its weight split.  The bound is the same, but where several sets weigh
+  the same another may be found, and with it another conflict branched on, so the trees can change ([the root
+  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-warm-starts-by-deletion)
+  has the measurements).
 * **Forced members.**  The weight split of `I*` bounds the intersection without each member in one pass, by weak
   duality, and a member without which that bound is below the need is forced, as the matching's are.  The split is
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by

@@ -751,6 +751,96 @@ and the games before it in DIR, checks them at its root, and writes its own ther
 store takes its 117,197 steps.  The runs are in `~/taxman_work/lab/work/carry/b1/` (the learning) and `b2/` (the
 measurement).
 
+## 2026-10-27: warm starts by deletion
+
+**Question.**  With conflict branching off, a solve of the GF(2) bound starts from 3.3 members and makes 105
+augmentations to a heaviest set of about 108.  Can a level start from its parent's heaviest set instead?  **Answer.**
+Yes, by deleting from that set the members the level lost, one at a time, each along one shortest cycle of an exchange
+graph that admits every size, with no augmentation (the tactic `warm_start`, off by default).  On 24 units of game 4984
+under the chain's settings it takes the CPU to 0.48 of the old build's (unit ratios 0.30 to 0.64), with every tree the
+same.  The tactic stays off by default because a tree can change where several heaviest sets weigh the same, as game
+3000's does with conflict branching off.
+
+**Where the solves come from.**  A counting build (a level tagged with how it was made, each solve counted by the tag)
+ran the six units profiled in the section on the GF(2) bound at a node (63,761 steps), with conflict branching off and
+price reuse on:
+
+| the level solved | solves | share of the solves' cycles | augmentations a solve |
+|---|---|---|---|
+| a child that lost one member of its parent's heaviest set, which the cycle did not certify | 4,448 | 73.3% | 104 |
+| a child that lost two to four (379 two, 41 three, 2 four) | 422 | 5.4% | 78 |
+| a node that went on without a member of its own heaviest set, no level kept for it | 1,121 | 21.1% | 115 |
+| a unit's root, and two children whose parent's tableau the workspace no longer held | 8 | 0.3% | 200 |
+
+Of the 31,851 children pushed, 63.6% inherited their parent's heaviest set and 21.1% were certified by one cycle, with
+no solve; the solved ones are the rest.  A child keeps only its parent's dominant sets that hold what it promotes and
+avoid what it drops (`gf2`'s module docs, "Warm starts").  The members it drops are heavy, the divisors of the number
+promoted among them, so they came in with the first few augmentations, and the sets from before them are the few members
+a solve starts from.  The nodes go on without a member that strong branching did not price: the member of a conflict of
+one, or one that a rule drops from the node's candidates at the start of a step.
+
+**Why the parent's set less the lost members is no start.**  The augmentations may start from any common independent
+set that is extreme (the heaviest of its size, which feasible potentials certify) and heavier than every smaller one.
+Contracting the members promoted keeps the parent's heaviest set `I` the heaviest of all sizes, and its weight split a
+split, and so does deleting elements outside `I`: circuits only lose members, and free elements stay free.  Deleting a
+member does not.  Every element whose circuit held it becomes free in that matroid, and the split's condition for a
+free element (`w1 ≤ 0` in `A`, `w2 ≤ 0` in `B`) fails wherever its `w1` or `w2` is positive, so the set less the member
+is in general not even extreme (the test of 2026-10-13 found it extreme at 2 of 2,543 nodes).  The look child of the
+cheaper look is the same case seen from the other side: its heaviest set without the member and its substitute is
+smaller than the node's, and no cycle of the node's exchange graph, which keeps the size, reaches it.
+
+**The deletion.**  The heaviest set without a member `x`, of every size, is `I` flipped along the shortest cycle through
+`x` in the exchange graph of `I` with two elements of weight 0 added, each independent of everything: `o` outside the
+set and `i` in it (`Meet::without_any_size`).  A cycle through `o` is a path between members of `I`'s own graph, which
+makes a set one smaller, and a cycle through `i` is a path from an element free in `A` to one free in `B`, which makes
+a set one larger.  Every set without `x`, with copies of `o` and `i` added to make its size `I`'s, differs from `I` by
+cycles of lengths that are not negative under the split, one of them through `x`, and a cycle through two copies of
+either is no shorter than one through a single copy.  So no bound on what the other sizes lose is needed, which is all
+`Meet::without` lacked; the search is its Dijkstra over the split's reduced lengths, `o` reached as an element free in
+both matroids and `i` as a member through the hub.  The levels use it three ways, each set found the heaviest of all
+sizes of its problem:
+
+* *A child that lost one member* finds its heaviest set by one search of its parent's graph, the promoted members and
+  the other elements it dropped banned (`warm_child`).
+* *A child that lost more* deletes the others in its own problem, from the tableau of the set so far, derived from the
+  parent's, and its weight split, found anew each time.
+* *A node that goes on without a member* deletes it in place (`warm_delete`) and keeps a copy of the tableau for its
+  own to be derived from, after the child's subtree has used the workspace; where the node has no split yet (a rule
+  dropped the candidate at the start of a step), it is found first.
+
+The first build made no split for a node that had none when it went on without a member, and left 1,017 solves on the
+six units, 1,009 of them such nodes: it took the CPU of the 24 units to 0.577 (geometric mean 0.546, unit ratios 0.351
+to 0.692, one run each), with 2,520 solves left of 16,840.  The final build leaves the units' 24 roots and 43 other
+solves.
+
+**Tests.**  `without_any_size` against brute force for every member of the heaviest set of 120 random problems (4,000 in
+the long test), with and without banned elements, its set checked common independent and of its weight; the walk of
+random paths of the boards 60 to 330 with the tactic, every node's bound against the matroids built afresh, and in debug
+builds every child and node warm-started against a solve; the soundness configurations 52 and 53, and
+`conflict_branching=off,warm_start=on` among the solver's variants of every tactic.
+
+**Results.**  Paired as in the section on the GF(2) bound at a node: the old build (2f124a6) and the new one solve each
+unit at the same time on the two hyperthreads of one core, four cores at once, two runs a unit with the hyperthreads
+swapped:
+
+| conflict branching | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios | steps |
+|---|---|---|---|---|---|
+| off (the chain's setting) | 2 | 0.480 | 0.442 ± 9.7% | 0.303 to 0.637 | the same at every unit |
+| on | 1 | 0.481 | 0.488 ± 14.1% | 0.264 to 0.943 | the same at every unit |
+
+The two runs of a unit agree within 3.5%.  The best is the same at every unit.  Under the chain's settings the solves of
+the 24 units fall from 16,840 to 67, and their augmentations from 1.70 million to 13,329; with conflict branching on,
+from 35,743 to 26.  The units that gain least are those that solved least (6327 and 4790 with it on, 45 and 121 solves).
+The whole game 3000 keeps its 117,197 steps with the tactic (115,973 with conflict branching and price reuse), its
+solves falling from 2,233 (2,103) to the root's one; with conflict branching off its steps go from 167,554 to 161,460, a
+tree changed by a tie, and its solves from 3,039 to one.  With the tactic off, game 3000 keeps every counter of
+the old build.
+
+**Decision.**  Kept, off by default, for the chain to take with `--tactic warm_start=on`: the bound at every node is the
+same, so a checkpoint records the tactic (bit 14) and does not bind it, and a run may resume a search with it on or off.
+The solves are gone from these units, so the bound's cost is now its splits, its searches for forced members and the
+deletions themselves; a profile of the new build is the next measurement.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -785,3 +875,9 @@ the stores `store-4983-48.txt` and `store-4983-144.txt`, and `summ.py`), `s2/` t
 another), `s3/` and `s4/` the measurements with conflict branching on and off, `s5/` the variant that spares the
 heaviest set, and `s6/` the second set of units; each with its runner (`run.sh`), `analyze.py`, `perstep.py` and a
 result file a solve.
+`~/taxman_work/lab/work/warm-2026-10-27/` has the runs of the warm start: in `tools/` the paired runner (`pair.sh`), its
+summary for trees that may differ (`wsumm.py`), the runner of one build (`solo.sh`), the counters' module and summaries
+(`prof.rs`, `profsum.py`, `profsum2.py`) and game 3000's runs (`ident.sh`); the counting build's patch
+(`wip-with-prof.patch`) and source (`prof-src/`); and a file a solve in `prof0/` (where the solves come from), `prof2w/`
+(the solves left by the first build), `pair1-v1/` (the first build), `pair2/` (the final one), `pair3-cbon/`
+(conflict branching on) and `ident/` (game 3000).

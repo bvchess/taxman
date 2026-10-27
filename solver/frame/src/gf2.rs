@@ -61,6 +61,11 @@
 //! promoted candidate and no deleted one), less what was promoted; and when that is the parent's heaviest set
 //! itself, which is the heaviest of all sizes, the child's heaviest set is known with no augmentation at all.
 //!
+//! A child that drops members of its parent's heaviest set keeps only the entries from before those members came in,
+//! which in the hardest games are a few members of a hundred.  With the tactic `warm_start` such a child deletes them
+//! from the parent's heaviest set instead, one at a time, each along the shortest cycle through it in an exchange
+//! graph that takes in the sets of every size ([`meet::Meet::without_any_size`], `warm_child`), with no augmentation.
+//!
 //! # Forced members, and the bound without a member
 //!
 //! With the heaviest set `I*` of all sizes, [`meet::Meet::split_bounds`] bounds the problem without each member of
@@ -491,6 +496,12 @@ pub struct Gf2Stats {
     pub derived: u64,
     pub derived_from_copies: u64,
     pub blocks_built: u64,
+    /// With the tactic `warm_start`: children whose heaviest set came from their parent's ([`warm_child`]), levels
+    /// that went on without a member of their heaviest set with their new one found from it (`warm_delete`), and the
+    /// members deleted on the way in both, each by one search.
+    pub warm_children: u64,
+    pub warm_levels: u64,
+    pub warm_deletions: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -539,6 +550,13 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// `force_window`; [`ForceWindow::default`] until set).
     pub fn set_force_window(&mut self, window: ForceWindow) {
         dispatch!(self, l => l.force_window = window)
+    }
+
+    /// Whether a child whose parent's heaviest set lost members it dropped finds its heaviest set from its parent's
+    /// (the tactic `warm_start`, `warm_child`; off until set): the same bound, but where several sets are the heaviest,
+    /// possibly another of them.
+    pub fn set_warm_start(&mut self, on: bool) {
+        dispatch!(self, l => l.warm = on)
     }
 
     /// Starts over with level 0 at the state reached from the root by promoting `promoted`, with the candidates
@@ -797,6 +815,15 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.source.clear();
     }
 
+    /// The level's matroids, of `graph`'s blocks and weights.
+    fn problem<'a>(&'a self, graph: &'a Gf2Graph) -> Problem<'a, R> {
+        Problem {
+            block: [&graph.block[0], &graph.block[1]],
+            vector: [&self.vec[0], &self.vec[1]],
+            weight: &graph.weight,
+        }
+    }
+
     fn copy_from(&mut self, other: &Self) {
         for m in 0..2 {
             self.vec[m].copy_from_slice(&other.vec[m]);
@@ -837,6 +864,10 @@ struct Levels<'g, const W: usize, const R: usize> {
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
     contracted_idx: Vec<u32>,
+    /// The tactic `warm_start`: a child whose parent's heaviest set lost members it dropped starts from that set
+    /// ([`warm_child`]); and its scratch, a weight split.
+    warm: bool,
+    warm_pot: Vec<i64>,
     stats: Gf2Stats,
     /// Which free members are searched for being forced ([`ForceWindow`]).
     force_window: ForceWindow,
@@ -881,6 +912,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
             contracted_idx: Vec::with_capacity(n),
+            warm: false,
+            warm_pot: vec![0; n],
             stats: Gf2Stats::default(),
             force_window: ForceWindow::default(),
             cycles: Vec::new(),
@@ -989,6 +1022,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.loss_floor = parent.loss_floor;
             (child.source.held, child.source.contracted) = (held, *added);
             self.stats.inherited += 1;
+        } else if self.warm {
+            let scratch = (&mut self.live_idx, &mut self.start_idx, &mut self.contracted_idx, &mut self.warm_pot);
+            let warm =
+                warm_child(self.graph, &lower[d], parent, child, added, &mut self.meet, scratch, &mut self.stats);
+            if let Some(contracted) = warm {
+                (child.source.held, child.source.contracted) = (self.meet.solves, contracted);
+                self.stats.warm_children += 1;
+            }
         } else if certify_child(self.graph, &lower[d], parent, child, added, &mut self.meet, &mut self.live_idx) {
             (child.source.held, child.source.contracted) = (held, *added);
             self.stats.certified_children += 1;
@@ -1015,9 +1056,25 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             std::mem::swap(&mut self.kept, &mut self.prior);
             return;
         }
+        let level = &self.levels[self.depth];
+        let member = level.solved && level.settled && level.history.last().is_some_and(|last| last.contains(x));
+        if self.warm && member && level.live.contains(x) {
+            // The level's weight split and tableau, which the deletion needs (a node that drops candidates at the
+            // start of its step, after it went on without a member, has neither yet).
+            self.ensure_split();
+            let level = &mut self.levels[self.depth];
+            if level.meet_solve != self.meet.solves {
+                resolve(self.graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+            }
+        }
         let level = &mut self.levels[self.depth];
         self.prior.copy_sets_from(level);
         if !level.live.contains(x) {
+            return;
+        }
+        if self.warm && warm_delete(self.graph, level, &mut self.meet, x) {
+            self.stats.warm_deletions += 1;
+            self.stats.warm_levels += 1;
             return;
         }
         level.live.remove(x);
@@ -1053,33 +1110,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let mut forced = Bits::EMPTY;
         // A bound below the need cuts the node, which then needs neither its split nor its forced members.
         if let Some(need) = need.filter(|&need| level.value >= need) {
-            if !level.has_split && level.settled {
-                if self.starts.len() <= d {
-                    self.starts.resize_with(d + 1, Default::default);
-                }
-                let node = self.nodes[d];
-                let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
-                let start = from.map(|i| &self.starts[i].0);
-                // The level's problem is its node's last split's, or its parent node's contracted by what it promoted.
-                let graph = self.graph;
-                let contracted = &mut self.contracted_idx;
-                contracted.clear();
-                let same_problem = match from {
-                    Some(i) if i == d => true,
-                    Some(i) if self.starts[i].1 == self.nodes[i] => {
-                        contracted.extend(level.added.iter().map(|x| graph.index[x as usize]));
-                        true
-                    }
-                    _ => false,
-                };
-                let contracted = same_problem.then_some(&contracted[..]);
-                let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
-                split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted);
-                if level.has_pot {
-                    self.meet.save_split(&mut self.starts[d].0);
-                    self.starts[d].1 = node;
-                }
-            }
+            self.ensure_split();
+            let level = &mut self.levels[d];
             if level.has_split {
                 for &(x, bound) in &level.split {
                     if bound < need as i64 {
@@ -1091,6 +1123,41 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         let level = &self.levels[d];
         Eval { value: level.value, chosen, forced }
+    }
+
+    /// The weight split of the top level, if it is solved, of all sizes, and has none yet: started from its node's last
+    /// split, or else from its parent node's, whose problem is the level's contracted by what it promoted.
+    fn ensure_split(&mut self) {
+        let d = self.depth;
+        let level = &mut self.levels[d];
+        if level.has_split || !level.settled {
+            return;
+        }
+        if self.starts.len() <= d {
+            self.starts.resize_with(d + 1, Default::default);
+        }
+        let node = self.nodes[d];
+        let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
+        let start = from.map(|i| &self.starts[i].0);
+        // The level's problem is its node's last split's, or its parent node's contracted by what it promoted.
+        let graph = self.graph;
+        let contracted = &mut self.contracted_idx;
+        contracted.clear();
+        let same_problem = match from {
+            Some(i) if i == d => true,
+            Some(i) if self.starts[i].1 == self.nodes[i] => {
+                contracted.extend(level.added.iter().map(|x| graph.index[x as usize]));
+                true
+            }
+            _ => false,
+        };
+        let contracted = same_problem.then_some(&contracted[..]);
+        let (meet, live_idx, start_idx) = (&mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        split(graph, level, meet, live_idx, start_idx, &mut self.stats, start, contracted);
+        if level.has_pot {
+            self.meet.save_split(&mut self.starts[d].0);
+            self.starts[d].1 = node;
+        }
     }
 
     /// More forced members of the top level's heaviest set (solved, of all sizes, its split found and its tableau
@@ -1534,6 +1601,137 @@ fn certify_child<const W: usize, const R: usize>(
     child.value = value as u64 - added.sum();
     // The child's smaller sets, with the promoted, are smaller sets of the parent's without x.
     child.loss_floor = (losses.smaller - delta).max(0);
+    true
+}
+
+/// With the tactic `warm_start`: a child whose parent's heaviest set `I` (of all sizes) holds the members it promotes
+/// and loses others that it dropped, its heaviest set of all sizes found from `I` with no solve, if the workspace holds
+/// the parent's tableau and the parent has a weight split.  The child's sets with the promoted are the parent's sets
+/// that hold them and avoid the dropped elements, so the members left out are deleted one at a time from the heaviest
+/// set so far ([`Meet::without_any_size`], exact for every size): the first from `I` in the parent's problem, the
+/// promoted and the elements dropped outside `I` banned; each other one, if still a member, in the child's problem with
+/// the members left to delete, from the tableau of the set so far, derived from the one before ([`Meet::derive`]), and
+/// its weight split (every set so far is a heaviest of all sizes of its problem, which the split's existence shows
+/// again).  Then the child is solved: its heaviest set the last one, less the promoted.  Returns what the child's
+/// tableau, derived from the one the workspace holds, contracts: `added` if that is the parent's, nothing if it is the
+/// last one derived; or `None` (nothing found, the child left as it was, and the workspace possibly holding another
+/// tableau than the parent's).  `vectors` is a level with the parent's vectors (`parent` may be a copy of its sets
+/// only, see [`Levels::push_all`]).
+#[allow(clippy::too_many_arguments)]
+fn warm_child<const W: usize, const R: usize>(
+    graph: &Gf2Graph,
+    vectors: &Level<W, R>,
+    parent: &Level<W, R>,
+    child: &mut Level<W, R>,
+    added: &Bits<W>,
+    meet: &mut Meet<R>,
+    (banned, live, start, pot): (&mut Vec<u32>, &mut Vec<u32>, &mut Vec<u32>, &mut Vec<i64>),
+    stats: &mut Gf2Stats,
+) -> Option<Bits<W>> {
+    if !(parent.solved && parent.settled && parent.has_pot && parent.meet_solve == meet.solves) {
+        return None;
+    }
+    let last = *parent.history.last()?;
+    let mut missing = last - *added - child.live;
+    if !added.is_subset(&last) || missing.is_empty() {
+        return None;
+    }
+    let index = |x: u32| graph.index[x as usize];
+    let x = missing.max().expect("a member left out");
+    missing.remove(x);
+    banned.clear();
+    banned.extend((*added | (parent.live - last - child.live)).iter().map(index));
+    let value = meet.without_any_size(&vectors.problem(graph), &parent.pot, index(x), banned)?;
+    stats.warm_deletions += 1;
+    let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+    let mut set = ((last - flip) | (flip - last)) - *added;
+    let mut value = value - added.sum() as i64;
+    let mut contract = Some(*added);
+    let child_problem = child.problem(graph);
+    loop {
+        // A member left out that a flip took out of the set is deleted with nothing to do.
+        missing &= set;
+        let Some(x) = missing.max() else { break };
+        live.clear();
+        live.extend((child.live | missing).iter().map(index));
+        start.clear();
+        start.extend(set.iter().map(index));
+        banned.clear();
+        banned.extend(contract.take().unwrap_or(Bits::EMPTY).iter().map(index));
+        meet.derive(&child_problem, live, start, banned);
+        if !meet.split_bounds_from(&child_problem, live, None, None, |_, _| {}) {
+            return None;
+        }
+        pot.copy_from_slice(meet.potentials());
+        missing.remove(x);
+        value = meet.without_any_size(&child_problem, pot, index(x), &[])?;
+        stats.warm_deletions += 1;
+        let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+        set = (set - flip) | (flip - set);
+    }
+    #[cfg(debug_assertions)]
+    {
+        let mut cold = Meet::<R>::new(graph.len(), graph.blocks);
+        live.clear();
+        live.extend(child.live.iter().map(index));
+        cold.solve(&child_problem, live, &[], usize::MAX, i64::MAX, |_| {});
+        assert_eq!(cold.value, value, "a child's warm start and its solve disagree");
+        assert_eq!(set.sum() as i64, value, "a child's warm start found a set of another weight");
+    }
+    while child.history.last().is_some_and(|entry| entry.len() >= set.len()) {
+        child.history.pop();
+    }
+    child.history.push(set);
+    child.solved = true;
+    child.settled = true;
+    child.cap = parent.cap.saturating_sub(added.len() as usize);
+    child.value = value as u64;
+    child.loss_floor = 0;
+    Some(contract.unwrap_or(Bits::EMPTY))
+}
+
+/// With the tactic `warm_start`: `level` (solved, of all sizes, with a weight split, its tableau the workspace's) goes
+/// on without the member `x` of its heaviest set, whose own heaviest set of all sizes is found from it with no solve
+/// ([`Meet::without_any_size`]), and a copy of the tableau is kept for the level's to be derived from (the child that
+/// promotes `x`, pushed next, uses the workspace).  False (and nothing done) where the level does not qualify.
+fn warm_delete<const W: usize, const R: usize>(
+    graph: &Gf2Graph,
+    level: &mut Level<W, R>,
+    meet: &mut Meet<R>,
+    x: u32,
+) -> bool {
+    let Some(&last) = level.history.last() else { return false };
+    let held = level.meet_solve == meet.solves && level.meet_solve != 0;
+    if !(level.solved && level.settled && level.has_pot && held && last.contains(x)) {
+        return false;
+    }
+    let Some(value) = meet.without_any_size(&level.problem(graph), &level.pot, graph.index[x as usize], &[]) else {
+        return false;
+    };
+    let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+    let set = (last - flip) | (flip - last);
+    level.live.remove(x);
+    #[cfg(debug_assertions)]
+    {
+        let mut cold = Meet::<R>::new(graph.len(), graph.blocks);
+        let live: Vec<u32> = level.live.iter().map(|y| graph.index[y as usize]).collect();
+        cold.solve(&level.problem(graph), &live, &[], usize::MAX, i64::MAX, |_| {});
+        assert_eq!(cold.value, value, "a level's warm deletion of {x} and its solve disagree");
+        assert_eq!(set.sum() as i64, value, "a level's warm deletion of {x} found a set of another weight");
+    }
+    level.history.retain(|entry| !entry.contains(x) && entry.len() < set.len());
+    level.history.push(set);
+    level.value = value as u64;
+    level.loss_floor = 0;
+    level.has_split = false;
+    level.has_pot = false;
+    // The workspace's tableau, of the level before, is the one to derive the level's from (its set flipped, `x`
+    // deleted), copied for when the workspace holds another.
+    level.source.held = level.meet_solve;
+    level.source.contracted = Bits::EMPTY;
+    meet.save(&mut level.source.snapshot);
+    level.source.saved = true;
+    level.meet_solve = 0;
     true
 }
 

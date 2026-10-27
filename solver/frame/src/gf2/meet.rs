@@ -216,6 +216,10 @@ const NONE: u32 = u32::MAX;
 const NO_SLOT: u16 = u16::MAX;
 /// The heap entry of [`Meet::without`] that stands for the next element free in A.
 const FREE_A: u32 = u32::MAX - 1;
+/// The vertices of [`Meet::without_any_size`]'s search that stand for no element: one outside the set that is free in
+/// both matroids, and a member that is in no circuit of either, both of weight 0.
+const OUT_DUMMY: u32 = u32::MAX - 2;
+const IN_DUMMY: u32 = u32::MAX - 3;
 
 /// The workspace of the intersection: everything a solve needs, kept between solves so that a solve allocates
 /// nothing once the vectors have grown.
@@ -363,6 +367,9 @@ pub struct Meet<const R: usize> {
     /// The element that closed the cycle the last [`has_cycle_within`](Self::has_cycle_within) found (`NONE` for
     /// none).
     found: u32,
+    /// The predecessors of [`OUT_DUMMY`] and [`IN_DUMMY`] in the last search of
+    /// [`without_any_size`](Self::without_any_size).
+    dummy_back: [u32; 2],
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
     pub withouts_exact: u64,
@@ -389,11 +396,12 @@ pub struct Meet<const R: usize> {
 }
 
 /// The queue of the searches of the exchange graph, which take the entries `(distance, vertex)` least first (the
-/// vertex [`FREE_A`] after every element at the same distance).  When the distances stay below a bound under 2^49 and
-/// the elements fit 14 bits, the entries are keys of a [`RadixHeap`], the distance above the vertex (`FREE_A` the
-/// largest vertex): a search pushes no entry below the last it took (every arc adds an arc to the packed distance,
-/// and the hubs' entries are later still), so the keys are monotone and come out in the same order as from a binary
-/// heap, which takes the other searches.
+/// vertices [`IN_DUMMY`], [`OUT_DUMMY`] and [`FREE_A`], in that order, after every element at the same distance).
+/// When the distances stay below a bound under 2^49 and the elements fit 14 bits with the three codes above them, the
+/// entries are keys of a [`RadixHeap`], the distance above the vertex (`FREE_A` the largest vertex): a search pushes
+/// no entry below the last it took (every arc adds an arc to the packed distance, and the hubs' entries are later
+/// still), so the keys are monotone and come out in the same order as from a binary heap, which takes the other
+/// searches.
 struct Queue {
     radix: RadixHeap,
     heap: BinaryHeap<Reverse<(Dist, u32)>>,
@@ -410,7 +418,7 @@ impl Queue {
 
     /// Empties the queue for a search whose distances stay below `bound`, of elements numbered below `n`.
     fn start(&mut self, bound: Dist, n: usize) {
-        self.packed = (0..1 << 49).contains(&bound) && (n as u64) < Self::FREE;
+        self.packed = (0..1 << 49).contains(&bound) && (n as u64) < Self::FREE - 2;
         self.radix.clear();
         self.heap.clear();
     }
@@ -418,7 +426,12 @@ impl Queue {
     #[inline]
     fn push(&mut self, d: Dist, v: u32) {
         if self.packed {
-            let code = if v == FREE_A { Self::FREE } else { u64::from(v) };
+            let code = match v {
+                FREE_A => Self::FREE,
+                OUT_DUMMY => Self::FREE - 1,
+                IN_DUMMY => Self::FREE - 2,
+                _ => u64::from(v),
+            };
             self.radix.push((d as u64) << Self::BITS | code);
         } else {
             self.heap.push(Reverse((d, v)));
@@ -430,7 +443,13 @@ impl Queue {
         if self.packed {
             self.radix.pop().map(|k| {
                 let code = k & Self::FREE;
-                ((k >> Self::BITS) as Dist, if code == Self::FREE { FREE_A } else { code as u32 })
+                let v = match code {
+                    Self::FREE => FREE_A,
+                    c if c == Self::FREE - 1 => OUT_DUMMY,
+                    c if c == Self::FREE - 2 => IN_DUMMY,
+                    c => c as u32,
+                };
+                ((k >> Self::BITS) as Dist, v)
             })
         } else {
             self.heap.pop().map(|Reverse(entry)| entry)
@@ -632,6 +651,7 @@ impl<const R: usize> Meet<R> {
             sorted_for: 0,
             flip: Vec::with_capacity(n),
             found: NONE,
+            dummy_back: [NONE; 2],
             withouts: 0,
             withouts_exact: 0,
             mark: vec![0; n],
@@ -2082,7 +2102,7 @@ impl<const R: usize> Meet<R> {
     /// than the best found can pass.
     pub fn without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, banned: &[u32]) -> Option<i64> {
         self.withouts += 1;
-        let (length, end) = self.shortest_cycle(p, pot, x, limit, banned, false)?;
+        let (length, end) = self.shortest_cycle::<false>(p, pot, x, limit, banned, false)?;
         // The cycle's elements, and the set flipped along it checked common independent in the blocks it touches
         // (the others hold the same members as before).
         self.flip.clear();
@@ -2091,6 +2111,56 @@ impl<const R: usize> Meet<R> {
         while v != x && v != NONE && self.flip.len() <= self.pos.len() {
             self.flip.push(v);
             v = self.back[v as usize];
+        }
+        if v != x || !self.flipped_independent(p) {
+            debug_assert!(false, "the shortest cycle through a member flips into a dependent set");
+            return None;
+        }
+        self.withouts_exact += 1;
+        Some(self.value - length)
+    }
+
+    /// After a [`solve`](Self::solve) that settled, or a [`derive`](Self::derive), with the workspace still holding
+    /// it: the weight of the heaviest common independent set without its member `x`, of any size, among the sets that
+    /// hold every member of `banned` and no other element of it, and that set, the heaviest set flipped along the
+    /// elements of [`cycle`](Self::cycle); `None` if the flip is not common independent, which the argument below
+    /// rules out (debug builds assert it).  `pot` is the weight split of the heaviest set `I` (as for
+    /// [`without`](Self::without)).  The tableau is left as it was.
+    ///
+    /// [`without`](Self::without)'s search, in the exchange graph of `I` with elements of weight 0 added that are
+    /// independent of everything (each in a block of its own in both matroids): copies of `o` outside the set and of
+    /// `i` in it.  `I` with the copies of `i` is a heaviest common independent set of all sizes there, and `w1` and
+    /// `w2` both 0 on the copies extend the split.  A common independent set `J` without `x`, with as many copies of
+    /// each added as make its size that set's, differs from it by cycles alone, whose lengths are not negative and add
+    /// up to `w(I) − w(J)` (see the module docs, "The heaviest set without a member"), and one of them passes through
+    /// `x`.  The copies of `o` have the same arcs (from and to every member), and so have those of `i` (from every
+    /// element free in B, to every element free in A), so a cycle through two copies of one is no shorter than the one
+    /// that goes on from the first as from the second (what it leaves out closes a cycle) and has fewer arcs: the
+    /// search needs one `o` and one `i`, and its shortest cycle through `x` gives the heaviest set without `x` of every
+    /// size, with no bound on what the other sizes lose.  Less `o` and `i`, the cycle is one of `I`'s exchange graph,
+    /// or a path through `x` from a member to a member (through `o`: a set one smaller), from an element free in A to
+    /// one free in B (through `i`: one larger), or between a member and an element free in one matroid (through both).
+    /// `o` is searched as an element free in both matroids reached through `through`, `i` as a member reached through
+    /// the hub, `w1(o)` and `w2(i)` being 0.  The cycle `x → o → x`, of length `w(x)` (the set `I − x`), bounds the
+    /// search.
+    pub fn without_any_size(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, banned: &[u32]) -> Option<i64> {
+        self.withouts += 1;
+        let (length, end) = self.shortest_cycle::<true>(p, pot, x, p.weight[x as usize], banned, false)?;
+        // The cycle's elements: from the one that closes it, its predecessors back to x, the two vertices that stand
+        // for no element left out.
+        self.flip.clear();
+        self.flip.push(x);
+        let (mut v, mut steps) = (end, 0);
+        while v != x && v != NONE && steps <= self.pos.len() + 2 {
+            v = match v {
+                OUT_DUMMY => self.dummy_back[0],
+                IN_DUMMY => self.dummy_back[1],
+                _ => {
+                    self.flip.push(v);
+                    self.back[v as usize]
+                }
+            };
+            steps += 1;
         }
         if v != x || !self.flipped_independent(p) {
             debug_assert!(false, "the shortest cycle through a member flips into a dependent set");
@@ -2114,7 +2184,7 @@ impl<const R: usize> Meet<R> {
         if !searchable {
             return true;
         }
-        let Some((_, end)) = self.shortest_cycle(p, pot, x, limit, &[], true) else { return false };
+        let Some((_, end)) = self.shortest_cycle::<false>(p, pot, x, limit, &[], true) else { return false };
         self.found = end;
         true
     }
@@ -2167,7 +2237,7 @@ impl<const R: usize> Meet<R> {
 
     /// The search of [`without`](Self::without): the shortest cycle's length and the element that closes it at `x`,
     /// or with `first` the first cycle found within `limit`.
-    fn shortest_cycle(
+    fn shortest_cycle<const SIZES: bool>(
         &mut self,
         p: &Problem<'_, R>,
         pot: &[i64],
@@ -2216,6 +2286,11 @@ impl<const R: usize> Meet<R> {
         let mut next_member = 0;
         // The vertices settled so far, which orders the offers.
         let mut tick = 0u32;
+        // With `SIZES`, the vertices that stand for no element ([`without_any_size`](Self::without_any_size)): their
+        // distances, predecessors, and whether they are settled (`OUT_DUMMY`'s first).
+        let mut dummy_reach = [INF; 2];
+        let mut dummy_back = [NONE; 2];
+        let mut dummy_done = [false; 2];
         // Offers the distance `d` to `v` from `from`, unless it is no shorter than the best cycle so far (the search
         // ends before it would take the entry).
         macro_rules! offer {
@@ -2259,6 +2334,26 @@ impl<const R: usize> Meet<R> {
                 }
             }};
         }
+        // With `SIZES`, offers the element outside that is free in both matroids its distance through `through` (its
+        // `w1` is 0), and the member in no circuit its distance through the hub (its `w2` is 0).
+        macro_rules! offer_out {
+            () => {{
+                let d = through.0 + 1;
+                if SIZES && !dummy_done[0] && d < dummy_reach[0] && d < cycle.0 {
+                    (dummy_reach[0], dummy_back[0]) = (d, through.1);
+                    heap.push(d, OUT_DUMMY);
+                }
+            }};
+        }
+        macro_rules! offer_in {
+            () => {{
+                let d = hub.0;
+                if SIZES && !dummy_done[1] && d < dummy_reach[1] && d < cycle.0 {
+                    (dummy_reach[1], dummy_back[1]) = (d, hub.1);
+                    heap.push(d, IN_DUMMY);
+                }
+            }};
+        }
         heap.push(0, x);
         seen[x as usize] = reached;
         reach[x as usize] = 0;
@@ -2266,6 +2361,31 @@ impl<const R: usize> Meet<R> {
         while let Some((d, v)) = heap.pop() {
             if d >= cycle.0 || (first && cycle.1 != NONE) {
                 break;
+            }
+            if SIZES && (v == OUT_DUMMY || v == IN_DUMMY) {
+                let k = usize::from(v == IN_DUMMY);
+                if dummy_done[k] || d != dummy_reach[k] {
+                    continue;
+                }
+                dummy_done[k] = true;
+                tick += 1;
+                if v == OUT_DUMMY {
+                    // Free in B, of `w2` 0: arcs to every member, x's closing a cycle, the others' through the hub.
+                    if d + w2(x) * HOPS + 1 < cycle.0 {
+                        cycle = (d + w2(x) * HOPS + 1, v);
+                    }
+                    if d + 1 < hub.0 {
+                        hub = (d + 1, v, tick);
+                        queue_member!();
+                        offer_in!();
+                    }
+                } else if d < through.0 {
+                    // A member in no circuit, of `w1` 0: arcs to the elements free in A alone.
+                    through = (d, v);
+                    queue_free!();
+                    offer_out!();
+                }
+                continue;
             }
             let v = if v == FREE_A {
                 // The element free in A with the largest w1 still unsettled, unless the entry is stale.
@@ -2322,6 +2442,7 @@ impl<const R: usize> Meet<R> {
                 if d + w1(v) * HOPS < through.0 {
                     through = (d + w1(v) * HOPS, v);
                     queue_free!();
+                    offer_out!();
                 }
             } else if free!(self, 1, i) {
                 // Free in B: arcs to every member, x's closing a cycle, the others' through the hub.
@@ -2331,6 +2452,7 @@ impl<const R: usize> Meet<R> {
                 if d - w2(v) * HOPS + 1 < hub.0 {
                     hub = (d - w2(v) * HOPS + 1, v, tick);
                     queue_member!();
+                    offer_in!();
                 }
             } else {
                 // The members of its circuit in B.
@@ -2348,6 +2470,7 @@ impl<const R: usize> Meet<R> {
                 });
             }
         }
+        self.dummy_back = dummy_back;
         (cycle.1 != NONE).then(|| (cycle.0.div_euclid(HOPS), cycle.1))
     }
 
@@ -2659,6 +2782,12 @@ mod tests {
         certified: usize,
         asked_one_sided: usize,
         certified_one_sided: usize,
+        /// Heaviest sets without a member of every size ([`Meet::without_any_size`]), with some elements banned, and of
+        /// another size than the heaviest set's: smaller and larger.
+        any_size: usize,
+        any_size_banned: usize,
+        any_size_smaller: usize,
+        any_size_larger: usize,
     }
 
     /// Whether `set` is independent in the matroid with these blocks and vectors.
@@ -2670,10 +2799,16 @@ mod tests {
 
     /// By brute force: the heaviest common independent set of at most `cap` elements, of each subset of `live`.
     fn brute(p: &Problem<'_, 1>, live: &[u32], cap: usize) -> i64 {
+        brute_holding(p, live, &[], cap)
+    }
+
+    /// [`brute`] among the sets that hold every element of `must` (elements of `live`).
+    fn brute_holding(p: &Problem<'_, 1>, live: &[u32], must: &[u32], cap: usize) -> i64 {
         let mut best = 0;
         for mask in 0u32..(1 << live.len()) {
             let set: Vec<u32> = (0..live.len()).filter(|&i| mask >> i & 1 == 1).map(|i| live[i]).collect();
             if set.len() <= cap
+                && must.iter().all(|e| set.contains(e))
                 && independent(p.block[0], p.vector[0], &set)
                 && independent(p.block[1], p.vector[1], &set)
             {
@@ -2794,6 +2929,35 @@ mod tests {
                     let rest: Vec<u32> = live.iter().copied().filter(|&e| e != x).collect();
                     assert_eq!(value, brute(&p, &rest, cap), "trial {trial}: without {x}, at most {cap}");
                 }
+            }
+        }
+        // The heaviest set without each member of every size, with nothing banned and with every third element other
+        // than the member banned (members kept, the others left out), its value and the set it flips to.
+        for &x in &members {
+            for skip in [None, Some(trial % 3)] {
+                let banned: Vec<u32> =
+                    live.iter().copied().filter(|&e| e != x && Some(e as usize % 3) == skip).collect();
+                let rest: Vec<u32> =
+                    live.iter().copied().filter(|&e| e != x && (!banned.contains(&e) || meet.contains(e))).collect();
+                let must: Vec<u32> = banned.iter().copied().filter(|&e| meet.contains(e)).collect();
+                let value = meet.without_any_size(&p, &pot, x, &banned).expect("the flip is common independent");
+                assert_eq!(value, brute_holding(&p, &rest, &must, n), "trial {trial}: without {x}, banned {banned:?}");
+                let mut flipped: Vec<u32> = members.clone();
+                for &e in meet.cycle() {
+                    match flipped.iter().position(|&f| f == e) {
+                        Some(i) => _ = flipped.remove(i),
+                        None => flipped.push(e),
+                    }
+                }
+                assert!(!flipped.contains(&x) && banned.iter().all(|e| flipped.contains(e) == meet.contains(*e)));
+                assert!(
+                    independent(p.block[0], p.vector[0], &flipped) && independent(p.block[1], p.vector[1], &flipped)
+                );
+                assert_eq!(flipped.iter().map(|&e| p.weight[e as usize]).sum::<i64>(), value, "trial {trial}");
+                counts.any_size += 1;
+                counts.any_size_banned += usize::from(!banned.is_empty());
+                counts.any_size_smaller += usize::from(flipped.len() < size);
+                counts.any_size_larger += usize::from(flipped.len() > size);
             }
         }
     }
@@ -2930,6 +3094,11 @@ mod tests {
         let at_least = |count: usize, most: usize| count * 100 >= most * percent;
         assert!(at_least(exact_losses, 3000), "{exact_losses} exact losses");
         assert!(at_least(asked, 10_000) && certified > asked / 4, "{certified} of {asked} certified");
+        let Counts { any_size, any_size_banned, any_size_smaller, any_size_larger, .. } = counts;
+        println!("{any_size} without a member of any size, {any_size_banned} with some banned");
+        println!("{any_size_smaller} smaller, {any_size_larger} larger");
+        assert!(at_least(any_size, 10_000) && any_size_banned > any_size / 4, "{any_size} {any_size_banned}");
+        assert!(any_size_smaller > any_size / 20 && any_size_larger > 0, "{any_size_smaller} {any_size_larger}");
     }
 
     /// The same checks on problems with one-sided elements, as for the warm starts above.  The heaviest sets must hold

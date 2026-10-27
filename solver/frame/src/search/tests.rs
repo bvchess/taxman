@@ -1135,10 +1135,19 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&carrying.encode()), Ok(carrying));
     assert!(!header.tactics.carried_nogoods);
 
+    // So is the warm start of the GF(2) bound, which is off by default.
+    let mut warming = header;
+    warming.tactics.warm_start = true;
+    assert_eq!(warming.mismatch(&header), None);
+    assert_eq!(header.mismatch(&warming), None);
+    assert_ne!(warming.encode(), header.encode());
+    assert_eq!(Header::<8>::decode(&warming.encode()), Ok(warming));
+    assert!(!header.tactics.warm_start);
+
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
     // each switch that is on (the defaults: 0xFB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look`
-    // bit 10, `near_repeat` bit 11, and `price_reuse` bit 12 and `carried_nogoods` bit 13, off by default), and no
-    // higher bit is used.
+    // bit 10, `near_repeat` bit 11, and `price_reuse` bit 12, `carried_nogoods` bit 13 and `warm_start` bit 14, off by
+    // default), and no higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -1169,6 +1178,9 @@ fn units_and_headers_round_trip() {
             let t = SearchTactics { carried_nogoods: on, ..t };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             assert_eq!(t.bits() >> 13, u16::from(on));
+            let t = SearchTactics { warm_start: on, ..t };
+            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+            assert_eq!(t.bits() >> 13, 3 * u16::from(on));
         }
     }
     assert_eq!(SearchTactics::default().bits(), 0xFB9);
@@ -1226,7 +1238,17 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&carrying), carrying);
     assert_eq!(carrying.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
     assert!(!carrying.same_recorded(&SearchTactics { symmetry: false, ..carrying }));
-    assert!(SearchTactics::from_bits(1 << 14).unwrap_err().contains("unknown tactics"));
+    // `warm_start` is bit 14, off by default, and binds nothing either.
+    let warming = SearchTactics { warm_start: true, ..SearchTactics::legacy_tuning() };
+    assert_eq!(warming.bits(), 0xFB9 | 1 << 14);
+    assert_eq!(SearchTactics::from_bits(0x4FB9), Ok(warming));
+    assert_eq!(SearchTactics::WARM_START_BIT, 1 << 14);
+    assert!(warming.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(SearchTactics::legacy_tuning().same_recorded(&warming));
+    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&warming), warming);
+    assert_eq!(warming.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
+    assert!(!warming.same_recorded(&SearchTactics { symmetry: false, ..warming }));
+    assert!(SearchTactics::from_bits(1 << 15).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- the extended problem: one-sided candidates ----

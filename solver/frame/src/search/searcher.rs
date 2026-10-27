@@ -133,6 +133,9 @@ pub struct SearchSpace<'a, const W: usize> {
     pub gf2_deep_branching: Gf2Branching,
     /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
+    /// With `gf2`: a child whose parent's heaviest set lost members it dropped finds its heaviest set from its parent's
+    /// (tactic `warm_start`, [`Gf2Bound::set_warm_start`]).
+    pub gf2_warm_start: bool,
     /// The branching settings, which a caller may change while the search runs; each searcher reads them when it
     /// starts a unit ([`Branching`]).  With `gf2`, their `conflict_branching` and `gate` give the gap from which a
     /// check branches on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
@@ -204,6 +207,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             gf2_strong_depth: tactics.strong_depth,
             gf2_deep_branching: tactics.deep_branching,
             gf2_force_window: tactics.force_window,
+            gf2_warm_start: tactics.warm_start,
             branching: Arc::new(Branching::new(BranchSettings::of(&tactics))),
             symmetry: tactics
                 .symmetry
@@ -468,6 +472,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 gf2: space.gf2.as_ref().map(|graph| {
                     let mut bound = Gf2Bound::new(graph);
                     bound.set_force_window(space.gf2_force_window);
+                    bound.set_warm_start(space.gf2_warm_start);
                     bound
                 }),
                 order: Vec::new(),

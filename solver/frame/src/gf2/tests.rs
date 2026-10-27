@@ -623,17 +623,31 @@ fn look_at_a_child<const W: usize>(
     walked.child_bounds_equal += u64::from(value == bound);
 }
 
-/// Walks `paths` random paths of each of `boards` at W = 16 (`walk_random_paths`, with the one engine a board needs),
-/// and checks that the walks reached at least `percent` percent of what [`levels_match_fresh_matroids_along_random_paths`]
-/// asks: the bound of every node equals the bound of the matroids built afresh from its state, and the forced members,
-/// the certified bounds and the solved bounds without a candidate are right.
-fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64) {
+/// Walks `paths` random paths of each of `boards` at W = 16 (`walk_random_paths`, with the one engine a board needs,
+/// with the tactic `warm_start` if `warm`), and checks that the walks reached at least `percent` percent of what
+/// [`levels_match_fresh_matroids_along_random_paths`] asks: the bound of every node equals the bound of the matroids
+/// built afresh from its state, and the forced members, the certified bounds and the solved bounds without a candidate
+/// are right.  With `warm`, the children found from their parent's heaviest set count as the certified ones do, some
+/// must have left out more than one member of it, and some nodes must have gone on without a member of their own.
+fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64, warm: bool) {
     const W: usize = 16;
     let mut walked = Walked::default();
+    let (mut warm_children, mut warm_levels, mut warm_deletions) = (0, 0, 0);
     for &n in boards {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-        walk_random_paths(&p, rng, paths, usize::MAX, &mut [Gf2Bound::<W>::new(&graph)], &mut walked);
+        let mut engine = Gf2Bound::<W>::new(&graph);
+        engine.set_warm_start(warm);
+        walk_random_paths(&p, rng, paths, usize::MAX, std::slice::from_mut(&mut engine), &mut walked);
+        warm_children += engine.stats().warm_children;
+        warm_levels += engine.stats().warm_levels;
+        warm_deletions += engine.stats().warm_deletions;
+    }
+    walked.children += warm_children;
+    if warm {
+        println!("{warm_children} children and {warm_levels} nodes warm-started, {warm_deletions} deletions");
+        let more = warm_deletions > warm_children + warm_levels;
+        assert!(warm_children > 0 && warm_levels > 0 && more, "{warm_children} {warm_levels} {warm_deletions}");
     }
     let Walked { checks, inherited, forced_checked, certified_checked, excluded_checked, children, .. } = walked;
     println!("{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}");
@@ -663,7 +677,14 @@ fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64) {
 /// [`levels_match_fresh_matroids_along_random_paths`] along 3 paths of the boards 60, 120, 200 and 330.
 #[test]
 fn levels_match_fresh_matroids_along_a_few_random_paths() {
-    walk_real_games(&[60, 120, 200, 330], 3, &mut Rng(0xA5A5_0123_4567_89AC), 5);
+    walk_real_games(&[60, 120, 200, 330], 3, &mut Rng(0xA5A5_0123_4567_89AC), 5, false);
+}
+
+/// [`levels_match_fresh_matroids_along_a_few_random_paths`] with the tactic `warm_start`: a child that drops members
+/// of its parent's heaviest set finds its own from it (debug builds also check each such child against a solve).
+#[test]
+fn levels_match_fresh_matroids_along_a_few_random_paths_with_warm_starts() {
+    walk_real_games(&[60, 120, 200, 330], 3, &mut Rng(0xA5A5_0123_4567_89AD), 5, true);
 }
 
 /// Along random paths of the boards from 60 to 1000 at W = 16 (`walk_random_paths`, with the one engine a board
@@ -673,7 +694,18 @@ fn levels_match_fresh_matroids_along_a_few_random_paths() {
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths")]
 fn levels_match_fresh_matroids_along_random_paths() {
     let boards = [60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000];
-    walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AB), 100);
+    walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AB), 100, false);
+}
+
+/// [`levels_match_fresh_matroids_along_random_paths`] with the tactic `warm_start`.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths_with_warm_starts"
+)]
+fn levels_match_fresh_matroids_along_random_paths_with_warm_starts() {
+    let boards = [60u32, 90, 120, 150, 200, 260, 330, 420, 520, 640, 760, 900, 1000];
+    walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AE), 100, true);
 }
 
 /// Along random paths of the boards 300 and 760 at W = 16 (`walk_random_paths`), engines whose search stamps start
