@@ -29,14 +29,42 @@
 //! not promoted it (or they promote it again, and look at the nogood then).  A nogood watches the rarest of its members
 //! that it can, those in the fewest nogoods of the store, which the paths that many nodes take promote least.
 //!
-//! A store's file is text, one nogood a line, its members in decimal separated by spaces; blank lines are skipped.
+//! A store's file is text, one nogood a line, its members in decimal separated by spaces; blank lines are skipped.  A
+//! *directory of stores* holds the file of each game whose search wrote one, `nogoods-N.txt` for game N
+//! ([`store_file`]), and a search reads those of its own game and the games before it
+//! ([`CarriedNogoods::from_dir`]).
 
 use super::{FrameGraph, FrameSet, Scratch};
 use crate::bits::Bits;
 use std::collections::HashSet;
 use std::mem;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Most sets a search reads from a directory of stores ([`CarriedNogoods::from_dir`]): checking each at the root takes a
+/// fraction of a millisecond, and the search starts after it.
+pub const DIR_CAP: usize = 20_000;
+
+/// The file of game `n`'s store in the directory of stores `dir`.
+pub fn store_file(dir: &Path, n: u32) -> PathBuf {
+    dir.join(format!("nogoods-{n}.txt"))
+}
+
+/// The games whose stores the directory `dir` holds, and their files, the latest game first (none if it cannot be
+/// read).
+fn stores_in(dir: &Path) -> Vec<(u32, PathBuf)> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut found: Vec<(u32, PathBuf)> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let n = name.strip_prefix("nogoods-")?.strip_suffix(".txt")?.parse().ok()?;
+            Some((n, entry.path()))
+        })
+        .collect();
+    found.sort_by_key(|&(n, _)| std::cmp::Reverse(n));
+    found
+}
 
 /// The nogoods carried into a search, validated at its root (see the module docs).
 pub struct CarriedNogoods<const W: usize> {
@@ -181,6 +209,35 @@ impl<const W: usize> CarriedNogoods<W> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let sets = Self::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(Self::validated(model, root, candidates, &sets))
+    }
+
+    /// The store of game `n` from the directory of stores `dir`: the sets of the files of game `n` (written by an
+    /// earlier run of its search) and of the games before it, the latest game's first, at most [`DIR_CAP`] of them,
+    /// validated at `root` ([`validated`](Self::validated)); and the files it read.  A file that cannot be read or
+    /// parsed is passed over, with a warning on stderr: a store is only ever a help.
+    pub fn from_dir(
+        dir: &Path,
+        n: u32,
+        model: &FrameGraph,
+        root: &FrameSet<W>,
+        candidates: &Bits<W>,
+    ) -> (Self, Validation, Vec<PathBuf>) {
+        let (mut sets, mut read) = (Vec::new(), Vec::new());
+        for (_, path) in stores_in(dir).into_iter().filter(|&(m, _)| m <= n) {
+            if sets.len() >= DIR_CAP {
+                break;
+            }
+            let parsed = std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|text| Self::parse(&text));
+            match parsed {
+                Ok(more) => {
+                    sets.extend(more.into_iter().take(DIR_CAP - sets.len()));
+                    read.push(path);
+                }
+                Err(e) => eprintln!("warning: carried nogoods: {} passed over: {e}", path.display()),
+            }
+        }
+        let (store, validation) = Self::validated(model, root, candidates, &sets);
+        (store, validation, read)
     }
 
     /// The number of nogoods.

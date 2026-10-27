@@ -149,6 +149,29 @@ fn every_tactic_gives_the_same_scores_at_a_few_games() {
     every_tactic_gives_the_same_scores_at(100..=120);
 }
 
+/// Games solved with a directory of stores of carried nogoods (`--carried-dir`, with the tactic `carried_nogoods`)
+/// find the scores of `optimal.json`: the store there is what a search of game 110 learns in its first steps, which
+/// each of the games 111..=120 checks at its own root and searches with.
+#[test]
+fn games_with_a_directory_of_stores_find_their_scores() {
+    let optimal = Optimal::built_in();
+    let dir = TempDir::new("carried-dir");
+    let game = common::Game::<8>::of_board(110).expect("game 110 has candidates");
+    let lines: String = game
+        .learned(common::LEARNING_STEPS)
+        .iter()
+        .map(|n| n.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(" ") + "\n")
+        .collect();
+    assert!(!lines.is_empty(), "the search of 110 learned no nogood");
+    fs::write(taxman::model::store_file(&dir, 110), lines).unwrap();
+    let mut opts = SolveOptions { force_search: true, carried_dir: Some(dir.to_path_buf()), ..options(1) };
+    opts.tactics.search.carried_nogoods = true;
+    for r in solve_all(111, 120, &opts) {
+        assert!(r.completed, "n={}", r.n);
+        assert_eq!(Some(r.score), optimal.score(r.n), "n={}", r.n);
+    }
+}
+
 /// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games 1..=300.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is every_tactic_gives_the_same_scores_at_a_few_games")]

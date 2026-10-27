@@ -133,7 +133,7 @@ pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
 use crate::bits::Bits;
 use crate::engine::{self, CheckpointHook, Control, Counters, EngineConfig, ProgressNote, Start, Stats};
 use crate::matchbound::MatchGraph;
-use crate::model::NogoodStats;
+use crate::model::{CarriedNogoods, NogoodStats};
 use header::Header;
 use incumbent::{distinct, dive, surviving};
 use profile::Begin;
@@ -273,7 +273,7 @@ pub fn search_above<const W: usize>(
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None, None)
+    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None, None, None)
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -286,7 +286,7 @@ pub fn search_with<const W: usize>(
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
     let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
-    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None, None, None)
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -303,7 +303,7 @@ pub fn search_beside<const W: usize>(
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
@@ -319,6 +319,10 @@ pub fn search_beside<const W: usize>(
 ///
 /// With `profile`, the search keeps the profile that it asks for in its file ([`SearchProfile`]), which observes the
 /// search and changes nothing of it: a profile that cannot be written is said on stderr, and the search goes on.
+///
+/// With the tactic `carried_nogoods` and a directory of stores `carried`, the search carries the nogoods of the stores
+/// there of its game and the games before it, validated at its root, at its start and at each resume
+/// ([`CarriedNogoods::from_dir`]); they only prune (solver/docs/design/carried-nogoods.md).
 #[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
@@ -330,15 +334,31 @@ pub fn search_steered<const W: usize>(
     branching: &Arc<Branching>,
     near_repeat: &OnceLock<NearRepeat<W>>,
     profile: Option<&ProfilePlan>,
+    carried: Option<&Path>,
 ) -> io::Result<SearchResult<W>> {
     let (forgetting, near_repeat, branching) = (prepared.tactics.forgetting(), Some(near_repeat), Some(branching));
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, branching, near_repeat, profile)
+    search_forgetting(
+        prepared,
+        cfg,
+        seeds,
+        cap,
+        resume,
+        None,
+        forgetting,
+        None,
+        plan,
+        branching,
+        near_repeat,
+        profile,
+        carried,
+    )
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
 /// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
 /// settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
-/// comes to hold, if given, and keeping the profile `profile` asks for, if given ([`search_steered`]).
+/// comes to hold, if given, keeping the profile `profile` asks for, if given, and carrying the nogoods of the directory
+/// of stores `carried_dir`, if given, with the tactic `carried_nogoods` ([`search_steered`]).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -353,6 +373,7 @@ fn search_forgetting<const W: usize>(
     branching: Option<&Arc<Branching>>,
     near_repeat: Option<&OnceLock<NearRepeat<W>>>,
     profile: Option<&ProfilePlan>,
+    carried_dir: Option<&Path>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
@@ -407,8 +428,31 @@ fn search_forgetting<const W: usize>(
     // The near-repeat cut, with the tactic: a node is cut only where the incumbent reaches its bound (the setup's last
     // check), which the searchers compare at each node, since the cut may be armed when it is below.
     let near_repeat = near_repeat.filter(|_| prepared.tactics.near_repeat);
-    let space =
-        SearchSpace { forgetting, diagnostics, began: t0, near_repeat, ..SearchSpace::new(prepared, &match_graph) };
+    // The carried nogoods, with the tactic: the stores of this game and the games before it, checked at this root.
+    let carried = carried_dir.filter(|_| prepared.tactics.carried_nogoods).map(|dir| {
+        let (store, v, files) =
+            CarriedNogoods::from_dir(dir, prepared.n, &prepared.model, &prepared.root, &prepared.candidates);
+        eprintln!(
+            "n={}: carried nogoods: {} kept of {} sets from {} files of {} ({} with a number that is no candidate, {} \
+             promotable)",
+            prepared.n,
+            v.kept,
+            v.given,
+            files.len(),
+            dir.display(),
+            v.not_candidates,
+            v.promotable
+        );
+        store
+    });
+    let space = SearchSpace {
+        forgetting,
+        diagnostics,
+        began: t0,
+        near_repeat,
+        carried: carried.as_ref(),
+        ..SearchSpace::new(prepared, &match_graph)
+    };
     let space = match branching {
         Some(branching) => SearchSpace { branching: Arc::clone(branching), ..space },
         None => space,

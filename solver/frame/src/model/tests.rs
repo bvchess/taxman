@@ -1400,3 +1400,43 @@ fn carried_nogoods_answer_by_their_definition_along_a_search() {
         "{ruled} ruled out, {at_start} at the start, {cuts} cuts, {children} children"
     );
 }
+
+/// A search reads, from a directory of stores, the files of its game and the games before it, the latest first, and
+/// passes over the files of later games, the files it cannot parse and the files of other names; what it reads is
+/// validated as a store's sets are.
+#[test]
+fn a_directory_of_stores_gives_the_stores_of_the_game_and_the_games_before_it() {
+    let g = load(golden_ns().into_iter().find(|&n| n >= 100).expect("a golden game of 100 or more"));
+    let (model, root) = FrameGraph::build::<8>(&Tables::new(g.n), &g.columns).unwrap();
+    let candidates = Bits::<8>::from_slice(&g.candidates);
+    // Nogoods made from the conflicts of states along a promotion path, as a search learns them.
+    let mut scratch = Scratch::new();
+    let (mut state, mut promoted, mut nogoods) = (root, Bits::<8>::EMPTY, Vec::new());
+    for x in candidates.iter() {
+        let set = state.narrow_candidates(&candidates) - promoted;
+        if let Some(k) = model.conflict_using(&mut scratch, &state, &set, true) {
+            nogoods.push(model.nogood(&mut scratch, &root, &promoted, &k).expect("a conflict has a nogood"));
+        }
+        if model.promote_in_place(&mut state, x) {
+            promoted.insert(x);
+        }
+    }
+    assert!(nogoods.len() >= 4, "n={}: {} nogoods", g.n, nogoods.len());
+    let line = |n: &Bits<8>| n.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(" ") + "\n";
+    let dir = crate::test_support::TempDir::new("carried-dir");
+    let write = |name: &str, text: &str| std::fs::write(dir.join(name), text).unwrap();
+    write("nogoods-5.txt", &line(&nogoods[0]));
+    write("nogoods-9.txt", &(line(&nogoods[1]) + &line(&nogoods[2])));
+    write("nogoods-7.txt", "1 2 x\n");
+    write("nogoods-12.txt", &line(&nogoods[3]));
+    write("other-8.txt", &line(&nogoods[3]));
+    let (store, validation, files) = CarriedNogoods::from_dir(&dir, 10, &model, &root, &candidates);
+    assert_eq!(files, [dir.join("nogoods-9.txt"), dir.join("nogoods-5.txt")]);
+    assert_eq!(validation.given, 3);
+    assert_eq!(store.len(), validation.kept);
+    assert!(!store.is_empty() && store.sets().all(|n| !model.can_promote_all_using(&mut scratch, &root, &n)));
+    // Game 12 reads its own store too; game 4, none.
+    assert_eq!(CarriedNogoods::from_dir(&dir, 12, &model, &root, &candidates).1.given, 4);
+    assert!(CarriedNogoods::from_dir(&dir, 4, &model, &root, &candidates).0.is_empty());
+    assert_eq!(store_file(&dir, 9), dir.join("nogoods-9.txt"));
+}

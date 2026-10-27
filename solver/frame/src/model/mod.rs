@@ -57,7 +57,7 @@ mod peel;
 mod promote;
 mod provider;
 
-pub use carried::{CarriedNogoods, Validation, Watches};
+pub use carried::{store_file, CarriedNogoods, Validation, Watches, DIR_CAP};
 pub use conflict::ConflictCache;
 pub use frame::{Frame, FrameSet};
 pub use nogoods::{Keep, Lookup, NogoodStats, Nogoods};

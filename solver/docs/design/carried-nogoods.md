@@ -53,8 +53,10 @@ run that resumes a search says whether it has a store ([trust.md](trust.md)).
 
 ## Where a store comes from
 
-Only `tune solve --carried FILE`, with `--tactic carried_nogoods=on`, gives a search a store; the solver gives none, and
-the tactic does nothing there.  A store for the chain would be written by each search as it goes, from the nogoods its
-searchers learn, and read by the next game's search, which validates it at its own root.  What it is worth, measured on
+`taxman solve --carried-dir DIR` turns the tactic on and gives each game's search a store: at its start and at each
+resume, the search reads the files `DIR/nogoods-N.txt` of its own game and the games before it, the latest game's
+first and at most 20,000 sets (`CarriedNogoods::from_dir`), and checks them at its root.  `tune solve --carried FILE`,
+with `--tactic carried_nogoods=on`, gives the units it solves the store of one file.  Without a store the tactic does
+nothing.  What it is worth, measured on
 units of game 4984 with the nogoods that units of 4983 learned, is in [the root gap and the size of a
 game](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-carrying-the-hard-cores-nogoods-into-the-next-game-q7).

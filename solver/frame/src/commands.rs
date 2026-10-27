@@ -123,7 +123,7 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 11] = [
+const SOLVE_FLAGS: [&str; 12] = [
     "--out",
     WINDOW_FLAG,
     "--game-hours",
@@ -135,6 +135,7 @@ const SOLVE_FLAGS: [&str; 11] = [
     "--hook-after",
     "--profile",
     "--profile-depth",
+    "--carried-dir",
 ];
 
 /// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
@@ -214,6 +215,10 @@ pub fn solve(args: &[String]) -> CliResult {
             ));
         }
         opts.profile_depth = depth;
+    }
+    opts.carried_dir = args.value("--carried-dir").map(PathBuf::from);
+    if opts.carried_dir.is_some() {
+        opts.tactics.search.carried_nogoods = true;
     }
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);

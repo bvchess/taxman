@@ -205,6 +205,11 @@ pub struct SolveOptions {
     /// changes nothing of it: it is no tactic, no part of a checkpoint and no part of a result.  None by default.
     pub profile: Option<PathBuf>,
     pub profile_depth: u32,
+    /// The directory of stores of carried nogoods (`--carried-dir`, with the tactic `carried_nogoods`, which the flag
+    /// turns on): each game's search carries the nogoods of the stores there of its game and the games before it,
+    /// checked at its root ([`crate::model::CarriedNogoods::from_dir`]).  They only prune, so the results are the same
+    /// with any stores or none.  None by default.
+    pub carried_dir: Option<PathBuf>,
 }
 
 impl Default for SolveOptions {
@@ -235,6 +240,7 @@ impl Default for SolveOptions {
             lab: LabOptions::default(),
             profile: None,
             profile_depth: search::PROFILE_DEPTH,
+            carried_dir: None,
         }
     }
 }
@@ -1207,8 +1213,9 @@ impl<const W: usize> Job for SearchJob<W> {
         let (prepared, resuming, branching, plan) = (&self.prepared, self.resuming, &self.branching, finder.as_ref());
         let profile = opts.profile.as_deref().map(|dir| ProfilePlan::in_dir(dir, n, opts.profile_depth));
         let near = &self.near;
+        let (profile, carried) = (profile.as_ref(), opts.carried_dir.as_deref());
         let found =
-            search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile.as_ref());
+            search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile, carried);
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);
