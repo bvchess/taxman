@@ -183,8 +183,8 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
                     "forget_nogoods":true,"nogood_period":50000,"nogood_keep":"none","nogood_limit":0,
                     "lagrange":false,"gf2":true,"symmetry":true,"force_window":"all","branching":"exact",
                     "strong_limit":"all","strong_depth":"all","deep_branching":"split","more_forced":true,
-                    "conflict_branching":true,"conflict_look":true,"near_repeat":true,"price_reuse":false,"prev_cap":true,
-                    "seed_incumbent":true},
+                    "conflict_branching":true,"conflict_look":true,"near_repeat":true,"price_reuse":false,
+                    "carried_nogoods":false,"prev_cap":true,"seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
  "options":{"force_search":false,"use_prev":false},
  "optimal_match":true, "build":{"commit":"e8c39cfac7e6...","dirty":false}}

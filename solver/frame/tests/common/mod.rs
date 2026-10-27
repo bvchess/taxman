@@ -26,11 +26,11 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::engine::{self, EngineConfig, Start};
+use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::gf2::{ForceWindow, Gf2Graph};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
-use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
+use taxman::model::{CarriedNogoods, FrameGraph, FrameSet, Keep, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::lagrange::Refits;
@@ -326,6 +326,8 @@ pub struct Config {
     pub near_repeat: bool,
     /// The reuse of the choice's prices (tactic `price_reuse`), where conflict branching chooses.
     pub price_reuse: Option<Reuse>,
+    /// The game's store of carried nogoods (tactic `carried_nogoods`, [`Game::carried`]).
+    pub carried: bool,
 }
 
 impl Config {
@@ -358,7 +360,24 @@ impl Config {
             gf2_words: None,
             near_repeat: t.near_repeat,
             price_reuse: t.price_reuse.then_some(Reuse::STANDARD),
+            carried: t.carried_nogoods,
         }
+    }
+}
+
+/// About how many steps the search runs whose nogoods start a game's store of carried nogoods ([`Game::carried`]).
+pub const LEARNING_STEPS: u64 = 2_048;
+
+/// A searcher that adds the nogoods it holds to `learned` at the end of each unit it runs ([`Game::learned`]).
+struct Learning<'s, 'l, const W: usize> {
+    searcher: TaxSearcher<'s, W>,
+    learned: &'l Mutex<Vec<Bits<W>>>,
+}
+
+impl<const W: usize> Searcher<TaxUnit<W>> for Learning<'_, '_, W> {
+    fn run(&mut self, unit: TaxUnit<W>, ctx: &mut Ctx<'_, TaxUnit<W>>) {
+        self.searcher.run(unit, ctx);
+        self.learned.lock().unwrap().extend_from_slice(self.searcher.nogoods());
     }
 }
 
@@ -391,6 +410,9 @@ pub struct Game<const W: usize> {
     /// The near-repeat cut of the game's searches, by a game proven before ([`Game::with_near_repeat`]); empty without
     /// one.
     near: OnceLock<NearRepeat<W>>,
+    /// The store of carried nogoods of the configurations with `carried`, made when one first searches
+    /// ([`Game::carried`]).
+    carried: OnceLock<CarriedNogoods<W>>,
 }
 
 impl<const W: usize> Game<W> {
@@ -398,7 +420,7 @@ impl<const W: usize> Game<W> {
     pub fn new(model: FrameGraph, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = model.max_promotions_among(&root, &candidates).max(0) as u32;
         let graph = MatchGraph::new(&model, &root);
-        Game { model, root, candidates, max_total, graph, near: OnceLock::new() }
+        Game { model, root, candidates, max_total, graph, near: OnceLock::new(), carried: OnceLock::new() }
     }
 
     /// The game whose searches cut by the problem of `m`'s game, whose best promotion sum is at most `bound`
@@ -443,6 +465,43 @@ impl<const W: usize> Game<W> {
         Game::from_columns(&board.tables, &board.frames.columns(), board.candidates())
     }
 
+    /// The store of carried nogoods that the configurations with `carried` give the game's searches (tactic
+    /// `carried_nogoods`), validated at the root as a search's store is: the nogoods that a search of the game learns in
+    /// its first [`LEARNING_STEPS`] steps from no incumbent ([`learned`](Self::learned)), as the search of a game before
+    /// would hand them on; every pair of candidates at most eight apart in increasing order and every run of three and of
+    /// four, most of which can be promoted; and all those sets with a number that is no candidate added.  A store that
+    /// kept a set that can be promoted, or one that holds a number no node can promote, would lose completions.
+    pub fn carried(&self) -> &CarriedNogoods<W> {
+        self.carried.get_or_init(|| {
+            let mut sets: Vec<Vec<u32>> = self.learned(LEARNING_STEPS).iter().map(|n| n.iter().collect()).collect();
+            let cands: Vec<u32> = self.candidates.iter().collect();
+            for (i, &a) in cands.iter().enumerate() {
+                sets.extend(cands[i + 1..].iter().take(8).map(|&b| vec![a, b]));
+            }
+            for run in [3, 4] {
+                sets.extend(cands.windows(run).map(<[u32]>::to_vec));
+            }
+            let outsider = (2..=self.root_max()).find(|&x| !self.candidates.contains(x));
+            let with_outsider: Vec<Vec<u32>> =
+                sets.iter().filter_map(|set| outsider.map(|x| set.iter().copied().chain([x]).collect())).collect();
+            sets.extend(with_outsider);
+            CarriedNogoods::validated(&self.model, &self.root, &self.candidates, &sets).0
+        })
+    }
+
+    /// The nogoods that a search of the game learns in about its first `steps` steps (the engine counts every 1,024),
+    /// from the root and no incumbent, under the default tactics with no forgetting, on one thread.
+    pub fn learned(&self, steps: u64) -> Vec<Bits<W>> {
+        let cfg = Config { period: None, ..Config::standard() };
+        let space = self.space(cfg);
+        let engine = EngineConfig { node_limit: Some(steps), ..config(1) };
+        let start = Start::Fresh { units: vec![self.root_unit()], best: 0, payload: encode(&Bits::<W>::EMPTY) };
+        let learned = Mutex::new(Vec::new());
+        engine::run(&engine, start, b"test", |_| Learning { searcher: TaxSearcher::new(&space), learned: &learned })
+            .unwrap();
+        learned.into_inner().unwrap()
+    }
+
     /// The unit of the root: nothing promoted, all candidates to try.
     pub fn root_unit(&self) -> TaxUnit<W> {
         TaxUnit { promoted: Bits::EMPTY, cands: self.candidates }
@@ -458,7 +517,29 @@ impl<const W: usize> Game<W> {
         engine: Option<EngineConfig>,
         resume: Option<PathBuf>,
     ) -> Outcome<W> {
-        let space = SearchSpace {
+        let space = self.space(cfg);
+        let near = space.near_repeat.and_then(OnceLock::get);
+        let cut_before = near.map_or(0, NearRepeat::nodes_cut);
+        let engine = engine.unwrap_or_else(|| config(cfg.threads));
+        let start = match resume {
+            Some(path) => Start::Resume(path),
+            None => Start::Fresh { units, best, payload: encode(&Bits::<W>::EMPTY) },
+        };
+        let out = engine::run(&engine, start, b"test", |_| TaxSearcher::new(&space)).unwrap();
+        let set = decode::<W>(&out.payload);
+        Outcome {
+            best: out.best,
+            set,
+            real: self.is_real(&set, out.best),
+            completed: out.completed,
+            nodes: out.stats.nodes,
+            near_cuts: near.map_or(0, |near| near.nodes_cut() - cut_before),
+        }
+    }
+
+    /// The space of the game's searches under `cfg`.
+    fn space(&self, cfg: Config) -> SearchSpace<'_, W> {
+        SearchSpace {
             model: &self.model,
             root: &self.root,
             match_graph: &self.graph,
@@ -497,26 +578,10 @@ impl<const W: usize> Game<W> {
             // As a search has it: with the tactic, and cutting where the incumbent reaches the bound.
             near_repeat: cfg.near_repeat.then_some(&self.near),
             price_reuse: cfg.price_reuse,
+            carried: cfg.carried.then(|| self.carried()),
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,
-        };
-        let near = space.near_repeat.and_then(OnceLock::get);
-        let cut_before = near.map_or(0, NearRepeat::nodes_cut);
-        let engine = engine.unwrap_or_else(|| config(cfg.threads));
-        let start = match resume {
-            Some(path) => Start::Resume(path),
-            None => Start::Fresh { units, best, payload: encode(&Bits::<W>::EMPTY) },
-        };
-        let out = engine::run(&engine, start, b"test", |_| TaxSearcher::new(&space)).unwrap();
-        let set = decode::<W>(&out.payload);
-        Outcome {
-            best: out.best,
-            set,
-            real: self.is_real(&set, out.best),
-            completed: out.completed,
-            nodes: out.stats.nodes,
-            near_cuts: near.map_or(0, |near| near.nodes_cut() - cut_before),
         }
     }
 

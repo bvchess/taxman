@@ -34,7 +34,9 @@ use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::matchbound::{MatchBound, MatchGraph};
-use crate::model::{ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch};
+use crate::model::{
+    CarriedNogoods, ConflictCache, FrameGraph, FrameSet, Lookup, NogoodStats, Nogoods, Scratch, Watches,
+};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -148,6 +150,11 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With the tactic `price_reuse`, when the choice of the conflict takes the prices it made for a node of the
     /// searcher's path at an earlier check ([`Reuse`]); `None`: it makes them at every check.
     pub price_reuse: Option<Reuse>,
+    /// With the tactic `carried_nogoods`: the nogoods carried into the search from another, validated at its root
+    /// ([`CarriedNogoods`]), which the searchers use only to prune: to rule candidates out of a unit's node and of
+    /// children, and to end a node whose forced members complete one.  `None` for a search without a store, as
+    /// [`SearchSpace::new`] makes it: a caller that has one, and the tactic, sets it.
+    pub carried: Option<&'a CarriedNogoods<W>>,
     /// The search's profile, if it keeps one ([`SearchProfile`]): each searcher counts its steps by node, and tags the
     /// nodes it makes near the root.  It observes the search and changes nothing of it.
     pub profile: Option<&'a SearchProfile>,
@@ -201,6 +208,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
                 .filter(|pairs| !pairs.is_empty()),
             near_repeat: None,
             price_reuse: tactics.price_reuse.then_some(Reuse::STANDARD),
+            carried: None,
             profile: None,
             #[cfg(feature = "studies")]
             hooks: None,
@@ -358,6 +366,10 @@ pub(super) struct Counts {
     pub(super) symmetry_excluded: u64,
     /// Nodes and children the near-repeat cut cut ([`NearRepeat`]).
     pub(super) near_repeat: u64,
+    /// Candidates the carried nogoods ruled out of units' nodes and children, and nodes they ended
+    /// ([`SearchSpace::carried`]).
+    pub(super) carried_ruled_out: u64,
+    pub(super) carried_cuts: u64,
 }
 
 /// The Taxman searcher: explores units depth-first on a stack of nodes it reuses (no recursion, and no
@@ -398,6 +410,9 @@ struct Stepper<'a, const W: usize> {
     /// The nogoods learned (tactic `nogoods`), and the steps taken since the table was last cleared.
     nogoods: Option<Nogoods<W>>,
     steps_since_clear: u64,
+    /// The members that the carried nogoods watch along the path ([`SearchSpace::carried`]), valid for the node being
+    /// worked on, and for a child once it is made.
+    watches: Option<Watches>,
     /// The Lagrangian bound over the nogoods along the path (tactic `lagrange`).
     lagrange: Option<Lagrangian<'a, W>>,
     /// The sums of the rule of the tactic `symmetry` (empty without it).
@@ -463,6 +478,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                     table
                 }),
                 steps_since_clear: 0,
+                watches: space.carried.map(CarriedNogoods::watches),
                 lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
                 counts: Counts::default(),
@@ -502,13 +518,20 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             .model
             .promote_all_using(&mut self.stepper.scratch, space.root, &unit.promoted)
             .unwrap_or_else(|| panic!("a unit's promotions {:?} cannot be promoted from the root", unit.promoted));
-        let max_add = max_additional(space.model, space.max_total, &state, &unit.promoted, &unit.cands);
+        // The carried nogoods rule candidates out of the unit's node, and watch members for its children (`make_child`).
+        let mut cands = unit.cands;
+        if let (Some(carried), Some(watches)) = (space.carried, &mut self.stepper.watches) {
+            let out = carried.start(watches, &unit.promoted, &cands);
+            self.stepper.counts.carried_ruled_out += u64::from(out.len());
+            cands -= out;
+        }
+        let max_add = max_additional(space.model, space.max_total, &state, &unit.promoted, &cands);
         let sum = unit.promoted.sum();
         let node = Node {
             state,
             promoted: unit.promoted,
             sum,
-            cands: unit.cands,
+            cands,
             max_add,
             known_end: 0,
             checked: None,
@@ -522,10 +545,10 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             self.stack[0] = node;
         }
         if self.stepper.matching_on {
-            self.stepper.matching.reset(&unit.promoted, &unit.cands);
+            self.stepper.matching.reset(&unit.promoted, &cands);
         }
         if let Some(g) = &mut self.stepper.gf2 {
-            g.reset(&unit.promoted, &unit.cands);
+            g.reset(&unit.promoted, &cands);
         }
         if let Some(lagrange) = &mut self.stepper.lagrange {
             lagrange.start();
@@ -1020,6 +1043,11 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(table) = &mut self.nogoods {
             cands -= table.ruled_out(&added, &child.promoted, &cands);
         }
+        if let (Some(carried), Some(watches)) = (space.carried, &mut self.watches) {
+            let out = carried.promote(watches, &added, &child.promoted, &cands);
+            self.counts.carried_ruled_out += u64::from(out.len());
+            cands -= out;
+        }
         if let Some(sym) = &space.symmetry {
             // The candidates the rule drops are in no completion of the child that keeps the symmetric pairs'
             // inequalities, which are the only ones the search needs (the prime-exchange theorem, R2,
@@ -1240,6 +1268,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Err(cut::GF2);
         }
         let forced = eval.forced;
+        // A carried nogood all of whose members are forced or promoted: no completion reaches `need`.
+        let carried_cut = match (space.carried, &self.watches) {
+            (Some(carried), Some(watches)) => carried.all_forced(watches, promoted, &forced),
+            _ => false,
+        };
+        if carried_cut {
+            self.counts.carried_cuts += 1;
+            #[cfg(feature = "studies")]
+            self.tell_check(&eval, None);
+            return Err(cut::REFINED);
+        }
         let promoted = *promoted;
         let mut learning = self.nogoods.as_mut().map(|table| Learning { table, root: space.root, promoted });
         let mut seek = Seek {
@@ -1606,6 +1645,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
         if let Some(near) = self.near_repeat {
             near.add_cut(counts.near_repeat);
+        }
+        if let Some(carried) = self.space.carried {
+            carried.add_counts(counts.carried_ruled_out, counts.carried_cuts);
         }
         if let Some(g) = &self.gf2 {
             let (now, before) = (g.stats(), self.gf2_flushed);

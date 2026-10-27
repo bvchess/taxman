@@ -47,7 +47,7 @@ impl Default for Tactics {
 }
 
 /// The number of tactics.
-pub const TACTIC_COUNT: usize = 24;
+pub const TACTIC_COUNT: usize = 25;
 
 /// The value of a tactic: an on/off switch, the depth of `match_refine`, a count or the name of a policy of the nogood
 /// table, or one of the settings that tune the GF(2) search.
@@ -207,6 +207,7 @@ impl Tactics {
             ("conflict_look", Slot::Switch(&mut self.search.conflict_look)),
             ("near_repeat", Slot::Switch(&mut self.search.near_repeat)),
             ("price_reuse", Slot::Switch(&mut self.search.price_reuse)),
+            ("carried_nogoods", Slot::Switch(&mut self.search.carried_nogoods)),
             ("prev_cap", Slot::Switch(&mut self.prev_cap)),
             ("seed_incumbent", Slot::Switch(&mut self.seed_incumbent)),
         ]
@@ -292,6 +293,7 @@ mod tests {
                 "conflict_look",
                 "near_repeat",
                 "price_reuse",
+                "carried_nogoods",
                 "prev_cap",
                 "seed_incumbent"
             ]
@@ -299,7 +301,7 @@ mod tests {
         let values: Vec<String> = t.settings().iter().map(|s| s.1.to_string()).collect();
         let expected = [
             "on", "on", "1", "on", "on", "on", "50000", "none", "0", "off", "on", "on", "all", "exact", "all", "all",
-            "split", "on", "on", "on", "on", "off", "on", "on",
+            "split", "on", "on", "on", "on", "off", "off", "on", "on",
         ];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
@@ -491,6 +493,7 @@ mod tests {
                 conflict_look: false,
                 near_repeat: false,
                 price_reuse: true,
+                carried_nogoods: true,
             },
             prime_shortcut: false,
             same_search: false,

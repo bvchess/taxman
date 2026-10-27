@@ -1260,3 +1260,143 @@ fn relaxed_models_check_only_their_frames() {
     eprintln!("relaxed set check: {tried} sets, {independent} independent, {promotable} promotable");
     assert!(promotable > tried / 10 && promotable < tried && independent > tried / 10);
 }
+
+/// A store of carried nogoods keeps, of the sets it is given, the conflicts of the root that a peel finds within the
+/// sets of candidates that cannot be promoted from the root: sets with a number that is no candidate, and sets that can
+/// be promoted, are dropped, and every nogood kept is a subset of a set it was given and cannot be promoted from the
+/// root.  The sets are random sets of candidates, the nogoods that the conflicts along random
+/// promotion paths make (what a search learns), and those with a number that is no candidate added.
+#[test]
+fn carried_nogoods_are_validated_at_the_root() {
+    let mut rng = Rng(0x0CA4_41ED_0000_0001);
+    let (mut kept, mut promotable, mut foreign) = (0, 0, 0);
+    for n in golden_ns().into_iter().filter(|&n| (60..512).contains(&n) && n % 11 == 0) {
+        let g = load(n);
+        let (model, root) = FrameGraph::build::<8>(&Tables::new(g.n), &g.columns).unwrap();
+        let candidates = Bits::<8>::from_slice(&g.candidates);
+        let outsider = (2..g.n).find(|&x| !candidates.contains(x)).expect("a number that is no candidate");
+        let mut scratch = Scratch::new();
+        let mut sets: Vec<Vec<u32>> = Vec::new();
+        let mut list: Vec<u32> = candidates.iter().collect();
+        for _ in 0..40 {
+            let size = 2 + rng.below(5) as usize;
+            rng.shuffle(&mut list);
+            sets.push(list[..size.min(list.len())].to_vec());
+        }
+        for _ in 0..4 {
+            let (mut state, mut promoted) = (root, Bits::<8>::EMPTY);
+            for x in rng.subset(&candidates, 20).iter() {
+                if !model.promote_in_place(&mut state, x) {
+                    continue;
+                }
+                promoted.insert(x);
+                let set = rng.subset(&state.narrow_candidates(&candidates), 30) - promoted;
+                let Some(k) = model.conflict_using(&mut scratch, &state, &set, true) else { continue };
+                let nogood = model.nogood(&mut scratch, &root, &promoted, &k).expect("a conflict has a nogood");
+                sets.push(nogood.iter().collect());
+                sets.push(nogood.iter().chain([outsider]).collect());
+            }
+        }
+        let (store, validation) = CarriedNogoods::validated(&model, &root, &candidates, &sets);
+        let all_candidates = |set: &Vec<u32>| set.iter().all(|&x| candidates.contains(x));
+        let expected_promotable = sets
+            .iter()
+            .filter(|set| all_candidates(set))
+            .filter(|set| model.can_promote_all_using(&mut scratch, &root, &Bits::from_slice(set)))
+            .count();
+        assert_eq!(validation.given, sets.len(), "n={n}");
+        assert_eq!(validation.not_candidates, sets.iter().filter(|set| !all_candidates(set)).count(), "n={n}");
+        assert_eq!(validation.promotable, expected_promotable, "n={n}");
+        assert_eq!(validation.kept, store.len(), "n={n}");
+        for nogood in store.sets() {
+            assert!(nogood.is_subset(&candidates), "n={n}: {nogood:?}");
+            assert!(!model.can_promote_all_using(&mut scratch, &root, &nogood), "n={n}: {nogood:?} can be promoted");
+            // It comes from a set of candidates it was given that holds it.
+            let source = |set: &Vec<u32>| all_candidates(set) && nogood.is_subset(&Bits::from_slice(set));
+            assert!(sets.iter().any(source), "n={n}: {nogood:?} comes from no set");
+        }
+        kept += store.len();
+        promotable += validation.promotable;
+        foreign += validation.not_candidates;
+    }
+    eprintln!("carried nogoods: {kept} kept, {promotable} promotable sets and {foreign} with a non-candidate dropped");
+    assert!(kept > 100 && promotable > 50 && foreign > 100, "{kept} {promotable} {foreign}");
+}
+
+/// The candidates among `cands` that some nogood of `nogoods` has as its one member not in `promoted` (by definition).
+fn left_one<const W: usize>(nogoods: &[Bits<W>], promoted: &Bits<W>, cands: &Bits<W>) -> Bits<W> {
+    let mut out = Bits::EMPTY;
+    for n in nogoods {
+        let rest = *n - *promoted;
+        if rest.len() == 1 && rest.is_subset(cands) {
+            out |= rest;
+        }
+    }
+    out
+}
+
+/// What a store of carried nogoods answers along a depth-first search, against its definition, on random stores over
+/// up to 250 numbers: at a unit's node, the candidates that some nogood has as its one member not promoted (the nogoods
+/// of one member among them); at each child, the same of the child; and at every node, whether some nogood with a member
+/// among a random set of forced candidates lies within the promotions and them.  The search goes down and back up at
+/// random, a node's loop going on without the members it branched on, so that the watches are checked after backtracks.
+#[test]
+fn carried_nogoods_answer_by_their_definition_along_a_search() {
+    let mut rng = Rng(0x0CA4_41ED_0000_0002);
+    let (mut ruled, mut at_start, mut cuts, mut children) = (0, 0, 0, 0);
+    for _ in 0..150 {
+        // Most members from a crowd of 24, so that the questions find nogoods.
+        let nogoods: Vec<Bits<4>> = (0..1 + rng.below(40))
+            .map(|_| {
+                let size = 1 + rng.below(5);
+                (0..size).map(|_| if rng.chance(70) { rng.below(24) } else { rng.below(250) } as u32).collect()
+            })
+            .collect();
+        let store = CarriedNogoods::of(&nogoods);
+        assert_eq!(store.sets().collect::<Vec<_>>(), nogoods);
+        let holds_one = |set: &Bits<4>| nogoods.iter().any(|n| n.is_subset(set));
+        let crowd = Bits::from_range(0, 23) | (0..20).map(|_| rng.below(250) as u32).collect();
+        // A unit's node: promotions that hold no nogood, as a search's are.
+        let mut promoted = rng.subset(&crowd, 15);
+        while holds_one(&promoted) {
+            promoted = promoted.without(promoted.max().unwrap());
+        }
+        let cands = rng.subset(&crowd, 70) - promoted;
+        let mut watches = store.watches();
+        let out = store.start(&mut watches, &promoted, &cands);
+        assert_eq!(out, left_one(&nogoods, &promoted, &cands), "{nogoods:?} {promoted:?} {cands:?}");
+        at_start += out.len();
+        let mut path = vec![(promoted, cands - out)];
+        for _ in 0..60 {
+            let (promoted, cands) = *path.last().unwrap();
+            let forced = rng.subset(&cands, 30);
+            let within = promoted | forced;
+            let cut = nogoods.iter().any(|n| n.intersects(&forced) && n.is_subset(&within));
+            assert_eq!(store.all_forced(&watches, &promoted, &forced), cut, "{nogoods:?} {promoted:?} {forced:?}");
+            cuts += u32::from(cut);
+            if path.len() > 1 && rng.chance(35) {
+                path.pop();
+                continue;
+            }
+            // A child promotes one candidate, or a few, as a child of forced members does; the node goes on without
+            // them.  A promotion that would hold a nogood fails, as the search's does, and changes nothing.
+            let added =
+                if rng.chance(70) { rng.subset(&cands, 10).iter().take(1).collect() } else { rng.subset(&cands, 15) };
+            if added.is_empty() || holds_one(&(promoted | added)) {
+                continue;
+            }
+            let last = path.len() - 1;
+            path[last].1 = cands - added;
+            let (child, rest) = (promoted | added, cands - added);
+            let out = store.promote(&mut watches, &added, &child, &rest);
+            assert_eq!(out, left_one(&nogoods, &child, &rest), "{nogoods:?} {promoted:?} {added:?} {rest:?}");
+            ruled += out.len();
+            children += 1;
+            path.push((child, rest - out));
+        }
+    }
+    assert!(
+        ruled > 200 && at_start > 50 && cuts > 100 && children > 2000,
+        "{ruled} ruled out, {at_start} at the start, {cuts} cuts, {children} children"
+    );
+}

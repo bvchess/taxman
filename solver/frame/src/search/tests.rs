@@ -1124,9 +1124,19 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&reusing.encode()), Ok(reusing));
     assert!(!header.tactics.price_reuse);
 
+    // So is the carrying of nogoods, which is off by default.
+    let mut carrying = header;
+    carrying.tactics.carried_nogoods = true;
+    assert_eq!(carrying.mismatch(&header), None);
+    assert_eq!(header.mismatch(&carrying), None);
+    assert_ne!(carrying.encode(), header.encode());
+    assert_eq!(Header::<8>::decode(&carrying.encode()), Ok(carrying));
+    assert!(!header.tactics.carried_nogoods);
+
     // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
     // each switch that is on (the defaults: 0xFB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look`
-    // bit 10, `near_repeat` bit 11 and `price_reuse` bit 12, off by default), and no higher bit is used.
+    // bit 10, `near_repeat` bit 11, and `price_reuse` bit 12 and `carried_nogoods` bit 13, off by default), and no
+    // higher bit is used.
     for refine in [0, 1, 7] {
         for (on, off) in [(true, false), (false, true)] {
             let t = SearchTactics {
@@ -1154,6 +1164,9 @@ fn units_and_headers_round_trip() {
             let t = SearchTactics { price_reuse: on, ..t };
             assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
             assert_eq!(t.bits() >> 12, u16::from(on));
+            let t = SearchTactics { carried_nogoods: on, ..t };
+            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+            assert_eq!(t.bits() >> 13, u16::from(on));
         }
     }
     assert_eq!(SearchTactics::default().bits(), 0xFB9);
@@ -1201,7 +1214,17 @@ fn units_and_headers_round_trip() {
     assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&reusing), reusing);
     assert_eq!(reusing.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
     assert!(!reusing.same_recorded(&SearchTactics { symmetry: false, ..reusing }));
-    assert!(SearchTactics::from_bits(1 << 13).unwrap_err().contains("unknown tactics"));
+    // `carried_nogoods` is bit 13, off by default, and binds nothing either.
+    let carrying = SearchTactics { carried_nogoods: true, ..SearchTactics::legacy_tuning() };
+    assert_eq!(carrying.bits(), 0xFB9 | 1 << 13);
+    assert_eq!(SearchTactics::from_bits(0x2FB9), Ok(carrying));
+    assert_eq!(SearchTactics::CARRIED_NOGOODS_BIT, 1 << 13);
+    assert!(carrying.same_recorded(&SearchTactics::legacy_tuning()));
+    assert!(SearchTactics::legacy_tuning().same_recorded(&carrying));
+    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&carrying), carrying);
+    assert_eq!(carrying.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
+    assert!(!carrying.same_recorded(&SearchTactics { symmetry: false, ..carrying }));
+    assert!(SearchTactics::from_bits(1 << 14).unwrap_err().contains("unknown tactics"));
 }
 
 // ---- the extended problem: one-sided candidates ----

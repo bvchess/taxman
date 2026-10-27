@@ -25,6 +25,8 @@
 //!   frame.  Its methods promote (`promote`: why a set of promotions can be checked frame by frame) and find
 //!   conflicts and nogoods (`conflict`).
 //! * [`Nogoods`] (`nogoods`): the table of conflicts of the root that a searcher learns.
+//! * [`CarriedNogoods`] (`carried`): nogoods carried into a search from another, validated at its root, which the
+//!   search uses only to prune (tactic `carried_nogoods`).
 //!
 //! # One-sided candidates
 //!
@@ -47,6 +49,7 @@
 //!
 //! Numbers are `u32` game numbers throughout; the lists store them as `u16`, which bounds boards at 65535.
 
+mod carried;
 mod conflict;
 mod frame;
 mod nogoods;
@@ -54,6 +57,7 @@ mod peel;
 mod promote;
 mod provider;
 
+pub use carried::{CarriedNogoods, Validation, Watches};
 pub use conflict::ConflictCache;
 pub use frame::{Frame, FrameSet};
 pub use nogoods::{Keep, Lookup, NogoodStats, Nogoods};

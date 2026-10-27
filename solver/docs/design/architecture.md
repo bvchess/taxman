@@ -26,8 +26,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
    tells the story (sources, factors, `unzip`, impossible moves, freedoms, numbering, merging) and builds
    `SearchFrames`; `board_frames.rs` has `Frame` and `BoardFrames`.
 6. `src/model/`: the search state.  `mod.rs` says what is where: `Frame` and `FrameSet` (`frame.rs`), `FrameGraph`,
-   winnability and reduction (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`) and nogoods
-   (`nogoods.rs`).
+   winnability and reduction (`peel.rs`), promotion (`promote.rs`), then conflicts (`conflict.rs`), nogoods
+   (`nogoods.rs`) and the nogoods carried from another search (`carried.rs`, [carried-nogoods.md](carried-nogoods.md)).
 7. `src/accelerate.rs`: the shortcuts from the game of n − 1 (the comment of `prime_shortcut` proves the prime formula),
    and the last step, from promotions to moves.
 

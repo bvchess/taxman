@@ -12,7 +12,7 @@
 //! ```text
 //! cargo run --release --example tune -- units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]
 //! cargo run --release --example tune -- solve GAME [--known FILE] [--units FILE] [--ids I,J,...]
-//!     [--tactic NAME=VALUE]... [--gate GAP] [--node-limit L] [--cpu-limit SECONDS]
+//!     [--tactic NAME=VALUE]... [--gate GAP] [--node-limit L] [--cpu-limit SECONDS] [--carried FILE]
 //! cargo run --release --example tune -- expand GAME --units FILE --ids I,J,... [--known FILE] [--node-limit K]
 //!     [--gate GAP] [--out FILE]
 //! ```
@@ -43,7 +43,9 @@
 //! which then reports `completed: false`.  `--cpu-limit SECONDS` stops a unit the same way after that much CPU time of
 //! the process (the unit's one thread; a decimal number), which, unlike the node limit, can cut a unit at different
 //! steps from one run to the next.  While a unit runs, a progress line goes to stderr every 30 seconds, headed by its id
-//! and ending with a line of its own at its end.
+//! and ending with a line of its own at its end.  `--carried FILE`, with `--tactic carried_nogoods=on` (each needs the
+//! other), gives the searches the nogoods of FILE (one a line, its members in decimal), validated at the game's root
+//! (`taxman::model::CarriedNogoods`; what the validation kept goes to stderr), which they use only to prune.
 //!
 //! `expand` makes more units from the units of a checkpoint.  A checkpoint of a game with billions of steps holds few
 //! units of the middle sizes: its workers stood at shallow nodes, whose loops are huge, or at deep ones, whose loops
@@ -57,7 +59,9 @@
 //! every unit, is not in it), `wall_s`, `completed`, `best` (the best promotion sum found, the starting incumbent's if
 //! nothing beat it), `incumbent` (the starting one), `proved`, `opt` (the known optimum or null), `tactics` (the
 //! changes from the defaults), `node_limit` and `cpu_limit` (the limits asked for, in steps and seconds, or null) and
-//! `gate` (the gap from which conflict branching chooses) and `stats` (the searchers' counters, `search::stat`).
+//! `gate` (the gap from which conflict branching chooses), `stats` (the searchers' counters, `search::stat`) and
+//! `carried` (with `--carried`: the nogoods the store kept, and the candidates it ruled out and the nodes it ended in the
+//! unit; else null).
 //!
 //! With the tactic `near_repeat` (on by default), `solve` cuts by the known game of GAME − 1 if the known games have it
 //! (`taxman::board::near_repeat`: B is its score less its game with no promotions), at the nodes where the incumbent
@@ -89,6 +93,7 @@ use taxman::game::Optimal;
 use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
+use taxman::model::CarriedNogoods;
 use taxman::rng::Rng;
 use taxman::search::{self, stat, NodeBound, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
@@ -243,6 +248,17 @@ fn solve_unit<const W: usize>(
         best: outcome.best,
         stats: outcome.stats,
     })
+}
+
+/// What the store of carried nogoods did in a unit: its nogoods, and the candidates ruled out and the nodes ended since
+/// its counts were `before`.
+fn carried_json<const W: usize>(store: &CarriedNogoods<W>, before: (u64, u64)) -> Json {
+    let (ruled_out, cuts) = store.counts();
+    Json::object([
+        ("nogoods", Json::from(store.len())),
+        ("ruled_out", Json::from(ruled_out - before.0)),
+        ("cuts", Json::from(cuts - before.1)),
+    ])
 }
 
 /// The searchers' counters by name.
@@ -520,6 +536,8 @@ struct SolveOptions {
     gate: Option<u64>,
     node_limit: Option<u64>,
     cpu_limit: Option<Duration>,
+    /// The file of nogoods to carry into the searches (`--carried`, with the tactic `carried_nogoods`).
+    carried: Option<PathBuf>,
 }
 
 /// The search space of `prepared` as `o` asks for it: with the gate given, if there is one.
@@ -597,12 +615,29 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
         (true, Some(score)) => near_repeat(&prepared, score)?.map_or_else(OnceLock::new, OnceLock::from),
         _ => OnceLock::new(),
     };
-    let space = SearchSpace { near_repeat: Some(&near), ..search_space(&prepared, &graph, o) };
+    // The store of carried nogoods (tactic `carried_nogoods`), validated at the game's root.
+    let carried = match (&o.carried, o.tactics.carried_nogoods) {
+        (Some(path), true) => {
+            let (store, v) = CarriedNogoods::read(path, &prepared.model, &prepared.root, &prepared.candidates)?;
+            eprintln!(
+                "carried nogoods: {} kept of {} sets ({} with a number that is no candidate, {} promotable, {} made \
+                 smaller)",
+                v.kept, v.given, v.not_candidates, v.promotable, v.shrunk
+            );
+            Some(store)
+        }
+        (None, false) => None,
+        (Some(_), false) => return Err("--carried needs --tactic carried_nogoods=on".into()),
+        (None, true) => return Err("--tactic carried_nogoods=on needs --carried FILE".into()),
+    };
+    let space =
+        SearchSpace { near_repeat: Some(&near), carried: carried.as_ref(), ..search_space(&prepared, &graph, o) };
     let gate = space.branching.settings().gate;
     let near_repeat = near.get();
     let description = Tactics { search: o.tactics, ..Tactics::default() }.description();
     for Row { id, depth, unit } in wanted {
         let cut_before = near_repeat.map_or(0, |near| near.nodes_cut());
+        let carried_before = carried.as_ref().map_or((0, 0), CarriedNogoods::counts);
         let solved = solve_unit(&space, unit, &start, Limits { nodes: o.node_limit, cpu: o.cpu_limit }, &id)?;
         let cut = near_repeat.map_or(Json::Null, |near| Json::from(near.nodes_cut() - cut_before));
         let line = Json::object([
@@ -624,6 +659,7 @@ fn solve<const W: usize>(game: u32, o: &SolveOptions, optimal: &Optimal) -> Resu
             ("near_repeat_cut", cut),
             ("gate", Json::from(gate)),
             ("stats", stats_json(&solved.stats)),
+            ("carried", carried.as_ref().map_or(Json::Null, |store| carried_json(store, carried_before))),
         ]);
         println!("{line}");
     }
@@ -659,7 +695,7 @@ fn parse() -> Result<Command, String> {
     let command = args.next().ok_or("usage: tune units|solve GAME ... (see the top of examples/tune.rs)")?;
     let mut positional = Vec::new();
     let (mut known, mut units, mut ids, mut out, mut node_limit) = (None, None, None, None, None);
-    let (mut cpu_limit, mut gate) = (None, None);
+    let (mut cpu_limit, mut gate, mut carried) = (None, None, None);
     let (mut sample, mut seed) = (100usize, 1u64);
     let mut tactics = Tactics::default();
     while let Some(arg) = args.next() {
@@ -672,6 +708,7 @@ fn parse() -> Result<Command, String> {
             "--ids" => ids = Some(value("--ids")?.split(',').map(str::to_owned).collect()),
             "--sample" => sample = number("--sample", value("--sample")?)? as usize,
             "--seed" => seed = number("--seed", value("--seed")?)?,
+            "--carried" => carried = Some(PathBuf::from(value("--carried")?)),
             "--node-limit" => node_limit = Some(number("--node-limit", value("--node-limit")?)?),
             "--cpu-limit" => {
                 let text = value("--cpu-limit")?;
@@ -708,14 +745,19 @@ fn parse() -> Result<Command, String> {
             Ok(Command::Units { game: game(Some(g))?, ckpt: ckpt.into(), sample, seed, out, known })
         }
         ("solve", [g]) => {
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit };
+            let options =
+                SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit, carried };
             Ok(Command::Solve { game: game(Some(g))?, options })
         }
         ("expand", [g]) => {
             if cpu_limit.is_some() {
                 return Err("expand stops at --node-limit K steps; --cpu-limit is for solve".into());
             }
-            let options = SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit };
+            if carried.is_some() || tactics.search.carried_nogoods {
+                return Err("expand carries no nogoods; --carried and carried_nogoods are for solve".into());
+            }
+            let options =
+                SolveOptions { known, units, ids, tactics: tactics.search, gate, node_limit, cpu_limit, carried };
             Ok(Command::Expand { game: game(Some(g))?, options, out })
         }
         ("units", _) => Err("usage: tune units GAME CKPT [--known FILE] [--sample K] [--seed S] [--out FILE]".into()),
@@ -723,7 +765,7 @@ fn parse() -> Result<Command, String> {
                               [--gate GAP] [--out FILE]"
             .into()),
         ("solve", _) => Err("usage: tune solve GAME [--known FILE] [--units FILE] [--ids I,J,...] [--tactic N=V]... \
-                 [--gate GAP] [--node-limit L] [--cpu-limit SECONDS]"
+                 [--gate GAP] [--node-limit L] [--cpu-limit SECONDS] [--carried FILE]"
             .into()),
         (other, _) => Err(format!("unknown command {other:?}: units, solve or expand")),
     }
@@ -886,6 +928,7 @@ mod tests {
                 gate,
                 node_limit: None,
                 cpu_limit: None,
+                carried: None,
             };
             let solved = |gate| {
                 let space = search_space(&w.prepared, &graph, &options(gate));
@@ -954,6 +997,7 @@ mod tests {
                 gate: None,
                 node_limit: None,
                 cpu_limit: None,
+                carried: None,
             };
             let lines = expand::<W>(GAME, &options, 1_024, Optimal::built_in()).unwrap();
             assert_eq!(lines.len(), units.len());

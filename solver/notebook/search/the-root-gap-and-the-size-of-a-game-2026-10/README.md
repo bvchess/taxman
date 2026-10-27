@@ -625,6 +625,102 @@ block 2, 10.2 in block 3 and 16.7 in block 4.  The load was heavier in both 44 b
 switches are the outcome files `20261027T1250Z-threads-44`, `20261027T1302Z-threads-88`, `20261027T1314Z-threads-44`
 and `20261027T1329Z-threads-88` in the channel's `out/` folder, named in UTC; the load sample was not kept.
 
+## 2026-10-27: carrying the hard core's nogoods into the next game (Q7)
+
+**Question.**  Games 4983 and 4984 have the same top, the same structure of the root's gap, and 4983 took 8.8 billion
+steps (45 hours).  Does a store of the nogoods that 4983's search learned, checked at 4984's root and used only to prune,
+never to choose the conflict a node branches on, take 7% or more off the CPU of 4984's search?  **Answer.**  Yes under
+the chain's settings since 07:19 PDT that day (conflict branching off, price reuse on), though not on every unit: over
+71 units of 4984 a store from 144 units of 4983 takes 0.62 of the steps and 0.85 of the CPU, and one from 48 units 0.65
+and 0.88, and a third of the units cost more CPU.  With conflict branching on, as the chain ran 4984 before then, the
+store takes 0.87 to 0.90 of the steps but 0.97 to 0.99 of the CPU, no gain.  The steps it saves are cheap ones, and each
+step left costs 10 to 33% more: a child that loses a member of its parent's heaviest set solves its GF(2) bound again
+instead of inheriting it.
+
+**Method.**  The design was fixed beforehand, from what sank the carried tables of [carrying nogoods
+over](../carrying-nogoods-over-2026-10-measured-not-kept/README.md) and [carrying a search's learning to the next
+game](../carrying-a-searchs-learning-to-the-next-game-2026-10/README.md): a store apart from the searcher's table, every
+set checked at the new root before use, an index so that no question scans the store, and no say in which conflict a
+node branches on ([carried-nogoods.md](../../../docs/design/carried-nogoods.md)).
+
+1. *What 4983 learned.*  A logging patch (`probe.patch`) wrote out every nogood a table learned.  `tune solve` on 48
+   units of 4983 (the units of its live checkpoint at 2.9 billion steps that the forecast cut, `live4983.jsonl`; gaps 300
+   to 1,100; at most 30,000 steps each, the chain's tactics of the time) took 180,319 steps and learned 2,456 nogoods,
+   1,385 distinct: the *store of 48 units*.  With 96 more units (gaps 300 to 1,500) the *store of 144 units* holds
+   6,560 from 1.61 million steps.  The nogoods are large, a median of 31 members (quartiles 26 and 36): a nogood is a
+   subset of a node's promotions and its conflict, and these nodes are 50 to 140 promotions deep.  Every one of them is
+   a nogood of 4984's root, and the check at that root made none smaller.
+2. *Would the store act (the stop rule)?*  The patch also held the store of 48 units beside the searches of 48 units
+   of 4984 (its live checkpoint at 2.1 billion steps, `units-4984.jsonl` of the patch study; gaps 300 to 1,100), and
+   counted without changing anything.  The searches computed a conflict 887 times in 179,468 steps, where their own
+   tables knew none; the store held a conflict there every time, and the very nogood the search then learned 670 times
+   (76%).  Of the 78,600 candidates that the tables and the known conflicts ruled out of children the store would have
+   ruled out 79%, and 57,684 more besides, at 27% of the children; and its nogoods held all of a check's forced members
+   at 6.5% of the checks.  The stop rule's bar was 10%.
+3. *The tactic.*  `carried_nogoods` gives a search a store (`tune solve --carried FILE`): a unit's node and each child
+   drop the candidates that would complete a nogood, and a check ends a node whose forced members complete one.  The
+   first version tested each nogood's members at each child; the second keeps two watched members of each nogood along
+   the searcher's path, as SAT solvers do, and lists each nogood's members from the rarest in the store.  Both grow the
+   same trees (all 96 solves compared), and the watched version's cost of a step does not grow with the store.
+4. *The measurement.*  48 more units of 4984 (12 in each gap band from 500 to 700, 700 to 900, 900 to 1,100 and 1,100
+   to 1,400), each solved under every setting on one thread, at most 8 solves at once, `nice -n 19`, by a build on
+   93e486b, before the cheaper search for augmenting paths of the section on the GF(2) bound at a node.  Steps are
+   exact.  CPU is the thread's, and on this machine it drifts with the load: in the first round, which ran a unit's
+   settings one after the other, the default's repeat took 1.22 of its first CPU on the same trees.  So the rounds
+   below run all the settings of a unit at the same time.  Every solve completed and found the same best.
+
+**Results.**  Steps and CPU of each setting against the default with the same tactics; in brackets the geometric mean
+over the units of 1,000 steps or more (29 to 33 units):
+
+| tactics | the default (steps, CPU) | store of 48 units | store of 144 units | 144, without the cut |
+|---|---|---|---|---|
+| conflict branching on (gate 300), price reuse | 1,335,495 steps, 2,853 s | 0.900, 0.991 (0.824, 0.947) | 0.874, 0.972 (0.809, 0.946) | 0.882, 0.975 (0.806, 0.934) |
+| conflict branching off, price reuse | 595,494 steps, 1,003 s | 0.666, 0.884 (0.640, 0.873) | 0.566, 0.748 (0.578, 0.802) | 0.616, 0.730 (0.673, 0.811) |
+| the same, on 23 more units (gaps 700 to 1,500) | 544,142 steps, 813 s | 0.629, 0.872 (0.626, 0.883) | 0.673, 0.973 (0.579, 0.835) | |
+| the same, the 71 units together | 1,139,636 steps, 1,816 s | 0.648, 0.879 (0.634, 0.877) | 0.617, 0.849 (0.578, 0.814) | |
+
+The 23 more units are those of a second sample of 24 (none of the others') that every setting completed; the default
+took more than 400,000 steps on the 24th.  Over the 71 units, 41 and 40 take less CPU with the stores of 48 and 144
+units, and of the 11 of 20,000 steps or more, 9 and 7 (0.86 and 0.83 of the CPU together).
+
+1. **The store prunes much more with conflict branching off.**  The search then branches on the smallest conflict its
+   table knows, and the store's rule-outs and cuts take a third to two fifths of its steps; with conflict branching on,
+   whose choice already avoids much of what the store prunes, a tenth.
+2. **A step costs more.**  With conflict branching off, a step with the store costs 1.32 times the default's (1.18
+   without the cut), and the GF(2) bound solves 0.146 to 0.150 times a step against 0.107 (augmentations 13.9 to 14.1
+   against 9.7).  A child keeps its parent's heaviest set, with no solve, only if it keeps all its members
+   (`Gf2Bound::push_all`), and the candidates the store rules out are often members of it.  The cost does not come
+   from the store's own questions: it is the same with 1,385 and 6,560 nogoods.  A cheaper solve, such as the warm
+   start that the section on the GF(2) bound at a node proposes, would make the store's steps cheaper too.
+3. **A larger store prunes more, mostly.**  The store of 144 units takes 15% fewer steps than the store of 48 on the
+   first set and 5% fewer over the 71 units, though 7% more on the second set, at the same cost of a step; loading and
+   checking its 6,560 nogoods takes 1.4 s, once a search.
+4. **The cut pays in steps, not always in CPU.**  Without it the store of 144 units takes 0.62 of the steps against 0.57,
+   and about the same CPU (0.73 against 0.75): the steps the cut saves are the cheapest.
+5. **Sparing the heaviest set loses.**  A variant that leaves in a child the members of the heaviest set it would
+   inherit, so that it inherits it, took 1.31 times the steps and 1.12 times the CPU of the store of 144 units without
+   it, on 30 of the units run side by side (all 10 of 1,000 steps or more dearer), and was not kept: the pruning is worth
+   more than the solves it costs.
+
+**Confidence.**  High that the store takes steps off 4984's units under both settings (exact, 24 to 29 of 29 to 33
+units fewer); medium that it takes 12 to 15% off their CPU with conflict branching off (two unit sets, settings run side
+by side, a third of the units dearer, 3 to 25% on each set with each store); medium-low that a whole game gains as much:
+the units are subtrees of a 2.1-billion-step checkpoint, and the stores come from units of 4983, not from its whole
+search.
+
+**How the chain would make the store.**  Each searcher would hand the nogoods of its table to a set the search shares at
+each forgetting (every 50,000 steps) and when it ends, distinct and capped (at about 100,000, the most recent kept).
+The search would write the set beside its checkpoint, so that a resumed search keeps it, and at its end as the store
+of the next game (`nogoods-N.txt` in the chain's data folder); the next game's search would read the latest store,
+check it at its own root, and add what it learns to its own.  The solver gives no store yet: `taxman solve` would need
+a flag to read one and the shared set to write one.
+
+**Decision.**  The tactic is kept, off by default, so that the default trees and the tripwires do not change; a
+checkpoint records it in bit 13 and does not bind it.  With conflict branching off it passes the bar of 7% of the CPU
+on units, so the next step is the chain's: the solver writing and reading a store as above, then whole games of the
+patch with it against their neighbors without it, as the look was tested ([the live
+lab](../the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -653,3 +749,9 @@ the settings (`settings.txt` for run 1, `settings2.txt` and `settings3.txt` for 
 check of conflict branching off against a gate of 2,200), the unit ids (`sample1.txt` to `sample4.txt`, and
 `sample3b.txt`), a file a solve in `out1/` to `out4/` (a directory a run), the screening (`screen.sh`, `screen.json` and
 `screen/`) and the summaries (`analyze.py`, `summ.py`).
+`~/taxman_work/lab/work/carry/` has the carried store's runs (Q7): the logging patch (`probe.patch`), the builds of
+`tune` (`bin/`), the id lists (`units/`), and a folder a stage: `s1/` the logging runs (the nogoods learned, `dump-*.txt`,
+the stores `store-4983-48.txt` and `store-4983-144.txt`, and `summ.py`), `s2/` the first measurement (settings one after
+another), `s3/` and `s4/` the measurements with conflict branching on and off, `s5/` the variant that spares the
+heaviest set, and `s6/` the second set of units; each with its runner (`run.sh`), `analyze.py`, `perstep.py` and a
+result file a solve.

@@ -46,7 +46,12 @@ use taxman::search::{search, Gf2Branching, Reuse, SearchTactics};
 /// (46 and 47; tactic `near_repeat`, which the others have, and which acts where a game has the cut of a game before
 /// it, [`game_after`], and the incumbent reaches its bound), then conflict branching at every check with the reuse of
 /// its prices (tactic `price_reuse`), under the standard schedule, under one that never makes the prices again, on two
-/// threads, and under one that takes none (48 to 51).  The matching path with the forgetting of nogoods at the
+/// threads, and under one that takes none (48 to 51), then the nogoods carried into the search (tactic
+/// `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three and
+/// four, [`Game::carried`](common::Game::carried)): on the GF(2) bound, on two threads, with conflict branching at every
+/// check and the reuse of its prices, with the search's own conflict everywhere, and on the matching path, where it only
+/// rules candidates out (52 to 56).  The
+/// matching path with the forgetting of nogoods at the
 /// production period, every step, every third, and never; on one thread and two; and the GF(2) bound with each way of
 /// choosing the branch, with and without the matching bound as a first check, forced members, nogoods and the
 /// Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits its multipliers only after 2,000
@@ -114,6 +119,11 @@ fn configs() -> Vec<Config> {
         Config { conflict_branching: Some(0), conflict_look: false, price_reuse: Some(forever), ..g },
         Config { conflict_branching: Some(0), price_reuse: Some(forever), threads: 2, period: Some(3), ..g },
         Config { conflict_branching: Some(0), price_reuse: Some(never_again), ..g },
+        Config { carried: true, ..g },
+        Config { carried: true, threads: 2, period: Some(3), ..g },
+        Config { carried: true, conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
+        Config { carried: true, conflict_branching: None, ..g },
+        Config { carried: true, ..base },
     ]
 }
 
@@ -228,6 +238,42 @@ fn the_near_repeat_cut_acts_and_changes_no_answer() {
         }
     }
     assert!(cut > 0 && changed > 0, "the cut cut {cut} nodes and changed {changed} trees");
+}
+
+/// The carried nogoods act, and change no answer: the games 232, 344 and 376, under each configuration that has a store
+/// ([`Game::carried`](common::Game::carried)) and the same without it, from an incumbent worth 1 or 5 less than
+/// `optimal.json`'s promotion sum, must come back with exactly that sum and a promotable set; the stores rule candidates
+/// out and end nodes, and change some of the trees.
+#[test]
+fn the_carried_nogoods_act_and_change_no_answer() {
+    let optimal = Optimal::built_in();
+    let (mut changed, mut ruled_out, mut cuts) = (0, 0, 0);
+    for n in [232, 344, 376] {
+        let truth = optimal_sum::<8>(optimal, n).unwrap();
+        let game = game_after::<8>(optimal, n, truth - 5).unwrap();
+        for cfg in configs().into_iter().filter(|cfg| cfg.carried) {
+            for k in [1, 5] {
+                let [with, without] = [true, false].map(|carried| {
+                    game.search(Config { carried, ..cfg }, vec![game.root_unit()], truth - k, None, None)
+                });
+                for out in [&with, &without] {
+                    assert!(
+                        out.completed && out.best == truth && out.real,
+                        "n={n} {cfg:?} from {}: {out:?}",
+                        truth - k
+                    );
+                }
+                changed += usize::from(with.nodes != without.nodes);
+            }
+        }
+        let (r, c) = game.carried().counts();
+        assert!(!game.carried().is_empty(), "n={n}: an empty store");
+        (ruled_out, cuts) = (ruled_out + r, cuts + c);
+    }
+    assert!(
+        ruled_out > 0 && cuts > 0 && changed > 0,
+        "the stores ruled out {ruled_out} candidates, ended {cuts} nodes and changed {changed} trees"
+    );
 }
 
 /// The near-repeat cut waits for the incumbent to reach its bound.  On the games 232, 344 and 376 on the matching path,
@@ -579,11 +625,13 @@ fn units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
 }
 
 /// [`units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum`] with a few units of the games 1100 at W = 20
-/// and 2050 at W = 64, the narrowest and the widest of them.
+/// and 2050 at W = 64, the narrowest and the widest of them, under the configurations without carried nogoods: the
+/// store of a game this wide takes a search of its own to make ([`Game::carried`](common::Game::carried)), which the
+/// test above makes and the small games' tests make for every game.
 #[test]
 fn a_few_units_of_wide_games_from_a_handicapped_incumbent_find_the_optimum() {
     let mut rng = Rng(0x3D1D_E000_0000_0078);
-    let configs = configs();
+    let configs: Vec<Config> = configs().into_iter().filter(|cfg| !cfg.carried).collect();
     let runs =
         handicapped_units::<20>(1100, &mut rng, 4, &configs) + handicapped_units::<64>(2050, &mut rng, 4, &configs);
     assert!(runs > 20, "{runs} runs");
