@@ -42,9 +42,10 @@ misses are the *odd* cores of movers with three or more factors.
   linear in the elements.  It derives a child's from the parent's, which the workspace still holds when the child is
   checked: the promoted members' slots are freed and dropped from the circuits, a contraction, and for a certified child
   the set is first flipped along its cycle by exchanges, each a pivot that keeps the span.  It derives a node's from a
-  copy of its own tableau, saved when it kept the certified level (`Snapshot`), which keeps each element's circuit and
-  whether it is free.  A derived tableau keeps no residues, which only a solve's pivots read: outside a solve a
-  residue is read only for being zero, which the flag of a free element says.  In a block whose span changes, the
+  copy of its own tableau, saved when it kept the certified level (`Snapshot`): the workspace's arrays that hold each
+  element's circuit and whether it is free, copied whole and taken back by exchanging them with the workspace's.  A
+  derived tableau keeps no residues, which only a solve's pivots read: outside a solve a residue is read only for being
+  zero, which the flag of a free element says.  In a block whose span changes, the
   circuits that hold no member leaving carry over, and the other elements are reduced by the block's new members.  A
   child that keeps its parent's heaviest set, whose tableau only loses the promoted members and the elements it
   dropped, is derived with no marks, exchanges or reductions (`Meet::derive_by_contraction`).  The columns of `A` (the
@@ -67,7 +68,14 @@ misses are the *odd* cores of movers with three or more factors.
   path, found only where a floor carried along the path does not decide: a child that keeps its parent's heaviest set
   has the parent's gap as its floor, and a node's level without a member the node's less the cycle's length.  That holds
   of a gap with no path at all too, where no common independent set is larger than the heaviest set, as at every level
-  of the units of 4984 measured: the levels below have none either.  Both searches run over the split's reduced lengths,
+  of the units of 4984 measured: the levels below have none either.  A child that a warm start found by deletions
+  (below), and a node that went on without a member by one, take both floors from the level they came from, less what
+  the heaviest set lost, where its size allows (`floors_after`): with what the child promoted, each of its sets is one
+  of that level's, so a set smaller than its heaviest set is smaller than that level's too where its heaviest set, with
+  the promoted, is no larger, and a larger set is larger where it is no smaller
+  ([the root
+  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-28-floors-from-the-level-before-offers-dropped-before-their-bounds-and-copies-swapped-back)
+  has the measurements).  Both searches run over the split's reduced lengths,
   by A* with the bounds of the searches for forced members below (`Meet::smaller_loss`, `Meet::gap_with`); debug builds
   check each against Dijkstra's search and Bellman–Ford's.  A child that loses one member of its parent's heaviest set
   besides those it promotes gets its own the same way, from the parent's exchange graph with the dropped elements banned
@@ -127,6 +135,8 @@ misses are the *odd* cores of movers with three or more factors.
   a lower bound on the path back to it, an element's least arc out where a member's column offers it, else 0, and so
   finds the shortest cycle within the slack, which serves more of the levels after than the first one found would
   ([an A* search](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-an-a-search-for-forced-members)).
+  An element's bound is found only where its offer could be made whatever the bound, below the slack and the shortest
+  cycle found: the columns a search reads offer few of their elements.
   A member on a cycle that the search for another found within the slack is not searched, since
   that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the node's own
   or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`, a bit test

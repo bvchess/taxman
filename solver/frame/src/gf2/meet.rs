@@ -739,23 +739,27 @@ impl Cycles {
     }
 }
 
-/// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): per
-/// matroid, the elements by block (the blocks' ends in `ends`), each with [`SNAP_FREE`] set where it is free, their
-/// masks, and the members of each block in slot order (their ends in `slot_ends`).  The residues are not kept: a
-/// derived tableau keeps only whether each element is free (see "Deriving a tableau" in the docs of [`Meet`]).
+/// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): the arrays
+/// of the workspace that hold it, as they were (each element's mask, flag of freedom and slot, the blocks' slots and
+/// live elements, the set and its lists).  Neither the residues nor the columns of A are kept: a derived tableau keeps
+/// only whether each element is free (see "Deriving a tableau" in the docs of [`Meet`]), and the columns are built
+/// again for it where they are read.  The copy is taken back by exchanging its arrays with the workspace's, which
+/// leaves the snapshot holding no tableau.
 #[derive(Clone, Default)]
 pub struct Snapshot<const R: usize> {
-    elems: [Vec<u32>; 2],
-    ends: [Vec<usize>; 2],
-    masks: [Vec<Vector<R>>; 2],
-    slots: [Vec<u32>; 2],
-    slot_ends: [Vec<usize>; 2],
-    /// The tableau saved.
+    mask: [Vec<Vector<R>>; 2],
+    free: [Vec<bool>; 2],
+    slot: [Vec<u16>; 2],
+    slot_elem: [Vec<Vec<u32>>; 2],
+    next_slot: [Vec<usize>; 2],
+    block_live: [Vec<Vec<u32>>; 2],
+    inside: Vec<bool>,
+    members: Vec<u32>,
+    out_a: Vec<Vec<u32>>,
+    pos: Vec<u32>,
+    /// The tableau saved (0 once taken back).
     tableau: u64,
 }
-
-/// The bit of an element of a [`Snapshot`] that marks it free.
-const SNAP_FREE: u32 = 1 << 31;
 
 impl<const R: usize> Meet<R> {
     /// A workspace for problems of `n` elements and `blocks` blocks in each matroid.
@@ -1719,47 +1723,30 @@ impl<const R: usize> Meet<R> {
     }
 
     /// [`derive`](Self::derive) from the tableau `snapshot` holds (saved by [`save`](Self::save)) instead of the one
-    /// the workspace holds.
+    /// the workspace holds.  The snapshot's arrays are exchanged with the workspace's, so that it holds no tableau
+    /// after.
     pub fn derive_from(
         &mut self,
-        snapshot: &Snapshot<R>,
+        snapshot: &mut Snapshot<R>,
         p: &Problem<'_, R>,
         live: &[u32],
         start: &[u32],
         contracted: &[u32],
     ) {
         let s = snapshot;
+        debug_assert!(s.tableau != 0, "a snapshot taken back twice");
         for m in 0..2 {
-            let (mut at, mut slot_at) = (0, 0);
-            for b in 0..self.block_live[m].len() {
-                let list = &mut self.block_live[m][b];
-                list.clear();
-                for k in at..s.ends[m][b] {
-                    let (e, free) = (s.elems[m][k] & !SNAP_FREE, s.elems[m][k] & SNAP_FREE != 0);
-                    let i = e as usize;
-                    list.push(e);
-                    self.mask[m][i] = s.masks[m][k];
-                    self.free[m][i] = free;
-                    self.slot[m][i] = NO_SLOT;
-                }
-                at = s.ends[m][b];
-                let slots = &s.slots[m][slot_at..s.slot_ends[m][b]];
-                for (k, &e) in slots.iter().enumerate() {
-                    self.slot_elem[m][b][k] = e;
-                    if e != NONE {
-                        self.slot[m][e as usize] = k as u16;
-                    }
-                }
-                self.next_slot[m][b] = slots.len();
-                slot_at = s.slot_ends[m][b];
-            }
+            std::mem::swap(&mut self.mask[m], &mut s.mask[m]);
+            std::mem::swap(&mut self.free[m], &mut s.free[m]);
+            std::mem::swap(&mut self.slot[m], &mut s.slot[m]);
+            std::mem::swap(&mut self.slot_elem[m], &mut s.slot_elem[m]);
+            std::mem::swap(&mut self.next_slot[m], &mut s.next_slot[m]);
+            std::mem::swap(&mut self.block_live[m], &mut s.block_live[m]);
         }
-        for &e in &s.elems[0] {
-            self.inside[(e & !SNAP_FREE) as usize] = false;
-        }
-        for &e in s.slots[0].iter().filter(|&&e| e != NONE) {
-            self.inside[e as usize] = true;
-        }
+        std::mem::swap(&mut self.inside, &mut s.inside);
+        std::mem::swap(&mut self.members, &mut s.members);
+        std::mem::swap(&mut self.out_a, &mut s.out_a);
+        std::mem::swap(&mut self.pos, &mut s.pos);
         // The workspace holds the snapshot's tableau, under a number of its own, nothing changed since the copy, with
         // no residues.
         self.solves += 1;
@@ -1769,7 +1756,8 @@ impl<const R: usize> Meet<R> {
             changed.fill(0);
         }
         self.lineage.clear();
-        self.lineage.extend([snapshot.tableau, self.tableau]);
+        self.lineage.extend([s.tableau, self.tableau]);
+        s.tableau = 0;
         self.restored += 1;
         self.derive(p, live, start, contracted);
     }
@@ -1780,22 +1768,17 @@ impl<const R: usize> Meet<R> {
         let s = snapshot;
         s.tableau = self.tableau;
         for m in 0..2 {
-            for v in [&mut s.elems[m], &mut s.slots[m]] {
-                v.clear();
-            }
-            s.ends[m].clear();
-            s.masks[m].clear();
-            s.slot_ends[m].clear();
-            for b in 0..self.block_live[m].len() {
-                for &e in &self.block_live[m][b] {
-                    s.elems[m].push(if self.free[m][e as usize] { e | SNAP_FREE } else { e });
-                    s.masks[m].push(self.mask[m][e as usize]);
-                }
-                s.ends[m].push(s.elems[m].len());
-                s.slots[m].extend_from_slice(&self.slot_elem[m][b][..self.next_slot[m][b]]);
-                s.slot_ends[m].push(s.slots[m].len());
-            }
+            s.mask[m].clone_from(&self.mask[m]);
+            s.free[m].clone_from(&self.free[m]);
+            s.slot[m].clone_from(&self.slot[m]);
+            s.slot_elem[m].clone_from(&self.slot_elem[m]);
+            s.next_slot[m].clone_from(&self.next_slot[m]);
+            s.block_live[m].clone_from(&self.block_live[m]);
         }
+        s.inside.clone_from(&self.inside);
+        s.members.clone_from(&self.members);
+        s.out_a.clone_from(&self.out_a);
+        s.pos.clone_from(&self.pos);
     }
 
     /// The rows of the live elements of block `b` of matroid `m` whose circuits the tableau derived from does not give:
@@ -2971,14 +2954,16 @@ impl<const R: usize> Meet<R> {
     /// its distance from `x` plus a lower bound on the length of a path from it back to `x`, its least arc out where
     /// that is cheap to know, else 0.  An element outside the set in the span of A, which the members' columns offer,
     /// has arcs out to the members of its circuit in B, or to every member if it is free in B; its least is found when
-    /// the element is first offered on the tableau.  Members and the elements free in A, which the search reaches
-    /// through the hubs in the order of `w2` and of `w1`, take 0.  Each bound is at most every arc out of its vertex
-    /// plus the bound of the arc's head, so the bounds are consistent: the keys taken never decrease, each vertex is
-    /// taken at its distance, and every cycle through a vertex taken at key `k` is at least `k` long.  So the search
-    /// stops at the first key at or past the shortest cycle found, or past `limit`.  A cycle through a vertex at
-    /// distance `d` is also at least `d + closing` long, so no vertex is offered a distance above `limit − closing`.
-    /// An element free in B has arcs to every member and no other, so it shortens no distance unless it lowers the hub
-    /// (the least distance less `w2` over such elements taken): one that would not is not offered.
+    /// the element is first offered on the tableau, and only where the offer could be made whatever the bound: at a
+    /// distance below the limit of the offers and the shortest cycle found.  Members and the elements free in A, which
+    /// the search reaches through the hubs in the order of `w2` and of `w1`, take 0.  Each bound is at most every arc
+    /// out of its vertex plus the bound of the arc's head, so the bounds are consistent: the keys taken never
+    /// decrease, each vertex is taken at its distance, and every cycle through a vertex taken at key `k` is at least
+    /// `k` long.  So the search stops at the first key at or past the shortest cycle found, or past `limit`.  A cycle
+    /// through a vertex at distance `d` is also at least `d + closing` long, so no vertex is offered a distance above
+    /// `limit − closing`.  An element free in B has arcs to every member and no other, so it shortens no distance
+    /// unless it lowers the hub (the least distance less `w2` over such elements taken): one that would not is not
+    /// offered.
     pub fn has_cycle_within(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, closing: i64) -> bool {
         let searchable = self.settled
             && self.tableau == self.solves
@@ -3102,6 +3087,10 @@ impl<const R: usize> Meet<R> {
                 let column = usize::from(p.block[0][u as usize]) * 64 * R + usize::from(self.slot[0][u as usize]);
                 for &y in &self.columns[column] {
                     let (i, dy) = (y as usize, d + w1(u) - w1(y));
+                    // An offer this far is not made whatever the bound, which is never negative: none is found.
+                    if dy >= offered || dy >= cycle.0 {
+                        continue;
+                    }
                     let free_b = self.free[1][i];
                     if free_b && dy - w2(y) >= hub.0 {
                         continue;

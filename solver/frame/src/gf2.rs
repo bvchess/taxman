@@ -761,6 +761,10 @@ struct Level<const W: usize, const R: usize> {
     /// A child pushed at a need ([`Gf2Bound::push_all_at`]) whose warm start stopped where an upper bound on its value,
     /// `value`, fell below that need: nothing else of the level holds, and the child's check cuts it.
     below: bool,
+    /// In debug builds: whether the floors of what the other sizes lose came from the level before (`floors_after`)
+    /// since the level's last check of forced members, which checks them.
+    #[cfg(debug_assertions)]
+    floors_after: bool,
 }
 
 /// What a pricing ([`Gf2Bound::prices_excluding`]) found at a level, for its children's: the level's node, heaviest
@@ -783,7 +787,8 @@ impl<const W: usize> Default for Priced<W> {
 /// Where a solved level's tableau can be derived from instead of built ([`meet::Meet::derive`]): the workspace's solve
 /// count when it held a related tableau (0 for none), whose problem is the level's before the members `contracted`
 /// were promoted; and a copy of the level's own tableau, or of one it was certified from (with nothing contracted
-/// since), if `saved`.  Either serves while the level's set is the same and its live elements only lose members.
+/// since), if `saved`, which a derivation takes back once ([`meet::Meet::derive_from`]).  Either serves while the
+/// level's set is the same and its live elements only lose members.
 #[derive(Clone, Default)]
 struct Source<const W: usize, const R: usize> {
     held: u64,
@@ -821,6 +826,8 @@ impl<const W: usize, const R: usize> Level<W, R> {
             source: Source::default(),
             added: Bits::EMPTY,
             below: false,
+            #[cfg(debug_assertions)]
+            floors_after: false,
         }
     }
 
@@ -842,6 +849,10 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.value = other.value;
         self.source.clear();
         self.below = other.below;
+        #[cfg(debug_assertions)]
+        {
+            self.floors_after = other.floors_after;
+        }
     }
 
     /// The level's matroids, of `graph`'s blocks and weights.
@@ -873,6 +884,10 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.source.clear();
         self.added = other.added;
         self.below = false;
+        #[cfg(debug_assertions)]
+        {
+            self.floors_after = false;
+        }
     }
 }
 
@@ -1009,6 +1024,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.source.clear();
         level.added = Bits::EMPTY;
         level.below = false;
+        #[cfg(debug_assertions)]
+        {
+            level.floors_after = false;
+        }
         contract_all(self.graph, level, promoted, &mut self.contraction);
     }
 
@@ -1334,6 +1353,17 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         };
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
         let certified = losses.certify(slack + 1, slack + 1, &mut self.meet, &problem, &level.pot);
+        // A floor of the smaller sets' loss carried from the level before, checked against that loss (a floor of the gap
+        // is checked where it is used, by `Losses::of`).
+        #[cfg(debug_assertions)]
+        if std::mem::take(&mut level.floors_after) {
+            let loss = self.meet.smaller_loss(&problem, &level.pot);
+            assert!(
+                level.loss_floor <= loss,
+                "a floor {} of the smaller sets' loss above it, {loss}",
+                level.loss_floor
+            );
+        }
         level.gap_floor = losses.gap_floor(level.gap_floor);
         if !certified {
             return false;
@@ -2039,13 +2069,39 @@ fn warm_child<const W: usize, const R: usize>(
     while child.history.last().is_some_and(|entry| entry.len() >= set.len()) {
         child.history.pop();
     }
+    // What the child's sets of other sizes lose, from what the parent's lose (see `floors_after`): its sets with the
+    // promoted are sets of the parent's.
+    let parent_size = parent.history.last().map_or(0, |last| last.len());
+    let lost = parent.value as i64 - added.sum() as i64 - value;
+    (child.loss_floor, child.gap_floor) =
+        floors_after(parent.loss_floor, parent.gap_floor, parent_size, set.len() + added.len(), lost);
+    #[cfg(debug_assertions)]
+    {
+        child.floors_after = true;
+    }
     child.history.push(set);
     child.solved = true;
     child.settled = true;
     child.cap = parent.cap.saturating_sub(added.len() as usize);
     child.value = value as u64;
-    child.loss_floor = 0;
     Some(contract.unwrap_or(Bits::EMPTY))
+}
+
+/// What the common independent sets smaller and larger than a level's heaviest set `J` (of all sizes) lose against
+/// it at least (see [`Losses`]), from the floors `loss_floor` and `gap_floor` of the level it came from, whose
+/// heaviest set `I` has `size` members.  The level came from that one by promoting members `F` of `I` and deleting
+/// candidates (a warm child), or by deleting candidates alone (`F` empty: a level that went on without a member), so
+/// every common independent set `K` of its problem makes `K ∪ F` one of the other's.  `J ∪ F` has `size_after`
+/// members and weighs `lost` less than `I`.  Where `size_after ≤ size`, a `K` smaller than `J` makes `K ∪ F` smaller
+/// than `I`, so it weighs at most `w(I) − loss_floor`, and `K` loses at least `loss_floor − lost` against `J`.  Where
+/// `size_after ≥ size`, a larger `K` likewise loses at least `gap_floor − lost`, and there is none where `I` has none
+/// (`i64::MAX`).  A floor that does not follow is 0.
+fn floors_after(loss_floor: i64, gap_floor: i64, size: u32, size_after: u32, lost: i64) -> (i64, i64) {
+    debug_assert!(lost >= 0, "a heaviest set heavier than the one it came from");
+    let less = |floor: i64| if floor == i64::MAX { i64::MAX } else { (floor - lost).max(0) };
+    let smaller = if size_after <= size { less(loss_floor) } else { 0 };
+    let larger = if size_after >= size { less(gap_floor) } else { 0 };
+    (smaller, larger)
 }
 
 /// The first deletion of a warm start ([`warm_child`]): the child's heaviest set of all sizes less its first member left
@@ -2143,9 +2199,14 @@ fn warm_delete<const W: usize, const R: usize>(
     }
     level.history.retain(|entry| !entry.contains(x) && entry.len() < set.len());
     level.history.push(set);
+    // Its sets are the level's before, without x (see `floors_after`).
+    let lost = level.value as i64 - value;
+    (level.loss_floor, level.gap_floor) = floors_after(level.loss_floor, level.gap_floor, last.len(), set.len(), lost);
+    #[cfg(debug_assertions)]
+    {
+        level.floors_after = true;
+    }
     level.value = value as u64;
-    level.loss_floor = 0;
-    level.gap_floor = 0;
     level.has_split = false;
     level.has_pot = false;
     // The workspace's tableau, of the level before, is the one to derive the level's from (its set flipped, `x`
@@ -2170,7 +2231,9 @@ fn warm_delete<const W: usize, const R: usize>(
 /// for itself without a member, of the node's gap less the length of the cycle that certified it, since its larger
 /// sets are the node's without the member, and its heaviest set weighs that much less than the node's.  A gap of
 /// `i64::MAX`, where no common independent set is larger than the heaviest set, is a floor too: the levels below have
-/// none either.  `counts` is whether the larger sets count (`larger` is `i64::MAX` where they do not).
+/// none either.  A child warm-started by deletions, and a level that went on without a member by one, take both
+/// floors from the level they came from, less what their heaviest set lost, where its size allows (`floors_after`).
+/// `counts` is whether the larger sets count (`larger` is `i64::MAX` where they do not).
 struct Losses {
     smaller: i64,
     exact: bool,
@@ -2293,7 +2356,7 @@ fn resolve<const W: usize, const R: usize>(
     start_idx.clear();
     start_idx.extend(chosen.iter().map(|x| graph.index[x as usize]));
     let size = start_idx.len();
-    let source = &level.source;
+    let source = &mut level.source;
     start_idx.extend(source.contracted.iter().map(|x| graph.index[x as usize]));
     let (start, contracted) = start_idx.split_at(size);
     let problem = Problem {
@@ -2302,11 +2365,12 @@ fn resolve<const W: usize, const R: usize>(
         weight: &graph.weight,
     };
     // The same tableau as the solve from the heaviest set would build (see `meet`, "Deriving a tableau"), derived
-    // from a related one where the level has one.
+    // from a related one where the level has one.  The copy is taken back, so the level has it no longer.
     if source.held != 0 && source.held == meet.solves {
         meet.derive(&problem, live_idx, start, contracted);
     } else if source.saved {
-        meet.derive_from(&source.snapshot, &problem, live_idx, start, &[]);
+        meet.derive_from(&mut source.snapshot, &problem, live_idx, start, &[]);
+        source.saved = false;
     } else {
         meet.solve(&problem, live_idx, start, usize::MAX, i64::MAX, |_| {});
     }

@@ -1491,6 +1491,114 @@ branching 12%.
 
 **Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
 
+## 2026-10-28: floors from the level before, offers dropped before their bounds, and copies swapped back
+
+**Question.**  After the searches that stop where their checks do, where does a step of game 4984 go under the chain's
+settings, and can another 7% of the CPU be cut with the same trees?  **Answer.**  Yes: 0.906 of the CPU of ff89271 on
+the 24 units of the sections above, 0.903 on 24 others and 0.899 on 21 units of 4995, with every tree the same.  A warm
+child takes what the sets of other sizes lose from its parent, which spares the search for the smaller sets' loss at
+nearly every warm child; the A* search for forced members finds an element's bound only where the offer could be made
+at all; and the copy of the tableau a node keeps for itself is taken back by swapping its arrays into the workspace.
+
+**Method.**  The 24 units of the sections above under the chain's settings since game 4995: conflict branching on at a
+gate of 1,200, price reuse, the warm start, and the store of 144 units of 4983 (106,567 steps in all).  Scratch builds
+counted the cycles of a step's parts by the kind of level, with the level a node keeps for itself tagged apart from the
+children that inherit their parent's heaviest set, and inside the A* search: the members and elements it takes, the
+entries of the members' columns it reads, the bounds it finds and the offers it makes, by whether it finds a cycle.  A
+third build counted the members a level a node keeps for itself took in by its flip.  Each build was then paired
+against the one before it or against ff89271, the two solving each unit at once on the two hyperthreads of one core,
+as in the sections above.
+
+**Where a step goes.**  At ff89271, 1.05 M cycles a step (the counters overlap):
+
+| part | share of a step |
+|---|---|
+| the levels nodes keep for themselves: their checks | 33.2% |
+| of which the tableau restored (92 k cycles), derived (203 k) and its columns built (136 k) | 11.3% |
+| of which the A* searches that find a cycle, 4.0 an evaluation at 52 k cycles each | 6.1% |
+| of which the A* searches that show a member forced, 26.5 an evaluation at 5.3 k cycles each | 4.1% |
+| warm children: their checks | 11.2% |
+| of which what the smaller sets lose, 357 k cycles a check | 2.8% |
+| the copy of the tableau a node keeps for itself | 3.1% |
+| a child's promotion: its peels, 2.3 frames a step at 39 k cycles each (215 moves a frame) | 10.0% |
+
+Three findings decided the change:
+
+* *A warm child searched for what its smaller sets lose at every check*, where its parent's floor shows it.  A warm
+  child's sets, with what it promoted, are its parent's, and its heaviest set with them weighs less than the parent's by
+  what the deletions lost, so its slack is the parent's less that loss.  The parent's check of forced members had shown
+  that its smaller sets lose more than its slack, so the child's lose more than its own.
+* *The A* search found the bound of every element its members' columns offer before testing the offer.*  A search that
+  finds a cycle read 1,083 entries of the columns of the 22.8 members it took, and offered 45 of them.
+* *The copy of the tableau a node keeps for itself was gathered element by element and scattered back*: 101 k and 92 k
+  cycles.
+
+**The change.**  Three parts, each leaving every result the same:
+
+1. *Floors after a warm start or a deletion* (`floors_after`).  A level that came from another by promoting members `F`
+   of its heaviest set `I` and deleting candidates (a warm child), or by deleting candidates alone (a node that goes on
+   without a member of `I` by a deletion), makes every common independent set `K` of its problem, with `F`, one of the
+   other's.  Its heaviest set `J`, with `F`, weighs `lost` less than `I`.  Where `|J ∪ F| ≤ |I|`, a set `K` smaller
+   than `J` makes `K ∪ F` smaller than `I`, which weighs at most `w(I)` less the floor of what `I`'s smaller sets lose,
+   so `K` loses at least that floor less `lost` against `J`; and where `|J ∪ F| ≥ |I|` the larger sets likewise, a gap
+   of no larger set staying one.  Debug builds check every floor of the smaller sets' loss so carried against that
+   loss, found by A* and checked against Dijkstra's search, and every floor of the gap against the gap.
+2. *Offers dropped before their bounds.*  The A* search for a cycle through a member makes no offer at a distance at or
+   past its limit or the shortest cycle found, whatever the vertex's bound, which is never negative; so it tests that
+   before it finds the element's bound.
+3. *The copy swapped back.*  The copy of a tableau (`Snapshot`) is the workspace's arrays copied whole: each element's
+   mask, flag and slot, the blocks' slots and live elements, the set and its lists.  It is taken back by exchanging the
+   arrays with the workspace's, and so serves once; the columns of A are built again where they are read, as before.
+
+**Results.**  CPU of each build over the one named, paired, every tree the same:
+
+| build | units | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios |
+|---|---|---|---|---|---|
+| the copy swapped back, with its columns, over ff89271 | the 24 above | 1 | 0.994 | 0.994 ± 0.3% | 0.978 to 1.006 |
+| that and parts 1 and 2, over ff89271 | the 24 above | 1 | 0.928 | 0.931 ± 0.6% | 0.907 to 0.955 |
+| the same | 24 others (gaps 500 to 1,300) | 1 | 0.930 | 0.940 ± 0.9% | 0.905 to 0.981 |
+| the same | 21 units of 4995 with its store of 20,000 nogoods, at most 20,000 steps each | 1 | 0.937 | 0.935 ± 0.8% | 0.883 to 0.954 |
+| the copy without its columns (the build committed), over the build above | the 24 above | 1 | 0.968 | 0.970 ± 0.3% | 0.956 to 0.988 |
+| the copy swapped back against the copy scattered, both builds with the sorted columns below | the 24 above | 1 | 0.971 | 0.972 ± 0.2% | 0.961 to 0.988 |
+| the build committed over ff89271 | the 24 above | 2 | 0.906 | 0.914 ± 0.7% | 0.886 to 0.960 |
+| the same | 24 others | 1 | 0.903 | 0.930 ± 2.1% | 0.883 to 1.155 (a unit of 49 steps) |
+| the same | 21 units of 4995 | 1 | 0.899 | 0.898 ± 1.6% | 0.819 to 0.927 |
+
+In the scratch build of the change a step fell from 1.05 M cycles to 0.98 M, less than the CPU did.  At a warm child the
+smaller sets' loss took 3.4 k cycles against 357 k; the A* searches that find a cycle at the levels nodes keep for
+themselves took 44 k against 52 k, and those that show a member forced 4.0 k against 5.3 k; the copy took 81 k cycles
+against 101 k, and taking it back 3.4 k against 92 k.  Game 3000 keeps every counter of `tune` under the default tactics
+(117,197 steps), the chain's (161,460) and conflict branching off (161,460), at 0.968, 0.929 and 0.929 of the CPU
+(paired, one run each).  A debug build of `tune` that checked the floor of the smaller sets' loss at every check of
+forced members solved the roots of 1000 to 1700 by 50 under the chain's settings, of 1000 and 1350 with conflict
+branching off, of 1000 and 1300 with price reuse and the warm start off too, and six units of 4984 with the store,
+every check passing, each in the steps and best of the base; the build committed, which checks a floor where it was
+carried from the level before, solved seven of those roots and four of those units so.
+
+**Tried and not kept.**
+
+* *The columns of A kept in the copy*, so that the level a node keeps for itself derives its columns from the flip:
+  the copy cost 158 k cycles against 101 k, and the columns derived from a flip 148 k against 136 k built.  Leaving them
+  out took 0.968 of the CPU.
+* *Columns derived from a log of the circuits that changed*, each element that changed taken out of the columns of its
+  circuit before, instead of a pass over every column: 1.070 of the CPU of ff89271 with the copy swapped back (1.076 of
+  that alone).  A column holds 47 elements on average and many more in the large blocks, and finding each element in
+  it costs more than the pass.
+* *Columns sorted by `w1` for the searches*, each made when a search first reads it on a tableau, so that a search reads
+  a member's column only as far as its first offer too long: 1.090 of the CPU of the build committed.  A column is read
+  few times on a tableau (at the levels nodes keep for themselves, about 150 reads an evaluation for 118 members), and a
+  sort costs more than the entries it spares.
+
+**What is left.**  At 0.98 M cycles a step, the levels nodes keep for themselves take 32%: their A* searches 10%, their
+tableaux derived 8% and their columns built 3%.  Of the 4.0 searches an evaluation there that find a cycle, 0.7 are
+for the 2.4 members that the flip took in and 3.4 for members from before: the flip breaks the cycles that the levels
+before found.  The A* searches read the members' columns for few offers, 1,083 entries for 45 in a search that finds a
+cycle, at about 26 cycles an entry, about 10% of a step in all with strong branching's searches for the lengths of the
+cycles (1.1 a step, 45 k cycles each).  A child's promotion takes 11%, nearly all of it in the peels of the frames it
+touches.
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1593,3 +1701,19 @@ on parts 1 to 3); the builds (`bin/`); the unit lists (`set24.txt`, `setB.txt`);
 daeade5), `pairB/` (the bound of the arc into the member), `pairC/` (the copy and contraction in one pass), `final/`,
 `finalB/` and `p4995-final/` (the build committed), and `ident/` and `ident-pair/` (game 3000, unpaired and paired),
 with the debug runs' output in `debug*.txt`.
+`~/taxman_work/lab/work/step6-2026-10-28/` has the runs of the floors from the level before (2026-10-28): in `tools/`
+round 4's and 5's runners (`solo.sh`, `pair.sh`, `pair4995.sh`, `final.sh`, `ident_pair.sh`, `dbg.sh`, `dbgunits.sh`),
+the debug drivers (`debug_all.sh`, `debug_final.sh`), the base's runs of the same roots and their comparison
+(`roots_base.sh`, `roots_cmp.py`), the pairs' summary (`wsumm.py`), the scripts that put the counters on a copy of the
+source
+(`prof_apply.py` with `prof.rs`, then `prof_apply2.py` to `prof_apply5.py`) and their summary (`psum6.py`), and the
+script that put the original copy into a build (`old_snapshot.py`); the variants as patches against ff89271
+(`v2-plus-floors.patch`, the columns derived from a log, with the floors; `v3.patch`, the columns kept in the copy;
+`v4.patch`, the build committed before its comments were written; `v5.patch`, the sorted columns); the scratch builds'
+sources (`prof-src/` to `prof5-src/`, `v5a-src/`); the builds (`bin/`); the unit lists (`set24.txt`, `setB.txt`); and a
+file a solve in `prof0/` (the first profile, whose counters of the split overlapped), `prof2/` and `prof3/` (the
+profiles of ff89271), `prof4/` and `prof5/` (of the columns kept in the copy and of the build committed), `pairV1/` to
+`pairV3/`, `pairBV3/` and `p4995-v3/` (the builds on the way over ff89271), `pairV4v3/` (the copy without its
+columns), `pairV5v4/` (the sorted columns), `pairV5aV5/` (the copy swapped back against the copy scattered),
+`final-v4/`, `finalB-v4/` and `p4995-v4/` (the build committed), `ident-v4/` (game 3000), `debug4/` and `debug5/` (the
+debug runs) and `roots-base/` (the base on the debug runs' roots).
