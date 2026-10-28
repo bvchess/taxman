@@ -35,9 +35,12 @@ Each job's file names the instance that suits it; this page says why.
   where you find setup problems on Linux, test failures, and the single-thread rate and the 1-to-4-thread part of the
   sweep ([A small instance first](before-a-big-run.md#a-small-instance-first)).
 * **Check `lscpu` on a large machine** for the number of NUMA nodes.  The engine does not pin threads: each searcher
-  allocates its own state on its own thread, so first touch keeps it local.  If there are several nodes and the sweep
-  shows a step in `k/s/thr` where the thread count crosses a node, that is the cause.  The 64-vCPU instances of the
-  calibration were one socket and one node (`solver/notebook/graviton-calibration-2026-10/machines/`).
+  allocates its own state on its own thread, so first touch puts it on that thread's node.  Threads still move between
+  nodes: on a two-socket Xeon about a tenth of their time ran against remote memory, which cost a step about 0.3%
+  ([remote memory and huge pages](../../notebook/remote-memory-and-huge-pages-on-a-two-socket-xeon-2026-10/README.md)).
+  If there are several nodes and the sweep shows a step in `k/s/thr` where the thread count crosses a node, that is the
+  cause.  The 64-vCPU instances of the calibration were one socket and one node
+  (`solver/notebook/graviton-calibration-2026-10/machines/`).
 * **Build on the machine type that runs the binary.**  A plain `cargo build` makes generic code; `-C target-cpu=native`
   is opt-in ([README, section 2](../../frame/README.md#2-build-test-run)).  These scripts add it through `RUSTFLAGS`,
   the default of `env.sh`; set `RUSTFLAGS=` to build generic code.  `native` tunes for the CPU that builds, so a binary
