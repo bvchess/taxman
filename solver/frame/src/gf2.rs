@@ -1198,13 +1198,14 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// its parent's less the elements it promoted or dropped (contracting a member keeps the circuits of the others),
     /// and no cycle within the slack passes through a forced member, so a child that inherits its parent's heaviest
     /// set finds nearly all its members free on its parent's cycles.  The forced members are those a search for each
-    /// would find: a member is free exactly when some cycle within the slack passes through it.
+    /// would find: a member is free exactly when some cycle within the slack passes through it.  Each search finds the
+    /// shortest such cycle, by A* ([`Meet::has_cycle_within`]), so that the cycles kept serve the most levels after.
     ///
     /// Where many members are left to search ([`BOUNDED_SEARCHES_FROM`]), the least length of an arc out of each
     /// member ([`Meet::opening_length`]) and into it ([`Meet::closing_lengths`], one pass over the circuits of `B`)
     /// show forced, with no search, the members whose two arcs alone are longer than the slack (the split's forced
-    /// members among them), and bound the search for each of the others ([`Meet::has_cycle_within`]), which finds
-    /// the cycle it would find without the bound.
+    /// members among them), and bound the search for each of the others, which finds the cycle it would find without
+    /// the bound.
     fn force_by_cycles(&mut self, cap: usize, need: u64, forced: &mut Bits<W>) -> bool {
         let graph = self.graph;
         let level = &mut self.levels[self.depth];

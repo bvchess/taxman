@@ -934,6 +934,114 @@ made again (10%) come next.
 
 **Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
 
+## 2026-10-27: an A* search for forced members
+
+**Question.**  After the cheaper search for forced members, where does a step of game 4984 spend its CPU, and what cuts
+the next 7% with the same trees?  **Answer.**  The searches for forced members still took the most, and what they cost
+is the vertices they take, not the arcs they read.  An A* search for the shortest cycle within the slack, searches that
+leave out the elements free in B that cannot lower the hub, and two smaller changes take 24 units of 4984 to 0.829 of
+the CPU of 947946a, with every tree and every counter the same.
+
+**Method.**  The 24 units of the sections above under the chain's settings: conflict branching off, price reuse, the
+warm start, and the store of 144 units of 4983, 127,434 steps in all.  A scratch build counted, by the kind of level,
+the searches for forced members: how many there were, what they found, and the vertices and arcs they took.  It also
+timed the splits and the tableaux made again.  Switches in the same binary turned each idea on, and every unit took the
+same steps, best and counters of `tune` under every switch.  Then the old build (947946a) and the final one solved each
+unit at once on the two hyperthreads of one core, as in the sections above.
+
+**Where the time goes.**  At 1.80 M cycles a step (the CPU time at 2.2 GHz):
+
+| part | share of a step |
+|---|---|
+| the levels nodes keep for themselves: their searches for forced members, losses, kept cycles and arcs | 22.9% |
+| of which the searches that find a cycle, 12.4 an evaluation at 59 k cycles each | 12.6% |
+| of which the searches that find none, 28.3 an evaluation at 7.4 k cycles each | 3.6% |
+| the same for warm children | 9.7% |
+| the weight splits of the kept levels, inherited children and warm children | 24.6% |
+| the loss of the smaller sets (`Meet::smaller_loss`) | 3.6% |
+
+Three findings decided the change:
+
+* *A search costs the vertices it takes, about 450 cycles each.*  Reading only the arcs within the slack (a member's
+  column filtered and sorted once an evaluation, an element's circuit in B masked) cut what a search reads from 375
+  column entries and 127 circuit bits to 79 and 16, and a search that finds a cycle cost 58.1 k cycles against 59.1 k.
+  Nor is the cost the memory: a search made twice in a row was 6% faster the second time.  Nor is it the queue: a
+  binary heap of the same keys cost the same, and a sorted vector more.
+* *Half the vertices taken are elements free in B.*  A search that finds a cycle took 131 entries off its queue, and 62
+  of them were elements free in B.  Such an element reaches the members only through the hub, the least distance less
+  `w2` of such elements taken, and most could not lower it.
+* *The first cycle found is long.*  A search stopped at the first cycle within the slack, 185 long on average against a
+  slack of 211, and such cycles serve few of the levels after.  A search for the shortest (141 long) freed 8.4 more
+  members an evaluation on the cycles kept and left 4.3 searches that find a cycle instead of 12.4, but each cost 2.4
+  times as much, and the CPU fell by 1% only.
+
+**The change.**  Four parts, each leaving every result the same:
+
+1. *An A* search for the shortest cycle.*  `Meet::has_cycle_within` takes the vertices in the order of their distance
+   from the member plus a lower bound on the length of the path back to it.  The bound of an element outside the set
+   that a member's column offers is its least arc out: to a member of its circuit in B, or for one free in B to the
+   member of least `w2`.  It is found when the element is first offered on the tableau, and kept for the other searches
+   there.  Members and elements free in A, which come through the hubs in the order of `w2` and `w1`, take 0.  Each
+   bound is at most every arc out of its vertex plus the bound of the arc's head, so the keys taken never decrease, and
+   the search finds the shortest cycle: it stops at the first key at or past the shortest cycle found, or past the
+   slack.  The forced members are the same, since a member is forced exactly when no cycle within the slack passes
+   through it, and the cycles kept are the shortest.  Any shortest cycle will do, so the distances leave out the count
+   of arcs that the other searches pack with them, and the queue, their radix heap, takes keys that tie in distance
+   with the last one taken: it needs only that no key falls in distance.
+2. *The elements free in B that cannot lower the hub are not offered*, in the A* search and in the search for the bound
+   without a member (`Meet::without`, `Meet::without_any_size`).  Such an element has arcs to the members alone, which
+   the hub reaches no later, so no distance, predecessor or cycle changes; taking it offered nothing, so the order of
+   the offers is kept too.  The search for the loss of the smaller sets offers none of them, since none lowers anything.
+3. *The copy of a tableau without its residues.*  The copy that a node keeps for itself (`Snapshot`) keeps each
+   element's circuit and whether it is free, since a derived tableau reads its residues only for being zero.  A copy
+   costs 86 k cycles, against 152 k in the profile of the section above, and the tableau derived from it 313 k against
+   355 k.
+4. *The elements that enter a derived tableau listed once* (`Meet::derive`), not sought in every block: 153 k cycles a
+   tableau derived, against 167 k.
+
+**Results.**  The scratch build, one build at a time, under the chain's settings (CPU of the 24 units, solved four at
+once on cores of their own; the A* variants differ by less than the noise):
+
+| scratch build | CPU |
+|---|---|
+| 947946a, with the counters | 104.1 s |
+| with parts 3 and 4 | 103.4 s |
+| and part 2 | 98.1 s |
+| and the shortest cycle by the old search | 95.0 s |
+| with A* whose bounds of every element are found at each evaluation that searches | 84.3 s |
+| with A* whose bounds are found when first offered (the final change) | 83.8 s |
+
+Paired, the final build against 947946a:
+
+| units | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios | steps |
+|---|---|---|---|---|---|
+| the 24 above | 2, the hyperthreads swapped | 0.829 | 0.826 ± 1.5% | 0.764 to 0.874 | the same at every unit |
+| 24 others, gaps 500 to 1,300 | 1 | 0.828 | 0.853 ± 2.6% | 0.730 to 0.983 | the same at every unit |
+
+Every unit of the first set also kept every counter of `tune`, and the build committed, whose code differs only in
+its checks and comments, took 0.830 of the CPU in one more run.  The whole game 3000 keeps its 117,197 steps under the
+default tactics and its 161,460 under the chain's, with every counter of `tune`, at 0.883 and 0.847 of the CPU
+(unpaired).
+
+**Tried and not kept.**
+
+* *Only the arcs within the slack read* (above): the same cost.
+* *A binary heap or a sorted vector for the searches' queue*: the same cost, or more.
+* *The columns of A in one flat array by member*, counted and then filled: 230 k cycles a build against 122 k.
+* *The search for the loss of the smaller sets stopped once every path left reaches what it must certify*: it stopped
+  early at 98.5% of its calls, but cost 601 k cycles against 640 k.
+* *The bounds of every element found at every evaluation*, even those that search nothing: 141 k cycles each, 7% of a
+  step, most of it at inherited children, which search 0.3 members.
+* *The first cycle found by A*, not the shortest*: the same cost.
+* *Distances packed with the count of arcs in the A* search*, as in the other searches, so that no key ties below the
+  last one taken: 1.064 of the final build's CPU on the 24 units (paired, one run).
+
+**What is left.**  In the scratch build with the final change, at 1.45 M cycles a step, the weight splits take 30%:
+Bellman–Ford 13%, the tableaux derived 9%, the columns of A 7% and the copies restored 5%.  The searches for forced
+members take 9%, and the loss of the smaller sets 3.5%.
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -981,3 +1089,11 @@ the scratch builds (`edit_*.py`); the scratch build's counters and switches as a
 (`prof-switches.patch`, with its module `prof.rs`); the unit lists (`set24.txt`, `setB.txt`); and a file a solve in
 `base0/` (the old build), `prof1/` to `prof6/` (the profiles, with each switch), `pair1/` and `pair2/` (the paired runs)
 and `ident/` (game 3000).
+`~/taxman_work/lab/work/step2-2026-10-27/` has the runs of the A* search for forced members: in `tools/` the runner of
+one build (`solo.sh`) and of two at once (`two.sh`), the paired runner (`pair.sh`), the summaries (`profsum2.py` for the
+counters by kind of level, `brief.sh` for the comparisons, `wsumm.py` for the pairs), game 3000's runs (`ident.sh`) and
+the scripts that edited the scratch build (`edit_astar.py`, `edit_astar2.py`); the scratch build's counters as patches
+against 947946a (`prof.patch`, the first, and `prof-switches.patch`, the last with every switch, with its module
+`prof.rs`); the unit lists (`set24.txt`, `setB.txt`); the quick checks' logs (`quick*.log`); and a file a solve in
+`profA/` to `profM4/` (the profiles, a folder a switch), `pair1/` and `pair2/` (the paired runs), `pair3/`, `pair5/`
+and `pair6/` (the A* search with the arcs packed), `pair7/` (the build committed) and `ident/` (game 3000).

@@ -40,7 +40,8 @@ misses are the *odd* cores of movers with three or more factors.
   linear in the elements.  It derives a child's from the parent's, which the workspace still holds when the child is
   checked: the promoted members' slots are freed and dropped from the circuits, a contraction, and for a certified child
   the set is first flipped along its cycle by exchanges, each a pivot that keeps the span.  It derives a node's from a
-  copy of its own tableau, saved when it kept the certified level (`Snapshot`).  In a block whose span changes, the
+  copy of its own tableau, saved when it kept the certified level (`Snapshot`), which keeps each element's circuit and
+  whether it is free, not its residue, read only for being zero.  In a block whose span changes, the
   circuits that hold no member leaving carry over, and the other elements are reduced by the block's new members.  The
   docs of `Meet` in `src/gf2/meet.rs` ("Deriving a tableau") have the argument, and the random paths of the tests check
   every derived tableau against the one a solve builds.  The trees are the same.
@@ -93,10 +94,14 @@ misses are the *odd* cores of movers with three or more factors.
   column of `A` and its block of `B`), which saves a pass over every circuit.  Where many members are left to search,
   one pass over the circuits of `B` finds the least arc into each (`Meet::closing_lengths`), and a member's column the
   least arc out of it (`Meet::opening_length`): a member whose two arcs are longer than the slack is forced with no
-  search, and the search for each other offers no vertex a distance from which no cycle within the slack can close, so
-  it finds the cycle it finds without the bound ([the root
+  search, and the search for each other offers no vertex a distance from which no cycle within the slack can close
+  ([the root
   gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-cheaper-search-for-forced-members)
-  has the measurements).  A member on a cycle that the search for another found within the slack is not searched, since
+  has the measurements).  Each search is A*: it takes the vertices in the order of their distance from the member plus
+  a lower bound on the path back to it, an element's least arc out where a member's column offers it, else 0, and so
+  finds the shortest cycle within the slack, which serves more of the levels after than the first one found would
+  ([an A* search](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-an-a-search-for-forced-members)).
+  A member on a cycle that the search for another found within the slack is not searched, since
   that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the node's own
   or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`, a bit test
   an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that inherits its
@@ -107,9 +112,11 @@ misses are the *odd* cores of movers with three or more factors.
   (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
   campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
   the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
-  least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  Their queue is a radix heap of
-  packed (distance, vertex) keys, bucketed by distance and the keys of one distance sorted once, which come out in the
-  binary heap's order.
+  least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  An element free in `B` that
+  would not lower the hub is not offered, since it reaches no member sooner; the search for the loss of the smaller
+  sets offers none.  Their queue is a radix heap of packed (distance, vertex) keys, bucketed by distance and the keys of
+  one distance sorted once, which come out in the binary heap's order.  A*'s keys are the distance plus the bound,
+  with no count of arcs, so they can tie in distance with the last one taken, which the queue allows.
 * **A child's bound from its parent's split.**  The same weak duality bounds a child before it is made.  A child that
   promotes members `F` of `I*` has the parent's problem contracted by `F`, so each of its common independent sets `J`
   makes `J ∪ F` one of the parent's, with no candidate the child lacks.  So `w1(J) + w2(J)` is at most the heaviest
