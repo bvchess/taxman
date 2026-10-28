@@ -1599,6 +1599,109 @@ touches.
 
 **Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
 
+## 2026-10-28: what a step's parts cost made twice, and changes that did not pay
+
+**Question.**  After the floors from the level before, can another 7% of the CPU of a step of game 4984 be cut under the
+chain's settings, with the same trees?  **Answer.**  Not found.  The changes to the CPU's work that the last profile
+pointed to took 0.992 to 1.002 of the CPU each and 1.002 together.  Making a part twice, which measures what it costs
+on warm caches, put the A* searches for forced members at 8.1% of the CPU and the peels of a child's frames at 6.6%.
+Peel orders kept along the path, which check a promotion's frames from the order the parent's peel found instead of
+peeling them, took 1.002 to 1.066 of the CPU in six versions, never less than the peels.
+
+**Method.**  The 24 units of the sections above under the chain's settings since game 4995: conflict branching on at a
+gate of 1,200, price reuse, the warm start, and the store of 144 units of 4983 (106,567 steps in all).  Each idea was a
+switch of a scratch build, read from the environment, and the build with the switch off and on solved each unit at once
+on the two hyperthreads of one core, one run a unit; the base build paired against itself so took 0.9987 of the CPU
+(geometric mean 0.9992 ± 0.1%).  A switch that makes a part twice, the second time just after the first, measures that
+part's cost on warm caches, and since the second run leaves every result as the first left it, the trees stay the same.
+Four scratch builds counted cycles: round 6's counters on master with more of this round's, and three builds of the peel
+orders.  The peel orders were
+built in the solver itself and paired against 1b59354; debug builds of each version solved the roots of 1000 and 1100
+under the chain's settings, of 1000 and 1350 with conflict branching off, and three units of 4984, every check passing
+and each in the base's steps.  Every pair took the same steps and found the same best at every unit.
+
+**Changes to the CPU's work.**  None paid.  The last profile put about 26 cycles on each entry of a member's column that
+the A* search reads, but filtering a column without branches before the offers took 0.992 of the CPU; the parts below
+took no more than the noise of a pair.
+
+| change | CPU |
+|---|---|
+| the A* search for forced members: a column's entries filtered without branches before the offers | 0.992 |
+| the same in the search of `Meet::without` | 0.997 |
+| the same in the split's rounds | 0.998 |
+| `w2` of the member in each slot of `B`, for the A* search's bounds and its circuits of `B` | 0.996 |
+| kept cycles: whether a cycle frees a member asked before whether its elements are live | 0.997 |
+| a frame that only loses a factor no move has, not peeled (it never happened: 0 of 89,811 checks of one number) | 0.998 |
+| the peel: each move's live factors listed as it is counted, by its index among the moves, and the factors with one move pushed after the count | 1.000 |
+| a block's exchanges in a derivation applied in one pass over its elements | 1.002 |
+| all of the above but the peel | 1.002 |
+
+**Parts made twice.**  Each row is the CPU of the build that makes the part twice over the one that makes it once.
+The second time finds the caches warm, so a part costs at least this much.
+
+| part made twice | CPU |
+|---|---|
+| the A* searches of the check of forced members (`Meet::has_cycle_within`) | 1.081 |
+| the peels of the frames a promotion changes | 1.066 |
+| the columns of `A` built | 1.024 |
+| the least arcs into the members (`Meet::closing_lengths`) | 1.021 |
+| the forest of a split's predecessors | 1.016 |
+| a tableau's lists | 1.015 |
+| a split saved | 1.003 |
+| the copy of the tableau a node keeps for itself | 1.002 |
+| a child's vectors copied | 1.002 |
+
+A copy of a tableau or of a child's vectors, 2.7% and 2.4% of a step by the counters, costs little made again: its cost
+is the first touch of the memory.  The searches and the peels cost the same warm: they are work.  Padding the GF(2)
+vectors and tableaux to five words where four do took 1.023 of the CPU, a measure of what their width costs.
+
+**Peel orders.**  The peel finds an order in which it drops a frame's moves, each with its *witness*, the factor that
+no move left has when the move drops.  After a promotion each move keeps its witness unless the promotion took it away
+or gave it to a new move, so a frame's order in the parent checks the child's frame with only the moves those touch
+re-dropped: a new move is held back until its factors' last moves in the order have dropped, and a move whose witness a
+move held back has is held back too.  The orders were kept by slot of the searcher's stack, a frame's order in the slot
+of the node whose promotion last changed it.  Debug builds compared every check with a peel, and every order with the
+frame.
+
+| version | CPU |
+|---|---|
+| orders found by the children's peels, none at a unit's node | 1.002 |
+| a unit's node's orders made at its start; moves held back to the end | 1.017 |
+| moves held back dropped as soon as one of their factors has no move left, found by a scan of the held moves a turn | 1.066 |
+| the same with a count of the held moves a factor has, and the next turn one can drop | 1.006 |
+| a factor's last move in the order found from the factor's moves, not from a pass over every move's factors | 1.016 |
+| the same, each factor's last move kept once found, and up to 32 moves held back | 1.016 |
+
+The counters of the second version show why the order does not carry: of 207,632 checks from an order, 122,267 (59%)
+held back more moves than the check had room for and peeled the frame after all, and the others held back 7.7 moves
+on average.  Most factors are some move's witness, so a new move holds back the moves whose witnesses it has, and those
+hold back the moves whose witnesses they have.  With drops as soon as they can, 22% of the checks still peeled the frame
+(16 moves held back at most), and a check took 46 k cycles on average, the peels it fell back to included, more than a
+peel's 38 k.
+
+**What the profile found besides.**  At a push the parent has 1,141 live elements of the root's 1,349, and the units'
+nodes 1,248 to 1,329 candidates, so the elements a unit can no longer use are too few to shrink the arrays by.  A peel
+counts 215 moves and 265 factors; 7.3% of the frames a number is promoted into have a factor that no move of theirs
+has, and a number promoted out of its frame is a live factor of a move there every time.  A repair of the split takes
+104 k cycles at a child that keeps its parent's heaviest set, of which the forest of the start's predecessors takes
+46.6 k and the passes over the live elements 51.9 k, against 3.5 k for the subtrees that break (14.5 roots, 9.2 vertices
+pulled); at a level a node keeps for itself, 160 k, of which 76.2 k the passes and 64.6 k the pulls and scans of `B`.
+The child's candidates take 4.4% of a step beyond its promotion, 2.5% of it the carried store and the rule of symmetry.
+
+**Ideas left, not built.**
+
+* *An element's search state in one record*: in the A* search for forced members, its distance, bound, stamps,
+  predecessor and `w1`, `w2` and freedom in `B`, so that an offer reads one cache line instead of six arrays.  The searches cost 8.1% warm, and the
+  passing entries (342 of the 1,083 a search that finds a cycle reads) do most of their work.
+* *A split repaired with no pass over every live element* where a child only contracted members: the forest of the
+  start's predecessors and the passes are 94% of such a repair, which is 3.7% of a step by the counters.
+* *A set width of 80 words* for the boards 4096 to 5119 (0.981 of the CPU in round 3), taken at a game boundary, since a
+  checkpoint made at another width is refused.
+* *Profile-guided optimization of the build*, which needs `llvm-profdata` (the toolchain's `llvm-tools`, not installed
+  here) and a training run in the chain's build.
+
+**Decision.**  Nothing kept; the code stays at 1b59354.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1717,3 +1820,14 @@ profiles of ff89271), `prof4/` and `prof5/` (of the columns kept in the copy and
 columns), `pairV5v4/` (the sorted columns), `pairV5aV5/` (the copy swapped back against the copy scattered),
 `final-v4/`, `finalB-v4/` and `p4995-v4/` (the build committed), `ident-v4/` (game 3000), `debug4/` and `debug5/` (the
 debug runs) and `roots-base/` (the base on the debug runs' roots).
+`~/taxman_work/lab/work/step7-2026-10-28/` has the runs of the parts made twice and the changes that did not pay
+(2026-10-28): in `tools/` round 6's runners and summaries, `pairenv.sh` (a pair with an environment of its own on each
+side), `switches.sh` (each switch of a scratch build paired against its build with none) and `unitsize.py` (the units'
+candidates and depths); the scratch builds' sources, each switch read from `TAXMAN_X` (`x1-src/` the changes to the
+CPU's work, `x2-src/` with `x2_apply.py` the slots' `w2` and the exchanges in one pass, `x3-src/` the peels made twice
+and the five-word vectors, `x5-src/` with `x5_more.py` the other parts made twice), the counters' sources (`p1-src/`,
+round 6's counters with this round's; `p2-src/` and `p3-src/`, the peel orders' second and fifth versions with
+`p2_apply.py`, `p4_apply.py` and `p6_apply.py`); the peel orders' last version as a patch against 1b59354
+(`peel-orders-v6.patch`); the builds (`bin/`); the working notes (`notes.md`); and a file a solve in `aa1/` (the base
+against itself), `sw-x1-*` to `sw-x5-*` (each switch, by its mask), `v1-a/` to `v6-a/` (the peel orders over the
+base), `prof-p1/`, `prof-p2/`, `prof-p5/` and `prof-p6/` (the counters), with the debug runs in `dbg1/` and `dbg3/` to `dbg6/`.
