@@ -533,11 +533,12 @@ mod tests {
         let report = thread::scope(|scope| {
             let finder = scope.spawn(move || rounds(prepared, steered, planned, 1, &ended, None));
             thread::sleep(Duration::from_millis(100));
+            assert!(!finder.is_finished(), "the finder ended before the search did");
             drop(alive);
             finder.join().unwrap()
         });
         assert!(began.elapsed() < Duration::from_secs(20), "{:?}", began.elapsed());
-        assert!(report.seconds >= 0.1 && report.seconds < 20.0, "{report:?}");
+        assert!(report.seconds < 20.0, "{report:?}");
         // The finder of a search that ended before it started reports nothing.
         let (alive, ended) = mpsc::channel::<()>();
         drop(alive);
