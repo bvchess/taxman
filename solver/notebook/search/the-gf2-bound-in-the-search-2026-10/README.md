@@ -215,7 +215,7 @@ search 545); `verify-results` accepts it, and it took 88 s of wall time and 395 
   was not needed: [the inner loop of the GF(2) search](../the-inner-loop-of-the-gf2-search-2026-10/README.md), the round
   after this one, did without most of the solves, since the heaviest set without a member is the heaviest set flipped
   along one cycle of its exchange graph, read off with no solve and certified by what the sets of other sizes lose (the
-  rows of 2026-10-14 in [the register](../../register/node-bound.md)).
+  rows of 2026-10-14 in [the register](../../register/gf2-machinery.md)).
 * **Seams kept open** for studies that would build on this bound (the cover LP or a Lagrangian over the conflicts with
   this intersection as the inner problem, cut pools at the root, the symmetry rule): `meet::Problem` takes any positive
   weights, but the start from the heaviest uncontended candidates and the greedy lower bound assume that weights do not

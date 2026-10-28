@@ -72,8 +72,9 @@ of the page the row points to; a game is named by n, and times are search second
 The register is a file a subject, in [register/](register/).  Read the file of your subject whole, or search them all
 with `grep -ri WORD solver/notebook/register/`:
 
-* [node-bound.md](register/node-bound.md): the bound computed at every node (the matching and GF(2) bounds) and its
-  machinery: conflicts, refinement, forced members, cycle searches, the cost of a node.
+* [node-bound.md](register/node-bound.md): the bound at every node: the matching bound, its cost, and the adoption of
+  the GF(2) bound.
+* [gf2-machinery.md](register/gf2-machinery.md): computing the GF(2) bound, and making a step cheaper.
 * [stronger-bounds.md](register/stronger-bounds.md): the bounds tried on top of it: Lagrangian, LP, cuts and covers,
   the multi-field bound (A1), the root gaps.
 * [search.md](register/search.md): the rest of the search: branching, the start and the ceiling, decomposition,
