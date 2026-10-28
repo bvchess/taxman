@@ -1078,6 +1078,97 @@ against B on the same units.
 * No unit's best differs between the settings.  The controls, gate 2400 on 4992 and gate 1200 below its gate on 4995,
   took 0.97 to 1.02 of B's CPU on the same trees, so the CPU ratios are good to a few percent.
 
+## 2026-10-28: what the store costs a step
+
+**Question.**  On units of game 4995 a step with the store of 20,000 nogoods cost 18% more than one without a store, and
+26% more with 50,545 nogoods, so that the larger store's 5% fewer steps saved no CPU.  Where does that cost go, and can
+the store's own work be made nearly free with the same trees, for 7% of the CPU or more?  **Answer.**  Most of it is not
+the store's work but the trees it makes.  With the trees held the same, the store's questions cost about 4.5% of the CPU
+with 20,000 nogoods and about 10% with 50,545.  The rest comes from what the store prunes: it removes cheap steps, so the
+steps left check more bounds, and its children lose members of their parent's heaviest set, which the GF(2) bound then
+deletes.  Keeping each nogood as the set of its members' ranks takes the CPU to 0.991 of the old build's with 20,000
+nogoods and 0.974 with 50,545, with the same trees: under the bar, and not kept.  With it, the store of 50,545 still
+saves no CPU over the store of 20,000, so the most a search reads stays at 20,000 nogoods.
+
+**Method.**  The units of the sweep of game 4995 (`units-4995.jsonl`, the 60 of `sample.txt`), under the chain's
+settings: conflict branching on, a gate of 1,200, price reuse, the warm start, and the stores of the sweep.  The store of
+20,000 nogoods holds 333 numbers, the one of 50,545 holds 366, and a nogood has 38 members on average.
+
+1. *Where a step's cycles go.*  A scratch build counted the cycles of the parts of a step (the processor's time-stamp
+   counter) on 8 of the sweep's units of 39,000 steps or more, stopped at 30,000 steps each, each solved alone on one
+   thread.
+2. *The store's questions with the trees held.*  A switch of the same build asks the store its questions and drops the
+   answers, so that the trees are those without a store.  It was paired against the same build without a store on the
+   21 units of the sweep of 5,000 steps or more, at most 60,000 steps each: both at once on the two hyperthreads of one
+   core, as in the sections above.
+3. *The change tried.*  The old build (29aa8ba) and the new one, paired the same way on the same 21 units: two runs
+   with the store of 20,000, the hyperthreads swapped, and one with the store of 50,545.  Every unit took the same steps
+   and best, and the store ruled out the same candidates and ended the same nodes.
+
+**Where a step's cycles go.**  Cycles a step on the 8 units, by the old build, and the parts' calls a step:
+
+| part | no store | 20,000 nogoods | 50,545 nogoods |
+|---|---|---|---|
+| a step | 996 k | 1,241 k | 1,388 k |
+| the store's questions (a child's rule-outs, a check's cut) | 0 | 57 k | 144 k |
+| the GF(2) bound's evaluations | 545 k (0.79 a step) | 618 k (0.89) | 639 k (0.89) |
+| the GF(2) levels of children | 121 k (0.49 a step, 245 k each) | 200 k (0.58, 345 k each) | 220 k (0.58, 377 k each) |
+| the choice of the branch | 121 k | 144 k | 156 k |
+| the making of a child, less the store's questions | 158 k | 171 k | 177 k |
+
+Three findings:
+
+* *The store prunes cheap steps.*  Without a store 0.13 of the steps make a child that cannot be promoted, and end there;
+  with the store 0.02 do, since it rules out the candidates whose promotion would complete a nogood.  So the steps left
+  check more bounds: 0.58 children checked a step against 0.49, and 0.89 GF(2) evaluations against 0.79.  This is no
+  cost of the store: on the units every setting completes, the store of 20,000 takes 0.65 of the steps and 0.77 of the
+  CPU of no store (the sweep's `analysis.txt`).
+* *A child's GF(2) level costs 41% more with the store* (54% more with 50,545 nogoods).  The candidates the store rules
+  out of a child are often members of its parent's heaviest set, which the warm start then deletes one at a time.  This
+  is 4.7% of a step with 20,000 nogoods, in the GF(2) bound, and the store's answers decide it.
+* *The store's own questions are 4.6% of a step with 20,000 nogoods and 10.4% with 50,545*, and grow with the store.  A
+  child looked at 124 nogoods with 20,000 and 295 with 50,545 (those that watch what it promotes, 7.9 members a child),
+  at 650 cycles each, and moved the watch of nearly all of them; the look scanned 5.8 members of the nogood, from the
+  rarest, for one not promoted, in a list of all the store's members.  The check of forced members looked at 125 and 261
+  nogoods, at 110 cycles each, 0.8% and 1.5% of a step.  The store's memory hardly slows the rest of a step: in the
+  dry run of the new build (method 2), alone on the 8 units, the questions cost what the counters say, and the rest of a
+  step 0.2% more than without a store with 20,000 nogoods and 1.6% more with 50,545.
+
+**The change tried.**  The members of a store's nogoods are a few hundred numbers of the hard core, so the store ranks
+them from the rarest (in the fewest nogoods, then the smallest) and keeps each nogood as the set of its members' ranks,
+six words with 333 numbers.  The member a nogood watches next is the lowest rank of the nogood less the child's
+promotions (made a set of ranks once a child) and the member it watches besides, a few word operations and one read of
+memory.  The watches are the same as before, member for member, so every answer is too.
+
+**Results.**  CPU of the new build over the old, paired, with every tree the same:
+
+| measure | 20,000 nogoods | 50,545 nogoods |
+|---|---|---|
+| the store's questions with the trees held (dry run over no store, new build) | 1.036 | 1.075 |
+| the new build over the old (21 units) | 0.991 (geometric mean 0.992, unit ratios 0.984 to 1.001, two runs) | 0.974 (geometric mean 0.978, unit ratios 0.959 to 1.006, one run) |
+
+In the scratch build a nogood looked at costs 390 cycles against 650 (360 against 710 with 50,545 nogoods), and the
+questions 3.2% of a step against 4.6% (6.3% against 10.4%).  Also tried, on the change:
+
+* *A watch on a member that is no candidate*, preferred to the rarest: no node below the child promotes it, so the
+  nogood is not looked at again there.  A child looked at 101 nogoods against 124, and the cycles were the same (28.6 k a
+  step against 27.9 k), presumably since a member that is no candidate of a deep child is often one of its parent's,
+  which a sibling then promotes.
+* *The watched ranks in 16 bits*, halving the watches' memory: 0.999 of the new build's CPU (one run).  With the nogoods
+  also ordered by their ranks, so that those that watch the same members lie together: 0.992 (one run, unit ratios
+  0.987 to 1.004), left out as too small for the code it takes.
+
+**The size of the store.**  With the new build, the store of 50,545 against the store of 20,000 on the 60 units,
+paired, at most 150,000 steps each: 0.946 of the steps and 0.994 of the CPU (geometric mean 1.033: the small units pay
+for the larger store's start).  So a larger store still buys no CPU, and the most a search reads (`DIR_CAP`) stays at
+20,000 nogoods.
+
+**Decision.**  Not kept: 0.991 of the CPU with the store of 20,000 nogoods and 0.974 with 50,545, under the bar of 7%,
+and a larger store still does not pay with it.  No change to the store's questions can reach the bar with 20,000
+nogoods, since they cost 4.5% in all.  The largest cost the store causes that is left is the GF(2) levels of the
+children it prunes, 4.7% of a step; the rest of what a step costs more is the pruning itself, which pays.  The most a
+search reads (`DIR_CAP`) stays at 20,000 nogoods.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1138,3 +1229,13 @@ folder a game: the live checkpoint the units were cut from (`nNNNN-live.ckpt`) a
 build of `tune`, the runner (`run.sh SETFILE SAMPLEFILE OUTDIR NODELIMIT`, resumable), the settings (`settings.txt`),
 the unit ids (`sample.txt`, and `sample2.txt` for 4991's second batch), a file a solve in `out/`, and `analyze.py` with
 its output, `analysis.txt`; `patch4995/` has the unit picker (`pick.py`) and `notes.txt` too.
+`~/taxman_work/lab/work/store-2026-10-27/` has the runs of what the store costs a step (2026-10-28): in `tools/` the
+runner of one build (`solo.sh`), the paired runners (`pair.sh` with one store, `pair2.sh` with a store and a switch a
+side), the summaries (`profsum.py`, `percall.py` and `perunit.py` for the counters, `pairsum.py` for the pairs,
+`same.py` for the trees) and the unit picker (`pick.py`); the counters as patches against 29aa8ba (`prof.patch` on the
+old store, `prof-v1-dry.patch` on the rank sets, with the dry switch); the variants' code (`carried-v1-clean.rs` the
+change tried, `carried-v2.rs` the watch on a member that is no candidate, `carried-v3-scratch.rs` the 16-bit ranks and the
+order); the builds (`bin/`); the unit lists (`prof8.txt`, `pair21.txt`, `debug8.txt`); and a file a solve in `profA/`
+to `profC/` (the profiles of the old build, the change and the variant), `pairA/` and `pairC/` (the change against the
+old build, the two stores), `pairB/` (the dry runs), `pairD/` (the two stores on the new build), `pairE/` (the 16-bit
+ranks and the order) and `debug/` (a debug build).
