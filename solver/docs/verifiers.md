@@ -51,13 +51,13 @@ On 2026-10-27, the committed chain gave, on four threads of the chain's machine,
 
 ```
 $ taxman verify-results --threads 4 results/strict.jsonl
-results/strict.jsonl: 4983 completed games, n = 1..=4983 (0 missing), 0 incomplete lines
-  proof: trivial 13, prime_formula 623, cap 435, exhausted 1584, same_search 1946, known 382
-  assumptions: none in 4601 of 4983 games; 382 assume statement U at 298 boards in all
-  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1614, prime formula 665
-  searches shortened by the near-repeat cut, by proof: exhausted 4
+results/strict.jsonl: 5000 completed games, n = 1..=5000 (0 missing), 0 incomplete lines
+  proof: trivial 13, prime_formula 626, cap 436, exhausted 1590, same_search 1953, known 382
+  assumptions: none in 4618 of 5000 games; 382 assume statement U at 298 boards in all
+  scores at a proven ceiling, given the game of n-1: n + score(n-1) 1619, prime formula 668
+  searches shortened by the near-repeat cut, by proof: exhausted 5
 0 games are in more than one file, with equal scores in all
-checked in 120403.5 ms
+checked in 77798.7 ms
 ```
 
 What the checks cannot catch is a game that is legal, finished and within the chain bounds but not optimal, when the

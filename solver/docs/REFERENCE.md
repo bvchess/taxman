@@ -84,8 +84,8 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
 
   ```
   $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
-  added 3683 games (n = 1301..=4983); the table has 4983 games, n up to 4983; wrote /tmp/optimal.json
-  stopped at n = 4984: the results end at n = 4983
+  added 3700 games (n = 1301..=5000); the table has 5000 games, n up to 5000; wrote /tmp/optimal.json
+  stopped at n = 5001: the results end at n = 5000
   ```
 
   Check the new file with `taxman verify-optimal /tmp/optimal.json` before it replaces `results/optimal.json`.  The

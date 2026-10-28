@@ -2288,15 +2288,15 @@ fn a_proof_with_another_score_than_the_results_is_an_error() {
 }
 
 /// The committed prover files prove every game of the chain to 2175 (the prover's own proofs, without a certificate),
-/// and the committed chain past it, to 4983, is not proven at 2176, the first game that needs a certificate: nothing
+/// and the committed chain past it, to 5000, is not proven at 2176, the first game that needs a certificate: nothing
 /// past it is proven, since each game rests on the one before it.  The barred bounds and the certificates in
-/// `solver/tools/certify` reach 3440 at most, so the games 3441..=4983 have neither: they are in the chain, and the
+/// `solver/tools/certify` reach 3440 at most, so the games 3441..=5000 have neither: they are in the chain, and the
 /// test claims nothing of them but that, with a game before them unproven, they are unproven too.
 #[test]
 fn the_prover_proves_the_committed_chain_to_2175() {
     let exact = read_exact(&taxman::paths::exact_files_in_repository().unwrap()).unwrap();
     let scores: BTreeMap<u32, u64> = fixtures().known.games().map(|(n, score, _)| (n, score)).collect();
-    assert_eq!(scores.keys().next_back(), Some(&4983));
+    assert_eq!(scores.keys().next_back(), Some(&5000));
     let to_2175: BTreeMap<u32, u64> = scores.range(..=2175).map(|(&n, &score)| (n, score)).collect();
     let reached = frontier(&to_2175, &exact, &BTreeSet::new()).unwrap();
     assert_eq!(reached, Frontier { through: 2175, first_gap: None, beyond: vec![] });

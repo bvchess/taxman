@@ -1042,6 +1042,42 @@ members take 9%, and the loss of the smaller sets 3.5%.
 
 **Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
 
+## 2026-10-27: settings checks on games 4991, 4992 and 4995
+
+**Decision.**  Conflict branching on at a gate of 1200, so only at the nodes whose gap is above 1200, against the
+chain's setting of conflict branching off.  The lab channel applied it to the searches of 4991 and 4992 as they ran, and
+then as a policy from game 4995 on.  In each of the three games it took 0.90 to 0.92 of the chain's CPU on units of the
+game.  On 4984 the sweep had found conflict branching off best
+([above](#2026-10-27-a-sweep-of-the-settings-on-game-4984)); on the later builds, with the carried store, the gate won
+three games in a row.
+
+**Method.**  For each game, units cut from its live checkpoint, each solved to the end or to 150,000 steps on one thread
+by `tune solve` at `nice -n 19`, the settings interleaved per unit: 108 units of 4991, and 60 each of 4992 and 4995, of
+gaps from 300 to about 2,100.  The baseline B is the chain's setting: conflict branching off, price reuse, the warm
+start, and the store of the last game searched before (4984 for 4991, 4991 for 4992, 4992 for 4995).  Ratios are
+against B on the same units.
+
+**Results.**  Steps and CPU relative to B:
+
+| game | units | gate 1200: steps, CPU | the other settings: steps, CPU |
+|---|---|---|---|
+| 4991 | 108 | 0.94, 0.92 | gate 300: 0.98, 2.03; no store: 1.10, 1.02 |
+| 4992 | 60 | 0.98, 0.90 | gate 2400: 1.00 of the steps; it never engages, since no unit's gap reaches 2,400 |
+| 4995 | 60 | 0.96, 0.91 | gate 800: 1.03, 0.99 |
+
+* In each game, gate 1200 changes nothing below a gap of 1200: every unit there takes B's steps.
+* Above it, a step costs less.  On the units that both settings capped, gate 1200 took 0.93, 0.88 and 0.94 of B's CPU
+  at equal steps.
+* The gain in steps rests on a few units.  In 4992 it rests on one, 4992-1098 (59,185 steps to 24,393), without which
+  gate 1200 takes 1.004 of B's steps.  In 4995 it rests on three, 4995-640, 4995-6410 and 4995-6591, without which it
+  takes 1.017.  In 4991, 4991-7103 went from 93 k steps to 40 k and 4991-6006 from 30 k to 14 k, while 4991-934 rose
+  from 66 k to 79 k.
+* The lower gates lose.  Gate 300 took fewer steps on 4991 but cost 2.03 of the CPU, and gate 800 took 1.22 of B's steps
+  on the 11 units of gap 1200 and more that both finished in 4995.
+* The carried store helps: without it, 4991's units took 1.10 of the steps.
+* No unit's best differs between the settings.  The controls, gate 2400 on 4992 and gate 1200 below its gate on 4995,
+  took 0.97 to 1.02 of B's CPU on the same trees, so the CPU ratios are good to a few percent.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1097,3 +1133,8 @@ against 947946a (`prof.patch`, the first, and `prof-switches.patch`, the last wi
 `prof.rs`); the unit lists (`set24.txt`, `setB.txt`); the quick checks' logs (`quick*.log`); and a file a solve in
 `profA/` to `profM4/` (the profiles, a folder a switch), `pair1/` and `pair2/` (the paired runs), `pair3/`, `pair5/`
 and `pair6/` (the A* search with the arcs packed), `pair7/` (the build committed) and `ident/` (game 3000).
+`~/taxman_work/lab/work/patch4991/`, `patch4992/` and `patch4995/` have the settings checks of 4991, 4992 and 4995, a
+folder a game: the live checkpoint the units were cut from (`nNNNN-live.ckpt`) and the units (`units-NNNN.jsonl`), the
+build of `tune`, the runner (`run.sh SETFILE SAMPLEFILE OUTDIR NODELIMIT`, resumable), the settings (`settings.txt`),
+the unit ids (`sample.txt`, and `sample2.txt` for 4991's second batch), a file a solve in `out/`, and `analyze.py` with
+its output, `analysis.txt`; `patch4995/` has the unit picker (`pick.py`) and `notes.txt` too.
