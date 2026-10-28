@@ -83,7 +83,7 @@ pub mod meet;
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet};
-use meet::{bit, is_zero, lowest, xor, Cycles, Meet, Problem, Snapshot, SplitStart, Vector};
+use meet::{bit, is_zero, lowest, xor, Cycles, Deletion, Meet, Problem, Snapshot, SplitStart, Vector};
 
 const NONE: u32 = u32::MAX;
 
@@ -902,6 +902,8 @@ struct Levels<'g, const W: usize, const R: usize> {
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
     contracted_idx: Vec<u32>,
+    /// Scratch of [`contract_all`].
+    contraction: Contraction<R>,
     /// The tactic `warm_start`: a child whose parent's heaviest set lost members it dropped starts from that set
     /// ([`warm_child`]); and its scratch, a weight split and its start for the next.
     warm: bool,
@@ -954,6 +956,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
             contracted_idx: Vec::with_capacity(n),
+            contraction: Contraction::default(),
             warm: false,
             warm_pot: vec![0; n],
             warm_split: SplitStart::default(),
@@ -1006,9 +1009,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.source.clear();
         level.added = Bits::EMPTY;
         level.below = false;
-        for x in promoted.iter() {
-            contract(self.graph, level, x);
-        }
+        contract_all(self.graph, level, promoted, &mut self.contraction);
     }
 
     fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>, need: Option<u64>) {
@@ -1029,7 +1030,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let need = need.filter(|_| self.warm).map(|need| need as i64);
         let first = if self.warm {
             let live = lower[d].live & *child_cands;
-            warm_first(self.graph, &lower[d], parent, added, &live, &mut self.meet, &mut self.live_idx, &mut self.stats)
+            let (meet, banned, stats) = (&mut self.meet, &mut self.live_idx, &mut self.stats);
+            warm_first(self.graph, &lower[d], parent, added, &live, need, meet, banned, stats)
         } else {
             None
         };
@@ -1064,8 +1066,21 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         // loops of the contractions above stay out of it (`contract` leaves those of its own).
         child.live = child.live.intersect(child_cands);
         child.added = *added;
-        for x in added.iter() {
-            contract(self.graph, child, x);
+        #[cfg(debug_assertions)]
+        let one_at_a_time = (added.len() > 1).then(|| {
+            let mut one = child.clone();
+            for x in added.iter() {
+                contract(self.graph, &mut one, x);
+            }
+            one
+        });
+        contract_all(self.graph, child, added, &mut self.contraction);
+        #[cfg(debug_assertions)]
+        if let Some(one) = one_at_a_time {
+            assert!(
+                one.vec == child.vec && one.live == child.live,
+                "the contractions together and one at a time differ"
+            );
         }
         #[cfg(debug_assertions)]
         {
@@ -1318,7 +1333,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
-        let certified = losses.certify(slack + 1, &mut self.meet, &problem, &level.pot);
+        let certified = losses.certify(slack + 1, slack + 1, &mut self.meet, &problem, &level.pot);
         level.gap_floor = losses.gap_floor(level.gap_floor);
         if !certified {
             return false;
@@ -1559,7 +1574,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
                     cycle.iter().map(|&e| graph.elems[e as usize]).collect()
                 });
                 let value = level.value as i64 - delta;
-                if losses.certify(delta, &mut self.meet, &problem, &level.pot) {
+                if losses.certify(delta, i64::MAX, &mut self.meet, &problem, &level.pot) {
                     self.certified.push((x, flip.map(|flip| (last - flip) | (flip - last)), value as u64, delta));
                     bound = Some(value as u64);
                 }
@@ -1636,7 +1651,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
         }
         let problem = level.problem(graph);
-        let found = self.meet.without(&problem, &level.pot, graph.index[x as usize], self.certified_reach, &[]);
+        // The cycle is as long as the set certified loses, which bounds the search.
+        let length = level.value as i64 - value as i64;
+        debug_assert!(length <= self.certified_reach, "a certified cycle longer than the reach of its search");
+        let found = self.meet.without(&problem, &level.pot, graph.index[x as usize], length, &[]);
         debug_assert_eq!(found, Some(value as i64), "the heaviest set without {x}, found again");
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
         let flip: Bits<W> = self.meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
@@ -1701,6 +1719,107 @@ fn contract<const W: usize, const R: usize>(graph: &Gf2Graph, level: &mut Level<
             }
         }
         level.vec[m][e] = [0; R];
+    }
+}
+
+/// Scratch of [`contract_all`]: a block's promoted elements, their rows and pivots, and the row of each pivot.
+#[derive(Clone, Default)]
+struct Contraction<const R: usize> {
+    group: Vec<usize>,
+    rows: Vec<Vector<R>>,
+    pivots: Vec<usize>,
+    row_of: Vec<u16>,
+}
+
+/// [`contract`] for every member of `added`, in increasing order, with the same vectors and live set: per block of each
+/// matroid, its promoted members' vectors are brought to rows whose pivots (the lowest bit each has once reduced by
+/// those before it, as the contractions one at a time find them) no other row has, and each element of the block is
+/// reduced by the rows of the pivots it has, in one pass.  One at a time, each contraction clears its pivot from every
+/// vector and sets no pivot cleared before (its vector, reduced by those before it, has none), so the vectors end with
+/// no pivot set, each its own plus a combination of the promoted vectors; and there is only one such vector, since the
+/// promoted vectors are independent and the rows a basis of their span whose pivots are a unit each.
+fn contract_all<const W: usize, const R: usize>(
+    graph: &Gf2Graph,
+    level: &mut Level<W, R>,
+    added: &Bits<W>,
+    scratch: &mut Contraction<R>,
+) {
+    if added.len() <= 1 {
+        for x in added.iter() {
+            contract(graph, level, x);
+        }
+        return;
+    }
+    let Contraction { group, rows, pivots, row_of } = scratch;
+    row_of.resize(64 * R, 0);
+    for x in added.iter() {
+        level.live.remove(x);
+    }
+    for (m, vectors) in level.vec.iter_mut().enumerate() {
+        let blocks = &graph.block[m];
+        let mut left = *added;
+        while let Some(first) = left.min() {
+            // The promoted members of the block of the smallest left, in increasing order.
+            let b = blocks[graph.element(first).expect("a promoted candidate is an element") as usize];
+            group.clear();
+            for x in left.iter() {
+                let e = graph.element(x).expect("a promoted candidate is an element") as usize;
+                if blocks[e] == b {
+                    group.push(e);
+                }
+            }
+            for &e in group.iter() {
+                left.remove(graph.elems[e]);
+            }
+            rows.clear();
+            pivots.clear();
+            for &e in group.iter() {
+                let mut r = vectors[e];
+                for (row, &p) in rows.iter().zip(pivots.iter()) {
+                    if bit(&r, p) {
+                        xor(&mut r, row);
+                    }
+                }
+                pivots.push(lowest(&r).expect("a promoted candidate is not a loop"));
+                rows.push(r);
+            }
+            // Each row cleared of the pivots after its own (those before it it has none of).
+            for i in (0..rows.len()).rev() {
+                for j in i + 1..rows.len() {
+                    if bit(&rows[i], pivots[j]) {
+                        let row = rows[j];
+                        xor(&mut rows[i], &row);
+                    }
+                }
+            }
+            let mut mask = [0u64; R];
+            for (j, &p) in pivots.iter().enumerate() {
+                mask[p / 64] |= 1 << (p % 64);
+                row_of[p] = j as u16;
+            }
+            for &y in &graph.block_elems[m][usize::from(b)] {
+                let y = y as usize;
+                let v = &mut vectors[y];
+                let mut set = [0u64; R];
+                for (s, (a, k)) in set.iter_mut().zip(v.iter().zip(&mask)) {
+                    *s = a & k;
+                }
+                if is_zero(&set) {
+                    continue;
+                }
+                for (i, &word) in set.iter().enumerate() {
+                    let mut word = word;
+                    while word != 0 {
+                        xor(v, &rows[usize::from(row_of[64 * i + word.trailing_zeros() as usize])]);
+                        word &= word - 1;
+                    }
+                }
+                // The promoted members' vectors, in the span of the rows, become zero too.
+                if is_zero(v) {
+                    level.live.remove(graph.elems[y]);
+                }
+            }
+        }
     }
 }
 
@@ -1804,7 +1923,7 @@ fn certify_child<const W: usize, const R: usize>(
     };
     let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
     let delta = parent.value as i64 - value;
-    if !losses.certify(delta, meet, &problem, &parent.pot) {
+    if !losses.certify(delta, i64::MAX, meet, &problem, &parent.pot) {
         return false;
     }
     let set = ((last - flip) | (flip - last)) - *added;
@@ -1876,8 +1995,17 @@ fn warm_child<const W: usize, const R: usize>(
         own_split = true;
         pot.copy_from_slice(meet.potentials());
         missing.remove(x);
-        value = meet.without_any_size(&child_problem, pot, index(x), &[])?;
+        // A set below the need is not looked for: the child is cut, `need − 1` an upper bound on its bound.
+        let deletion = meet.without_any_size_reaching(&child_problem, pot, index(x), &[], need.unwrap_or(i64::MIN))?;
         stats.warm_deletions += 1;
+        match deletion {
+            Deletion::Weight(weight) => value = weight,
+            Deletion::Below => {
+                value = need.expect("a need to be below") - 1;
+                cut = true;
+                break;
+            }
+        }
         let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
         set = (set - flip) | (flip - set);
         cut = below(value);
@@ -1939,7 +2067,9 @@ struct WarmFirst<const W: usize> {
 /// member of a common independent set is no loop of the contraction by others) and so leave the members lost as they
 /// are.  Nor do they change the search: a loop's circuit in the matroid where it is one lies within `added`, all
 /// banned, so its arcs there are only to or from banned members, and no cycle that avoids those passes through it.
-/// `banned` is scratch.  The workspace's tableau is left as it was.
+/// With the child's `need`, the search looks for no set below it ([`Meet::without_any_size_reaching`]): where the
+/// heaviest set without the member weighs less than the need, its weight is given as `need − 1`, an upper bound on it,
+/// and its set as empty.  `banned` is scratch.  The workspace's tableau is left as it was.
 #[allow(clippy::too_many_arguments)]
 fn warm_first<const W: usize, const R: usize>(
     graph: &Gf2Graph,
@@ -1947,6 +2077,7 @@ fn warm_first<const W: usize, const R: usize>(
     parent: &Level<W, R>,
     added: &Bits<W>,
     live: &Bits<W>,
+    need: Option<i64>,
     meet: &mut Meet<R>,
     banned: &mut Vec<u32>,
     stats: &mut Gf2Stats,
@@ -1964,11 +2095,21 @@ fn warm_first<const W: usize, const R: usize>(
     missing.remove(x);
     banned.clear();
     banned.extend((*added | (parent.live - last - *live)).iter().map(index));
-    let value = meet.without_any_size(&vectors.problem(graph), &parent.pot, index(x), banned)?;
+    let added_sum = added.sum() as i64;
+    // With a need, a set below it is not looked for: the child is cut, its bound below `need`.
+    let least = need.map_or(i64::MIN, |need| need.saturating_add(added_sum));
+    let value = match meet.without_any_size_reaching(&vectors.problem(graph), &parent.pot, index(x), banned, least)? {
+        Deletion::Weight(value) => value,
+        Deletion::Below => {
+            stats.warm_deletions += 1;
+            let need = need.expect("a need to be below");
+            return Some(WarmFirst { value: need - 1, set: Bits::EMPTY, missing: Bits::EMPTY });
+        }
+    };
     stats.warm_deletions += 1;
     let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
     let set = ((last - flip) | (flip - last)) - *added;
-    Some(WarmFirst { value: value - added.sum() as i64, set, missing })
+    Some(WarmFirst { value: value - added_sum, set, missing })
 }
 
 /// With the tactic `warm_start`: `level` (solved, of all sizes, with a weight split, its tableau the workspace's) goes
@@ -2113,11 +2254,13 @@ impl Losses {
     }
 
     /// Whether a set that loses `delta` against the heaviest set is the heaviest of its kind; if the bound on the
-    /// smaller sets does not decide, it is made exact first ([`Meet::smaller_loss`] on the workspace's tableau and
-    /// the level's split `pot`).
+    /// smaller sets does not decide, it is found first ([`Meet::smaller_loss_within`] on the workspace's tableau and
+    /// the level's split `pot`): exact where it is below `upto` (or `delta`, if more), else as at least that, which is
+    /// all a caller that asks about no loss above `upto` needs (`i64::MAX`: exact).
     fn certify<const R: usize>(
         &mut self,
         delta: i64,
+        upto: i64,
         meet: &mut Meet<R>,
         problem: &Problem<'_, R>,
         pot: &[i64],
@@ -2126,8 +2269,10 @@ impl Losses {
             return false;
         }
         if delta > self.smaller && !self.exact {
-            self.smaller = self.smaller.max(meet.smaller_loss(problem, pot));
-            self.exact = true;
+            let limit = upto.max(delta);
+            let loss = meet.smaller_loss_within(problem, pot, limit);
+            self.smaller = self.smaller.max(loss);
+            self.exact = loss < limit;
         }
         delta <= self.smaller
     }

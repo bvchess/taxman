@@ -159,6 +159,15 @@ macro_rules! free {
     }};
 }
 
+/// What [`Meet::without_any_size_reaching`] found of the heaviest set without a member.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Deletion {
+    /// It weighs this much, and is the heaviest set flipped along [`Meet::cycle`].
+    Weight(i64),
+    /// It weighs less than was asked for.
+    Below,
+}
+
 /// The two matroids: for each element, its block in `A` and in `B` and its vectors there.  An element whose vector
 /// is zero in either is a loop: no common independent set holds it.
 pub struct Problem<'a, const R: usize> {
@@ -2893,8 +2902,39 @@ impl<const R: usize> Meet<R> {
     /// the hub, `w1(o)` and `w2(i)` being 0.  The cycle `x → o → x`, of length `w(x)` (the set `I − x`), bounds the
     /// search.
     pub fn without_any_size(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, banned: &[u32]) -> Option<i64> {
+        match self.without_any_size_reaching(p, pot, x, banned, i64::MIN)? {
+            Deletion::Weight(value) => Some(value),
+            Deletion::Below => None,
+        }
+    }
+
+    /// [`without_any_size`](Self::without_any_size) where the set matters only if it weighs at least `least`:
+    /// [`Deletion::Below`] where it weighs less.  A cycle longer than the heaviest set's weight less `least` flips to a
+    /// set lighter than `least`, so the search stops there instead of at the member's weight.  Where the set is not
+    /// below, it is the one `without_any_size` finds: up to the cycle it closes, the search takes the same vertices in
+    /// the same order, since the offers it drops for lying past its bound would not have been taken before that cycle.
+    pub fn without_any_size_reaching(
+        &mut self,
+        p: &Problem<'_, R>,
+        pot: &[i64],
+        x: u32,
+        banned: &[u32],
+        least: i64,
+    ) -> Option<Deletion> {
+        if !self.settled || self.tableau != self.solves || !self.inside[x as usize] {
+            debug_assert!(false, "the bound without a member needs the tableau of a settled solve holding it");
+            return None;
+        }
+        // The cycle x → o → x, as long as x weighs, is in every search that reaches its length.
+        let whole = p.weight[x as usize];
+        let limit = whole.min(self.value.saturating_sub(least));
+        if limit < 0 {
+            return Some(Deletion::Below);
+        }
         self.withouts += 1;
-        let (length, end) = self.shortest_cycle::<true>(p, pot, x, p.weight[x as usize], banned)?;
+        let Some((length, end)) = self.shortest_cycle::<true>(p, pot, x, limit, banned) else {
+            return (limit < whole).then_some(Deletion::Below);
+        };
         // The cycle's elements: from the one that closes it, its predecessors back to x, the two vertices that stand
         // for no element left out.
         self.flip.clear();
@@ -2916,7 +2956,7 @@ impl<const R: usize> Meet<R> {
             return None;
         }
         self.withouts_exact += 1;
-        Some(self.value - length)
+        Some(Deletion::Weight(self.value - length))
     }
 
     /// Whether the exchange graph of [`without`](Self::without) has a cycle through the member `x` at most `limit`
@@ -3521,6 +3561,14 @@ impl<const R: usize> Meet<R> {
     /// no less than 0, and an element free in A, reached through the hub, take 0.  A member alone is such a path, so
     /// the search starts from the lightest member's weight and stops at the first key at or past the shortest path.
     pub fn smaller_loss(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
+        self.smaller_loss_within(p, pot, i64::MAX)
+    }
+
+    /// [`smaller_loss`](Self::smaller_loss) for a caller that needs to know it only below `limit` (at least 0): the loss
+    /// where it is less than `limit`, else `limit` (`i64::MAX` where there is no smaller set), by the same search
+    /// started from `limit` instead of the lightest member's weight where that is more, which takes no key at or past
+    /// `limit`.
+    pub fn smaller_loss_within(&mut self, p: &Problem<'_, R>, pot: &[i64], limit: i64) -> i64 {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
@@ -3536,7 +3584,7 @@ impl<const R: usize> Meet<R> {
         let reached = settled - 1;
         let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
         let (bound, bounded_at, bounds_stamp) = (&mut self.path_bound, &mut self.bounded_at, self.bounds_stamp);
-        let mut best = lightest * HOPS;
+        let mut best = lightest.min(limit.max(0)) * HOPS;
         let heap = &mut self.heap;
         heap.start(best, self.pos.len());
         // An element free in B is not offered: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least
@@ -3632,7 +3680,7 @@ impl<const R: usize> Meet<R> {
         }
         let loss = best.div_euclid(HOPS);
         #[cfg(debug_assertions)]
-        assert_eq!(loss, plain, "the smaller sets' loss by A* and by Dijkstra's search differ");
+        assert_eq!(loss, plain.min(limit.max(0)), "the smaller sets' loss by A* and by Dijkstra's search differ");
         loss
     }
 
@@ -4132,6 +4180,11 @@ mod tests {
         let smaller = brute(&p, &live, size - 1);
         assert!(loss <= meet.value - smaller, "trial {trial}: the loss of the smaller sets");
         counts.exact_losses += usize::from(loss == meet.value - smaller);
+        // Below a limit, the loss; from it on, the limit.
+        for limit in [0, loss / 2, loss, loss + 1] {
+            let within = meet.smaller_loss_within(&p, &pot, limit);
+            assert_eq!(within, loss.min(limit), "trial {trial}: the loss of the smaller sets within {limit}");
+        }
         // The heaviest common independent set of exactly one more element, if there is one.
         let larger = (0u32..1 << n)
             .filter(|mask| mask.count_ones() as usize == size + 1)
@@ -4177,6 +4230,13 @@ mod tests {
                     independent(p.block[0], p.vector[0], &flipped) && independent(p.block[1], p.vector[1], &flipped)
                 );
                 assert_eq!(flipped.iter().map(|&e| p.weight[e as usize]).sum::<i64>(), value, "trial {trial}");
+                // Asked for a set at least as heavy, the search finds the same cycle; asked for a heavier one, none.
+                let cycle = meet.cycle().to_vec();
+                let reaching = meet.without_any_size_reaching(&p, &pot, x, &banned, value);
+                assert_eq!(reaching, Some(Deletion::Weight(value)), "trial {trial}: without {x}, reaching its weight");
+                assert_eq!(meet.cycle(), &cycle[..], "trial {trial}: without {x}, the cycle reaching its weight");
+                let above = meet.without_any_size_reaching(&p, &pot, x, &banned, value + 1);
+                assert_eq!(above, Some(Deletion::Below), "trial {trial}: without {x}, reaching past its weight");
                 counts.any_size += 1;
                 counts.any_size_banned += usize::from(!banned.is_empty());
                 counts.any_size_smaller += usize::from(flipped.len() < size);

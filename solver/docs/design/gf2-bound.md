@@ -23,15 +23,17 @@ matching bound, since independent vectors have a system of distinct representati
 misses are the *odd* cores of movers with three or more factors.
 
 * **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once a search, and `gf2::Gf2Bound` keeps a level
-  for each node of the searcher's path.  A child's level is its parent's, contracted by what the child promoted (one
-  pivot per member and matroid), with the candidates it lost deleted.  A candidate that the contraction makes a loop (a
-  zero vector, in no common independent set) leaves the level's live candidates and stays out below it.  The
-  intersection (`gf2::meet`: Lawler's shortest augmenting paths, over a tableau of bitset rows that a pivot updates per
-  exchange) starts from the last of the sets that the parent's augmentations passed through and that the changes keep.
-  Each such set is the heaviest of its size and heavier than all smaller ones, and when the set kept is the parent's
-  heaviest set, the child inherits it with no solve.  The parent here is the node as it was before it went on without
-  the member the child promotes (the search keeps it aside for that), so that the child finds the node's heaviest set
-  among those sets.
+  for each node of the searcher's path.  A child's level is its parent's, contracted by what the child promoted, with
+  the candidates it lost deleted.  The promoted members of each block become rows with a pivot each, and each vector of
+  the block is reduced by the rows of the pivots it has (`contract_all`): the vectors that one pivot per member and
+  matroid would make, in one pass over the block, where a child that promotes many members, its node's forced members,
+  made a pass for each.  A candidate that the contraction makes a loop (a zero vector, in no common independent set)
+  leaves the level's live candidates and stays out below it.  The intersection (`gf2::meet`: Lawler's shortest
+  augmenting paths, over a tableau of bitset rows that a pivot updates per exchange) starts from the last of the sets
+  that the parent's augmentations passed through and that the changes keep.  Each such set is the heaviest of its size
+  and heavier than all smaller ones, and when the set kept is the parent's heaviest set, the child inherits it with no
+  solve.  The parent here is the node as it was before it went on without the member the child promotes (the search
+  keeps it aside for that), so that the child finds the node's heaviest set among those sets.
 * **Tableaux derived, not built.**  A solved level needs its tableau for its weight split even when the workspace no
   longer holds it: a child that inherited its heaviest set or was certified, or a node going on without the member it
   branched on.  A solve from `I*` would build the tableau, a pivot per member over its block.  `Meet::derive` makes a
@@ -59,22 +61,24 @@ misses are the *odd* cores of movers with three or more factors.
   the cycle's length.  The proof: the symmetric difference of `I*` and any set without `x` splits into cycles and paths
   of the exchange graph, all of non-negative length but the one through `x` (the module comment of `src/gf2/meet.rs`).
   What the smaller sets lose comes from the level's history (a dominant set one smaller), from a floor carried along the
-  path, or from a search for the shortest path between members; what the larger sets lose (the gap) is the length of
-  the shortest augmenting path, found only where a floor carried along the path does not decide: a child that keeps its
-  parent's heaviest set has the parent's gap as its floor, and a node's level without a member the node's less the
-  cycle's length.  That holds of a gap with no path at all too, where no common independent set is larger than the
-  heaviest set, as at every level of the units of 4984 measured: the levels below have none either.  Both searches run
-  over the split's reduced lengths, by A* with the bounds of the searches for forced members below
-  (`Meet::smaller_loss`, `Meet::gap_with`); debug builds check each against Dijkstra's search and Bellman–Ford's.  A
-  child that loses one member of its parent's heaviest set besides those it promotes gets its own the same way, from
-  the parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a
-  hundred members of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's
-  heaviest set carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the
-  elements it promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle of the
-  child's graph is one of the parent's, as long, and a member's shortest cycle at the parent that is still a cycle of
-  the child (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches,
-  nearly all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees
-  ([cheaper steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
+  path, or from a search for the shortest path between members, which the search for forced members makes only as far as
+  its slack: whether the smaller sets lose more than the slack is all it asks, and a loss found no shorter is kept as a
+  floor (`Meet::smaller_loss_within`).  What the larger sets lose (the gap) is the length of the shortest augmenting
+  path, found only where a floor carried along the path does not decide: a child that keeps its parent's heaviest set
+  has the parent's gap as its floor, and a node's level without a member the node's less the cycle's length.  That holds
+  of a gap with no path at all too, where no common independent set is larger than the heaviest set, as at every level
+  of the units of 4984 measured: the levels below have none either.  Both searches run over the split's reduced lengths,
+  by A* with the bounds of the searches for forced members below (`Meet::smaller_loss`, `Meet::gap_with`); debug builds
+  check each against Dijkstra's search and Bellman–Ford's.  A child that loses one member of its parent's heaviest set
+  besides those it promotes gets its own the same way, from the parent's exchange graph with the dropped elements banned
+  from the cycle.  Conflict branching prices a hundred members of a node this way
+  ([search.md](search.md#conflict-branching)), and a child that inherits its parent's heaviest set carries its parent's
+  prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the elements it promoted or dropped,
+  since contracting a member keeps the circuits of the others, so every cycle of the child's graph is one of the
+  parent's, as long, and a member's shortest cycle at the parent that is still a cycle of the child
+  (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches, nearly all
+  of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees ([cheaper
+  steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
 * **Warm starts across deletions** (tactic `warm_start`, off by default).  A child that drops members of its parent's
   `I*` keeps only the dominant sets from before those members came in, a few members in the hardest games, and solves
   from there; so does a node that goes on without a member of its own `I*` with no level kept for it.  With the tactic,
@@ -82,14 +86,17 @@ misses are the *odd* cores of movers with three or more factors.
   finds the shortest cycle through the member in the exchange graph of `I*` with two elements of weight 0 added, each
   independent of everything: one outside the set, through which a cycle is a path that makes a set one smaller, and one
   in it, through which a cycle is a path that makes a set one larger.  `I*` flipped along that cycle is the heaviest set
-  without the member of every size, with no bound needed on what the other sizes lose (the comment of
-  `without_any_size` has the proof).  A child's second member is deleted in its own problem, from the tableau of the
-  set so far, derived from the parent's, and its weight split, which starts from the parent's split and each later
-  one from the one before.  Each deletion only lowers the set, so the search, which cuts a child whose bound is below
-  its need, stops a child's deletions at the first set below it (`Gf2Bound::push_all_at`); the first deletion, in the
-  parent's problem, is made before the child's vectors are, which it does not read.  The bound is the same, but where
-  several sets weigh the same another may be found, and with it another conflict branched on, so the trees can change
-  ([the root
+  without the member of every size, with no bound needed on what the other sizes lose (the comment of `without_any_size`
+  has the proof).  A child's second member is deleted in its own problem, from the tableau of the set so far, derived
+  from the parent's, and its weight split, which starts from the parent's split and each later one from the one before.
+  Each deletion only lowers the set, so the search, which cuts a child whose bound is below its need, stops a child's
+  deletions at the first set below it (`Gf2Bound::push_all_at`); the first deletion, in the parent's problem, is made
+  before the child's vectors are, which it does not read.  Nor does a deletion look for a set below the need
+  (`Meet::without_any_size_reaching`): its search stops at the cycles longer than the set's weight less the need, where
+  it would go on to the member's own weight, and below the need the child is cut with its bound given as the need less
+  1, an upper bound on it.  The cycle it finds otherwise is the one the search with no need finds, which takes the same
+  vertices in the same order up to it.  The bound is the same, but where several sets weigh the same another may be
+  found, and with it another conflict branched on, so the trees can change ([the root
   gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-warm-starts-by-deletion)
   has the measurements).
 * **Forced members.**  The weight split of `I*` bounds the intersection without each member in one pass, by weak
@@ -147,13 +154,13 @@ misses are the *odd* cores of movers with three or more factors.
   lowest.  The search reads each such bound off the exchange graph where it certifies it, and solves it where not: in
   the order of the split's bounds, each solve stopped once it reaches both the lowest so far and the need, after a
   greedy lower bound.  A member whose bound falls below the need is forced too, and the chosen member's level, certified
-  or solved, is what the node goes on with.  A certified bound needs only the length of the shortest cycle, which the
-  A* search of the forced members finds (`Meet::shortest_cycle_length`); `Meet::without` then finds the cycle of the
-  member whose level the node keeps alone, the shortest with the fewest arcs, whose flip is that level's heaviest set.
-  The cheaper choices (the split's bound alone, the largest member) take more nodes and more time ([the GF(2) bound in
-  the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).  The tactics `branching`,
-  `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how far strong branching
-  goes ([tactics.md](tactics.md)).
+  or solved, is what the node goes on with.  A certified bound needs only the length of the shortest cycle, which the A*
+  search of the forced members finds (`Meet::shortest_cycle_length`); `Meet::without` then finds the cycle of the member
+  whose level the node keeps alone, the shortest with the fewest arcs, whose flip is that level's heaviest set, its
+  search bounded by that length.  The cheaper choices (the split's bound alone, the largest member) take more nodes and
+  more time ([the GF(2) bound in the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).  The
+  tactics `branching`, `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how
+  far strong branching goes ([tactics.md](tactics.md)).
 * **What it replaces.**  With `gf2` the search does not compute the matching bound, which as a first check before the
   intersection costs more than the cuts it saves; so `match_refine` has no effect.  The conflicts, nogoods, forced
   members and exact sets work as with the matching bound.  The Lagrangian bound over the nogoods still applies after the

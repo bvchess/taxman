@@ -1387,6 +1387,110 @@ the store, every check passing.
 
 **Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
 
+## 2026-10-28: searches that stop where their checks do, and contractions a block at a time
+
+**Question.**  After the warm starts stopped at the need, where does a step of game 4984 go under the chain's settings,
+and can another 7% of the CPU be cut with the same trees?  **Answer.**  Yes: 0.916 of the CPU of daeade5 on the 24
+units of the sections above, 0.911 on 24 others and 0.912 on 21 units of 4995, with every tree the same.  Two
+searches went further than their checks need: a warm child's first deletion went on to the member's weight where only
+the child's need mattered, and the loss of the smaller sets to the lightest member's weight where only the slack did.
+And a child that promotes its node's forced members contracted its vectors one member at a time, a pass over a block
+for each.
+
+**Method.**  The 24 units of the sections above under the chain's settings since game 4995: conflict branching on at a
+gate of 1,200, price reuse, the warm start, and the store of 144 units of 4983 (106,567 steps in all).  A scratch build
+with round 4's counters, and those of a child's promotion and contraction split by how many numbers it promotes,
+profiled the old build and the change.  Each build was then paired against the one before it, the two solving each unit
+at once on the two hyperthreads of one core, as in the sections above.
+
+**Where a step goes.**  At daeade5, 1.15 M cycles a step (the counters overlap):
+
+| part | share of a step |
+|---|---|
+| the levels nodes keep for themselves: their checks | 30.6% |
+| of which the tableau restored and derived, its columns and its split | 16.3% |
+| of which the searches for forced members | 10.5% |
+| warm children: their checks | 11.8% |
+| of which what the smaller sets lose, 530 k cycles a search | 3.8% |
+| children that keep their parent's heaviest set: their checks | 10.7% |
+| strong branching: the cycles' lengths (4.9%), the kept member's cycle (2.7%) and the copy of the tableau (2.8%) | 10.7% |
+| a child's promotion: 101 k cycles for one number, 282 k for several | 9.1% |
+| a child's vectors copied (2.0%) and contracted (4.5%) | 6.5% |
+| warm children's first deletions, whose searches take 244 k cycles each | 5.6% |
+
+Three findings decided the change:
+
+* *The first deletion of a cut child searched past its need.*  Of the 24,702 warm children, 14,349 (0.135 a step) are
+  cut by their first deletion.  It finds the shortest cycle through the member in an exchange graph that admits every
+  size, by Dijkstra's search with no bound but the member's weight, and so takes every vertex closer than that cycle; a
+  cut child's cycle is longer than its slack, and the search went on to it.
+* *The loss of the smaller sets was found exactly at every warm child checked.*  Their floor is 0, so the check of
+  forced members searched for it each time, up to the lightest member's weight, where the check asks only whether it is
+  more than the slack.
+* *A child's contraction was a pass over a block for each member it promotes*, 8.6 members a push on average: 17 k
+  cycles where it promotes one number (0.27 a step), about 250 k where it promotes several (0.19 a step, the forced
+  members of a node).
+
+**The change.**  Four parts, each leaving every result the same:
+
+1. *A deletion asked for a set at least as heavy as the need* (`Meet::without_any_size_reaching`).  A warm child's
+   deletions, its first in the parent's problem and the others in its own, search no cycle longer than the set's weight
+   less the need.  Where none is that short, the child's heaviest set is below the need, the child is cut, and its
+   bound is given as the need less 1, an upper bound on it that cuts it as its own would.  Where one is, the search
+   takes the same vertices in the same order as without the need up to the cycle it closes, which is the same: offers
+   at or past the bound are dropped, but none of them is taken before that cycle.
+2. *The loss of the smaller sets within the slack* (`Meet::smaller_loss_within`).  The check of forced members asks
+   whether the smaller sets lose more than the slack, so its search starts from the slack plus 1 where the lightest
+   member weighs more, and takes no key from there on.  A loss found no shorter is kept as the level's floor, which
+   is all it is; a later check that asks about a longer loss searches again.
+3. *A child's contractions a block at a time* (`contract_all`).  The members a child promotes in each block become rows
+   whose pivots, the lowest bit each has once reduced by those before it, no other row has, and each vector of the block
+   is reduced by the rows of the pivots it has, in one pass.  One at a time, each contraction clears its pivot from
+   every vector and sets none cleared before, so the vectors end with no pivot set, each its own plus a combination of
+   the promoted vectors, which is unique.  The rows are reduced against each other, so an element finds the rows it
+   needs in its own vector masked by the pivots, a few word operations, where the pass a block tried on 2026-10-27,
+   which did not pay, tested each row in turn on each element.  Debug builds check every child's vectors and live set
+   against the contractions one at a time.
+4. *The kept member's cycle within its length.*  Strong branching knows the length of the cycle of the member whose
+   level the node keeps (the A* search found it), so `Meet::without`, which finds that cycle again with the fewest arcs,
+   searches no further.
+
+**Results.**  CPU of each build over the one named, paired, every tree the same:
+
+| build | units | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios |
+|---|---|---|---|---|---|
+| parts 1 to 3 over daeade5 | the 24 above | 2 | 0.922 | 0.923 ± 0.7% | 0.895 to 0.961 |
+| the same | 24 others (gaps 500 to 1,300) | 1 | 0.915 | 0.928 ± 0.8% | 0.899 to 0.964 |
+| the same | 21 units of 4995 with its store of 20,000 nogoods, at most 20,000 steps each | 1 | 0.921 | 0.921 ± 0.6% | 0.900 to 0.948 |
+| the build committed over daeade5 | the 24 above | 2 | 0.916 | 0.917 ± 0.7% | 0.886 to 0.944 |
+| the same | 24 others | 1 | 0.911 | 0.918 ± 0.8% | 0.875 to 0.946 |
+| the same | 21 units of 4995 | 1 | 0.912 | 0.912 ± 0.6% | 0.890 to 0.937 |
+
+In the scratch build with parts 1 to 3 a step fell from 1.15 M cycles to 1.06 M.  The first deletions fell from 5.6% of
+a step to 1.8% (78 k cycles a deletion's search against 244 k), the loss of the smaller sets from 3.9% to 2.5% (318 k
+cycles a search against 530 k), and the contractions from 4.5% to 2.8% (132 k cycles where a child promotes several
+numbers).  Game 3000 keeps every counter of `tune` under the default tactics (117,197 steps), the chain's (161,460) and
+conflict branching off (161,460), at 0.975, 0.951 and 0.949 of the CPU (paired, one run each).  Debug builds of `tune`
+solved the roots of 1000 to 1700 under the chain's settings, of 1000 and 1350 with conflict branching off, of 1000 and
+1300 with price reuse and the warm start off too, and six units of 4984 with the store, every check passing.
+
+**Tried and not kept.**
+
+* *The least arc into the member as every vertex's bound in the A* search for forced members*, besides its least arc
+  out: 1.000 of the CPU of parts 1 to 3 (geometric mean 0.996, two runs).  A search that proves a member forced takes
+  the same vertices with it, since it already offered none a distance past the slack less that arc, and the searches
+  that find a cycle took few fewer.
+* *A child's vectors copied and contracted in one pass over the elements*, each reduced as it is copied: 1.010 of the
+  CPU of parts 1 to 3, in a build with part 4 as well (unit ratios 1.002 to 1.018, two runs).  The blocks that a child
+  does not touch, a plain copy before, became a loop with a test an element.
+
+**What is left.**  At 1.06 M cycles a step (parts 1 to 3), the levels nodes keep for themselves take 33%, their
+tableaux restored, derived and split 18% and their searches for forced members 11%; a child's promotion takes 10%, two
+thirds of it where it promotes a node's forced members (282 k cycles each, a peel of each frame they touch); and strong
+branching 12%.
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1478,3 +1582,14 @@ width of 80 words (`w80.patch`) and the build with switches (`sw.patch`, against
 `prof1/` to `prof3/` (the profiles), `pairA/` to `pairD/` (the builds in turn), `pairW/` (the width), `swS1/` to
 `swS3/` (the switches), `final-v6/`, `finalB-v6/` and `p4995-v6/` (the build committed), `p4995-v4/` (a build before
 it on 4995) and `ident-v6/` (game 3000), with the debug runs' output in `debug*.txt`.
+`~/taxman_work/lab/work/step5-2026-10-28/` has the runs of the searches that stop where their checks do (2026-10-28): in
+`tools/` round 4's runners (`solo.sh`, `pair.sh`, `pair4995.sh`, `final.sh`, `dbg.sh`, `dbgunits.sh`, `ident.sh`, with
+`ident_pair.sh` for game 3000 paired) and summaries (`psum3.py`, `psum4.py`, `wsumm.py`, with `praw.py` for single
+counters), the scripts that put round 4's counters on the old build and on the change (`fixprof.py`, `fixprof2.py`,
+`fixprof3.py`, after round 4's `prof.patch`), and the scripts that edited the files (`splice.py` with
+`contract_all.rs.txt`, `reflow.py`, `refill_tail.py`); the scratch builds' sources (`prof-src/` on daeade5, `prof2-src/`
+on parts 1 to 3); the builds (`bin/`); the unit lists (`set24.txt`, `setB.txt`); and a file a solve in `prof1/` and
+`prof2/` (the profiles of the old build and of parts 1 to 3), `pairA/`, `pairAB/` and `p4995-v1/` (parts 1 to 3 over
+daeade5), `pairB/` (the bound of the arc into the member), `pairC/` (the copy and contraction in one pass), `final/`,
+`finalB/` and `p4995-final/` (the build committed), and `ident/` and `ident-pair/` (game 3000, unpaired and paired),
+with the debug runs' output in `debug*.txt`.
