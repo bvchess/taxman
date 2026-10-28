@@ -41,10 +41,16 @@ misses are the *odd* cores of movers with three or more factors.
   checked: the promoted members' slots are freed and dropped from the circuits, a contraction, and for a certified child
   the set is first flipped along its cycle by exchanges, each a pivot that keeps the span.  It derives a node's from a
   copy of its own tableau, saved when it kept the certified level (`Snapshot`), which keeps each element's circuit and
-  whether it is free, not its residue, read only for being zero.  In a block whose span changes, the
-  circuits that hold no member leaving carry over, and the other elements are reduced by the block's new members.  The
-  docs of `Meet` in `src/gf2/meet.rs` ("Deriving a tableau") have the argument, and the random paths of the tests check
-  every derived tableau against the one a solve builds.  The trees are the same.
+  whether it is free.  A derived tableau keeps no residues, which only a solve's pivots read: outside a solve a
+  residue is read only for being zero, which the flag of a free element says.  In a block whose span changes, the
+  circuits that hold no member leaving carry over, and the other elements are reduced by the block's new members.  A
+  child that keeps its parent's heaviest set, whose tableau only loses the promoted members and the elements it
+  dropped, is derived with no marks, exchanges or reductions (`Meet::derive_by_contraction`).  The columns of `A` (the
+  elements outside the set by the members of their circuits, which the split and the searches read) are derived too
+  where the workspace has the source's: the elements no longer live leave them, and those whose circuit changed move
+  (`Meet::derive_columns`).  The docs of `Meet` in `src/gf2/meet.rs` ("Deriving a tableau") have the argument, and the
+  random paths of the tests check every derived tableau, and its columns, against those a solve builds.  The trees
+  are the same.
 * **The heaviest set without a member, with no solve.**  In practice the heaviest set without a member `x` of `I*` is
   `I*` flipped along one cycle through `x` of its exchange graph.  `Meet::without` finds the shortest such cycle by
   Dijkstra's search over the weight split's reduced lengths (below), checks that the flipped set is common independent
@@ -53,10 +59,12 @@ misses are the *odd* cores of movers with three or more factors.
   the cycle's length.  The proof: the symmetric difference of `I*` and any set without `x` splits into cycles and paths
   of the exchange graph, all of non-negative length but the one through `x` (the module comment of `src/gf2/meet.rs`).
   What the smaller sets lose comes from the level's history (a dominant set one smaller), from a floor carried along the
-  path, or from a search for the shortest path between members; what the larger sets lose is the solve's last shortest
-  path.  A child that loses one member of its parent's heaviest set besides those it promotes gets its own the same way,
-  from the parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a hundred
-  members of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's
+  path, or from a search for the shortest path between members; what the larger sets lose (the gap) is the solve's
+  last shortest path, found only where a floor carried along the path does not decide: a child that keeps its parent's
+  heaviest set has the parent's gap as its floor, and a node's level without a member the node's less the cycle's
+  length.  A child that loses one member of its parent's heaviest set besides those it promotes gets its own the same
+  way, from the parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices a
+  hundred members of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its parent's
   heaviest set carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the
   elements it promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle of the
   child's graph is one of the parent's, as long, and a member's shortest cycle at the parent that is still a cycle of
@@ -72,7 +80,8 @@ misses are the *odd* cores of movers with three or more factors.
   in it, through which a cycle is a path that makes a set one larger.  `I*` flipped along that cycle is the heaviest set
   without the member of every size, with no bound needed on what the other sizes lose (the comment of
   `without_any_size` has the proof).  A child's second member is deleted in its own problem, from the tableau of the
-  set so far, derived from the parent's, and its weight split.  The bound is the same, but where several sets weigh
+  set so far, derived from the parent's, and its weight split, which starts from the parent's split and each later
+  one from the one before.  The bound is the same, but where several sets weigh
   the same another may be found, and with it another conflict branched on, so the trees can change ([the root
   gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-warm-starts-by-deletion)
   has the measurements).
@@ -81,10 +90,13 @@ misses are the *odd* cores of movers with three or more factors.
   Frank's: `w = w1 + w2`, with `I*` heaviest in `A` for `w1` and in `B` for `w2`, found from difference constraints by
   Bellman–Ford, each round from the vertices that changed.  It starts from the last split of the same node, or else of
   its parent, wherever the path of predecessors that gave a potential is still a path (`Meet::split_from`), and reaches
-  the same split, the shortest distances.  Where the level's set is the start's less the members promoted since, as in a
-  child that inherits its parent's heaviest set, the arcs among the vertices the start had are the start's: the walks
-  then check only vertices, and a potential whose path holds is the distance among those vertices, so the first round
-  relaxes only the arcs into and out of the others.  Its bound is loose, so for the members it leaves free within the
+  the same split, the shortest distances.  Where the level's tableau derives from the start's (`Meet::repair_from`),
+  `derive` has marked the elements whose circuit, freedom or side changed in each matroid since, and the constraint
+  graph among the others is the start's.  The paths that break are then found from those elements and the ones no
+  longer live, down the forest of the start's predecessors, and only the vertices whose paths broke and the changed
+  elements are pulled along their arcs in and relaxed in the first round.  Elsewhere every vertex's path is walked, and
+  where the set is the start's less the members promoted since, the first round relaxes only the arcs into and out of
+  the vertices whose paths broke.  Its bound is loose, so for the members it leaves free within the
   tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too when
   no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
   (`Meet::has_cycle_within`).  With the window `all` the searches find every member forced that the split's bound shows

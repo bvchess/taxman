@@ -736,9 +736,10 @@ struct Level<const W: usize, const R: usize> {
     bounds: bool,
     pot: Vec<i64>,
     has_pot: bool,
-    /// A lower bound on what the common independent sets smaller than the heaviest set (of all sizes) lose against
-    /// it (0 if nothing more is known; see [`Losses`]).
+    /// Lower bounds on what the common independent sets smaller than the heaviest set (of all sizes) lose against it,
+    /// and on what those larger lose (0 if nothing more is known; see [`Losses`]).
     loss_floor: i64,
+    gap_floor: i64,
     /// The workspace's solve count when this level was last solved, unchanged since (0 for none): if the workspace
     /// has made no solve since, it still holds the level's tableau.
     meet_solve: u64,
@@ -801,6 +802,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             pot: vec![0; n],
             has_pot: false,
             loss_floor: 0,
+            gap_floor: 0,
             meet_solve: 0,
             source: Source::default(),
             added: Bits::EMPTY,
@@ -817,6 +819,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         }
         self.meet_solve = other.meet_solve;
         self.loss_floor = other.loss_floor;
+        self.gap_floor = other.gap_floor;
         self.history.clone_from(&other.history);
         self.solved = other.solved;
         self.cap = other.cap;
@@ -838,12 +841,18 @@ impl<const W: usize, const R: usize> Level<W, R> {
         for m in 0..2 {
             self.vec[m].copy_from_slice(&other.vec[m]);
         }
+        self.copy_from_but_vectors(other);
+    }
+
+    /// [`copy_from`](Self::copy_from) but for the vectors, which stay as they were.
+    fn copy_from_but_vectors(&mut self, other: &Self) {
         self.live = other.live;
         self.history.clear();
         self.solved = false;
         self.settled = false;
         self.has_split = false;
         self.has_pot = false;
+        self.gap_floor = 0;
         self.meet_solve = 0;
         self.source.clear();
         self.added = other.added;
@@ -875,9 +884,10 @@ struct Levels<'g, const W: usize, const R: usize> {
     start_idx: Vec<u32>,
     contracted_idx: Vec<u32>,
     /// The tactic `warm_start`: a child whose parent's heaviest set lost members it dropped starts from that set
-    /// ([`warm_child`]); and its scratch, a weight split.
+    /// ([`warm_child`]); and its scratch, a weight split and its start for the next.
     warm: bool,
     warm_pot: Vec<i64>,
+    warm_split: SplitStart,
     /// Scratch of [`force_by_cycles`](Self::force_by_cycles): the least length of an arc into each member.
     closing: Vec<i64>,
     stats: Gf2Stats,
@@ -926,6 +936,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             contracted_idx: Vec::with_capacity(n),
             warm: false,
             warm_pot: vec![0; n],
+            warm_split: SplitStart::default(),
             closing: vec![0; n],
             stats: Gf2Stats::default(),
             force_window: ForceWindow::default(),
@@ -970,6 +981,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.settled = false;
         level.has_split = false;
         level.has_pot = false;
+        level.gap_floor = 0;
         level.meet_solve = 0;
         level.source.clear();
         level.added = Bits::EMPTY;
@@ -1031,14 +1043,27 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             child.settled = true;
             child.cap = parent.cap.saturating_sub(added.len() as usize);
             child.value = parent.value - added.sum();
-            // The child's smaller sets, with the promoted, are smaller sets of the parent's.
+            // The child's smaller and larger sets, with the promoted, are smaller and larger sets of the parent's.
             child.loss_floor = parent.loss_floor;
+            child.gap_floor = parent.gap_floor;
             (child.source.held, child.source.contracted) = (held, *added);
             self.stats.inherited += 1;
         } else if self.warm {
             let scratch = (&mut self.live_idx, &mut self.start_idx, &mut self.contracted_idx, &mut self.warm_pot);
-            let warm =
-                warm_child(self.graph, &lower[d], parent, child, added, &mut self.meet, scratch, &mut self.stats);
+            // The parent's split, where it is its node's last, for the splits on the way to start from.
+            let start = self.starts.get(d).filter(|start| start.1 == self.nodes[d]).map(|start| &start.0);
+            let splits = (start, &mut self.warm_split);
+            let warm = warm_child(
+                self.graph,
+                &lower[d],
+                parent,
+                child,
+                added,
+                &mut self.meet,
+                scratch,
+                splits,
+                &mut self.stats,
+            );
             if let Some(contracted) = warm {
                 (child.source.held, child.source.contracted) = (self.meet.solves, contracted);
                 self.stats.warm_children += 1;
@@ -1065,7 +1090,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn remove_candidate(&mut self, x: u32) {
         self.prior_for = Some((self.depth, x));
         if self.kept_for.take() == Some((self.depth, x)) {
+            // The level without x has the level's vectors (x is deleted, not promoted); the level before, kept aside
+            // for the child that promotes x, is read for its sets alone.
             std::mem::swap(&mut self.levels[self.depth], &mut self.kept);
+            std::mem::swap(&mut self.levels[self.depth].vec, &mut self.kept.vec);
             std::mem::swap(&mut self.kept, &mut self.prior);
             return;
         }
@@ -1222,7 +1250,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             weight: &graph.weight,
         };
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
-        if !losses.certify(slack + 1, &mut self.meet, &problem, &level.pot) {
+        let certified = losses.certify(slack + 1, &mut self.meet, &problem, &level.pot);
+        level.gap_floor = losses.gap_floor(level.gap_floor);
+        if !certified {
             return false;
         }
         level.loss_floor = losses.smaller;
@@ -1392,7 +1422,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         };
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
-        let reach = losses.reach(&last);
+        let reach = losses.reach(&last, &mut self.meet, &problem);
         self.certified.clear();
         if self.priced.len() <= d {
             self.priced.resize_with(d + 1, Priced::default);
@@ -1463,6 +1493,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             out.push(bound);
         }
         level.loss_floor = losses.smaller;
+        level.gap_floor = losses.gap_floor(level.gap_floor);
         self.stats.certified += out.iter().filter(|b| b.is_some()).count() as u64;
     }
 
@@ -1492,8 +1523,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn keep_certified(&mut self, x: u32) {
         let &(_, set, value, delta) = self.certified.iter().find(|c| c.0 == x).expect("a certified bound without x");
         let level = &self.levels[self.depth];
+        // The kept level's vectors are the level's, which it takes when it becomes the level (`remove_candidate`).
         let kept = &mut self.kept;
-        kept.copy_from(level);
+        kept.copy_from_but_vectors(level);
         kept.live.remove(x);
         // The level's dominant sets without x stay dominant without it; the heaviest set without x ends them.
         kept.history.extend(level.history.iter().filter(|h| !h.contains(x) && h.len() < set.len()));
@@ -1502,8 +1534,9 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         kept.settled = true;
         kept.cap = level.cap;
         kept.value = value;
-        // Without x the smaller sets weigh no more than with it.
+        // Without x the smaller and the larger sets weigh no more than with it.
         kept.loss_floor = (level.loss_floor - delta).max(0);
+        kept.gap_floor = (level.gap_floor - delta).max(0);
         // The level's tableau, which the workspace holds (it certified the set), is the one to derive the kept
         // level's from (the set flipped along the cycle, x deleted), copied because the child's subtree will use
         // the workspace before the level goes on without x.
@@ -1632,6 +1665,7 @@ fn solve<const W: usize, const R: usize>(
     level.cap = cap;
     level.value = meet.value as u64;
     level.loss_floor = Losses::from_history(level).unwrap_or(0);
+    level.gap_floor = 0;
     level.has_split = false;
     level.has_pot = false;
 }
@@ -1670,7 +1704,7 @@ fn certify_child<const W: usize, const R: usize>(
     let mut losses = Losses::of(parent, meet, &problem, true);
     banned.clear();
     banned.extend((*added | (parent.live - last - child.live)).iter().map(|y| graph.index[y as usize]));
-    let reach = losses.reach(&last);
+    let reach = losses.reach(&last, meet, &problem);
     let Some(value) = meet.without(&problem, &parent.pot, graph.index[x as usize], reach, banned) else {
         return false;
     };
@@ -1701,7 +1735,9 @@ fn certify_child<const W: usize, const R: usize>(
 /// promoted and the elements dropped outside `I` banned; each other one, if still a member, in the child's problem with
 /// the members left to delete, from the tableau of the set so far, derived from the one before ([`Meet::derive`]), and
 /// its weight split (every set so far is a heaviest of all sizes of its problem, which the split's existence shows
-/// again).  Then the child is solved: its heaviest set the last one, less the promoted.  Returns what the child's
+/// again; each split starts from the one before, the first from `start`, the parent's split if it has one, see
+/// [`Meet::split_from`]).  Then the child is solved: its heaviest set the last one, less the promoted.  Returns what
+/// the child's
 /// tableau, derived from the one the workspace holds, contracts: `added` if that is the parent's, nothing if it is the
 /// last one derived; or `None` (nothing found, the child left as it was, and the workspace possibly holding another
 /// tableau than the parent's).  `vectors` is a level with the parent's vectors (`parent` may be a copy of its sets
@@ -1715,6 +1751,7 @@ fn warm_child<const W: usize, const R: usize>(
     added: &Bits<W>,
     meet: &mut Meet<R>,
     (banned, live, start, pot): (&mut Vec<u32>, &mut Vec<u32>, &mut Vec<u32>, &mut Vec<i64>),
+    (parent_split, split): (Option<&SplitStart>, &mut SplitStart),
     stats: &mut Gf2Stats,
 ) -> Option<Bits<W>> {
     if !(parent.solved && parent.settled && parent.has_pot && parent.meet_solve == meet.solves) {
@@ -1737,6 +1774,7 @@ fn warm_child<const W: usize, const R: usize>(
     let mut value = value - added.sum() as i64;
     let mut contract = Some(*added);
     let child_problem = child.problem(graph);
+    let mut own_split = false;
     loop {
         // A member left out that a flip took out of the set is deleted with nothing to do.
         missing &= set;
@@ -1748,9 +1786,12 @@ fn warm_child<const W: usize, const R: usize>(
         banned.clear();
         banned.extend(contract.take().unwrap_or(Bits::EMPTY).iter().map(index));
         meet.derive(&child_problem, live, start, banned);
-        if !meet.split_from(&child_problem, live, None, None) {
+        let from = if own_split { Some(&*split) } else { parent_split };
+        if !meet.split_from(&child_problem, live, from, None) {
             return None;
         }
+        meet.save_split(split);
+        own_split = true;
         pot.copy_from_slice(meet.potentials());
         missing.remove(x);
         value = meet.without_any_size(&child_problem, pot, index(x), &[])?;
@@ -1812,6 +1853,7 @@ fn warm_delete<const W: usize, const R: usize>(
     level.history.push(set);
     level.value = value as u64;
     level.loss_floor = 0;
+    level.gap_floor = 0;
     level.has_split = false;
     level.has_pot = false;
     // The workspace's tableau, of the level before, is the one to derive the level's from (its set flipped, `x`
@@ -1827,11 +1869,18 @@ fn warm_delete<const W: usize, const R: usize>(
 /// What the common independent sets of other sizes than a level's heaviest set (of all sizes, its tableau the
 /// workspace's) lose against it at least, which certifies a set read off its exchange graph as the heaviest without
 /// a member if the set loses no more (see `meet`'s module docs): the smaller ones `smaller` (exact once `exact`),
-/// the larger ones `larger` (`i64::MAX` where they do not count).
+/// the larger ones `larger` (exact, the gap of [`Meet::gap`], once `larger_exact`; `i64::MAX` where they do not count).
+///
+/// What the larger sets lose starts from the level's floor where the workspace has not found the gap yet, and the gap
+/// is found only where the floor decides nothing.  A child that keeps its parent's heaviest set has a floor of the
+/// parent's gap, since its larger sets, with the promoted, are larger sets of the parent's; the level a node keeps
+/// for itself without a member, of the node's gap less the length of the cycle that certified it, since its larger
+/// sets are the node's without the member, and its heaviest set weighs that much less than the node's.
 struct Losses {
     smaller: i64,
     exact: bool,
     larger: i64,
+    larger_exact: bool,
 }
 
 impl Losses {
@@ -1850,17 +1899,53 @@ impl Losses {
         larger: bool,
     ) -> Self {
         let exact = Self::from_history(level);
+        let (larger, larger_exact) = if !larger {
+            (i64::MAX, true)
+        } else if level.gap_floor > 0 && !meet.knows_gap() {
+            (level.gap_floor, false)
+        } else {
+            (meet.gap(problem), true)
+        };
+        debug_assert!(!larger_exact || larger == i64::MAX || level.gap_floor <= larger, "a floor of the gap above it");
+        debug_assert!(larger_exact || level.gap_floor <= meet.gap(problem), "a floor of the gap above it");
         Losses {
             smaller: exact.unwrap_or(level.loss_floor).max(level.loss_floor),
             exact: exact.is_some(),
-            larger: if larger { meet.gap(problem) } else { i64::MAX },
+            larger,
+            larger_exact,
+        }
+    }
+
+    /// Whether the larger sets lose at least `delta`: the floor first, the gap where it does not decide.
+    fn larger_at_least<const R: usize>(&mut self, delta: i64, meet: &mut Meet<R>, problem: &Problem<'_, R>) -> bool {
+        if delta > self.larger && !self.larger_exact {
+            self.larger = meet.gap(problem);
+            self.larger_exact = true;
+        }
+        delta <= self.larger
+    }
+
+    /// What the level's floor of the gap becomes: the gap if it was found, else `floor`.
+    fn gap_floor(&self, floor: i64) -> i64 {
+        if self.larger_exact && self.larger != i64::MAX {
+            self.larger
+        } else {
+            floor
         }
     }
 
     /// The longest cycle that can certify: no longer than what the larger sets lose, nor than the smallest member
-    /// of the heaviest set `last`, which is all that the heaviest set less it loses.
-    fn reach<const W: usize>(&self, last: &Bits<W>) -> i64 {
-        self.larger.min(last.min().map_or(0, i64::from))
+    /// of the heaviest set `last`, which is all that the heaviest set less it loses.  The gap is found only where the
+    /// floor is below that member.
+    fn reach<const W: usize, const R: usize>(
+        &mut self,
+        last: &Bits<W>,
+        meet: &mut Meet<R>,
+        problem: &Problem<'_, R>,
+    ) -> i64 {
+        let least = last.min().map_or(0, i64::from);
+        self.larger_at_least(least, meet, problem);
+        self.larger.min(least)
     }
 
     /// Whether a set that loses `delta` against the heaviest set is the heaviest of its kind; if the bound on the
@@ -1873,7 +1958,7 @@ impl Losses {
         problem: &Problem<'_, R>,
         pot: &[i64],
     ) -> bool {
-        if delta > self.larger {
+        if !self.larger_at_least(delta, meet, problem) {
             return false;
         }
         if delta > self.smaller && !self.exact {

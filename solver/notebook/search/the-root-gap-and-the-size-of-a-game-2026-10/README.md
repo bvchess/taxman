@@ -1078,6 +1078,126 @@ against B on the same units.
 * No unit's best differs between the settings.  The controls, gate 2400 on 4992 and gate 1200 below its gate on 4995,
   took 0.97 to 1.02 of B's CPU on the same trees, so the CPU ratios are good to a few percent.
 
+## 2026-10-27: splits started from what changed, and tableaux derived with less
+
+**Question.**  After the A* search, the weight splits and the tableaux made again took 30% of a step of 4984.  Can
+they be made cheaper with the same trees, by 7% of the CPU?  **Answer.**  By 7% under the chain's setting from game
+4995 on (conflict branching on at gate 1,200) and by 6% with conflict branching off: a split started from what the
+derivation of its tableau marked changed, columns of A and tableaux derived with less, the gap carried down as a floor,
+and no residues in derived tableaux.  Every tree and counter is the same.  The counters of the scratch builds overstated
+what each change would save, two to three times: on this machine a step waits on memory, and the cost the counters give
+one part moves to the others when it goes.
+
+**Method.**  The 24 units of the sections above, under the chain's settings of 2026-10-27 (conflict branching off,
+price reuse, the warm start, the store of 144 units of 4983), 127,434 steps in all.  Scratch builds with cycle counters
+by part of a step and by kind of level (`prof1` on 29aa8ba, `prof2` and `prof3` on the changes), each change then
+paired against the old build as in the sections above: the two builds solve each unit at once on the two hyperthreads
+of one core, two runs with the hyperthreads swapped.  A core's second-level cache, 256 KB, is shared by its two
+hyperthreads and holds less than the workspace, the levels' vectors and the copies of a step.
+
+**Where the time goes.**  At 29aa8ba, 1.45 M cycles a step (counters; the parts overlap):
+
+| part | share of a step |
+|---|---|
+| the levels nodes keep for themselves: their checks | 29.5% |
+| of which the weight split (the tableau restored and derived 6.2%, the columns 3.5%, Bellman–Ford 6.6%) | 16.7% |
+| of which the searches for forced members and the losses | 12.5% |
+| the children that keep their parent's heaviest set: their checks | 14.1% |
+| of which the weight split (the tableau derived 3.2%, the columns 3.9%, Bellman–Ford 3.0%) | 10.5% |
+| the warm children: their checks, and their warm starts | 11.8%, 8.1% |
+| the child's vectors copied and contracted | 6.6% |
+| the child made (the promotion, the nogoods, the symmetry) | 11.3% |
+| strong branching | 12.2% |
+
+Three findings decided the change:
+
+* *Every split is read.*  Each of the levels' 99,079 splits was used by the searches, strong branching or a warm start,
+  so none can be left until asked for.
+* *The start of a split costs more than its rounds.*  Of the 121 k cycles of a split at a child that keeps its parent's
+  heaviest set, the walk that checks which of the start's potentials still hold (every vertex's path of predecessors)
+  took 89 k and the rounds 1.6 k.  At a level a node keeps for itself, the walk took 129 k and the rounds 166 k: the
+  flip along the certified cycle adds arcs, so the first round relaxed every vertex.
+* *The columns of A are built again at every split*, 120 to 160 k cycles, though a child's are its parent's less a few
+  elements.
+
+**The change.**  Seven parts, each leaving every result the same:
+
+1. *A split from what changed* (`Meet::repair_from`).  `Meet::derive` marks, in each matroid, the elements whose
+   circuit, freedom or side it changes, and keeps the tableaux the workspace's derives from.  A split found on one of
+   those starts the next: only an arc into an element changed in A, or out of one changed in B, can be new, so the
+   paths of predecessors that break are found from the changed elements and the ones no longer live, down the forest
+   of the start's predecessors (a counting sort, made when first asked for).  Only the vertices whose paths broke and
+   the changed elements are pulled along their arcs in and relaxed in the first round.  Bellman–Ford reaches the same
+   split from any potentials that are lengths of paths, and debug builds check every split against the one from
+   scratch.  Bellman–Ford's predecessors form a forest, since a cycle of them would be a negative cycle (Cormen et al.,
+   Lemma 24.16), and debug builds check that too.
+2. *A warm child's splits on the way to its set* start from its parent's split, and each later one from the one before.
+3. *Columns of A derived* (`Meet::derive_columns`).  Where the workspace has the source tableau's columns, a derived
+   tableau drops the elements no longer live from them and empties the columns of the members gone.  Where elements
+   changed, it also drops the changed ones, empties the column of each member that came in, and pushes each changed
+   element into the columns of its new circuit.  Debug builds check them against columns built.
+4. *A derivation by contraction* (`Meet::derive_by_contraction`): a child that keeps its parent's heaviest set loses
+   only the promoted members and the elements it dropped, so its tableau is made with no marks, exchanges or reductions.
+5. *The gap as a floor.*  What the larger sets lose is carried down as what the smaller sets lose is: a child that keeps
+   its parent's heaviest set has the parent's gap as its floor (its larger sets, with the promoted, are the parent's),
+   and a node's level without a member the node's gap less the cycle's length.  The gap is found only where the floor
+   does not decide.
+6. *No residues in derived tableaux.*  Outside a solve a residue is read only for being zero, which the flag of a free
+   element already says, so a derived or restored tableau writes only the flags.
+7. *The vectors of the level a node keeps for itself* are the node's, which it takes when it becomes the level, with no
+   copy.
+
+**Results.**  The build committed paired against 29aa8ba, one run a unit; every unit took the same steps and best:
+
+| units, setting | total CPU | geometric mean of the units' ratios | the units' ratios |
+|---|---|---|---|
+| the 24 above, conflict branching on at gate 1,200 (from 4995) | 0.927 | 0.930 ± 0.6% | 0.910 to 0.968 |
+| the 24 above, conflict branching off | 0.941 | 0.930 ± 0.7% | 0.907 to 0.963 |
+| 24 others (gaps 500 to 1,300), conflict branching on at gate 1,200 | 0.932 | 0.944 ± 0.8% | 0.917 to 0.984 |
+| 24 others, conflict branching off | 0.930 | 0.936 ± 0.7% | 0.915 to 0.978 |
+
+Game 3000 keeps every counter of `tune` under the default tactics and under the chain's settings.  Before the fault
+below was fixed, two runs a unit on the 24 units gave 0.930 with conflict branching on and 0.944 with it off.  On the
+way, with conflict branching off: the first part with the second (the split from what changed) took 0.986 of the CPU;
+with the third, the fifth and one pass fewer of the derivation, 0.960.  Against that build, the seventh with columns
+kept in a tableau's copy took 1.004, and the fourth with both 0.995; the final build leaves the columns out of the
+copies and adds the sixth.
+
+**A fault the tests found.**  The first version of the derived columns emptied only the columns of the slots no member
+held.  Where a block's span changes, a member that comes in takes the first free slot, which can be one that a member
+contracted in the same derivation left (a warm child's derivation both contracts and flips).  That column kept the
+elements of the old member's circuit, whose circuits had lost it, so the columns held arcs the exchange graph does not
+have.  The release runs had not shown it, every tree the same on 48 units and game 3000; the check of debug builds
+did, in the quick check and at game 1000's root under the chain's settings.  The fix empties the column of every member
+that came in; debug builds of `tune` then solved the roots of 1000 to 1700 under the chain's settings, the default
+tactics and conflict branching with the warm start, every check passed.  The same quick check found the check itself
+built its columns from the lists of the tableau before (it ran before the derivation remade them), that a restored
+tableau was still marked as keeping its residues, and that the check of a free element's flag against its residue
+read elements no longer live, whose residues a solve leaves stale, where a walk of predecessors asks about them (its
+answer for such an element is not used).  The checks are fixed, the columns compared as sets, since their order
+decides only which of equal offers a search takes first; the flags of the live elements were right.
+
+**Tried and not kept.**
+
+* *Columns of A as bits*, the circuits' masks transposed 64 by 64: 1.062 of the CPU.  A column read became a scan of
+  its words, and the transposition alone costs 57 k cycles against 72 k for the lists (a microbenchmark, caches warm).
+* *The first version of the split from what changed*, its forest found with a search for vertices that no root
+  reaches, its marks in one array for both matroids: 1.004 of the CPU of the build without it.  The forest cost 130 k
+  cycles a split; the counting sort that replaced it, 16 k in a microbenchmark and 53 k in the search.
+* *The contraction of a child's members in one pass a block*: its share of a step stayed at 4.7%.
+* *A lower bound on what the smaller sets lose* (a member alone, or a member's least arc out and another's least arc
+  in) certified 411 of the 12,544 searches for it at warm children.
+* *Columns kept in a tableau's copy*, for the level a node keeps for itself: 1.004 of the CPU, with the seventh part.
+* *The path's vectors kept once*, the top level's, contracted in place with a log of what changed and put back at a
+  pop, instead of a copy a child: 1.014 of the CPU of the final build.
+
+**What is left.**  In the scratch build `prof3` (1.35 M cycles a step), the levels nodes keep for themselves take 28.8%,
+their searches for forced members 9.1% and their tableaux restored and derived 7.4%; the GF(2) levels pushed 16.2%; the
+child made 12.1%; and the searches of the exchange graph 28% together (forced members 11.3%, strong branching 8.3%,
+warm starts 5.0%, the smaller sets' loss 3.6%).
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## 2026-10-28: what the store costs a step
 
 **Question.**  On units of game 4995 a step with the store of 20,000 nogoods cost 18% more than one without a store, and
@@ -1229,6 +1349,17 @@ folder a game: the live checkpoint the units were cut from (`nNNNN-live.ckpt`) a
 build of `tune`, the runner (`run.sh SETFILE SAMPLEFILE OUTDIR NODELIMIT`, resumable), the settings (`settings.txt`),
 the unit ids (`sample.txt`, and `sample2.txt` for 4991's second batch), a file a solve in `out/`, and `analyze.py` with
 its output, `analysis.txt`; `patch4995/` has the unit picker (`pick.py`) and `notes.txt` too.
+`~/taxman_work/lab/work/step3-2026-10-27/` has the runs of the splits started from what changed: in `tools/` the runner
+of one build (`solo.sh`, `one.sh`), the paired runner (`pair.sh`, with `EXTRA` for other tactics) and its summary
+(`wsumm.py`), game 3000's runs (`ident.sh`), the counters' summaries (`psum.py`, `psum2.py`, `psum3.py`) and the scripts
+that made each version (`edit_*.py`, the counters `prof2_apply.py` and `prof3_apply.py`); the counters' module
+(`prof.rs`) and first patch (`prof.patch`, on 29aa8ba); each version's patch (`real-*.patch`); the microbenchmarks of
+the columns and of the forest (`mb/`); the unit lists (`set24.txt`, `setB.txt`); and a file a solve in `prof1/` to
+`prof3/` (the profiles), `pair1/` to `pair11/` (the versions paired, in the order they were built),
+`pairB/`, `pairC/` and `pairBC/` (that version on the other units and with conflict branching on) and `ident-v7/`
+(game 3000); and, after the fault the tests found, the quick check's log (`qc/`), the runner of a debug build on games'
+roots (`tools/dbg.sh`), and the runs of the build committed (`tools/recheck.sh`: `fixC/`, `fixO/`, `fixBC/`, `fixBO/`
+and `ident-fix/`).
 `~/taxman_work/lab/work/store-2026-10-27/` has the runs of what the store costs a step (2026-10-28): in `tools/` the
 runner of one build (`solo.sh`), the paired runners (`pair.sh` with one store, `pair2.sh` with a store and a switch a
 side), the summaries (`profsum.py`, `percall.py` and `perunit.py` for the counters, `pairsum.py` for the pairs,

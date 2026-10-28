@@ -142,12 +142,19 @@ fn bound_without(value: i64, (w1, w2): (i64, i64), repl: [i64; 2]) -> i64 {
 }
 
 /// Whether the live element `i` is free in matroid `m` of the workspace `meet`'s tableau (its residue is not zero):
-/// the flag kept with the residue, checked against it in debug builds.  A macro, so that it reads the two fields alone
-/// while others are borrowed.
+/// the flag kept with the residue, checked against it in debug builds where the tableau keeps its residues (a solve's;
+/// see `residues` in [`Meet`]) and the element is live there (a solve writes the residues of its live elements alone).
+/// A macro, so that it reads the fields alone while others are borrowed.
 macro_rules! free {
     ($meet:expr, $m:expr, $i:expr) => {{
         let (m, i): (usize, usize) = ($m, $i);
-        debug_assert_eq!($meet.free[m][i], !is_zero(&$meet.res[m][i]), "the flag of element {} in matroid {}", i, m);
+        #[cfg(debug_assertions)]
+        assert!(
+            !$meet.residues || $meet.listed[i] != $meet.tableau || $meet.free[m][i] == !is_zero(&$meet.res[m][i]),
+            "the flag of element {} in matroid {}",
+            i,
+            m
+        );
         $meet.free[m][i]
     }};
 }
@@ -229,6 +236,9 @@ const HOPS: i64 = 1 << 16;
 const INF: Dist = i64::MAX;
 const NONE: u32 = u32::MAX;
 const NO_SLOT: u16 = u16::MAX;
+/// The most tableaux a workspace's lineage holds ([`Meet::repair_from`]): a split found on an older one starts the next
+/// from scratch.
+const LINEAGE: usize = 64;
 /// The heap entry of [`Meet::without`] that stands for the next element free in A.
 const FREE_A: u32 = u32::MAX - 1;
 /// The vertices of [`Meet::without_any_size`]'s search that stand for no element: one outside the set that is free in
@@ -270,8 +280,8 @@ const HUB_MEMBER: u32 = IN_DUMMY;
 /// * Where the span of a block changes (an element that enters is free, or the numbers that enter and leave
 ///   differ), an element whose circuit holds no member that leaves keeps it: the circuit lies in the new set.  The
 ///   others outside the new set, free ones included, are reduced by its members, which costs a reduction each
-///   instead of a pivot per member over the whole block.  (The residues of a derived tableau are read only for
-///   being zero, so a reduction's will do.)
+///   instead of a pivot per member over the whole block.  (A residue outside a solve is read only for being zero,
+///   so a derived tableau keeps only whether each element is free, `free`, and not its residue.)
 /// * Contracting by members `C` of the set `S` (promoting them): an element is in the span of `S − C` in the
 ///   contraction exactly when it is in the span of `S`, and its circuit there is its circuit with respect to `S`
 ///   less `C` (the vectors reduced modulo those of `C`).  So the circuits carry over without the slots of `C`.
@@ -285,8 +295,17 @@ const HUB_MEMBER: u32 = IN_DUMMY;
 pub struct Meet<const R: usize> {
     mask: [Vec<Vector<R>>; 2],
     res: [Vec<Vector<R>>; 2],
+    /// Whether `res` holds the tableau's residues: after a solve, whose pivots need them, and not after a
+    /// [`derive`](Self::derive), whose tableau keeps only whether each element is free (`free`), all that is read of
+    /// a residue outside a solve.
+    residues: bool,
+    /// In debug builds, the tableau whose lists last held each element ([`lists`](Self::lists)), for the check of
+    /// `free!`: the residue and flag of an element no longer live are stale.
+    #[cfg(debug_assertions)]
+    listed: Vec<u64>,
     /// Whether each live element's residue is not zero (it is free: `I + e` is independent there), kept with `res`
-    /// wherever a residue is written, so that the searches read a byte instead of a vector (the macro `free!`).
+    /// wherever a solve writes a residue, and alone in a derived tableau, so that the searches read a byte instead of
+    /// a vector (the macro `free!`).
     free: [Vec<bool>; 2],
     /// The slot of each member of the tableau's set, [`NO_SLOT`] for the others.
     slot: [Vec<u16>; 2],
@@ -401,6 +420,14 @@ pub struct Meet<const R: usize> {
     /// Counters of [`without`](Self::without): calls, and those it certified.
     pub withouts: u64,
     pub withouts_exact: u64,
+    /// Per matroid, the tableau at which each element last changed its circuit or whether it is free there, or its
+    /// side of the set (0 for none since the tableau was restored from a copy), and the tableaux the workspace's
+    /// derives from by [`derive`](Self::derive), oldest first and itself last, for which those marks hold: a split
+    /// found on one of them starts the next from what changed since ([`repair_from`](Self::repair_from)).
+    changed_at: [Vec<u64>; 2],
+    /// [`repair_from`](Self::repair_from)'s elements changed in B.
+    relaxed: Vec<u32>,
+    lineage: Vec<u64>,
     /// [`derive`](Self::derive)'s scratch: marks by element, the elements that enter and leave a block, the live
     /// elements the tableau derived from did not have, and per matroid and block those whose circuits it does not
     /// give where the span changes.
@@ -409,6 +436,9 @@ pub struct Meet<const R: usize> {
     incoming: Vec<u32>,
     leaving: Vec<u32>,
     fresh: Vec<u32>,
+    /// The elements of the tableau derived from that are no longer live, outside its set and in the span of A there
+    /// (in some of its columns).
+    dropped: Vec<u32>,
     unsure: [Vec<Vec<u32>>; 2],
     /// Counters: tableaux derived (of which from a snapshot), blocks built in them, and blocks where elements were
     /// reduced.
@@ -579,6 +609,95 @@ pub struct SplitStart {
     role: Vec<u8>,
     members: usize,
     saved: bool,
+    /// The tableau the split was found on, and the forest of its predecessors ([`Tree`]) once `built`, when first
+    /// asked for.
+    tableau: u64,
+    tree: std::cell::RefCell<Tree>,
+    built: std::cell::Cell<bool>,
+}
+
+impl SplitStart {
+    /// The forest of the split's predecessors ([`Tree`]), made when first asked for.
+    fn tree(&self) -> std::cell::Ref<'_, Tree> {
+        if !self.built.get() {
+            self.tree.borrow_mut().build(&self.pred, &self.role);
+            self.built.set(true);
+        }
+        self.tree.borrow()
+    }
+}
+
+/// The predecessors of a split ([`SplitStart`]) as a forest over its live elements and the zero node (the last vertex):
+/// the children of each vertex, those whose predecessor it is, from `first[v]` to `first[v + 1]` in `children`.
+///
+/// They form a forest, its roots the vertices with no predecessor.  Throughout a split's Bellman–Ford, each vertex `v`
+/// with a predecessor `u` has a potential of at least `u`'s plus the length of the arc `u → v`: an equality when the
+/// predecessor is set (from a relaxation or a pull, or taken over with both potentials from a start, where it held with
+/// equality since that split had converged), and potentials only fall.  So when a relaxation closed a cycle of
+/// predecessors, it lowered its vertex strictly below its new predecessor's potential plus the arc, and adding the
+/// other arcs of the cycle, each at most the difference of its ends' potentials, makes the cycle's length negative
+/// (Cormen et al., *Introduction to Algorithms*, Lemma 24.16); and a split is kept only where Bellman–Ford converged,
+/// which no negative cycle allows.
+#[derive(Clone, Default)]
+struct Tree {
+    first: Vec<u32>,
+    children: Vec<u32>,
+    /// Scratch: where the next child of each vertex goes.
+    at: Vec<u32>,
+}
+
+impl Tree {
+    /// The forest of the predecessors `pred` of the vertices that `role` marks live and of the zero node, by a
+    /// counting sort.
+    fn build(&mut self, pred: &[u32], role: &[u8]) {
+        let count = pred.len();
+        let zero = count - 1;
+        let parent = |v: usize| if v == zero || role[v] != 0 { pred[v] } else { NONE };
+        self.first.clear();
+        self.first.resize(count + 1, 0);
+        for v in 0..count {
+            let q = parent(v);
+            if q != NONE {
+                self.first[q as usize + 1] += 1;
+            }
+        }
+        let mut sum = 0;
+        for first in &mut self.first {
+            sum += *first;
+            *first = sum;
+        }
+        self.at.clear();
+        self.at.extend_from_slice(&self.first[..count]);
+        self.children.clear();
+        self.children.resize(self.first[count] as usize, 0);
+        for v in 0..count {
+            let q = parent(v);
+            if q != NONE {
+                let k = &mut self.at[q as usize];
+                self.children[*k as usize] = v as u32;
+                *k += 1;
+            }
+        }
+        #[cfg(debug_assertions)]
+        {
+            // Every vertex hangs from a root: no cycle of predecessors (see the docs).
+            let mut stack: Vec<usize> =
+                (0..count).filter(|&v| (v == zero || role[v] != 0) && pred[v] == NONE).collect();
+            let mut reached = 0;
+            while let Some(v) = stack.pop() {
+                reached += 1;
+                stack.extend(self.children_of(v).iter().map(|&c| c as usize));
+            }
+            let counted = (0..count).filter(|&v| v == zero || role[v] != 0).count();
+            assert_eq!(reached, counted, "a cycle of a split's predecessors");
+        }
+    }
+
+    /// The children of the vertex `v`.
+    #[inline]
+    fn children_of(&self, v: usize) -> &[u32] {
+        &self.children[self.first[v] as usize..self.first[v + 1] as usize]
+    }
 }
 
 /// Cycles of exchange graphs, each its elements in the order of its arcs (from each to the next, and from the last to
@@ -614,8 +733,7 @@ impl Cycles {
 /// A copy of a workspace's tableau ([`Meet::save`]) to derive another from later ([`Meet::derive_from`]): per
 /// matroid, the elements by block (the blocks' ends in `ends`), each with [`SNAP_FREE`] set where it is free, their
 /// masks, and the members of each block in slot order (their ends in `slot_ends`).  The residues are not kept: a
-/// derived tableau's are read only for being zero (see "Deriving a tableau" in the docs of [`Meet`]), so a free
-/// element's comes back as [`free_residue`].
+/// derived tableau keeps only whether each element is free (see "Deriving a tableau" in the docs of [`Meet`]).
 #[derive(Clone, Default)]
 pub struct Snapshot<const R: usize> {
     elems: [Vec<u32>; 2],
@@ -623,17 +741,12 @@ pub struct Snapshot<const R: usize> {
     masks: [Vec<Vector<R>>; 2],
     slots: [Vec<u32>; 2],
     slot_ends: [Vec<usize>; 2],
+    /// The tableau saved.
+    tableau: u64,
 }
 
 /// The bit of an element of a [`Snapshot`] that marks it free.
 const SNAP_FREE: u32 = 1 << 31;
-
-/// The residue that a free element of a tableau restored from a [`Snapshot`] is given: any that is not zero.
-const fn free_residue<const R: usize>() -> Vector<R> {
-    let mut v = [0; R];
-    v[0] = 1;
-    v
-}
 
 impl<const R: usize> Meet<R> {
     /// A workspace for problems of `n` elements and `blocks` blocks in each matroid.
@@ -641,6 +754,9 @@ impl<const R: usize> Meet<R> {
         Meet {
             mask: [vec![[0; R]; n], vec![[0; R]; n]],
             res: [vec![[0; R]; n], vec![[0; R]; n]],
+            residues: false,
+            #[cfg(debug_assertions)]
+            listed: vec![0; n],
             free: [vec![false; n], vec![false; n]],
             slot: [vec![NO_SLOT; n], vec![NO_SLOT; n]],
             slot_elem: blocks.map(|b| vec![vec![NONE; 64 * R]; b]),
@@ -707,11 +823,15 @@ impl<const R: usize> Meet<R> {
             dummy_back: [NONE; 2],
             withouts: 0,
             withouts_exact: 0,
+            changed_at: [vec![0; n], vec![0; n]],
+            relaxed: Vec::new(),
+            lineage: Vec::new(),
             mark: vec![0; n],
             entering: Vec::new(),
             incoming: Vec::new(),
             leaving: Vec::new(),
             fresh: Vec::new(),
+            dropped: Vec::new(),
             unsure: blocks.map(|b| vec![Vec::new(); b]),
             derived: 0,
             restored: 0,
@@ -748,6 +868,9 @@ impl<const R: usize> Meet<R> {
     ) {
         self.solves += 1;
         self.tableau = self.solves;
+        self.residues = true;
+        self.lineage.clear();
+        self.lineage.push(self.tableau);
         for &e in live {
             self.inside[e as usize] = false;
         }
@@ -802,6 +925,10 @@ impl<const R: usize> Meet<R> {
             let list = if self.inside[i] { &mut self.members } else { &mut self.out_a[usize::from(p.block[0][i])] };
             self.pos[i] = list.len() as u32;
             list.push(e);
+            #[cfg(debug_assertions)]
+            {
+                self.listed[i] = self.tableau;
+            }
         }
         self.value = self.members.iter().map(|&e| p.weight[e as usize]).sum();
     }
@@ -887,6 +1014,11 @@ impl<const R: usize> Meet<R> {
             self.gap_for = self.tableau;
         }
         self.gap
+    }
+
+    /// Whether [`gap`](Self::gap) knows the gap of the tableau the workspace holds, with no search.
+    pub fn knows_gap(&self) -> bool {
+        self.gap_for == self.tableau
     }
 
     /// The gap of the tableau's set, the heaviest of all sizes: the length of the shortest augmenting path, which
@@ -1038,6 +1170,13 @@ impl<const R: usize> Meet<R> {
         const LIVE: u8 = 2;
         const WANTED: u8 = 4;
         let held = self.tableau == self.solves;
+        let source = self.tableau;
+        if held && self.derive_by_contraction(p, live, start, contracted) {
+            self.finish_derive(p, live, source, true, self.columns_for == source);
+            #[cfg(test)]
+            self.check_derived(p, live, start);
+            return;
+        }
         self.solves += 1;
         self.tableau = self.solves;
         // The elements of the tableau held are the live elements of its blocks of A.
@@ -1093,7 +1232,7 @@ impl<const R: usize> Meet<R> {
                 while i < self.entering.len() {
                     let yi = self.entering[i] as usize;
                     let (mask, slot) = (&self.mask[m][yi], &self.slot[m]);
-                    let k = is_zero(&self.res[m][yi])
+                    let k = (!free!(self, m, yi))
                         .then(|| self.leaving.iter().position(|&x| bit(mask, usize::from(slot[x as usize]))))
                         .flatten();
                     if let Some(k) = k {
@@ -1119,21 +1258,35 @@ impl<const R: usize> Meet<R> {
                     let zi = z as usize;
                     let outside = self.mark[zi] & (LIVE | WANTED) == LIVE;
                     let held = || self.mask[m][zi].iter().zip(&gone).any(|(c, g)| c & g != 0);
-                    if outside && (!is_zero(&self.res[m][zi]) || held()) {
+                    if outside && (free!(self, m, zi) || held()) {
                         self.unsure[m][b].push(z);
                     }
                 }
             }
         }
-        // The new set and its elements; then each block's slots brought to it and the circuits not known found, or the
-        // block built.
+        // The new set and its elements (an element that changes sides is marked changed); then each block's slots
+        // brought to it and the circuits not known found, or the block built.
+        let columns = ok && self.columns_for == source;
+        self.dropped.clear();
         for list in &self.block_live[0] {
             for &e in list {
-                self.inside[e as usize] = false;
+                let i = e as usize;
+                if self.mark[i] & LIVE == 0 {
+                    if columns && !self.inside[i] && !self.free[0][i] {
+                        self.dropped.push(e);
+                    }
+                    self.inside[i] = false;
+                }
             }
         }
         for &e in live {
-            self.inside[e as usize] = self.mark[e as usize] & WANTED != 0;
+            let i = e as usize;
+            let inside = self.mark[i] & WANTED != 0;
+            if self.mark[i] & SOURCE != 0 && self.inside[i] != inside {
+                self.changed_at[0][i] = self.tableau;
+                self.changed_at[1][i] = self.tableau;
+            }
+            self.inside[i] = inside;
         }
         for list in &self.block_live[0] {
             for &e in list {
@@ -1161,12 +1314,38 @@ impl<const R: usize> Meet<R> {
                 self.dirty[m][b] = false;
             }
         }
+        self.finish_derive(p, live, source, ok, columns);
+        #[cfg(test)]
+        self.check_derived(p, live, start);
+    }
+
+    /// What [`derive`](Self::derive) does last, its tableau made from the one numbered `source` (`ok`, else built):
+    /// the columns of A (where the workspace had the source's), the lineage, the lists.
+    fn finish_derive(&mut self, p: &Problem<'_, R>, live: &[u32], source: u64, ok: bool, columns: bool) {
         self.derived += 1;
+        self.residues = false;
+        if ok && self.lineage.last() == Some(&source) {
+            if self.lineage.len() == LINEAGE {
+                self.lineage.remove(0);
+            }
+        } else {
+            self.lineage.clear();
+        }
+        self.lineage.push(self.tableau);
         self.lists(p, live);
+        // After the lists, which the columns built to check them in debug builds are made from.
+        if columns {
+            self.derive_columns(p, live);
+        }
         // `start` is the heaviest set of all sizes: the solve would end with the shortest path that gains nothing, whose
         // length is the gap, found when first asked for.
         (self.settled, self.stopped) = (true, false);
-        #[cfg(test)]
+    }
+
+    /// In tests, where asked for ([`check`](Self::check)): the tableau [`derive`](Self::derive) made of the heaviest
+    /// set `start` of the elements `live` against the one a solve builds.
+    #[cfg(test)]
+    fn check_derived(&mut self, p: &Problem<'_, R>, live: &[u32], start: &[u32]) {
         if let Some(mut check) = self.check.take() {
             check.solve(p, live, start, usize::MAX, i64::MAX, |_| {});
             // The gap found as `gap` would, without the count of rounds, which the tests compare across engines.
@@ -1180,6 +1359,60 @@ impl<const R: usize> Meet<R> {
             self.check = Some(check);
             self.checked += 1;
         }
+    }
+
+    /// [`derive`](Self::derive) where the new set is the one held less the members `contracted`, and the elements
+    /// `live` are among those held: no element changes sides, so every circuit stays but for the members gone (a
+    /// contraction keeps the others, and a deletion changes none), and each block's elements stay in their order.  So
+    /// the elements no longer live leave the blocks' lists, and the members contracted free their slots
+    /// ([`move_slots`](Self::move_slots)), with no marks, no exchange and no reduction.  False, with nothing done,
+    /// where the sets are not so (the general derivation then makes the tableau).
+    fn derive_by_contraction(&mut self, p: &Problem<'_, R>, live: &[u32], start: &[u32], contracted: &[u32]) -> bool {
+        let held = |meet: &Self, e: u32| {
+            let i = e as usize;
+            let list = if meet.inside[i] { &meet.members } else { &meet.out_a[usize::from(p.block[0][i])] };
+            list.get(meet.pos[i] as usize) == Some(&e)
+        };
+        let members = start.len() + contracted.len() == self.members.len();
+        if !members || !start.iter().chain(contracted).all(|&e| self.inside[e as usize] && held(self, e)) {
+            return false;
+        }
+        let g = self.next_generation(1);
+        for &e in live {
+            if !held(self, e) {
+                return false;
+            }
+            self.seen[e as usize] = g;
+        }
+        let live_now = |meet: &Self, e: u32| meet.seen[e as usize] == g;
+        if !start.iter().all(|&e| live_now(self, e)) || contracted.iter().any(|&e| live_now(self, e)) {
+            return false;
+        }
+        // Every member is in `start` or `contracted`, and none of `contracted` is live: a live element is a member
+        // exactly where it was.
+        let columns = self.columns_for == self.tableau;
+        self.solves += 1;
+        self.tableau = self.solves;
+        self.dropped.clear();
+        for list in &self.block_live[0] {
+            for &e in list {
+                let i = e as usize;
+                if self.seen[i] != g {
+                    if columns && !self.inside[i] && !self.free[0][i] {
+                        self.dropped.push(e);
+                    }
+                    self.inside[i] = false;
+                }
+            }
+        }
+        for m in 0..2 {
+            for b in 0..self.block_live[m].len() {
+                let seen = &self.seen;
+                self.block_live[m][b].retain(|&e| seen[e as usize] == g);
+                self.move_slots(m, b);
+            }
+        }
+        true
     }
 
     /// Whether `other`'s tableau reads the same as this one's outside a solve (see "Deriving a tableau" in the docs
@@ -1205,7 +1438,7 @@ impl<const R: usize> Meet<R> {
             for &e in live {
                 let i = e as usize;
                 let row = |t: &Meet<R>| {
-                    let free = !is_zero(&t.res[m][i]);
+                    let free = t.free[m][i];
                     if t.inside[i] {
                         let s = usize::from(t.slot[m][i]);
                         format!("member, its slot's {}", t.slot_elem[m][usize::from(p.block[m][i])][s])
@@ -1222,6 +1455,99 @@ impl<const R: usize> Meet<R> {
             }
         }
         Ok(())
+    }
+
+    /// The columns of A of the tableau [`derive`](Self::derive) just made of the live elements `live`, from those of
+    /// the tableau it derived it from, which the workspace holds ([`build_columns`](Self::build_columns)): the same
+    /// elements by slot, in another order within a column, which no search depends on (each takes its vertices by
+    /// distance and element).  A column whose slot no member holds is emptied.  Where no element changed (a contraction
+    /// and deletions alone), every other circuit stayed, less the members gone, so an element no longer live leaves the
+    /// columns of its circuit, which nothing touched.  Where some changed (marked by `derive`), every column drops the
+    /// elements no longer live and those changed, the column of a member that came in is emptied (its slot may be one
+    /// that a member contracted left, whose column holds elements whose circuits lost it), and each changed element
+    /// outside the set in the span of A joins the columns of its new circuit: an element whose circuit holds a member
+    /// that came in changed with it.
+    fn derive_columns(&mut self, p: &Problem<'_, R>, live: &[u32]) {
+        let tableau = self.tableau;
+        let changed = live.iter().any(|&e| self.changed_at[0][e as usize] == tableau);
+        let g = if changed { self.next_generation(1) } else { 0 };
+        let columns = &mut self.columns;
+        for (b, slots) in self.slot_elem[0].iter().enumerate() {
+            for (s, &x) in slots[..self.next_slot[0][b]].iter().enumerate() {
+                if x == NONE {
+                    columns[b * 64 * R + s].clear();
+                }
+            }
+        }
+        if changed {
+            for &e in live {
+                self.seen[e as usize] = g;
+            }
+            let (seen, changed_at) = (&self.seen, &self.changed_at[0]);
+            for (b, slots) in self.slot_elem[0].iter().enumerate() {
+                for (s, &x) in slots[..self.next_slot[0][b]].iter().enumerate() {
+                    let column = &mut columns[b * 64 * R + s];
+                    if x != NONE && changed_at[x as usize] == tableau {
+                        // A member that came in, in a slot that another left (whose column held the elements of that
+                        // one's circuit): its column is the changed elements', pushed below.
+                        column.clear();
+                    } else if x != NONE {
+                        column.retain(|&y| seen[y as usize] == g && changed_at[y as usize] != tableau);
+                    }
+                }
+            }
+            for &y in live {
+                let i = y as usize;
+                if changed_at[i] == tableau && !self.inside[i] && !free!(self, 0, i) {
+                    let b = usize::from(p.block[0][i]);
+                    each_bit(&self.mask[0][i], |s| columns[b * 64 * R + s].push(y));
+                }
+            }
+        } else {
+            for &y in &self.dropped {
+                let i = y as usize;
+                let b = usize::from(p.block[0][i]);
+                each_bit(&self.mask[0][i], |s| {
+                    let column = &mut columns[b * 64 * R + s];
+                    if let Some(k) = column.iter().position(|&z| z == y) {
+                        column.swap_remove(k);
+                    }
+                });
+            }
+        }
+        self.free_a.clear();
+        for list in &self.block_live[0] {
+            for &y in list {
+                let i = y as usize;
+                if !self.inside[i] && free!(self, 0, i) {
+                    self.free_a.push(y);
+                }
+            }
+        }
+        self.columns_for = tableau;
+        #[cfg(debug_assertions)]
+        {
+            let sorted = |columns: &[Vec<u32>]| -> Vec<Vec<u32>> {
+                columns
+                    .iter()
+                    .map(|c| {
+                        let mut c = c.clone();
+                        c.sort_unstable();
+                        c
+                    })
+                    .collect()
+            };
+            // As sets: the order within a column, and of the elements free in A, decides only which of several
+            // equal offers a search or Bellman–Ford takes first, which changes no distance, cycle length or split, and
+            // the searches sort the elements free in A first (`sort_by_split`).
+            let (derived, mut free_a) = (sorted(&self.columns), self.free_a.clone());
+            self.build_columns();
+            assert_eq!(derived, sorted(&self.columns), "derived columns of A differ from those built");
+            free_a.sort_unstable();
+            let mut built = self.free_a.clone();
+            built.sort_unstable();
+            assert_eq!(free_a, built, "the elements free in A of derived columns differ from those built");
+        }
     }
 
     /// [`derive`](Self::derive) from the tableau `snapshot` holds (saved by [`save`](Self::save)) instead of the one
@@ -1245,7 +1571,6 @@ impl<const R: usize> Meet<R> {
                     let i = e as usize;
                     list.push(e);
                     self.mask[m][i] = s.masks[m][k];
-                    self.res[m][i] = if free { free_residue() } else { [0; R] };
                     self.free[m][i] = free;
                     self.slot[m][i] = NO_SLOT;
                 }
@@ -1267,8 +1592,16 @@ impl<const R: usize> Meet<R> {
         for &e in s.slots[0].iter().filter(|&&e| e != NONE) {
             self.inside[e as usize] = true;
         }
-        // The workspace holds the snapshot's tableau.
+        // The workspace holds the snapshot's tableau, under a number of its own, nothing changed since the copy, with
+        // no residues.
+        self.solves += 1;
         self.tableau = self.solves;
+        self.residues = false;
+        for changed in &mut self.changed_at {
+            changed.fill(0);
+        }
+        self.lineage.clear();
+        self.lineage.extend([snapshot.tableau, self.tableau]);
         self.restored += 1;
         self.derive(p, live, start, contracted);
     }
@@ -1277,6 +1610,7 @@ impl<const R: usize> Meet<R> {
     pub fn save(&self, snapshot: &mut Snapshot<R>) {
         debug_assert_eq!(self.tableau, self.solves, "a snapshot of no tableau");
         let s = snapshot;
+        s.tableau = self.tableau;
         for m in 0..2 {
             for v in [&mut s.elems[m], &mut s.slots[m]] {
                 v.clear();
@@ -1316,9 +1650,11 @@ impl<const R: usize> Meet<R> {
         }
         for &e in self.fresh.iter().filter(|&&e| usize::from(p.block[m][e as usize]) == b).chain(&unsure) {
             let i = e as usize;
-            (self.res[m][i], self.mask[m][i]) = span.reduce(p.vector[m][i]);
-            self.free[m][i] = !is_zero(&self.res[m][i]);
+            let residue;
+            (residue, self.mask[m][i]) = span.reduce(p.vector[m][i]);
+            self.free[m][i] = !is_zero(&residue);
             self.slot[m][i] = NO_SLOT;
+            self.changed_at[m][i] = self.tableau;
         }
         self.unsure[m][b] = unsure;
         self.reduced += 1;
@@ -1366,7 +1702,6 @@ impl<const R: usize> Meet<R> {
                 let mut own = [0; R];
                 own[k / 64] |= 1 << (k % 64);
                 self.mask[m][z] = own;
-                self.res[m][z] = [0; R];
                 self.free[m][z] = false;
             }
         }
@@ -1415,13 +1750,16 @@ impl<const R: usize> Meet<R> {
         let s = usize::from(self.slot[m][xi]);
         let mut d = self.mask[m][yi];
         d[s / 64] ^= 1 << (s % 64);
-        let mask = &mut self.mask[m];
+        let (mask, changed, tableau) = (&mut self.mask[m], &mut self.changed_at[m], self.tableau);
         let (word, shift) = (s / 64, s % 64);
         for &z in &self.block_live[m][b] {
             let z = z as usize;
             let select = 0u64.wrapping_sub(mask[z][word] >> shift & 1);
             for k in 0..R {
                 mask[z][k] ^= d[k] & select;
+            }
+            if select != 0 {
+                changed[z] = tableau;
             }
         }
         // y was in the loop (its mask holds s): it is now just its slot, and x the circuit y had.
@@ -1748,22 +2086,23 @@ impl<const R: usize> Meet<R> {
     }
 
     /// The split's arc `q → u` in the current tableau (`zero` the zero node), as [`split_bounds`](Self::split_bounds)
-    /// lists them.
+    /// lists them.  The answer for a vertex no longer live reads stale fields and means nothing: the walks that ask
+    /// also find such a vertex's path broken.
     fn split_arc(&self, p: &Problem<'_, R>, q: usize, u: usize, zero: usize) -> bool {
         if q == zero {
-            return self.inside[u] || !is_zero(&self.res[0][u]);
+            return self.inside[u] || free!(self, 0, u);
         }
         if u == zero {
-            return self.inside[q] || !is_zero(&self.res[1][q]);
+            return self.inside[q] || free!(self, 1, q);
         }
         match (self.inside[q], self.inside[u]) {
             (true, false) => {
-                is_zero(&self.res[0][u])
+                !free!(self, 0, u)
                     && p.block[0][q] == p.block[0][u]
                     && bit(&self.mask[0][u], usize::from(self.slot[0][q]))
             }
             (false, true) => {
-                is_zero(&self.res[1][q])
+                !free!(self, 1, q)
                     && p.block[1][q] == p.block[1][u]
                     && bit(&self.mask[1][q], usize::from(self.slot[1][u]))
             }
@@ -1851,6 +2190,186 @@ impl<const R: usize> Meet<R> {
         }
         self.walk = walk;
         (valid, zero_status == valid)
+    }
+
+    /// The split's starting potentials and first round from `start`, an earlier split found on a tableau that the
+    /// workspace's derives from ([`lineage`](Self::lineage)), by what changed since: in each matroid, the elements
+    /// whose circuit or freedom there, or side of the set, changed (marked by [`derive`](Self::derive)), and the
+    /// elements no longer live.
+    ///
+    /// The constraint graph's arcs into an element outside the set are of A (from the members of its circuit, or from
+    /// the zero node where it is free), and those out of it of B (to the members of its circuit, or to the zero node
+    /// where it is free); a member's arcs to and from the zero node are fixed by its side, and its others are those
+    /// of the elements outside.  A circuit that only lost members (a member contracted or gone) only lost arcs.  So an
+    /// arc between two elements on their sides of `start` is an arc of `start`'s graph, as long, unless it runs into an
+    /// element changed in A or out of one changed in B.  A vertex whose path of predecessors in `start` is still a path
+    /// starts from its potential there: every vertex on it live and on its side, and each arc there.  The paths that
+    /// break are those through a vertex no longer live or on the other side, through an element changed in A whose arc
+    /// from its predecessor is gone, or through a child of an element changed in B whose arc from it is gone: the
+    /// subtrees of those vertices in the forest of `start`'s predecessors ([`Tree`]).  The others' potentials are
+    /// lengths of paths, no lower than the distances, so Bellman–Ford from them reaches the same split.
+    ///
+    /// Where the zero node's path holds, an arc that the first round of a split from scratch would find too long runs
+    /// into a vertex whose path broke or an element changed in A, or out of a vertex whose path broke or an element
+    /// changed in B: between other vertices it is an arc of `start`'s graph between potentials of `start`, which keep
+    /// it.  So the vertices whose paths broke and the elements changed in A pull their potentials along their arcs in,
+    /// and the first round relaxes the arcs out of the vertices whose paths broke, of the elements changed in B, and of
+    /// those whose pull lowered them (as [`pull_into_broken`](Self::pull_into_broken) does where nothing changed).
+    /// Where the zero node's path broke, the first round relaxes every vertex.
+    fn repair_from(&mut self, p: &Problem<'_, R>, live: &[u32], start: &SplitStart) {
+        let w = p.weight;
+        let zero = self.pot.len() - 1;
+        let since = start.tableau;
+        let tree = start.tree();
+        let g = self.next_generation(3);
+        let (live_mark, broken, listed) = (g - 2, g - 1, g);
+        for &e in live {
+            self.settled_at[e as usize] = live_mark;
+        }
+        let base = start.pot[zero];
+        let on_side = |inside: &[bool], i: usize| start.role[i] == 1 + u8::from(inside[i]);
+        // The roots of the subtrees that break; the elements changed in A, to pull, and in B, to relax first.
+        let mut roots = std::mem::take(&mut self.walk);
+        let mut pulled = std::mem::take(&mut self.changed_out);
+        let mut relaxed = std::mem::take(&mut self.relaxed);
+        roots.clear();
+        pulled.clear();
+        relaxed.clear();
+        self.changed_in.clear();
+        for &e in live {
+            let i = e as usize;
+            if !on_side(&self.inside, i) {
+                roots.push(e);
+                continue;
+            }
+            self.pot[i] = start.pot[i] + base;
+            let q = start.pred[i];
+            self.split_pred[i] = q;
+            if self.inside[i] {
+                continue;
+            }
+            if self.changed_at[0][i] > since {
+                if q != NONE && !self.split_arc(p, q as usize, i, zero) {
+                    roots.push(e);
+                }
+                pulled.push(e);
+            }
+            if self.changed_at[1][i] > since {
+                for &c in tree.children_of(i) {
+                    let ci = c as usize;
+                    let kept = ci == zero || (self.settled_at[ci] == live_mark && on_side(&self.inside, ci));
+                    if kept && !self.split_arc(p, i, ci, zero) {
+                        roots.push(c);
+                    }
+                }
+                relaxed.push(e);
+            }
+        }
+        self.pot[zero] = base;
+        self.split_pred[zero] = start.pred[zero];
+        for (i, &role) in start.role.iter().enumerate() {
+            if role != 0 && self.settled_at[i] != live_mark {
+                roots.push(i as u32);
+            }
+        }
+        // What hangs from the roots: the live ones start from 0 again, to be pulled and relaxed.
+        let mut zero_holds = true;
+        while let Some(v) = roots.pop() {
+            let vi = v as usize;
+            if vi == zero {
+                if !zero_holds {
+                    continue;
+                }
+                zero_holds = false;
+                (self.pot[zero], self.split_pred[zero]) = (0, NONE);
+            } else {
+                if self.seen[vi] == broken {
+                    continue;
+                }
+                self.seen[vi] = broken;
+                if self.settled_at[vi] == live_mark {
+                    (self.pot[vi], self.split_pred[vi]) = (0, NONE);
+                    pulled.push(v);
+                }
+            }
+            roots.extend_from_slice(tree.children_of(vi));
+        }
+        drop(tree);
+        self.walk = roots;
+        if !zero_holds {
+            self.changed_in.extend_from_slice(live);
+            self.changed_in.push(zero as u32);
+            (self.changed_out, self.relaxed) = (pulled, relaxed);
+            return;
+        }
+        for &v in &relaxed {
+            if self.seen[v as usize] != broken {
+                self.seen[v as usize] = listed;
+                self.changed_in.push(v);
+            }
+        }
+        // Each vertex to pull takes its potential along its arcs in: an element outside from the zero node where it is
+        // free in A, else from the members of its circuit in A; a member from the zero node, and from the elements
+        // outside whose circuit in B holds it, found by one pass over each block of B that has such members.  Those
+        // whose paths broke are relaxed first, and so are the others that the pull lowered.
+        let pz = self.pot[zero];
+        for &v in &pulled {
+            let vi = v as usize;
+            let (mut best, mut from) = (self.pot[vi], NONE);
+            if self.inside[vi] {
+                if pz + w[vi] < best {
+                    (best, from) = (pz + w[vi], zero as u32);
+                }
+                let (b, s) = (usize::from(p.block[1][vi]), usize::from(self.slot[1][vi]));
+                self.changed_slots[1][b][s / 64] |= 1 << (s % 64);
+            } else if free!(self, 0, vi) {
+                if pz < best {
+                    (best, from) = (pz, zero as u32);
+                }
+            } else {
+                let (pot, elems) = (&self.pot, &self.slot_elem[0][usize::from(p.block[0][vi])]);
+                each_bit(&self.mask[0][vi], |s| {
+                    let x = elems[s];
+                    if pot[x as usize] < best {
+                        (best, from) = (pot[x as usize], x);
+                    }
+                });
+            }
+            if from != NONE {
+                self.pot[vi] = best;
+                self.split_pred[vi] = from;
+            }
+            if self.seen[vi] == broken || (from != NONE && self.seen[vi] != listed) {
+                self.seen[vi] = listed;
+                self.changed_in.push(v);
+            }
+        }
+        for b in 0..self.block_live[1].len() {
+            let slots = std::mem::replace(&mut self.changed_slots[1][b], [0; R]);
+            if is_zero(&slots) {
+                continue;
+            }
+            let elems = &self.slot_elem[1][b];
+            for &y in &self.block_live[1][b] {
+                let yi = y as usize;
+                if self.inside[yi] || free!(self, 1, yi) {
+                    continue;
+                }
+                let mut into = self.mask[1][yi];
+                for (word, slot) in into.iter_mut().zip(&slots) {
+                    *word &= slot;
+                }
+                let (pot, pred) = (&mut self.pot, &mut self.split_pred);
+                each_bit(&into, |s| {
+                    let x = elems[s] as usize;
+                    let d = pot[yi] + w[x] - w[yi];
+                    if d < pot[x] {
+                        (pot[x], pred[x]) = (d, y);
+                    }
+                });
+            }
+        }
+        (self.changed_out, self.relaxed) = (pulled, relaxed);
     }
 
     /// Whether, for a problem that is `start`'s contracted by `contracted`, the current set is `start`'s less
@@ -1948,16 +2467,21 @@ impl<const R: usize> Meet<R> {
         self.pot[zero] = 0;
         self.split_pred[zero] = NONE;
         self.changed_in.clear();
-        let mut narrowed = false;
+        let mut seeded = false;
         if let Some(start) = start.filter(|start| start.saved) {
-            let kept = contracted.is_some_and(|c| self.keeps_arcs(live, start, c));
-            let (valid, zero_valid) = self.warm_start(p, live, start, kept);
-            if kept && zero_valid {
-                self.pull_into_broken(p, live, valid);
-                narrowed = true;
+            if self.lineage.contains(&start.tableau) {
+                self.repair_from(p, live, start);
+                seeded = true;
+            } else {
+                let kept = contracted.is_some_and(|c| self.keeps_arcs(live, start, c));
+                let (valid, zero_valid) = self.warm_start(p, live, start, kept);
+                if kept && zero_valid {
+                    self.pull_into_broken(p, live, valid);
+                    seeded = true;
+                }
             }
         }
-        if !narrowed {
+        if !seeded {
             self.changed_in.extend_from_slice(live);
             self.changed_in.push(zero as u32);
         }
@@ -2057,7 +2581,7 @@ impl<const R: usize> Meet<R> {
                 if wy <= 0 || self.inside[i] {
                     continue;
                 }
-                debug_assert!(is_zero(&self.res[m][i]), "an element of positive weight is free of I*");
+                debug_assert!(!free!(self, m, i), "an element of positive weight is free of I*");
                 let elems = &self.slot_elem[m][usize::from(p.block[m][i])];
                 each_bit(&self.mask[m][i], |s| {
                     let x = elems[s] as usize;
@@ -2552,7 +3076,7 @@ impl<const R: usize> Meet<R> {
             // to a member from an element outside free in B or whose circuit there holds it.
             let (m, x, y) = if self.inside[u] { (0, u, v) } else { (1, v, u) };
             let in_circuit = || p.block[m][x] == p.block[m][y] && bit(&self.mask[m][y], usize::from(self.slot[m][x]));
-            if is_zero(&self.res[m][y]) && !in_circuit() {
+            if !free!(self, m, y) && !in_circuit() {
                 return None;
             }
             length += if self.inside[u] { p.weight[u] } else { -p.weight[u] };
@@ -2968,6 +3492,8 @@ impl<const R: usize> Meet<R> {
         }
         start.members = self.members.len();
         start.saved = true;
+        start.tableau = self.tableau;
+        start.built.set(false);
     }
 
     /// Whether the current set flipped on `self.flip` is independent in both matroids: in each block a flipped
