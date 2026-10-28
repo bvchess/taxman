@@ -1016,9 +1016,165 @@ impl<const R: usize> Meet<R> {
         self.gap
     }
 
+    /// [`gap`](Self::gap), where `pot` is the weight split of the tableau's set (its `w1` by element, as
+    /// [`potentials`](Self::potentials) has it): found by an A* search over the split's reduced lengths
+    /// ([`gap_by_split`](Self::gap_by_split)) instead of Bellman–Ford's.  The same gap, which debug builds check.
+    pub fn gap_with(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
+        if self.gap_for != self.tableau {
+            debug_assert!(self.settled && self.tableau == self.solves, "the gap of no settled tableau");
+            self.gap = self.gap_by_split(p, pot);
+            #[cfg(debug_assertions)]
+            {
+                let plain = self.find_gap(p);
+                assert_eq!(self.gap, plain, "the gap by the split's search and by Bellman–Ford's differ");
+            }
+            self.gap_for = self.tableau;
+        }
+        self.gap
+    }
+
     /// Whether [`gap`](Self::gap) knows the gap of the tableau the workspace holds, with no search.
     pub fn knows_gap(&self) -> bool {
         self.gap_for == self.tableau
+    }
+
+    /// The gap of [`gap_with`](Self::gap_with): the length of the shortest augmenting path, from an element outside the
+    /// set free in A to one free in B, `i64::MAX` if there is none.  With the split, such a path's length is the sum
+    /// of its arcs' reduced lengths (none negative) less `w1` of its first element and `w2` of its last (see the
+    /// module docs), each not negative too: so a search from every element free in A at its `−w1`, which ends a path
+    /// at an element free in B at its `−w2`.  A member's arcs to the elements free in A offer them no less than they
+    /// start from (`w1` of a member is not negative), so they are not offered.  The search is A* over the bounds of
+    /// [`smaller_loss`](Self::smaller_loss): an element outside the set in the span of B takes its least arc out, one
+    /// free in B its `−w2`, a member 0.  A path is no longer than the set's weight, so no key above it is offered.
+    fn gap_by_split(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
+        if self.columns_for != self.tableau {
+            self.build_columns();
+        }
+        self.sort_by_split(p, pot);
+        self.bounds_for_tableau(p, pot);
+        let w = p.weight;
+        let w1 = |e: u32| pot[e as usize];
+        let w2 = |e: u32| w[e as usize] - pot[e as usize];
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
+        let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
+        let (bound, bounded_at, bounds_stamp) = (&mut self.path_bound, &mut self.bounded_at, self.bounds_stamp);
+        let (by_w2, heap) = (&self.by_w2, &mut self.heap);
+        let past = self.value.max(0) + 1;
+        heap.start(past, self.pos.len());
+        let mut best = past;
+        // The bound of an element outside the set (not free in both: that would make the set heavier).
+        macro_rules! h {
+            ($i:expr, $v:expr) => {{
+                let (i, v): (usize, u32) = ($i, $v);
+                if self.free[1][i] {
+                    -w2(v)
+                } else {
+                    if bounded_at[i] != bounds_stamp {
+                        let (elems, mut least) = (&self.slot_elem[1][usize::from(p.block[1][i])], INF);
+                        each_bit(&self.mask[1][i], |s| least = least.min(w2(elems[s]) - w2(v)));
+                        bound[i] = least;
+                        bounded_at[i] = bounds_stamp;
+                    }
+                    bound[i]
+                }
+            }};
+        }
+        // Offers the distance `d` to `v`, with the bound `h` of the rest of a path from it.
+        macro_rules! offer {
+            ($v:expr, $d:expr, $h:expr) => {{
+                let (v, d): (u32, Dist) = ($v, $d);
+                let i = v as usize;
+                if stamp[i] != settled && (seen[i] != reached || d < reach[i]) {
+                    let key = d.saturating_add($h);
+                    if key < best {
+                        seen[i] = reached;
+                        reach[i] = d;
+                        heap.push(key, v);
+                    }
+                }
+            }};
+        }
+        // The members as reached from the elements free in B (each has an arc to every member): the hub, the least
+        // distance less `w2` over those taken, and the members by increasing `w2`, of which the next one not taken is
+        // queued at the hub's distance plus its `w2`.
+        let mut hub = INF;
+        let mut next_member = 0;
+        macro_rules! queue_member {
+            () => {{
+                while next_member < by_w2.len() && stamp[by_w2[next_member] as usize] == settled {
+                    next_member += 1;
+                }
+                if let (Some(&z), true) = (by_w2.get(next_member), hub != INF) {
+                    if hub + w2(z) < best {
+                        heap.push(hub + w2(z), HUB_MEMBER);
+                    }
+                }
+            }};
+        }
+        for &y in &self.free_a {
+            let i = y as usize;
+            debug_assert!(!self.free[1][i], "an element free in both matroids of the heaviest set of all sizes");
+            offer!(y, -w1(y), h!(i, y));
+        }
+        while let Some((key, code)) = heap.pop() {
+            if key >= best {
+                break;
+            }
+            let (v, d) = if code == HUB_MEMBER {
+                while next_member < by_w2.len() && stamp[by_w2[next_member] as usize] == settled {
+                    next_member += 1;
+                }
+                let Some(&z) = by_w2.get(next_member) else { continue };
+                if hub + w2(z) != key {
+                    continue;
+                }
+                let i = z as usize;
+                if !(seen[i] == reached && reach[i] <= key) {
+                    (seen[i], reach[i]) = (reached, key);
+                }
+                stamp[i] = settled;
+                queue_member!();
+                (z, reach[i])
+            } else {
+                let i = code as usize;
+                let h = if self.inside[i] { 0 } else { h!(i, code) };
+                if stamp[i] == settled || reach[i].saturating_add(h) != key {
+                    continue;
+                }
+                stamp[i] = settled;
+                if by_w2.get(next_member) == Some(&code) {
+                    queue_member!();
+                }
+                (code, reach[i])
+            };
+            let i = v as usize;
+            if self.inside[i] {
+                // A member: arcs of A to the elements of its column (those free in A start lower).
+                let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+                for &y in &self.columns[column] {
+                    offer!(y, d + w1(v) - w1(y), h!(y as usize, y));
+                }
+            } else if self.free[1][i] {
+                // Free in B: a path ends here, and goes on to every member through the hub.
+                best = best.min(d - w2(v));
+                if d - w2(v) < hub {
+                    hub = d - w2(v);
+                    queue_member!();
+                }
+            } else {
+                let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
+                each_bit(&self.mask[1][i], |s| {
+                    let z = elems[s];
+                    offer!(z, d + w2(z) - w2(v), 0);
+                });
+            }
+        }
+        if best >= past {
+            i64::MAX
+        } else {
+            best
+        }
     }
 
     /// The gap of the tableau's set, the heaviest of all sizes: the length of the shortest augmenting path, which
@@ -1172,7 +1328,8 @@ impl<const R: usize> Meet<R> {
         let held = self.tableau == self.solves;
         let source = self.tableau;
         if held && self.derive_by_contraction(p, live, start, contracted) {
-            self.finish_derive(p, live, source, true, self.columns_for == source);
+            // No element changed: a contraction and deletions alone.
+            self.finish_derive(p, live, source, true, (self.columns_for == source).then_some(false));
             #[cfg(test)]
             self.check_derived(p, live, start);
             return;
@@ -1314,14 +1471,15 @@ impl<const R: usize> Meet<R> {
                 self.dirty[m][b] = false;
             }
         }
-        self.finish_derive(p, live, source, ok, columns);
+        self.finish_derive(p, live, source, ok, columns.then_some(true));
         #[cfg(test)]
         self.check_derived(p, live, start);
     }
 
     /// What [`derive`](Self::derive) does last, its tableau made from the one numbered `source` (`ok`, else built):
-    /// the columns of A (where the workspace had the source's), the lineage, the lists.
-    fn finish_derive(&mut self, p: &Problem<'_, R>, live: &[u32], source: u64, ok: bool, columns: bool) {
+    /// the columns of A where the workspace had the source's (`columns`: `Some(marked)`, `marked` false where no
+    /// element can have been marked changed), the lineage, the lists.
+    fn finish_derive(&mut self, p: &Problem<'_, R>, live: &[u32], source: u64, ok: bool, columns: Option<bool>) {
         self.derived += 1;
         self.residues = false;
         if ok && self.lineage.last() == Some(&source) {
@@ -1334,8 +1492,8 @@ impl<const R: usize> Meet<R> {
         self.lineage.push(self.tableau);
         self.lists(p, live);
         // After the lists, which the columns built to check them in debug builds are made from.
-        if columns {
-            self.derive_columns(p, live);
+        if let Some(marked) = columns {
+            self.derive_columns(p, live, marked);
         }
         // `start` is the heaviest set of all sizes: the solve would end with the shortest path that gains nothing, whose
         // length is the gap, found when first asked for.
@@ -1466,10 +1624,11 @@ impl<const R: usize> Meet<R> {
     /// elements no longer live and those changed, the column of a member that came in is emptied (its slot may be one
     /// that a member contracted left, whose column holds elements whose circuits lost it), and each changed element
     /// outside the set in the span of A joins the columns of its new circuit: an element whose circuit holds a member
-    /// that came in changed with it.
-    fn derive_columns(&mut self, p: &Problem<'_, R>, live: &[u32]) {
+    /// that came in changed with it.  Unless `marked`, the derivation marked no element (a contraction and deletions
+    /// alone, [`derive_by_contraction`](Self::derive_by_contraction)), and the elements are not looked at for marks.
+    fn derive_columns(&mut self, p: &Problem<'_, R>, live: &[u32], marked: bool) {
         let tableau = self.tableau;
-        let changed = live.iter().any(|&e| self.changed_at[0][e as usize] == tableau);
+        let changed = marked && live.iter().any(|&e| self.changed_at[0][e as usize] == tableau);
         let g = if changed { self.next_generation(1) } else { 0 };
         let columns = &mut self.columns;
         for (b, slots) in self.slot_elem[0].iter().enumerate() {
@@ -2789,32 +2948,51 @@ impl<const R: usize> Meet<R> {
         if !searchable {
             return true;
         }
-        let Some(end) = self.bounded_cycle(p, pot, x, limit, closing) else { return false };
+        let Some((end, _)) = self.bounded_cycle(p, pot, x, limit, closing) else { return false };
         self.found = end;
         true
     }
 
+    /// The length of the shortest cycle through the member `x` of the exchange graph of [`without`](Self::without), if
+    /// one is at most `limit` long: the length [`without`](Self::without) finds, by the A* search of
+    /// [`has_cycle_within`](Self::has_cycle_within), which costs less (its cycle may be another as short, and is not
+    /// kept).  The same conditions as [`without`](Self::without)'s, with `None` where they fail.
+    pub fn shortest_cycle_length(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64) -> Option<i64> {
+        let searchable = self.settled
+            && self.tableau == self.solves
+            && self.inside[x as usize]
+            && (0..i64::MAX / (2 * HOPS)).contains(&limit);
+        debug_assert!(
+            searchable,
+            "the shortest cycle through a member needs the tableau of a settled solve holding it"
+        );
+        self.found = NONE;
+        if !searchable {
+            return None;
+        }
+        self.bounded_cycle(p, pot, x, limit, 0).map(|(_, length)| length)
+    }
+
     /// The search of [`has_cycle_within`](Self::has_cycle_within): the element that closes a shortest cycle through `x`
-    /// within `limit`, if there is one.  Any shortest cycle will do, so the distances leave the arcs out, and an entry
-    /// can tie in distance with the last one taken and come out before the others of that distance ([`Queue`]).
-    fn bounded_cycle(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32, limit: i64, closing: i64) -> Option<u32> {
+    /// within `limit`, if there is one, and the cycle's length.  Any shortest cycle will do, so the distances leave the
+    /// arcs out, and an entry can tie in distance with the last one taken and come out before the others of that
+    /// distance ([`Queue`]).
+    fn bounded_cycle(
+        &mut self,
+        p: &Problem<'_, R>,
+        pot: &[i64],
+        x: u32,
+        limit: i64,
+        closing: i64,
+    ) -> Option<(u32, i64)> {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
         self.sort_by_split(p, pot);
+        self.bounds_for_tableau(p, pot);
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
-        if self.bounds_for != self.tableau {
-            // Fresh bounds for the tableau: a new stamp, cleared before the counter wraps.
-            self.bounds_stamp = self.bounds_stamp.wrapping_add(1);
-            if self.bounds_stamp == 0 {
-                self.bounded_at.fill(0);
-                self.bounds_stamp = 1;
-            }
-            self.least_w2 = self.by_w2.first().map_or(INF, |&z| w2(z));
-            self.bounds_for = self.tableau;
-        }
         let settled = self.next_generation(2);
         let reached = settled - 1;
         let (reach, back, seen, stamp) = (&mut self.reach, &mut self.back, &mut self.seen, &mut self.settled_at);
@@ -2985,7 +3163,7 @@ impl<const R: usize> Meet<R> {
                 });
             }
         }
-        (cycle.1 != NONE).then_some(cycle.1)
+        (cycle.1 != NONE).then_some((cycle.1, cycle.0))
     }
 
     /// For the searches for cycles through the members of the tableau's set, with its weight split `pot` (`w1` by
@@ -3334,13 +3512,134 @@ impl<const R: usize> Meet<R> {
     /// loses against the heaviest set.  The symmetric difference of the two splits into cycles of the exchange graph
     /// and paths from member to member, at least one (see the module docs), so that loss is at least the shortest
     /// such path, a member alone included, whose length is the sum of the reduced lengths of its arcs plus `w2` of
-    /// its first member and `w1` of its last: Dijkstra's search from every member at its `w2`, as in
+    /// its first member and `w1` of its last: a search from every member at its `w2`, as in
     /// [`without`](Self::without).  `i64::MAX` if there is no smaller set (an empty heaviest set).
+    ///
+    /// The search is A* ([`has_cycle_within`](Self::has_cycle_within) has the argument): an element outside the set
+    /// is taken in the order of its distance plus its least arc out, to a member of its circuit in B, found when it is
+    /// first offered on the tableau and kept for the other searches there; a member, which may end a path at `w1` of
+    /// no less than 0, and an element free in A, reached through the hub, take 0.  A member alone is such a path, so
+    /// the search starts from the lightest member's weight and stops at the first key at or past the shortest path.
     pub fn smaller_loss(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
         if self.columns_for != self.tableau {
             self.build_columns();
         }
         self.sort_by_split(p, pot);
+        self.bounds_for_tableau(p, pot);
+        let w = p.weight;
+        let w1 = |e: u32| pot[e as usize];
+        let w2 = |e: u32| w[e as usize] - pot[e as usize];
+        let Some(lightest) = self.members.iter().map(|&z| w[z as usize]).min() else { return i64::MAX };
+        #[cfg(debug_assertions)]
+        let plain = self.smaller_loss_by_dijkstra(p, pot);
+        let settled = self.next_generation(2);
+        let reached = settled - 1;
+        let (reach, seen, stamp) = (&mut self.reach, &mut self.seen, &mut self.settled_at);
+        let (bound, bounded_at, bounds_stamp) = (&mut self.path_bound, &mut self.bounded_at, self.bounds_stamp);
+        let mut best = lightest * HOPS;
+        let heap = &mut self.heap;
+        heap.start(best, self.pos.len());
+        // An element free in B is not offered: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least
+        // `w2(z) + 1` (the distances are not negative, and the split makes `w2(v) ≤ 0` for an element free in B), while
+        // each member started at `w2(z)`, so none is an improvement.  The key of an element outside the set is its
+        // distance plus its bound (`bound`, packed as the distances are), of a member its distance.
+        macro_rules! offer {
+            ($v:expr, $d:expr) => {{
+                let (v, d): (u32, Dist) = ($v, $d);
+                let i = v as usize;
+                if d < best && stamp[i] != settled && (seen[i] != reached || d < reach[i]) && !self.free[1][i] {
+                    let h = if self.inside[i] {
+                        0
+                    } else {
+                        if bounded_at[i] != bounds_stamp {
+                            let (elems, mut least) = (&self.slot_elem[1][usize::from(p.block[1][i])], INF);
+                            each_bit(&self.mask[1][i], |s| least = least.min(w2(elems[s]) - w2(v)));
+                            bound[i] = least;
+                            bounded_at[i] = bounds_stamp;
+                        }
+                        bound[i].saturating_mul(HOPS)
+                    };
+                    let key = d.saturating_add(h);
+                    if key < best {
+                        seen[i] = reached;
+                        reach[i] = d;
+                        heap.push(key, v);
+                    }
+                }
+            }};
+        }
+        let mut next_free = 0;
+        let mut through = INF;
+        macro_rules! queue_free {
+            () => {{
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                if let Some(&y) = self.free_a.get(next_free) {
+                    heap.push(through - w1(y) * HOPS + 1, FREE_A);
+                }
+            }};
+        }
+        for &z in &self.members {
+            offer!(z, w2(z) * HOPS);
+        }
+        while let Some((key, v)) = heap.pop() {
+            if key >= best {
+                break;
+            }
+            let (v, d) = if v == FREE_A {
+                while next_free < self.free_a.len() && stamp[self.free_a[next_free] as usize] == settled {
+                    next_free += 1;
+                }
+                let Some(&y) = self.free_a.get(next_free) else { continue };
+                if key != through - w1(y) * HOPS + 1 {
+                    continue;
+                }
+                stamp[y as usize] = settled;
+                queue_free!();
+                (y, key)
+            } else {
+                let i = v as usize;
+                let h = if self.inside[i] { 0 } else { bound[i].saturating_mul(HOPS) };
+                if stamp[i] == settled || reach[i].saturating_add(h) != key {
+                    continue;
+                }
+                stamp[i] = settled;
+                (v, reach[i])
+            };
+            let i = v as usize;
+            if self.inside[i] {
+                // A path may end here, at w1, or go on along the arcs of A.
+                best = best.min(d + w1(v) * HOPS);
+                let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
+                for &y in &self.columns[column] {
+                    offer!(y, d + (w1(v) - w1(y)) * HOPS + 1);
+                }
+                if d + w1(v) * HOPS < through {
+                    through = d + w1(v) * HOPS;
+                    queue_free!();
+                }
+            } else {
+                // In the span of B (an element free in A is in it, being free in no more than one matroid: free in both,
+                // it would make the heaviest set heavier).
+                debug_assert!(!free!(self, 1, i), "an element free in B in the search for the smaller sets' loss");
+                let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
+                each_bit(&self.mask[1][i], |s| {
+                    let z = elems[s];
+                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
+                });
+            }
+        }
+        let loss = best.div_euclid(HOPS);
+        #[cfg(debug_assertions)]
+        assert_eq!(loss, plain, "the smaller sets' loss by A* and by Dijkstra's search differ");
+        loss
+    }
+
+    /// In debug builds, [`smaller_loss`](Self::smaller_loss) by Dijkstra's search with no bounds, from no limit, to
+    /// check the A* search against.
+    #[cfg(debug_assertions)]
+    fn smaller_loss_by_dijkstra(&mut self, p: &Problem<'_, R>, pot: &[i64]) -> i64 {
         let w = p.weight;
         let w1 = |e: u32| pot[e as usize];
         let w2 = |e: u32| w[e as usize] - pot[e as usize];
@@ -3350,9 +3649,6 @@ impl<const R: usize> Meet<R> {
         let heap = &mut self.heap;
         heap.start(INF, self.pos.len());
         let mut best = INF;
-        // An element free in B is not offered: its arcs to the members offer each `d − w2(v) + 1 + w2(z)`, at least
-        // `w2(z) + 1` (the distances are not negative, and the split makes `w2(v) ≤ 0` for an element free in B), while
-        // each member started at `w2(z)`, so none is an improvement.
         macro_rules! offer {
             ($v:expr, $d:expr) => {{
                 let (v, d): (u32, Dist) = ($v, $d);
@@ -3403,7 +3699,6 @@ impl<const R: usize> Meet<R> {
             };
             let i = v as usize;
             if self.inside[i] {
-                // A path may end here, at w1, or go on along the arcs of A.
                 best = best.min(d + w1(v) * HOPS);
                 let column = usize::from(p.block[0][i]) * 64 * R + usize::from(self.slot[0][i]);
                 for &y in &self.columns[column] {
@@ -3414,20 +3709,29 @@ impl<const R: usize> Meet<R> {
                     queue_free!();
                 }
             } else {
-                // In the span of B (an element free in A is in it, being free in no more than one matroid: free in both,
-                // it would make the heaviest set heavier).
-                debug_assert!(!free!(self, 1, i), "an element free in B in the search for the smaller sets' loss");
                 let elems = &self.slot_elem[1][usize::from(p.block[1][i])];
-                each_bit(&self.mask[1][i], |s| {
-                    let z = elems[s];
-                    offer!(z, d + (w2(z) - w2(v)) * HOPS + 1);
-                });
+                each_bit(&self.mask[1][i], |s| offer!(elems[s], d + (w2(elems[s]) - w2(v)) * HOPS + 1));
             }
         }
         if best == INF {
             i64::MAX
         } else {
             best.div_euclid(HOPS)
+        }
+    }
+
+    /// The bounds of the A* searches ([`has_cycle_within`](Self::has_cycle_within), [`smaller_loss`](Self::smaller_loss))
+    /// on the length of a path back from an element outside the set, made afresh where they were found on another
+    /// tableau: a new stamp, cleared before the counter wraps.  After [`sort_by_split`](Self::sort_by_split).
+    fn bounds_for_tableau(&mut self, p: &Problem<'_, R>, pot: &[i64]) {
+        if self.bounds_for != self.tableau {
+            self.bounds_stamp = self.bounds_stamp.wrapping_add(1);
+            if self.bounds_stamp == 0 {
+                self.bounded_at.fill(0);
+                self.bounds_stamp = 1;
+            }
+            self.least_w2 = self.by_w2.first().map_or(INF, |&z| p.weight[z as usize] - pot[z as usize]);
+            self.bounds_for = self.tableau;
         }
     }
 

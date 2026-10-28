@@ -511,6 +511,8 @@ pub struct Gf2Stats {
     pub warm_children: u64,
     pub warm_levels: u64,
     pub warm_deletions: u64,
+    /// Children pushed at a need whose warm start stopped below it ([`Gf2Bound::push_all_at`]).
+    pub warm_below: u64,
 }
 
 impl<'g, const W: usize> Gf2Bound<'g, W> {
@@ -583,7 +585,16 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// Pushes the child of the top level made by promoting `added` (each a candidate of the top level, or removed
     /// from them since), with the candidates `child_cands` (among the top level's, less `added`).
     pub fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
-        dispatch!(self, l => l.push_all(added, child_cands))
+        dispatch!(self, l => l.push_all(added, child_cands, None))
+    }
+
+    /// [`push_all`](Self::push_all) for a child whose check cuts it where its bound is below `need`.  With the tactic
+    /// `warm_start`, a child that loses members of its parent's heaviest set stops as soon as the heaviest set so far of
+    /// its deletions, an upper bound on its own (each deletion only lowers it), falls below `need`; the first deletion
+    /// is made before the child's vectors are, which it does not need.  [`evaluate`](Self::evaluate) then returns that
+    /// bound, which cuts the child as its bound would, with no heaviest set and no forced members.
+    pub fn push_all_at(&mut self, added: &Bits<W>, child_cands: &Bits<W>, need: u64) {
+        dispatch!(self, l => l.push_all(added, child_cands, Some(need)))
     }
 
     /// Returns to the parent of the top level.
@@ -747,6 +758,9 @@ struct Level<const W: usize, const R: usize> {
     source: Source<W, R>,
     /// What the level's node promoted from its parent's (nothing at a unit's root).
     added: Bits<W>,
+    /// A child pushed at a need ([`Gf2Bound::push_all_at`]) whose warm start stopped where an upper bound on its value,
+    /// `value`, fell below that need: nothing else of the level holds, and the child's check cuts it.
+    below: bool,
 }
 
 /// What a pricing ([`Gf2Bound::prices_excluding`]) found at a level, for its children's: the level's node, heaviest
@@ -806,6 +820,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
             meet_solve: 0,
             source: Source::default(),
             added: Bits::EMPTY,
+            below: false,
         }
     }
 
@@ -826,6 +841,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.settled = other.settled;
         self.value = other.value;
         self.source.clear();
+        self.below = other.below;
     }
 
     /// The level's matroids, of `graph`'s blocks and weights.
@@ -856,6 +872,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         self.meet_solve = 0;
         self.source.clear();
         self.added = other.added;
+        self.below = false;
     }
 }
 
@@ -877,8 +894,10 @@ struct Levels<'g, const W: usize, const R: usize> {
     prior: Level<W, R>,
     prior_for: Option<(usize, u32)>,
     /// The heaviest sets without the members that the last [`certified_excluding`](Self::certified_excluding)
-    /// certified, their weights, and the lengths of their cycles.
-    certified: Vec<(u32, Bits<W>, u64, i64)>,
+    /// certified (where that call found them: a pricing; for strong branching, `keep_certified` finds the one it
+    /// keeps), their weights, and the lengths of their cycles; and the reach of their searches.
+    certified: Vec<(u32, Option<Bits<W>>, u64, i64)>,
+    certified_reach: i64,
     meet: Meet<R>,
     live_idx: Vec<u32>,
     start_idx: Vec<u32>,
@@ -930,6 +949,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             prior: Level::new(n),
             prior_for: None,
             certified: Vec::new(),
+            certified_reach: 0,
             meet: Meet::new(n, graph.blocks),
             live_idx: Vec::with_capacity(n),
             start_idx: Vec::with_capacity(n),
@@ -985,12 +1005,13 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         level.meet_solve = 0;
         level.source.clear();
         level.added = Bits::EMPTY;
+        level.below = false;
         for x in promoted.iter() {
             contract(self.graph, level, x);
         }
     }
 
-    fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
+    fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>, need: Option<u64>) {
         let d = self.depth;
         self.kept_for = None;
         let from_prior = self.prior_for.take().is_some_and(|(depth, x)| depth == d && added.contains(x));
@@ -1000,14 +1021,49 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         let (lower, upper) = self.levels.split_at_mut(d + 1);
         let child = &mut upper[0];
+        // The child's problem is the top level's before it went on without the candidate the child promotes (the
+        // same vectors), so it starts from that level's dominant sets.
+        let parent = if from_prior { &self.prior } else { &lower[d] };
+        // A warm child's first deletion, in its parent's problem, before the child is made: one whose heaviest set it
+        // shows below the need is neither made nor warm-started further.
+        let need = need.filter(|_| self.warm).map(|need| need as i64);
+        let first = if self.warm {
+            let live = lower[d].live & *child_cands;
+            warm_first(self.graph, &lower[d], parent, added, &live, &mut self.meet, &mut self.live_idx, &mut self.stats)
+        } else {
+            None
+        };
+        if let Some(first) = first.filter(|first| need.is_some_and(|need| first.value < need)) {
+            #[cfg(debug_assertions)]
+            {
+                // The child made after all, and solved: its bound is no higher.
+                let graph = self.graph;
+                child.copy_from(&lower[d]);
+                child.live = child.live.intersect(child_cands);
+                for x in added.iter() {
+                    contract(graph, child, x);
+                }
+                let live: Vec<u32> = child.live.iter().map(|x| graph.index[x as usize]).collect();
+                let mut cold = Meet::<R>::new(graph.len(), graph.blocks);
+                cold.solve(&child.problem(graph), &live, &[], usize::MAX, i64::MAX, |_| {});
+                assert!(
+                    cold.value <= first.value,
+                    "a child's warm start stopped at {}, below {}",
+                    first.value,
+                    cold.value
+                );
+            }
+            child.below = true;
+            child.value = first.value.max(0) as u64;
+            self.stats.warm_below += 1;
+            self.descend();
+            return;
+        }
         child.copy_from(&lower[d]);
         // The child's candidates are among the top level's, so its live ones are the top level's that it keeps: the
         // loops of the contractions above stay out of it (`contract` leaves those of its own).
         child.live = child.live.intersect(child_cands);
         child.added = *added;
-        // The child's problem is the top level's before it went on without the candidate the child promotes (the
-        // same vectors), so it starts from that level's dominant sets.
-        let parent = if from_prior { &self.prior } else { &lower[d] };
         for x in added.iter() {
             contract(self.graph, child, x);
         }
@@ -1055,23 +1111,31 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
             let splits = (start, &mut self.warm_split);
             let warm = warm_child(
                 self.graph,
-                &lower[d],
                 parent,
                 child,
                 added,
                 &mut self.meet,
                 scratch,
                 splits,
+                (first, need),
                 &mut self.stats,
             );
             if let Some(contracted) = warm {
                 (child.source.held, child.source.contracted) = (self.meet.solves, contracted);
                 self.stats.warm_children += 1;
+            } else if child.below {
+                self.stats.warm_below += 1;
             }
         } else if certify_child(self.graph, &lower[d], parent, child, added, &mut self.meet, &mut self.live_idx) {
             (child.source.held, child.source.contracted) = (held, *added);
             self.stats.certified_children += 1;
         }
+        self.descend();
+    }
+
+    /// The child just pushed is the top level, a node of its own.
+    fn descend(&mut self) {
+        let d = self.depth;
         self.depth = d + 1;
         self.next_node += 1;
         if self.nodes.len() == d + 1 {
@@ -1138,6 +1202,10 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     fn evaluate(&mut self, cap: usize, need: Option<u64>) -> Eval<W> {
         let d = self.depth;
         let level = &mut self.levels[d];
+        if level.below {
+            // A bound below the need the child was pushed at, which cuts it (a smaller `cap` only lowers it).
+            return Eval { value: level.value, chosen: Bits::EMPTY, forced: Bits::EMPTY };
+        }
         let fits = level.solved && level.history.last().is_some_and(|last| last.len() as usize <= cap);
         // A heaviest set under a larger limit that fits a smaller one is the heaviest under it too, and one of all
         // sizes is the heaviest under any limit it fits.
@@ -1422,7 +1490,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         };
         let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
         let mut losses = Losses::of(level, &mut self.meet, &problem, cap > size);
-        let reach = losses.reach(&last, &mut self.meet, &problem);
+        let reach = losses.reach(&last, &mut self.meet, &problem, &level.pot);
         self.certified.clear();
         if self.priced.len() <= d {
             self.priced.resize_with(d + 1, Priced::default);
@@ -1454,24 +1522,29 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
                 let searched = self.meet.without(&problem, &level.pot, e, reach, &[]).map(|v| level.value as i64 - v);
                 assert_eq!(searched, (length <= reach).then_some(length), "the cycle carried through {x}");
             }
-            // The length of the shortest cycle through x if it is within the reach.
+            // The length of the shortest cycle through x if it is within the reach.  Strong branching needs the cycle
+            // of the member it keeps the level for alone, which `keep_certified` finds then: so here the A* search
+            // finds the length of the others' ([`Meet::shortest_cycle_length`], the length `Meet::without` finds).
+            let e = graph.index[x as usize];
             let found = match carried {
                 Some((length, _)) => {
                     self.stats.carried += 1;
                     (length <= reach).then_some(length)
                 }
-                None => self
-                    .meet
-                    .without(&problem, &level.pot, graph.index[x as usize], reach, &[])
-                    .map(|value| level.value as i64 - value),
+                None if !carry => self.meet.shortest_cycle_length(&problem, &level.pot, e, reach),
+                None => self.meet.without(&problem, &level.pot, e, reach, &[]).map(|value| level.value as i64 - value),
             };
+            #[cfg(debug_assertions)]
+            if !carry {
+                let searched = self.meet.without(&problem, &level.pot, e, reach, &[]).map(|v| level.value as i64 - v);
+                assert_eq!(found, searched, "the shortest cycle's length through {x} by A* and by Meet::without");
+            }
             let mut bound = None;
             if let Some(delta) = found {
-                let cycle = carried.map_or_else(|| self.meet.cycle(), |c| c.1);
                 // The heaviest set flipped along the cycle, which is the heaviest set without x if the sizes
                 // certify it.
-                let flip: Bits<W> = cycle.iter().map(|&e| graph.elems[e as usize]).collect();
-                if carry {
+                let flip: Option<Bits<W>> = carry.then(|| {
+                    let cycle = carried.map_or_else(|| self.meet.cycle(), |c| c.1);
                     // From x in the order of its arcs: a search's cycle is x and then its predecessors, against them.
                     let start = mine.elems.len();
                     match carried {
@@ -1483,15 +1556,17 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
                         }
                     }
                     mine.cycles.push((x, delta, start..mine.elems.len()));
-                }
+                    cycle.iter().map(|&e| graph.elems[e as usize]).collect()
+                });
                 let value = level.value as i64 - delta;
                 if losses.certify(delta, &mut self.meet, &problem, &level.pot) {
-                    self.certified.push((x, (last - flip) | (flip - last), value as u64, delta));
+                    self.certified.push((x, flip.map(|flip| (last - flip) | (flip - last)), value as u64, delta));
                     bound = Some(value as u64);
                 }
             }
             out.push(bound);
         }
+        self.certified_reach = reach;
         level.loss_floor = losses.smaller;
         level.gap_floor = losses.gap_floor(level.gap_floor);
         self.stats.certified += out.iter().filter(|b| b.is_some()).count() as u64;
@@ -1522,6 +1597,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
 
     fn keep_certified(&mut self, x: u32) {
         let &(_, set, value, delta) = self.certified.iter().find(|c| c.0 == x).expect("a certified bound without x");
+        let set = set.unwrap_or_else(|| self.set_without(x, value));
         let level = &self.levels[self.depth];
         // The kept level's vectors are the level's, which it takes when it becomes the level (`remove_candidate`).
         let kept = &mut self.kept;
@@ -1547,6 +1623,24 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         self.kept_for = Some((self.depth, x));
         self.scratch_for = None;
+    }
+
+    /// The heaviest set without the member `x` of the top level's heaviest set, which the last
+    /// [`certified_excluding`](Self::certified_excluding) certified at `value` with the length of the shortest cycle
+    /// through `x` alone: the level's heaviest set flipped along the cycle [`Meet::without`] finds, the one a pricing
+    /// finds (the level's tableau made again first, where the workspace no longer holds it).
+    fn set_without(&mut self, x: u32, value: u64) -> Bits<W> {
+        let graph = self.graph;
+        let level = &mut self.levels[self.depth];
+        if level.meet_solve != self.meet.solves {
+            resolve(graph, level, &mut self.meet, &mut self.live_idx, &mut self.start_idx);
+        }
+        let problem = level.problem(graph);
+        let found = self.meet.without(&problem, &level.pot, graph.index[x as usize], self.certified_reach, &[]);
+        debug_assert_eq!(found, Some(value as i64), "the heaviest set without {x}, found again");
+        let last = level.history.last().copied().unwrap_or(Bits::EMPTY);
+        let flip: Bits<W> = self.meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+        (last - flip) | (flip - last)
     }
 
     fn keep_excluded(&mut self) {
@@ -1704,7 +1798,7 @@ fn certify_child<const W: usize, const R: usize>(
     let mut losses = Losses::of(parent, meet, &problem, true);
     banned.clear();
     banned.extend((*added | (parent.live - last - child.live)).iter().map(|y| graph.index[y as usize]));
-    let reach = losses.reach(&last, meet, &problem);
+    let reach = losses.reach(&last, meet, &problem, &parent.pot);
     let Some(value) = meet.without(&problem, &parent.pot, graph.index[x as usize], reach, banned) else {
         return false;
     };
@@ -1731,51 +1825,39 @@ fn certify_child<const W: usize, const R: usize>(
 /// and loses others that it dropped, its heaviest set of all sizes found from `I` with no solve, if the workspace holds
 /// the parent's tableau and the parent has a weight split.  The child's sets with the promoted are the parent's sets
 /// that hold them and avoid the dropped elements, so the members left out are deleted one at a time from the heaviest
-/// set so far ([`Meet::without_any_size`], exact for every size): the first from `I` in the parent's problem, the
-/// promoted and the elements dropped outside `I` banned; each other one, if still a member, in the child's problem with
+/// set so far ([`Meet::without_any_size`], exact for every size): the first from `I` in the parent's problem
+/// ([`warm_first`], `first`, made before the child is); each other one, if still a member, in the child's problem with
 /// the members left to delete, from the tableau of the set so far, derived from the one before ([`Meet::derive`]), and
 /// its weight split (every set so far is a heaviest of all sizes of its problem, which the split's existence shows
 /// again; each split starts from the one before, the first from `start`, the parent's split if it has one, see
-/// [`Meet::split_from`]).  Then the child is solved: its heaviest set the last one, less the promoted.  Returns what
-/// the child's
+/// [`Meet::split_from`]).  Then the child is solved: its heaviest set the last one, less the promoted.  Each deletion
+/// only lowers the heaviest set, so with `need` the deletions stop at the first set below it, whose weight, an upper
+/// bound on the child's, is the child's value, marked `below` ([`Gf2Bound::push_all_at`]).  Returns what the child's
 /// tableau, derived from the one the workspace holds, contracts: `added` if that is the parent's, nothing if it is the
-/// last one derived; or `None` (nothing found, the child left as it was, and the workspace possibly holding another
-/// tableau than the parent's).  `vectors` is a level with the parent's vectors (`parent` may be a copy of its sets
-/// only, see [`Levels::push_all`]).
+/// last one derived; or `None` (nothing found, the child left as it was, or below, and the workspace possibly holding
+/// another tableau than the parent's).
 #[allow(clippy::too_many_arguments)]
 fn warm_child<const W: usize, const R: usize>(
     graph: &Gf2Graph,
-    vectors: &Level<W, R>,
     parent: &Level<W, R>,
     child: &mut Level<W, R>,
     added: &Bits<W>,
     meet: &mut Meet<R>,
     (banned, live, start, pot): (&mut Vec<u32>, &mut Vec<u32>, &mut Vec<u32>, &mut Vec<i64>),
     (parent_split, split): (Option<&SplitStart>, &mut SplitStart),
+    (first, need): (Option<WarmFirst<W>>, Option<i64>),
     stats: &mut Gf2Stats,
 ) -> Option<Bits<W>> {
-    if !(parent.solved && parent.settled && parent.has_pot && parent.meet_solve == meet.solves) {
-        return None;
-    }
-    let last = *parent.history.last()?;
-    let mut missing = last - *added - child.live;
-    if !added.is_subset(&last) || missing.is_empty() {
-        return None;
-    }
+    let WarmFirst { value, set, missing } = first?;
+    let (mut value, mut set, mut missing) = (value, set, missing);
     let index = |x: u32| graph.index[x as usize];
-    let x = missing.max().expect("a member left out");
-    missing.remove(x);
-    banned.clear();
-    banned.extend((*added | (parent.live - last - child.live)).iter().map(index));
-    let value = meet.without_any_size(&vectors.problem(graph), &parent.pot, index(x), banned)?;
-    stats.warm_deletions += 1;
-    let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
-    let mut set = ((last - flip) | (flip - last)) - *added;
-    let mut value = value - added.sum() as i64;
+    // Each deletion only lowers the heaviest set: one below the need cuts the child, whatever the others find.
+    let below = |value: i64| need.is_some_and(|need| value < need);
     let mut contract = Some(*added);
     let child_problem = child.problem(graph);
     let mut own_split = false;
-    loop {
+    let mut cut = below(value);
+    while !cut {
         // A member left out that a flip took out of the set is deleted with nothing to do.
         missing &= set;
         let Some(x) = missing.max() else { break };
@@ -1798,6 +1880,24 @@ fn warm_child<const W: usize, const R: usize>(
         stats.warm_deletions += 1;
         let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
         set = (set - flip) | (flip - set);
+        cut = below(value);
+    }
+    if cut {
+        #[cfg(debug_assertions)]
+        {
+            let mut cold = Meet::<R>::new(graph.len(), graph.blocks);
+            live.clear();
+            live.extend(child.live.iter().map(index));
+            cold.solve(&child_problem, live, &[], usize::MAX, i64::MAX, |_| {});
+            assert!(
+                cold.value <= value,
+                "a child's warm start stopped at {value}, below its heaviest set {}",
+                cold.value
+            );
+        }
+        child.below = true;
+        child.value = value.max(0) as u64;
+        return None;
     }
     #[cfg(debug_assertions)]
     {
@@ -1818,6 +1918,57 @@ fn warm_child<const W: usize, const R: usize>(
     child.value = value as u64;
     child.loss_floor = 0;
     Some(contract.unwrap_or(Bits::EMPTY))
+}
+
+/// The first deletion of a warm start ([`warm_child`]): the child's heaviest set of all sizes less its first member left
+/// out (the largest), its weight (both less `added`), and the members left out still to delete.
+#[derive(Clone, Copy)]
+struct WarmFirst<const W: usize> {
+    value: i64,
+    set: Bits<W>,
+    missing: Bits<W>,
+}
+
+/// With the tactic `warm_start`, before the child that promotes `added` is made: where [`warm_child`] would warm-start
+/// it (its parent's heaviest set `I`, of all sizes, holds `added` and loses members that the child dropped, the
+/// workspace's tableau is the parent's and the parent has a weight split), the first of its deletions, made in the
+/// parent's problem ([`Meet::without_any_size`]): `I` without the largest member lost, flipped along the shortest cycle
+/// through it, the promoted and the elements the child dropped outside `I` banned.  `live` is `vectors`'s live elements
+/// among the child's candidates (`vectors` is a level with the parent's vectors; `parent` may be a copy of its sets
+/// only): the child's live elements but for the loops of the contraction by `added`, which hold no member of `I` (a
+/// member of a common independent set is no loop of the contraction by others) and so leave the members lost as they
+/// are.  Nor do they change the search: a loop's circuit in the matroid where it is one lies within `added`, all
+/// banned, so its arcs there are only to or from banned members, and no cycle that avoids those passes through it.
+/// `banned` is scratch.  The workspace's tableau is left as it was.
+#[allow(clippy::too_many_arguments)]
+fn warm_first<const W: usize, const R: usize>(
+    graph: &Gf2Graph,
+    vectors: &Level<W, R>,
+    parent: &Level<W, R>,
+    added: &Bits<W>,
+    live: &Bits<W>,
+    meet: &mut Meet<R>,
+    banned: &mut Vec<u32>,
+    stats: &mut Gf2Stats,
+) -> Option<WarmFirst<W>> {
+    if !(parent.solved && parent.settled && parent.has_pot && parent.meet_solve == meet.solves) {
+        return None;
+    }
+    let last = *parent.history.last()?;
+    let mut missing = last - *added - *live;
+    if !added.is_subset(&last) || missing.is_empty() {
+        return None;
+    }
+    let index = |x: u32| graph.index[x as usize];
+    let x = missing.max().expect("a member left out");
+    missing.remove(x);
+    banned.clear();
+    banned.extend((*added | (parent.live - last - *live)).iter().map(index));
+    let value = meet.without_any_size(&vectors.problem(graph), &parent.pot, index(x), banned)?;
+    stats.warm_deletions += 1;
+    let flip: Bits<W> = meet.cycle().iter().map(|&e| graph.elems[e as usize]).collect();
+    let set = ((last - flip) | (flip - last)) - *added;
+    Some(WarmFirst { value: value - added.sum() as i64, set, missing })
 }
 
 /// With the tactic `warm_start`: `level` (solved, of all sizes, with a weight split, its tableau the workspace's) goes
@@ -1869,18 +2020,22 @@ fn warm_delete<const W: usize, const R: usize>(
 /// What the common independent sets of other sizes than a level's heaviest set (of all sizes, its tableau the
 /// workspace's) lose against it at least, which certifies a set read off its exchange graph as the heaviest without
 /// a member if the set loses no more (see `meet`'s module docs): the smaller ones `smaller` (exact once `exact`),
-/// the larger ones `larger` (exact, the gap of [`Meet::gap`], once `larger_exact`; `i64::MAX` where they do not count).
+/// the larger ones `larger` (exact, the gap of [`Meet::gap_with`], once `larger_exact`; `i64::MAX` where they do not
+/// count).
 ///
 /// What the larger sets lose starts from the level's floor where the workspace has not found the gap yet, and the gap
 /// is found only where the floor decides nothing.  A child that keeps its parent's heaviest set has a floor of the
 /// parent's gap, since its larger sets, with the promoted, are larger sets of the parent's; the level a node keeps
 /// for itself without a member, of the node's gap less the length of the cycle that certified it, since its larger
-/// sets are the node's without the member, and its heaviest set weighs that much less than the node's.
+/// sets are the node's without the member, and its heaviest set weighs that much less than the node's.  A gap of
+/// `i64::MAX`, where no common independent set is larger than the heaviest set, is a floor too: the levels below have
+/// none either.  `counts` is whether the larger sets count (`larger` is `i64::MAX` where they do not).
 struct Losses {
     smaller: i64,
     exact: bool,
     larger: i64,
     larger_exact: bool,
+    counts: bool,
 }
 
 impl Losses {
@@ -1891,20 +2046,20 @@ impl Losses {
         Some(level.value as i64 - smaller.sum() as i64)
     }
 
-    /// For `level`, whose tableau the workspace `meet` holds; the larger sets count if `larger`.
+    /// For `level`, whose tableau the workspace `meet` holds; the larger sets count if `counts`.
     fn of<const W: usize, const R: usize>(
         level: &Level<W, R>,
         meet: &mut Meet<R>,
         problem: &Problem<'_, R>,
-        larger: bool,
+        counts: bool,
     ) -> Self {
         let exact = Self::from_history(level);
-        let (larger, larger_exact) = if !larger {
+        let (larger, larger_exact) = if !counts {
             (i64::MAX, true)
         } else if level.gap_floor > 0 && !meet.knows_gap() {
             (level.gap_floor, false)
         } else {
-            (meet.gap(problem), true)
+            (meet.gap_with(problem, &level.pot), true)
         };
         debug_assert!(!larger_exact || larger == i64::MAX || level.gap_floor <= larger, "a floor of the gap above it");
         debug_assert!(larger_exact || level.gap_floor <= meet.gap(problem), "a floor of the gap above it");
@@ -1913,21 +2068,29 @@ impl Losses {
             exact: exact.is_some(),
             larger,
             larger_exact,
+            counts,
         }
     }
 
     /// Whether the larger sets lose at least `delta`: the floor first, the gap where it does not decide.
-    fn larger_at_least<const R: usize>(&mut self, delta: i64, meet: &mut Meet<R>, problem: &Problem<'_, R>) -> bool {
+    fn larger_at_least<const R: usize>(
+        &mut self,
+        delta: i64,
+        meet: &mut Meet<R>,
+        problem: &Problem<'_, R>,
+        pot: &[i64],
+    ) -> bool {
         if delta > self.larger && !self.larger_exact {
-            self.larger = meet.gap(problem);
+            self.larger = meet.gap_with(problem, pot);
             self.larger_exact = true;
         }
         delta <= self.larger
     }
 
-    /// What the level's floor of the gap becomes: the gap if it was found, else `floor`.
+    /// What the level's floor of the gap becomes: the gap if it was found (`i64::MAX` too, where there is no larger
+    /// set), else `floor`.
     fn gap_floor(&self, floor: i64) -> i64 {
-        if self.larger_exact && self.larger != i64::MAX {
+        if self.counts && self.larger_exact {
             self.larger
         } else {
             floor
@@ -1942,9 +2105,10 @@ impl Losses {
         last: &Bits<W>,
         meet: &mut Meet<R>,
         problem: &Problem<'_, R>,
+        pot: &[i64],
     ) -> i64 {
         let least = last.min().map_or(0, i64::from);
-        self.larger_at_least(least, meet, problem);
+        self.larger_at_least(least, meet, problem, pot);
         self.larger.min(least)
     }
 
@@ -1958,7 +2122,7 @@ impl Losses {
         problem: &Problem<'_, R>,
         pot: &[i64],
     ) -> bool {
-        if !self.larger_at_least(delta, meet, problem) {
+        if !self.larger_at_least(delta, meet, problem, pot) {
             return false;
         }
         if delta > self.smaller && !self.exact {

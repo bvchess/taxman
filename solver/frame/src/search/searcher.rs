@@ -1042,7 +1042,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
         let max_next = max_additional(model, space.max_total, &child.state, &child.promoted, &rest);
         let mut cands = model.narrow(&child.state, &rest);
         // Usually the child promotes one number, and a membership test is cheaper than a set intersection.
-        let touched = |k: &Bits<W>| if added.len() == 1 { k.contains(branch.n) } else { k.intersects(&added) };
+        let single = added.len() == 1;
+        let touched = |k: &Bits<W>| if single { k.contains(branch.n) } else { k.intersects(&added) };
         for k in self.known.iter().filter(|k| touched(k)) {
             let rest = *k - child.promoted;
             if rest.len() == 1 {
@@ -1122,7 +1123,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
             self.matching.push_all(added, &cands);
         }
         if let Some(g) = &mut self.gf2 {
-            g.push_all(added, &cands);
+            // The check cuts the child where its bound is below `need`, which a warm start may show early.
+            g.push_all_at(added, &cands, need);
         }
         match self.check(&child.state, &child.promoted, &cands, need, max_next, false, ctx) {
             Ok(open) => {

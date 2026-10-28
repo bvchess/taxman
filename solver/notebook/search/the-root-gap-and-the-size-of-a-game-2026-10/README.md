@@ -1289,6 +1289,104 @@ nogoods, since they cost 4.5% in all.  The largest cost the store causes that is
 children it prunes, 4.7% of a step; the rest of what a step costs more is the pruning itself, which pays.  The most a
 search reads (`DIR_CAP`) stays at 20,000 nogoods.
 
+## 2026-10-28: warm starts stopped at the need, and A* for the bound's other searches
+
+**Question.**  After the splits started from what changed, the GF(2) bound still takes most of a step of game 4984.  Can
+another 7% of the CPU be cut under the chain's settings, with the same trees?  **Answer.**  Yes: 0.918 of the CPU of
+7140548 on the 24 units of the sections above (geometric mean 0.929), 0.915 on 24 others and 0.913 on 21 units of 4995,
+with every tree the same.  Most of it comes from warm children, most of which their own bound cuts: their deletions
+stop at the first set below the need, and the first is made before the child's vectors are.  Strong branching
+finds its bounds' lengths by the A* search of the forced members, and the smaller sets' loss and the gap are found by
+A* too; a gap of no larger set at all, which every level with a child had, is carried down as a floor.
+
+**Method.**  The 24 units of the sections above under the chain's settings since game 4995: conflict branching on at a
+gate of 1,200, price reuse, the warm start, and the store of 144 units of 4983 (106,567 steps in all).  Three scratch
+builds counted the cycles of a step's parts (round 3's counters, with those of the parts outside the bound), what the
+children checked and the warm starts came to, and how the gap was found.  Each change was then paired against the build
+before it, the two builds solving each unit at once on the two hyperthreads of one core, as in the sections above, and
+three in one build were each paired against the build with it switched off.  These builds, like those before, are made
+without `target-cpu=native`, which the chain's builds use.
+
+**Where a step goes.**  At 1.24 M cycles a step (the counters overlap):
+
+| part | share of a step |
+|---|---|
+| the levels nodes keep for themselves: their checks | 28.4% |
+| children pushed: vectors copied (2.2%) and contracted (5.1%), warm starts (9.7%) | 17.5% |
+| children that keep their parent's heaviest set: their checks | 11.0% |
+| warm children: their checks | 10.6% |
+| strong branching's bounds without the members of a conflict | 8.6% |
+| a child's promotion (a peel of each frame it touches; a child promotes 8.3 numbers on average) | 8.4% |
+| the copy of the tableau a node keeps for itself | 2.7% |
+| the gap, by Bellman–Ford, at 0.75 checks a step | 2.4% |
+
+Three findings decided the change:
+
+* *Most warm children are cut by their own bound.*  Of 24,702 warm children (0.23 a step), 15,875 had a bound below
+  their need, and the first deletion showed it for 14,360 of them.  Of those, 2,360 had lost two members or more, and
+  each deletion after the first derives a tableau, finds a split and searches (0.08 a step, about 620 k cycles each).
+  Each child's vectors were copied and contracted before its first deletion, which does not read them.
+* *The gap was found at every level checked.*  A floor carried down spares the search for the gap, but the floor was 0
+  at all 79,550 checks that found it.  Where no common independent set is larger than the heaviest set the gap is
+  `i64::MAX`, which the floor left out, and so was every gap of a level with a child.
+* *Strong branching reads each member's cycle for its length alone*, but for the member whose level the node keeps.
+
+The levels nodes keep for themselves end with 37.6 members forced an evaluation, 11.2 by their two arcs and 26.5 by a
+search, against 4.0 searches that found a cycle and 75.9 members freed by cycles kept.
+
+**The change.**  Six parts, each leaving every result the same:
+
+1. *Warm starts stopped at the need.*  Each deletion of a warm start only lowers the heaviest set, and the search cuts a
+   child whose bound is below its need.  So a child pushed at its need (`Gf2Bound::push_all_at`) stops its deletions at
+   the first set below it, and `evaluate` returns that set's weight, an upper bound on the child's, which cuts the child
+   as its bound would.  Debug builds solve each child cut so and check that its bound is no higher.
+2. *The first deletion before the child is made* (`warm_first`), in the parent's problem, so that a child it cuts is
+   never copied or contracted.  The loops of the contraction are not banned from its search, as they were once the
+   child was made, and that changes nothing: a loop's circuit in the matroid where it is one lies within the promoted
+   members, all banned, so its arcs there run only to or from banned members, and no cycle that avoids them passes
+   through it.
+3. *The gap of no larger set carried down as a floor*, as a finite gap is: a level below has no larger set either.
+4. *Strong branching by the length of the shortest cycle.*  The A* search of the forced members finds each member's
+   (`Meet::shortest_cycle_length`), and `Meet::without` finds the cycle of the member whose level the node keeps alone,
+   when it keeps it: the shortest with the fewest arcs, as before, so the level is the same.  Debug builds check every
+   length against `Meet::without`'s.
+5. *The smaller sets' loss and the gap by A** over the split's reduced lengths, with the bounds of the search for
+   forced members: the loss from the lightest member's weight (`Meet::smaller_loss`), the gap from the elements free in
+   A (`Meet::gap_with`).  Debug builds check each against Dijkstra's search with no bounds and against Bellman–Ford's.
+6. *Two small ones*: a derivation by contraction does not scan for marks it cannot have made, and `make_child` asks once
+   whether the child promotes one number.
+
+**Results.**  CPU of each build over the one named or the one before it, paired, every tree the same (the builds
+between them had the branchless contraction and the deferred copy below):
+
+| build | runs a unit | total CPU | geometric mean of the units' ratios | the units' ratios |
+|---|---|---|---|---|
+| part 1 with the split's bound before each warm start, over 7140548 | 2 | 0.971 | 0.973 ± 0.8% | 0.940 to 1.003 |
+| parts 4 and 5 for the smaller sets' loss | 1 | 0.982 | 0.979 ± 2.0% | 0.787 to 1.005 |
+| the gap by A* (a switch in one build) | 1 | 0.989 | | |
+| the build committed, over 7140548 | 2 | 0.918 | 0.929 ± 1.1% | 0.884 to 0.986 |
+| the same, on 24 other units of 4984 (gaps 500 to 1,300) | 1 | 0.915 | 0.940 ± 1.1% | 0.895 to 0.988 |
+| the same, on 21 units of 4995 with its store of 20,000 nogoods, at most 20,000 steps each | 1 | 0.913 | 0.914 ± 0.6% | 0.888 to 0.943 |
+
+Game 3000 keeps every counter of `tune` under the default tactics (117,197 steps), the chain's (161,460) and conflict
+branching off (161,460), at 0.95 to 0.96 of the CPU (unpaired).  Debug builds of `tune` solved the roots of 1000 to
+1700 under the chain's settings, with conflict branching off and with the default tactics, and six units of 4984 with
+the store, every check passing.
+
+**Tried and not kept.**
+
+* *The split's bound without each member a warm child loses*, before its warm start: it cut 11 of the 24,702.
+* *A branchless contraction of a child's vectors*, which rewrites every vector: 1.037 of the CPU (one run, a switch in
+  one build).
+* *The copy of the tableau a node keeps for itself made only when the workspace first changes*, so that none is made
+  where a cut child leaves the workspace's tableau to the node: 0.997 of the CPU (one run, a switch), too little for
+  its code.
+* *A set width of 80 words*, for the boards 4096 to 5119 (4984 needs 78): 0.981 of the CPU (one run), with the same
+  trees.  The chain's builds use `target-cpu=native`, whose popcount instruction makes the wide sets cheaper than in
+  these builds, and a checkpoint made at another width is refused, so a search under way could not resume at it.
+
+**Decision.**  Kept, as the default: every tree is the same, so it is no tactic.
+
 ## Files
 
 The scripts and their output are in the lab's work folder on the machine of the chain, not copied here.
@@ -1370,3 +1468,13 @@ order); the builds (`bin/`); the unit lists (`prof8.txt`, `pair21.txt`, `debug8.
 to `profC/` (the profiles of the old build, the change and the variant), `pairA/` and `pairC/` (the change against the
 old build, the two stores), `pairB/` (the dry runs), `pairD/` (the two stores on the new build), `pairE/` (the 16-bit
 ranks and the order) and `debug/` (a debug build).
+`~/taxman_work/lab/work/step4-2026-10-28/` has the runs of the warm starts stopped at the need (2026-10-28): in `tools/`
+the runner of one build (`solo.sh`), the paired runners (`pair.sh` on 4984, `pair4995.sh` on 4995, `final.sh` for the
+build committed), the debug runners (`dbg.sh` on games' roots, `dbgunits.sh` on units), game 3000's runs (`ident.sh`),
+the counters' summary (`psum4.py`, over round 3's `psum3.py`) and the second script of counters (`prof4_apply.py`, after
+round 3's `prof3_apply.py`); the counters as a patch against 7140548 (`prof.patch`, with its module `prof.rs`), the
+width of 80 words (`w80.patch`) and the build with switches (`sw.patch`, against the build committed); the builds
+(`bin/`, the switches as wrappers `sw-s1` to `sw-s3`); the unit lists (`set24.txt`, `setB.txt`); and a file a solve in
+`prof1/` to `prof3/` (the profiles), `pairA/` to `pairD/` (the builds in turn), `pairW/` (the width), `swS1/` to
+`swS3/` (the switches), `final-v6/`, `finalB-v6/` and `p4995-v6/` (the build committed), `p4995-v4/` (a build before
+it on 4995) and `ident-v6/` (game 3000), with the debug runs' output in `debug*.txt`.

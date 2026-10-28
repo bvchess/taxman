@@ -367,6 +367,9 @@ struct Walked {
     /// the matroids built afresh from the child's state, and of those the bounds equal to it.
     child_bounds: u64,
     child_bounds_equal: u64,
+    /// Children pushed at a need whose warm start stopped below it (`Gf2Bound::push_all_at`), each checked against the
+    /// bound of the matroids built afresh from the child's state.
+    below: u64,
 }
 
 /// Runs `f` on every engine, checks that all give the same result and returns it.
@@ -390,7 +393,10 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// are the fresh solves', and so are the bounds without a candidate that are solved (to the end, where they must be
 /// equal, or stopped early, where they are between the stop and the truth).  Half the promotions go as strong
 /// branching makes them: the bounds without some members of the heaviest set certified, the node going on without
-/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  Every
+/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  Half the
+/// children are pushed as the search checks them, at a need near what the node's bound leaves them
+/// ([`Gf2Bound::push_all_at`]): one whose warm start shows it below the need is cut, its bound no lower than that of
+/// the matroids built afresh from its state, and the node goes on.  Every
 /// node's members are priced as conflict branching prices them, carrying its parent's cycles, and the prices are the
 /// bounds found without the carry.  The narrowing of a child's candidates and the count of the promotions left are
 /// the model's, so that `p` may be an extended problem with one-sided candidates (for a problem without them they are
@@ -520,7 +526,29 @@ fn walk_random_paths<const W: usize>(
                         }
                     }
                     let before = engines[0].stats().inherited;
-                    agree(engines, |e| e.push_all(&Bits::EMPTY.with(x), &child_cands));
+                    if rng.chance(50) {
+                        // As the search checks a child: pushed at a need near what the node's bound leaves it, which
+                        // a warm start may show the child below before its heaviest set is known.  A child below it is
+                        // cut, and the node goes on; another is checked against fresh matroids as every level is.
+                        let room = p.max_total.saturating_sub(promoted.len() + 1);
+                        let child_cap = room.min(p.model.max_promotions_among(&next, &child_cands).max(0) as u32);
+                        let need = (eval.value.saturating_sub(u64::from(x)) + 10).saturating_sub(rng.below(40));
+                        let below = engines[0].stats().warm_below;
+                        agree(engines, |e| e.push_all_at(&Bits::EMPTY.with(x), &child_cands, need));
+                        let value = agree(engines, |e| e.evaluate(child_cap, Some(need))).value;
+                        walked.below += engines[0].stats().warm_below - below;
+                        if value < need {
+                            let child_graph = Gf2Graph::new(&p.model, &next, &child_cands);
+                            let mut fresh_child = Gf2Bound::<W>::new(&child_graph);
+                            fresh_child.reset(&Bits::EMPTY, &child_cands);
+                            let truth = fresh_child.evaluate(child_cap, None).value;
+                            assert!(truth <= value, "n={n}: promoting {x} after {promoted:?}: {truth} above {value}");
+                            agree(engines, |e| e.pop());
+                            continue;
+                        }
+                    } else {
+                        agree(engines, |e| e.push_all(&Bits::EMPTY.with(x), &child_cands));
+                    }
                     walked.inherited += engines[0].stats().inherited - before;
                     walked.one_sided_promoted += u64::from(one_sided.contains(x));
                     path.push((next, promoted.with(x), child_cands));
@@ -646,9 +674,12 @@ fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64, wa
     }
     walked.children += warm_children;
     if warm {
+        let below = walked.below;
         println!("{warm_children} children and {warm_levels} nodes warm-started, {warm_deletions} deletions");
+        println!("{below} children pushed at a need cut by their warm starts");
         let more = warm_deletions > warm_children + warm_levels;
         assert!(warm_children > 0 && warm_levels > 0 && more, "{warm_children} {warm_levels} {warm_deletions}");
+        assert!(below > 0, "no child pushed at a need was cut by its warm start");
     }
     let Walked { checks, inherited, forced_checked, certified_checked, excluded_checked, children, .. } = walked;
     println!("{checks} {inherited} {forced_checked} {certified_checked} {children} {excluded_checked}");
