@@ -393,8 +393,8 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 /// are the fresh solves', and so are the bounds without a candidate that are solved (to the end, where they must be
 /// equal, or stopped early, where they are between the stop and the truth).  Half the promotions go as strong
 /// branching makes them: the bounds without some members of the heaviest set certified, the node going on without
-/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  Half the
-/// children are pushed as the search checks them, at a need near what the node's bound leaves them
+/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  With
+/// `at_need`, half the children are pushed as the search checks them, at a need near what the node's bound leaves them
 /// ([`Gf2Bound::push_all_at`]): one whose warm start shows it below the need is cut, its bound no lower than that of
 /// the matroids built afresh from its state, and the node goes on.  Every
 /// node's members are priced as conflict branching prices them, carrying its parent's cycles, and the prices are the
@@ -411,6 +411,7 @@ fn walk_random_paths<const W: usize>(
     rng: &mut Rng,
     paths: usize,
     forced_cap: usize,
+    at_need: bool,
     engines: &mut [Gf2Bound<'_, W>],
     walked: &mut Walked,
 ) {
@@ -526,7 +527,7 @@ fn walk_random_paths<const W: usize>(
                         }
                     }
                     let before = engines[0].stats().inherited;
-                    if rng.chance(50) {
+                    if at_need && rng.chance(50) {
                         // As the search checks a child: pushed at a need near what the node's bound leaves it, which
                         // a warm start may show the child below before its heaviest set is known.  A child below it is
                         // cut, and the node goes on; another is checked against fresh matroids as every level is.
@@ -667,7 +668,7 @@ fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64, wa
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let mut engine = Gf2Bound::<W>::new(&graph);
         engine.set_warm_start(warm);
-        walk_random_paths(&p, rng, paths, usize::MAX, std::slice::from_mut(&mut engine), &mut walked);
+        walk_random_paths(&p, rng, paths, usize::MAX, true, std::slice::from_mut(&mut engine), &mut walked);
         warm_children += engine.stats().warm_children;
         warm_levels += engine.stats().warm_levels;
         warm_deletions += engine.stats().warm_deletions;
@@ -738,7 +739,7 @@ fn split_bounds_found_where_asked_for_agree_with_those_found_with_every_split() 
         for engine in &mut engines {
             engine.set_warm_start(warm);
         }
-        walk_random_paths(&p, &mut rng, 3, usize::MAX, &mut engines, &mut walked);
+        walk_random_paths(&p, &mut rng, 3, usize::MAX, true, &mut engines, &mut walked);
     }
     let Walked { checks, forced_checked, splits_compared, .. } = walked;
     println!("{checks} nodes, {forced_checked} forced members checked, {splits_compared} split bounds compared");
@@ -769,17 +770,18 @@ fn levels_match_fresh_matroids_along_random_paths_with_warm_starts() {
     walk_real_games(&boards, 12, &mut Rng(0xA5A5_0123_4567_89AE), 100, true);
 }
 
-/// Along random paths of the boards 300 and 760 at W = 16 (`walk_random_paths`), engines whose search stamps start
-/// just below their 32-bit counter's wrap, so that they wrap on the way, give every result of an engine whose stamps
-/// start at 0 and do the same work: the counter's wrap changes nothing.  (Without the stamps cleared before the wrap,
-/// the counter came back to 0, which every stamp never written holds, and then to the stamps of 2^32 stamps before:
-/// see `meet`'s test of the same.)
+/// Along random paths of the boards 300 and 760 at W = 16 (`walk_random_paths`, 6 paths and 2), engines whose search
+/// stamps start just below their 32-bit counter's wrap, so that they wrap on the way, give every result of an engine
+/// whose stamps start at 0 and do the same work: the counter's wrap changes nothing.  (Without the stamps cleared
+/// before the wrap, the counter came back to 0, which every stamp never written holds, and then to the stamps of 2^32
+/// stamps before: see `meet`'s test of the same.)  The engines have no warm start, so the walk pushes no child at a
+/// need, which would change nothing for them.
 #[test]
 fn engines_agree_across_the_wrap_of_the_stamp_counter() {
     const W: usize = 16;
     let mut rng = Rng(0x57A3_9E11_0000_0002);
     let mut walked = Walked::default();
-    for n in [300u32, 760] {
+    for (n, paths) in [(300u32, 6), (760, 2)] {
         let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let starts = [u32::MAX - 300, u32::MAX - 1_500, u32::MAX - 3_000];
@@ -787,7 +789,7 @@ fn engines_agree_across_the_wrap_of_the_stamp_counter() {
         for (engine, &start) in engines[1..].iter_mut().zip(&starts) {
             engine.set_stamp_generation(start);
         }
-        walk_random_paths(&p, &mut rng, 6, usize::MAX, &mut engines, &mut walked);
+        walk_random_paths(&p, &mut rng, paths, usize::MAX, false, &mut engines, &mut walked);
         for (engine, &start) in engines[1..].iter_mut().zip(&starts) {
             let end = engine.stamp_generation();
             assert!(end < start, "n={n}: the stamps from {start} did not wrap ({end})");
@@ -812,7 +814,7 @@ fn walk_extended_problems<const W: usize>(boards: &[u32], paths: usize, rng: &mu
         for open in [all, half] {
             let Ok((_, p)) = extended_problem(&board, &open.into_iter().collect()) else { continue };
             let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-            walk_random_paths(&p, rng, paths, FORCED_CAP, &mut [Gf2Bound::<W>::new(&graph)], walked);
+            walk_random_paths(&p, rng, paths, FORCED_CAP, true, &mut [Gf2Bound::<W>::new(&graph)], walked);
             walks += 1;
         }
     }
@@ -1062,7 +1064,7 @@ fn engines_of_every_word_count_agree_along(boards: &[u32], paths: usize, percent
             engines.push(Gf2Bound::<W>::new(padded));
         }
         assert_eq!(engines.len(), 1 + 2 * (MAX_WORDS - natural), "n={n}");
-        walk_random_paths(&p, &mut rng, paths, usize::MAX, &mut engines, &mut walked);
+        walk_random_paths(&p, &mut rng, paths, usize::MAX, true, &mut engines, &mut walked);
     }
     let Walked { checks, excluded_checked, splits_compared, .. } = walked;
     let at_least = |count: u64, most: u64| count * 100 >= most * percent;
