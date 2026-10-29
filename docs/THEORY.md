@@ -3,7 +3,7 @@
 The theory proves what the project's programs rest on: the frame solver, which finds optimal games; the prover, which
 proves them optimal on the whole board; and the claims of the heuristics.  Each result has a name, such as [the ceiling
 lemma](theory/neighbors.md#the-ceiling-lemma), and a label: the letter of its file and its number there, as in N4.
-[statements.md](theory/statements.md) lists every result with its standing, with the notation and open questions. Four
+[statements.md](theory/statements.md) lists every result with its standing, with the notation and open questions.  Four
 statements are open: [statement U](theory/exactness.md#statement-u), [the sources
 conjecture](theory/sources.md#the-sources-conjecture), (★) and (♦).  [evidence.md](theory/evidence.md) gives the
 computations behind the standings that rest on computation, and the heuristics' table of claims

@@ -70,7 +70,7 @@ contradiction.  ∎
 **Theorem P2 (the playability theorem).**  Let S ⊆ {2, …, n}.  Then S is playable iff its own instance is: iff some
 injective map pay gives each x in S a maximal factor of x outside S, and the precedence of pay is acyclic.  Moreover:
 
-1. every [topological order](primer.md#topological-orders) of the precedence of such a map is the order of a game that
+1. every [topological order](primer/graphs.md#topological-orders) of the precedence of such a map is the order of a game that
    plays S and nothing else; and
 2. the order in which any game plays the members of S is a topological order of the precedence of such a map.
 
@@ -287,7 +287,7 @@ move.
 Playability implies linear independence over every field, which gives the bounds of [the parity bound
 (W1)](parity-bound.md#the-parity-bound) and of [the frame bound (B2)](frame-bounds.md#the-frame-bound), through [the
 signed frame theorem (B1)](frame-bounds.md#the-signed-frame-theorem).  The primer explains
-[GF(2)](primer.md#finite-fields-and-gf2).
+[GF(2)](primer/linear-algebra.md#finite-fields-and-gf2).
 
 *Incidence vectors.*  Fix a board n and a field 𝔽.  The coordinates are the numbers from 1 to n/2, which hold every
 maximal factor of a number up to n.  Each number s from 2 to n has the *incidence vector* v(s), with a 1 at each maximal
@@ -408,7 +408,7 @@ with two factors.
 An *odd core* of an instance is a core whose members' lists, as vectors of 0s and 1s on the pool, are linearly
 independent over GF(2).  The name comes from a count: the lists are independent over GF(2) iff some square submatrix,
 on as many factors as members, is nonsingular over GF(2), and its determinant is, mod 2, its permanent, the number of
-payment schemes onto those factors ([the primer](primer.md#matchings-permanents-and-determinants)).
+payment schemes onto those factors ([the primer](primer/graphs.md#matchings-permanents-and-determinants)).
 
 Odd cores are what [the independence lemma](#the-independence-lemma) cannot see: an unplayable set S whose vectors u(s)
 are independent over GF(2) passes P10, and it holds an odd core of its own instance, a core by [P7](#the-core-theorem)

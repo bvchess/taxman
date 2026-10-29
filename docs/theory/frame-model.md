@@ -119,7 +119,7 @@ in layer 2 are exactly U\*_2, and S_2 is a forest in G_n.  Where the frames of l
 layer 2 up to n/2.
 
 *Proof.*  In layer 2 descending greedy keeps an edge unless it closes a cycle with the edges kept: it is the scan,
-[the greedy algorithm](primer.md#the-greedy-algorithm) on the [forests](primer.md#forests) of G_n.  An exchange shows
+[the greedy algorithm](primer/greedy.md#the-greedy-algorithm) on the [forests](primer/linear-algebra.md#forests) of G_n.  An exchange shows
 that S_2 is what the scan keeps of S_2 ∪ U\*_2.  Parts (b) and (d) cited below are the primer's, in its section on the
 greedy algorithm, and a forest spans an edge outside it when the edge closes a cycle with it.
 
@@ -168,7 +168,7 @@ So a winnable pair has at least as many factors as moves.
 *Proof.*  No move divides another, since they lie in one layer, and a move's divisors among the factors are its live
 factors.  A winning order pays each move with a live factor present at its turn, and these payments are distinct.  When
 pay(a) divides b, b comes after a, or b would have removed pay(a): the order is a topological order of the precedence,
-which is therefore acyclic ([topological orders](primer.md#topological-orders)).  Conversely, in a topological order of
+which is therefore acyclic ([topological orders](primer/graphs.md#topological-orders)).  Conversely, in a topological order of
 an acyclic scheme every move that lists pay(a) comes after a, so pay(a) is there at a's turn, and the order wins.  A
 scheme pays the moves with distinct factors.  ∎
 
@@ -390,8 +390,8 @@ alone as edges, and d the number of frames of layer 2 with no square.
 1. A source pq joins p and q in the frame graph, and p² hangs on p alone.  So H_n has d + 1 components: each frame with
    no square, and g with the rest.
 2. U\*_2, which the scan keeps (step 3 of F4's proof), is a maximal forest in H_n ([part
-   (a)](primer.md#the-greedy-algorithm)).  So it has d fewer members than the primes up to n/2
-   ([rank](primer.md#forests)), the frames' factors ([F1](#the-frame-lemma)): the frames have d freedoms in all.  A
+   (a)](primer/greedy.md#the-greedy-algorithm)).  So it has d fewer members than the primes up to n/2
+   ([rank](primer/linear-algebra.md#forests)), the frames' factors ([F1](#the-frame-lemma)): the frames have d freedoms in all.  A
    frame with no square has as moves a forest on its own primes, so a freedom at least: each of the d has one, and the
    others none.
 3. *Nagura's theorem:* for every real x ≥ 25 some prime lies in (x, 6x/5].  It follows from Dusart's Proposition 6.8

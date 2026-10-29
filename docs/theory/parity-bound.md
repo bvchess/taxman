@@ -22,8 +22,8 @@ promotions](frame-bounds.md)).
 [sources.md](sources.md#descending-greedy).  The incidence vector v(s) of a number s, the unit vector e_s of s ≤ n/2,
 and a set *independent with its own coordinates* (its members' v(s) together with the e_s of its members up to n/2) are
 those of [playability.md](playability.md#independence).  GF(2) is explained in [the
-primer](primer.md#finite-fields-and-gf2), and linear independence, spans, circuits, private coordinates and quotients by
-a span in [its section on linear independence](primer.md#linear-independence).
+primer](primer/linear-algebra.md#finite-fields-and-gf2), and linear independence, spans, circuits, private coordinates and quotients by
+a span in [its section on linear independence](primer/linear-algebra.md#linear-independence).
 
 ## The parity vectors
 
@@ -44,7 +44,7 @@ GF(2), and *independent at both parities* when it is independent at parity 0 and
 is a nonempty set whose parity-i vectors sum to 0 while those of no smaller nonempty part of it do.  For a set Y, a set
 I disjoint from Y is independent at parity i *together with Y* when Y ∪ I is independent at parity i, and at both
 parities together with Y when it is at each.  When Y is independent at parity i, this says that the classes of I's
-parity-i vectors modulo the span of Y's are independent ([the primer](primer.md#linear-independence)).
+parity-i vectors modulo the span of Y's are independent ([the primer](primer/linear-algebra.md#linear-independence)).
 
 *Extra coordinates.*  At parity i, no vector but a number's own has a 1 at its extra coordinate, so no combination of
 the other members' parity-i vectors reaches the number's, and no nonempty set whose parity-i vectors sum to 0 holds it.
@@ -95,7 +95,7 @@ nothing.
 
 1. *A set S is independent at both parities iff it is independent with its own coordinates.*  Every vector of that
    family lies in E₀ or in E₁, two disjoint blocks of coordinates, so the family is independent iff its vectors in E₀
-   are and its vectors in E₁ are ([the primer](primer.md#linear-independence)): a nonempty part of the family whose
+   are and its vectors in E₁ are ([the primer](primer/linear-algebra.md#linear-independence)): a nonempty part of the family whose
    vectors sum to 0 splits into its vectors in E₀ and its vectors in E₁, each of which sums to 0 alone, and one of them
    is nonempty.  Its vectors in E_i are exactly the parity-i vectors of the members of S that have no extra
    coordinate at parity i: v(s) when Ω(s) and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is
@@ -120,13 +120,13 @@ parity bound is the heaviest of these.
 Three properties make the bound useful.
 
 * **It takes polynomial time.**  The heaviest set independent at both parities is found by weighted matroid
-  intersection, a classical algorithm ([the primer](primer.md#two-families-at-once)), which needs only a test of
+  intersection, a classical algorithm ([the primer](primer/bounds.md#two-families-at-once)), which needs only a test of
   independence at each parity, here on sparse vectors over GF(2).  No proof depends on the algorithm, since the next
   property certifies its answer.
 * **Its value can be checked without trusting the algorithm.**  Let w = w₀ + w₁ be a split of the weights under which
   a set I independent at both parities is a heaviest set independent at parity 0 for w₀ and a heaviest set independent
   at parity 1 for w₁.  Then every set J independent at both parities has w(J) = w₀(J) + w₁(J) ≤ w₀(I) + w₁(I) = w(I),
-  so the split proves w(I) the maximum, whatever produced I ([the primer](primer.md#two-families-at-once), the
+  so the split proves w(I) the maximum, whatever produced I ([the primer](primer/bounds.md#two-families-at-once), the
   paragraph "Certificates").  For the two parities such a split always exists (the primer, the paragraph "For families
   of vectors").  The prover accepts a value only with its split.
 * **The same split bounds the sets that avoid a member x of I.**  Such a set weighs at most the heaviest set without x
@@ -205,7 +205,7 @@ game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 The sources are the largest numbers, and each has an extra coordinate at one parity, so the parity bound takes them as
 the greedy algorithm would at the other: by decreasing value, each one whose vector is no sum of those taken before it.
 The *sources' vectors* of game n are the incidence vectors v(s) over GF(2) of its sources s.  Their *greedy basis* is
-the set of sources that [the greedy algorithm](primer.md#the-greedy-algorithm) keeps when it takes the sources by
+the set of sources that [the greedy algorithm](primer/greedy.md#the-greedy-algorithm) keeps when it takes the sources by
 decreasing value and keeps each whose vector is not in the span of the vectors of those kept.
 
 **Proposition W3 (the greedy-basis proposition).**  Let n ≥ 2.  Every heaviest set independent at both parities holds,
@@ -228,7 +228,7 @@ is made of larger sources, which is how the greedy algorithm rejects.
    would be independent at both and outweigh I.  So v(d), the parity-i vector of d, is the sum of the parity-i vectors
    of exactly one set of members of I, since I is independent at parity i.  With d, this set is the circuit H of I + d
    at parity i, and a member e of I lies in H exactly when I − e + d is independent at parity i ([the
-   primer](primer.md#linear-independence)).  If H held a member e smaller than d, I − e + d would be independent at
+   primer](primer/linear-algebra.md#linear-independence)).  If H held a member e smaller than d, I − e + d would be independent at
    parity i, and at the other parity too, where d has its extra coordinate, and it would outweigh I.  So the other
    members of H are larger than d: sources above d, members of G.  A member with an extra coordinate at parity i lies
    in no circuit at parity i, so the parity-i vector of each is its v, and these vectors sum to v(d).  Then the greedy
@@ -267,10 +267,10 @@ Between it and the bounds it is compared with:
   (B6)](frame-bounds.md#the-comparison-theorem)), and the two are equal on every board measured
   ([frame-bounds.md](frame-bounds.md#the-frame-bound), the paragraph "Against the parity bound").
 * A bound built the same way over the rationals would admit every set that the parity bound admits ([the
-  primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and more.  The triangle {6, 10, 15} is
+  primer](primer/linear-algebra.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and more.  The triangle {6, 10, 15} is
   unplayable, since whichever member is played first leaves at most one of the factors 2, 3 and 5 for the other two,
   and its vectors are dependent over GF(2) but independent over the rationals ([the
-  primer](primer.md#finite-fields-and-gf2), the paragraph "Example").
+  primer](primer/linear-algebra.md#finite-fields-and-gf2), the paragraph "Example").
 * The bound asks for independence at two parities at once, and there the greedy algorithm, which takes the numbers in
   decreasing order of weight and keeps each that leaves the kept set independent at both parities, can miss the
   heaviest set.  On every board from 4 up, give 2 the weight 3, give 3 and 4 the weight 2, and give every other

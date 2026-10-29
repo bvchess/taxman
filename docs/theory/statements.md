@@ -19,7 +19,7 @@ t and ρ, are local: each file defines those it uses.
 | ΣS | the sum of the members of a set S | here |
 | S_k, S_{≥k} | the members of a set S in layer k, and in layers k and up | here |
 | ℓ(n) | the most moves of a game of n | [longest games](uniqueness-and-longest-games.md#longest-games) |
-| ν(n), ν(S) | the matching number of the board's maximal-factor graph, or of a set's incidence graph | [longest games](uniqueness-and-longest-games.md#longest-games), [the primer](primer.md#matchings-permanents-and-determinants) |
+| ν(n), ν(S) | the matching number of the board's maximal-factor graph, or of a set's incidence graph | [longest games](uniqueness-and-longest-games.md#longest-games), [the primer](primer/graphs.md#matchings-permanents-and-determinants) |
 | q(n) | the largest prime ≤ n; for a prime p, q(p − 1) is the largest prime below it | [neighbors.md](neighbors.md#neighboring-games) |
 | p, q, r | primes, local to a statement; never a bare q where q(n) is in play | |
 | Ω(x) | the number of prime factors of x, counted with multiplicity: its layer | [playability.md](playability.md#playability) |
@@ -29,7 +29,7 @@ t and ρ, are local: each file defines those it uses.
 | R | the residual of an instance | [the residual](playability.md#cores-and-the-residual) |
 | pay(x) | the factor that a payment scheme pays x with | [payment schemes](playability.md#payment-schemes) |
 | v(s), u(s), e_s | the incidence vector of s; the same with the coordinates of a set's own members deleted; the unit vector of s | [independence](playability.md#independence) |
-| 𝔽 | a field; GF(2) and GF(3) are the fields of two and three elements | [the primer](primer.md#finite-fields-and-gf2) |
+| 𝔽 | a field; GF(2) and GF(3) are the fields of two and three elements | [the primer](primer/linear-algebra.md#finite-fields-and-gf2) |
 | per(S, T) | the number of payment schemes of S whose payments are T | [Franklín and Moniot](franklin-moniot.md#what-the-paper-proves) |
 | U\*, U\*_k | the sources that descending greedy keeps, and their part in layer k | [descending greedy](sources.md#descending-greedy) |
 | U\*(n) | U\* of game n, where two games are in play | [the repeat lemma](search-rules.md#the-repeat-lemma) |
@@ -47,7 +47,7 @@ t and ρ, are local: each file defines those it uses.
 | V | a score of a game, or the value of a search's incumbent | [exact searches](search-rules.md#exact-searches), [the certificate theorem](extended-problem.md#the-certificate-theorem) |
 | T_h | the candidates that touch frame h: those of home h and of home h + 1 | [signed frames](frame-bounds.md#signed-frames) |
 | σ | a signing of a frame | [signed frames](frame-bounds.md#signed-frames) |
-| w, λ | weights, and multipliers | [weak duality](primer.md#weak-duality-and-lagrangian-relaxation) |
+| w, λ | weights, and multipliers | [weak duality](primer/bounds.md#weak-duality-and-lagrangian-relaxation) |
 | π_{p,q}, c_r(S) | the exchange of the primes p and q, and the sum of S's cofactors of r | [the prime-exchange theorem](search-rules.md#the-prime-exchange-theorem) |
 | lo(n), hi(n) | a lower and an upper bound on opt(n) | [bounds carried between games](search-rules.md#bounds-carried-between-games) |
 

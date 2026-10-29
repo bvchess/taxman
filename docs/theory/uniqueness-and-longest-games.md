@@ -36,12 +36,12 @@ weights.
 1. *Counts.*  Fix t, and a component H of the sources.  The set S ∩ H ∩ [t, n] is playable, as part of S (a set of
    members of a playable instance is playable: [induced instances](playability.md#payment-schemes)).  So by (★) it has
    at most |U\* ∩ H ∩ [t, n]| members.  Summing over the components gives |S ∩ [t, n]| ≤ |U\* ∩ [t, n]|.
-2. *The rest.*  The paragraph "Dominance" of [sums over thresholds](primer.md#sums-over-thresholds) turns these counts
+2. *The rest.*  The paragraph "Dominance" of [sums over thresholds](primer/greedy.md#sums-over-thresholds) turns these counts
    into the order of the members, and into w(S) ≤ w(U\*) for every positive, strictly increasing weighting w, with
    equality only if S = U\*.  ∎
 
 This is the textbook fact that distinct weights give a family of vectors only one heaviest basis, the one [the greedy
-algorithm](primer.md#the-greedy-algorithm) keeps, transplanted.  The textbook fact rests on the exchange property, which
+algorithm](primer/greedy.md#the-greedy-algorithm) keeps, transplanted.  The textbook fact rests on the exchange property, which
 the playable sets of sources can lack, as in game 2873 ([where exchange breaks](sources.md#where-exchange-breaks)); in
 game 21 they are the forests of a graph ([the two-factor proposition (P11)](playability.md#the-two-factor-proposition)).
 Their incidence vectors are always linearly independent over GF(2) ([the independence lemma
@@ -68,9 +68,9 @@ rules and score opt(425) = 57,010.
 
 A second optimal set rules out a relaxation that is exact for the whole game and that the greedy algorithm solves.  A
 *greedy relaxation* of game n is a family of subsets of the numbers 2 to n that is closed under taking subsets, holds
-every playable set of game n, and on which [the greedy algorithm](primer.md#the-greedy-algorithm) finds a heaviest
+every playable set of game n, and on which [the greedy algorithm](primer/greedy.md#the-greedy-algorithm) finds a heaviest
 member for every nonnegative weighting: taking the numbers in decreasing order of weight, it keeps each one that leaves
-the kept set in the family.  These families are the matroids ([the primer](primer.md#matroids)).  The heaviest member,
+the kept set in the family.  These families are the matroids ([the primer](primer/greedy.md#matroids)).  The heaviest member,
 with the values as weights, weighs at least opt(n), since the optimal sets are members; the relaxation is *exact* when
 it weighs exactly opt(n).
 
@@ -84,7 +84,7 @@ be a heaviest one.
 
 1. *One heaviest member.*  In a greedy relaxation of game n, let G be the set that the greedy algorithm keeps, taking
    the numbers in decreasing order.  The values are positive and distinct, so G is the only heaviest member: every other
-   member I has w(I) < w(G).  This is the primer's greedy theorem ([matroids](primer.md#matroids)): with positive
+   member I has w(I) < w(G).  This is the primer's greedy theorem ([matroids](primer/greedy.md#matroids)): with positive
    weights a heaviest member is a basis, a member that no further number can join, and distinct weights give only one
    heaviest basis.
 2. *Every optimal set would be it.*  Every optimal set is playable, so a member, and the heaviest member weighs at least

@@ -21,8 +21,8 @@ conjecture (♦).
 *Words.*  Frames, their numbering, [candidates, homes, winnable frames and promotion
 sets](frame-model.md#the-frame-model), and [nodes, completions, state(P) and the promotion
 limit](frame-model.md#searching-the-frame-model) are defined in frame-model.md.  Fields are explained in [the
-primer](primer.md#finite-fields-and-gf2), and linear independence in [its section on linear
-independence](primer.md#linear-independence).
+primer](primer/linear-algebra.md#finite-fields-and-gf2), and linear independence in [its section on linear
+independence](primer/linear-algebra.md#linear-independence).
 
 ## Signed frames
 
@@ -48,7 +48,7 @@ state form a promotion set (at the root P is empty, a promotion set by [the exac
 (X7)](exactness.md#the-exactness-theorem), as U\* is playable), so every frame of the state is winnable with nothing
 applied, its moves peel completely ([the peel theorem (P4)](playability.md#the-peel-theorem)), and [the peel-order lemma
 (P9)](playability.md#the-peel-order-lemma), part 2, applies.  A family made of the moves' vectors and others is then
-independent exactly when the others' *classes* modulo the moves' span are ([quotients](primer.md#linear-independence)):
+independent exactly when the others' *classes* modulo the moves' span are ([quotients](primer/linear-algebra.md#linear-independence)):
 a set is independent in frame h exactly when the classes of its members that touch frame h are.  The quotient has
 dimension |Q_h| less the number of moves, the frame's freedoms, so a set independent in frame h has at most that many
 members in T_h.
@@ -61,7 +61,7 @@ family of vectors: give each candidate its class in the even frame it touches, i
 quotient spaces, where each frame's quotient meets the sum of the others only in 0, so that a set is independent exactly
 when its part in each even frame is (the primer, the item "Disjoint blocks").  Likewise for the odd frames.  Weighted
 matroid intersection finds a heaviest set independent in two such families, within a limit on its size ([the
-primer](primer.md#two-families-at-once)).  The frame bound needs only weak duality, by which a weight split that attains
+primer](primer/bounds.md#two-families-at-once)).  The frame bound needs only weak duality, by which a weight split that attains
 a value proves it; one exists under the limit too (the primer's paragraph "For families of vectors").
 
 *Example.*  On the board of 21, setup leaves two frames with freedoms: frame 0, with the moves 14 and 21 and the factors
@@ -112,7 +112,7 @@ their nonzero entries.
    in frame h together with P.
 6. *Together with P is the node's frame.*  By step 2 for P, the moves' vectors and those of P's members that touch frame
    h are independent, so X is independent together with P exactly when its classes modulo the span of all of these are
-   ([independence together with a set](primer.md#linear-independence)).  Adding the vectors of P's members of home
+   ([independence together with a set](primer/linear-algebra.md#linear-independence)).  Adding the vectors of P's members of home
    h + 1 to the span makes them moves, as they are in state(P).  Quotienting by the e_y of P's members y of home h
    deletes the coordinates y: they leave the factors, as in state(P).  The frames of state(P) are then reduced, as [its
    definition](frame-model.md#searching-the-frame-model) has it: a move a left with a single factor f among the factors
@@ -231,7 +231,7 @@ bound ([solver/docs/design/extended-mode.md](../../solver/docs/design/extended-m
 ## The decomposition bound
 
 Independence under other signings, over any fields, combines with the frame bound into one bound by splitting the
-weights among the conditions, as weak duality allows ([the primer](primer.md#weak-duality-and-lagrangian-relaxation)).
+weights among the conditions, as weak duality allows ([the primer](primer/bounds.md#weak-duality-and-lagrangian-relaxation)).
 Nothing that proves a score rests on this bound; studies of stronger bounds use it.
 
 **Theorem B4 (the decomposition bound).**  Let Π be a root problem of the frame model, and σ_1, …, σ_t signings of
@@ -254,8 +254,8 @@ At a node, the same argument runs with X in place of L, by B1 (2) and B2.  ∎
 
 Each term is a standard computation: MI weighs a heaviest set independent in the two families of [signed
 frames](#signed-frames) within the promotion limit, which weighted matroid intersection finds and a weight split checks
-([the primer](primer.md#two-families-at-once); under the limit, the paragraph "For families of vectors"), and max_j the
-greedy algorithm on frame h_j's classes under σ_j ([the primer](primer.md#the-greedy-algorithm)).  At λ = 0 the sum is
+([the primer](primer/bounds.md#two-families-at-once); under the limit, the paragraph "For families of vectors"), and max_j the
+greedy algorithm on frame h_j's classes under σ_j ([the primer](primer/greedy.md#the-greedy-algorithm)).  At λ = 0 the sum is
 0 and dec(0) is the frame bound, so the best multipliers do at least as well.  The least value of dec over the
 multipliers is that of a linear program over the convex hulls of the sets that each condition admits (the primer, the
 paragraph "The best bound"), whose parts have the hulls that the paragraph "For families of vectors" describes.  That
@@ -359,7 +359,7 @@ candidates.
 1. *Blocks.*  Let block j be the coordinates up to n/2 in layer j.  A number s has v(s) in block Ω(s) − 1 and, if
    s ≤ n/2, e_s in block Ω(s), so each parity-i vector lies in a block of parity i or, for a number above n/2, on a
    private coordinate, and a set is independent at parity i exactly when its vectors in each block are ([vectors on
-   disjoint coordinates](primer.md#linear-independence)).  Block j is the union of the pools F_D of the frames D of
+   disjoint coordinates](primer/linear-algebra.md#linear-independence)).  Block j is the union of the pools F_D of the frames D of
    layer j + 1 ([the frame lemma (F1)](frame-model.md#the-frame-lemma)).
 2. *Working modulo U\*.*  U\* is playable, so independent at both parities (W1), and X ∪ U\* is independent at parity i
    exactly when the classes of X's parity-i vectors modulo the span of U\*'s are.  At parity i a member of U\* has a

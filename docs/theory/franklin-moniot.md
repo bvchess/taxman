@@ -18,7 +18,7 @@ linear algebra: everything below about GF(2) is this file's.
 
 The game's words are the [glossary's](../GLOSSARY.md); instances, payment schemes, precedence, peel, cores, odd cores and
 the vectors u(s) are [playability.md's](playability.md#payment-schemes).  The primer explains
-[GF(2)](primer.md#finite-fields-and-gf2) and [permanents and determinants](primer.md#matchings-permanents-and-determinants).
+[GF(2)](primer/linear-algebra.md#finite-fields-and-gf2) and [permanents and determinants](primer/graphs.md#matchings-permanents-and-determinants).
 Two words differ between the paper and the theory.  The paper's *rank* of a number is its layer Ω.  And *flat* means two
 things: the paper's flat alternating cycle has its vertices in two consecutive ranks, while the flat cycle of [the
 flat-cycle lemma (P3)](playability.md#the-flat-cycle-lemma) is a cycle of a precedence whose members lie in one layer;
@@ -127,7 +127,7 @@ heaviest subsets of {2, …, n} that meet the three conditions in turn.
 2. *Independence.*  S is independent with its own coordinates iff its vectors u(s), the rows of its list matrix, are
    independent ([independence](playability.md#independence)).  The rows are independent iff some |S| columns T make a
    nonsingular square matrix, since the row rank is the column rank.  Over GF(2) the determinant of a matrix of 0s and
-   1s is its permanent mod 2 ([the primer](primer.md#matchings-permanents-and-determinants)), and the permanent here is
+   1s is its permanent mod 2 ([the primer](primer/graphs.md#matchings-permanents-and-determinants)), and the permanent here is
    per(S, T).
 3. *Playability.*  By [P2](playability.md#the-playability-theorem), S is playable iff some payment scheme has an acyclic
    precedence.  By [C1](#the-bridge-lemma), a scheme has one iff no other scheme has its payments T, that is, iff per(S,
@@ -151,7 +151,7 @@ parity bound admits and the game does not are those with an odd count onto some 
 independent and not playable, and each holds an odd core.
 
 *Which field.*  GF(2) is stricter than the rationals: vectors of integers independent over GF(2) are independent over
-the rationals ([the primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and a bound built over
+the rationals ([the primer](primer/linear-algebra.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and a bound built over
 the rationals would admit the triangle, whose determinant is −2.  GF(3) is neither stricter nor weaker.  The odd core of
 the board of 45 has a determinant of absolute value 3, so GF(3) excludes it while GF(2) admits it; the triangle's −2 is
 1 mod 3, so GF(3) admits it while GF(2) excludes it.  Taken together, the signings over GF(3) miss nothing, frame by

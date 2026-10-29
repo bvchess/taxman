@@ -22,7 +22,7 @@ factors.
 * **(♦) ⟹ (★).**  Suppose every member that descending greedy rejects is a sum of members it kept above it.  Above any
   threshold t, greedy's kept members are independent (playable) and span every member above t, so they are a basis:
   greedy keeps rank(K_{≥t}) members, the most any playable subset has.  That is (★) for every component and every
-  truncation.  Since [the greedy algorithm](../../../docs/theory/primer.md#the-greedy-algorithm) keeps a heaviest
+  truncation.  Since [the greedy algorithm](../../../docs/theory/primer/greedy.md#the-greedy-algorithm) keeps a heaviest
   independent set of vectors for every weighting, it is also [the sources conjecture
   (S1)](../../../docs/theory/sources.md#the-sources-conjecture) for every weighting consistent with the order.
 * **Checking (♦) is greedy itself** (`src/span.rs`).  A member with a factor no kept member lists is kept ([the

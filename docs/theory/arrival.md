@@ -81,13 +81,13 @@ that held n/2, and the hypotheses say that both were closed in game n − 1 and 
    sources' vectors ([the greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition)).  The frames
    have disjoint factors, so the sources' vectors lie on disjoint blocks of coordinates, a block for each frame, and a
    set of sources is independent exactly when its part in each frame is ([linear
-   independence](primer.md#linear-independence)).  So [the greedy algorithm](primer.md#the-greedy-algorithm) decides
+   independence](primer/linear-algebra.md#linear-independence)).  So [the greedy algorithm](primer/greedy.md#the-greedy-algorithm) decides
    each source among the sources of its own frame, and the greedy basis is the union of the frames' greedy bases: B is
    the greedy basis of the old sources of M, and U\*(n) ∩ M that of all its sources.  These two facts are all that the
    step uses of (♦): by step 2 and the split by frames, they say that descending greedy agrees with the greedy basis on
    each D_i in game n − 1 and on M in game n.  B spans v(n), and its vectors are independent, so exactly one C ⊆ B sums
    to v(n); let x be its smallest member.  Then B′ = B + n − x is a basis, and it meets [the optimality
-   criterion](primer.md#the-optimality-criterion): for a source y of M outside B′, the members of the circuit of B′ + y
+   criterion](primer/greedy.md#the-optimality-criterion): for a source y of M outside B′, the members of the circuit of B′ + y
    all exceed y.  For y = x that circuit is C + n, whose other members exceed x.  For y ≠ x, the members of the circuit
    H of B + y exceed y, since B is heaviest.  If x ∉ H, H is the circuit of B′ + y.  If x ∈ H, adding v(n) and the
    vectors of C to those of H − y gives v(y) as the sum over ((H − y) △ C) + n ⊆ B′, the circuit of B′ + y less y: the
@@ -120,7 +120,7 @@ The odd case uses (♦) only on M and the D_i: descending greedy must agree ther
 the scan of the forests of the graph G_n of [the bottom-layers theorem](frame-model.md#the-bottom-layers-theorem), its
 step 3: it keeps an edge unless the edge closes a cycle with the edges kept.  Over GF(2) each edge is the sum of the
 unit vectors of its two ends, and a set of edges is independent exactly when it is a forest
-([forests](primer.md#forests)).  The incidence vectors are these vectors with the coordinate of g left out, which keeps
+([forests](primer/linear-algebra.md#forests)).  The incidence vectors are these vectors with the coordinate of g left out, which keeps
 their dependencies: in a sum of edges, the coordinate of g is the sum of the others, since each edge has two ends.
 
 ### The layer-2 corollary
