@@ -24,7 +24,7 @@ descending loops.
             If x and p*x are both still unused, match them:
                 the player picks p*x, the taxman collects x.
 
-The descending prime order is the load-bearing one: Theorem 3's proof
+The descending prime order is the one Theorem 3's proof depends on: it
 turns on the fact that a flat alternating cycle would have required a
 pair the algorithm must already have taken at a larger prime.  The
 descending order over x is the paper's, and is kept for fidelity, but

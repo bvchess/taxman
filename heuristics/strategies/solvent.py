@@ -14,7 +14,7 @@ Per candidate the decision has three outcomes:
   * the search succeeds and the updated matching's precedence relation
     is acyclic -> accept.
   * the search succeeds but the matching has gone precedence-cyclic ->
-    ask peel, which decides exactly.  This path is load-bearing:
+    ask peel, which decides exactly.  This path cannot be skipped:
     some sets have perfect matchings, every one of them cyclic (first
     at n=21), and peel correctly refuses those -- it is a
     playability oracle, strictly stronger than a matching test.
