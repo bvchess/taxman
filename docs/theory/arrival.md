@@ -75,21 +75,25 @@ that held n/2, and the hypotheses say that both were closed in game n − 1 and 
 6. *The root problem.*  In both cases the frames that change are closed before and after: the D_i, and D′ for even n,
    in game n − 1; M, and the pieces for even n, in game n.  The other frames are the same, with the same moves.  So the
    frames with freedoms are those of game n − 1, with the same moves, and step 1 gives Π_n = Π_{n−1}.
-7. *Odd n: the move given up.*  Let B be the moves of the D_i, |F_M| of them by step 3, and independent vectors on the
-   coordinates F_M ([the independence lemma (P10)](playability.md#the-independence-lemma)), which span every vector of a
-   source of M. Given (♦) in games n − 1 and n, U\* is in each game the greedy basis of the sources' linear matroid
-   ([the greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition)), the direct sum of the frames'
-   parts, since the frames have disjoint factors; so B is the greedy basis of the old sources of M, and U\*(n) ∩ M that
-   of all its sources.  These two facts are all that the step uses of (♦): by step 2 and the direct sum, they say that
-   descending greedy agrees with the greedy basis on each D_i in game n − 1 and on M in game n.  B spans v(n), and its
-   vectors are independent, so exactly one C ⊆ B sums to v(n); let x be its smallest member.  Then B′ = B + n − x is a
-   basis, and it meets [the optimality criterion](primer.md#the-optimality-criterion): for a source y of M outside B′,
-   the members of the circuit of B′ + y all exceed y.  For y = x that circuit is C + n, whose other members exceed x.
-   For y ≠ x, the members of the circuit H of B + y exceed y, since B is heaviest.  If x ∉ H, H is the circuit of B′ +
-   y.  If x ∈ H, adding v(n) and the vectors of C to those of H − y gives v(y) as the sum over ((H − y) △ C) + n ⊆ B′,
-   the circuit of B′ + y less y: the members of H − y exceed y, those of C exceed x, which exceeds y, and n exceeds them
-   all.  The values are distinct and positive, so B′ is the one heaviest basis, the greedy basis.  So U\*(n) ∩ M = B′,
-   and with step 3, U\*(n) = U\*(n − 1) + n − x.  ∎
+7. *Odd n: the move given up.*  Let B be the moves of the D_i, |F_M| of them by step 3, whose vectors are linearly
+   independent on the coordinates F_M ([the independence lemma (P10)](playability.md#the-independence-lemma)) and so
+   span every vector of a source of M.  Given (♦) in games n − 1 and n, U\* is in each game the greedy basis of the
+   sources' vectors ([the greedy-basis proposition (W3)](parity-bound.md#the-greedy-basis-proposition)).  The frames
+   have disjoint factors, so the sources' vectors lie on disjoint blocks of coordinates, a block for each frame, and a
+   set of sources is independent exactly when its part in each frame is ([linear
+   independence](primer.md#linear-independence)).  So [the greedy algorithm](primer.md#the-greedy-algorithm) decides
+   each source among the sources of its own frame, and the greedy basis is the union of the frames' greedy bases: B is
+   the greedy basis of the old sources of M, and U\*(n) ∩ M that of all its sources.  These two facts are all that the
+   step uses of (♦): by step 2 and the split by frames, they say that descending greedy agrees with the greedy basis on
+   each D_i in game n − 1 and on M in game n.  B spans v(n), and its vectors are independent, so exactly one C ⊆ B sums
+   to v(n); let x be its smallest member.  Then B′ = B + n − x is a basis, and it meets [the optimality
+   criterion](primer.md#the-optimality-criterion): for a source y of M outside B′, the members of the circuit of B′ + y
+   all exceed y.  For y = x that circuit is C + n, whose other members exceed x.  For y ≠ x, the members of the circuit
+   H of B + y exceed y, since B is heaviest.  If x ∉ H, H is the circuit of B′ + y.  If x ∈ H, adding v(n) and the
+   vectors of C to those of H − y gives v(y) as the sum over ((H − y) △ C) + n ⊆ B′, the circuit of B′ + y less y: the
+   members of H − y exceed y, those of C exceed x, which exceeds y, and n exceeds them all.  The values are distinct and
+   positive, so B′ is the one heaviest basis, the greedy basis.  So U\*(n) ∩ M = B′, and with step 3,
+   U\*(n) = U\*(n − 1) + n − x.  ∎
 
 Read in game n − 1, the hypotheses say that the frames that n joins are closed, and for even n that n/2 was not a move
 (steps 3 to 5).  Conversely, these give back the hypotheses, for odd n given (♦) in game n, which makes M closed
@@ -113,10 +117,11 @@ M (step 7).  Without (♦) the proof needs the hypothesis, and no game is known 
 
 The odd case uses (♦) only on M and the D_i: descending greedy must agree there with the greedy basis.  In layers 1 and
 2 it always does.  In layer 1 every source has the vector e₁ and each game keeps one.  In layer 2 descending greedy is
-the scan of the graphic matroid of the graph G_n of [the bottom-layers
-theorem](frame-model.md#the-bottom-layers-theorem), its step 3, and the incidence vectors are that matroid's vectors
-over GF(2) ([the primer](primer.md#linear-and-graphic-matroids)) with the coordinate of g left out, which keeps their
-dependencies: in a sum of edges, the coordinate of g is the sum of the others, since each edge has two ends.
+the scan of the forests of the graph G_n of [the bottom-layers theorem](frame-model.md#the-bottom-layers-theorem), its
+step 3: it keeps an edge unless the edge closes a cycle with the edges kept.  Over GF(2) each edge is the sum of the
+unit vectors of its two ends, and a set of edges is independent exactly when it is a forest
+([forests](primer.md#forests)).  The incidence vectors are these vectors with the coordinate of g left out, which keeps
+their dependencies: in a sum of edges, the coordinate of g is the sum of the others, since each edge has two ends.
 
 ### The layer-2 corollary
 

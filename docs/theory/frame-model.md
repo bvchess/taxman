@@ -118,26 +118,25 @@ the edge p–g.
 in layer 2 are exactly U\*_2, and S_2 is a forest in G_n.  Where the frames of layer 2 are closed, S plays no number of
 layer 2 up to n/2.
 
-*Proof.*  In layer 2 descending greedy is the scan of a graphic matroid, the [greedy algorithm of a
-matroid](primer.md#the-greedy-algorithm-of-a-matroid), and an exchange shows that S_2 is what the scan keeps of
-S_2 ∪ U\*_2.  Parts (b) and (d) cited below are those of the primer's paragraph "What the scan finds", and an
-independent set of the graphic matroid [spans](primer.md#matroids) an edge when the edge closes a cycle with it.
+*Proof.*  In layer 2 descending greedy keeps an edge unless it closes a cycle with the edges kept: it is the scan,
+[the greedy algorithm](primer.md#the-greedy-algorithm) on the [forests](primer.md#forests) of G_n.  An exchange shows
+that S_2 is what the scan keeps of S_2 ∪ U\*_2.  Parts (b) and (d) cited below are the primer's, in its section on the
+greedy algorithm, and a forest spans an edge outside it when the edge closes a cycle with it.
 
 1. S_1 = {q(n)} by [the prime lemma (N1)](neighbors.md#the-prime-lemma), so the pool of S's layer instance at 2 is
    every prime up to n/2.
 2. A set of numbers of layer 2 is playable against those primes iff it is a forest in G_n, by [the two-factor
-   proposition (P11)](playability.md#the-two-factor-proposition): these sets are the independent sets of the graphic
-   matroid of G_n (matroids).
+   proposition (P11)](playability.md#the-two-factor-proposition).
 3. Adding a source s of layer 2 to the kept sources changes only their layer instance at 2 ([F3](#the-layer-theorem)),
    so descending greedy keeps s iff s closes no cycle with the kept sources of layer 2: on these sources it is the scan.
-   By part (b), the elements the scan keeps before an element x span all the elements above x, so it keeps x iff x
-   closes no cycle with the elements above x.
+   By part (b), the edges the scan keeps before an edge x span all the edges above x, so it keeps x iff x closes no
+   cycle with the edges above x.
 4. Let I be what the scan keeps of W = S_2 ∪ U\*_2.  The members of W above a source x of W are sources of layer 2.  If
    x ∈ U\*_2, x closes no cycle with them, since it closes none with all the sources of layer 2 above x (step 3).  If
    x ∉ U\*_2, it closes a cycle with the members of U\*_2 above it.  So I = U\*_2 ∪ E, with E made of numbers of S_2 up
    to n/2.
-5. The weights, the numbers themselves, are distinct and positive, so by part (d) I is the only heaviest independent
-   subset of W.  S_2 is independent (F3 and step 2), so ΣI ≥ ΣS_2, with equality only if I = S_2.
+5. The weights, the numbers themselves, are distinct and positive, so by part (d) I is the only heaviest forest in W.
+   S_2 is a forest (F3 and step 2), so ΣI ≥ ΣS_2, with equality only if I = S_2.
 6. S′ = (S ∖ S_2) ∪ I is playable by F3: at layer 2 it has the forest I against the same pool; at layer 3 the pool
    only grows, since S plays the numbers E too; the other layers do not change.  So ΣS′ ≤ ΣS, which forces
    S_2 = I = U\*_2 ∪ E.
@@ -390,11 +389,11 @@ alone as edges, and d the number of frames of layer 2 with no square.
 
 1. A source pq joins p and q in the frame graph, and p² hangs on p alone.  So H_n has d + 1 components: each frame with
    no square, and g with the rest.
-2. U\*_2, which the scan keeps (step 3 of F4's proof), is a basis of H_n's graphic matroid ([part
-   (a)](primer.md#the-greedy-algorithm-of-a-matroid)).  So it has d fewer members than the primes up to n/2
-   ([rank](primer.md#linear-and-graphic-matroids)), the frames' factors ([F1](#the-frame-lemma)): the frames have d
-   freedoms in all.  A frame with no square has as moves a forest on its own primes, so a freedom at least: each of the
-   d has one, and the others none.
+2. U\*_2, which the scan keeps (step 3 of F4's proof), is a maximal forest in H_n ([part
+   (a)](primer.md#the-greedy-algorithm)).  So it has d fewer members than the primes up to n/2
+   ([rank](primer.md#forests)), the frames' factors ([F1](#the-frame-lemma)): the frames have d freedoms in all.  A
+   frame with no square has as moves a forest on its own primes, so a freedom at least: each of the d has one, and the
+   others none.
 3. *Nagura's theorem:* for every real x ≥ 25 some prime lies in (x, 6x/5].  It follows from Dusart's Proposition 6.8
    ([arXiv:1002.0442](https://arxiv.org/abs/1002.0442)) for x ≥ 396,738, and from a computation below.
 4. Let n ≥ 2500, s < s′ consecutive primes up to √n, and x = n/(2s) > √n/2 ≥ 25.  Since s′ ≤ 5s/3 (step 3 from 25 on,
