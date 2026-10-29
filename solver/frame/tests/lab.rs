@@ -610,25 +610,26 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
     assert_eq!((result.score, result.optimal_match), (optimal.score(1000).unwrap(), Some(true)));
 }
 
-/// The gate of a policy reaches the searchers and changes the tree of a game, and not its answer.  Game 1000, searched
-/// from nothing on one thread, is solved with no policy and under a policy whose gate is 0, so that conflict branching
-/// chooses at every check, not only where the gap passes 300.  Each ends with its score in the table, the trees
-/// differ, and the line of the second says which gate the policy gave.
+/// The gate of a policy reaches the searchers and changes the tree of a game, and not its answer.  Game 780, searched
+/// from nothing on one thread (498 steps), is solved with no policy and under a policy whose gate is 0 (339 steps), so
+/// that conflict branching chooses at every check, not only where the gap passes 300.  Each ends with its score in the
+/// table, the trees differ, and the line of the second says which gate the policy gave.
 #[test]
 fn a_policys_gate_changes_the_tree_of_a_game_and_not_its_answer() {
+    const N: u32 = 780;
     let optimal = Optimal::built_in();
     let solved = |tag: &str, policy: Option<&str>| {
         let dir = TempDir::new(tag);
         let ckpt = dir.join("ckpt");
         if let Some(policy) = policy {
             fs::create_dir_all(&ckpt).unwrap();
-            let entry = format!(r#"{{"from":1000,"at":"2026-10-22T00:00:00Z","file":"by-hand",{policy}}}"#);
+            let entry = format!(r#"{{"from":{N},"at":"2026-10-22T00:00:00Z","file":"by-hand",{policy}}}"#);
             fs::write(ckpt.join("run.lab"), format!(r#"{{"policies":[{entry}]}}"#)).unwrap();
         }
         let opts = SolveOptions { checkpoint_dir: Some(ckpt), force_search: true, ..options(1) };
-        let r = solver::solve_game_with(1000, None, &opts, optimal).unwrap_or_else(|e| panic!("{policy:?}: {e}"));
+        let r = solver::solve_game_with(N, None, &opts, optimal).unwrap_or_else(|e| panic!("{policy:?}: {e}"));
         let answer = (r.score, r.completed, r.optimal_match);
-        assert_eq!(answer, (optimal.score(1000).unwrap(), true, Some(true)), "{policy:?}");
+        assert_eq!(answer, (optimal.score(N).unwrap(), true, Some(true)), "{policy:?}");
         let given = r.lab.as_ref().and_then(|lab| lab.get("policy")).and_then(|policy| policy.get("gate"));
         (r.nodes, given.and_then(Json::as_u64))
     };

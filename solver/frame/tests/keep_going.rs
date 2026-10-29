@@ -87,22 +87,23 @@ fn a_prime_game_after_an_unfinished_game_is_searched_and_after_a_proven_one_deri
     assert_eq!(games[1].prev.as_ref().unwrap().proof, games[0].proof);
 }
 
-/// A repeat rests on the earlier game whose search it repeats, which must be completed: 1313 poses 1312's search problem
-/// (the committed chain repeats it), and is a repeat when 1312 is proven and a search when 1312 is only an unfinished
-/// line, whose best game seeds it.
+/// A repeat rests on the earlier game whose search it repeats, which must be completed: 951 poses 950's search problem
+/// (the committed chain repeats it), and is a repeat when 950 is proven and a search when 950 is only an unfinished
+/// line, whose best game seeds it.  Both searches take more than the 1,024 steps after which a node limit of 1,000
+/// stops them (950's takes 1,584 with no seed).
 #[test]
 fn a_repeat_rests_on_a_completed_game_and_never_on_an_unfinished_one() {
     let dir = TempDir::new("keep-going-repeat");
     let stopping = SolveOptions { node_limit: Some(1_000), keep_going: true, ..common::options(1) };
-    let (games, summary) = solved(&stopping, 1312, 1313, &dir.join("unfinished.jsonl"));
+    let (games, summary) = solved(&stopping, 950, 951, &dir.join("unfinished.jsonl"));
     assert_eq!((summary.unfinished, summary.stopped_at), (2, None));
-    assert!(games.iter().all(|g| !g.completed && g.method == Method::Search), "1313 searches, it does not repeat 1312");
-    assert_eq!(games[1].prev.as_ref().map(|p| (p.n, p.proof)), Some((1312, None)));
+    assert!(games.iter().all(|g| !g.completed && g.method == Method::Search), "951 searches, it does not repeat 950");
+    assert_eq!(games[1].prev.as_ref().map(|p| (p.n, p.proof)), Some((950, None)));
 
     let proven = SolveOptions { node_limit: None, ..stopping };
-    let (games, _) = solved(&proven, 1312, 1313, &dir.join("proven.jsonl"));
+    let (games, _) = solved(&proven, 950, 951, &dir.join("proven.jsonl"));
     assert_eq!((games[1].method, games[1].proof), (Method::Repeat, Some(Proof::SameSearch)));
-    assert_eq!(games[1].same_search.as_ref().map(|s| s.n), Some(1312));
+    assert_eq!(games[1].same_search.as_ref().map(|s| s.n), Some(950));
 }
 
 #[test]

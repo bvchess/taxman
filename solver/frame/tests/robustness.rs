@@ -786,17 +786,22 @@ fn a_checkpoint_directory_in_use_is_refused() {
 }
 
 /// The board of the signal test: 944, whose search on the matching path lasts long enough to be stopped (the GF(2)
-/// search takes under a tenth of a second), and in a quick run 935, which does too and costs two thirds as much.
-const SIGNALED: u32 = if QUICK { 935 } else { 944 };
+/// search takes under a tenth of a second), and in a quick run 925, which does too, with an eighth of the steps (some
+/// 23,000 against 191,000; 0.7 s on two threads where 944 takes 3.9 s).
+const SIGNALED: u32 = if QUICK { 925 } else { 944 };
 
-/// Runs `solve` of the board `SIGNALED` (on the table's game of the one before it) with progress lines, and once
-/// the search is under way sends `signal` (if any); returns the exit status and stdout.
+/// Runs `solve` of the board `SIGNALED` (in a full run on the known game of the one before it) with progress lines, and
+/// once the search is under way sends `signal` (if any); returns the exit status and stdout.
 #[cfg(unix)]
 fn solve_signaled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let out = dir.join("results.jsonl");
     let ckpt = dir.join("ckpt");
+    // The known games cost a process a second of CPU to read, and the quick board's search is the same without the game
+    // before it (some 23,000 steps either way); 944's is not (486,000 without it, 191,000 with it).
+    let known: &[&str] = if QUICK { &[] } else { &["--use-prev"] };
     let mut child = taxman()
-        .args(["solve", &SIGNALED.to_string(), "--use-prev", "--force-search", "--threads", "2", "--progress", "0.02"])
+        .args(["solve", &SIGNALED.to_string(), "--force-search", "--threads", "2", "--progress", "0.02"])
+        .args(known)
         .args(["--tactic", "gf2=off", "--tactic", "lagrange=on", "--tactic", "symmetry=off"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
@@ -811,8 +816,10 @@ fn solve_signaled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
         }
     });
     if let Some(signal) = signal {
-        // The first progress line says the search is running.
-        let line = rx.recv_timeout(Duration::from_secs(60)).expect("a progress line");
+        // The first progress line says the search is running (a note about the missing game before it comes first).
+        let line = std::iter::from_fn(|| rx.recv_timeout(Duration::from_secs(60)).ok())
+            .find(|line| !line.starts_with("note: "))
+            .expect("a progress line");
         assert!(line.starts_with(&format!("n={SIGNALED} ")) && line.contains(" nodes "), "{line}");
         let pid = child.id().to_string();
         assert!(Command::new("kill").args([signal, &pid]).status().unwrap().success());

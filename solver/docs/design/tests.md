@@ -231,7 +231,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   later (a `branching` of a game's own holds over them, whichever comes first; a setting left out keeps the one before;
   the lines and `run.lab` record them, the gate among them), one redeploys a run and starts it again, one stops a search
   of game 1000 again and again and resumes it under a policy that flips both switches and changes the gate each time,
-  and one solves game 1000 with and without a policy whose gate is 0, which changes the tree and not the answer.  The
+  and one solves game 780 with and without a policy whose gate is 0, which changes the tree and not the answer.  The
   gate also has a test of the small games (`tests/soundness.rs`: three gates, one answer, other trees) and one of a
   unit solved by `tune --gate` (`examples/tune.rs`).
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended

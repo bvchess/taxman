@@ -139,8 +139,12 @@ pub fn variants() -> Vec<(&'static str, SearchTactics)> {
     ]
 }
 
+/// The engine configuration of a search on `threads` threads with no progress lines.  The default asks the system how
+/// many CPUs there are (the process's CPU mask and control groups: some 50 µs of system calls), which the thousands
+/// of tiny searches of the soundness tests would each pay for, so it is made once.
 pub fn config(threads: usize) -> EngineConfig {
-    EngineConfig { threads, progress: None, ..EngineConfig::default() }
+    static DEFAULT: OnceLock<EngineConfig> = OnceLock::new();
+    EngineConfig { threads, progress: None, ..DEFAULT.get_or_init(EngineConfig::default).clone() }
 }
 
 /// What a search of a game from the frame builder looks like at set width `W`: everything that must not depend on

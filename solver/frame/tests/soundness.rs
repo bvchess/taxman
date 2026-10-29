@@ -190,12 +190,25 @@ fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewe
     cut
 }
 
-/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than the table's promotion sum.  Their
+/// The games 2..=46, under each tactic, from an incumbent worth 1 or 5 less than the table's promotion sum.  Their
 /// trees are too small for the near-repeat cut to act: [`the_near_repeat_cut_acts_and_changes_no_answer`] has games
-/// where it does.
+/// where it does.  The small games are three tests, so that their thousands of searches (each one starts its threads
+/// and makes its searchers' memory) run side by side.
 #[test]
-fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() {
-    searches_from_a_handicapped_incumbent(2..=90, 300);
+fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_2_to_46() {
+    searches_from_a_handicapped_incumbent(2..=46, 100);
+}
+
+/// [`a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_2_to_46`] for the games 47..=69.
+#[test]
+fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_47_to_69() {
+    searches_from_a_handicapped_incumbent(47..=69, 100);
+}
+
+/// [`a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_2_to_46`] for the games 70..=90.
+#[test]
+fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_70_to_90() {
+    searches_from_a_handicapped_incumbent(70..=90, 100);
 }
 
 /// Every game 2..=300 that has candidates, from an incumbent worth 1 or 5 less than the table's promotion sum,
@@ -204,7 +217,9 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() 
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games"
+    ignore = "long: the quick check is a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_2_to_46, \
+              a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_47_to_69 and \
+              a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_games_70_to_90"
 )]
 fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
     let cut = searches_from_a_handicapped_incumbent(2..=300, 4000);
@@ -1132,17 +1147,26 @@ fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFra
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_search_of_the_small_extended_problems_from_a_handicapped_incumbent_finds_the_optimum"
+    ignore = "long: the quick check is a_search_of_the_extended_problems_of_the_boards_2_to_42_from_a_handicapped_incumbent_finds_the_optimum \
+              and a_search_of_the_extended_problems_of_the_boards_43_to_70_from_a_handicapped_incumbent_finds_the_optimum"
 )]
 fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum() {
     // There were 1,258 problems, 978 of them with one-sided candidates, and 16,128 runs, 12,648 of them on those.
     extended_searches_from_a_handicapped_incumbent(2..=300, 0xE87E_4DED_5EED_0001, [1100, 850, 14_000, 11_000]);
 }
 
-/// [`a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum`] on the boards 2..=70.
+/// [`a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum`] on the boards 2..=42.  The small
+/// boards are two tests, so that their thousands of searches (each one starts its threads and makes its searchers'
+/// memory) run side by side.
 #[test]
-fn a_search_of_the_small_extended_problems_from_a_handicapped_incumbent_finds_the_optimum() {
-    extended_searches_from_a_handicapped_incumbent(2..=70, 0xE87E_4DED_5EED_0002, [150, 100, 1000, 800]);
+fn a_search_of_the_extended_problems_of_the_boards_2_to_42_from_a_handicapped_incumbent_finds_the_optimum() {
+    extended_searches_from_a_handicapped_incumbent(2..=42, 0xE87E_4DED_5EED_0002, [75, 50, 500, 400]);
+}
+
+/// The same on the boards 43..=70, with a stream of random sets of its own.
+#[test]
+fn a_search_of_the_extended_problems_of_the_boards_43_to_70_from_a_handicapped_incumbent_finds_the_optimum() {
+    extended_searches_from_a_handicapped_incumbent(43..=70, 0xE87E_4DED_5EED_0003, [75, 50, 500, 400]);
 }
 
 /// The searches of the extended problems of the boards `ns`, drawn with `seed` (see

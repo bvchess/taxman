@@ -703,10 +703,11 @@ fn a_floor_at_the_ceiling_ends_the_search_before_it_starts() {
 
 /// A search under a floor that a limit stops resumes from its checkpoint under the same floor, to the same end; a
 /// checkpoint that holds the floor and no set is not resumed under another floor or none, nor the other way round, and
-/// the dual bound of the stopped search holds the floor as its incumbent.
+/// the dual bound of the stopped search holds the floor as its incumbent.  Game 800 takes 1,393 steps under the floor
+/// below P* and 1,103 under the floor at it, each more than the 1,024 after which a node limit of 1,000 stops it.
 #[test]
 fn a_search_under_a_floor_resumes_under_the_same_floor() {
-    let n = 1000;
+    let n = 800;
     let board = crate::board::Board::<16>::for_n(n);
     let p = board.prepare(SearchTactics::default()).unwrap();
     let opt = crate::game::Optimal::built_in().score(n).unwrap() - board.in_the_bag;
@@ -917,11 +918,11 @@ fn a_ceiling_given_to_the_control_ends_the_search() {
     a_ceiling_given_to_the_control_ends_the_search_of(988, true);
 }
 
-/// [`a_ceiling_given_to_the_control_ends_the_search`] for game 1000, whose search is too short to give the ceiling to
-/// while it runs: given before the search, in the control or as `cap`.
+/// [`a_ceiling_given_to_the_control_ends_the_search`] for game 780, whose search (498 steps; 114 with the ceiling) is
+/// too short to give the ceiling to while it runs: given before the search, in the control or as `cap`.
 #[test]
 fn a_ceiling_given_before_the_search_to_the_control_ends_it() {
-    a_ceiling_given_to_the_control_ends_the_search_of(1000, false);
+    a_ceiling_given_to_the_control_ends_the_search_of(780, false);
 }
 
 /// A ceiling given to the control of the search of game `n` ends it, before it starts and, if `live`, from another
