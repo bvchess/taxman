@@ -2355,6 +2355,7 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 /// file, and stays under the index limit.
 const INDEXES: &[&str] = &[
     "docs/THEORY.md",
+    "docs/theory/primer.md",
     "solver/noframe/README.md",
     "solver/docs/DESIGN.md",
     "solver/docs/RUNBOOK.md",
