@@ -990,11 +990,7 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
     for &(s, j) in p.model.one_sided() {
         let Some(e) = graph.element(s) else { continue };
         let e = e as usize;
-        assert_eq!(
-            usize::from(graph.block[j % 2][e]),
-            j / 2,
-            "n={n}: the block of {s} on the side of its frame {j}"
-        );
+        assert_eq!(usize::from(graph.block[j % 2][e]), j / 2, "n={n}: the block of {s} on the side of its frame {j}");
         assert!(
             graph.vecs[j % 2][e * words..(e + 1) * words].iter().any(|&w| w != 0),
             "n={n}: {s} is a loop of its frame"
