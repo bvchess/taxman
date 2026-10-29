@@ -2,10 +2,11 @@
 """The quick check of the frame solver's crate: the check that every change passes before it is merged
 (solver/docs/design/testing.md). Standard library only.
 
-usage: solver/tools/quick_check.py   (from anywhere; it works in solver/frame and runs at a low priority)
+usage: solver/tools/quick_check.py   (from anywhere; it works in solver/frame and solver/gzip, at a low priority)
 
 It runs `cargo fmt --check`, `cargo clippy --all-targets`, the build of the tests, and the tests of a non-release
-build, with solver/tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy).  Two checks at once
+build, with solver/tools/cloud/run_tests.py (every test a process of its own, all the CPUs busy).  The gzip decoder's
+crate (solver/gzip) has the same fmt and clippy checks, and its tests run in the same suite.  Two checks at once
 slow each other, in their builds as much as in their tests, so checks take turns: a check takes a lock (LOCK, a file in
 the system's temporary directory, one for every checkout) before it builds anything and holds it until it exits, and a
 second check waits for it, saying so.  The system frees the lock when the check ends, however it ends.  The limits
@@ -55,6 +56,7 @@ JOBS = (os.cpu_count() or 1) * 3 // 2
 TOOLS = Path(__file__).resolve().parent
 LOCK = Path(tempfile.gettempdir()) / "taxman-quick-check.lock"  # held by the check that is running
 CRATE = TOOLS.parent / "frame"  # the frame solver's crate: where the checks run
+GZIP = TOOLS.parent / "gzip"  # the gzip decoder's crate: its fmt and clippy checks run here, and its tests in the suite
 RUN_TESTS = TOOLS / "cloud" / "run_tests.py"
 TIMES = CRATE / "target" / "quick-check-times.json"  # how long the tests took last time: the longest start first
 REPORT = CRATE / "target" / "quick-check-report.txt"
@@ -257,18 +259,22 @@ def say(message: str) -> None:
     print(f"quick check: {message}", file=sys.stderr, flush=True)
 
 
-def step(name: str, command: List[str]) -> bool:
+def step(name: str, command: List[str], crate: Path = CRATE) -> bool:
     say(f"{name}: {' '.join(command)}")
-    return subprocess.run(command, cwd=CRATE).returncode == 0
+    return subprocess.run(command, cwd=crate).returncode == 0
 
 
 def run_checks(waited_for_lock: float) -> List[str]:
     """Runs fmt, clippy and the build, waits for a quiet machine (the seconds already waited for the lock count against
-    BUSY_WAIT), then runs the tests.  Returns what failed, one message each."""
+    BUSY_WAIT), then runs the tests.  Returns what failed, one message each.  The gzip decoder's crate has its fmt and
+    clippy here, and its tests build and run with the frame solver's."""
     failed = []
-    for name, command in [("fmt", ["cargo", "fmt", "--check"]), ("clippy", ["cargo", "clippy", "--all-targets"]),
-                          ("build", ["cargo", "test", "--no-run"])]:
-        if not step(name, command):
+    for name, command, crate in [("fmt", ["cargo", "fmt", "--check"], CRATE),
+                                 ("clippy", ["cargo", "clippy", "--all-targets"], CRATE),
+                                 ("build", ["cargo", "test", "--no-run"], CRATE),
+                                 ("gzip fmt", ["cargo", "fmt", "--check"], GZIP),
+                                 ("gzip clippy", ["cargo", "clippy", "--all-targets"], GZIP)]:
+        if not step(name, command, crate):
             failed.append(f"{name} failed")
     SUMMARY.unlink(missing_ok=True)
     if "build failed" not in failed:
@@ -278,7 +284,7 @@ def run_checks(waited_for_lock: float) -> List[str]:
         else:
             TIMES.parent.mkdir(exist_ok=True)
             tests = [sys.executable, "-I", str(RUN_TESTS), "--jobs", str(JOBS), "--times", str(TIMES), "--report",
-                     str(REPORT), "--summary", str(SUMMARY), f"solver={CRATE}"]
+                     str(REPORT), "--summary", str(SUMMARY), f"solver={CRATE}", f"gzip={GZIP}"]
             if not step("tests", tests):
                 failed.append(f"tests failed (the report is {REPORT})")
     return failed

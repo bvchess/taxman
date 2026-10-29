@@ -12,11 +12,11 @@ tests run in the test profile: `opt-level = 2`, because they replay real games, 
 release profile does not have.
 
 **The quick check and the full suite.**  The *quick check* is the command `solver/tools/quick_check.py` (it works in
-`solver/frame`): `cargo fmt --check`, `cargo clippy --all-targets`, the build of the tests, and the tests of a
-non-release build, which `solver/tools/cloud/run_tests.py` runs, every test a process of its own and all the CPUs
-busy.  After a one-line change it takes about 12 s to rebuild and about 10 s to run the tests on a laptop of ten cores
-(a plain non-release `cargo test`, one binary after another, takes about 19 s).  It verifies most merges, a refactoring
-included.
+`solver/frame`, and runs the formatting check, the lints and the tests of `solver/gzip` too): `cargo fmt --check`,
+`cargo clippy --all-targets`, the build of the tests, and the tests of a non-release build, which
+`solver/tools/cloud/run_tests.py` runs, every test a process of its own and all the CPUs busy.  After a one-line change
+it takes about 12 s to rebuild and about 10 s to run the tests on a laptop of ten cores (a plain non-release `cargo
+test`, one binary after another, takes about 19 s).  It verifies most merges, a refactoring included.
 
 **It waits for a quiet machine**, because its limits are for one with nothing else to do.  When the build has ended it
 samples what everything on the machine uses of the CPUs for 2 s, and if other work uses more than 25% of the CPUs it

@@ -1,8 +1,8 @@
 # Working notes: the Rust programs
 
 The rules for the frame solver and the prover, on top of the project's ([../CLAUDE.md](../CLAUDE.md)).  How-to lives in
-the docs listed at the end.  Paths here are from the top of the repository; Cargo commands run in `solver/frame` or
-`solver/noframe`.
+the docs listed at the end.  Paths here are from the top of the repository; Cargo commands run in `solver/frame`,
+`solver/noframe` or `solver/gzip`.
 
 * **Read [solver/docs/STATUS.md](docs/STATUS.md) first.**  It is the current state of the work; brief subagents with it
   and the notebook entries their task needs.

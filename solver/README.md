@@ -11,8 +11,8 @@ their documents.
   game, U holds there too.
 
 [results/README.md](../results/README.md#what-supports-the-scores) says how far the games of each program reach.  Cargo
-commands run in `solver/frame` or `solver/noframe`; every other command in the docs runs from the top of the repository,
-and the paths below are from this directory.
+commands run in `solver/frame`, `solver/noframe` or `solver/gzip`; every other command in the docs runs from the top of
+the repository, and the paths below are from this directory.
 
 ## The documents
 
@@ -29,6 +29,7 @@ file your task needs.
 | [../docs/GLOSSARY.md](../docs/GLOSSARY.md) | reference | the project's words, each with the one name the docs use |
 | [../results/README.md](../results/README.md) | reference | the committed results files and what supports their scores; [runs.md](../results/runs.md) records how the committed chain was made, run by run |
 | [noframe/README.md](noframe/README.md) | explanation and reference | the prover: its proofs and checks of the frame solver's results on the whole board, and its checks of the conjectures; the index of [noframe/docs/](noframe/docs/), a file a subject |
+| [gzip/README.md](gzip/README.md) | guide and reference | the gzip decoder for the compressed results file: why the programs share it, how to call it, and what it checks |
 | [docs/DESIGN.md](docs/DESIGN.md) | explanation | how the frame solver works and why, from the frame model and the search to the trust model, the tests and performance; the index of [docs/design/](docs/design/), a file a part |
 | [../docs/THEORY.md](../docs/THEORY.md) | explanation | the theorems both programs rest on: maximal factors, playable sets, the bounds and the frame model's exactness; the index of [docs/theory/](../docs/theory/), a file a subject, with the file of each theorem |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | guide | running the frame solver, and the prover's proofs, on a cloud machine of many CPUs; the index of [docs/runbook/](docs/runbook/), a file a job, and [launch.md](docs/runbook/launch.md) has the rules for every launch |

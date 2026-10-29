@@ -1,0 +1,17 @@
+[package]
+name = "taxman-gzip"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+description = "A gzip decoder in the standard library alone, for the results file"
+publish = false
+
+[lib]
+name = "taxman_gzip"
+path = "src/lib.rs"
+
+[dependencies]
+
+# The tests decode a few large inputs, so give them an optimizer (as the frame solver's do).
+[profile.test]
+opt-level = 2
