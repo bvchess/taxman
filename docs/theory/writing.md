@@ -6,20 +6,22 @@ reader.  These rules add to [the rules for all the docs](../WRITING.md), which h
 ## 1. Write for a reader with an undergraduate background
 
 Assume the reader knows proofs by induction and by contradiction, sets, graphs, and linear algebra over the real
-numbers, and has the rules of the game from the [glossary](../GLOSSARY.md).  Anything beyond that, such as GF(2),
-matroids or matroid intersection, is explained in [the primer](primer.md), and a proof links the primer where it uses
-it.  The primer explains standard mathematics and advances nothing; the other files advance the theory and link the
-primer.  A reader is convinced by what they understand, so a proof explains its steps as it goes: why each one is
-needed, not only that it holds.
+numbers, and has the rules of the game from the [glossary](../GLOSSARY.md).  Anything beyond that, such as GF(2), the
+greedy algorithm or the weak duality of a weight split, is explained in [the primer](primer.md), and a proof links the
+primer where it uses it.  Use the plainest mathematics that carries the proof: linear independence over GF(2) and the
+forests of a graph where they suffice, and the general theory of matroids only where a result is about it.  The primer
+explains standard mathematics and advances nothing; the other files advance the theory and link the primer.  A reader is
+convinced by what they understand, so a proof explains its steps as it goes: why each one is needed, not only that it
+holds.
 
 ## 2. Rank the results by what rests on them
 
-A result is *load-bearing* when the proof of a score depends on it: the exactness of the frame model, each rule by which
-a search prunes, the certificates, and the bounds carried between games.  A load-bearing result gets a complete proof,
-with every case.  A result is *explanatory* when it shows why something holds or why an approach fails; it gets the idea
-of its proof, marked as a sketch, or a link to the details.  An *observation* is stated as measured, beside its
-evidence.  Each file leads with its load-bearing results.  A long proof of a result that nothing rests on costs the
-reader effort for little, so it goes to the end of its file or to the notebook.
+A result that the proof of a score depends on, such as the exactness of the frame model, each rule by which a search
+prunes, the certificates, and the bounds carried between games, gets a complete proof, with every case.  A result is
+*explanatory* when it shows why something holds or why an approach fails; it gets the idea of its proof, marked as a
+sketch, or a link to the details.  An *observation* is stated as measured, beside its evidence.  Each file leads with
+the results that scores rest on.  A long proof of a result that nothing rests on costs the reader effort for little, so
+it goes to the end of its file or to the notebook.
 
 ## 3. Give the idea first, then the steps
 
@@ -47,13 +49,13 @@ them: U, (★) and (♦).  Each symbol keeps one meaning across the theory, and 
 [statements.md](statements.md) lists them; a letter that serves one proof only must not be one of those.  Introduce a
 symbol only for what the text uses again and again, and use words for the rest.
 
-Where mathematics has a standard term, such as topological order or matroid intersection, use it, or give it beside the
-project's word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2, a role
-on the board, while in ordinary mathematics a factor is a divisor of some given number.  And in Taxman *greedy* usually
-means the strategy that takes the largest legal move, so the theory never says greedy alone: *descending greedy* is the
-procedure that builds U\*, and the primer's greedy algorithm is a matroid's.  *Heaviest* means of largest weight, a
-maximum-weight set in the standard term ([the primer](primer.md)): say it of sets, and say *larger* and *smaller* of
-single numbers, whose weight is their value.
+Where mathematics has a standard term, such as topological order or a basis, use it, or give it beside the project's
+word.  Flag a project word that means something else elsewhere.  A *factor* here is a number up to n/2, a role on the
+board, while in ordinary mathematics a factor is a divisor of some given number.  And in Taxman *greedy* usually means
+the strategy that takes the largest legal move, so the theory never says greedy alone: *descending greedy* is the
+procedure that builds U\*, and the primer's greedy algorithm is the one of linear algebra.  *Heaviest* means of largest
+weight, a maximum-weight set in the standard term ([the primer](primer.md)): say it of sets, and say *larger* and
+*smaller* of single numbers, whose weight is their value.
 
 ## 6. Define each term before using it, in one place
 
