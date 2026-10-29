@@ -471,6 +471,10 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
     let higher = Upper { score: score + 1, ..line.clone() };
     refused(known, &higher, &format!("found against {}, more: not a certificate", score + 1));
     refused(&Optimal::default(), line, "the results have no game of n");
+    // The missing game is said before the board is set up, which would refuse the open member 682, no source of 5001.
+    let far = Upper { n: 5001, score: 1, needs: true, open: vec![682] };
+    let e = certify_game(5001, &Optimal::default(), &far, true, &options(1)).unwrap_err();
+    assert_eq!(e, "n=5001: the results have no game of n");
 
     let wrong = known_with(
         &dir.join("score.jsonl"),

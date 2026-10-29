@@ -378,9 +378,21 @@ pub fn certify_game_with(
     earlier: &mut EarlierCertificates,
 ) -> Result<Certificate, String> {
     let beyond = || format!("n={n} is beyond the largest supported board, n={MAX_N}");
+    // What is missing from the inputs is said before the board is set up, which costs about n².
+    let recorded = recorded_game(n, known, upper)?;
     // A problem that no set width can search is set up at the widest, whose refusal says why.
     let width = certificate_width(n, &upper.open, claims)?.1.unwrap_or(WIDTHS[WIDTHS.len() - 1]);
-    crate::with_words!(width, W => certify_at::<W>(n, known, upper, claims, opts, earlier), else Err(beyond()))
+    crate::with_words!(width, W => certify_at::<W>(n, recorded, known, upper, claims, opts, earlier), else Err(beyond()))
+}
+
+/// The score and the moves of the recorded game of `n`, if the barred bounds `upper` given are the board's and the
+/// results have a game of it.
+fn recorded_game<'a>(n: u32, known: &'a Optimal, upper: &Upper) -> Result<(u64, &'a [u32]), String> {
+    let at = |e: String| format!("n={n}: {e}");
+    if upper.n != n {
+        return Err(at(format!("the barred bounds given are those of n={}", upper.n)));
+    }
+    known.score(n).zip(known.moves(n)).ok_or_else(|| at("the results have no game of n".into()))
 }
 
 /// The block words the GF(2) bound of Π⁺(`open`) of the board `1..=n` needs at its root ([`Board::extended_words`]: an
@@ -414,6 +426,7 @@ pub fn certificate_width(n: u32, open: &[u32], claims: bool) -> Result<(usize, O
 
 fn certify_at<const W: usize>(
     n: u32,
+    (score, moves): (u64, &[u32]),
     known: &Optimal,
     upper: &Upper,
     claims: bool,
@@ -421,12 +434,6 @@ fn certify_at<const W: usize>(
     earlier: &mut EarlierCertificates,
 ) -> Result<Certificate, String> {
     let at = |e: String| format!("n={n}: {e}");
-    if upper.n != n {
-        return Err(at(format!("the barred bounds given are those of n={}", upper.n)));
-    }
-    let (Some(score), Some(moves)) = (known.score(n), known.moves(n)) else {
-        return Err(at("the results have no game of n".into()));
-    };
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
     let resuming = checkpoint.is_some();
     let Recorded { board, extended, prepared, posed, start, worth } =

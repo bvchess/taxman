@@ -240,10 +240,12 @@ fn certify_names_the_input_that_is_missing() {
     assert_eq!(run.stdout, "");
 
     // The barred bounds say that the first board past the end of the table built into the binary needs a certificate,
-    // and the results given have no game of it.
+    // and the results given have no game of it.  Certify says so before it sets the board up (a board of 5001 numbers
+    // takes seconds), so the line needs no open member; an open member is a source that setup keeps on the board it
+    // is for (682 is one on the board 1302, not on 5001).
     let past = Optimal::built_in().max_n() + 1;
     let needs = dir.join("needs.jsonl");
-    fs::write(&needs, format!("{{\"n\":{past},\"score\":533559,\"needs\":1,\"open\":[[682,3,87]]}}\n")).unwrap();
+    fs::write(&needs, format!("{{\"n\":{past},\"score\":533559,\"needs\":1,\"open\":[]}}\n")).unwrap();
     let alone = dir.join("alone.jsonl");
     fs::write(&alone, "").unwrap();
     let board = past.to_string();
