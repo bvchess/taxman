@@ -32,8 +32,17 @@ pub(crate) const LAST: u32 = if QUICK { 912 } else { 960 };
 
 /// A book of the boards `ns`, with no bounds but those of the trivial boards.
 pub(crate) fn book_of(ns: impl Iterator<Item = u32>) -> Book {
+    book_with_plains(ns).0
+}
+
+/// [`book_of`] and the game with no promotions of each board, taken from the setup that made the book: a test that
+/// wants the games would otherwise set every board up a second time, and a board's setup is most of what these tests
+/// cost.
+pub(crate) fn book_with_plains(ns: impl Iterator<Item = u32>) -> (Book, BTreeMap<u32, Vec<u32>>) {
     let ns: Vec<u32> = ns.collect();
-    Book::new(schedule::all_facts(&ns, 8).expect("the boards' facts"))
+    let facts = schedule::all_facts(&ns, 8).expect("the boards' facts");
+    let plains = facts.iter().map(|f| (f.n, f.plain.clone())).collect();
+    (Book::new(facts), plains)
 }
 
 /// Gives the book the optimal game of `n` as proven.
@@ -120,16 +129,17 @@ fn the_relations_bracket_the_optimum_of_every_board_to(top: u32, min_changes: us
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is loose_bounds_and_the_relations_bracket_the_optimum_of_1001_to_1100"
+    ignore = "long: the quick check is loose_bounds_and_the_relations_bracket_the_optimum_of_1011_to_1080"
 )]
 fn loose_bounds_and_the_relations_bracket_the_optimum() {
     loose_bounds_and_the_relations_bracket_the_optimum_of(1001..=1300, (100, 30));
 }
 
-/// [`loose_bounds_and_the_relations_bracket_the_optimum`] for the boards 1001..=1100.
+/// [`loose_bounds_and_the_relations_bracket_the_optimum`] for the boards 1011..=1080: they too pass the set width of
+/// 1,024, and 1050 is their one proven game.
 #[test]
-fn loose_bounds_and_the_relations_bracket_the_optimum_of_1001_to_1100() {
-    loose_bounds_and_the_relations_bracket_the_optimum_of(1001..=1100, (30, 10));
+fn loose_bounds_and_the_relations_bracket_the_optimum_of_1011_to_1080() {
+    loose_bounds_and_the_relations_bracket_the_optimum_of(1011..=1080, (30, 10));
 }
 
 /// The test of the boards `ns`, where the relations must derive more than `(lower, upper)` bounds of the two sides.
@@ -137,9 +147,9 @@ fn loose_bounds_and_the_relations_bracket_the_optimum_of(
     ns: std::ops::RangeInclusive<u32>,
     (lower, upper): (usize, usize),
 ) {
-    let mut book = book_of(ns.clone());
+    let (mut book, mut plains) = book_with_plains(ns.clone());
     for n in ns.clone() {
-        let plain = taxman::with_width!(n, W => Board::<W>::for_n(n).plain);
+        let plain = plains.remove(&n).expect("the game of a board of the book");
         let value = replay_finished(n, &plain).unwrap();
         book.offer_lower(n, Lower { value, moves: plain, promotions: None, rule: Rule::Start, from: None }, false)
             .unwrap();
@@ -415,6 +425,17 @@ fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
     let mut scheduler = climbing(&dir, &[906], &Settings { climb_down: false, ..quiet() });
     let job = scheduler.next_job(0.0).unwrap();
     assert_eq!((job.kind, job.n), (Kind::Climb(Way::Up), 909));
+
+    // With the climbs off, by a limit of 0 or by no way, the same ledger has an ordinary search first.  (It is the
+    // ledger as it was opened, not opened again for each setting: that costs the setup of every board.)
+    let settings = scheduler.settings.clone();
+    for off in [Settings { climb_limit: 0.0, ..quiet() }, Settings { climb_up: false, climb_down: false, ..quiet() }] {
+        scheduler.settings = off;
+        let job = scheduler.next_job(0.0).unwrap();
+        assert_eq!(job.kind, Kind::Search, "n={}", job.n);
+    }
+    scheduler.settings = settings;
+
     start(&mut scheduler, &job);
     scheduler.finish(ended(909, Kind::Climb(Way::Up), false)).unwrap();
 
@@ -430,12 +451,6 @@ fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
     assert_eq!(next.limit, Duration::from_secs_f64(Settings::default().base));
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     assert!(events.contains("\"job\":\"climb\"") && events.contains("\"outcome\":\"parked\""), "{events}");
-
-    for off in [Settings { climb_limit: 0.0, ..quiet() }, Settings { climb_up: false, climb_down: false, ..quiet() }] {
-        let dir = TempDir::new("ledger-climb-off");
-        let job = climbing(&dir, &[906], &off).next_job(0.0).unwrap();
-        assert_eq!(job.kind, Kind::Search, "n={}", job.n);
-    }
 }
 
 /// With the game of 906 given, 909 is climbed to up and 903 down (904-908 are proven; 902 is not searched, 901 being
@@ -447,6 +462,21 @@ fn a_climb_that_stops_parks_its_board_in_the_ordinary_queue() {
 fn a_proven_board_is_climbed_down_from_after_the_climbs_up() {
     let dir = TempDir::new("ledger-climb-down");
     let mut scheduler = climbing(&dir, &[906], &quiet());
+
+    // The ways alone, on the ledger as it was opened (not opened again for each: that costs the setup of every board):
+    // the climb down first when it is the only way, no climb down after the climb up when only up.
+    let only = |climb_up, climb_down| Settings { climb_up, climb_down, ..quiet() };
+    scheduler.settings = only(false, true);
+    let first = scheduler.next_job(0.0).unwrap();
+    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Down), 903));
+    scheduler.settings = only(true, false);
+    let first = scheduler.next_job(0.0).unwrap();
+    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Up), 909));
+    start(&mut scheduler, &first);
+    assert_eq!(scheduler.next_job(0.0).unwrap().kind, Kind::Search, "no climb down");
+    scheduler.running.remove(&first.n);
+    scheduler.settings = quiet();
+
     let up = scheduler.next_job(0.0).unwrap();
     assert_eq!((up.kind, up.n), (Kind::Climb(Way::Up), 909), "the climbs up have priority");
     start(&mut scheduler, &up);
@@ -465,18 +495,6 @@ fn a_proven_board_is_climbed_down_from_after_the_climbs_up() {
     let events = std::fs::read_to_string(schedule::events_path(&dir)).unwrap();
     let climb = events.lines().find(|line| line.contains("\"job\":\"climb\"")).expect("an event of the climb");
     assert!(climb.contains("\"way\":\"down\"") && climb.contains("\"outcome\":\"parked\""), "{climb}");
-
-    // The ways alone: the climb down first when it is the only way, no climb down after the climb up when only up.
-    let only = |climb_up, climb_down| Settings { climb_up, climb_down, ..quiet() };
-    let dir = TempDir::new("ledger-climb-down-only");
-    let first = climbing(&dir, &[906], &only(false, true)).next_job(0.0).unwrap();
-    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Down), 903));
-    let dir = TempDir::new("ledger-climb-up-only");
-    let mut scheduler = climbing(&dir, &[906], &only(true, false));
-    let first = scheduler.next_job(0.0).unwrap();
-    assert_eq!((first.kind, first.n), (Kind::Climb(Way::Up), 909));
-    start(&mut scheduler, &first);
-    assert_eq!(scheduler.next_job(0.0).unwrap().kind, Kind::Search, "no climb down");
 }
 
 /// The board below one that is being climbed to down has no ordinary search meanwhile, as the board above one climbed

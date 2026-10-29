@@ -8,7 +8,7 @@ use super::export::{self, civil_date, Options};
 use super::schedule::{self, read_ledger, Settings};
 use super::store::{self, Best, Chain, Game, Line, Store};
 use super::support::{TempDir, QUICK};
-use super::tests::{book_of, give, opt, opt_game, write_results, LAST};
+use super::tests::{book_with_plains, give, opt, opt_game, write_results, LAST};
 use super::verify;
 use super::STRICT;
 use std::path::{Path, PathBuf};
@@ -28,37 +28,50 @@ fn promoted(n: u32) -> (u64, Vec<u32>, Vec<u32>) {
     (value, moves, set)
 }
 
+/// How far below its place in a long run a board of the hand-made books is: none in a long run, and in a quick run
+/// (`QUICK`) 600, where setting a board up and replaying its game cost about a sixth of what they cost at 901.  The
+/// books of a quick run are of the same shape: every kind of bound is there, and the cases below find the lines they
+/// edit.  The comments and names here are of the boards of a long run.
+const SHIFT: u32 = if QUICK { 600 } else { 0 };
+
+/// The board of the hand-made books that stands for the board `n` of a long run's.
+const fn board(n: u32) -> u32 {
+    n - SHIFT
+}
+
 /// The boards of the hand-made books: 901..960, and two islands with no board next to them, 975 and 976 (which the
 /// run found: its bound is the better for 975, which has nothing below it) and 980 (which the relations leave as it
 /// was, with its start game).
 fn boards() -> Vec<u32> {
-    (901..=960).chain([975, 976, 980]).collect()
+    (board(901)..=board(960)).chain([board(975), board(976), board(980)]).collect()
 }
 
 /// What the run found in the hand-made books, and the chain's games they are given.
-const FOUND: [u32; 3] = [925, 950, 976];
-const GIVEN: [u32; 2] = [920, 940];
+const FOUND: [u32; 3] = [board(925), board(950), board(976)];
+const GIVEN: [u32; 2] = [board(920), board(940)];
 
 /// A book of the boards `ns` as a run might leave them partway: every board has its start game (no promotions) and a
 /// bound above opt(n) (the root's bound for every tenth board, else a stopped search's), the boards `found` have
 /// their optimal game (a search's) and an exhausted search, `given` boards are the chain's games, and the relations
 /// have carried the bounds between the boards.
 fn partial_book(ns: &[u32], given: &[u32], found: &[u32]) -> Book {
-    let mut book = book_of(ns.iter().copied());
+    let (mut book, mut plains) = book_with_plains(ns.iter().copied());
     for &n in ns {
-        let moves = taxman::with_width!(n, W => Board::<W>::for_n(n).plain);
+        let moves = plains.remove(&n).expect("the game of a board of the book");
         let value = moves.iter().map(|&m| u64::from(m)).sum();
         let start = Lower { value, moves, promotions: Some(Vec::new()), rule: Rule::Start, from: None };
         book.offer_lower(n, start, false).unwrap();
-        let upper = if n % 10 == 0 {
+        // The kind of a board's bound is that of its place in a long run.
+        let long = n + SHIFT;
+        let upper = if long.is_multiple_of(10) {
             Upper { value: verify::root_upper(n).unwrap(), rule: Rule::Root, from: None }
-        } else if n == 975 {
+        } else if long == 975 {
             // So loose that the bound of 976, which the run found, is the better (monotone: nothing is below 975).
             Upper { value: opt(n) + 5000, rule: Rule::Dual, from: None }
-        } else if n % 11 == 3 {
+        } else if long % 11 == 3 {
             // A search under a floor that completed having found nothing: the floor is the bound.
             Upper { value: opt(n) + 4 + u64::from(n % 5), rule: Rule::Floor, from: None }
-        } else if n % 13 == 2 {
+        } else if long % 13 == 2 {
             Upper { value: opt(n) + 6 + u64::from(n % 3), rule: Rule::Nogoods, from: None }
         } else {
             Upper { value: opt(n) + 5 + u64::from(n % 7), rule: Rule::Dual, from: None }
@@ -111,7 +124,7 @@ struct Fixture {
 fn fixture(name: &str) -> Fixture {
     let dir = TempDir::new(name);
     let (strict, bounds, games) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
-    write_results(&strict, &[920, 940]);
+    write_results(&strict, &GIVEN);
     let book = partial_book(&boards(), &GIVEN, &FOUND);
     let chain = store::chain(&strict).unwrap();
     let (lines, _) = export::plan(&entries(&book), &Store::default(), &chain, &options()).unwrap();
@@ -253,12 +266,12 @@ fn a_line_is_written_and_read_back_and_a_malformed_one_is_refused() {
 fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing() {
     let dir = TempDir::new("store-export");
     let (strict, bounds) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"));
-    write_results(&strict, &[920, 940]);
+    write_results(&strict, &GIVEN);
     let chain = store::chain(&strict).unwrap();
     let mut book = partial_book(&boards(), &GIVEN, &FOUND);
 
     let (lines, summary) = export::plan(&entries(&book), &Store::default(), &chain, &options()).unwrap();
-    assert!(lines.iter().all(|l| l.n != 920 && l.n != 940), "the chain's boards have no line");
+    assert!(lines.iter().all(|l| !GIVEN.contains(&l.n)), "the chain's boards have no line");
     assert_eq!(summary.chain, 2);
     let first_upper = line_of(&lines, |l| l.side == Side::Upper);
     assert!(lines[..first_upper].iter().all(|l| l.side == Side::Lower));
@@ -275,8 +288,8 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
         assert!(matches!(lines[i].rule, Rule::Monotone | Rule::Ceiling | Rule::Prime));
         assert!(lines[..i].iter().any(|l| l.side == Side::Lower && (l.n, l.value) == (from, value)), "{:?}", lines[i]);
     }
-    // None cites a game of the chain, which a run need not have: the boards next to 920 and 940 have their games written.
-    assert!(lines.iter().all(|l| l.side != Side::Lower || l.game.is_some() || ![920, 940].contains(&l.from.unwrap())));
+    // None cites a game of the chain, which a run need not have: the boards next to the chain's have their games written.
+    assert!(lines.iter().all(|l| l.side != Side::Lower || l.game.is_some() || !GIVEN.contains(&l.from.unwrap())));
 
     // Every rule of the format is there, with what it rests on.
     for rule in [Rule::Start, Rule::Search, Rule::Monotone, Rule::Ceiling, Rule::Prime, Rule::Repeat] {
@@ -313,15 +326,17 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     }
     let dual = lines.iter().find(|l| l.rule == Rule::Dual).unwrap();
     assert_eq!(dual.checkpoint.as_deref(), Some(format!("s3://bucket/run/ckpt/n{}.ckpt", dual.n).as_str()));
-    // A relation from a board of the chain cites it: 921 is a ceiling of 920 or a repeat of it, resting on 920.
-    let from_chain: Vec<&Line> = lines.iter().filter(|l| l.from.is_some_and(|f| f == 920 || f == 940)).collect();
+    // A relation from a board of the chain cites it: the board above one is a ceiling of it or a repeat of it, resting on
+    // it.
+    let from_chain: Vec<&Line> = lines.iter().filter(|l| l.from.is_some_and(|f| GIVEN.contains(&f))).collect();
     assert!(
         from_chain.iter().any(|l| l.side == Side::Upper && l.rests_on.contains(&l.from.unwrap())),
         "{from_chain:?}"
     );
     // The proven boards: the two found, and what the relations settled around them and the chain's games.
     let proven = Best::of(&lines).proven();
-    assert!(proven.contains(&925) && proven.contains(&950) && proven.len() > 6, "{proven:?}");
+    let [found_first, found_second, _] = FOUND;
+    assert!(proven.contains(&found_first) && proven.contains(&found_second) && proven.len() > 6, "{proven:?}");
     assert_eq!(summary.proven, proven.len());
 
     Store::append(&bounds, &lines).unwrap();
@@ -332,17 +347,19 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
     assert!(again.is_empty() && summary.lines == 0 && summary.newly_proven.is_empty(), "{again:?}");
     assert_eq!(summary.proven, proven.len());
 
-    // More is found: 930's optimal game and an exhausted search, and 910's optimal game; the relations carry them.
-    for n in [930, 910] {
+    // More is found: the optimal game of a board and an exhausted search of it, and the optimal game of another board
+    // (the long run's 930 and 910); the relations carry them.
+    let (searched, played) = (board(930), board(910));
+    for n in [searched, played] {
         let (value, moves, set) = promoted(n);
         book.offer_lower(n, Lower { value, moves, promotions: Some(set), rule: Rule::Search, from: None }, false)
             .unwrap();
     }
-    book.offer_upper(930, Upper { value: opt(930), rule: Rule::Exhausted, from: None }, false).unwrap();
-    book.propagate([930, 910]).unwrap();
+    book.offer_upper(searched, Upper { value: opt(searched), rule: Rule::Exhausted, from: None }, false).unwrap();
+    book.propagate([searched, played]).unwrap();
     let before = on_disk.best();
     let (more, summary) = export::plan(&entries(&book), &on_disk, &chain, &options()).unwrap();
-    assert!(more.len() > 2 && summary.newly_proven.contains(&930), "{summary}");
+    assert!(more.len() > 2 && summary.newly_proven.contains(&searched), "{summary}");
     for line in &more {
         match line.side {
             Side::Lower => assert!(before.lower.get(&line.n).is_none_or(|b| b.value < line.value), "{line:?}"),
@@ -350,14 +367,14 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
         }
     }
     assert!(
-        more.iter().any(|l| l.n == 930 && l.side == Side::Lower)
-            && more.iter().any(|l| l.n == 930 && l.side == Side::Upper)
+        more.iter().any(|l| l.n == searched && l.side == Side::Lower)
+            && more.iter().any(|l| l.n == searched && l.side == Side::Upper)
     );
-    // Each upper bound comes after the bound it cites: 931's ceiling from the exhausted 930 is after it.
+    // Each upper bound comes after the bound it cites: the ceiling of the board above the exhausted one is after it.
     let at = |pick: &dyn Fn(&Line) -> bool| more.iter().position(pick);
     if let (Some(cited), Some(citing)) = (
-        at(&|l| l.n == 930 && l.side == Side::Upper),
-        at(&|l| l.n == 931 && l.side == Side::Upper && l.from == Some(930)),
+        at(&|l| l.n == searched && l.side == Side::Upper),
+        at(&|l| l.n == searched + 1 && l.side == Side::Upper && l.from == Some(searched)),
     ) {
         assert!(cited < citing);
     }
@@ -443,21 +460,26 @@ fn all_proven_run(dir: &Path, first: u32, last: u32, proven: Option<&Path>, boun
 
 /// A run of 901..`LAST` (901..960) with the games of 900 and one in the middle (930) given (the chain's, so the export
 /// leaves them out) and the rest hidden: its export has every other board proven, a second export appends nothing, and
-/// both referees accept the file, the Python one with the games `ledger games` writes.
+/// both referees accept the file, the Python one with the games `ledger games` writes.  A quick run (`QUICK`) is of
+/// 521..532 with 520 and 526 given: every search of a run sets its board up again, and these boards take a fraction of
+/// the time that 901's do.  It has the climbs from the given game, which stop at their limits and park their boards,
+/// the ordinary searches, which stop and go on from their checkpoints, and in its export lower bounds by the start game,
+/// a search and the ceiling, prime and repeat relations, and upper bounds by an exhausted search and the same relations.
 #[test]
 fn a_run_is_exported_and_both_referees_accept_the_file() {
     let dir = TempDir::new("store-run");
     let (strict, bounds, games) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
-    let (middle, proven) = (if QUICK { 906 } else { 930 }, (LAST - 901) as usize);
-    write_results(&strict, &[900, middle]);
-    let run_dir = all_proven_run(&dir, 901, LAST, Some(&strict), None);
+    let (first, last, middle) = if QUICK { (521, 532, 526) } else { (901, LAST, 930) };
+    let proven = (last - first) as usize;
+    write_results(&strict, &[first - 1, middle]);
+    let run_dir = all_proven_run(&dir, first, last, Some(&strict), None);
     let ledger = read_ledger(&run_dir).unwrap();
     assert!(ledger.iter().all(Entry::proven));
 
     let summary = export::export(&run_dir, &bounds, &strict, &options()).unwrap();
     assert_eq!((summary.chain, summary.proven, summary.newly_proven.len()), (2, proven, proven), "{summary}");
     assert_eq!((summary.boards, summary.lower_better, summary.upper_better), (proven, 0, 0), "{summary}");
-    let ranges = format!("901-{}, {}-{LAST}", middle - 1, middle + 1);
+    let ranges = format!("{first}-{}, {}-{last}", middle - 1, middle + 1);
     assert!(summary.to_string().contains(&format!("{proven} boards newly proven ({ranges})")), "{summary}");
     let bytes = std::fs::read(&bounds).unwrap();
     let again = export::export(&run_dir, &bounds, &strict, &options()).unwrap();
@@ -528,7 +550,9 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
     let lower_moves = |l: &Line| l.side == Side::Lower && matches!(l.game, Some(Game::Moves(_)));
     let lower_promoted = |l: &Line| l.side == Side::Lower && l.rule == Rule::Search;
     let upper_by = |rule: Rule| move |l: &Line| l.side == Side::Upper && l.rule == rule;
-    let cases: Vec<(&str, Edit, bool, &str)> = vec![
+    // The chain's first board, and the first board the run found (the long run's 920 and 925).
+    let (chain_board, [searched, ..]) = (GIVEN[0], FOUND);
+    let cases: Vec<(&str, Edit, bool, String)> = vec![
         (
             "a game of moves with its first two moves swapped",
             Box::new(move |lines| {
@@ -539,7 +563,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             true,
-            "the game",
+            "the game".into(),
         ),
         (
             "a promotion set's value raised by one",
@@ -549,7 +573,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             true,
-            "scores",
+            "scores".into(),
         ),
         (
             "a root bound lowered by one",
@@ -559,7 +583,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             false,
-            "the root bound is",
+            "the root bound is".into(),
         ),
         (
             "a ceiling bound lowered by one",
@@ -569,29 +593,31 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             true,
-            "but the line says",
+            "but the line says".into(),
         ),
         (
             "the line a relation cites removed",
             Box::new(move |lines| {
-                let k = line_of(lines, |l| l.side == Side::Upper && l.rule == Rule::Ceiling && l.from == Some(925));
-                let cited = line_of(lines, |l| l.side == Side::Upper && l.n == 925);
+                let k =
+                    line_of(lines, |l| l.side == Side::Upper && l.rule == Rule::Ceiling && l.from == Some(searched));
+                let cited = line_of(lines, |l| l.side == Side::Upper && l.n == searched);
                 lines.remove(cited);
                 k - usize::from(cited < k)
             }),
             true,
-            "bounds board 925",
+            format!("bounds board {searched}"),
         ),
         (
             "the board a repeat's bound rests on dropped",
             Box::new(move |lines| {
-                let k = line_of(lines, |l| l.side == Side::Upper && l.rule == Rule::Repeat && l.from != Some(920));
+                let k =
+                    line_of(lines, |l| l.side == Side::Upper && l.rule == Rule::Repeat && l.from != Some(chain_board));
                 let from = lines[k].from.unwrap();
                 lines[k].rests_on.retain(|&b| b != from);
                 k
             }),
             true,
-            "leaves out",
+            "leaves out".into(),
         ),
         (
             "a repeat's own board dropped from what it rests on",
@@ -605,7 +631,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             true,
-            "leaves out",
+            "leaves out".into(),
         ),
         (
             "a repeat's bag changed",
@@ -616,7 +642,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             false,
-            "the bags are",
+            "the bags are".into(),
         ),
         (
             "the value that a carried game cites changed",
@@ -626,7 +652,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 k
             }),
             true,
-            "no line before it gives a game",
+            "no line before it gives a game".into(),
         ),
         (
             "a carried game moved before the line it cites",
@@ -638,7 +664,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 cited
             }),
             true,
-            "no line before it gives a game",
+            "no line before it gives a game".into(),
         ),
         (
             "the game that another line cites is not a game",
@@ -650,7 +676,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 cited
             }),
             true,
-            "the game",
+            "the game".into(),
         ),
         (
             "a line that improves nothing",
@@ -660,18 +686,18 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
                 lines.len() - 1
             }),
             true,
-            "does not improve",
+            "does not improve".into(),
         ),
         (
             "an upper bound below the chain's score",
             Box::new(move |lines| {
                 let mut line = lines[line_of(lines, upper_by(Rule::Dual))].clone();
-                (line.n, line.value, line.rests_on) = (920, opt(920) - 1, vec![920]);
+                (line.n, line.value, line.rests_on) = (chain_board, opt(chain_board) - 1, vec![chain_board]);
                 lines.push(line);
                 lines.len() - 1
             }),
             true,
-            "n=920: the upper bound",
+            format!("n={chain_board}: the upper bound"),
         ),
     ];
     for (case, (what, edit, python_finds, expected)) in cases.into_iter().enumerate() {
@@ -684,9 +710,9 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
         write_lines(&path, &lines);
         // A board of the chain that the file's bounds do not enclose is named by its board, with no line.
         let named =
-            if expected.starts_with("n=") { expected.to_owned() } else { format!("line {} (n={})", k + 1, lines[k].n) };
+            if expected.starts_with("n=") { expected.clone() } else { format!("line {} (n={})", k + 1, lines[k].n) };
         let (text, ok) = verify::verify(&path, &f.strict, 4).unwrap();
-        assert!(!ok && text.contains(&named) && text.contains(expected), "{what}: {named}, {expected}\n{text}");
+        assert!(!ok && text.contains(&named) && text.contains(&expected), "{what}: {named}, {expected}\n{text}");
         let (status, report) = python(&path, Some(&f.games), &f.strict);
         assert_eq!(status, Some(i32::from(python_finds)), "{what}\n{report}");
         if python_finds {
@@ -776,8 +802,10 @@ const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/boun
 
 /// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these
 /// are games replayed by the referee, and the whole file, its upper bounds with it, is the long test's (and is checked
-/// at every export).
-const QUICK_LINES: usize = 10;
+/// at every export).  The first three are a promotion set (of board 4401) and the games carried from it by the ceiling
+/// lemma and by monotonicity; each further promotion set is the same replay on another board of that size, whose
+/// frames cost as much to set up as board 4401's.
+const QUICK_LINES: usize = 3;
 
 /// The first lines of the committed store pass the verifier.  A prefix of an append-only store is a store too: a line
 /// cites only lines before it, so the first `QUICK_LINES` pass as the whole file does.

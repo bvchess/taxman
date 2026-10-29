@@ -759,7 +759,8 @@ struct MainThread {
 pub struct Scheduler {
     pub book: Book,
     dir: PathBuf,
-    settings: Settings,
+    /// How the run goes; a test of the order of the jobs changes it between calls of [`next_job`](Self::next_job).
+    pub settings: Settings,
     events: BufWriter<File>,
     t0: Instant,
     /// The CPU seconds of the earlier runs, and of this process when the run began.
