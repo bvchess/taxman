@@ -214,7 +214,7 @@ fn a_game_with_a_checkpoint_is_resumed_not_repeated_from(first: u32, last: u32) 
     verify_files(std::slice::from_ref(&path), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
 }
 
-/// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on optimal.json's 32 (`--use-prev`),
+/// A repeat assumes what the game it repeats assumes: 34 repeats 33, which, built on the table's 32 (`--use-prev`),
 /// reaches its ceiling and so assumes that game optimal, and so does 34 then, though it ran no search.  Searched
 /// without the repeat and without the ceiling (a proof by `cap` would rest on 33 too), 34 is an exhausted search
 /// and assumes nothing.
@@ -223,10 +223,10 @@ fn a_repeat_assumes_what_the_game_it_repeats_assumes() {
     let dir = TempDir::new("same-search-assumes");
     let use_prev = SolveOptions { use_prev: true, ..options(true) };
     let games = solver::solve_range(33, 34, &use_prev, None).unwrap();
-    let optimal_json = Assumptions::from([assumed_optimal(32)]);
-    assert_eq!((games[0].proof, &games[0].assumes), (Some(Proof::Cap), &optimal_json));
-    assert_eq!(games[1].same_search.as_ref().map(|s| (s.n, &s.assumes)), Some((33, &optimal_json)));
-    assert_eq!(games[1].assumes, optimal_json);
+    let table_assumed = Assumptions::from([assumed_optimal(32)]);
+    assert_eq!((games[0].proof, &games[0].assumes), (Some(Proof::Cap), &table_assumed));
+    assert_eq!(games[1].same_search.as_ref().map(|s| (s.n, &s.assumes)), Some((33, &table_assumed)));
+    assert_eq!(games[1].assumes, table_assumed);
 
     let path = dir.join("r.jsonl");
     solver::solve_range(33, 33, &use_prev, Some(&path)).unwrap();

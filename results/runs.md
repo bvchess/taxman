@@ -1,8 +1,10 @@
-# How strict.jsonl was made
+# How results/optimal.jsonl.gz was made
 
 Part of [the results](README.md).
 
-It was made in six runs, each a continuation of the one before:
+It was made in six runs, each a continuation of the one before.  Each run wrote its results to a plain file of its own,
+`strict.jsonl` in its working directory, and the games were brought home from there into the committed file, which was
+`results/strict.jsonl`, a plain file, in the commits that the table names:
 
 | games | where | build | git has the file before the run as |
 |---|---|---|---|
@@ -11,10 +13,10 @@ It was made in six runs, each a continuation of the one before:
 | 3441–3914 | appended from a run on a cloud machine of the same kind | commit eb84a6f | `git show b23f497:rust/results/strict.jsonl`, whose 3440 lines are this file's first 3440, byte for byte |
 | 3915–4547 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit ca357bf | `git show c7d81c2:rust/results/strict.jsonl`, whose 3914 lines are this file's first 3914, byte for byte |
 | 4548–4874 | appended from a run on a cloud machine of the same kind, which took the games before from this file and the bounds store (`--use-prev`) | commit 4974a71 | `git show f48df13:results/strict.jsonl`, whose 4547 lines are this file's first 4547, byte for byte |
-| 4875–5053 | appended from a run on a friend's machine of 88 threads, which took the games before from this file and the bounds store (`--use-prev`) | commits a88dc7f, bcfde26, 551f883, 9b4b308, d45a513, afbc256, d10e27a, c3357cd, 88b1228, 947946a, 29aa8ba, 7140548, ee9d945 and 1b59354 | `git show 18232de:results/strict.jsonl`, whose 4874 lines are this file's first 4874, byte for byte |
+| 4875–5055 | appended from a run on a friend's machine of 88 threads, which took the games before from this file and the bounds store (`--use-prev`) | commits a88dc7f, bcfde26, 551f883, 9b4b308, d45a513, afbc256, d10e27a, c3357cd, 88b1228, 947946a, 29aa8ba, 7140548, ee9d945, 1b59354 and 85dd216 | `git show 18232de:results/strict.jsonl`, whose 4874 lines are this file's first 4874, byte for byte |
 
 Each build was of a clean tree, which every line records.  Every line records the `default` tactics: no tactic is
-unproven any more, so none is switched off.  The sixth run's lines come from fourteen builds, one for each stretch of its
+unproven any more, so none is switched off.  The sixth run's lines come from fifteen builds, one for each stretch of its
 games.
 
 **The first run, games 1–2175.**  The command was, up to the paths, `taxman solve 1-2175 --threads 8 --out
@@ -22,7 +24,7 @@ strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 0`, run o
 (10 CPUs) with nothing else running.  Every line records the build of commit feba6d0 (`dirty` false), 8 threads, no
 `--time-limit` or `--node-limit`, and the `default` tactics: the GF(2) bound, `gf2`, on, and the Lagrangian bound over
 the nogoods, `lagrange`, off.  No game was resumed (`invocations` is 1 in every line of 1–2175), and none was built from
-a results file or from `optimal.json` (`prev.source` is `run` from 2 on).  The [entry on the
+a results file or from the table (`prev.source` is `run` from 2 on).  The [entry on the
 run](../solver/notebook/the-committed-chain-to-2175-2026-10/README.md) adds what it showed.
 
 *Details.*  The checkpoint interval is not recorded, but the `engine.checkpoints` counts imply about 60 s: 1 each for
@@ -150,30 +152,30 @@ entry](../solver/notebook/the-run-past-5000-2026-10/README.md) records the run.
   and 0.532 G); by time, 4865 (8,995 s or 2.50 h), 4864, 4872 and 4860.  The queue of work units never held more than
   5,617, and none spilled.
 
-**The sixth run, games 4875–5053.**  The command was `solver/tools/cloud/chain.sh 8191`, which runs `taxman solve 1-8191
+**The sixth run, games 4875–5055.**  The command was `solver/tools/cloud/chain.sh 8191`, which runs `taxman solve 1-8191
 --use-prev` with a window of 4 games in flight and [the wall](../docs/GLOSSARY.md#the-search) at 48 hours of a game's
 own search (the details below say where the window and the wall changed), on a friend's machine of 88 threads: two Intel
 Xeon E5-2699 v4 (x86_64, Ubuntu).  It continued the fifth run's results file and its checkpoints, which were copied from
 the cloud machine.  It took games 1–4874 from the file and each game the bounds store had proven from the store, with no
 search, and searched the others, from 4875 on.  Its own file started with `known` copies of games 1–4874.  The lines of
-games 4875–5053 were appended to this file, byte for byte.  Those copies and the run's incomplete lines (two of game
+games 4875–5055 were appended to this file, byte for byte.  Those copies and the run's incomplete lines (two of game
 4875, one each of 4879, 4880, 4895, 4899, 4914, 4921, 4944, 4950, 4953, 4956 and 4960, three of 4984, one each of 4991,
 4992, 5037 and 5047, two of 5049, and one of 5054) were left out.  No line was relabeled: every build is after commit
 7987c86, so a search that took no step already says `start`.  Every kept line records that the tree was clean (`dirty`
 false), no `--time-limit` or `--node-limit`, the `default` tactics, with the tactic `conflict_branching` on to 4983, and
-the option `use_prev`; the lines of 4899 to 5053 record `background` and `finder_seconds` 900 too, and those of 4914 to
-5053 the tactics `conflict_look` and `near_repeat`, on a build that has them.  The lines of 4953 on, made by builds in
+the option `use_prev`; the lines of 4899 to 5055 record `background` and `finder_seconds` 900 too, and those of 4914 to
+5055 the tactics `conflict_look` and `near_repeat`, on a build that has them.  The lines of 4953 on, made by builds in
 which `conflict_look` is on by default, no longer name it in `tactics`, and those of 4960 on record `price_reuse=on`,
 which the command switched on.  The lines of 4984 on record `carried_nogoods=on` and `warm_start=on` too, and
-`conflict_branching=off` in all but 4991, 4992, 4995, 4998, 5000 and the 25 searched games of 5001–5053, whose searches
+`conflict_branching=off` in all but 4991, 4992, 4995, 4998, 5000 and the 27 searched games of 5001–5055, whose searches
 the lab switched to conflict branching at a gate of 1200 (below).  The first line, 4875, records its game of 4874 as the
 line of this file, with its proof, `same_search`, which both verifiers accept.
 
 *Details.*  `chain.sh` ran twenty-three times, from 2026-10-21 to 29 (times UTC).  Each stop was a SIGTERM to
 `chain.sh`: the solver wrote a final checkpoint, and the next invocation resumed from it.  The lines come from the second
-to the thirteenth, the sixteenth to the twentieth and the twenty-second (the fourteenth and the fifteenth searched 4984
-and wrote only its incomplete lines, the twenty-first searched 5049 and wrote only an incomplete line, and the
-twenty-third was still running when the games were brought home):
+to the thirteenth, the sixteenth to the twentieth, the twenty-second and the twenty-third (the fourteenth and the
+fifteenth searched 4984 and wrote only its incomplete lines, and the twenty-first searched 5049 and wrote only an
+incomplete line; the twenty-third was still running when the games were brought home):
 
 1. 21:41 to 01:54: build 88915fb, on every thread (88), with the default tactics of that build, which had no conflict
    branching.  It resumed 4875 from the fifth run's checkpoint and was stopped with 4875 unfinished (the incomplete line
@@ -220,17 +222,17 @@ twenty-third was still running when the games were brought home):
     with the same trees), with the same flags: 5049 to 5053, and 5054 unfinished.
 23. From 06:30 on 2026-10-29: build 85dd216, with `--gate-trial 1000,800,600` added, so that each game's search tries
     those gates against the policy's own once it has taken 50 M steps and keeps the cheapest ([the
-    design](../solver/docs/design/gate-trial.md)): 5054 on.  It was still running when the games were brought home, past
-    5053, whose line is the last in this file.
+    design](../solver/docs/design/gate-trial.md)): 5054, which the twenty-second had left unfinished, and 5055.  It was
+    still running when the games were brought home, past 5055, whose line is the last in this file.
 
 * `invocations` is 1 in every kept line but 4879, 4880, 4895, 4899, 4900, 4901, 4914, 4921, 4944, 4945, 4950, 4952,
-  4953, 4956, 4960, 4984, 4991, 4992, 4995, 5037, 5040, 5047, 5048, 5049 and 5052, which a stop interrupted: 4984 and
-  5049 record 4, 4880, 4953, 4956 and 4992 record 3, and the others 2.  `prev.source` is `results` for 4875, 4879, 4880,
-  4895, 4899, 4914, 4921, 4944, 4950, 4953, 4956, 4960, 4984, 4991, 4992, 5037, 5047 and 5049, the first game of each of
-  the eighteen invocations whose lines are kept that read the game of n − 1 from the results file, and `run` for the
-  other 161.  Threads: 88 in 4875–4878 and 4899–5053, and 72 in 4879–4898.
-* The 179 games are 68 searches (all exhausted), 17 proofs at the ceiling (method `start`: 4876, 4878, 4887, 4896,
-  4902, 4917, 4923, 4959, 4965, 4977, 4986, 5005, 5012, 5013, 5025, 5031 and 5044), 24 primes (4877, 4889, 4903, 4909,
+  4953, 4956, 4960, 4984, 4991, 4992, 4995, 5037, 5040, 5047, 5048, 5049, 5052 and 5054, which a stop interrupted: 4984
+  and 5049 record 4, 4880, 4953, 4956 and 4992 record 3, and the others 2.  `prev.source` is `results` for 4875, 4879,
+  4880, 4895, 4899, 4914, 4921, 4944, 4950, 4953, 4956, 4960, 4984, 4991, 4992, 5037, 5047, 5049 and 5054, the first
+  game of each of the nineteen invocations whose lines are kept that read the game of n − 1 from the results file, and
+  `run` for the other 162.  Threads: 88 in 4875–4878 and 4899–5055, and 72 in 4879–4898.
+* The 181 games are 69 searches (all exhausted), 18 proofs at the ceiling (method `start`: 4876, 4878, 4887, 4896,
+  4902, 4917, 4923, 4959, 4965, 4977, 4986, 5005, 5012, 5013, 5025, 5031, 5044 and 5055), 24 primes (4877, 4889, 4903, 4909,
   4919, 4931, 4933, 4937, 4943, 4951, 4957, 4967, 4969, 4973, 4987, 4993, 4999, 5003, 5009, 5011, 5021, 5023, 5039 and
   5051) and 70 repeats.  No game came from the bounds store, which has proven none past 4783.
 * The searches of 4875–4900 took 2.63 G nodes and 22.97 hours of game time (the games overlap in the window), and every
@@ -246,21 +248,23 @@ twenty-third was still running when the games were brought home):
   invocations), 4992 (1.95 G, 15,680 s), 4991 (1.21 G, 11,143 s) and 4995 (978 M, 6,287 s), and 5000 took 28.6 M nodes
   and 189 s.  Their queues of work units never held more than 10,314, and none spilled.  The 12 searches of 5001–5036
   took 1.54 G nodes, 16.8 M or more each; the dearest by nodes were 5022 (287 M, 2,360 s), 5032 (196 M) and 5035
-  (194 M).  The 7 searches of 5037–5053 took 10.47 G nodes, 193 M or more each; the dearest, by nodes, were 5052 (4.09
-  G, 21,088 s), 5049 (4.05 G, 22,543 s over four invocations), 5040 (552 M, 3,843 s) and 5043 (537 M, 3,850 s).  The
-  queue of work units in 5001–5053 never held more than 12,362, and none spilled.  The lines of 4899 to 5053 record
-  `seconds.own`.
+  (194 M).  The 8 searches of 5037–5055 took 17.92 G nodes, 193 M or more each; the dearest, by nodes, were 5054 (7.45
+  G, 37,449 s over two invocations), 5052 (4.09 G, 21,088 s), 5049 (4.05 G, 22,543 s over four invocations), 5040 (552
+  M, 3,843 s) and 5043 (537 M, 3,850 s).  The queue of work units in 5001–5055 never held more than 12,621, and none
+  spilled.  The lines of 4899 to 5055 record `seconds.own`.  The line of 5054 records the gate trial in
+  `options.gate_trial`, 1000, 800 and 600, and a gate of 600 in its `lab` key; 5055 was a proof at the ceiling with no
+  node.
 * During the fourth to the sixth invocations the lab ran studies in a sandbox beside the chain, on 16 threads at nice
   19.  Its command folder carried no command to the solver, and no line up to 4919 has a `lab` key, so the lab changed
-  no search there.  From 4920 on the lab set a policy for the tactic `conflict_look` (the `lab` key of 62 lines, 4920 to
-  5053, and `tactics` `conflict_look=on` on the 9 where it was on: 4920, 4928, 4932, 4936, 4940, 4944, 4949, 4950 and
+  no search there.  From 4920 on the lab set a policy for the tactic `conflict_look` (the `lab` key of 64 lines, 4920 to
+  5055, and `tactics` `conflict_look=on` on the 9 where it was on: 4920, 4928, 4932, 4936, 4940, 4944, 4949, 4950 and
   4952); the tactic only chooses between two true conflicts of a node, so both verifiers accept the lines, which they do
   for any tactic.
 * On 2026-10-27 and 28 the lab also changed the run's threads and its branching, through its command folder:
   * the threads to 44 from 12:50 to 13:02 and from 13:14 to 13:29 on 2026-10-27, in 4984's search, and back to 88;
   * conflict branching off for 4984, and by a policy for the games from 4985 on, at 14:19 on 2026-10-27;
   * conflict branching on at a gate of 1200 for 4991 at 21:54, for 4992 at 02:45 on 2026-10-28, and by a policy for the
-    games from 4995 on at 03:12, which reached the searches of 4995, 4998 and 5000 and the 25 of 5001–5053, and was
+    games from 4995 on at 03:12, which reached the searches of 4995, 4998 and 5000 and the 27 of 5001–5055, and was
     not changed again.
 
   Conflict branching only chooses which true conflict a node branches on, so both verifiers accept the lines.  The
@@ -272,14 +276,14 @@ twenty-third was still running when the games were brought home):
   4952 (2,670), 4953 (165), 4991 (58,300,645), 5037 (254,558), 5043 (12,716,671), 5047 (1,925,714) and 5048 (585,636),
   and no other.
 * The tactic `price_reuse` ([design](../solver/docs/design/price-reuse.md)), which keeps the prices that conflict
-  branching makes for the nodes of a searcher's path, was on from the thirteenth invocation, in 4960 to 5053.  It only
+  branching makes for the nodes of a searcher's path, was on from the thirteenth invocation, in 4960 to 5055.  It only
   ranks true conflicts of a node, so both verifiers accept the lines.
 * The tactics `carried_nogoods` ([design](../solver/docs/design/carried-nogoods.md)) and `warm_start`
-  ([design](../solver/docs/design/gf2-bound.md#the-gf2-bound)) were on in 4984 to 5053.  A carried nogood is checked at
+  ([design](../solver/docs/design/gf2-bound.md#the-gf2-bound)) were on in 4984 to 5055.  A carried nogood is checked at
   the game's root before the search uses it, and the warm start changes only which of several heaviest sets the GF(2)
   bound finds, so both verifiers accept the lines.
 
-**The earlier files.**  This is the fourth file of its name.  The earlier three were chains to 1300, and git has them:
+**The earlier chains.**  This is the fourth chain committed.  The earlier three were chains to 1300, and git has them:
 
 * the first, of commit bd9bb5d, in schema 3: `git show cd3d32f:rust/results/strict.jsonl`;
 * the second, of commit 243af9b, in schema 4: `git show 2487671:rust/results/strict.jsonl`;
@@ -291,7 +295,7 @@ game whose search took no step is `search` in them and `start` here.  The first 
 Their moves differ from this file's in a few games ([README.md, "Games with several optimal
 sets"](README.md#games-with-several-optimal-sets)).
 
-**Other files checked with it.**  Three other files were checked with `strict.jsonl`, and agree with it ([README.md,
+**Other files checked with it.**  Three other files were checked with this file, and agree with it ([README.md,
 "What supports the scores"](README.md#what-supports-the-scores)):
 
 * `default.jsonl` (1001–1231, schema 1), the first run past 1000, made with the unproven tactics `reuse_prev` and
@@ -301,7 +305,7 @@ sets"](README.md#games-with-several-optimal-sets)).
   commit e710d16), a chain with those tactics off.  It has 34 prime, 127 exhausted and 70 at the ceiling, all 231
   resting on nothing unproven.
 * The GF(2) study's `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (1301–2175, schema 5,
-  commit 716ebd9, 2 threads), a chain from `optimal.json`'s game of 1300.
+  commit 716ebd9, 2 threads), a chain from the table's game of 1300.
 
-The two chains stay as their studies' data.  The verifiers read the second beside `strict.jsonl`, and no longer read
+The two chains stay as their studies' data.  The verifiers read the second beside this file, and no longer read
 the first.

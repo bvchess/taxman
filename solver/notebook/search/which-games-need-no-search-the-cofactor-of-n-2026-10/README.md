@@ -15,7 +15,7 @@ states the rule there ([the cofactor rule](../../../../docs/theory/arrival.md#th
 
 ## Method
 
-* **The games.**  The first completed line of each n of the [committed chain](../../../../results/README.md#strictjsonl)
+* **The games.**  The first completed line of each n of the [committed chain](../../../../results/README.md#optimaljsonlgz)
   (`results/strict.jsonl`, games to 4949) and, for 4950–4979, of the running chain's file, which the study reads on
   2026-10-24 and never writes.  The study leaves out the 382 lines of method `known`, games 3984–4783 that the [bounds
   store](../../../../results/README.md#boundsjsonl) had proven and the chain took as copies, since no search was in

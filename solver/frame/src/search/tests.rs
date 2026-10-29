@@ -1643,7 +1643,7 @@ fn bench_search_one() {
         time_limit: seconds.map(Duration::from_secs),
         ..config(threads)
     };
-    // What optimal.json says the best promotion sum is, and the `prev_cap` ceiling.
+    // What the table says the best promotion sum is, and the `prev_cap` ceiling.
     {
         let optimal = crate::game::Optimal::built_in();
         let in_the_bag: u64 =

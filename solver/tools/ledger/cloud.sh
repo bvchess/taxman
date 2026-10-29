@@ -23,7 +23,7 @@
 #   PROVEN      a results file whose proven games the run is given (default none: the truth stays hidden)
 #   BOUNDS      a bounds store (results/bounds.jsonl) whose best bounds the run starts from (default none); the run's
 #               ledger is exported to it afterwards with `ledger export` (solver/docs/runbook/ledger.md)
-#   KNOWN       the results file the report checks against (default results/strict.jsonl)
+#   KNOWN       the results file the report checks against (default results/optimal.jsonl.gz)
 #   LEDGER_BIN  the program (default solver/frame/target/release/examples/ledger; a laptop's test is
 #               solver/frame/target/debug/examples/ledger, built by `cargo build --profile test --example ledger`
 #               in solver/frame)
@@ -42,7 +42,7 @@ range="${1:?usage: solver/tools/ledger/cloud.sh FIRST-LAST}"
 workers="${WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 cpu_hours="${CPU_HOURS:-$workers}"
 out="${OUT:-$HOME/ledger}"
-known="${KNOWN:-results/strict.jsonl}"
+known="${KNOWN:-results/optimal.jsonl.gz}"
 ledger="${LEDGER_BIN:-solver/frame/target/release/examples/ledger}"
 mkdir -p "$out"
 

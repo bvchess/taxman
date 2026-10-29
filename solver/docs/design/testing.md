@@ -68,7 +68,7 @@ probe in [performance.md](performance.md)):
   below the best completion of its node;
 * a pure speedup: every search tree identical, so the probe's fingerprints and the node-count tripwires do not move;
 * anything that touches the search, the chain or the results: `taxman regress --to 1000`; a scratch chain (`taxman
-  solve 1-N --out FILE`, not in `results/`) compared with `results/strict.jsonl`; and both verifiers on it, since a
+  solve 1-N --out FILE`, not in `results/`) compared with `results/optimal.jsonl.gz`; and both verifiers on it, since a
   results line carries provenance that they check (`solver/tools/cloud/verify.sh FILE` runs `taxman verify-results` and
   `solver/tools/check_results.py`, and compares with the committed chain);
 * a change to an on-disk format (results line, checkpoint header, `testdata/`): the commit message says so, and why.

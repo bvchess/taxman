@@ -113,8 +113,7 @@ class Setup(unittest.TestCase):
         (self.source / "solver" / "noframe").mkdir()
         (self.source / "solver" / "noframe" / "Cargo.toml").write_text("[package]\n")
         (self.source / "results").mkdir()
-        (self.source / "results" / "optimal.json").write_text("{}\n")
-        (self.source / "results" / "strict.jsonl").write_text("")
+        (self.source / "results" / "optimal.jsonl.gz").write_bytes(b"")
         executable(self.source / "solver" / "tools" / "check_results.py", "")
         executable(self.source / "solver" / "noframe" / "tools" / "summarize.py", "")
         (self.source / ".gitignore").write_text("target\n")
@@ -190,7 +189,7 @@ class Setup(unittest.TestCase):
         self.assertTrue((machine / "solver/frame/target/release/examples/ledger").exists())
         self.assertFalse((machine / "solver/frame/target/release/examples/ladder").exists())
         self.assertFalse((machine / "solver/noframe/target").exists())
-        self.assertIn("smoke: replay optimal.json", logged)  # the solver has its checks, the prover none
+        self.assertIn("smoke: the committed results file", logged)  # the solver has its checks, the prover none
         self.assertIn("smoke: none for the prover", logged)
 
     def test_build_prover_asks_for_the_prover_and_none_leaves_it_out(self):
@@ -277,7 +276,7 @@ class Setup(unittest.TestCase):
         self.assertIn("the binaries come from the build cache", logged)
         self.assertIn("release suite: not run", logged)
         self.assertTrue(os.access(second / "solver/frame/target/release/taxman", os.X_OK))
-        self.assertIn("smoke: replay optimal.json", logged)  # the smoke checks still show that the machine runs them
+        self.assertIn("smoke: the committed results file", logged)  # the smoke checks still show the machine runs them
 
     def test_a_build_with_the_studies_is_cached_apart_from_one_without(self):
         default_entry = "prover-bins+prover-examples+solver-bins+solver-examples"

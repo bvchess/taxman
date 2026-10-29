@@ -155,7 +155,7 @@ mod tests {
 
     /// The known optimum of game `n` as a promotion sum.
     fn opt<const W: usize>(board: &Board<W>) -> u64 {
-        Optimal::built_in().score(board.n()).expect("a game of optimal.json") - board.in_the_bag
+        Optimal::built_in().score(board.n()).expect("a game of the table") - board.in_the_bag
     }
 
     /// Game `n` stopped before its first node: its checkpoint holds the root unit alone, and the dual bound is the

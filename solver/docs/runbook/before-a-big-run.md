@@ -13,8 +13,9 @@ next one would cost more to find:
    the sweep to its CPU count, the cost of a checkpoint pause, and a rehearsal of the whole chain to 1231 with
    deliberate interruptions (the sections from [The big instance: correctness](#the-big-instance-correctness) on).
 
-Then start the production chain ([chain.md](chain.md)), from n = 1 or from the committed `results/strict.jsonl` ([its
-range](../../../results/README.md)), in tmux, on spot, with a deadline and a copy of the state kept off the machine.
+Then start the production chain ([chain.md](chain.md)), from n = 1 or from the committed `results/optimal.jsonl.gz`
+([its range](../../../results/README.md#optimaljsonlgz)), in tmux, on spot, with a deadline and a copy of the state
+kept off the machine.
 
 ## Dry run in Docker (optional)
 

@@ -1,37 +1,36 @@
 # Results of the solver
 
-This directory holds the project's results: a chain of optimal games, the table of optimal games, bounds on opt(n) for
-the games at the chain's end and past it, and the certificates of [statement
-U](../docs/theory/exactness.md#statement-u).  This page says what each file holds, how far it reaches, how it was made
-and what supports its scores.  The [glossary](../docs/GLOSSARY.md) defines the terms; [the frame
-model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame solver's scores rest, are
-defined in the theory, and the prover in [its README](../solver/noframe/README.md).
+This directory holds the project's results: a chain of optimal games, bounds on opt(n) for the games at the chain's end
+and past it, and the certificates of [statement U](../docs/theory/exactness.md#statement-u).  This page says what each
+file holds, how far it reaches, how it was made and what supports its scores.  The [glossary](../docs/GLOSSARY.md)
+defines the terms; [the frame model](../docs/theory/frame-model.md#the-frame-model) and statement U, on which the frame
+solver's scores rest, are defined in the theory, and the prover in [its README](../solver/noframe/README.md).
 
 A results file has one JSON line per game, as `taxman solve --out` writes it.  The fields are described in
 `src/results.rs` and in [the frame solver's reference](../solver/docs/REFERENCE.md#a-results-line---out-schema-5).  The
-counts on this page are pinned by `tests/results.rs`, so changing a file means updating both together.
+counts on this page are a snapshot, dated 2026-10-29, which no test pins: the commands in
+[the next section](#optimaljsonlgz) print the current ones.
 
 ## The files
 
 | file | holds | games | made by |
 |---|---|---|---|
-| `strict.jsonl` | the committed chain: an optimal game for every n, each built from the one before | 1–5053 | six runs of `taxman solve` ([below](#strictjsonl)) |
-| `optimal.json` | the table of optimal games, built into the frame solver | 1–5053 | the Java solver for 1–1000, the chain for 1001–5053 ([below](#optimaljson)) |
+| `optimal.jsonl.gz` | the committed chain: an optimal game for every n, each built from the one before; the table of optimal games built into the frame solver | 1–5055 on 2026-10-29 | six runs of `taxman solve` ([below](#optimaljsonlgz)) |
 | `bounds.jsonl` | the bounds store: bounds on opt(n) for the games from 3915 on, one line a bound | 3915–8191 | the ledger's exports ([below](#boundsjsonl)) |
 | `certificates/` | certificates of [statement U](../docs/theory/exactness.md#statement-u) | 600–1300 | `taxman certify` ([below](#certificates)) |
 
 How far each kind of proof reaches:
 
-* **Every game of `strict.jsonl`** is proven within the frame model.
+* **Every game of `optimal.jsonl.gz`** is proven within the frame model.
 * **Games 2 to 2175** are also proven on the whole board by the prover, so their scores are opt(n) without the frame
   model.
-* **Games 2176 to 5053** are proven within the frame model, which is exact given statement U.  U is not certified past
-  2175, and `taxman certify` can check it game by game.  A game of them proven by the ceiling or the prime formula is
-  opt(n) wherever the game before it is.
+* **Games 2176 on** are proven within the frame model, which is exact given statement U.  U is not certified past 2175,
+  and `taxman certify` can check it game by game.  A game of them proven by the ceiling or the prime formula is opt(n)
+  wherever the game before it is.
 
 "What supports the scores", below, gives the evidence for each.
 
-**`explore.jsonl` is not a chain, and never goes into `strict.jsonl`.**  The file of a sweep ([the frame solver's
+**`explore.jsonl` is not a chain, and never goes into `optimal.jsonl.gz`.**  The file of a sweep ([the frame solver's
 README, "Keeping going past limits, and the
 sweep"](../solver/frame/README.md#keeping-going-past-limits-and-the-sweep); `solver/tools/cloud/sweep.sh`) merges the
 games of many blocks of consecutive games, each given a limited search.  So it has:
@@ -45,39 +44,59 @@ Each completed game in it is proven by its own proof, given what it assumes, in 
 for those games alone, and a game that follows a hole may rest on nothing the chain would have given it.  It is not
 committed here: a sweep's results go to a file of their own, with a notebook entry saying what they are.
 
-## strict.jsonl
+## optimal.jsonl.gz
 
-The chain of optimal games from n = 1 to n = 5053, and the file to build on.  Every game is built from the one before,
-every line has its full provenance, and no game rests on `optimal.json`.  It has 5053 lines in schema 5, the completed
-games in order of n, and no line of an unfinished search.  382 of its lines, all in 3984–4783, are games that the bounds
-store had proven (proof `known`): the fourth and fifth runs took each from the store with no search, and its line cites
-the store's two lines ([the frame solver's reference, "Citing a known
-source"](../solver/docs/REFERENCE.md#citing-a-known-source)).  The name is from the builds that had unproven tactics,
-which the chain was made without; none is left, so every run from n = 1 is made without them.  [runs.md](runs.md)
-records the six runs that made it.
+The chain of optimal games from n = 1, the file to build on, and the table of optimal games that the frame solver has
+built in.  Every game is built from the one before, every line has its full provenance, and no game rests on a table.  It
+has one line a game in schema 5, the completed games in order of n (so line n is game n), and no line of an unfinished
+search.  Some of its lines are games that the bounds store had proven (proof `known`, in the table below): the fourth and
+fifth runs took each from the store with no search, and its line cites the store's two lines ([the frame solver's
+reference, "Citing a known source"](../solver/docs/REFERENCE.md#citing-a-known-source)).  [runs.md](runs.md) records the
+six runs that made it.
 
-Its games, by proof, as `taxman verify-results` and `solver/tools/check_results.py` report them:
+**The file is gzip, one member for each batch of games.**  The first 500 games are one member, the next 500 the next, and
+so on; a batch of games brought home later is appended as one member of its own (`solver/docs/runbook/chain.md`,
+["Verifying, and bringing the results home"](../solver/docs/runbook/chain.md#verifying-and-bringing-the-results-home)),
+so the bytes of the games before it never change.  Both Rust programs read it through the crate
+[solver/gzip](../solver/gzip/README.md), which checks each member's CRC-32 and so fails loudly on a damaged file;
+Python and the shell read it with `gzip`.  The frame solver builds the file into its binary.  Its table is the games of
+the file as of the build, each decoded and parsed when it is asked for, member by member: a run that needs none decodes
+nothing, and one that needs the first games decodes the first members ([the design](../solver/docs/design/engine.md)).
+The table holds each line's score and moves and not its proof, so a game taken from it (`--use-prev`) is assumed
+optimal, and the results whose proofs rest on it say so: "the game of n in results/optimal.jsonl.gz is optimal".  A
+chain that assumes nothing beyond the frame model starts at n = 1, as this one does.
 
-| | 1–1300 | 1301–2175 | 2176–3440 | 3441–3914 | 3915–4547 | 4548–4874 | 4875–5000 | 5001–5053 | `strict.jsonl` |
+To read it, from the top of the repository:
+
+    gzip -dc results/optimal.jsonl.gz | sed -n 5000p      # the line of game 5000
+    taxman verify-results results/optimal.jsonl.gz
+    python3 solver/tools/check_results.py results/optimal.jsonl.gz
+
+The last two are the verifiers, which print the counts below as they stand.
+
+**The snapshot of 2026-10-29: games 1–5055** in 11 members of 500 games (the last of 55), 1,088,719 bytes, which
+decompress to 36,708,039 bytes.  Its games, by proof, as the verifiers report them:
+
+| | 1–1300 | 1301–2175 | 2176–3440 | 3441–3914 | 3915–4547 | 4548–4874 | 4875–5000 | 5001–5055 | all |
 |---|---|---|---|---|---|---|---|---|---|
-| games | 1300 | 875 | 1265 | 474 | 633 | 327 | 126 | 53 | 5053 |
+| games | 1300 | 875 | 1265 | 474 | 633 | 327 | 126 | 55 | 5055 |
 | proof `trivial` | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 13 |
-| proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 178 | 150 | 35 | 49 | 19 | 1609 |
+| proof `exhausted`: the search explored its whole tree | 416 | 314 | 448 | 178 | 150 | 35 | 49 | 20 | 1610 |
 | of those, searches the [near-repeat cut](../solver/docs/design/search.md#the-near-repeat-cut) shortened (`stats.near_repeat_cut` above 0) | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 4 | 9 |
-| proof `cap`: the search reached the [ceiling](../docs/GLOSSARY.md#the-game) | 115 | 77 | 119 | 43 | 57 | 14 | 11 | 6 | 442 |
+| proof `cap`: the search reached the [ceiling](../docs/GLOSSARY.md#the-game) | 115 | 77 | 119 | 43 | 57 | 14 | 11 | 7 | 443 |
 | proof `prime_formula` | 211 | 115 | 155 | 60 | 55 | 13 | 17 | 7 | 633 |
 | proof `same_search`: a repeat of an earlier game's search | 545 | 369 | 543 | 193 | 204 | 50 | 49 | 21 | 1974 |
 | proof `known`: a game of the bounds store, taken with no search | 0 | 0 | 0 | 0 | 167 | 215 | 0 | 0 | 382 |
-| score = n + score(n − 1) | 424 | 270 | 402 | 148 | 218 | 115 | 42 | 18 | 1637 |
+| score = n + score(n − 1) | 424 | 270 | 402 | 148 | 218 | 115 | 42 | 19 | 1638 |
 | score = n + score(n − 1) − P (a prime n) | 210 | 115 | 155 | 60 | 75 | 36 | 17 | 7 | 675 |
 
 The near-repeat cut shortens a search and leaves its proof `exhausted`, so a line counts the nodes it cut in
 `stats.near_repeat_cut`.  The first five runs and the sixth run to game 4920 searched the games without the cut, and
-no line of them has the key; 61 lines of games 4921–5053 have it, and nine of them cut nodes: 4929 (20,458,994), 4936
+no line of them has the key; 63 lines of games 4921–5055 have it, and nine of them cut nodes: 4929 (20,458,994), 4936
 (52,079), 4952 (2,670), 4953 (165), 4991 (58,300,645), 5037 (254,558), 5043 (12,716,671), 5047 (1,925,714) and 5048
 (585,636).
 
-Of its 2051 searched games, 1609 are exhausted and 442 at the ceiling.  The proofs at the ceiling were all decided
+Of its 2053 searched games, 1610 are exhausted and 443 at the ceiling.  The proofs at the ceiling were all decided
 before the search explored a node (the method `start`) but six: 686's took 29 nodes, and 2695's, 3052's, 3306's, 3796's
 and 3933's took 7,175, 2,826, 5,366, 5,530 and 3,093.  A repeat takes the promotions of the latest earlier game that
 posed the same search problem: the game of n − 1 for 1757 of the 1974 repeats, and of n − 2 for the other 217, where
@@ -104,28 +123,37 @@ has the tables and the cofactors that are always searched.
 * 4548–4874: 35 exhausted, 14 at the ceiling, 13 prime, 50 repeats and 215 from the store: 49 searches, 50 repeats,
   13 primes and 215 games of the store.
 * 4875–5000: 49 exhausted, 11 at the ceiling, 17 prime and 49 repeats: 60 searches, 49 repeats and 17 primes.
-* 5001–5053: 19 exhausted, 6 at the ceiling, 7 prime and 21 repeats: 25 searches, 21 repeats and 7 primes.
+* 5001–5055: 20 exhausted, 7 at the ceiling, 7 prime and 21 repeats: 27 searches, 21 repeats and 7 primes.
 
 ### Games with several optimal sets
 
 Several games have more than one optimal set of moves, and which one a run finds depends on the order of its search.
 So scores are reproducible, but move lists need not be.  Each chain that found a set proved its game optimal, so each
-set is optimal.  `tests/results.rs` pins the games where this file differs from the table.  The sets of this file
-differ from the earlier files' in these games:
+set is optimal.  The file has the sets of the chain that made it, from n = 1.  Until the committed chain and the table
+of optimal games became this one file, the table (`optimal.json`: the Java solver's games 1–1000, the earlier chains'
+games to 1300, and then this chain's games) and the chain (`strict.jsonl`) differed in some games, and other chains
+differ from the file in others.  These are all of them:
 
-* **539, 684–687 and 770–773**, which the prover lists with two or three optimal sets each ([the prover's
-  README](../solver/noframe/docs/uniqueness.md) has the exchanges).  This file has `optimal.json`'s
-  set of moves in each of them but 539 and 770–773, where the chain found another optimal set.  The earlier chains of
-  commits 243af9b and 271c817 had the table's sets at 539 and 770–773 and another at 684–687.
-* **1215**, where `optimal.json` and every earlier chain have {312, 450} and this file {342, 420}: an exchange of two
-  numbers of the same sum, 762.  The prover enumerates optimal sets only to n = 989.
-* **1221–1224**, where the chain of commit bd9bb5d and the cost-curve study's chain found {364, 456, 544}, and this
-  file, `default.jsonl` and the chains of 243af9b and 271c817 have {348, 408, 608}.  It is an exchange of three
+* **539 and 770–773**, which the prover lists with two or three optimal sets each ([the prover's
+  README](../solver/noframe/docs/uniqueness.md) has the exchanges).  The file has the chain's set.  The table had the
+  Java's set in each, as did the earlier chains of commits 243af9b and 271c817.
+* **684–687**, where those two earlier chains had another optimal set than the table's, which the file has.
+* **1215**, where the table and every earlier chain have {312, 450} and the file {342, 420}: an exchange of two numbers
+  of the same sum, 762.  The prover enumerates optimal sets only to n = 989.
+* **1221–1224**, where the chain of commit bd9bb5d and the cost-curve study's chain found {364, 456, 544}, and the file,
+  `default.jsonl`, the table and the chains of 243af9b and 271c817 have {348, 408, 608}.  It is an exchange of three
   numbers of the same sum, 1364, that starts at 1221 and is carried by 1222, 1223 and 1224.  The prover describes
   exchanges like it, which first appear at game 425.
-* **1560–1563**, where the GF(2) study's chain has {510, 594, 620, 624, 660} and this file {476, 528, 616, 644, 744}:
-  an exchange of five numbers of the same sum, 3008, found by the search of 1560 and carried by the three repeats after
-  it.
+* **1560–1563**, where the GF(2) study's chain has {510, 594, 620, 624, 660} and the file {476, 528, 616, 644, 744}: an
+  exchange of five numbers of the same sum, 3008, found by the search of 1560 and carried by the three repeats after it.
+
+**The games 1–1300 in history.**  The games 1–1000 of the file reproduce the Java solver's table score for score, with no
+unproven tactic on, in 7.5 s of search in all on 8 threads, the slowest n = 992 at 0.7 s.  The Java solver is at the git
+tag `java-final`, and its table, whose games it made with the tactics `reuse_prev` and `revise_freedoms` on, was the
+file `results/optimal.json` until the table and the chain became one file.  That table's games 1001–1300 came from the
+chain of commit bd9bb5d and then from that of commit 243af9b, which differs from the first at 1221–1224 only, added by
+`taxman extend-optimal` (a command since removed).  Its games 1301 on were the chain's own, move for move, copied in the
+same way on 2026-10-28 (1301–5000) and 2026-10-29 (5001–5053).
 
 ## What supports the scores
 
@@ -134,31 +162,26 @@ U](../docs/theory/exactness.md#statement-u) holds
 ([DESIGN.md](../solver/docs/design/frame-model.md#what-optimal-means)), and ["The files"](#the-files), above, says how
 far each kind of proof reaches.
 
-Two verifiers check the files.  From the top of the repository:
-
-    taxman verify-results results/strict.jsonl
-    python3 solver/tools/check_results.py results/strict.jsonl
-
-The first is the frame solver's own.  It also runs on any results file that `solve --out` opens, and in
-`tests/results.rs`.  The second is an independent verifier in Python, which shares no code with the solver; it also
-checks each score against the Franklín–Moniot upper bound and the best-known heuristic chain where `heuristics/results`
-has them.  Both replay every game (legal, scoring what is recorded, with no legal move left, and opening with the
-largest prime), confirm each score against `optimal.json` and the bounds score(n − 1) ≤ score(n) ≤ n +
-score(n − 1), check each line's arithmetic and the predecessor it names and that the files agree, and derive each
-line's proof kind and what it assumes by the rules in `src/results.rs`.  [The frame solver's
-reference](../solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted) defines the proof kinds and the assumptions,
-and says what each verifier checks.  Both pass `strict.jsonl`, in about 10 s (42 s of CPU, on several threads) and 3 s
-on the laptop.
+Two verifiers check the file, as [above](#optimaljsonlgz) shows.  The first is the frame solver's own.  It also runs on
+any results file that `solve --out` opens, and in `tests/results.rs`.  The second is an independent verifier in Python,
+which shares no code with the solver; it also checks each score against the Franklín–Moniot upper bound and the
+best-known heuristic chain where `heuristics/results` has them.  Both replay every game (legal, scoring what is
+recorded, with no legal move left, and opening with the largest prime), confirm each score against the table and the
+bounds score(n − 1) ≤ score(n) ≤ n + score(n − 1), check each line's arithmetic and the predecessor it names and that
+the files agree, and derive each line's proof kind and what it assumes by the rules in `src/results.rs`.  [The frame
+solver's reference](../solver/docs/REFERENCE.md#4-why-the-answers-can-be-trusted) defines the proof kinds and the
+assumptions, and says what each verifier checks.  Both pass `optimal.jsonl.gz`.  Checked against itself, the file's
+comparison with the table is each game with itself, so it has nothing to do there.
 
 What that evidence amounts to:
 
 1. **Arithmetic certificates.**  A score at the [ceiling](../docs/GLOSSARY.md#the-game), n + score(n − 1), is optimal
    whenever the game of n − 1 is, whatever found it.  So is a score equal to n + score(n − 1) − P for a prime n, with P
-   the largest prime below n (the [prime formula](../docs/GLOSSARY.md#the-game), proven in `src/accelerate.rs`).  2312
-   of `strict.jsonl`'s games have such a score: 1637 at n + score(n − 1), among them its 442 proofs at the ceiling, and
+   the largest prime below n (the [prime formula](../docs/GLOSSARY.md#the-game), proven in `src/accelerate.rs`).  2313
+   of the file's games have such a score: 1638 at n + score(n − 1), among them its 443 proofs at the ceiling, and
    675 prime ones.
-2. **Exhaustive searches.**  `strict.jsonl`'s 1609 `exhausted` games are proven by a search that explored its whole
-   tree, as the solver reports it.  The rest of the file is its 442 proofs at the ceiling, its 633 prime games, its 13
+2. **Exhaustive searches.**  The file's 1610 `exhausted` games are proven by a search that explored its whole
+   tree, as the solver reports it.  The rest of the file is its 443 proofs at the ceiling, its 633 prime games, its 13
    trivial ones (no promotion candidate, so there is only one game), its 1974
    [repeats](../docs/GLOSSARY.md#results-and-trust), which both verifiers check against the earlier game
    (`src/results.rs`), and its 382 games of the bounds store.  A game of the store is a game the referee replays at the
@@ -176,26 +199,27 @@ What that evidence amounts to:
      repeat, so on the chain from n = 1 (see 5).
    * Past 1300, `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` has ten games of 1302–1352
      solved standalone (the matching path, 8 threads), each finishing with the promotion sum recorded here.  The rest of
-     1301–5053 is the chain's: 1193 exhausted searches of their own, 327 proofs at the ceiling, 422 prime ones and 1429
+     1301–5055 is the chain's: 1194 exhausted searches of their own, 328 proofs at the ceiling, 422 prime ones and 1429
      repeats that rest on the games before them, and 382 games of the store.
 4. **Agreement between builds and files.**
-   * n ≤ 1000: `strict.jsonl`'s scores are `optimal.json`'s, all 1000 (each line's `optimal_match` is true;
-     `tests/results.rs` checks it).  797 of the games are `optimal.json`'s move for move, and 995 are its sets of moves:
-     all but 539 and 770–773 (above).
-   * n = 1001–1300: `optimal.json` holds the games of the chain of commit 243af9b, copied move for move by `taxman
-     extend-optimal`, and `strict.jsonl`'s games are those, move for move, but 1215 (above; `tests/results.rs` checks
-     it).  The lines say `optimal_match` true here too.  When the run was made the table held those games, so this is a
-     second run reproducing the first's scores, not a comparison with another source.
-   * n = 1301–2175: `optimal.json` had no game here when the run was made (the lines say `optimal_match` null; it holds
-     this file's games here from 2026-10-28), so the comparison is with another run of the same search.  The GF(2) study's chain was made from `optimal.json`'s game of 1300 (`--use-prev`)
-     by the build of commit 716ebd9, on 2 threads in three invocations, and reached 2175 from 1301 in 92 minutes of game
-     time.  Its 875 games have this file's scores and proofs in every game, and its moves in all but 1560–1563 (above).
-     Its methods are this file's too, except that a game whose search took no step was labeled `search` then and is
-     `start` here.  Only its game of 1301 assumes anything: that `optimal.json`'s game of 1300 is optimal.
-     `taxman verify-results results/strict.jsonl solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
+   * n ≤ 1000: the chain's scores are the table's, all 1000, where the table was the Java solver's `optimal.json` when
+     the run was made (each line's `optimal_match` is true).  797 of the chain's games are that table's move for move,
+     and 995 are its sets of moves: all but 539 and 770–773 (above).
+   * n = 1001–1300: that table held the games of the chain of commit 243af9b, copied move for move by `taxman
+     extend-optimal`, and the chain's games are those, move for move, but 1215 (above).  The lines say `optimal_match`
+     true here too.  When the run was made the table held those games, so this is a second run reproducing the first's
+     scores, not a comparison with another source.
+   * n = 1301–2175: the table had no game here when the run was made (the lines say `optimal_match` null; the file holds
+     these games from 2026-10-28), so the comparison is with another run of the same search.  The GF(2) study's chain
+     was made from the table's game of 1300 (`--use-prev`) by the build of commit 716ebd9, on 2 threads in three
+     invocations, and reached 2175 from 1301 in 92 minutes of game time.  Its 875 games have this file's scores and
+     proofs in every game, and its moves in all but 1560–1563 (above).  Its methods are this file's too, except that a
+     game whose search took no step was labeled `search` then and is `start` here.  Only its game of 1301 assumes
+     anything: that the table's game of 1300 is optimal.
+     `taxman verify-results results/optimal.jsonl.gz solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl`
      (93 s) accepts them and finds 875 games in both files, with equal scores in all.  `solver/tools/check_results.py`
      finds the same, and refuses the label `search` of the games with no node.
-   * n = 2176–3440: `optimal.json` had no game here either, and no other chain reaches far.
+   * n = 2176–3440: the table had no game here either, and no other chain reaches far.
      `solver/frame/testdata/c8g.chain-2176.jsonl`, the Graviton calibration's chain (64 threads, one game after
      another, the build of commit 407645f, 15 minutes), has the games 2176–2276, 101 in all.  A rehearsal of the second
      run, made on the same machine type just before it started (the build of commit 55287ff, 64 threads, a window of
@@ -211,23 +235,23 @@ What that evidence amounts to:
      which took games 1–4547 from this file and did not solve them again, and the verifiers pass the whole file.
    * n = 4875–5053: no other chain reaches here either.  The evidence is the sixth run's own (runs.md),
      which took games 1–4874 from this file and did not solve them again, and the verifiers pass the whole file.
-   * 1001–1231: the scores of `strict.jsonl`, the cost-curve study's chain (commit e710d16, 8 threads, a chain with the
+   * 1001–1231: the scores of this file, the cost-curve study's chain (commit e710d16, 8 threads, a chain with the
      unproven tactics off) and `default.jsonl` (the earlier solver, with unproven tactics on) are equal in all 231
-     games.  `strict.jsonl`'s games are `default.jsonl`'s move for move but 1215, and the cost-curve chain's but 1215
+     games.  This file's games are `default.jsonl`'s move for move but 1215, and the cost-curve chain's but 1215
      and 1221–1224: other games, with the same scores.
    * The earlier committed chains, of commits bd9bb5d, 243af9b and 271c817, have the same scores in all 1300 games.  The
      second's and the third's moves are the same as each other's, and differ from this file's at 539, 684–687, 770–773
      and 1215; the first's differ at those and at 1221–1224.
-5. **Independence from `optimal.json`.**  `strict.jsonl` starts at n = 1, so no game of it is built from
-   `optimal.json`, which was only compared with, up to 1300, where the table ended then; a score that differed would
+5. **Independence from the table.**  The chain starts at n = 1, so no game of it is built from the table (the
+   old `optimal.json`), which was only compared with, up to 1300, where the table ended then; a score that differed would
    have been a hard error.
 6. **The prover's proofs.**  The prover proves every n up to 2175 optimal without the frame model, with no frames or
    promotions ([the prover's README](../solver/noframe/README.md); [the parity bound
    (W1)](../docs/theory/parity-bound.md#the-parity-bound)).  So
-   `strict.jsonl`'s scores to 2175 do not rest on the frame model either: those 2175 are opt(n) on the whole board.  The
+   the file's scores to 2175 do not rest on the frame model either: those 2175 are opt(n) on the whole board.  The
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
-   notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 2878
-   games of 2176–5053 are proven within the frame model, which is exact given U ([the exactness theorem
+   notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 2880
+   games of 2176–5055 are proven within the frame model, which is exact given U ([the exactness theorem
    (X7)](../docs/theory/exactness.md#the-exactness-theorem)).  `taxman certify` can check U there game by game, with
    the prover's barred bounds ([the prover's README](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has
    them to 3440).
@@ -236,31 +260,12 @@ The checks cannot catch a game that is legal, finished and within the chain boun
 − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
 the standalone solves (3) matter.
 
-## optimal.json
-
-The table of optimal games, built into the frame solver.  Its games 1–1000 were made by the Java solver, with the
-tactics `reuse_prev` and `revise_freedoms` on.  Its games 1001–1300 are the chain's, added by `taxman extend-optimal`:
-first from the chain of commit bd9bb5d, then from that of commit 243af9b, which differs from it at 1221–1224 only.
-`strict.jsonl` has the second's games but at 1215.  Its games 1301–5053 are `strict.jsonl`'s own, move for move, added
-by the same command on 2026-10-28 (1301–5000) and 2026-10-29 (5001–5053) ([the
-reference](../solver/docs/REFERENCE.md#2-the-other-commands) has its output).
-
-The file records no proofs and no provenance.  So a game taken from it (`--use-prev`) is assumed optimal, and the
-results whose proofs rest on it say so: "the game of n in optimal.json is optimal".  A chain that assumes nothing
-beyond the frame model starts at n = 1.  `strict.jsonl` is such a chain, and its games 1–1000 reproduce
-`optimal.json`'s scores with no unproven tactic on, in 7.5 s of search in all on 8 threads, the slowest n = 992 at
-0.7 s.
-
-The file is tens of megabytes, and the solver's binary carries all of it.  The binary reads a game when it is asked for,
-so a run that needs none reads nothing, and one that needs a few reads those ([the
-design](../solver/docs/design/engine.md)).
-
 ## bounds.jsonl
 
 The bounds store: the bounds on opt(n) that [the
 ledger](../solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) finds, kept for good, for the
 games from 3915 on.  A game is *proven* when its best lower bound equals its best upper bound, and the file is the
-record of those proofs, which the lines of proof `known` in `strict.jsonl` cite.  The first `ledger export` made it,
+record of those proofs, which the lines of proof `known` in `optimal.jsonl.gz` cite.  The first `ledger export` made it,
 from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
@@ -268,7 +273,7 @@ bound is the frame model's, carried between games as [the
 theory](../docs/theory/search-rules.md#bounds-carried-between-games) says.
 
 A line is a bound, not a game of `taxman solve`.  It is not in the schema of the results lines, and an export adds
-no line of a game that `strict.jsonl` has.  It is not `explore.jsonl`'s kind of file either: that one holds the
+no line of a game that `optimal.jsonl.gz` has.  It is not `explore.jsonl`'s kind of file either: that one holds the
 sweep's games.
 
 * `taxman solve --use-prev` draws on it: a game it has proven is recorded with no search, and its other games seed and
@@ -291,7 +296,7 @@ flag.
     python3 -I solver/tools/check_bounds.py results/bounds.jsonl --games games.jsonl
 
 * **`export`** appends the bounds of the run's `ledger.jsonl` that improve on the file's best, for the games that
-  `results/strict.jsonl` does not have (`--strict` names another file).  It creates the file if there is none, and
+  `results/optimal.jsonl.gz` does not have (`--strict` names another file).  It creates the file if there is none, and
   prints what it appended: the games, the lower and upper bounds that are the first of their game or improve one, and
   the games newly proven.  `--source` names the run, which every line records with the day.  `--checkpoints` is the
   place of the run's checkpoints, the prefix of `nN.ckpt` (for instance `s3://BUCKET/ledger-DATE/out/run/ckpt`), which
@@ -411,7 +416,7 @@ the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 byt
 a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155 for an upper bound.  At the end of
 the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, and a cited game and an upper
 bound about 150 and 220 bytes.  On 2026-10-22 the store held 4,277 games in 9.2 megabytes, about 2.1 kilobytes a game,
-against `strict.jsonl`'s 7.3 (36.7 megabytes for 5,053 games).
+against the chain's 7.3 (36.7 megabytes for 5,053 games uncompressed; the file of 5,055 games is 1.09 megabytes).
 
 ## certificates
 
@@ -421,7 +426,7 @@ proves).
 
 `certificates_600_1300.jsonl` has a certificate for each of the 377 games of 600..1300 that need one: 296 certified by
 a search, and 81 by posing the same problem as an earlier game.  `taxman verify-certificates` passes it, in 4.6 s.  It
-was made by `taxman certify 600-1300 --results results/strict.jsonl U --out
+was made by `taxman certify 600-1300 --results results/optimal.jsonl.gz U --out
 results/certificates/certificates_600_1300.jsonl --threads 1 --progress 0`, in 39 s, on the code of commit 35c614b.
 `U` there stands for the four `--upper` files, the prover's barred bounds for 2..1300, 1301..2175, 2176..3314 and
 3315..3440 (`solver/noframe/data/upper_*.jsonl`).

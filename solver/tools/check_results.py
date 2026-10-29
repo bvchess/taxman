@@ -2,7 +2,13 @@
 """Independent referee for the solver's results files (`taxman solve --out`, one JSON object per line).
 
 Standard library only, and it shares no code with the Rust crate: the rules, the bounds and the provenance rules
-are written out again here, so that a bug in the solver cannot vouch for itself.
+are written out again here, so that a bug in the solver cannot vouch for itself.  A file whose name ends in .gz is
+read through gzip, every member of it, as the committed file results/optimal.jsonl.gz is.
+
+The table is the games of the committed file (results/optimal.jsonl.gz, `--committed`) unless `--table` names another
+file: the games that a file's lines are compared with, and that a line can cite.  A game of the table is assumed
+optimal.  The committed file is checked as any other file is; its comparison with the table is then each game with
+itself.
 
 For every completed game:
   legal       the moves replay under the rules: a move is a number still in the pot with a proper divisor still in
@@ -21,8 +27,8 @@ For every completed game:
               search whose starting game reached a ceiling, so that it took no step) is completed with nodes 0, and a
               completed search has nodes above 0, so a line of an older build, which called a start game a search,
               is a problem
-  optimal     the score is optimal.json's, where the table has the game
-  chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from optimal.json
+  optimal     the score is the table's, where the table has the game
+  chain       score(n-1) <= score(n) <= n + score(n-1), with n-1 from the same file, else from the table
               (both are theorems about optimal games: a game of n-1 is a game of n, and deleting the move n from
               a game of n leaves a game of n-1)
   bound       score <= the Franklin-Moniot upper bound (heuristics/results/fm_bound_2000.json)
@@ -31,20 +37,20 @@ For every completed game:
               n + score(n-1) - in_the_bag, the promotions do not exceed it, and a game records reaching the ceiling
               exactly when its promotions sum to it (where the search stops); a prime game scores n + score(n-1) - P,
               P the largest prime below n
-  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results), optimal.json's
+  provenance  the game of n-1 a line names (prev) is the file's game of n-1 (source run or results), the table's
               (source optimal), the committed chain's (strict) or a board the bounds store has proven (bounds), and
               the line's record of it matches that game (score, FNV-1a digest of the moves, proof, assumptions; not
               the digest of a store's game, which only the Rust program can play; a record of the proof known, of
               the file's own game, needs no more than the same score, moves and assumptions); the recorded proof
               and assumptions are the ones the rules below give
   known       a line that cites a known source (`known`: optimal, strict, or bounds with the rule and run of its lower
-              and upper lines) has its citation checked: optimal.json or the committed chain (--committed) holds a
+              and upper lines) has its citation checked: the table or the committed chain (--committed) holds a
               game of n that scores the line's score, or the bounds store (--bounds) has a lower line (if cited) and
               an upper line of board n worth the score, of that rule and from that run.  The assumptions are those
-              of the cited lines: optimal.json's game assumed optimal, the committed line's own, and statement U at
+              of the cited lines: the table's game assumed optimal, the committed line's own, and statement U at
               each board the upper line rests on.  The sources are read as they are; their own referees check them
   unfinished  an incomplete line that records its game (best_so_far, moves, promotions) is legal, scores the
-              best_so_far, has ascending promotions that are moves, and is no better than optimal.json's score; it need
+              best_so_far, has ascending promotions that are moves, and is no better than the table's score; it need
               not be over.  A line whose prev has source run or results and no proof was built on such a game
               (`solve --keep-going`): an earlier incomplete line of n-1 has that score and those moves.  That game seeded
               the line and proves nothing, so the line has no ceiling (setup.cap), no cap or prime_formula proof, and
@@ -65,31 +71,31 @@ both problems up again and compares them.
 Proof kinds (solver/frame/src/results.rs explains them): trivial, exhausted, cap, prime_formula, same_search, known.
 The assumptions of a game are what its proof takes as given beyond the frame model: a proof by the ceiling (`cap`) or
 by the prime formula rests on the game of n-1, so it assumes what that game's proof assumes, and for a game of n-1
-taken from optimal.json, that "the game of n-1 in optimal.json is optimal"; a repeat assumes what the game it repeats
-assumes; a known proof assumes what its source's game does; other proofs assume nothing.  A line of another schema
-than this referee reads is a problem.
+taken from the table, that "the game of n-1 in results/optimal.jsonl.gz is optimal"; a repeat assumes what the game it
+repeats assumes; a known proof assumes what its source's game does; other proofs assume nothing.  A line of another
+schema than this referee reads is a problem.
 
 The report counts games by proof kind and by assumption, and the arithmetic certificates: scores equal to
 n + score(n-1) or to the prime formula, which certify a game whatever found it, given that the game of n-1 is optimal.
 It also counts, by proof kind, the searches that the near-repeat cut shortened: those with a stats.near_repeat_cut
 above 0.
 
-usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--bounds PATH]
-Without FILEs it checks results/*.jsonl but the bounds store, which is not a file of results.  The exit status is 1
-if any check fails.
+usage: check_results.py [FILE ...] [--fm PATH] [--chain PATH] [--committed PATH] [--table PATH] [--bounds PATH]
+Without FILEs it checks results/*.jsonl and results/*.jsonl.gz but the bounds store, which is not a file of results.
+The exit status is 1 if any check fails.
 """
 import argparse
+import gzip
 import json
 import re
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "results"
-COMMITTED = RESULTS / "strict.jsonl"  # the committed chain, a source of known games
+COMMITTED = RESULTS / "optimal.jsonl.gz"  # the committed file: the table of optimal games and the committed chain
 BOUNDS = RESULTS / "bounds.jsonl"  # the bounds store, the other (it is not a results file)
-OPTIMAL = RESULTS / "optimal.json"
 FM_BOUND = REPO / "heuristics" / "results" / "fm_bound_2000.json"
 HEURISTIC_CHAIN = REPO / "heuristics" / "results" / "chain_1001_2000.json"
 
@@ -103,38 +109,21 @@ DIGEST = re.compile("[0-9a-f]{16}")
 PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
 
 
-class Table:
-    """The games of optimal.json by n, a mapping that parses a game when it is first asked for.
+Game = namedtuple("Game", "score moves proof assumes")  # a completed game of the committed file; assumes is a set
 
-    The file is tens of megabytes, one game a line as `taxman extend-optimal` writes it.  Parsing all of it takes
-    seconds, and the check of a file asks for the few games it names.
-    """
 
-    GAME = re.compile(r'\s*\{\s*"n":\s*(\d+)')
-
-    def __init__(self, text):
-        self.lines = {}
-        for line in text.splitlines():
-            found = self.GAME.match(line)
-            if found:
-                self.lines[int(found.group(1))] = line
-        self.parsed = {}
-
-    def __contains__(self, n):
-        return n in self.lines
-
-    def __getitem__(self, n):
-        if n not in self.parsed:
-            self.parsed[n] = json.loads(self.lines[n].rstrip().rstrip(","))
-        return self.parsed[n]
-
-    def get(self, n, default=None):
-        return self[n] if n in self else default
+def read_text(path):
+    """The text of a results file; a path whose name ends in .gz is read through gzip, every member of it."""
+    path = Path(path)
+    if path.name.endswith(".gz"):
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return f.read()
+    return path.read_text()
 
 
 def assumed_optimal(n):
-    """What a proof that rests on optimal.json's game of n assumes."""
-    return f"the game of {n} in optimal.json is optimal"
+    """What a proof that rests on the table's game of n assumes."""
+    return f"the game of {n} in results/optimal.jsonl.gz is optimal"
 
 
 U_STATEMENT = "statement U holds at n="
@@ -210,21 +199,20 @@ def finished_problems(n, moves, divisors):
 
 
 class Sources:
-    """The known sources a line that cites one is checked against: optimal.json, the committed chain and the bounds
-    store, read as they are (their own referees check them: `taxman verify-results`, this script on the chain;
-    `ledger verify-bounds`, `check_bounds.py`).  A source that was not given is empty, and a line that cites it is a
-    problem."""
+    """The known sources a line that cites one is checked against: the table, the committed chain and the bounds store,
+    read as they are (their own referees check them: `taxman verify-results`, this script on the committed file;
+    `ledger verify-bounds`, `check_bounds.py`).  By default the table and the committed chain are the same file, read
+    once.  A source that was not given is empty, and a line that cites it is a problem."""
 
-    def __init__(self, optimal, committed=None, bounds=None):
-        self.optimal = optimal
-        self.committed = {}  # n -> (score, moves, proof, assumptions) of the committed chain's completed games
+    def __init__(self, committed=None, bounds=None, table="committed"):
+        self.committed = self._games(committed)  # n -> the Game of each completed game of the committed file
+        # The table is the committed file's games, unless a file of its own is given (the Rust program's built-in table
+        # is the file as of its build, which a test or a newer checkout can make differ from the committed file).
+        self.table = self.committed if table == "committed" else self._games(table)
         self.lines = {}  # (n, side, value) -> the store's first line of that board, side and value
         self.lower = {}  # n -> the store's best lower line (the highest value, the later of equals)
         self.upper = {}  # n -> its best upper line (the lowest value, the later of equals)
         self.have_store = False
-        for line in self._rows(committed):
-            if line.get("schema") == SCHEMA and line.get("completed"):
-                self.committed[line["n"]] = (line["score"], line["moves"], line["proof"], set(line["assumes"]))
         if bounds is not None:
             self.have_store = True
             for line in self._rows(bounds):
@@ -234,11 +222,20 @@ class Sources:
                 if n not in best or better(best[n]["value"], value):
                     best[n] = line
 
+    @classmethod
+    def _games(cls, path):
+        """The Game of each completed game of the results file `path` by n (none, if there is no file)."""
+        return {
+            line["n"]: Game(line["score"], line["moves"], line["proof"], set(line["assumes"]))
+            for line in cls._rows(path)
+            if line.get("schema") == SCHEMA and line.get("completed")
+        }
+
     @staticmethod
     def _rows(path):
         if path is None:
             return []
-        return [json.loads(text) for text in Path(path).read_text().split("\n") if text.strip()]
+        return [json.loads(text) for text in read_text(path).split("\n") if text.strip()]
 
     def proven(self, n):
         """The store's upper line of the board n if its best bounds meet, else None."""
@@ -268,15 +265,15 @@ class Sources:
         if extra:
             return None, [f"known has the field {extra[0]!r}, which a citation of {source} does not"]
         if source == "optimal":
-            entry = self.optimal.get(n)
-            if entry is None or entry["score"] != score:
-                return None, [f"it cites optimal.json, which has no game of {n} scoring {score}"]
+            entry = self.table.get(n)
+            if entry is None or entry.score != score:
+                return None, [f"it cites the table, which has no game of {n} scoring {score}"]
             return {assumed_optimal(n)}, []
         if source == "strict":
             game = self.committed.get(n)
-            if game is None or game[0] != score:
+            if game is None or game.score != score:
                 return None, [f"it cites the committed chain, which has no game of {n} scoring {score}"]
-            return set(game[3]), []
+            return set(game.assumes), []
         if not self.have_store:
             return None, ["it cites the bounds store, which was not given to the check"]
         problems = []
@@ -302,7 +299,7 @@ class Sources:
 
 def read_lines(path, problems):
     """The parsed lines of a results file as (line number, object); an unparsable last line is torn."""
-    raw = path.read_text().split("\n")
+    raw = read_text(path).split("\n")
     numbered = [(i + 1, text) for i, text in enumerate(raw) if text.strip()]
     rows = []
     for k, (number, text) in enumerate(numbered):
@@ -427,9 +424,9 @@ def repeat_problems(n, number, row, done):
     return found
 
 
-def check_unfinished(path, number, row, optimal, divisors, unfinished, problems):
+def check_unfinished(path, number, row, table, divisors, unfinished, problems):
     """An incomplete line that records its game (best_so_far, moves, promotions): the game is legal, scores the
-    best_so_far, has ascending promotions that are moves, and is no better than optimal.json's score.  It need not be
+    best_so_far, has ascending promotions that are moves, and is no better than the table's score.  It need not be
     over, which only a completed game claims.  The line is kept for the games built on it."""
     best = row.get("best_so_far")
     if best is None:
@@ -451,15 +448,16 @@ def check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
         fail(f"replays to {score}, not the recorded best_so_far {best}")
     if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
         fail("the promotions are not moves in ascending order")
-    if n in optimal and best > optimal[n]["score"]:
-        fail(f"best_so_far {best} is above optimal.json's {optimal[n]['score']}")
+    if n in table and best > table[n].score:
+        fail(f"best_so_far {best} is above the table's {table[n].score}")
     unfinished.setdefault(n, []).append((number, best, digest(moves), moves))
 
 
-def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
+def check_file(path, fm, heuristic, divisors, problems, sources):
     """Checks one file; returns {n: (score, moves, proof, assumptions, line, row)} of its completed games, the
     report's counters (including the searches the near-repeat cut shortened, by proof), and the games that only an
     unfinished search is recorded for."""
+    table = sources.table
     rows = read_lines(path, problems)
     games = {}
     unfinished = {}  # n -> [(line, best_so_far, digest of the moves)] of the incomplete lines that record their game
@@ -475,7 +473,7 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
             if row.get("method") == "start":
                 problems.append(f"{path.name} line {number} (n={row.get('n')}): a start game that is not completed")
             stopped.add(row["n"])
-            check_unfinished(path, number, row, optimal, divisors, unfinished, problems)
+            check_unfinished(path, number, row, table, divisors, unfinished, problems)
             continue
         n = row["n"]
         if n in games:
@@ -505,8 +503,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
             fail(message)
         if promotions != sorted(set(promotions)) or not set(promotions) <= set(moves):
             fail("the promotions are not moves in ascending order")
-        if n in optimal and score != optimal[n]["score"]:
-            fail(f"scores {score}, but optimal.json has {optimal[n]['score']}")
+        if n in table and score != table[n].score:
+            fail(f"scores {score}, but the table has {table[n].score}")
         reached = reached_cap(row)
         for message in contradictions(n, row, reached):
             fail(message)
@@ -517,7 +515,8 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
 
         # The chain against whichever game of n-1 there is.
         below = done.get(n - 1)
-        before = below[0] if below else optimal.get(n - 1, {}).get("score")
+        listed = table.get(n - 1)
+        before = below[0] if below else (listed.score if listed else None)
         if before is not None:
             if score < before:
                 fail(f"scores {score}, less than score(n-1) = {before}")
@@ -551,10 +550,10 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
                 continue
             prev = below[:4]
         elif source == "optimal":
-            # A game of optimal.json is assumed optimal; the table at hand may lack it (a line made with a longer one).
-            entry = optimal.get(n - 1)
-            score_before = entry["score"] if entry is not None else record["score"]
-            moves_before = entry["moves"] if entry is not None else None
+            # A game of the table is assumed optimal; the table at hand may lack it (a line made with a longer one).
+            entry = table.get(n - 1)
+            score_before = entry.score if entry is not None else record["score"]
+            moves_before = entry.moves if entry is not None else None
             prev = (score_before, moves_before, None, {assumed_optimal(n - 1)})
         elif source in ("strict", "bounds"):
             # The committed chain's game, or a board the store has proven.
@@ -655,6 +654,11 @@ def check_file(path, optimal, fm, heuristic, divisors, problems, sources):
     return done, counts, assumed, certificates, shortened, sorted(stopped - set(games))
 
 
+def if_file(path):
+    """`path` if it is a file, else None: a source that was not given is a path that is not there."""
+    return path if path.is_file() else None
+
+
 def listing(counter):
     return ", ".join(f"{key} {count}" for key, count in sorted(counter.items())) or "none"
 
@@ -664,21 +668,26 @@ def main():
     ap.add_argument("files", nargs="*", type=Path)
     ap.add_argument("--fm", type=Path, default=FM_BOUND)
     ap.add_argument("--chain", type=Path, default=HEURISTIC_CHAIN)
-    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed chain, a source of known games")
+    ap.add_argument("--committed", type=Path, default=COMMITTED, help="the committed file, a source of known games")
+    ap.add_argument("--table", type=Path, help="the file of the table of optimal games (default: the committed file)")
     ap.add_argument("--bounds", type=Path, default=BOUNDS, help="the bounds store, the other source of known games")
     args = ap.parse_args()
     # (The bounds store is not a file of results: it is read for the lines that cite it.)
-    files = args.files or sorted(f for f in RESULTS.glob("*.jsonl") if f.name != BOUNDS.name)
+    files = args.files or sorted(
+        f for pattern in ("*.jsonl", "*.jsonl.gz") for f in RESULTS.glob(pattern) if f.name != BOUNDS.name
+    )
     files = [f for f in files if not f.name.endswith(".rejected.jsonl")]
 
-    optimal = Table(OPTIMAL.read_text())
-    sources = Sources(optimal, args.committed if args.committed.is_file() else None,
-                      args.bounds if args.bounds.is_file() else None)
+    sources = Sources(
+        if_file(args.committed),
+        if_file(args.bounds),
+        table="committed" if args.table is None else if_file(args.table),
+    )
     fm = json.loads(args.fm.read_text())
     heuristic = {entry["n"]: entry["score"] for entry in json.loads(args.chain.read_text())}
     largest = 2
     for path in files:
-        for line in path.read_text().split("\n"):
+        for line in read_text(path).split("\n"):
             try:
                 largest = max(largest, json.loads(line)["n"])
             except (json.JSONDecodeError, KeyError, TypeError):
@@ -691,7 +700,7 @@ def main():
     for path in files:
         print(f"{path}:")
         done, counts, assumed, certificates, shortened, unfinished = check_file(
-            path, optimal, fm, heuristic, divisors, problems, sources
+            path, fm, heuristic, divisors, problems, sources
         )
         if done:
             missing = sum(1 for n in range(min(done), max(done) + 1) if n not in done)

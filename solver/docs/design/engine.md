@@ -74,7 +74,7 @@ has the exact steps and checks.  The steps:
 | 2 | the prime shortcut: a prime n plays the game of n − 1 with its first move replaced by n (method `prime`) |
 | 3 | the frames, formed, simplified, numbered and merged; with no candidates the game with no promotions is the only one (method `trivial`) |
 | 4 | the search (method `search`, or `start` when its starting game reaches a ceiling before the search takes a step): the frame set and the greedy incumbent (`search::prepare`); a repeat of an earlier game's search (method `repeat`, tactic `same_search`; [same-search.md](same-search.md)); the starting incumbent, the ceiling and the seed; the engine; promotions → moves |
-| 5 | `conclude`: replay and check the game, confirm its score against `optimal.json`, assign its proof and what it assumes |
+| 5 | `conclude`: replay and check the game, confirm its score against the built-in table, assign its proof and what it assumes |
 | 6 | record the result (a range) |
 
 The steps again, with the functions that take them:
@@ -117,7 +117,7 @@ The steps again, with the functions that take them:
    |  never replaced)
    v
  [5] solver::conclude                replay (game::replay_finished); score == in_the_bag + promotions; the ceilings;
-   |                                 confirm the score against optimal.json; the proof and what it assumes
+   |                                 confirm the score against the built-in table; the proof and what it assumes
    v
  [6] results::ResultsFile::append    the JSON line, synced; only then is the game's checkpoint deleted;
                                      the game becomes the previous game of n+1
@@ -144,7 +144,7 @@ range skips the games the file completed.  It appends each result and syncs it a
 order of n, and only then deletes the game's checkpoint; a checkpoint left for a game that the file has completed is
 deleted when a range starts.  The game of n − 1 comes from, in order: this run, the results file, and with `use_prev`
 (`--use-prev`) the known games ([Known games](trust.md#known-games): the committed chain's, the bounds store's,
-`optimal.json`'s).  With none, the game is solved *standalone*, with no seed and no ceiling.
+the built-in table's).  With none, the game is solved *standalone*, with no seed and no ceiling.
 
 ### The window: games in flight
 
@@ -209,17 +209,18 @@ starts with the final seed and the ceiling, on every thread.
 [Round B](../../notebook/round-b-the-chain-on-many-threads-2026-10/README.md) has what the window buys and what was
 tried on the way.
 
-**The table of optimal games is built into the binary** (`optimal.json`, through `include_str!` and
-`game::Optimal::built_in`): the table as it was when the crate was compiled, which a rebuild picks up when the file
-changes.  The solver confirms every completed game's score against it, and a score that differs is a hard error that
-names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
-against anything else (`verify-optimal FILE` and `extend-optimal --table FILE` take one); the library takes
-another table where a test needs one (`solver::solve_range_each_with`, `results::read_results`).
+**The table of optimal games is built into the binary** (`results/optimal.jsonl.gz`, through `include_bytes!` and
+`game::Optimal::built_in`): the games of the file as it was when the crate was compiled, which a rebuild picks up when
+the file changes.  The solver confirms every completed game's score against it, and a score that differs is a hard error
+that names the game.  No option of `solve`, `regress` or `certify` names another table, so their runs cannot be checked
+against anything else; the library takes another table where a test needs one (`solver::solve_range_each_with`,
+`results::read_results`).
 
-The file is tens of megabytes, so the table is not parsed when a process starts.  `Optimal::built_in` finds the line of
-a game by bisection and parses that line the first time the game is asked for; the lines are one game each, in ascending
-order of n, as `Optimal::to_file_text` writes them.  A process that asks for no game reads none, one that asks for a few
-reads those, and what goes over every game (`verify-optimal`, `extend-optimal`) parses them all.
+The file decodes to tens of megabytes, so the table is not decoded when a process starts.  The file is a sequence of
+gzip members, each holding the lines of a batch of games, line n for game n.  `Optimal::built_in` decodes the members
+through [the gzip crate](../../gzip/README.md) in order, only as far as the game asked for, and parses the line of a
+game the first time it is asked for.  A process that asks for no game decodes nothing, one that asks for a few decodes
+as far as the last of them, and one that goes over every game decodes the whole file.
 
 ## The profile of a search
 

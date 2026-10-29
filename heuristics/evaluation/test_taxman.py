@@ -24,7 +24,7 @@ from core import (
 )
 from evaluation.bitpot import mask_of
 from evaluation.certify import Exact
-from evaluation.verify import DEFAULT_OPTIMAL, replay
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal, replay
 
 SPF = smallest_prime_factors(1000)
 
@@ -309,13 +309,10 @@ def test_solvent_b_fork_matches_full_rerun():
 def test_prime_sacrifice_identity():
     # Wiki "Reusing a previous solution", sections "If N is prime" and
     # "Generalizing": for prime N, opt(N) = N + opt(N-1) - p_hat, where
-    # p_hat is the largest prime below N. Pure data check against
-    # optimal.json -- no solver runs -- for every prime N in 3..1000
-    # (validated 167/167 in the original measurement).
-    from evaluation.bound import DEFAULT_OPTIMAL
-
-    optimal = json.loads(DEFAULT_OPTIMAL.read_text())
-    scores = {g["n"]: g["score"] for g in optimal}
+    # p_hat is the largest prime below N. Pure data check against the
+    # committed games (results/optimal.jsonl.gz) -- no solver runs -- for
+    # every prime N in 3..1000 (validated 167/167 in the original measurement).
+    scores = {n: g["score"] for n, g in load_optimal(DEFAULT_OPTIMAL, 1000).items()}
 
     largest_prime_below = [None] * 1001
     last_prime = None
@@ -347,14 +344,11 @@ def test_upper_delta_certificate_is_benign():
     # restricted to n<=400: solve_upper_half over the full n<=1000 range
     # takes ~70s in CPython (well over a reasonable pytest budget), while
     # n<=400 takes ~4s and still exercises many firings.
-    from evaluation.bound import DEFAULT_OPTIMAL
-
     n_max = 400
     spf = smallest_prime_factors(n_max)
     u_star = {n: sum(solve_upper_half(n, spf)[0]) for n in range(0, n_max + 1)}
 
-    optimal = json.loads(DEFAULT_OPTIMAL.read_text())
-    opt_score = {g["n"]: g["score"] for g in optimal}
+    opt_score = {n: g["score"] for n, g in load_optimal(DEFAULT_OPTIMAL, n_max).items()}
 
     cold_path = RESULTS_DIR / "chain_cold_1000.json"
     chain = json.loads(cold_path.read_text())
@@ -407,9 +401,9 @@ def test_reference_continuation_matches_committed_chain():
 def test_optimal_pick_set_is_unique_for_small_n():
     # Theory-free: certify.Exact walks every optimal continuation over raw pot states, so the whole optimal pick
     # set (not just its upper half) is enumerated.  For every n in 2..22 it is unique and equals the moves of
-    # optimal.json's game.
+    # the committed game.
     n_max = 22
-    optimal = {g["n"]: g for g in json.loads(DEFAULT_OPTIMAL.read_text())}
+    optimal = load_optimal(DEFAULT_OPTIMAL, n_max)
     divs = divisor_lists(n_max)
     for n in range(2, n_max + 1):
         solver = Exact(n, divs, time.monotonic() + 60)

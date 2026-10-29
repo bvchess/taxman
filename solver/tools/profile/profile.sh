@@ -2,7 +2,8 @@
 #
 # Where the time of a hard game goes (section 2 of the entry
 # solver/notebook/search/ideas-from-other-fields-the-pilots-2026-10/README.md): solves game N of the chain from 1 for
-# SECONDS on THREADS threads, as the chain solves it (its predecessor from a copy of results/strict.jsonl cut before N),
+# SECONDS on THREADS threads, as the chain solves it (its predecessor from a copy of results/optimal.jsonl.gz cut before
+# N),
 # samples it with macOS `sample` every millisecond, and charges each sample to a kind of work and a purpose
 # (attribute.py).
 #
@@ -28,12 +29,12 @@ DIR=$OUT/n$N
 mkdir -p "$DIR"
 rm -rf "$DIR/ckpt" "$DIR/prev.jsonl"
 "$PY" -c "
-import json, sys
-with open(sys.argv[1]) as f, open(sys.argv[2], 'w') as g:
+import gzip, json, sys
+with gzip.open(sys.argv[1], 'rt') as f, open(sys.argv[2], 'w') as g:
     for line in f:
         if json.loads(line)['n'] < int(sys.argv[3]):
             g.write(line)
-" "$REPO/results/strict.jsonl" "$DIR/prev.jsonl" "$N"
+" "$REPO/results/optimal.jsonl.gz" "$DIR/prev.jsonl" "$N"
 "$BIN" solve "$N" --threads "$THREADS" --out "$DIR/prev.jsonl" --checkpoint-dir "$DIR/ckpt" \
     --time-limit "$SECS" --progress 30 > "$DIR/solve.txt" 2> "$DIR/progress.txt" &
 PID=$!

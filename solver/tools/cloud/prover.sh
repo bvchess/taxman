@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The prover's proofs of opt(n) for a range of games, on all the CPUs of a machine, resumable.
 #
-#   solver/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: results/strict.jsonl)
+#   solver/tools/cloud/prover.sh A B             prove opt(n) = V(n) for n = A..B  (V: results/optimal.jsonl.gz)
 #   solver/tools/cloud/prover.sh --verify A B    check the output: every n in 2..B proven, every score the recorded one
 #   OUT=FILE solver/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
@@ -9,9 +9,9 @@
 # model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
 # the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
 # conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may
-# take any number of passes.  The games go dearest first, by the nodes the solver's search of each took (strict.jsonl;
-# `exact` takes one to three times as many), so that a long game starts early instead of last.  The searches start
-# from the roles of F4 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
+# take any number of passes.  The games go dearest first, by the nodes the solver's search of each took
+# (results/optimal.jsonl.gz; `exact` takes one to three times as many), so that a long game starts early instead of
+# last.  The searches start from the roles of F4 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
@@ -41,7 +41,7 @@
 #   THREADS         threads, default every CPU
 #   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
 #   OUT             the output file (required in list mode)
-#   STRICT          the recorded optima, default results/strict.jsonl (committed)
+#   STRICT          the recorded optima, default results/optimal.jsonl.gz (committed)
 #   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
 #                   data/exact_parity_2_1300.jsonl)
 #   EXTRA_ARGS      more flags for `exact`
@@ -55,7 +55,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$here/env.sh"
 
-STRICT="${STRICT:-$TAXMAN_ROOT/results/strict.jsonl}"
+STRICT="${STRICT:-$TAXMAN_ROOT/results/optimal.jsonl.gz}"
 BASELINE="${BASELINE:-$PROVER/data/exact_parity_2_1300.jsonl}"
 SUMMARIZE=("python3" "$PROVER/tools/summarize.py")
 
@@ -108,12 +108,17 @@ fi
 
 [ -x "$EXACT_BIN" ] || die "$EXACT_BIN is missing: run setup.sh"
 [ -r "$STRICT" ] || die "$STRICT is not readable"
+# Whether $STRICT, a gzip file or (-f) a plain one, holds game $1.  (grep -c, not grep -q: -q ends the pipe early, and
+# pipefail fails the pipe.)
+has_game() {
+    [ "$(gzip -dcf "$STRICT" | grep -c "\"n\":$1,")" -gt 0 ]
+}
 if [ "$list_mode" = 1 ]; then
     for n in ${list//,/ }; do
-        grep -q "\"n\":$n," "$STRICT" || die "$STRICT has no game $n (it holds the recorded optima)"
+        has_game "$n" || die "$STRICT has no game $n (it holds the recorded optima)"
     done
 else
-    grep -q "\"n\":$to," "$STRICT" || die "$STRICT has no game $to (it holds the recorded optima to prove)"
+    has_game "$to" || die "$STRICT has no game $to (it holds the recorded optima to prove)"
 fi
 THREADS="${THREADS:-$(ncpu)}"
 PASS_SECONDS="${PASS_SECONDS:-300}"

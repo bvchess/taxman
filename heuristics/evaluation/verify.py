@@ -28,15 +28,32 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import sys
 import time
 from pathlib import Path
-from typing import List, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set
 
 from core import smallest_prime_factors, solve_upper_half
 
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "results/optimal.json"
+DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "results/optimal.jsonl.gz"
+
+
+def load_optimal(path: Path, max_n: Optional[int] = None) -> Dict[int, dict]:
+    """The games of the committed results file by n, up to max_n (all if None).
+
+    The file is gzip, one result line a game in the order of n; each game has at least "n", "score" and "moves".  A
+    path that does not end in .gz is read as plain lines.  Reading stops at the first game past max_n.
+    """
+    games: Dict[int, dict] = {}
+    with (gzip.open(path, "rt", encoding="utf-8") if path.name.endswith(".gz") else open(path)) as lines:
+        for line in lines:
+            game = json.loads(line)
+            if max_n is not None and game["n"] > max_n:
+                break
+            games[game["n"]] = game
+    return games
 
 
 def replay(sequence: Sequence[int], pot: Set[int]) -> bool:
@@ -65,7 +82,7 @@ def main(argv: List[str] | None = None) -> int:
                         help="print every game, not just failures")
     args = parser.parse_args(argv)
 
-    optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+    optimal = load_optimal(args.optimal, args.max_n)
     spf = smallest_prime_factors(args.max_n)
 
     games = 0

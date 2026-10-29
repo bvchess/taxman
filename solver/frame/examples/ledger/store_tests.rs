@@ -110,7 +110,7 @@ struct Fixture {
 
 fn fixture(name: &str) -> Fixture {
     let dir = TempDir::new(name);
-    let (strict, bounds, games) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
+    let (strict, bounds, games) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
     write_results(&strict, &[920, 940]);
     let book = partial_book(&boards(), &GIVEN, &FOUND);
     let chain = store::chain(&strict).unwrap();
@@ -252,7 +252,7 @@ fn a_line_is_written_and_read_back_and_a_malformed_one_is_refused() {
 #[test]
 fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing() {
     let dir = TempDir::new("store-export");
-    let (strict, bounds) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"));
+    let (strict, bounds) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"));
     write_results(&strict, &[920, 940]);
     let chain = store::chain(&strict).unwrap();
     let mut book = partial_book(&boards(), &GIVEN, &FOUND);
@@ -379,7 +379,7 @@ fn an_export_appends_the_improvements_only_and_a_second_export_appends_nothing()
 #[test]
 fn a_long_chain_of_citations_is_exported_in_order() {
     let dir = TempDir::new("store-deep");
-    let strict = dir.join("strict.jsonl");
+    let strict = dir.join("committed.jsonl");
     write_results(&strict, &[]);
     let (first, top) = (2000, 5000);
     let entries: Vec<Entry> = (first..=top)
@@ -447,7 +447,7 @@ fn all_proven_run(dir: &Path, first: u32, last: u32, proven: Option<&Path>, boun
 #[test]
 fn a_run_is_exported_and_both_referees_accept_the_file() {
     let dir = TempDir::new("store-run");
-    let (strict, bounds, games) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
+    let (strict, bounds, games) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"), dir.join("games.jsonl"));
     let (middle, proven) = (if QUICK { 906 } else { 930 }, (LAST - 901) as usize);
     write_results(&strict, &[900, middle]);
     let run_dir = all_proven_run(&dir, 901, LAST, Some(&strict), None);
@@ -701,7 +701,7 @@ fn both_referees_refuse_the_tampered_files(sampled: impl Fn(usize) -> bool) {
 #[test]
 fn a_run_starts_from_the_file_and_skips_the_maps_of_boards_with_both_bounds() {
     let dir = TempDir::new("store-start");
-    let (strict, bounds) = (dir.join("strict.jsonl"), dir.join("bounds.jsonl"));
+    let (strict, bounds) = (dir.join("committed.jsonl"), dir.join("bounds.jsonl"));
     // The stretch `first..=last`, the first board that the file has, the last board of the file and the boards that the
     // run found: 901..960, 910, 960, and 925 and 950; in a quick run 115..124, 119, 127 and 121 (small boards, whose runs
     // are short, with a game beside the one it cites in the repeat class of 121).
@@ -771,7 +771,7 @@ fn the_python_referee_prints_its_usage() {
     assert!(run.status.success() && String::from_utf8_lossy(&run.stdout).contains("--games"));
 }
 
-/// The committed store, `results/bounds.jsonl`, checked against the chain `STRICT` (`results/strict.jsonl`).
+/// The committed store, `results/bounds.jsonl`, checked against the chain `STRICT` (`results/optimal.jsonl.gz`).
 const COMMITTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/bounds.jsonl");
 
 /// The lines of the committed store that the quick check verifies: an export writes its lower bounds first, so these

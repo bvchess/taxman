@@ -1,5 +1,4 @@
-//! The subcommands: `solve`, `regress`, `bench`, `verify-optimal`, `verify-results`, `extend-optimal`, `tables`,
-//! `certify` and `verify-certificates`.
+//! The subcommands: `solve`, `regress`, `bench`, `verify-results`, `tables`, `certify` and `verify-certificates`.
 //!
 //! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`],
 //! or [`range_options`] for those that solve a range) and call the library's pipeline ([`taxman::solver`]); what
@@ -8,8 +7,8 @@
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
 //!   it, `results::ResultsFile`) its results file, prints one summary line per game as it is concluded, and with
 //!   `--game-hours` ends at the first game whose own search passes the wall (exit status 4);
-//! * `regress` solves in memory and compares every score with `optimal.json`;
-//! * `bench` solves a fixed set of hard games, each on its own (given the game before it from `optimal.json` or the
+//! * `regress` solves in memory and compares every score with the table of optimal games;
+//! * `bench` solves a fixed set of hard games, each on its own (given the game before it from the table or the
 //!   committed chain, and nothing derived), and appends the run to a history file, so that performance can be followed
 //!   from commit to commit.  Its files are found in the repository ([`taxman::paths`]) unless `--history` and `--known`
 //!   name them;
@@ -17,13 +16,11 @@
 //!   signals), appends a certificate a game to its `--out` file (locked while it is open), takes the games of a range
 //!   or of a list file, and exits with status 2 on a game that beats a recorded score.
 //!
-//! The small ones: `verify-optimal` replays every game of the table of optimal games, `verify-results` checks results
-//! files without changing them, `verify-certificates` does the same for the files `certify` wrote and says how far the
-//! proofs of the recorded scores reach, `extend-optimal` writes the table with the games of a results file that
-//! continue it appended, and `tables` prints the maximal factors and composites of numbers on a board.  Every
-//! command that meets a score of a game `optimal.json` has checks it against the table built into the binary
-//! ([`Optimal::built_in`]): no flag turns that off, and only `verify-optimal FILE` and `extend-optimal --table FILE`
-//! name another table.
+//! The small ones: `verify-results` checks results files without changing them (a path that ends in `.gz` is read
+//! through the gzip decoder, as every results file a command is given by path), `verify-certificates` does the same for
+//! the files `certify` wrote and says how far the proofs of the recorded scores reach, and `tables` prints the maximal
+//! factors and composites of numbers on a board.  Every command that meets a score of a game the table of optimal games
+//! has checks it against the table built into the binary ([`Optimal::built_in`]): no flag turns that off.
 
 use crate::cli::{
     count, errln, outln, parse_range, range_options, read_board_list, solver_options, Args, CliError, CliResult,
@@ -195,9 +192,9 @@ pub fn solve(args: &[String]) -> CliResult {
     opts.force_search = args.has("--force-search");
     opts.use_prev = args.has("--use-prev");
     if opts.use_prev {
-        // The known games: optimal.json's, and the committed chain's and the bounds store's in the repository.
+        // The known games: the table's, and the committed chain's and the bounds store's in the repository.
         opts.known = KnownSources::in_repository().unwrap_or_else(|e| {
-            errln!("note: {e}; --use-prev draws on optimal.json alone");
+            errln!("note: {e}; --use-prev draws on the built-in table alone");
             KnownSources { boards: true, ..KnownSources::default() }
         });
     }
@@ -495,7 +492,7 @@ fn frontier_text(reached: &Frontier, upper: &BTreeMap<u32, Upper>) -> String {
 // regress
 
 /// `regress [--from A] [--to N] [--window K] [--use-prev]`: solves A..N in memory and checks every score against
-/// optimal.json (the first that differs is an error, as in any run).
+/// the table of optimal games (the first that differs is an error, as in any run).
 pub fn regress(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--to", "--from", WINDOW_FLAG]), &["--use-prev"])?;
     if !args.positional().is_empty() {
@@ -529,7 +526,7 @@ pub fn regress(args: &[String]) -> CliResult {
         .collect();
     outln!("by method: {}", counts.join(", "));
     let unchecked = results.iter().filter(|r| r.optimal_match.is_none()).count();
-    outln!("{} games match optimal.json, {unchecked} are not in it", results.len() - unchecked);
+    outln!("{} games match the table, {unchecked} are not in it", results.len() - unchecked);
     Ok(())
 }
 
@@ -544,14 +541,14 @@ const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
 /// the history.
 pub fn bench(args: &[String]) -> CliResult {
     let args = Args::parse(args, &flags_with(&["--history", "--known"]), &[])?;
-    // Where the run is recorded, and where the previous games past optimal.json's come from: in the repository
+    // Where the run is recorded, and where the previous games past the table's come from: in the repository
     // unless a flag names a file.
     let file = |flag: &str, in_repository: &str| match args.value(flag) {
         Some(path) => Ok(PathBuf::from(path)),
         None => paths::in_repository(in_repository, &format!("{flag} FILE")).map_err(failed),
     };
     let history = file("--history", paths::BENCH_HISTORY_IN_REPOSITORY)?;
-    let results = file("--known", paths::STRICT_RESULTS_IN_REPOSITORY)?;
+    let results = file("--known", paths::RESULTS_IN_REPOSITORY)?;
     let ns: Vec<u32> = if args.positional().is_empty() {
         BENCH_GAMES.to_vec()
     } else {
@@ -559,7 +556,7 @@ pub fn bench(args: &[String]) -> CliResult {
         args.positional().iter().map(parse).collect::<Result<_, _>>()?
     };
     let mut opts = solver_options(&args)?;
-    // Every game on its own: the previous game from optimal.json or, past it, from the committed results, and no
+    // Every game on its own: the previous game from the table or, past it, from the committed results, and no
     // derivation.
     opts.force_search = true;
     let known = Optimal::built_in().with_results_files(&[results]).map_err(failed)?;
@@ -623,37 +620,15 @@ fn append_history(path: &Path, record: &Json) -> std::io::Result<()> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// verify-optimal, verify-results, extend-optimal, tables
+// verify-results, tables
 
 fn millis(since: Instant) -> f64 {
     since.elapsed().as_secs_f64() * 1000.0
 }
 
-/// `verify-optimal [FILE]`: replays every game of the table of optimal games (the built-in one if no file is given)
-/// and checks its recorded score.
-pub fn verify_optimal(args: &[String]) -> CliResult {
-    let start = Instant::now();
-    let optimal = match args {
-        [] => Optimal::built_in().clone(),
-        [file] => Optimal::load(file).map_err(CliError::Failed)?,
-        _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
-    };
-    // The built-in table parses a game when it is asked for, and counting the moves asks for every game: so the time
-    // taken is that of having the whole table, as it is for a file.
-    let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
-    let load_ms = millis(start);
-
-    let start = Instant::now();
-    let checked = optimal.verify_all().map_err(CliError::Failed)?;
-    let replay_ms = millis(start);
-
-    outln!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
-    outln!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
-    Ok(())
-}
-
 /// `verify-results [--threads K] FILE...`: checks results files without changing them (`results::verify_files`), their
-/// scores against the built-in `optimal.json`.  The check sets up the search problems of the repeats on K threads,
+/// scores against the built-in table; a file whose name ends in `.gz`, the committed results `results/optimal.jsonl.gz`
+/// among them, is read through the gzip decoder.  The check sets up the search problems of the repeats on K threads,
 /// as many as `solve` takes by default (the CPUs) unless `--threads` says.  A line that cites a known source (proof
 /// `known`) is checked against it: the table, the committed chain and the bounds store of the repository's
 /// `results` (as `solve --use-prev` draws on them).
@@ -669,52 +644,6 @@ pub fn verify_results(args: &[String]) -> CliResult {
     let report = verify_files_with(&paths, &known, threads).map_err(CliError::Failed)?;
     outln!("{report}");
     outln!("checked in {:.1} ms", millis(start));
-    Ok(())
-}
-
-/// `extend-optimal RESULTS --out FILE [--table FILE]`: writes the table of optimal games to `--out FILE` with the
-/// games of the results file `RESULTS` that continue it appended (`results::extend_optimal`).  The table is the
-/// built-in one, or the file `--table` names (say a table extended before the binary was rebuilt with it); it is
-/// written to `--out` only, which the command line must name, and checks the results' scores.
-pub fn extend_optimal(args: &[String]) -> CliResult {
-    let usage = || CliError::Usage("usage: extend-optimal RESULTS --out FILE [--table FILE]".into());
-    let args = Args::parse(args, &["--out", "--table"], &[])?;
-    let [results] = args.positional() else { return Err(usage()) };
-    let Some(out) = args.value("--out") else {
-        return Err(CliError::Usage(
-            "extend-optimal needs --out FILE: it never writes over the table (or anything else) unasked".into(),
-        ));
-    };
-    let (results, out) = (Path::new(results), Path::new(out));
-    // The results are the evidence the table is made from: a mistyped --out must not replace them.
-    if std::fs::canonicalize(results).ok().is_some_and(|results| std::fs::canonicalize(out).ok() == Some(results)) {
-        return Err(CliError::Usage(format!(
-            "--out is the results file {}, which would be overwritten",
-            out.display()
-        )));
-    }
-    let mut optimal = match args.value("--table") {
-        Some(table) => Optimal::load(table).map_err(failed)?,
-        None => Optimal::built_in().clone(),
-    };
-
-    let known = known_in_repository(&optimal)?;
-    let contents = taxman::results::read_results_file_with(results, &known, 1).map_err(failed)?;
-    if contents.torn {
-        errln!("note: the last line of {} is torn and was ignored", results.display());
-    }
-    let extension = taxman::results::extend_optimal(&mut optimal, &contents).map_err(failed)?;
-    optimal.save(out).map_err(failed)?;
-
-    let (count, total) = (extension.added.clone().count(), optimal.sizes().count());
-    let added = if count == 0 {
-        "added no games".to_owned()
-    } else {
-        let games = if count == 1 { "game" } else { "games" };
-        format!("added {count} {games} (n = {}..={})", extension.added.start(), extension.added.end())
-    };
-    outln!("{added}; the table has {total} games, n up to {}; wrote {}", optimal.max_n(), out.display());
-    outln!("stopped at n = {}: {}", extension.stopped_at, extension.reason);
     Ok(())
 }
 

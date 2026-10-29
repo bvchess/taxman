@@ -644,7 +644,7 @@ scenario_status() {
         recorded_line 37 370 search 7 123.456 unknown exhausted
         recorded_line 38 380 search 9 1.5 unknown exhausted
         recorded_line 37 370 prime 0 0.055 unknown prime_formula "  own=0.000 s  best=-"
-        recorded_line 38 380 known 0 0.003 ok "known from the committed chain (strict.jsonl)"
+        recorded_line 38 380 known 0 0.003 ok "known from the committed chain"
         recorded_line 39 7466640 search 0 0.247 unknown cap "  assumes statement U  own=0.247 s  best=566640"
         recorded_line 40 400 search 248002917 812.5 unknown exhausted "  own=697.250 s  best=40000"
         printf 'n=41    score=410       search  nodes=1000000000  6000.000 s  incomplete\n'
@@ -706,7 +706,7 @@ scenario_status() {
         ' 37 0.0s 0 - recorded, score 370 (prime, prime_formula)'
     check "a line of an older solver has no own search time or best sum, and a known game has the words of its proof" \
         has_line "$tmp/s1.norm" \
-        ' 38 - 0 - recorded, score 380 (known, known from the committed chain (strict.jsonl), optimal ok)'
+        ' 38 - 0 - recorded, score 380 (known, known from the committed chain, optimal ok)'
     check "the proof ends at what the solver adds to it, and the fields come after it" has_line "$tmp/s1.norm" \
         ' 39 0.2s 0 566,640 recorded, score 7,466,640 (search, cap)'
     check "a recorded game's own search time is formatted as an in-flight game's, its best with commas" has_line \
@@ -1030,7 +1030,7 @@ scenario_sweep() {
     # 1301..1340 in four blocks and one second a game: the first block chains from the known games (1..1300), the other
     # blocks start standalone; the passes then search again the games that have more to give.
     known="$tmp/known1300.jsonl"
-    head -n 1300 "$TAXMAN_ROOT/results/strict.jsonl" >"$known"
+    gzip -dc "$TAXMAN_ROOT/results/optimal.jsonl.gz" | head -n 1300 >"$known"
     (
         export TAXMAN_WORK="$w" KNOWN="$known" BLOCKS=4 GAME_SECONDS=1 PROGRESS=0 MERGE_EVERY=5 S3_DEST=s3://b/sweep
         export SAVE_EVERY=3600
@@ -1073,7 +1073,7 @@ scenario_sweep() {
     # after it go on from it, as in an unbroken chain.
     # The known file here goes past FIRST - 1 (to 1420): the games of the range it holds are not taken.
     local w2="$tmp/sweep-boundary"
-    head -n 1420 "$TAXMAN_ROOT/results/strict.jsonl" >"$tmp/known1420.jsonl"
+    gzip -dc "$TAXMAN_ROOT/results/optimal.jsonl.gz" | head -n 1420 >"$tmp/known1420.jsonl"
     mkdir -p "$w2/results/explore-blocks"
     printf '1411 1412\n1413 1416\n' >"$w2/results/explore-blocks/plan"
     (

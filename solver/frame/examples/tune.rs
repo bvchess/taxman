@@ -65,7 +65,7 @@
 //!
 //! With the tactic `near_repeat` (on by default), `solve` cuts by the known game of GAME − 1 if the known games have it
 //! (`taxman::board::near_repeat`: B is its score less its game with no promotions), at the nodes where the incumbent
-//! reaches B, as the solver cuts by a proven game of n − 1; a known game of `optimal.json` is taken as optimal, as the
+//! reaches B, as the solver cuts by a proven game of n − 1; a known game of the table is taken as optimal, as the
 //! known optimum of GAME is.  A unit's line then has `near_repeat_cut`, the nodes the cut cut (null without the cut).
 //!
 //! Which `best` a subtree finds does not depend on the settings, except `symmetry` where the incumbent is not an

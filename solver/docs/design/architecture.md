@@ -11,7 +11,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **Foundations.**
 
-1. `src/game.rs`: the rules as a referee, and `optimal.json`, the table of optimal games.
+1. `src/game.rs`: the rules as a referee, and the built-in table of optimal games, the games of
+   `results/optimal.jsonl.gz` as of the build, decoded through [the gzip crate](../../gzip/README.md).
 2. `src/numtheory.rs`: maximal factors and composites; and `src/playable.rs`, whether a set of numbers can all be played
    on the whole board, with nothing of the frame model (the oracle of the model's tests, and the referee of
    `taxman certify`).
@@ -70,7 +71,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 **The front end.**
 
 14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line, with the commands `solve`, `regress`, `bench`,
-    `verify-optimal`, `verify-results`, `extend-optimal`, `tables`, `certify` and `verify-certificates`.
+    `verify-results`, `tables`, `certify` and `verify-certificates`.
 
 **Studies**, which the solver does not use and a first read skips:
 

@@ -219,20 +219,18 @@ pub fn barred_bounds(board: &Board, spf: &[u32], v: u64, ustar: &[u32]) -> Barre
 mod tests {
     use super::*;
     use crate::game::{relation, Prover, Relation, Verdict};
-    use crate::jsonl::recorded_games_to;
+    use crate::jsonl::{committed_chain, recorded_games_to};
     use crate::primes::smallest_prime_factors;
     use std::collections::{BTreeMap, BTreeSet};
-    use std::path::Path;
     use std::time::Instant;
 
-    /// The last game of optimal.json that these tests check; the table goes on past it, to games that other files of
-    /// barred bounds cover.
-    const TABLE_CHECKED_TO: u64 = 1300;
+    /// The last board that the tests over every board check.
+    const LAST_BOARD: u64 = 1300;
 
-    /// The games of optimal.json to [`TABLE_CHECKED_TO`]: n -> (score, moves).
-    fn optimal() -> BTreeMap<u64, (u64, Vec<u32>)> {
-        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        recorded_games_to(&[path], TABLE_CHECKED_TO)
+    /// The games of the committed chain to `last`, n -> (score, moves): only the members of the file that hold them
+    /// are decoded.
+    fn optimal(last: u64) -> BTreeMap<u64, (u64, Vec<u32>)> {
+        recorded_games_to(&[committed_chain()], last)
     }
 
     /// The boards the enumerating tests cover.
@@ -259,7 +257,7 @@ mod tests {
     fn cases() -> &'static [Case] {
         static CASES: std::sync::OnceLock<Vec<Case>> = std::sync::OnceLock::new();
         CASES.get_or_init(|| {
-            let (known, spf) = (optimal(), smallest_prime_factors(*SMALL.end() as usize));
+            let (known, spf) = (optimal(*SMALL.end()), smallest_prime_factors(*SMALL.end() as usize));
             let mut cases = Vec::new();
             for n in SMALL {
                 let (v, moves) = &known[&n];
@@ -343,7 +341,7 @@ mod tests {
     /// plain root (the sets worth more than V − 1).  Boards 2..=60.
     #[test]
     fn every_optimal_set_obeys_the_roles() {
-        let (known, spf) = (optimal(), smallest_prime_factors(*SMALL.end() as usize));
+        let (known, spf) = (optimal(*SMALL.end()), smallest_prime_factors(*SMALL.end() as usize));
         for n in SMALL {
             let (v, moves) = &known[&n];
             let board = Board::new(n as u32, &spf);
@@ -358,12 +356,12 @@ mod tests {
     }
 
     /// The roles follow each board's own closure of the frames of layer 2: the numbers of layer 2 up to n/2 are
-    /// barred where U\*_2 spans every prime up to n/2 and free where it does not, and every recorded game of
-    /// optimal.json obeys its board's roles, closed or not.  The frames are closed on every board from 187 on, as this
-    /// test checks to 1300 (and on some below it, which the roles then bar too).  Every board, 2..=1300.
+    /// barred where U\*_2 spans every prime up to n/2 and free where it does not, and every recorded game of the
+    /// committed chain obeys its board's roles, closed or not.  The frames are closed on every board from 187 on, as
+    /// this test checks to 1300 (and on some below it, which the roles then bar too).  Every board, 2..=1300.
     #[test]
     fn the_roles_follow_each_boards_closure_of_layer_two() {
-        let (known, spf) = (optimal(), smallest_prime_factors(1300));
+        let (known, spf) = (optimal(LAST_BOARD), smallest_prime_factors(LAST_BOARD as usize));
         let (mut boards, mut open_boards) = (0, Vec::new());
         for (&n, (_, moves)) in known.iter().filter(|(&n, _)| n >= 2) {
             let ustar = played_sources(n, moves);
@@ -382,7 +380,7 @@ mod tests {
             "{boards} boards, the frames of layer 2 not closed on {} of them: {open_boards:?}",
             open_boards.len()
         );
-        assert_eq!(boards, 1299);
+        assert_eq!(boards, LAST_BOARD - 1);
         assert!(!open_boards.is_empty(), "the check of closure is never false");
         assert!(open_boards.iter().all(|&n| n < 187), "a board from 187 on is not closed: {open_boards:?}");
     }
@@ -391,7 +389,7 @@ mod tests {
     /// 161 members are open).
     #[test]
     fn the_barred_bounds_at_600() {
-        let (known, spf) = (optimal(), smallest_prime_factors(600));
+        let (known, spf) = (optimal(600), smallest_prime_factors(600));
         let (v, moves) = &known[&600];
         let ustar = played_sources(600, moves);
         let barred = barred_bounds(&Board::new(600, &spf), &spf, *v, &ustar);
@@ -410,12 +408,12 @@ mod tests {
         ustar: Vec<u32>,
     }
 
-    /// The games of optimal.json in 187..=800 that need a search, as `exact` decides it: the relation to the game
+    /// The committed chain's games in 187..=800 that need a search, as `exact` decides it: the relation to the game
     /// before is none and the parity bound at the root is above the score.  Found once for all the tests.
     fn searched_games() -> &'static [Searched] {
         static GAMES: std::sync::OnceLock<Vec<Searched>> = std::sync::OnceLock::new();
         GAMES.get_or_init(|| {
-            let (known, spf) = (optimal(), smallest_prime_factors(800));
+            let (known, spf) = (optimal(800), smallest_prime_factors(800));
             let mut games = Vec::new();
             for n in 187..=800u64 {
                 let (v, moves) = known[&n].clone();
@@ -449,10 +447,11 @@ mod tests {
         pick
     }
 
-    /// Every recorded game of optimal.json plays exactly U\* above n/2 (`recorded_ustar` checks it).  Boards 2..=1300.
+    /// Every recorded game of the committed chain plays exactly U\* above n/2 (`recorded_ustar` checks it).  Boards
+    /// 2..=1300.
     #[test]
     fn every_recorded_game_plays_ustar() {
-        let (known, spf) = (optimal(), smallest_prime_factors(1300));
+        let (known, spf) = (optimal(LAST_BOARD), smallest_prime_factors(LAST_BOARD as usize));
         for (&n, (_, moves)) in &known {
             if n >= 2 {
                 recorded_ustar(n, moves, &spf);

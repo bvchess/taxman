@@ -213,9 +213,9 @@ ceiling.
 
 A step to the ceiling needs every optimal set of n − 1, not just one.  At 686 a test of one optimal set of 685 can miss
 the ceiling, if it tests the one set of the three that does not stay playable with 686; [the measurements of
-uniqueness](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board) say which set the table of optimal games
-records.  Where the optimal set of n − 1 is known to be unique, one test of T ∪ {n} decides whether n is at its ceiling,
-and if it is, the optimal set of n is known with no search.
+uniqueness](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board) say which set the results file
+`results/optimal.jsonl.gz` records.  Where the optimal set of n − 1 is known to be unique, one test of T ∪ {n} decides
+whether n is at its ceiling, and if it is, the optimal set of n is known with no search.
 
 The games of this file are replayed by the rules with `heuristics/core.py`.  The optimal sets of games 20 to 23 are
 each unique, by the exhaustive search of `heuristics/evaluation/certify.py`, which takes under a second for these

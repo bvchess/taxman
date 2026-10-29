@@ -1386,6 +1386,7 @@ pub fn derive_optimal_sets(board: &Board, relation: Relation, prev: &[Vec<u32>],
 #[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
+    use crate::jsonl::{committed_chain, recorded_games_to};
     use crate::primes::smallest_prime_factors;
 
     /// opt(n) by brute force over pick sets (playability by dismantling), for small n.
@@ -1408,35 +1409,14 @@ mod tests {
         best
     }
 
-    /// With the target one below optimal.json's score, the search (all its pruning rules: forced picks, nogoods,
-    /// the conflict-packing cut, and optionally the segment cuts, the Lagrangian bound or the parity bound) must
-    /// still reach a playable set worth opt(n); at the score itself it must prove that nothing beats it.
+    /// With the target one below the committed chain's score, the search (all its pruning rules: forced picks,
+    /// nogoods, the conflict-packing cut, and optionally the segment cuts, the Lagrangian bound or the parity bound)
+    /// must still reach a playable set worth opt(n); at the score itself it must prove that nothing beats it.
     /// Every 7th game to 420.
     #[test]
     fn the_search_finds_the_optimum_just_above_the_target() {
-        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"))
-            .expect("optimal.json");
-        let scores: Vec<(usize, u64)> = text
-            .lines()
-            .filter(|l| l.contains("\"n\""))
-            .map(|line| {
-                let num = |key: &str| -> u64 {
-                    let at = line.find(key).unwrap() + key.len();
-                    line[at..]
-                        .trim_start_matches([':', ' '])
-                        .chars()
-                        .take_while(char::is_ascii_digit)
-                        .collect::<String>()
-                        .parse()
-                        .unwrap()
-                };
-                (num("\"n\"") as usize, num("\"score\""))
-            })
-            .collect();
-        let mut opt = vec![0u64; scores.iter().map(|&(n, _)| n).max().expect("optimal.json has games") + 1];
-        for (n, score) in scores {
-            opt[n] = score;
-        }
+        let known = recorded_games_to(&[committed_chain()], 420);
+        let opt: Vec<u64> = (0..=420).map(|n| known.get(&n).map_or(0, |game| game.0)).collect();
         let spf = smallest_prime_factors(500);
         for n in (21..=420u32).step_by(7) {
             let board = Board::new(n, &spf);
@@ -1476,7 +1456,7 @@ mod tests {
 
     /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of
     /// an uninterrupted one, on both sides of opt(n) (opt(300) = 28691, opt(432) = 59259 and, with the parity
-    /// bound, opt(600) = 112623; optimal.json).
+    /// bound, opt(600) = 112623).
     #[test]
     fn paused_searches_resume_to_the_same_verdict() {
         let spf = smallest_prime_factors(600);
@@ -1514,7 +1494,7 @@ mod tests {
         }
     }
 
-    /// The known optima of 1..=20 (optimal.json), by brute force and by the prover on both sides of the value.
+    /// The known optima of 1..=20, by brute force and by the prover on both sides of the value.
     #[test]
     fn small_games() {
         let spf = smallest_prime_factors(100);
@@ -1648,11 +1628,10 @@ mod tests {
 
     /// Where V(n) is at its ceiling or meets the prime formula, the optimal sets derived from those of n − 1 are the
     /// ones enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every game to 260
-    /// (optimal.json's values; the optimal set is unique in all of them but 2..260 still exercises both rules).
+    /// (the committed chain's scores; the optimal set is unique in all of them but 2..260 still exercises both rules).
     #[test]
     fn derived_optimal_sets_are_the_enumerated_ones() {
-        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let known = crate::jsonl::recorded_games_to(&[path], 300);
+        let known = recorded_games_to(&[committed_chain()], 300);
         let spf = smallest_prime_factors(300);
         let all = |n: u64| -> Vec<Vec<u32>> {
             if n < 2 {
@@ -1688,18 +1667,19 @@ mod tests {
         assert!(derived > 100 && by_prime > 40, "{derived} {by_prime}");
     }
 
-    /// The first game with two optimal sets: 424 has one, 425 has two (optimal.json's, and the one with
-    /// {110, 132, 168} exchanged for {98, 150, 162}), with the same upper part.
+    /// The first game with two optimal sets: 424 has one, 425 has two, which differ by {110, 132, 168} exchanged for
+    /// {98, 150, 162} and have the same upper part.  The committed chain's game of 425 is one of them.
     #[test]
     fn game_425_has_two_optimal_sets() {
-        let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let known = crate::jsonl::recorded_games_to(&[path], 500);
+        let known = recorded_games_to(&[committed_chain()], 500);
         let spf = smallest_prime_factors(500);
         let sets = |n: u64| {
             let board = Board::new(n as u32, &spf);
             let mut prover = Prover::new(&board, known[&n].0 - 1, u64::MAX).enumerate(usize::MAX);
             assert_eq!(prover.run(), Verdict::Proven);
-            prover.found
+            let mut found = prover.found;
+            found.iter_mut().for_each(|s| s.sort_unstable());
+            found
         };
         assert_eq!(sets(424).len(), 1);
         let found = sets(425);
@@ -1709,10 +1689,16 @@ mod tests {
             m.sort_unstable();
             m
         };
-        let other: Vec<u32> = found.into_iter().find(|s| *s != recorded).expect("a second set");
-        let gone: Vec<u32> = recorded.iter().copied().filter(|c| !other.contains(c)).collect();
-        let new: Vec<u32> = other.iter().copied().filter(|c| !recorded.contains(c)).collect();
+        assert!(found.contains(&recorded), "the recorded game of 425 is not an optimal set");
+        let (first, second) = (&found[0], &found[1]);
+        let only_in = |a: &[u32], b: &[u32]| -> Vec<u32> { a.iter().copied().filter(|c| !b.contains(c)).collect() };
+        let (mut gone, mut new) = (only_in(first, second), only_in(second, first));
+        if gone.contains(&98) {
+            std::mem::swap(&mut gone, &mut new);
+        }
         assert_eq!((gone, new), (vec![110, 132, 168], vec![98, 150, 162]));
+        let above = |set: &[u32]| -> Vec<u32> { set.iter().copied().filter(|&c| 2 * c > 425).collect() };
+        assert_eq!(above(first), above(second));
     }
 
     /// Re-optimizing from a snapshot gives the same value as solving from scratch, along random chains of role

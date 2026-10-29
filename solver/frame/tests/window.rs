@@ -11,7 +11,7 @@
 
 mod common;
 
-use common::{matching_options, options, results_path, TempDir};
+use common::{committed_text, matching_options, options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -69,7 +69,7 @@ fn without_times(line: &Json) -> Json {
 
 /// The committed chain's games of `1..=hi`, by n, as [`provenance`] has them in a window of `window`.
 fn committed(hi: u32, window: usize) -> BTreeMap<u32, String> {
-    let text = fs::read_to_string(results_path("strict.jsonl")).unwrap();
+    let text = committed_text(hi as usize);
     let chain = text.lines().take(hi as usize).map(|line| Json::parse(line).unwrap());
     chain.filter(|line| n_of(line) <= hi).map(|line| (n_of(&line), provenance(&line, window))).collect()
 }

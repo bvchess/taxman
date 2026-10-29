@@ -24,7 +24,7 @@ commands:
   solve N|A-B [options]   solve game N or a range, each from the one before; the first from the game
                           of A-1 in --out FILE, or with --use-prev from the known games (with neither it is
                           solved standalone, which costs more: no seed from the game before and no ceiling).
-                          Every score is checked against optimal.json, which is built into this program
+                          Every score is checked against the table of optimal games, which is built into this program
       --threads K              worker threads (default: all CPUs)
       --background             run the workers at the lowest priority (Linux SCHED_IDLE): on a machine shared with
                                other work, with every hardware thread, the search takes the CPU the rest leaves
@@ -87,10 +87,10 @@ commands:
                                prune, and change no result
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
-      --use-prev               draw on the known games: optimal.json's, the committed chain's
-                               (results/strict.jsonl) and the proven boards of the bounds store
+      --use-prev               draw on the known games: the built-in table's, the committed chain's
+                               (results/optimal.jsonl.gz) and the proven boards of the bounds store
                                (results/bounds.jsonl).  A board a source has proven is recorded without a
-                               search (proof known), citing the source and what it assumes (optimal.json's games
+                               search (proof known), citing the source and what it assumes (the table's games
                                are assumed optimal; the store's, wherever statement U holds at the boards its
                                bound rests on); the game of A-1 from them, if --out FILE lacks it, gives the
                                ceiling and the seed; the store's other boards seed their searches with its lower
@@ -98,34 +98,29 @@ commands:
                                their searches
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
-                          solve A..N (default 1..400) in memory and check every score against optimal.json
+                          solve A..N (default 1..400) in memory and check every score against the built-in table
   bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
                           time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
-                          with the previous game from optimal.json or past it from the results file --known
-                          (default results/strict.jsonl), and no derivation; appends the run to
+                          with the previous game from the built-in table or past it from the results file --known
+                          (default results/optimal.jsonl.gz), and no derivation; appends the run to
                           --history (default solver/frame/bench/history.jsonl; both in the repository)
-  verify-optimal [FILE]   replay every game of the built-in optimal.json (or of the table FILE) and check its
-                          recorded score
   verify-results [--threads K] FILE...
                           check results files without changing them: every game replayed and its score checked
-                          against optimal.json, the chain from n-1, each line's proof and provenance, and that the
-                          files agree; counts games by proof and by what they assume.  K threads set up the
+                          against the built-in table, the chain from n-1, each line's proof and provenance, and that
+                          the files agree; counts games by proof and by what they assume.  A file whose name ends in
+                          .gz is read through the gzip decoder (the committed results are one).  K threads set up the
                           searches of the repeats (default: all CPUs).  A line that cites a known source is checked
-                          against optimal.json, the committed chain and the bounds store of results
-  extend-optimal RESULTS --out FILE [--table FILE]
-                          write the built-in optimal.json (or the table FILE) to --out FILE with the games of the
-                          results file RESULTS appended: from the game after the table's last, each game that
-                          RESULTS has completed, up to the first that it lacks.  A rebuild takes in a changed table
+                          against the built-in table, the committed chain and the bounds store of results
   certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]
                           prove the recorded scores of A..B (or of the boards of the list FILE, one n a
                           line in the order to certify them, blank lines and # comments skipped) that rest on the
                           frame model on the whole board, game by game: the extended problem with the open
                           members of the barred bounds (--upper, the prover's `upper` files) optional, searched
-                          from the recorded game (--results, over optimal.json); one line a game in --out,
-                          certified or beaten; a game whose extended problem an earlier certified game of the
-                          last 8 games posed is certified without a search (same_problem); a game that
-                          beats its score is also written to OUT.counterexample.jsonl and the run exits with
-                          status 2.
+                          from the recorded game (--results, over the built-in table; a .gz file is read as gzip);
+                          one line a game in --out, certified or beaten; a game whose extended problem an
+                          earlier certified game of the last 8 games posed is certified without a search
+                          (same_problem); a game that beats its score is also written to
+                          OUT.counterexample.jsonl and the run exits with status 2.
                           Options: --threads K, --checkpoint-dir DIR, --checkpoint-interval S, --progress S,
                           --time-limit S, --node-limit N, --mem-cap UNITS, --background, as for solve; --no-claims,
                           search the extended problem without the claims of `unzip` (the formulation of the
@@ -190,9 +185,7 @@ fn run(args: &[String]) -> CliResult {
         "solve" => commands::solve(rest),
         "regress" => commands::regress(rest),
         "bench" => commands::bench(rest),
-        "verify-optimal" => commands::verify_optimal(rest),
         "verify-results" => commands::verify_results(rest),
-        "extend-optimal" => commands::extend_optimal(rest),
         "tables" => commands::tables(rest),
         "certify" => commands::certify(rest),
         "verify-certificates" => commands::verify_certificates(rest),

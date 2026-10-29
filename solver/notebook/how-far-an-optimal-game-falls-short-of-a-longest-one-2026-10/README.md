@@ -14,7 +14,7 @@ and 835 alone, and from 836 on there is none.  Whether the shortfall is bounded 
 ## Method
 
 * **Games.**  The recorded game of each n is the first line of `results/strict.jsonl` for n, which ends at 4949 in the
-  committed file ([results/README.md](../../../results/README.md#strictjsonl)), and `results/optimal.json` up to 1300,
+  committed file ([results/README.md](../../../results/README.md#optimaljsonlgz)), and `results/optimal.json` up to 1300,
   as in [the earlier run](../../noframe/docs/longest-games.md#results).  The chain's own file holds games past 4949,
   which this machine does not have, so they are not covered.
 * **Program.**  The prover's tool `moves` ([`bin/moves.rs`](../../noframe/src/bin/moves.rs), made in commit 5700578),

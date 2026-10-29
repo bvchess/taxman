@@ -334,9 +334,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 
 * **chain**: games each built from the one before (n = 1, 2, 3, ...).  A game's search starts from the previous game's
   promotions and stops at its ceiling.  A game solved with no game of n − 1 is **standalone**.
-* **the committed chain**: the chain in the file `results/strict.jsonl`, from n = 1.  Every game in it is proven within
-  the frame model.  [results/README.md](../results/README.md#strictjsonl) gives its range.  The **end of the chain** is
-  its last game.
+* **the committed chain**: the chain in the file `results/optimal.jsonl.gz`, from n = 1.  Every game in it is proven
+  within the frame model.  [results/README.md](../results/README.md#optimaljsonlgz) gives its range.  The **end of the
+  chain** is its last game.
 * **repeat**: a game that poses the same search problem as an earlier game, which settled it.  The frame solver
   concludes it with the earlier game's promotions instead of searching ([the repeat lemma
   (R6)](theory/search-rules.md#the-repeat-lemma)).  `same_search` is the name of the tactic and of
@@ -350,10 +350,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   `same_search` or `known` ([the frame solver's reference, "Proof
   kinds"](../solver/docs/REFERENCE.md#proof-kinds)).
 * **assumes**: what a proof rests on beyond the frame model, inherited down the chain.  A game of n − 1, or of n, taken
-  from `optimal.json` is assumed optimal.  A bound of the bounds store assumes [statement
+  from the built-in table is assumed optimal.  A bound of the bounds store assumes [statement
   U](theory/exactness.md#statement-u) at the games it rests on.
-* **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from
-  `optimal.json`, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
+* **known game**, **known source**: a game that `taxman solve --use-prev` takes instead of searching for it, from the
+  built-in table, the committed chain, or a game that the bounds store has proven (`src/known.rs`).
 * **bounds store**: `results/bounds.jsonl`, the bounds on opt(n) that the ledger finds, one line each, kept for good
   ([results/README.md](../results/README.md#boundsjsonl); `src/store.rs`).  A game is **proven** there when its best
   lower bound equals its best upper bound.
@@ -364,10 +364,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
   game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
   score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
-* **optimal.json**: the table of optimal games, built into the binary
-  ([results/README.md](../results/README.md#optimaljson) says which games it holds and where they came from).
-  **optimal ok**: a score equals the table's.  That is not a proof, and above the table's last game there is no table to
-  match; a score that differs is a hard error.
+* **the built-in table**: the games of `results/optimal.jsonl.gz` as of the build, which the binary holds as the
+  compressed file and decodes as far as a game asks ([results/README.md](../results/README.md#optimaljsonlgz) says where
+  the games came from).  **optimal ok**: a score equals the table's.  That is not a proof, and above the table's last
+  game there is no table to match; a score that differs is a hard error.
 * **referee**: code that replays one game and checks it: legal, over, opening with the largest prime, scoring what is
   recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  A game that fails after it was found
   is **rejected**, written to `<results>.rejected.jsonl`.
@@ -386,8 +386,11 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the Java solver**: the original solver, whose algorithm the [wiki](https://github.com/bvchess/taxman/wiki) describes
   and the frame solver reimplements.  It is not in the tree.
 * **the prover**: the crate `solver/noframe/`, a branch and bound over sets of moves on the whole board.  It decides
-  playability by peel, uses only proven bounds, and shares no code with the frame solver.  It proves that no set of
-  moves beats a recorded score ([its README](../solver/noframe/README.md)).
+  playability by peel, uses only proven bounds, and shares no proof code with the frame solver.  It proves that no set
+  of moves beats a recorded score ([its README](../solver/noframe/README.md)).
+* **the gzip decoder**: the crate `solver/gzip/`, through which both programs read the results file.  Its CRC-32 check
+  makes a decoding error fail loudly, and never give both programs the same wrong game ([its
+  README](../solver/gzip/README.md)).
 * **brute force** (`src/brute.rs`): the frame solver's exhaustive search, the test oracle for small games.
 * **the sources conjecture (S1)**: no playable set of sources outweighs U\*.  The *sources' instance* has the sources as
   members, each listing all its maximal factors, and its *components*, *truncations*, *jams* and *victims* are defined

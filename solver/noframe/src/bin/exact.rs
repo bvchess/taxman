@@ -1,10 +1,10 @@
 //! The prover's proofs of optimal scores: for every game in a range, an upper bound on opt(n) proven without the
-//! frame model, compared with the recorded optimum V(n) (optimal.json and, for a game it lacks, the
-//! game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
+//! frame model, compared with the recorded optimum V(n) (the committed chain and the `--results` files; see
+//! solver/noframe/docs/reproducing.md, "The recorded games").  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1] [--parity 0]
 //!           [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]
-//!           [--optimal FILE] [--results FILE] --out FILE
+//!           [--optimal FILE] [--results FILE]... --out FILE
 //!
 //! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot bound and
 //! the parity bound (W1, docs/theory/parity-bound.md; `parity.rs`) are computed at the root; the
@@ -52,7 +52,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use taxman_prover::game::{relation, Board, Prover, Role, Verdict};
-use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
+use taxman_prover::jsonl::{campaign, committed_chain, parse_items, recorded_games_to, Obj};
 use taxman_prover::parity::{Meet, Outcome, Parity};
 use taxman_prover::primes::smallest_prime_factors;
 use taxman_prover::upper::{low_roles, obeys, recorded_ustar, upper_fixed_roles, watched};
@@ -152,8 +152,7 @@ fn main() {
     let (mut all, mut parity, mut segments, mut lagrangian) = (false, true, false, None);
     // The roles of F4 (docs/theory/frame-model.md) are the default; --fix-low 0 starts from the plain root.
     let (mut fix_low, mut fix_upper) = (true, false);
-    let mut optimal = root.join("../../results/optimal.json");
-    let mut results = root.join("../../results/strict.jsonl");
+    let mut files = vec![committed_chain()];
     let mut checkpoints = root.join("work/checkpoints");
     let mut out = PathBuf::new();
     for (flag, value) in flags {
@@ -168,8 +167,8 @@ fn main() {
             "--fix-low" => fix_low = value == "1" || value == "true",
             "--fix-upper" => fix_upper = value == "1" || value == "true",
             "--checkpoints" => checkpoints = value.into(),
-            "--optimal" => optimal = value.into(),
-            "--results" => results = value.into(),
+            "--optimal" => files[0] = value.into(),
+            "--results" => files.push(value.into()),
             "--out" => out = value.into(),
             _ => panic!("unknown flag {flag}"),
         }
@@ -186,7 +185,7 @@ fn main() {
     };
     // The Lagrangian bound cut nothing beside the parity bound at 990 (the same 44,411 nodes, 7% more time).
     let lagrangian = lagrangian.unwrap_or(!parity);
-    let known = recorded_games(&[&optimal, &results]);
+    let known = recorded_games_to(&files, items.iter().copied().max().unwrap_or(0));
     let items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && known.contains_key(n)).collect();
     let spf = smallest_prime_factors(items.iter().copied().max().unwrap_or(2) as usize);
     let pause_at = Instant::now() + Duration::from_secs_f64(seconds.min(1e9));

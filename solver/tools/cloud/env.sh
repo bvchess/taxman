@@ -33,7 +33,7 @@ EXACT_BIN="${EXACT_BIN:-$PROVER/target/release/exact}"
 CLOUD_DIR="$_cloud_dir"
 
 # The results file committed with the code, which a production run must agree with where they overlap.
-COMMITTED_RESULTS=("$TAXMAN_ROOT/results/strict.jsonl")
+COMMITTED_RESULTS=("$TAXMAN_ROOT/results/optimal.jsonl.gz")
 
 : "${RUSTFLAGS=-C target-cpu=native}"
 export RUSTFLAGS

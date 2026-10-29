@@ -1251,7 +1251,7 @@ impl Searched {
 /// The search of Π⁺(`open`) of the board `1..=n`, in the formulation `claims` says, against the whole-board oracle: for
 /// each of `tactics` (all of which must take the problem), the search on one thread, with no seed and no ceiling,
 /// completes with a promotion sum s such that `in_the_bag` + s is the heaviest weight of F ∪ X over the sets X of
-/// family A (F ∪ X playable), and is `optimal.json`'s score; the set it returns is a promotion set by the reference
+/// family A (F ∪ X playable), and is the table's score; the set it returns is a promotion set by the reference
 /// predicate, and F together with it is playable.  The sets of family A are enumerated once for all the tactics.
 fn check_the_search(n: u32, open: &[u32], claims: bool, tactics: &[SearchTactics]) -> Searched {
     let board = Board::<8>::for_n(n);

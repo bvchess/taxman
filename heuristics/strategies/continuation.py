@@ -10,7 +10,7 @@ game's lower picks, and a shallow flip/bundle search closes the rest.
 
 This module turns that measurement into a *sequential self-fed solver*.
 Games are solved in order; each game is warm-started from the previous
-game's OWN produced solution (not from optimal.json).  optimal.json, when
+game's OWN produced solution (not from results/optimal.jsonl.gz).  That file, when
 present, is used only to score the result -- never to guide the search.
 Feeding the solver its own output is the drift experiment: does the chain
 stay pinned to the optimum, or does small per-game error accumulate?
@@ -46,7 +46,7 @@ without re-solving game n from scratch:
   * "prime" -- the "prime sacrifice" identity from the wiki page "Reusing a
     previous solution" (https://github.com/bvchess/taxman/wiki/Reusing-a-
     previous-solution, sections "If N is prime" and "Generalizing"),
-    validated 167/167 against optimal.json: for prime N,
+    validated 167/167 against the optimal games: for prime N,
     opt(N) = N + opt(N-1) - p_hat, where p_hat is the largest prime < N.
     Sketch: 1 divides every number, so it is consumed by any game's first
     move; a prime's only proper divisor is 1, so any solution containing a
@@ -69,7 +69,7 @@ without re-solving game n from scratch:
     a lower pick in addition to the upper-half delta. Validated (scratchpad
     eviction_cert_check.py) as zero-harmful over all 998 cold-chain
     transitions at n<=1000 (gap never increases when it fires), and the
-    underlying identity holds on 70.4% of ground-truth optimal.json
+    underlying identity holds on 70.4% of ground-truth optimal-game
     transitions -- strong empirical support, but unlike "exact" and
     "prime" it has no correctness proof, so it is kept as a separate,
     lower-confidence label.
@@ -120,7 +120,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from core import check_sequence, maximal_factor_lists, smallest_prime_factors, solve_upper_half
-from evaluation.verify import DEFAULT_OPTIMAL
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 from strategies.seteval import SetEval
 from strategies.solvent import solvent
 
@@ -431,7 +431,7 @@ def solve_game(
     # are proven identities; "upper-delta" (see module docstring) is
     # CONJECTURE-GRADE, validated zero-harmful over all cold-chain
     # transitions at n<=1000 and holding on 70.4% of ground-truth
-    # optimal.json transitions, but with no correctness proof.
+    # optimal-game transitions, but with no correctness proof.
     certificate: Optional[str] = None
     if prev_score is not None and our_score == n + prev_score:
         certificate = "exact"
@@ -528,7 +528,7 @@ def run(
         if seed_from_optimal:
             if (from_n - 1) not in optimal:
                 raise SystemExit(
-                    f"--seed-from-optimal needs optimal.json to cover n={from_n - 1}"
+                    f"--seed-from-optimal needs results/optimal.jsonl.gz to cover n={from_n - 1}"
                 )
             prev_set = set(optimal[from_n - 1]["moves"])
             prev_score = optimal[from_n - 1]["score"]
@@ -568,7 +568,7 @@ def print_summary(
     total = len(records)
     print("=" * 64)
     print(f"CONTINUATION SOLVER: {total} games "
-          f"(seed = {'optimal.json' if seeded else 'cold/empty'}, "
+          f"(seed = {'optimal.jsonl.gz' if seeded else 'cold/empty'}, "
           f"reanchor-solvent = {'on' if reanchor else 'off'})")
     print("=" * 64)
     if total == 0:
@@ -576,7 +576,7 @@ def print_summary(
 
     scored = [r for r in records if "gap" in r]
 
-    # Exact-match rate + gap distribution vs optimal.json.
+    # Exact-match rate + gap distribution vs the optimal games.
     if scored:
         exact = sum(1 for r in scored if r["gap"] == 0)
         gaps = [r["gap"] for r in scored]
@@ -603,7 +603,7 @@ def print_summary(
             print(f"  {lo:4d}-{lo + 99:<4d}: mean={sum(gs) / len(gs):7.2f}  "
                   f"max={max(gs):5d}  exact={exact_b}/{len(gs)}")
     else:
-        print("\n(no optimal.json coverage in this range; gaps unavailable)")
+        print("\n(no results/optimal.jsonl.gz coverage in this range; gaps unavailable)")
 
     # Certificate rate, broken down by certificate kind.
     cert = sum(1 for r in records if r["certified"])
@@ -643,7 +643,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--from", dest="from_n", type=int, default=500)
     parser.add_argument("--to", dest="to_n", type=int, default=1000)
     parser.add_argument("--seed-from-optimal", action="store_true",
-                        help="start the chain from optimal.json's (from-1) "
+                        help="start the chain from results/optimal.jsonl.gz's (from-1) "
                              "solution (the standard experiment)")
     parser.add_argument("--bundle-limit", type=int, default=2000,
                         help="max tier-2 bundle evaluations per game")
@@ -660,7 +660,7 @@ def main(argv: List[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     sys.setrecursionlimit(100_000)
-    optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+    optimal = load_optimal(args.optimal, args.to_n)
     spf = smallest_prime_factors(args.to_n)
     mf = maximal_factor_lists(args.to_n)
 

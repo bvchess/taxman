@@ -20,7 +20,7 @@ pub fn chain(path: &Path) -> Result<Optimal, String> {
 }
 
 /// The lines of a store checked one by one against the lines before them, and the chain's proven games
-/// (`strict`, results/strict.jsonl: a line may cite a board of the committed chain, whose score is exact).
+/// (`strict`, results/optimal.jsonl.gz: a line may cite a board of the committed chain, whose score is exact).
 pub struct Chain<'a> {
     strict: &'a Optimal,
     /// For each board, its lower bounds so far, ascending (each improves on the one before).

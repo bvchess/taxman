@@ -402,7 +402,7 @@ mod tests {
         Board::new(Tables::new(n))
     }
 
-    /// The best promotion sum of game `n`, from `optimal.json`.
+    /// The best promotion sum of game `n`, from the table.
     fn known(board: &Board<W>) -> u64 {
         Optimal::built_in().score(board.n()).expect("a known game") - board.in_the_bag
     }

@@ -59,7 +59,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from core import order_for_real_game, smallest_prime_factors
-from evaluation.bound import DEFAULT_OPTIMAL
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 
 
 def born_free_matching(n: int, p_max: Optional[int] = None) -> Dict[int, int]:
@@ -121,7 +121,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     optimal: Dict[int, dict] = {}
     if args.optimal.exists():
-        optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+        optimal = load_optimal(args.optimal, max(ns))
     else:
         print(f"(no optimal solutions found at {args.optimal}, skipping comparison)")
 

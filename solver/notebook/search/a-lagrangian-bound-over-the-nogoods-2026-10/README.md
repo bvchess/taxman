@@ -130,7 +130,7 @@ cd3d32f:rust/results/strict.jsonl`), which "the committed `strict.jsonl`" and "t
 mean.  The figures of [the same-search round](../same-search-2026-10/README.md), which come from `repeats --known`, need
 that file: on the new one the repeats cost 0.0 s, since it did not search them.  The new file has the old one's scores,
 and its moves too but for 1221..1224, which have at least two optimal sets, and the two runs found different ones
-([results](../../../../results/README.md#strictjsonl)).
+([results](../../../../results/README.md#optimaljsonlgz)).
 
 **What would change it, and what is left:**
 

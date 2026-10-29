@@ -127,7 +127,7 @@
 //! * By exhaustive search, no frame model, `n = 2..66`: the theorem holds for every `n` and `f`.  The bound is
 //!   tight on 61 of the 65 games (58 with the rules' `opt(B_f)`), and on 20 of the 24 that are neither prime nor
 //!   exact (`opt(n) ≠ n + opt(n − 1)`); the misses, 21, 39, 51 and 57, are all `3p`.
-//! * By the frame model, `n = 2..800`: never below `optimal.json`; tight on 638 of 799 games, 229 of the 390 that
+//! * By the frame model, `n = 2..800`: never below the table of optimal games; tight on 638 of 799 games, 229 of the 390 that
 //!   are neither prime nor exact, and only 57 of the 152 of those that `reuse_prev` derived.  The misses are
 //!   mostly semiprimes `pq` (96 of 161), whose two ban costs are often equal; 146 of the 152 `reuse_prev` games
 //!   were semiprimes.

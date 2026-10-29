@@ -118,8 +118,10 @@ What the data shows, observed and not proven:
 * **The canonical set survives every step to a game at its ceiling or to a prime** observed from a game with several
   sets: 13 of 13 such steps.  The canonical set is the largest in decreasing lexicographic order, and canonical(n) =
   canonical(n − 1) + n at a ceiling, or − p + n at a prime.  The prime part is a theorem, since the bijection preserves
-  the lexicographic order.  The table optimal.json records the canonical set in 23 of the 30 games with several sets;
-  not at 684 and 685, where it records the third of three, or at 775–779, the second of two.
+  the lexicographic order.  The committed chain records the canonical set in 18 of the 30 games with several sets, not
+  at 539 and 684–685, where it records the third of three, or at 770–773 and 775–779, the second of two
+  (`tools/summarize.py optsets` lists them).  The table of optimal games that it replaced, optimal.json, recorded the
+  canonical set at 539 and 770–773 too, so in 23 of the 30.
 * **The recorded game of n − 1 is not always extendable.**  At 686, a game at its ceiling, the recorded optimal game of
   685 plus 686 is unplayable.  The equality opt(686) = 686 + opt(685) holds through another optimal set of 685, the
   canonical one.

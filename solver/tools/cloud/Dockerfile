@@ -17,9 +17,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 procps time tmux \
     && rm -rf /var/lib/apt/lists/*
 
-# The solver finds optimal.json at run time (src/paths.rs): results/optimal.json above the working
-# directory, or above the binary.  The copies below put the files where they are in a checkout, so the image needs no
-# flag.
+# The solver finds the committed results at run time (src/paths.rs): results/optimal.jsonl.gz above the working
+# directory, or above the binary.  The copies below put the files where they are in a checkout (solver/ includes
+# solver/gzip, which both crates build against), so the image needs no flag.
 WORKDIR /taxman
 COPY solver/ solver/
 COPY results/ results/

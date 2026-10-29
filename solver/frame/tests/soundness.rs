@@ -4,7 +4,7 @@
 //! completion (`truth − k`) and an empty payload.  If any pruning step loses every best completion, the fake one
 //! survives, and its payload does not match its value.  This tests every pruning at once, including all the `<`
 //! and `<=` boundaries: from `truth − 1`, every node whose bound is exactly `truth` must be explored.  `truth` is
-//! `optimal.json`'s promotion sum at the root of a real game, and an exhaustive search for perturbed games and
+//! the table's promotion sum at the root of a real game, and an exhaustive search for perturbed games and
 //! units deep in the tree.
 //!
 //! The last section runs the same tests on the extended problem Π⁺(O) (a problem with one-sided candidates, searched
@@ -129,16 +129,16 @@ fn configs() -> Vec<Config> {
     ]
 }
 
-/// `optimal.json`'s best promotion sum of game `n`: its score less what the game with no promotions scores.
+/// The table's best promotion sum of game `n`: its score less what the game with no promotions scores.
 fn optimal_sum<const W: usize>(optimal: &Optimal, n: u32) -> Option<u64> {
     let in_the_bag = Board::<W>::for_n(n).in_the_bag;
     optimal.score(n).map(|score| score - in_the_bag)
 }
 
 /// Game `n` at width `W` ([`Game::of_board`]) with the near-repeat cut (tactic `near_repeat`,
-/// [`Game::with_near_repeat`]) by the latest of the four games before it whose best promotion sum (`optimal.json`'s,
+/// [`Game::with_near_repeat`]) by the latest of the four games before it whose best promotion sum (the table's,
 /// the cut's bound) is at most `reach`, else by the latest of them; without it where none of them has candidates and a
-/// game in `optimal.json`.  A search cuts by it where its configuration has the tactic and its incumbent reaches the
+/// game in the table.  A search cuts by it where its configuration has the tactic and its incumbent reaches the
 /// bound, so a search from an incumbent of `reach` cuts by the game chosen, if any.  The solver cuts by the game of
 /// n − 1 alone, but the lemma holds for any game proven before, and a search from an incumbent below its own optimum
 /// reaches few bounds of n − 1.
@@ -151,7 +151,7 @@ fn game_after<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<G
 }
 
 /// The game before `n` whose cut [`game_after`] gives game `n` for an incumbent of `reach`, and its bound, the best
-/// promotion sum of `optimal.json`'s game.
+/// promotion sum of the table's game.
 fn game_before<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<(Game<W>, u64)> {
     let before = |m: u32| Some((Game::<W>::of_board(m)?, optimal_sum::<W>(optimal, m)?));
     let mut earlier: Vec<_> = (n.saturating_sub(4).max(1)..n).rev().filter_map(before).collect();
@@ -162,7 +162,7 @@ fn game_before<const W: usize>(optimal: &Optimal, n: u32, reach: u64) -> Option<
 // ---------------------------------------------------------------------------------------------------------
 // Real games
 
-/// Every game of `ns` that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
+/// Every game of `ns` that has candidates, from an incumbent worth 1 or 5 less than the table's promotion sum,
 /// under each tactic (past the board 200 one in three), with the near-repeat cut by a game before ([`game_after`])
 /// whose bound both incumbents reach where there is one: the search must come back with exactly that sum, and with a
 /// set that is promotable.  More than `fewest` searches are made.  Returns the nodes the cut cut.
@@ -190,7 +190,7 @@ fn searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u32>, fewe
     cut
 }
 
-/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum.  Their
+/// The games 2..=90, under each tactic, from an incumbent worth 1 or 5 less than the table's promotion sum.  Their
 /// trees are too small for the near-repeat cut to act: [`the_near_repeat_cut_acts_and_changes_no_answer`] has games
 /// where it does.
 #[test]
@@ -198,7 +198,7 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum_of_the_small_games() 
     searches_from_a_handicapped_incumbent(2..=90, 300);
 }
 
-/// Every game 2..=300 that has candidates, from an incumbent worth 1 or 5 less than `optimal.json`'s promotion sum,
+/// Every game 2..=300 that has candidates, from an incumbent worth 1 or 5 less than the table's promotion sum,
 /// under each tactic: the search must come back with exactly that sum, and with a set that is promotable.  Unlike
 /// the golden tests, which start from the greedy set, this starts from a weak incumbent.
 #[test]
@@ -213,7 +213,7 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
 
 /// The near-repeat cut acts, and changes no answer: the games 232, 344 and 376, whose searches from an incumbent below
 /// their optimum it cuts (by the games 231, 343 and 375, [`game_after`]), under each tactic, from an incumbent worth 1
-/// or 5 less than `optimal.json`'s promotion sum, must come back with exactly that sum and a promotable set, and the
+/// or 5 less than the table's promotion sum, must come back with exactly that sum and a promotable set, and the
 /// cut changes some of the trees.
 #[test]
 fn the_near_repeat_cut_acts_and_changes_no_answer() {
@@ -244,7 +244,7 @@ fn the_near_repeat_cut_acts_and_changes_no_answer() {
 
 /// The carried nogoods act, and change no answer: the games 232, 344 and 376, under each configuration that has a store
 /// ([`Game::carried`](common::Game::carried)) and the same without it, from an incumbent worth 1 or 5 less than
-/// `optimal.json`'s promotion sum, must come back with exactly that sum and a promotable set; the stores rule candidates
+/// the table's promotion sum, must come back with exactly that sum and a promotable set; the stores rule candidates
 /// out and end nodes, and change some of the trees.
 #[test]
 fn the_carried_nogoods_act_and_change_no_answer() {
@@ -309,7 +309,7 @@ fn the_near_repeat_cut_cuts_nothing_while_the_incumbent_is_below_its_bound() {
 
 /// The look at the last child of the search's own conflict (tactic `conflict_look`) acts, and changes no answer: with
 /// conflict branching at every check, whatever its gap, it changes the tree of some of the games 301 to 500 (every
-/// tenth) from the tree without it, and each search comes back with exactly the sum of `optimal.json`, from an
+/// tenth) from the tree without it, and each search comes back with exactly the sum of the table, from an
 /// incumbent worth 1 less.
 #[test]
 fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
@@ -332,7 +332,7 @@ fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
 
 /// The gate, the gap from which conflict branching chooses (what the lab's `branching` and `policy` commands set), acts
 /// and changes no answer: with the gates 0, 100 and 4,000 (the most a command may set), each search of the games 301 to
-/// 500 (every tenth) comes back with exactly the sum of `optimal.json`, from an incumbent worth 1 less, and the gates
+/// 500 (every tenth) comes back with exactly the sum of the table, from an incumbent worth 1 less, and the gates
 /// change the tree of some of them.
 #[test]
 fn the_gate_changes_the_trees_of_the_small_games_and_not_their_answers() {
@@ -352,7 +352,7 @@ fn the_gate_changes_the_trees_of_the_small_games_and_not_their_answers() {
 }
 
 /// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent
-/// worth 1 or 5 less than `optimal.json`'s promotion sum, with the Lagrangian bound refitted early and often (with
+/// worth 1 or 5 less than the table's promotion sum, with the Lagrangian bound refitted early and often (with
 /// the nogoods forgotten at the same time, and on two threads): in the games above, few searches are long enough
 /// for its multipliers to have much to fit.
 #[test]
@@ -492,7 +492,7 @@ impl<'a, const W: usize> Searched<'a, W> {
 
 /// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
 /// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
-/// `optimal.json`'s promotion sum: the search must complete with exactly that sum and a promotable set (R2,
+/// the table's promotion sum: the search must complete with exactly that sum and a promotable set (R2,
 /// docs/theory/search-rules.md: the root's heaviest set keeps the inequalities, so a search from the root loses
 /// nothing).  For the boards to 40 opt(n) is also checked against the exhaustive search without the frame model.
 #[test]
@@ -788,7 +788,7 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
 #[test]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
     let n = 1133;
-    let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
+    let truth = stored_games()[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide-quick");
     let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0])
         + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
@@ -796,7 +796,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
     assert!(resumes > 2, "only {resumes} resumes");
 }
 
-/// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/strict.jsonl`) from an
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/optimal.jsonl.gz`) from an
 /// incumbent 400 below it, stopped every 60 nodes or so (the engine checks every 1,024 steps of a searcher): its
 /// tactics, forgetting the nogoods every two or three steps, and refitting the Lagrangian bound every four; with the
 /// GF(2) bound, whose search of 1133 is too short to stop, game 992 (some ten thousand nodes) at those widths.
@@ -807,7 +807,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
 )]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let n = 1133;
-    let truth = stored_games("strict.jsonl")[&n].0 - Board::<20>::for_n(n).in_the_bag;
+    let truth = stored_games()[&n].0 - Board::<20>::for_n(n).in_the_bag;
     let dir = TempDir::new("churn-wide");
     let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14])
         + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
@@ -1116,7 +1116,7 @@ fn extended_configs() -> Vec<Config> {
     ]
 }
 
-/// `optimal.json`'s best promotion sum of the extended problem `ext` of game `n`, whatever sources are open: its score
+/// The table's best promotion sum of the extended problem `ext` of game `n`, whatever sources are open: its score
 /// less what the sources fixed in `ext` make (U holds up to 1300: some optimal game plays all of U\*, so the heaviest
 /// promotion set of Π⁺(O) plays the open sources too).
 fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFrames<W>) -> u64 {
@@ -1124,7 +1124,7 @@ fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFra
 }
 
 /// Every board 2..=300 searched as the extended problem Π⁺(O) from the root, from an incumbent worth 1 or 5 less than
-/// `optimal.json`'s promotion sum of it and an empty payload, under each configuration of extended mode: the search
+/// The table's promotion sum of it and an empty payload, under each configuration of extended mode: the search
 /// must complete with exactly that sum and a set that is promotable.  The sets O are the empty set, all of U\*_{≥3}
 /// (the boards to 120, where the problem has dozens of one-sided candidates) and three random non-empty subsets of it.
 /// Past the board 200 one configuration in three runs, as in the game tests above.  Unlike them it searches games whose
@@ -1199,7 +1199,7 @@ fn extended_searches_from_a_handicapped_incumbent(ns: std::ops::RangeInclusive<u
 
 /// The harness's own exhaustive oracle on the extended problem: [`Game::exhaustive`] on the game of Π⁺(O), whose counts
 /// of promotions and narrowing of candidates come from the model that knows the one-sided candidates, finds
-/// `optimal.json`'s promotion sum and a set that is real, on the boards to 60 for O empty, all of U\*_{≥3} and two
+/// The table's promotion sum and a set that is real, on the boards to 60 for O empty, all of U\*_{≥3} and two
 /// random subsets of it.  (The perturbed games above are held to this oracle, so it must be right where the search is
 /// run.)
 #[test]
@@ -1247,7 +1247,7 @@ const QUICK_RESUME: (u32, u64) = (800, 0x5EED_0E27_E4DE_D001);
 
 /// The extended problem of game `EXTENDED_RESUME.0`, with a random 20 of its U\*_{≥3} open, searched on one thread in
 /// pieces of 1,000 nodes, each resumed from the checkpoint the one before it left, ends with the sum of an
-/// uninterrupted search, which is `optimal.json`'s.  The sets are the search's own (`Board::prepare_extended_with`,
+/// uninterrupted search, which is the table's.  The sets are the search's own (`Board::prepare_extended_with`,
 /// `Board::prepare_extended_for_resume`, `search::search`), so the checkpoints are the ones the real search writes:
 /// their header records the one-sided candidates, and the resume checks them.  The engine checks a node limit every
 /// 1,024 steps of a searcher, so a piece is at least that long.

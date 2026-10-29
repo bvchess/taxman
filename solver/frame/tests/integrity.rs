@@ -1,5 +1,5 @@
 //! The integrity of results: what the solver checks before it builds on a previous game, the tripwires that catch one
-//! that is not optimal, how an assumption travels down a chain from `optimal.json`, what a results file must pass when
+//! that is not optimal, how an assumption travels down a chain from the table, what a results file must pass when
 //! it is opened, what survives a failure after a search, and the provenance every line carries.  Small boards, one or
 //! two threads.
 
@@ -44,7 +44,7 @@ fn prev(moves: Vec<u32>, score: u64) -> Prev {
 }
 
 /// A game of 80 that is legal, over and opens with 79, as an optimal game does, but scores less than
-/// opt(n): optimal.json's game cut short and finished by always playing the smallest legal move.
+/// opt(n): the table's game cut short and finished by always playing the smallest legal move.
 fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
     let optimal = Optimal::built_in();
     let best = optimal.moves(80).unwrap();
@@ -69,7 +69,7 @@ fn finished_but_worse_game_of_80() -> (Vec<u32>, u64) {
 fn a_previous_game_that_cannot_be_optimal_is_refused() {
     let opts = options(1);
     let optimal = Optimal::built_in();
-    // Not over: optimal.json's game of 80 without its last move.
+    // Not over: the table's game of 80 without its last move.
     let mut moves = optimal.moves(80).unwrap().to_vec();
     moves.pop();
     let score = replay(80, &moves).unwrap();
@@ -129,11 +129,11 @@ fn a_ceiling_tripped_in_a_range_is_recorded_as_rejected() {
 // ---------------------------------------------------------------------------------------------------------
 // Assumptions
 
-/// A run told to (`use_prev`) builds on a game of optimal.json, which it assumes optimal, and each result records
+/// A run told to (`use_prev`) builds on a game of the table, which it assumes optimal, and each result records
 /// that assumption exactly where its proof rests on it: a proof by `cap` or the prime formula on the game before, a
 /// repeat on the game it repeats, and an exhausted search on no game.
 #[test]
-fn the_results_built_on_a_game_of_optimal_json_assume_it_as_far_as_their_proofs_rest_on_it() {
+fn the_results_built_on_a_game_of_the_table_assume_it_as_far_as_their_proofs_rest_on_it() {
     let dir = TempDir::new("assumes");
     let results = dir.join("r.jsonl");
     // 33 reaches its ceiling and 34 repeats it, 35 is an exhausted search; 37 is a prime built on 36, an exhausted
@@ -142,9 +142,9 @@ fn the_results_built_on_a_game_of_optimal_json_assume_it_as_far_as_their_proofs_
     let games = solver::solve_range(33, 50, &opts, Some(&results)).unwrap();
     let first = &games[0];
     assert_eq!(first.prev.as_ref().map(|p| (p.n, p.source, p.proof)), Some((32, PrevSource::Optimal, None)));
-    let optimal_json = Assumptions::from([assumed_optimal(32)]);
+    let table_assumed = Assumptions::from([assumed_optimal(32)]);
     let mut assumed: BTreeMap<u32, Assumptions> = BTreeMap::new();
-    assumed.insert(32, optimal_json.clone());
+    assumed.insert(32, table_assumed.clone());
     for game in &games {
         let proof = game.proof.unwrap();
         let rests_on = match &game.same_search {
@@ -155,14 +155,14 @@ fn the_results_built_on_a_game_of_optimal_json_assume_it_as_far_as_their_proofs_
         assert_eq!(game.assumes, expected, "n={} ({})", game.n, proof.as_str());
         assumed.insert(game.n, game.assumes.clone());
     }
-    assert_eq!((first.proof, &first.assumes), (Some(Proof::Cap), &optimal_json));
-    assert_eq!((games[1].proof, &games[1].assumes), (Some(Proof::SameSearch), &optimal_json));
+    assert_eq!((first.proof, &first.assumes), (Some(Proof::Cap), &table_assumed));
+    assert_eq!((games[1].proof, &games[1].assumes), (Some(Proof::SameSearch), &table_assumed));
     assert_eq!((games[2].proof, games[2].assumes.is_empty()), (Some(Proof::Exhausted), true));
     assert_eq!((games[4].proof, games[4].assumes.is_empty()), (Some(Proof::PrimeFormula), true));
     // The file reads back with the same assumptions, and the lines carry them.
     let reread = ResultsFile::open(&results, Optimal::built_in(), 1).unwrap();
     assert!(games.iter().all(|g| reread.completed(g.n).unwrap().assumes == g.assumes));
-    assert_eq!(assumptions_of_line(&completed_line(&results, 34)), optimal_json);
+    assert_eq!(assumptions_of_line(&completed_line(&results, 34)), table_assumed);
     assert!(assumptions_of_line(&completed_line(&results, 35)).is_empty());
 }
 
@@ -287,7 +287,7 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
         (found.get("score").and_then(Json::as_u64), found.get("completed")),
         (Some(truth), Some(&Json::Bool(true)))
     );
-    assert!(found.get("rejected").and_then(Json::as_str).unwrap().contains("optimal.json says"));
+    assert!(found.get("rejected").and_then(Json::as_str).unwrap().contains("the table says"));
     assert!(!found.get("promotions").and_then(Json::as_arr).unwrap().is_empty());
     assert_eq!(lines(&results).len(), 1, "only the incomplete line is a result");
 

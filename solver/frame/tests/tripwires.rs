@@ -450,7 +450,7 @@ const NEAR_REPEATS: [(u32, u64, u64); 3] = [(768, 62, 85), (1083, 18, 70), (1101
 
 #[test]
 fn the_trees_that_the_near_repeat_cut_shortens_have_not_changed() {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let mut observed = Vec::new();
     for (n, ..) in NEAR_REPEATS {
         let prev = prev_of(&games, n);

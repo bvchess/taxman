@@ -6,9 +6,9 @@ Moving from one board to the next often leaves the search untouched.  The new nu
 setup settles.  The frames that the search sees, and their candidates, stay as they were.  The game then poses exactly
 the same search problem as an earlier one, so it has the same best promotions.  The tactic `same_search` (proven, on by
 default) recognizes this and reuses the earlier game's promotions instead of searching again.  About half of the
-committed chain's games that need a search are such repeats ([results/README.md](../../../results/README.md#strictjsonl)
-has the counts).  Skipping their searches saves a large share of a chain's search time; [the
-entry](../../notebook/search/same-search-2026-10/README.md) has the measurements.
+committed chain's games that need a search are such repeats
+([results/README.md](../../../results/README.md#optimaljsonlgz) has the counts).  Skipping their searches saves a large
+share of a chain's search time; [the entry](../../notebook/search/same-search-2026-10/README.md) has the measurements.
 
 *The search problem.*  A game's *search problem* Π is what setup gives the search, less what only changes how the search
 runs.  It has four parts:
@@ -62,7 +62,7 @@ unfinished search settles nothing.
 *The repeat.*  Suppose game n poses Π_n = Π_m, and m's proof settles it.  Then P\*(Π_n) = P\*(Π_m) = P, the sum of m's
 promotions S, and S is promotable in Π_n.  The game of n is S played on the board of n (`solution_for_promotions`).  It
 goes through `conclude` like any game.  It must replay legally, be over, and open with the largest prime.  It must score
-in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match optimal.json where the table has
+in_the_bag(n) + P, stay within `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`, and match the built-in table where it has
 n.
 
 The game is optimal on the premise of an exhausted proof of n: that the best game of n scores in_the_bag(n) + P\*(Π_n),

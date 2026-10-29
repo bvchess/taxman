@@ -99,8 +99,8 @@ Say what the reader needs in plain words, and no more:
   goes.
 
 Not "This project finds optimal games of Taxman, a number game, and proves that they are optimal" but "This project
-finds optimal games of Taxman, a number game."  Not "The committed chain, `results/strict.jsonl`, holds an optimal game
-for every n" but "The file `results/strict.jsonl` holds a chain of optimal games for every n."
+finds optimal games of Taxman, a number game."  Not "The committed chain, `results/optimal.jsonl.gz`, holds an optimal
+game for every n" but "The file `results/optimal.jsonl.gz` holds a chain of optimal games for every n."
 
 ## 10. Spell the American way
 

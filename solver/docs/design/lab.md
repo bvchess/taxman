@@ -71,7 +71,7 @@ builds never run in the chain, and the build resumes a checkpoint only if it set
 
 **The solver is the only writer of results.**  The lab writes only to the folder's `in/`.  The driver concludes every
 game as it does without a lab: the referee replays it, `conclude` checks its arithmetic, its ceilings and
-`optimal.json`, and only then is its line appended.  What the lab did to a game is kept in `nNNNN.lab` beside its
+the built-in table, and only then is its line appended.  What the lab did to a game is kept in `nNNNN.lab` beside its
 checkpoint, and what it gave for the games to come in `run.lab` beside them.  Both set nothing but the game's search
 tactics, any of which is sound, and the record its line carries.
 

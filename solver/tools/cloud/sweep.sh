@@ -29,11 +29,11 @@
 #
 # Output.  The merged file $RESULTS (default $TAXMAN_WORK/results/explore.jsonl) holds every line of every block and
 # pass, deduplicated; it is rebuilt from the block files, which only grow, every MERGE_EVERY seconds and when the script
-# ends, and the merge is idempotent.  It is NOT a chain and never goes into results/strict.jsonl: it has holes (games
-# that only an unfinished search is recorded for, or that no block reached), and the proofs in it rest only on the games
-# it holds.  Both referees (verify.sh) accept it: each line is checked against what it rests on in the same file.  The
-# line of a game says what it had from the game before it in its `prev` (null: nothing; no proof: the best game of an
-# unfinished search, as a seed; a proof: a proven game) and the pass that made it in `options.pass`
+# ends, and the merge is idempotent.  It is NOT a chain and never goes into results/optimal.jsonl.gz: it has holes
+# (games that only an unfinished search is recorded for, or that no block reached), and the proofs in it rest only on
+# the games it holds.  Both referees (verify.sh) accept it: each line is checked against what it rests on in the same
+# file.  The line of a game says what it had from the game before it in its `prev` (null: nothing; no proof: the best
+# game of an unfinished search, as a seed; a proof: a proven game) and the pass that made it in `options.pass`
 # (solver/docs/REFERENCE.md, "What a game had from n - 1").
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: each block resumes its file
@@ -55,7 +55,7 @@
 # Environment (all optional):
 #   BLOCKS         blocks, one thread each, default every CPU
 #   GAME_SECONDS   the limit of one game's search, default 180
-#   KNOWN          the results file the first block chains from, default the committed results/strict.jsonl
+#   KNOWN          the results file the first block chains from, default the committed results/optimal.jsonl.gz
 #   RESULTS        the merged file, default $TAXMAN_WORK/results/explore.jsonl; the block files are in
 #                  RESULTS-minus-.jsonl-blocks/ beside it, which save.sh copies with it
 #   MAX_PASSES     the most passes after the first in one run, default 20
@@ -151,15 +151,17 @@ done <"$PLAN"
 seed_first_block() {
     local file="${B_file[0]}" before=$((first - 1))
     [ "$first" -ge 2 ] && [ ! -s "$file" ] || return 0
+    # (KNOWN is a gzip file, as the committed one is, or (-f) a plain one.  grep -c, not -q: -q ends the pipe early,
+    # and pipefail fails the pipe.)
     if [ ! -r "$KNOWN" ] ||
-        ! grep -E -q "^\{\"schema\":5,\"n\":$before,\"score\":[0-9]" "$KNOWN"; then
+        [ "$(gzip -dcf "$KNOWN" | grep -E -c "^\{\"schema\":5,\"n\":$before,\"score\":[0-9]")" -eq 0 ]; then
         log "KNOWN ($KNOWN) has no proven game of $before: the first block starts standalone"
         return 0
     fi
     # (The n starts at the 17th character, after {"schema":5,"n": , and ends before the comma that RLENGTH counts.)
-    awk -v last="$before" 'match($0, /^\{"schema":5,"n":[0-9]+,/) {
+    gzip -dcf "$KNOWN" | awk -v last="$before" 'match($0, /^\{"schema":5,"n":[0-9]+,/) {
         if (substr($0, 17, RLENGTH - 17) + 0 <= last) print
-    }' "$KNOWN" >"$file.tmp" && mv "$file.tmp" "$file"
+    }' >"$file.tmp" && mv "$file.tmp" "$file"
     log "the first block chains from $KNOWN: its file starts as a copy of the games up to $before"
 }
 seed_first_block

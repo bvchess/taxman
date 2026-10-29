@@ -56,7 +56,7 @@ COUNTEREXAMPLE, and 4 for UNFINISHED: a game has no verdict yet.
   the same search, and the lines of one list should come from one build, so a list never changes build; a list that is
   to run on another build starts with its checkpoint directory deleted.  The build is `setup.sh` with the tests skipped
   (they run on the laptop), which builds the solver and the prover for the CPU of the machine and runs its smoke checks.
-* **Inputs,** all committed: `results/strict.jsonl` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
+* **Inputs,** all committed: `results/optimal.jsonl.gz` (the recorded games), `solver/noframe/data/upper_*.jsonl` (the
   prover's barred bounds), `solver/tools/certify/plan.jsonl` and [`plan.md`](../../tools/certify/plan.md), and the lists
   in `solver/tools/certify/lists/`.  `certify.sh` takes them from the checkout.
 
@@ -157,7 +157,7 @@ as the last save (about 10 minutes), hold the same files under `$D/logs/` and th
 aws s3 sync $D certify-run
 cp certify-run/results/certificates_LIST.jsonl results/certificates_A_B.jsonl
 nice -n 10 solver/frame/target/release/taxman verify-certificates results/certificates_A_B.jsonl \
-    --results results/strict.jsonl --upper solver/noframe/data/upper_FILE.jsonl ... --threads 4
+    --results results/optimal.jsonl.gz --upper solver/noframe/data/upper_FILE.jsonl ... --threads 4
 python3 solver/tools/certify_pilot.py results/certificates_A_B.jsonl --bands > certify-run/overhead.txt
 ```
 

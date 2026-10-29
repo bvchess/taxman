@@ -19,7 +19,7 @@ all-divisors matching bound (see `certify.py`): at n=1000 the gap
 to the true optimum is 1168 points here, versus 3038 for the
 all-divisors version.
 
-Measured against the known optimal solutions in optimal.json, the
+Measured against the known optimal solutions in results/optimal.jsonl.gz, the
 bound is tight - equal to the true optimum - in 45 games, all with
 N <= 122 (the last tight game is N=122).  Over N=500..1000 the optimum
 averages 99.71% of the bound and never falls below 99.57%.
@@ -56,13 +56,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from core import maximal_factors, smallest_prime_factors
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 
 try:
     import networkx as nx
 except ImportError:
     nx = None
-
-DEFAULT_OPTIMAL = Path(__file__).resolve().parent.parent.parent / "results/optimal.json"
 
 
 def fm_bound(n: int, spf: Optional[Sequence[int]] = None) -> int:
@@ -101,7 +100,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     optimal: Dict[int, dict] = {}
     if args.optimal.exists():
-        optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+        optimal = load_optimal(args.optimal, max(ns))
     else:
         print(f"(no optimal solutions found at {args.optimal}, skipping comparison)")
 

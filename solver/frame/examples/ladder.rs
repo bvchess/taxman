@@ -11,9 +11,9 @@
 //! at the set width `with_width!` picks for n) with the default search tactics, seeded with
 //! the promotions of the known game for n − 1 that are still candidates (as the `seed_incumbent` tactic
 //! does; `--seed-opt`: with the game for n itself, so that the search only has to prove it) and capped at
-//! n + opt(n − 1) − in_the_bag (`prev_cap`).  The known games are optimal.json's, plus the completed games of a
+//! n + opt(n − 1) − in_the_bag (`prev_cap`).  The known games are the table's, plus the completed games of a
 //! results file given with `--known` (one JSON object per line, as `taxman solve --out` writes), which is how
-//! games past the end of optimal.json get their n − 1.  One line per game and thread count: whether the search
+//! games past the end of the table get their n − 1.  One line per game and thread count: whether the search
 //! completed, its time and nodes, the incumbent against the known optimum, when the final incumbent was found,
 //! and the engine's activity ([`Counters::summary`]: effective parallelism, idle and lock-wait time, splits,
 //! steals, time to full occupancy), then the CPU seconds and the cycles of the process over the search (they move less

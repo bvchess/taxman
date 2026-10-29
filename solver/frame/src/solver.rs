@@ -56,7 +56,7 @@
 //! the largest prime; that a game from the frame model scores `in_the_bag` plus its promotions; that no game
 //! scores more than `n + score(n − 1)` (nor its promotions exceed the ceiling), which would prove the previous game
 //! was not optimal, and that a completed game does not score less than the previous one; and, for a completed
-//! game, that its score is `optimal.json`'s when that has the game (the table built into the binary,
+//! game, that its score is the table's when that has the game (the table built into the binary,
 //! [`Optimal::built_in`]).  Each failure is a hard error, and a game that fails after it was found is recorded,
 //! with its promotions, in the results file's [`rejected_path`](crate::results::rejected_path).
 //!
@@ -64,7 +64,7 @@
 //!
 //! [`solve_range_each`] solves the games `lo..=hi` and concludes them in order.  The previous game of each is
 //! the one before it; for `lo` it is the results file's game of `lo − 1`, else, with [`SolveOptions::use_prev`],
-//! the game of the known sources ([`SolveOptions::known`]: `optimal.json`'s, assumed optimal, and the committed chain's
+//! the game of the known sources ([`SolveOptions::known`]: the table's, assumed optimal, and the committed chain's
 //! and the bounds store's if it names them; the results that rest on a known game record what it assumes), else there
 //! is none and the game is solved *standalone*, with no seed and no ceiling (and a note on stderr says so).  Every
 //! result is appended to
@@ -155,13 +155,13 @@ pub struct SolveOptions {
     /// `same_search`).
     pub force_search: bool,
     /// Draw on the known games ([`crate::known`]; `--use-prev`): take the game of `n − 1` of a range's first game from
-    /// them when neither the run nor the results file has it (`optimal.json`'s, assumed optimal, which the results whose
+    /// them when neither the run nor the results file has it (the table's, assumed optimal, which the results whose
     /// proofs rest on it record; the committed chain's, the bounds store's, with what they assume), and let the bounds
     /// store help the search of a board it has not proven (its lower bound's game seeds, its upper bound is a ceiling).
     /// Without it such a game is solved standalone.  [`known`](Self::known) says which files, and whether the boards they prove
     /// are recorded without a search.
     pub use_prev: bool,
-    /// The files [`use_prev`](Self::use_prev) draws on besides `optimal.json`, and whether it goes as far as the boards of
+    /// The files [`use_prev`](Self::use_prev) draws on besides the table, and whether it goes as far as the boards of
     /// the range (`solve --use-prev` does); none by default.
     pub known: KnownSources,
     /// A game whose search a time or node limit stops does not end the range (`--keep-going`): its best game so far
@@ -270,9 +270,9 @@ pub enum PrevSource {
     Run,
     /// Read from the results file.
     Results,
-    /// Read from `optimal.json`.
+    /// Read from the table.
     Optimal,
-    /// Read from the committed chain, `results/strict.jsonl` (`--use-prev`).
+    /// Read from the committed chain, `results/optimal.jsonl.gz` (`--use-prev`).
     Strict,
     /// A board the bounds store has proven (`--use-prev`).
     Bounds,
@@ -293,7 +293,7 @@ impl PrevSource {
         }
     }
 
-    /// Where it came from, for a message: "this run", "the results file", "optimal.json", ...
+    /// Where it came from, for a message: "this run", "the results file", "the built-in table", ...
     pub fn whence(self) -> &'static str {
         match self {
             PrevSource::Run => "this run",
@@ -311,7 +311,7 @@ pub struct Prev {
     pub moves: Vec<u32>,
     pub score: u64,
     pub source: PrevSource,
-    /// How its optimality is established; `None` if that is not known (`optimal.json` does not say), and for the best
+    /// How its optimality is established; `None` if that is not known (the table does not say), and for the best
     /// game of a search that a limit stopped ([`proven`](Self::proven) false).
     pub proof: Option<Proof>,
     /// What its proof assumes (see [`crate::results`]).
@@ -633,7 +633,7 @@ pub struct GameResult {
     /// The gate trial's gates (`--gate-trial`), and what the trial did in the last invocation, if it ran to its end.
     pub gate_trial_gates: Option<Vec<u64>>,
     pub gate_trial: Option<gate_trial::Report>,
-    /// `Some(true)` when `optimal.json` has the game, whose score the game's equals (else it is rejected); `None`
+    /// `Some(true)` when the table has the game, whose score the game's equals (else it is rejected); `None`
     /// if the game is incomplete or the table lacks `n`.
     pub optimal_match: Option<bool>,
     /// The game of `n − 1` this one was built from.
@@ -833,7 +833,7 @@ impl GameResult {
         Json::object(fields)
     }
 
-    /// One line for a person: n, score, method, nodes, time, the comparison with `optimal.json`, the proof,
+    /// One line for a person: n, score, method, nodes, time, the comparison with the table, the proof,
     /// and what it assumes, if anything; then the game's own search time and its best promotion sum (the score less
     /// `in_the_bag`, or `-` for a game that has no `in_the_bag`).
     pub fn summary_line(&self) -> String {
@@ -918,7 +918,7 @@ fn at(n: u32, failure: Failure) -> Failure {
 }
 
 /// Solves game `n`.  `prev` is the solution of `n − 1` if known.  The score is confirmed against
-/// `optimal.json` ([`Optimal::built_in`]).
+/// the table ([`Optimal::built_in`]).
 pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<GameResult, String> {
     solve_game_with(n, prev, opts, Optimal::built_in())
 }
@@ -947,7 +947,7 @@ pub fn solve_game_with(
 /// The game of `n − 1` as the setup of game `n` knows it.
 #[derive(Clone, Debug)]
 enum Before {
-    /// Not made by this run (the results file's, `optimal.json`'s or a caller's): known from the start, and checked
+    /// Not made by this run (the results file's, the table's or a caller's): known from the start, and checked
     /// by the setup.
     Given(Prev),
     /// This run's: known once it is concluded, and refereed by `conclude` before that.
@@ -1285,7 +1285,7 @@ impl<const W: usize> Job for SearchJob<W> {
 /// B, `prev`'s score less the `in_the_bag` of `n − 1`, bounds P\*(Π_M) where that score is opt(n − 1)
 /// (docs/theory/search-rules.md, the paragraph "What it rests on"): a proven game that assumes nothing is optimal
 /// within the frame model, so the cut adds nothing to what the search's answer rests on, and a result that the cut
-/// helped assumes what it assumed without it.  A game that assumes something (one of `optimal.json`, or one whose bound
+/// helped assumes what it assumed without it.  A game that assumes something (one of the table's games, or one whose bound
 /// rests on statement U) would make the answer rest on that, which a result line has no way to say, so it carries no
 /// cut.  Nor does a provisional game of `n − 1`, the best of an unfinished search, which bounds nothing: `window`'s
 /// driver gives a search the game of `n − 1` only once that game is concluded, with the search's go or, for a search
@@ -1566,7 +1566,7 @@ struct Context<'a> {
     since: Instant,
 }
 
-/// Checks the game (see the module documentation), compares it with `optimal.json`, and completes the result
+/// Checks the game (see the module documentation), compares it with the table, and completes the result
 /// with its proof and its assumptions.
 fn conclude(
     mut result: GameResult,
@@ -1638,7 +1638,7 @@ fn conclude(
     }
     if let Some(expected) = context.optimal.score(n) {
         if expected != score {
-            return reject(result, format!("scored {score} but optimal.json says {expected}"));
+            return reject(result, format!("scored {score} but the table says {expected}"));
         }
         result.optimal_match = Some(true);
     }
@@ -1716,8 +1716,8 @@ fn shared_spill_dir(opts: &SolveOptions) -> Option<PathBuf> {
 // Repeats of earlier searches
 
 /// How far back a game looks for an earlier game whose search problem it repeats (tactic `same_search`): the games
-/// `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: each of the 1974 games of
-/// the committed chain 1..5053 whose problem an earlier game posed repeats the last game before it that set a search
+/// `n − SAME_SEARCH_WINDOW` to `n − 1`.  A board's frames change a little with each number: a game of
+/// the committed chain whose problem an earlier game posed repeats the last game before it that set a search
 /// up, `n − 1`, or `n − 2` when `n − 1` is prime (solver/notebook/search/same-search-2026-10/README.md).  The window
 /// keeps the setups a range starts with to a few, and makes the game repeated a function of the window's games alone.
 pub const SAME_SEARCH_WINDOW: u32 = 8;
@@ -1932,7 +1932,7 @@ fn previous_game(
 /// Says on stderr that game `n` has no previous game, so that it is solved standalone: correct, but without the seed
 /// and the ceiling that the game of `n − 1` gives, so it costs more
 /// (`solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md` measures how much).  `in_table`:
-/// whether `optimal.json` has the game of `n − 1` (which `--use-prev` would take).
+/// whether the table has the game of `n − 1` (which `--use-prev` would take).
 fn note_standalone(n: u32, in_table: bool) {
     let before = n - 1;
     let how = if in_table {
@@ -1961,13 +1961,13 @@ pub fn solve_range(
 
 /// Solves the games `lo..=hi`, each from the solution of the one before, and concludes them in order (with
 /// up to [`SolveOptions::window`] games in flight, see `window`).  The solution of `lo − 1` comes from the results
-/// file, else, with [`SolveOptions::use_prev`], from the known sources ([`SolveOptions::known`]: `optimal.json` and, if
+/// file, else, with [`SolveOptions::use_prev`], from the known sources ([`SolveOptions::known`]: the table and, if
 /// it names them, the committed chain and the bounds store).  The results file is checked when it is opened
 /// ([`ResultsFile::open`]); games already completed in it are skipped (and a checkpoint left for one is deleted).
 /// Every other result is appended to the file (if there is one), then given to `on_game`, and only then is its
 /// checkpoint deleted.  A game that fails a check after it was found goes to the file's
 /// [`rejected_path`](crate::results::rejected_path) instead, and the run fails.  The range stops at a game whose
-/// search did not complete.  Scores are confirmed against `optimal.json` ([`Optimal::built_in`]).
+/// search did not complete.  Scores are confirmed against the table ([`Optimal::built_in`]).
 pub fn solve_range_each(
     lo: u32,
     hi: u32,
@@ -1978,7 +1978,7 @@ pub fn solve_range_each(
     solve_range_each_with(lo, hi, opts, results_path, Optimal::built_in(), on_game)
 }
 
-/// [`solve_range_each`] with the table `optimal` in place of `optimal.json`, for tests.
+/// [`solve_range_each`] with the table `optimal` in place of the built-in one, for tests.
 pub fn solve_range_each_with(
     lo: u32,
     hi: u32,
@@ -2087,12 +2087,12 @@ mod tests {
     }
 
     #[test]
-    fn the_previous_game_comes_from_optimal_json_only_when_asked() {
+    fn the_previous_game_comes_from_the_table_only_when_asked() {
         // By default a range that starts late has no previous game: its first game is solved standalone.
         let r = solve_range(50, 52, &one_thread(), None).unwrap();
         assert_eq!((r[0].prev_source(), r[1].prev_source()), (None, Some(PrevSource::Run)));
         assert!(r.iter().all(|g| g.assumes.is_empty()), "standalone, and chained from it, nothing is assumed");
-        // With `use_prev`, optimal.json's game of 49, assumed optimal as far as a proof rests on it.
+        // With `use_prev`, the table's game of 49, assumed optimal as far as a proof rests on it.
         let opts = SolveOptions { use_prev: true, ..one_thread() };
         let r = solve_range(50, 52, &opts, None).unwrap();
         assert_eq!((r[0].prev_source(), r[1].prev_source()), (Some(PrevSource::Optimal), Some(PrevSource::Run)));
@@ -2143,7 +2143,7 @@ mod tests {
     }
 
     /// Solves the games `lo..=hi` as a range does (its driver, [`window::solve`], on one thread, so one game after
-    /// the other), each from the one before (the first from `optimal.json`'s game before it), with the `Earlier`
+    /// the other), each from the one before (the first from the table's game before it), with the `Earlier`
     /// that the run keeps; returns it and the results.
     fn solved_with_earlier(lo: u32, hi: u32) -> (Earlier, Vec<GameResult>) {
         let (opts, optimal) = (one_thread(), Optimal::built_in());
@@ -2156,7 +2156,7 @@ mod tests {
         (earlier, results)
     }
 
-    /// The boards 300 and 301 pose one search problem (as the committed chain, `results/strict.jsonl`, has it): 301
+    /// The boards 300 and 301 pose one search problem (as the committed chain, `results/optimal.jsonl.gz`, has it): 301
     /// repeats 300's search.  The `Earlier` of a run finds that out from the problem that the run set 300 up with, as
     /// it does from the one set up again, and compares that problem, not another.
     #[test]

@@ -1892,12 +1892,12 @@ mod tests {
     /// (`tests/tripwires.rs`, `NEAR_REPEATS`).
     const NEAR: u32 = 1083;
 
-    /// Game `n` as the run concludes a search of it: `optimal.json`'s game, proven, and assuming nothing.
+    /// Game `n` as the run concludes a search of it: the table's game, proven, and assuming nothing.
     fn concluded(n: u32) -> Prev {
         let optimal = Optimal::built_in();
         Prev {
-            moves: optimal.moves(n).expect("a game of optimal.json").to_vec(),
-            score: optimal.score(n).expect("a game of optimal.json"),
+            moves: optimal.moves(n).expect("a game of the table").to_vec(),
+            score: optimal.score(n).expect("a game of the table"),
             source: super::super::PrevSource::Run,
             proof: Some(crate::results::Proof::Exhausted),
             assumes: Default::default(),
@@ -1942,7 +1942,7 @@ mod tests {
 
     /// A search that runs when the game before it is concluded is armed with the near-repeat cut by that game, then
     /// (step 5 of the module docs): game 1083, searched beside 1082, held before its first step until the conclusion of
-    /// 1082 has armed it, cuts, and comes back with `optimal.json`'s score, as it does without the tactic, which arms
+    /// 1082 has armed it, cuts, and comes back with the table's score, as it does without the tactic, which arms
     /// nothing, in more steps.  B is the score of 1082 less its `in_the_bag`, and the cut is armed once.
     #[test]
     fn a_running_search_is_armed_with_the_near_repeat_cut_when_the_game_before_it_is_concluded() {

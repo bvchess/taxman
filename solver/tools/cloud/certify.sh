@@ -45,7 +45,7 @@
 # Environment (all optional):
 #   THREADS              threads to share among the lists without :THREADS, default every CPU
 #   LISTS                where the lists are, default solver/tools/certify/lists/stage4
-#   CERT_RESULTS         the recorded games, default results/strict.jsonl
+#   CERT_RESULTS         the recorded games, default results/optimal.jsonl.gz
 #   CERT_UPPER           the prover's barred bounds, a list of files, default every solver/noframe/data/upper_*.jsonl
 #   OUT_DIR              the output files, default $TAXMAN_WORK/results (the directory that save.sh copies)
 #   CHECKPOINT_INTERVAL  seconds, default 300       PROGRESS  seconds between progress lines, default 60
@@ -64,7 +64,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/run.sh"
 
 LISTS="${LISTS:-$TOOLS/certify/lists/stage4}"
-CERT_RESULTS="${CERT_RESULTS:-$TAXMAN_ROOT/results/strict.jsonl}"
+CERT_RESULTS="${CERT_RESULTS:-$TAXMAN_ROOT/results/optimal.jsonl.gz}"
 OUT_DIR="${OUT_DIR:-$TAXMAN_WORK/results}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"

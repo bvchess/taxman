@@ -27,9 +27,7 @@ from itertools import combinations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-OPTIMAL_JSON = ROOT / "results/optimal.json"  # the table of recorded games
-STRICT_JSONL = ROOT / "results/strict.jsonl"  # the committed chain (the first line for an n)
-OPTIMAL_JSON_LAST_N = 1000  # recorded_moves reads the games above it from STRICT_JSONL
+COMMITTED = ROOT / "results/optimal.jsonl.gz"  # the committed chain: the recorded games, a result line each
 UPPER_MODES = {
     "all": "every optimal set",
     "fixed": "optimal sets whose upper part is U*",
@@ -281,21 +279,14 @@ def adversary(paths):
 
 
 @cache
-def optimal_json_moves():
-    return {g["n"]: g["moves"] for g in json.loads(OPTIMAL_JSON.read_text())}
-
-
-@cache
-def strict_moves():
-    first = {}
-    for r in lines([str(STRICT_JSONL)]):
-        first.setdefault(r["n"], r["moves"])
-    return first
+def recorded_games():
+    """The result line of each n of the committed chain (loaded on first use)."""
+    return {r["n"]: r for r in lines([str(COMMITTED)])}
 
 
 def recorded_moves(n):
-    """The moves of the recorded game for n (loaded on first use)."""
-    return (optimal_json_moves() if n <= OPTIMAL_JSON_LAST_N else strict_moves())[n]
+    """The moves of the recorded game for n."""
+    return recorded_games()[n]["moves"]
 
 
 def prime_factors(m):
@@ -512,12 +503,8 @@ def moves(paths):
 
 
 def recorded_scores():
-    """The recorded optimum V(n) of each n: optimal.json's, then the solver's committed results for the n it lacks
-    (the order `exact` reads them in)."""
-    scores = {g["n"]: g["score"] for g in json.loads(OPTIMAL_JSON.read_text())}
-    for r in lines([str(STRICT_JSONL)]):
-        scores.setdefault(r["n"], r["score"])
-    return scores
+    """The recorded optimum V(n) of each n, from the committed chain."""
+    return {n: r["score"] for n, r in recorded_games().items()}
 
 
 def exact_order(args):
@@ -529,9 +516,7 @@ def exact_order(args):
     Games at their ceiling (`chain`) or meeting the prime formula (`prime`), which `exact` does not search, go
     last."""
     lo, hi = int(args[0]), int(args[1])
-    rows = {}
-    for r in lines([str(STRICT_JSONL)]):
-        rows.setdefault(r["n"], r)
+    rows = recorded_games()
 
     def solver_nodes(n):
         r = rows[n]

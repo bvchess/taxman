@@ -98,8 +98,8 @@ exact for the whole game.
 proved.  The optimal set is unique in every game n ≤ 424; from 425 on a few games have two or three, and most have one.
 In every game enumerated, the optimal sets all have the same upper part, U\*, and the same number of members, and they
 differ by an exchange of equally many numbers up to n/2, of equal sum, each a maximal factor of a member of U\*.  At 685
-the set recorded in [results/optimal.json](../../results/optimal.json) is the one of its three optimal sets that does
-not stay playable with 686 ([the step theorem (N6)](neighbors.md#the-step-theorem)).
+the set recorded in [results/optimal.jsonl.gz](../../results/optimal.jsonl.gz) is the one of its three optimal sets that
+does not stay playable with 686 ([the step theorem (N6)](neighbors.md#the-step-theorem)).
 [solver/noframe/docs/uniqueness.md](../../solver/noframe/docs/uniqueness.md) has the method and the data, and
 [evidence.md](evidence.md) the range.
 
@@ -157,9 +157,9 @@ moves above n/2, which are U\*, and differs from it below n/2 alone, by five sma
 1. The prover proves opt(833) = 218,226 and finds the optimal set unique, with 362 members, and with upper part U\*
    ([solver/noframe/docs/proofs.md](../../solver/noframe/docs/proofs.md),
    [uniqueness.md](../../solver/noframe/docs/uniqueness.md)).  So every optimal game has 362 moves.
-2. The optimal set of [results/optimal.json](../../results/optimal.json), with 250, 252, 294 and 400 exchanged for 116,
-   180, 200, 320 and 351, replays by the rules: a legal game of 363 moves, scoring 218,197.  Since ν(833) = 363, [the
-   length lemma (Q3)](#the-length-lemma) gives ℓ(833) = 363.
+2. The optimal set of [results/optimal.jsonl.gz](../../results/optimal.jsonl.gz), with 250, 252, 294 and 400 exchanged
+   for 116, 180, 200, 320 and 351, replays by the rules: a legal game of 363 moves, scoring 218,197.  Since ν(833) =
+   363, [the length lemma (Q3)](#the-length-lemma) gives ℓ(833) = 363.
 3. [The prover](../GLOSSARY.md#programs-files-and-documents)'s branch and bound, weighing each move by its value plus a
    constant above every sum, so that a set's weight orders it by its number of moves and then by its sum, proves that
    no playable set of 363 members sums to more than 218,197.

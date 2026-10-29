@@ -70,7 +70,7 @@
 //! | | [`solver`] | the per-game pipeline, the options, the range driver |
 //! | | [`results`] | what a result line records about its proof, and the checks a results file passes |
 //! | | [`store`] | the bounds store: the line and the file the ledger keeps its bounds in, and the relations between boards |
-//! | | [`known`] | the known games `solve --use-prev` draws on: `optimal.json`, the committed chain, the bounds store |
+//! | | [`known`] | the known games `solve --use-prev` draws on: the table, the committed chain, the bounds store |
 //! | | [`certify`] | `taxman certify`: a recorded score proven on the whole board; `certify::verify` checks them |
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |

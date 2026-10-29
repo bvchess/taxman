@@ -789,7 +789,7 @@ fn a_checkpoint_directory_in_use_is_refused() {
 /// search takes under a tenth of a second), and in a quick run 935, which does too and costs two thirds as much.
 const SIGNALED: u32 = if QUICK { 935 } else { 944 };
 
-/// Runs `solve` of the board `SIGNALED` (on optimal.json's game of the one before it) with progress lines, and once
+/// Runs `solve` of the board `SIGNALED` (on the table's game of the one before it) with progress lines, and once
 /// the search is under way sends `signal` (if any); returns the exit status and stdout.
 #[cfg(unix)]
 fn solve_signaled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {

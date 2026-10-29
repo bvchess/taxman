@@ -10,7 +10,7 @@
 //! ([`taxman::search::finder`]).  This program makes that start once, on one thread, and then runs the finder alone,
 //! on one thread, for each budget of `--seconds` (default 5,60) and each random seed of `--seeds` (default 0,100,200:
 //! the rounds of a run draw with the seed plus 1, 2, ...), from a control that holds the start as the incumbent, as the
-//! search would.  `--known FILE` (repeatable) names the results files whose completed games, with `optimal.json`'s,
+//! search would.  `--known FILE` (repeatable) names the results files whose completed games, with the table's,
 //! are the known games: the game of `n − 1` is the seed (`--no-seed`: none, the finder starts from the incumbent
 //! alone).  `--target SUM` is the final best promotion sum of the game (the score less `in_the_bag`), which a run is
 //! said to reach or not.

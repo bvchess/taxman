@@ -16,7 +16,7 @@
 //!
 //! # How the tests use it
 //!
-//! * Here: it reproduces `optimal.json` for every board up to 40; it agrees with a naive solver on random sparse
+//! * Here: it reproduces the table of optimal games for every board up to 40; it agrees with a naive solver on random sparse
 //!   boards all the way up to 127 (which exercises the high 64 bits of the `u128`); the two rules agree on boards
 //!   without holes; and the hole semantics are pinned on small cases.
 //! * [`crate::sacrifice`]'s tests check the frame model on every board `1..=n` minus one number, `n ≤ 36`
@@ -25,7 +25,7 @@
 //!   larger ranges.
 //!
 //! No test compares the solver's own answers with it directly.  On boards without holes the chain is: the solver
-//! reproduces `optimal.json` (to 1000), and this module reproduces `optimal.json` to 40; the Python certifier
+//! reproduces the table of optimal games (to 1000), and this module reproduces it to 40; the Python certifier
 //! `heuristics/evaluation/certify.py` is the exhaustive check that goes further (to 62).
 //!
 //! # Boards and rules
@@ -235,7 +235,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
-    fn small_boards_match_optimal_json() {
+    fn small_boards_match_the_table() {
         let optimal = Optimal::built_in();
         for n in 1..=40 {
             let exact = solve(n, &[], Rule::Divisor);

@@ -24,7 +24,7 @@ on the laptop while four other jobs of two threads each ran, and took 1048.7 s o
 
 * Every score equals optimal.json's, and every move list, proof and method is the earlier chain's: same_search 545,
   exhausted 416, prime formula 211, cap 115, trivial 13.  No game assumes anything.  The move sets are optimal.json's
-  but at 684..687 ([the results](../../../results/README.md#strictjsonl) has the rest).
+  but at 684..687 ([the results](../../../results/README.md#optimaljsonlgz) has the rest).
 * The steps of the other 1299 games total 279.0 M against 280.1 M before.  Game 1232 took 63% more steps (53.0 M against
   32.6 M) at a higher rate (256 k/s against 178 k/s, under another load), so its 206.7 s against 183.6 s are the extra
   steps.

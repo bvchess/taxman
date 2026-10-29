@@ -1,9 +1,9 @@
-//! The known games `taxman solve --use-prev` draws on (`src/known.rs`): `optimal.json`, the committed chain and the
+//! The known games `taxman solve --use-prev` draws on (`src/known.rs`): the table, the committed chain and the
 //! bounds store.  A board that a source has proven is recorded without a search, citing the source and carrying what it
 //! assumes; the game of `n − 1` from a source gives the ceiling and the seed; the store's open boards seed their
 //! searches and give them a ceiling.  Both verifiers of results files check the citations against the sources, and refuse a store line
 //! that is missing, changed, or not the one cited.  The stores here are made by hand, for boards 900..960 and the like,
-//! with the truth's games (`optimal.json`'s) as their lines; the committed chain is a small one made for the purpose.
+//! with the truth's games (the table's) as their lines; the committed chain is a small one made for the purpose.
 
 mod common;
 
@@ -18,13 +18,13 @@ use taxman::results::{assumed_optimal, assumed_u, verify_files_with, Assumptions
 use taxman::solver::{self, GameResult, Method, PrevSource, SolveOptions};
 use taxman::store::{Rule, Side, Store};
 
-/// The truth: `optimal.json`'s game of `n`.
+/// The truth: the table's game of `n`.
 fn truth(n: u32) -> (u64, Vec<u32>) {
     let table = Optimal::built_in();
     (table.score(n).expect("a game of the table"), table.moves(n).expect("a game of the table").to_vec())
 }
 
-/// A table with the one game `n` of optimal.json: the table a run confirms its scores against, so that the other
+/// A table with the games `games` of the built-in table: the table a run confirms its scores against, so that the other
 /// boards of its range are known to nothing but the sources it is given.
 fn table_of(games: &[u32]) -> Optimal {
     let mut table = Optimal::from_json(&Json::Arr(Vec::new())).unwrap();
@@ -119,7 +119,20 @@ fn python_verdict(file: &Path, sources: &KnownSources) -> (Option<i32>, String) 
     let none = Path::new("/nonexistent/none.jsonl");
     let committed = sources.committed.as_deref().unwrap_or(none);
     let bounds = sources.bounds.as_deref().unwrap_or(none);
-    let args = [common::path(file), "--committed", common::path(committed), "--bounds", common::path(bounds)];
+    // Its table, as the Rust verifier's built-in one: the first games of the committed results, in a file beside `file`.
+    let table = file.with_file_name("table.jsonl");
+    if !table.exists() {
+        fs::write(&table, common::committed_text(common::FIRST_GAMES as usize)).unwrap();
+    }
+    let args = [
+        common::path(file),
+        "--committed",
+        common::path(committed),
+        "--table",
+        common::path(&table),
+        "--bounds",
+        common::path(bounds),
+    ];
     let run = python(&script, &args);
     (run.code, run.stdout)
 }
@@ -451,7 +464,7 @@ fn an_open_board_of_the_store_seeds_its_search_to(hi: u32) {
 fn the_committed_chain_and_the_table_are_known_games_too() {
     let dir = TempDir::new("known-committed");
     // A small committed chain: the games 1..=60, as `taxman solve 1-60 --out` writes them.
-    let committed = dir.join("strict.jsonl");
+    let committed = dir.join("committed.jsonl");
     let chain = solver::solve_range(1, 60, &SolveOptions { threads: 1, ..SolveOptions::default() }, Some(&committed));
     let chain = chain.unwrap();
     let store = store_of(&dir, &[50, 62]);
@@ -554,13 +567,13 @@ fn a_store_game_that_does_not_play_or_contradicts_the_chain_stops_the_run_naming
 }
 
 /// The command line finds the sources in `results` of the repository it runs in (a directory above the working
-/// directory with `results/optimal.json`), and names no option for them: a repository made for the purpose,
+/// directory with `results/optimal.jsonl.gz`), and names no option for them: a repository made for the purpose,
 /// with a store of two boards and no committed chain.
 #[test]
 fn solve_use_prev_and_verify_results_find_the_sources_in_the_repository() {
     let dir = TempDir::new("known-cli");
     fs::create_dir_all(dir.join("results")).unwrap();
-    fs::write(dir.join("results/optimal.json"), "[]").unwrap();
+    fs::write(dir.join("results/optimal.jsonl.gz"), common::gzip_stored(&[""])).unwrap();
     let store = dir.join("results/bounds.jsonl");
     write_lines(&store, &[proven_lines(905), proven_lines(906)].concat());
     let in_repo = |args: &[&str]| {
@@ -582,7 +595,7 @@ fn solve_use_prev_and_verify_results_find_the_sources_in_the_repository() {
     assert_eq!(lines.len(), 6, "{stdout}");
     for (line, n) in lines.iter().zip(903..) {
         let store_board = [905, 906].contains(&n);
-        let source = if store_board { "the bounds store" } else { "optimal.json" };
+        let source = if store_board { "the bounds store" } else { "the built-in table" };
         assert!(line.contains("known") && line.contains(&format!("from {source}")), "{line}");
         assert!(line.contains(&format!("n={n} ")), "{line}");
     }

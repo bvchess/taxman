@@ -1,6 +1,6 @@
-//! The ledger's tests: the relations on the boards of optimal.json (every bound they derive brackets opt(n), and
+//! The ledger's tests: the relations on the boards of the table (every bound they derive brackets opt(n), and
 //! every game they make is legal), a violation, the choice of the next search (the climbs), the finder, and runs of the
-//! scheduler checked against optimal.json.  The runs of the first tests leave the finder off (`lns_seconds` 0), whose
+//! scheduler checked against the table.  The runs of the first tests leave the finder off (`lns_seconds` 0), whose
 //! default second a board would make them slow; the finder has tests of its own at the end.
 
 use super::book::{Book, Entry, Lower, Rule, Upper};
@@ -19,11 +19,11 @@ use taxman::json::Json;
 use taxman::store::{ceiling_game, monotone_game, prime_down, prime_up};
 
 pub(crate) fn opt(n: u32) -> u64 {
-    Optimal::built_in().score(n).expect("a board of optimal.json")
+    Optimal::built_in().score(n).expect("a board of the table")
 }
 
 pub(crate) fn opt_game(n: u32) -> Vec<u32> {
-    Optimal::built_in().moves(n).expect("a board of optimal.json").to_vec()
+    Optimal::built_in().moves(n).expect("a board of the table").to_vec()
 }
 
 /// The last board of the stretch 901.. that the runs of the tests prove: 960, and 912 in a quick run (`QUICK`), a

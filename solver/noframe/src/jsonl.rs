@@ -4,7 +4,8 @@
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use taxman_gzip::Members;
 
 /// A JSON object written field by field.
 pub struct Obj(String);
@@ -190,15 +191,44 @@ where
     });
 }
 
-/// The recorded game of each n, (score, moves), from files in optimal.json's or the solver's results format
-/// (the first "n", "score" and "moves" of each line holding an "n"); an earlier file wins over a later one.
-pub fn recorded_games(paths: &[&Path]) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
+/// The committed chain, the file `results/optimal.jsonl.gz` of the games that the frame solver proved: one result line
+/// a game, the line of game n the n-th.
+pub fn committed_chain() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz")
+}
+
+/// The text of the file at `path`, handed piece by piece to `read`, which says whether to go on.  A path that ends in
+/// `.gz` is a gzip file, which the project's decoder ([`taxman_gzip`]) gives a member at a time, so that a reader that
+/// has what it wants leaves the later members undecoded; any other path is plain text, a single piece.  A file that
+/// cannot be read or decoded stops the program: the decoder checks every member's CRC-32, so a fault in it is an
+/// error and never a wrong game.
+fn read_pieces(path: &Path, mut read: impl FnMut(&str) -> bool) {
+    if path.extension().is_some_and(|ext| ext == "gz") {
+        let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        for member in Members::new(&bytes) {
+            let text = member
+                .map_err(|e| e.to_string())
+                .and_then(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            if !read(&text) {
+                break;
+            }
+        }
+    } else {
+        read(&std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display())));
+    }
+}
+
+/// The recorded game of each n, (score, moves), from result files in the solver's format (the first "n", "score" and
+/// "moves" of each line holding an "n"); an earlier file wins over a later one.
+pub fn recorded_games<P: AsRef<Path>>(paths: &[P]) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
     recorded_games_to(paths, u64::MAX)
 }
 
 /// [`recorded_games`] for the games of n <= `last`; a line of a larger game is skipped before its score and moves are
-/// read, so a check of the small boards does not parse the large games of a table that reaches 5000.
-pub fn recorded_games_to(paths: &[&Path], last: u64) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
+/// read, so a check of the small boards does not parse the large games.  A gzip file, whose members hold the games in
+/// order, is decoded only as far as the member that reaches `last`.
+pub fn recorded_games_to<P: AsRef<Path>>(paths: &[P], last: u64) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
     fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {
         let at = line.find(&format!("\"{key}\""))? + key.len() + 2;
         Some(line[at..].trim_start().strip_prefix(':')?.trim_start())
@@ -206,21 +236,27 @@ pub fn recorded_games_to(paths: &[&Path], last: u64) -> std::collections::BTreeM
     let number = |s: &str| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u64>().ok();
     let mut known = std::collections::BTreeMap::new();
     for path in paths {
-        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        for line in text.lines() {
-            let game = || {
-                let n = number(after(line, "n")?).filter(|&n| n <= last)?;
-                let score = number(after(line, "score")?)?;
-                let moves = after(line, "moves")?.strip_prefix('[')?;
-                let moves = &moves[..moves.find(']')?];
-                let moves: Vec<u32> =
-                    moves.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().parse().unwrap()).collect();
-                Some((n, score, moves))
-            };
-            if let Some((n, score, moves)) = game() {
-                known.entry(n).or_insert((score, moves));
+        read_pieces(path.as_ref(), |text| {
+            let mut reached = false;
+            for line in text.lines() {
+                let Some(n) = after(line, "n").and_then(number) else { continue };
+                reached |= n >= last;
+                let game = || {
+                    let score = number(after(line, "score")?)?;
+                    let moves = after(line, "moves")?.strip_prefix('[')?;
+                    let moves = &moves[..moves.find(']')?];
+                    let moves: Vec<u32> =
+                        moves.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().parse().unwrap()).collect();
+                    Some((score, moves))
+                };
+                if n <= last {
+                    if let Some(game) = game() {
+                        known.entry(n).or_insert(game);
+                    }
+                }
             }
-        }
+            !reached
+        });
     }
     known
 }

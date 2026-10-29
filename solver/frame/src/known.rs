@@ -2,10 +2,11 @@
 //!
 //! Three sources hold games the run has not solved, each with what its game rests on:
 //!
-//! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary.  It
-//!   records no proofs, so a game of it is *assumed* optimal (`the game of n in optimal.json is optimal`).
-//! * **the committed chain** ([`Origin::Strict`]), `results/strict.jsonl`: a chain from n = 1, each game with its proof
-//!   and what it assumes.  A game of it is as proven as its line is.
+//! * **the table** ([`Origin::Optimal`]), the table of optimal games built into the binary: the games of
+//!   `results/optimal.jsonl.gz` as of the build.  It records no proofs, so a game of it is *assumed* optimal (`the game
+//!   of n in results/optimal.jsonl.gz is optimal`).
+//! * **the committed chain** ([`Origin::Strict`]), `results/optimal.jsonl.gz` in the checkout: a chain from n = 1, each
+//!   game with its proof and what it assumes.  A game of it is as proven as its line is.
 //! * **the bounds store** ([`Origin::Bounds`]), `results/bounds.jsonl` ([`crate::store`]): bounds on opt(n) that the
 //!   ledger finds.  A board whose best lower bound is its best upper bound is *proven*: the lower bound's game scores
 //!   what the upper bound allows, and the game is optimal wherever statement U holds at the boards its upper bound rests
@@ -34,9 +35,9 @@ use std::path::PathBuf;
 /// Where a known game comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Origin {
-    /// `optimal.json`.
+    /// The table built into the binary.
     Optimal,
-    /// The committed chain, `results/strict.jsonl`.
+    /// The committed chain, `results/optimal.jsonl.gz`.
     Strict,
     /// The bounds store, `results/bounds.jsonl`.
     Bounds,
@@ -59,8 +60,8 @@ impl Origin {
     /// Where it came from, for a message.
     pub fn whence(self) -> &'static str {
         match self {
-            Origin::Optimal => "optimal.json",
-            Origin::Strict => "the committed chain (strict.jsonl)",
+            Origin::Optimal => "the built-in table",
+            Origin::Strict => "the committed chain",
             Origin::Bounds => "the bounds store (bounds.jsonl)",
         }
     }
@@ -99,7 +100,7 @@ impl LineRef {
 /// and the value of the cited lines are the line's own `n` and `score`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Cite {
-    /// The game is optimal.json's.
+    /// The game is the table's.
     Optimal,
     /// The game is the committed chain's.
     Strict,
@@ -160,7 +161,7 @@ pub struct KnownGame {
     pub moves: Vec<u32>,
     pub origin: Origin,
     /// How the source establishes it, as the game of `n − 1` of a result line records it (`prev.proof`): the committed
-    /// line's proof; [`Proof::Known`] for a board of the store; none for `optimal.json`, which records none.
+    /// line's proof; [`Proof::Known`] for a board of the store; none for the table, which records none.
     pub proof: Option<Proof>,
     /// What the game rests on: [`assumed_optimal`] for the table's, the committed line's for the committed chain's, and
     /// [`assumed_u`] at the boards the store's upper bound rests on.
@@ -184,7 +185,7 @@ pub struct Open {
     pub upper: Option<Bound>,
 }
 
-/// The files `--use-prev` draws on besides optimal.json, and how far it goes.
+/// The files `--use-prev` draws on besides the table, and how far it goes.
 #[derive(Clone, Debug, Default)]
 pub struct KnownSources {
     /// The committed chain.
@@ -209,7 +210,7 @@ impl KnownSources {
         let root = crate::paths::repository_root()?;
         let file = |relative: &str| Some(root.join(relative)).filter(|path| path.is_file());
         Ok(KnownSources {
-            committed: file(crate::paths::STRICT_RESULTS_IN_REPOSITORY),
+            committed: file(crate::paths::RESULTS_IN_REPOSITORY),
             bounds: file(crate::paths::BOUNDS_STORE_IN_REPOSITORY),
             boards: true,
         })
@@ -380,8 +381,10 @@ impl<'a> Known<'a> {
         match cite {
             Cite::Optimal => match self.optimal.score(n) {
                 Some(table) if table == score => Ok(Assumptions::from([assumed_optimal(n)])),
-                Some(table) => Err(format!("it cites optimal.json, whose game of {n} scores {table}, not {score}")),
-                None => Err(format!("it cites optimal.json, which has no game of {n}")),
+                Some(table) => {
+                    Err(format!("it cites the built-in table, whose game of {n} scores {table}, not {score}"))
+                }
+                None => Err(format!("it cites the built-in table, which has no game of {n}")),
             },
             Cite::Strict => match self.committed.get(&n) {
                 Some(game) if game.score == score => Ok(game.assumes.clone()),

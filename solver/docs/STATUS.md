@@ -10,8 +10,8 @@ chain reaches in [results/README.md](../../results/README.md), and the research 
 
 The chain has passed game 5000, and so has the committed chain.  The priority is to push it further, with the least
 computation.  Certifying [statement U](../../docs/theory/exactness.md#statement-u), for particular games or in general,
-is not a priority.  `optimal.json` follows the committed chain: its games past the chain's end come from the chain
-(`taxman extend-optimal`, [the runbook](runbook/chain.md)).
+is not a priority.  The committed chain, `results/optimal.jsonl.gz`, is also the table built into the frame solver: the
+chain's games are appended to it ([the runbook](runbook/chain.md)), and a rebuild takes them into the table.
 
 ## In flight
 

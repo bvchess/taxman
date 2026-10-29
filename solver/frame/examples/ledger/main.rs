@@ -140,10 +140,10 @@
 //!
 //! A bound that the relations make is checked as it is made: a game must pass the referee (`replay_finished`), and
 //! L > U anywhere ends the run with an error (a bug, or a counterexample to statement U, on which every U of the frame
-//! model rests).  The run never reads optimal.json or a results file but `--proven`: the truth stays hidden from it.
+//! model rests).  The run never reads the table or a results file but `--proven`: the truth stays hidden from it.
 //!
 //! **report** prints what a run did: the boards proven and how (the rules of their two bounds), the curve of boards
-//! proven against CPU, the gaps left, and the check of every board against the known optima (optimal.json and the
+//! proven against CPU, the gaps left, and the check of every board against the known optima (the table and the
 //! completed games of each `--known FILE`): every game replays to its L, L <= opt <= U, and a proven value is
 //! opt(n).  It exits with status 1 if the check finds anything wrong.
 //!
@@ -152,7 +152,7 @@
 //! bound, appended and never changed; a line is added only when it improves the file's best bound of its board and
 //! side, and a board is proven when its best lower bound is its best upper bound.  **export** appends to `--bounds`
 //! (created if it is not there) the bounds of the run in DIR that improve on its best, for the boards that `--strict`
-//! (default results/strict.jsonl) has not proven, and prints what it appended and which boards are newly proven: a
+//! (default results/optimal.jsonl.gz) has not proven, and prints what it appended and which boards are newly proven: a
 //! lower bound with its game (the promotion set when the game was made from one; cited, the line of the game it was
 //! carried from, when a relation carried it), an upper bound with its rule, the board and value it was derived from,
 //! and the boards at which it assumes statement U; `--source` names the run,
@@ -186,7 +186,7 @@ use std::path::PathBuf;
 use taxman::search::finder as lns;
 
 /// The committed chain, whose games the bounds store cites and leaves out.
-const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/strict.jsonl");
+const STRICT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.jsonl.gz");
 
 fn usage() -> ! {
     eprintln!(

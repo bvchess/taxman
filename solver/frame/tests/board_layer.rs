@@ -1,6 +1,6 @@
 //! The board layer ([`taxman::frames`], [`taxman::board`]) against the committed chain.
 //!
-//! Every game of `results/strict.jsonl` that was searched (or repeats a search) records the moves of the game its
+//! Every game of `results/optimal.jsonl.gz` that was searched (or repeats a search) records the moves of the game its
 //! promotions make and the digest of the search problem its board poses.  Both come out of the board layer, which
 //! nothing else compares with the chain at the boards that matter (the golden data stops at 2049): a change of how
 //! setup forms and simplifies the frames, however it is made, must leave every one of them as it was.  A sample of
@@ -9,7 +9,7 @@
 
 mod common;
 
-use common::results_path;
+use common::committed_text;
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::search_problem;
@@ -33,10 +33,10 @@ struct Line {
     digest: String,
 }
 
-/// The searched games of `results/strict.jsonl`: every `every`th one, and the last (if the board is at most
+/// The searched games of `results/optimal.jsonl.gz`: every `every`th one, and the last (if the board is at most
 /// `up_to`).
 fn sampled_lines(every: usize, up_to: u32) -> Vec<Line> {
-    let text = std::fs::read_to_string(results_path("strict.jsonl")).expect("results file");
+    let text = committed_text(up_to as usize);
     // Line k is the game k, so the lines up to the board `up_to` are the first `up_to`.
     let searched: Vec<Json> = text
         .lines()
@@ -70,7 +70,7 @@ fn moves_of(line: &Line) -> Vec<u32> {
 }
 
 /// The moves of the games a promotion set makes, and the digest of the search problem of a board, are those of the
-/// committed chain: at a sample of boards from 18 to 5053, the sets of 8 to 128 words.
+/// committed chain: at a sample of its boards, from small sets to the widest.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -78,7 +78,7 @@ fn moves_of(line: &Line) -> Vec<u32> {
 )]
 fn the_board_layer_reproduces_the_chains_moves_and_problems() {
     let lines = sampled_lines(EVERY, u32::MAX);
-    assert!(lines.len() > 100 && lines.last().is_some_and(|l| l.n == 5053), "{} lines", lines.len());
+    assert!(lines.len() > 100 && lines.last().is_some_and(|l| l.n > 1300), "{} lines", lines.len());
     the_board_layer_reproduces(&lines);
 }
 

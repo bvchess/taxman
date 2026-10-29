@@ -19,7 +19,7 @@ For every line:
               to the game of the line before it that gives that board that value, and is replayed in turn
   relation    an upper bound by monotone, ceiling, prime or repeat is at least what the arithmetic of the lemma gives
               from the value of the bound it cites; the cited bound is a line before it (a bound of that board at most
-              that value) or a game of the chain (results/strict.jsonl, whose score is exact); and it rests on
+              that value) or a game of the chain (results/optimal.jsonl.gz, whose score is exact); and it rests on
               every board that cited bound rests on (and, for a repeat, on its own board)
   given       a given upper bound has the given game as the lower bound, at its value
 and across the file: where the chain has a game of a board, the file's bounds of it enclose the chain's score.
@@ -42,7 +42,7 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-STRICT = REPO / "results" / "strict.jsonl"
+STRICT = REPO / "results" / "optimal.jsonl.gz"
 
 SCHEMA = 1
 MAX_N = 8191  # the widest board of the solver (solver/frame/src/solver.rs)
@@ -286,10 +286,10 @@ class Chain:
         return found
 
 
-def chain_scores(path):
-    """{n: score} of the completed games of a results file."""
+def chain_scores(path, referee):
+    """{n: score} of the completed games of a results file, which the referee reads (a .gz file through gzip)."""
     scores = {}
-    for text in path.read_text().split("\n"):
+    for text in referee.read_text(path).split("\n"):
         if text.strip():
             row = json.loads(text)
             if row.get("completed"):
@@ -328,7 +328,7 @@ def main():
     args = ap.parse_args()
 
     referee = referee_module()
-    scores = chain_scores(args.strict)
+    scores = chain_scores(args.strict, referee)
     games = read_games(args.games) if args.games else {}
     problems = []
     rows = []

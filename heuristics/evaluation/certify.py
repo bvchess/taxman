@@ -1,16 +1,16 @@
 # Copyright (c) Brian Chess 2026
 # SPDX-License-Identifier: MIT
 
-"""Independent verification of optimal.json, free of the frame theory.
+"""Independent verification of results/optimal.jsonl.gz, free of the frame theory.
 
-optimal.json was produced by the frame/factor-game solver, and this
+results/optimal.jsonl.gz was produced by the frame/factor-game solver, and this
 project's upper-half algorithm is built on the same structural theory.
 Agreement between them is therefore not, by itself, evidence that
-either is correct.  This script certifies as much of optimal.json as
+either is correct.  This script certifies as much of that file as
 possible using only arguments that share no assumptions with frames,
 the factor game, or maximal-factor decompositions:
 
-1. Replay: every solution in optimal.json is checked to be a legal
+1. Replay: every solution in the file is checked to be a legal
    game whose score matches, making every entry a sound LOWER bound.
 
 2. Brute force: an exact solver over raw pot states - pick any number
@@ -42,7 +42,7 @@ int (bit i set = "i still in the pot", see bitpot.py), states are
 memoized in a dict keyed by the mask, and a sound admissible bound
 prunes branches that cannot beat the incumbent -- branch-and-bound in
 its simplest form.  The scientific point of this file matters as much
-as the algorithms: optimal.json and the theory being tested share
+as the algorithms: the file and the theory being tested share
 ancestry, so agreement between them proves nothing.  Certification
 requires arguments with no shared assumptions -- replay, exhaustion,
 an independent bound, and an induction (technique 3) whose entire
@@ -59,7 +59,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import time
 from pathlib import Path
@@ -67,7 +66,7 @@ from typing import Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from core import check_sequence, divisor_lists, smallest_prime_factors, solve_upper_half
 from evaluation.bitpot import bits, divisor_masks, mask_of, multiple_masks, popcount
-from evaluation.verify import DEFAULT_OPTIMAL
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 
 
 # Cap on distinct optimal whole pick sets enumerated per game (beyond it the game counts as non-unique).
@@ -182,11 +181,11 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--brute-max", type=int, default=64)
     parser.add_argument("--matching-max", type=int, default=300)
     parser.add_argument("--max-n", type=int, default=1300,
-                        help="audit the games of optimal.json up to this n")
+                        help="audit the games of results/optimal.jsonl.gz up to this n")
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     args = parser.parse_args(argv)
 
-    games = {g["n"]: g for g in json.loads(args.optimal.read_text()) if g["n"] <= args.max_n}
+    games = load_optimal(args.optimal, args.max_n)
     top = max(games)
     divs = divisor_lists(top)
     spf = smallest_prime_factors(top)
@@ -234,7 +233,7 @@ def main(argv: List[str] | None = None) -> int:
                 print(f"brute force: n={n}: our upper set {sorted(ours)} not "
                       f"among optimal upper sets {[sorted(s) for s in sets]}")
 
-    print(f"brute force: optimal.json scores verified exhaustively for "
+    print(f"brute force: the recorded scores verified exhaustively for "
           f"n=1..{brute_verified} (no theory assumed)")
     print(f"  our upper-half set appears in an optimal solution in "
           f"{upper_confirmed}/{brute_verified}; unique optimal upper set in "
@@ -280,7 +279,7 @@ def main(argv: List[str] | None = None) -> int:
 
     total_certified = sum(1 for n in games if certified[n])
     print(f"\nTOTAL independently certified: {total_certified}/{len(games)} "
-          f"games of optimal.json")
+          f"games of results/optimal.jsonl.gz")
     uncertified = [n for n in sorted(games) if not certified[n]]
     if uncertified:
         print(f"first uncertified games: {uncertified[:15]}")

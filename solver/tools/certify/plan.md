@@ -1,8 +1,8 @@
 # Certificates campaign plan
 
-- command: `certify_plan.py --results results/strict.jsonl --upper prover/data/upper_2176_3314.jsonl prover/data/upper_3315_3440.jsonl --problems bench/certify/problems_600_3440.jsonl --gaps bench/wall/gaps_chain.jsonl bench/wall/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir bench/certify`
+- command: `certify_plan.py --results results/optimal.jsonl.gz --upper prover/data/upper_2176_3314.jsonl prover/data/upper_3315_3440.jsonl --problems bench/certify/problems_600_3440.jsonl --gaps bench/wall/gaps_chain.jsonl bench/wall/gaps_chain_3313_3440.jsonl --from 2176 --to 3440 --era 2176-3310:6.396 --era 3311-3440:16.57 --out-dir bench/certify`
 - range: 2176..3440 (1,265 boards)
-- results: results/strict.jsonl
+- results: results/optimal.jsonl.gz
 - upper: prover/data/upper_2176_3314.jsonl, prover/data/upper_3315_3440.jsonl
 - problems: bench/certify/problems_600_3440.jsonl
 - gaps: bench/wall/gaps_chain.jsonl, bench/wall/gaps_chain_3313_3440.jsonl

@@ -35,7 +35,8 @@ Before the prover, this was the state of the evidence.
 * **The frame model** ([solver/docs/design/frame-model.md](../../docs/design/frame-model.md)).  Its assumptions (the
   greedy removal of impossible sources, `unzip`'s mandatory moves, freedoms = factors − sources, closed frames inert,
   promotions one frame forward) were validated end to end:
-  * the solver reproduces the Java's optimal.json to 1000, which the same model made, so not independently;
+  * the committed chain reproduces the Java solver's table of optimal games to 1000, score for score; the same model
+    made that table, so the agreement is not independent;
   * `src/brute.rs` matches it to 40 in its tests, and once to 52, by the example `sacrifice`, removed from master;
   * `heuristics/evaluation/certify.py`'s brute force over pot states confirms it to n = 62.
 

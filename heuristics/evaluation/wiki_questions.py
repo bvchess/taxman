@@ -5,8 +5,8 @@
 """The two open questions of the wiki's Questions page, measured on the committed games and by exhaustive search.
 
 solver/notebook/the-wikis-open-questions-2026-10/README.md has the method, the results and the proofs; this
-module computes every number there.  The games read are optimal.json (1..1300) and the committed chain
-results/strict.jsonl (its games 1..2175, TOP, which the study was made on; the file has more now).
+module computes every number there.  The games read are the committed games results/optimal.jsonl.gz (its games
+1..2175, TOP, which the study was made on; the file has more now).
 
 * `tax`: how many numbers the taxman takes for one move (its *tax*).  Every committed game, the moves that
   pay three, the shapes a tax can have (a check of the entry's theorem), a reordering of every game that has a
@@ -27,7 +27,6 @@ Usage (from heuristics/):
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 import time
@@ -38,27 +37,19 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 from core import Infeasible, divisor_lists, maximal_factors, peel, prime_factors, smallest_prime_factors
 from evaluation.bitpot import bits, mask_of, popcount
 from evaluation.certify import Exact
-from evaluation.verify import DEFAULT_OPTIMAL
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 from strategies.solvent import _playable_order
 
-DEFAULT_CHAIN = DEFAULT_OPTIMAL.parent / "strict.jsonl"
 TOP = 2175
-TABLE_TOP = 1300  # the last game of optimal.json that the study reads; the file goes on with the chain's games
 
 
 # --------------------------------------------------------------------------------------------------------------------
 # shared
 
 
-def load_games(optimal: Path, chain: Path) -> Tuple[Dict[int, List[int]], Dict[int, dict]]:
-    """optimal.json's moves by n, to TABLE_TOP, and the chain's completed lines by n, to TOP."""
-    table = {g["n"]: g["moves"] for g in json.loads(optimal.read_text()) if g["n"] <= TABLE_TOP}
-    lines = {}
-    for text in chain.read_text().splitlines():
-        line = json.loads(text)
-        if line.get("completed") and line["n"] <= TOP:
-            lines[line["n"]] = line
-    return table, lines
+def load_games(committed: Path) -> Dict[int, dict]:
+    """The completed lines of the committed file by n, to TOP."""
+    return {n: line for n, line in load_optimal(committed, TOP).items() if line.get("completed")}
 
 
 def taxes(n: int, moves: Sequence[int], divs: Sequence[List[int]]) -> Optional[List[List[int]]]:
@@ -171,24 +162,23 @@ def heaviest_tax_game(solver: Exact, pot: int, memo: Dict[int, Tuple[int, int]])
 def cmd_tax(args: argparse.Namespace) -> None:
     divs = divisor_lists(TOP)
     spf = smallest_prime_factors(TOP)
-    table, lines = load_games(args.optimal, args.chain)
-    files = (("optimal.json", table), ("strict.jsonl", {n: line["moves"] for n, line in lines.items()}))
-    for name, games in files:
-        sizes, worst, three, shapes = Counter(), Counter(), [], 0
-        for n, moves in sorted(games.items()):
-            tx = taxes(n, moves, divs)
-            sizes.update(len(t) for t in tx)
-            worst[max((len(t) for t in tx), default=0)] += 1
-            three += [(n, c, t) for c, t in zip(moves, tx) if len(t) >= 3]
-            shapes += sum(not tax_shape(c, t, spf) for c, t in zip(moves, tx))
-        print(f"{name}: {len(games)} games, {sum(sizes.values())} moves; moves by tax "
-              f"{sorted(sizes.items())}; games by largest tax {sorted(worst.items())}; taxes outside the theorem's "
-              f"shapes: {shapes}")
-        distinct = {}
-        for n, c, t in three:
-            distinct.setdefault((c, tuple(t)), []).append(n)
-        for (c, t), ns in distinct.items():
-            print(f"  {c} pays {list(t)} in the games of {ns[0]}..{ns[-1]} ({len(ns)} games)")
+    lines = load_games(args.optimal)
+    sizes, worst, three, shapes = Counter(), Counter(), [], 0
+    for n, line in sorted(lines.items()):
+        moves = line["moves"]
+        tx = taxes(n, moves, divs)
+        sizes.update(len(t) for t in tx)
+        worst[max((len(t) for t in tx), default=0)] += 1
+        three += [(n, c, t) for c, t in zip(moves, tx) if len(t) >= 3]
+        shapes += sum(not tax_shape(c, t, spf) for c, t in zip(moves, tx))
+    print(f"{len(lines)} games, {sum(sizes.values())} moves; moves by tax "
+          f"{sorted(sizes.items())}; games by largest tax {sorted(worst.items())}; taxes outside the theorem's "
+          f"shapes: {shapes}")
+    distinct = {}
+    for n, c, t in three:
+        distinct.setdefault((c, tuple(t)), []).append(n)
+    for (c, t), ns in distinct.items():
+        print(f"  {c} pays {list(t)} in the games of {ns[0]}..{ns[-1]} ({len(ns)} games)")
 
     repaired, stuck = 0, []
     for n, line in sorted(lines.items()):
@@ -322,21 +312,17 @@ def adaptation_counts(solver: Exact, n: int, delta: int) -> Tuple[int, int]:
 def cmd_adapt(args: argparse.Namespace) -> None:
     divs = divisor_lists(TOP)
     spf = smallest_prime_factors(TOP)
-    table, lines = load_games(args.optimal, args.chain)
+    lines = load_games(args.optimal)
     opt = {n: line["score"] for n, line in lines.items()}
 
-    for name, games, tops in (("optimal.json", table, (1000, 1300)), ("strict.jsonl", None, (1000, TOP))):
-        for top in tops:
-            how = Counter()
-            for n in range(2, top + 1):
-                moves, skipped, _ = adapt(n, games[n - 1] if games else lines[n - 1]["moves"], divs)
-                ok = sum(moves) == opt[n]
-                how["fails" if not ok else "lucky" if not skipped else "prime" if spf[n] == n else "general"] += 1
-            print(f"wiki's procedure on {name}'s games, n = 2..{top}: optimal {top - 1 - how['fails']} of {top - 1} "
-                  f"({100 * (top - 1 - how['fails']) / (top - 1):.1f}%): {dict(how)}")
-    differ = [n for n in range(2, 1302) if (sum(adapt(n, table[n - 1], divs)[0]) == opt[n])
-              != (sum(adapt(n, lines[n - 1]["moves"], divs)[0]) == opt[n])]
-    print(f"n of 2..1301 where the two files' games of n - 1 disagree: {differ}")
+    for top in (1000, 1300, TOP):
+        how = Counter()
+        for n in range(2, top + 1):
+            moves, skipped, _ = adapt(n, lines[n - 1]["moves"], divs)
+            ok = sum(moves) == opt[n]
+            how["fails" if not ok else "lucky" if not skipped else "prime" if spf[n] == n else "general"] += 1
+        print(f"wiki's procedure on the committed games, n = 2..{top}: optimal {top - 1 - how['fails']} of {top - 1} "
+              f"({100 * (top - 1 - how['fails']) / (top - 1):.1f}%): {dict(how)}")
 
     rows = []
     for n in range(2, TOP + 1):
@@ -442,7 +428,6 @@ def cmd_adapt(args: argparse.Namespace) -> None:
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
-    parser.add_argument("--chain", type=Path, default=DEFAULT_CHAIN)
     sub = parser.add_subparsers(dest="command", required=True)
     for name, run in (("tax", cmd_tax), ("adapt", cmd_adapt)):
         command = sub.add_parser(name)

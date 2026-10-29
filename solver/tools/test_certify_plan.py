@@ -4,6 +4,7 @@
 usage: python3 -I test_certify_plan.py      (or python3 -I -m unittest test_certify_plan, from this directory)
 """
 import contextlib
+import gzip
 import io
 import json
 import subprocess
@@ -561,6 +562,23 @@ class Inputs(Case):
         second = self.write("second.jsonl", [completed(LO + 1, nodes=3000)])
         results = certify_plan.load_results([first, second])
         self.assertEqual({n: r.nodes for n, r in results.items()}, {LO: 1000, LO + 1: 3000})
+
+    def test_a_gz_results_file_is_read_through_gzip_member_after_member(self):
+        path = self.dir / "chain.jsonl.gz"
+        members = [[completed(LO, nodes=1000)], [completed(LO + 1, nodes=3000), completed(LO + 2, nodes=500)]]
+        texts = ["".join(json.dumps(row) + "\n" for row in rows) for rows in members]
+        path.write_bytes(b"".join(gzip.compress(text.encode()) for text in texts))
+        results = certify_plan.load_results([str(path)])
+        self.assertEqual({n: r.nodes for n, r in results.items()}, {LO: 1000, LO + 1: 3000, LO + 2: 500})
+
+    def test_a_gz_file_that_is_not_gzip_is_an_error_naming_the_file(self):
+        path = self.dir / "chain.jsonl.gz"
+        path.write_text(json.dumps(completed(LO)) + "\n")
+        argv = self.argv([completed(LO)], [upper(LO, needs=0)])
+        argv[argv.index("--results") + 1] = str(path)
+        code, out, err = self.run_argv(argv)
+        self.assertEqual((code, out), (1, ""))
+        self.assertIn("chain.jsonl.gz: cannot read", err)
 
     def test_a_malformed_line_is_an_error_naming_file_and_line(self):
         for text, expected in [('{"n": 1}\n\n{"n": \n', "bad.jsonl line 3: not JSON"),

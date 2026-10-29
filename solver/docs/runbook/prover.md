@@ -2,7 +2,7 @@
 
 Part of the [runbook](../RUNBOOK.md).
 
-`prover.sh A B` proves opt(n) = V(n), the score that `results/strict.jsonl` records, for every n from A to B, on the
+`prover.sh A B` proves opt(n) = V(n), the score that `results/optimal.jsonl.gz` records, for every n from A to B, on the
 whole board.  It runs the prover's `exact` over the range in passes, one game a thread, and it is a small job next to
 the chain.  [The prover's proofs](../../noframe/docs/proofs.md) holds the proofs made so far and their cost.
 
@@ -113,9 +113,9 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh              # on spot: stops the run
    ```
 
-   `prover.sh` stops at once unless `results/strict.jsonl` holds game B.  `spot-watch.sh` starts without `S3_DEST`, so
-   its own `save.sh` copies nothing: the save to S3 is `prover.sh`'s, made as it exits (the exit trap of `run.sh`).  The
-   commands of [Watch, stop, resume](#watch-stop-resume) and [Bring the data home, verify,
+   `prover.sh` stops at once unless `results/optimal.jsonl.gz` holds game B.  `spot-watch.sh` starts without `S3_DEST`,
+   so its own `save.sh` copies nothing: the save to S3 is `prover.sh`'s, made as it exits (the exit trap of `run.sh`).
+   The commands of [Watch, stop, resume](#watch-stop-resume) and [Bring the data home, verify,
    commit](#bring-the-data-home-verify-commit) on your machine reach it as `$D`: `export
    D=s3://taxman-013764204840-us-east-1/PREFIX`.
 
@@ -204,7 +204,7 @@ The check (`summarize.py check A B`, which `prover.sh` also ran at the end) pass
 
 * every n in 2..B is proven: each n of A..B has a line, and with `BASELINE` each is proven by a bound, a search run to
   the end, or the ceiling or the prime formula from a proven predecessor;
-* every line's score is the score that `results/strict.jsonl` records.
+* every line's score is the score that `results/optimal.jsonl.gz` records.
 
 It then exits with status 0 and prints `OK: opt(n) is proven equal to the recorded score for every n in 2..B`;
 anything else prints which n failed.  Then, on your machine, count the proofs and their cost by bands of 100 in n:

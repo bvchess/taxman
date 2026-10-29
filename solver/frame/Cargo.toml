@@ -53,6 +53,9 @@ name = "ledger"
 test = true
 
 [dependencies]
+# The decoder of the results file, results/optimal.jsonl.gz, which the binary has built in; the prover reads it with the
+# same crate.
+taxman-gzip = { path = "../gzip" }
 
 [profile.release]
 lto = "fat"

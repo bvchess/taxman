@@ -20,23 +20,22 @@
 //!   best promotion sum is the same, and its game is `m`'s promotions played on this board (tactic `same_search`;
 //!   solver/docs/design/same-search.md, has the argument).
 //! * `known`: the optimality is a known source's, which the line's `known` field cites ([`Cite`], [`crate::known`]): the
-//!   game is taken from the source without a search (method `known`: `optimal.json`, the committed chain, or a board
-//!   that the bounds store has proven), or a search found a game that scores what the bounds store's upper bound of the
+//!   game is taken from the source without a search (method `known`: the table built into the program, the committed
+//!   chain, or a board that the bounds store has proven), or a search found a game that scores what the bounds store's
+//!   upper bound of the
 //!   board allows (method `search` or `start`; the bound stops the search the way `cap` does, and is checked against
 //!   the store).
 //!
 //! `cap` and `prime_formula` rest on the game of `n − 1` ([`Proof::rests_on_prev`]), and `same_search` on the game
 //! it repeats.  A proof that rests on another game assumes what that game's proof assumes ([`assumptions_of`]), and
 //! so on down the chain; a game's own search assumes nothing, since every tactic of the search is proven or sound.
-//! A `known` proof assumes what its source's game assumes: a game of `optimal.json` is assumed optimal, and the line
-//! says so, as [`assumed_optimal`] words it ("the game of 1300 in optimal.json is optimal"); the committed chain's
-//! game assumes what its line does (nothing); a bound of the bounds store holds wherever statement U holds at the
-//! boards it rests on, one assumption each ([`assumed_u`]).  The same assumption comes in when a run takes the game
-//! of `n − 1` from `optimal.json` (`solve --use-prev`) and a proof rests on it.  The researcher knows where the
-//! table's comes from: its games 1 to 1000 are the Java's, made with two conjectures (`reuse_prev` and
-//! `revise_freedoms`, removed from this solver), and its later ones were copied from a chain from n = 1.  A line
-//! that assumes nothing is proven within the frame model, given that the solver is right; so is every game of a
-//! chain from n = 1.
+//! A `known` proof assumes what its source's game assumes: a game of the table is assumed optimal, and the line says
+//! so, as [`assumed_optimal`] words it ("the game of 1300 in results/optimal.jsonl.gz is optimal"); the committed
+//! chain's game assumes what its line does; a bound of the bounds store holds wherever statement U holds at the boards
+//! it rests on, one assumption each ([`assumed_u`]).  The same assumption comes in when a run takes the game of `n − 1`
+//! from the table (`solve --use-prev`) and a proof rests on it.  The table holds the games of the committed chain and
+//! not the proofs of their lines, which is why its games are assumed: the lines of the file say what each game
+//! assumes.  A line that assumes nothing is proven within the frame model, given that the solver is right.
 //!
 //! # Checks
 //!
@@ -44,7 +43,7 @@
 //!
 //! * the game replays legally to its recorded score, is over (no legal move left) and opens with the largest
 //!   prime ([`replay_finished`]); its promotions are among its moves;
-//! * its score is `optimal.json`'s, where the table ([`Optimal::built_in`], or another a test gives) has the game;
+//! * its score is the table's, where the table ([`Optimal::built_in`], or another a test gives) has the game;
 //! * the fields the proof and the assumptions are derived from agree with each other, as the solver writes them: a
 //!   searched or repeat game, and only such a game, has a `setup`; every game but a prime one records
 //!   `in_the_bag`, which a prime game and a known one do not; only a search reaches its ceiling (`reached_cap`); a
@@ -52,7 +51,7 @@
 //!   repeats, and its `setup` has no `cap` (it ran no search to stop); a known game, and a search that a bound of the
 //!   store stopped, and only those, cite a source (`known`); only a search may count the nodes its near-repeat cut cut
 //!   (`stats.near_repeat_cut`, a number the proof does not rest on: the search still explores its whole tree);
-//! * against the game of `n − 1` (from the file, else from `optimal.json`):
+//! * against the game of `n − 1` (from the file, else from the table):
 //!   `score(n − 1) ≤ score(n) ≤ n + score(n − 1)`.  Both are theorems for optimal games, so a violation proves one
 //!   of the two games is not optimal;
 //! * the arithmetic of the line: a searched game scores `in_the_bag` plus its promotions; the ceiling on the
@@ -60,7 +59,7 @@
 //!   game records reaching it exactly when its promotions sum to it, where the search stops (so a proof by `cap`
 //!   cannot pass for an exhausted search, which does not rest on the game of `n − 1`); a prime game scores
 //!   `n + score(n − 1) − P`, `P` the largest prime below `n`;
-//! * the predecessor the line names is the game the file (or `optimal.json`) holds for `n − 1`: same score,
+//! * the predecessor the line names is the game the file (or the table) holds for `n − 1`: same score,
 //!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  But a record of the proof `known` of
 //!   the file's own game needs no more than the same score, moves and assumptions: it says where the run got its
 //!   copy of the game, and the file's line proves it.  A predecessor of a run or file with no proof is the best
@@ -83,7 +82,7 @@
 //!
 //! An incomplete line that records its game (`best_so_far`, with `moves` and `promotions`: the solver always writes
 //! them) is checked as far as it goes: the game is legal, scores the `best_so_far`, has ascending promotions that are
-//! moves, and is no better than `optimal.json`'s score.  A file may have holes, games with no line or only incomplete
+//! moves, and is no better than the table's score.  A file may have holes, games with no line or only incomplete
 //! ones (the file of a `--keep-going` run, or the sweep's `explore.jsonl`, which merges many); each line is checked
 //! against what it rests on in the same file, and a proof that rests on a game the file lacks is refused.
 //!
@@ -110,26 +109,19 @@
 //! `solver/tools/check_results.py` derives the same proofs and assumptions from the same rules with no code in common,
 //! so a mistake in either shows as a disagreement.
 //!
-//! # Extending the table of optimal games
-//!
-//! [`extend_optimal`] appends to the table `optimal.json` the games of a checked results file that continue it:
-//! from the game after the table's last, every game that is completed, up to the first game that is not
-//! (`taxman extend-optimal`).  A game that assumes a game of the table optimal assumes nothing the table does not
-//! already stand for, so it is appended like any other.  Its scores must agree with the table's wherever the two
-//! overlap, so a results file of another game cannot be mistaken for the table's continuation.
-//!
 //! The fields of a line are described in solver/docs/REFERENCE.md ("A results line (`--out`, schema 5)"); [`SCHEMA`] is
 //! the version of the format.
 
 use crate::board::search_problem;
-use crate::game::{largest_prime_at_most, replay, replay_finished, Optimal};
+use crate::game::{is_gzip, largest_prime_at_most, read_results_text, replay, replay_finished, Optimal};
 use crate::json::Json;
 use crate::known::{Cite, Known, KnownGame, Origin};
+use crate::paths::RESULTS_IN_REPOSITORY;
 use crate::search::{Problem, ProblemSize};
 use crate::solver::{parse_digest, GameResult, Method, PrevSource, SameSearch, MAX_N};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::fs::{self, File, OpenOptions, TryLockError};
+use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -142,9 +134,9 @@ pub const SCHEMA: u32 = 5;
 /// for a proof that rests on nothing else.
 pub type Assumptions = BTreeSet<String>;
 
-/// What a proof that rests on `optimal.json`'s game of `n` assumes: "the game of `n` in optimal.json is optimal".
+/// What a proof that rests on the table's game of `n` assumes: "the game of `n` in results/optimal.jsonl.gz is optimal".
 pub fn assumed_optimal(n: u32) -> String {
-    format!("the game of {n} in optimal.json is optimal")
+    format!("the game of {n} in {RESULTS_IN_REPOSITORY} is optimal")
 }
 
 /// What a bound of the bounds store that rests on statement U at the board `n` assumes: "statement U holds at n=4501".
@@ -297,7 +289,7 @@ pub struct StoredGame {
     pub promotions: Vec<u32>,
     pub proof: Proof,
     pub assumes: Assumptions,
-    /// Which theorem the score reaches, given the game of `n − 1` (if the file or `optimal.json` has it).
+    /// Which theorem the score reaches, given the game of `n − 1` (if the file or the table has it).
     pub ceiling_proof: Option<CeilingProof>,
     /// For a game that set a search up (searched or repeat), the size of its search problem as the line records it
     /// (`setup.frames`, `setup.candidates`, `setup.max_total`), which the problem set up again from its n
@@ -370,7 +362,7 @@ pub struct UnfinishedGame {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuiltOn {
     pub score: u64,
-    /// The game was optimal, given what it assumed (a completed game, or `optimal.json`'s): not the best game of an
+    /// The game was optimal, given what it assumed (a completed game, or the table's): not the best game of an
     /// unfinished search.
     pub proven: bool,
 }
@@ -562,7 +554,7 @@ fn parse_unfinished(f: &Fields, n: u32, line: usize) -> Result<Option<Unfinished
 }
 
 /// The checks of an incomplete line's game: legal, scoring the `best_so_far` it records (it need not be over, which
-/// only a completed game claims), promotions that are moves in ascending order, and no more than `optimal.json`'s
+/// only a completed game claims), promotions that are moves in ascending order, and no more than the table's
 /// score where the table has the game.
 fn check_unfinished(game: &UnfinishedGame, optimal: &Optimal) -> Result<(), String> {
     let replayed = replay(game.n, &game.moves)?;
@@ -577,7 +569,7 @@ fn check_unfinished(game: &UnfinishedGame, optimal: &Optimal) -> Result<(), Stri
         return Err(format!("promotion {p} is not a move"));
     }
     match optimal.score(game.n) {
-        Some(best) if game.score > best => Err(format!("best_so_far {} is above optimal.json's {best}", game.score)),
+        Some(best) if game.score > best => Err(format!("best_so_far {} is above the table's {best}", game.score)),
         _ => Ok(()),
     }
 }
@@ -671,14 +663,15 @@ pub struct CommittedGame {
     pub assumes: Assumptions,
 }
 
-/// The completed games of the results file at `path`, by n.  The lines of unfinished searches are passed over.
+/// The completed games of the results file at `path` (a gzip file if its name ends in `.gz`), by n.  The lines of
+/// unfinished searches are passed over.
 ///
 /// # Errors
 ///
 /// If the file cannot be read, a line is not a line of schema [`SCHEMA`], or two lines hold a completed game of one
 /// n.
 pub fn committed_games(path: &Path) -> Result<BTreeMap<u32, CommittedGame>, String> {
-    let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let text = read_results_text(path)?;
     let mut games = BTreeMap::new();
     for (i, raw) in text.lines().enumerate().filter(|(_, raw)| !raw.trim().is_empty()) {
         let at = |e: String| format!("{}: line {}: {e}", path.display(), i + 1);
@@ -832,30 +825,31 @@ fn problem_of(problems: &mut Problems, k: u32) -> Result<&(Problem, u64), String
     problems.entry(k).or_insert_with(|| set_up(k)).as_ref().map_err(String::clone)
 }
 
-/// [`read_results`] on the file at `path`, without changing it.  Errors name the file.
+/// [`read_results`] on the file at `path` (a gzip file if its name ends in `.gz`), without changing it.  Errors name the
+/// file.
 pub fn read_results_file(path: &Path, optimal: &Optimal, threads: usize) -> Result<Contents, String> {
     read_results_file_with(path, &Known::table(optimal), threads)
 }
 
 /// [`read_results_with`] on the file at `path`, without changing it.  Errors name the file.
 pub fn read_results_file_with(path: &Path, known: &Known, threads: usize) -> Result<Contents, String> {
-    let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let text = read_results_text(path)?;
     read_results_with(&text, known, threads).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// The game of `n − 1` that a line was built from, as far as it is known.  For a game of `optimal.json` that the
+/// The game of `n − 1` that a line was built from, as far as it is known.  For a game of the table that the
 /// table at hand does not have (a line made with a longer table), the line's own record stands in for its score,
 /// and its moves are not known.
 struct Pred<'a> {
     score: u64,
     moves: Option<&'a [u32]>,
     /// How the game's optimality is established, as the line records it: the proof of the file's completed game or of
-    /// the committed chain's, `known` for a board of the store; none for `optimal.json`'s and for an unfinished
+    /// the committed chain's, `known` for a board of the store; none for the table's and for an unfinished
     /// search's.
     proof: Option<Proof>,
     assumes: Assumptions,
     whence: String,
-    /// Whether the game is optimal, given what it assumes (the file's completed game, `optimal.json`'s); false for the
+    /// Whether the game is optimal, given what it assumes (the file's completed game, the table's); false for the
     /// best game of an unfinished search, which a line can have been seeded with and nothing more.
     proven: bool,
 }
@@ -915,8 +909,7 @@ fn contradiction(e: &Entry) -> Option<String> {
         }
         (Some(Cite::Optimal | Cite::Strict), Method::Search | Method::Start) => {
             return Some(
-                "a searched game that cites optimal.json or the committed chain, which only a known game does"
-                    .to_owned(),
+                "a searched game that cites the table or the committed chain, which only a known game does".to_owned(),
             );
         }
         (Some(_), Method::Search | Method::Start) if e.reached_cap => {
@@ -1026,7 +1019,7 @@ fn check_entry(
         return Err(fail(format!("promotion {p} is not a move")));
     }
     if let Some(expected) = optimal.score(n).filter(|&expected| expected != e.score) {
-        return Err(fail(format!("scores {}, but optimal.json has {expected}", e.score)));
+        return Err(fail(format!("scores {}, but the table has {expected}", e.score)));
     }
     if let Some(contradiction) = contradiction(&e) {
         return Err(fail(contradiction));
@@ -1046,7 +1039,7 @@ fn check_entry(
             moves: Some(optimal.moves(before)?),
             proof: None,
             assumes: Assumptions::from([assumed_optimal(before)]),
-            whence: "optimal.json".to_owned(),
+            whence: Origin::Optimal.whence().to_owned(),
             proven: true,
         })
     });
@@ -1116,7 +1109,7 @@ fn check_entry(
                     moves: None,
                     proof: None,
                     assumes: Assumptions::from([assumed_optimal(n - 1)]),
-                    whence: "optimal.json".to_owned(),
+                    whence: Origin::Optimal.whence().to_owned(),
                     proven: true,
                 }),
                 PrevSource::Strict | PrevSource::Bounds => {
@@ -1411,9 +1404,16 @@ pub(crate) fn sibling_path(file: &Path, kind: &str) -> PathBuf {
 
 /// Opens the file at `path` for appending (creating it if need be), locks it against every other process and every
 /// other handle (`flock`; the lock goes when the file is unlocked or dropped, or the process ends), and reads it whole.
-/// A file another holds is refused, since two runs appending to one file would both append the same games.
+/// A file another holds is refused, since two runs appending to one file would both append the same games.  So is a file
+/// whose name ends in `.gz`: what a run appends to is plain JSONL, and a line appended to a gzip file would damage it.
 pub(crate) fn open_locked(path: &Path) -> Result<(File, String), String> {
     let io_error = |e: std::io::Error| format!("{}: {e}", path.display());
+    if is_gzip(path) {
+        return Err(format!(
+            "{}: a file a run appends to is plain JSONL, and this name is a gzip file's",
+            path.display()
+        ));
+    }
     let mut file = OpenOptions::new().create(true).read(true).append(true).open(path).map_err(io_error)?;
     match file.try_lock() {
         Ok(()) => {}
@@ -1569,82 +1569,12 @@ impl fmt::Display for Report {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Extending the table of optimal games
-
-/// Why [`extend_optimal`] stopped.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StopReason {
-    /// The results end before game n; `last` is the n of their last completed game (0: none).
-    ResultsEnd { last: u32 },
-    /// The results hold games past game n (up to `last`) but none completed for it.
-    Gap { last: u32 },
-    /// The results hold only searches of game n that a limit stopped.
-    Incomplete,
-}
-
-impl fmt::Display for StopReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StopReason::ResultsEnd { last: 0 } => write!(f, "the results have no completed game"),
-            StopReason::ResultsEnd { last } => write!(f, "the results end at n = {last}"),
-            StopReason::Gap { last } => write!(f, "the results have no completed game of it, but go on to n = {last}"),
-            StopReason::Incomplete => write!(f, "the results have only a search of it that a limit stopped"),
-        }
-    }
-}
-
-/// What [`extend_optimal`] did.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Extension {
-    /// The values of n of the games it appended to the table (an empty range if none).
-    pub added: std::ops::RangeInclusive<u32>,
-    /// The first n it did not append.
-    pub stopped_at: u32,
-    /// Why it did not.
-    pub reason: StopReason,
-}
-
-/// Appends to `optimal` the games of a checked results file that continue it: from the game after the table's last,
-/// each game that `contents` ([`read_results`]) holds completed, up to the first game that has none.  A game whose
-/// proof assumes a game of the table optimal is appended too: it assumes nothing the table does not stand for.  A
-/// search that a limit stopped and a completed game of the same n may both be in the file (a run and its resume):
-/// the completed game is the game.
-///
-/// # Errors
-///
-/// If the results and the table score differently for an n that both have, naming it: they are not results
-/// for the same game, or one of them is wrong.  The scores are compared before anything is appended.
-pub fn extend_optimal(optimal: &mut Optimal, contents: &Contents) -> Result<Extension, String> {
-    for (&n, game) in &contents.games {
-        if let Some(recorded) = optimal.score(n).filter(|&recorded| recorded != game.score) {
-            return Err(format!(
-                "n={n}: the results (line {}) score {}, but the table has {recorded}",
-                game.line, game.score
-            ));
-        }
-    }
-    let last = contents.games.keys().next_back().copied().unwrap_or(0);
-    let first = optimal.max_n() + 1;
-    let mut n = first;
-    let reason = loop {
-        match contents.games.get(&n) {
-            Some(game) => optimal.push(n, game.score, game.moves.clone())?,
-            None if contents.runs.contains_key(&n) => break StopReason::Incomplete,
-            None if last > n => break StopReason::Gap { last },
-            None => break StopReason::ResultsEnd { last },
-        }
-        n += 1;
-    };
-    Ok(Extension { added: first..=n - 1, stopped_at: n, reason })
-}
-
-// ---------------------------------------------------------------------------------------------------------
 // Tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::solver::{solve_game, solve_range, Prev, SolveOptions};
+    use crate::solver::{solve_range, SolveOptions};
 
     /// The lines `taxman solve 1-12` writes, as JSON objects.
     fn lines_1_to_12() -> Vec<Json> {
@@ -1693,7 +1623,7 @@ mod tests {
         assert!(Proof::ALL.iter().all(|&p| Proof::parse(p.as_str()) == Some(p)));
         let names = |assumes: Assumptions| assumes.into_iter().collect::<Vec<_>>();
         // Inherited only by a proof that rests on the game of n − 1.
-        assert_eq!(assumed_optimal(1300), "the game of 1300 in optimal.json is optimal");
+        assert_eq!(assumed_optimal(1300), "the game of 1300 in results/optimal.jsonl.gz is optimal");
         let prev = Assumptions::from([assumed_optimal(1300)]);
         assert_eq!(names(assumptions_of(Proof::Cap, Some(&prev))), [assumed_optimal(1300)]);
         assert_eq!(names(assumptions_of(Proof::PrimeFormula, Some(&prev))), [assumed_optimal(1300)]);
@@ -1765,7 +1695,7 @@ mod tests {
         // A score that is not the table's: here the table is wrong about game 12, which the check cannot tell.
         let other = Optimal::from_json(&Json::parse(r#"[{"n":12,"score":51,"moves":[]}]"#).unwrap()).unwrap();
         let err = read_results(&text(&lines), &other, 1).unwrap_err();
-        assert!(err.starts_with("line 12 (n=12): scores 50, but optimal.json has 51"), "{err}");
+        assert!(err.starts_with("line 12 (n=12): scores 50, but the table has 51"), "{err}");
         refused(11, with(&lines[11], "proof", Json::from("cap")), "records the proof cap");
         refused(11, with(&lines[11], "promotions", Json::array([12u32, 8])), "not in ascending order");
         // Only schema 5 is read: a line of another schema, or of none, is refused.
@@ -1816,7 +1746,7 @@ mod tests {
     #[test]
     fn the_chain_catches_a_game_of_n_minus_1_that_is_not_optimal() {
         let lines = lines_1_to_12();
-        // Game 12 scores 50 (optimal.json's 11 scores 44); an optimal.json that says 11 scores less than 38 is
+        // Game 12 scores 50 (the table's 11 scores 44); a table that says 11 scores less than 38 is
         // contradicted, and so is one that says 11 scores more than 12.
         let line = text(&lines[11..]);
         for (score, expected) in [(30, "more than n + score(n − 1) = 42"), (51, "less than the 51 of n − 1")] {
@@ -1828,16 +1758,6 @@ mod tests {
         // Without a game of 11 the line cannot stand: it names one from this file.
         let err = read_results(&line, Optimal::built_in(), 1).unwrap_err();
         assert!(err.contains("which the file does not hold"), "{err}");
-    }
-
-    /// The table of the first `count` games of `contents`.
-    fn table_of(contents: &Contents, count: u32) -> Optimal {
-        let games = (1..=count).map(|n| {
-            let game = &contents.games[&n];
-            let moves = Json::array(game.moves.iter().copied());
-            Json::object([("n", Json::from(n)), ("score", Json::from(game.score)), ("moves", moves)])
-        });
-        Optimal::from_json(&Json::array(games)).unwrap()
     }
 
     /// The line a run stopped by a limit writes for a search of `n` that did not finish.
@@ -1866,104 +1786,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_table_is_extended_by_the_games_that_follow_it() {
-        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in(), 1).unwrap();
-        assert!(contents.games.values().all(|game| game.assumes.is_empty()));
-        let mut table = table_of(&contents, 5);
-        let extension = extend_optimal(&mut table, &contents).unwrap();
-        assert_eq!(extension, Extension { added: 6..=12, stopped_at: 13, reason: StopReason::ResultsEnd { last: 12 } });
-        assert!(table.sizes().eq(1..=12));
-        for (n, score, moves) in table.games() {
-            assert_eq!((score, moves), (contents.games[&n].score, &contents.games[&n].moves[..]), "n={n}");
-        }
-
-        // Nothing to add is fine, and changes nothing.
-        let before = table.to_file_text();
-        let extension = extend_optimal(&mut table, &contents).unwrap();
-        assert!(extension.added.is_empty() && extension.stopped_at == 13, "{extension:?}");
-        assert_eq!(table.to_file_text(), before);
-    }
-
-    #[test]
-    fn the_extension_takes_a_game_that_assumes_a_game_of_the_table() {
-        // Games 51 and 52 are solved standalone (their proofs rest on no other game).  Game 53, a prime, is built
-        // on optimal.json's game of 52, and its proof (the prime formula) assumes that game optimal.
-        let optimal = Optimal::built_in();
-        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
-        let mut lines: Vec<Json> = solve_range(51, 52, &opts, None).unwrap().iter().map(GameResult::to_json).collect();
-        let prev = Prev::from_optimal(optimal, 52).unwrap();
-        lines.push(solve_game(53, Some(&prev), &opts).unwrap().to_json());
-        let contents = read_results(&text(&lines), optimal, 1).unwrap();
-        assert!(contents.games[&51].assumes.is_empty() && contents.games[&52].assumes.is_empty());
-        assert!(contents.games[&53].assumes.iter().eq([&assumed_optimal(52)]));
-
-        let games = optimal.games().take(50).map(|(n, score, moves)| {
-            let moves = Json::array(moves.iter().copied());
-            Json::object([("n", Json::from(n)), ("score", Json::from(score)), ("moves", moves)])
-        });
-        let mut table = Optimal::from_json(&Json::array(games)).unwrap();
-        let extension = extend_optimal(&mut table, &contents).unwrap();
-        assert_eq!(
-            extension,
-            Extension { added: 51..=53, stopped_at: 54, reason: StopReason::ResultsEnd { last: 53 } }
-        );
-        assert!(table.sizes().eq(1..=53));
-    }
-
-    #[test]
-    fn the_extension_stops_at_an_unfinished_search_or_a_gap() {
-        let lines = lines_1_to_12();
-        let extend = |lines: &[Json]| {
-            let mut table = table_of(&read_results(&text(&lines[..7]), Optimal::built_in(), 1).unwrap(), 7);
-            extend_optimal(&mut table, &read_results(&text(lines), Optimal::built_in(), 1).unwrap()).unwrap()
-        };
-
-        // The file ends with a search of 10 that a limit stopped.
-        let mut unfinished = lines[..9].to_vec();
-        unfinished.push(incomplete_line(10));
-        let extension = extend(&unfinished);
-        assert_eq!((extension.added, extension.stopped_at, extension.reason), (8..=9, 10, StopReason::Incomplete));
-
-        // A run and its resume: the incomplete line comes first and the completed one is the game.
-        let mut resumed = lines[..9].to_vec();
-        resumed.push(incomplete_line(10));
-        resumed.extend_from_slice(&lines[9..]);
-        let extension = extend(&resumed);
-        assert_eq!((extension.added, extension.stopped_at), (8..=12, 13));
-
-        // A game of 12 solved on its own, with no 10 or 11 in the file.
-        let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
-        let mut alone = lines[..9].to_vec();
-        alone.push(solve_game(12, None, &opts).unwrap().to_json());
-        let extension = extend(&alone);
-        assert_eq!(
-            (extension.added, extension.stopped_at, extension.reason),
-            (8..=9, 10, StopReason::Gap { last: 12 })
-        );
-
-        // Games that are all in the table already: nothing is added, and the results' end is the reason.
-        let extension = extend(&lines[..7]);
-        let reason = StopReason::ResultsEnd { last: 7 };
-        assert_eq!((extension.added.is_empty(), extension.stopped_at, extension.reason), (true, 8, reason));
-    }
-
-    #[test]
-    fn the_extension_refuses_results_that_score_differently_from_the_table() {
-        let contents = read_results(&text(&lines_1_to_12()), Optimal::built_in(), 1).unwrap();
-        let wrong = r#"[{"n":3,"score":4,"moves":[3]}]"#;
-        let mut table = Optimal::from_json(&Json::parse(wrong).unwrap()).unwrap();
-        let err = extend_optimal(&mut table, &contents).unwrap_err();
-        assert!(err.starts_with("n=3: the results (line 3) score 3, but the table has 4"), "{err}");
-        assert_eq!(table.max_n(), 3, "nothing was appended");
-    }
-
-    /// The first `count` lines of the committed chain, which include hundreds of repeats (107 in the first 300), whose
-    /// checks set search problems up.
+    /// The first `count` lines of the committed chain, which include many repeats, whose checks set search problems up.
     fn committed_lines(count: usize) -> Vec<Json> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/strict.jsonl");
-        let text = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        text.lines().take(count).map(|line| Json::parse(line).unwrap()).collect()
+        crate::test_support::committed_text(count).lines().map(|line| Json::parse(line).unwrap()).collect()
     }
 
     /// The error that `lines` give on one thread, which they give on three as well (nothing else is checked of it).

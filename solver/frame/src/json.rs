@@ -1,5 +1,5 @@
-//! A minimal JSON reader and writer, so that the crate needs no dependencies.  It is enough for what the solver
-//! reads and writes as JSON: the table of optimal games `optimal.json` ([`crate::game::Optimal`]), the
+//! A minimal JSON reader and writer, so that the crate needs no third-party library.  It is enough for what the solver
+//! reads and writes as JSON: the games of the table of optimal games ([`crate::game::Optimal`]), the
 //! results files, one object per line ([`crate::results`]), and the golden test data.  (Checkpoints are
 //! binary, not JSON: see [`crate::engine`] and the search's header.)
 //!

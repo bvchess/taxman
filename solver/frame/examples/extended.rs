@@ -2,8 +2,8 @@
 //! ([`taxman::frames::build_extended`], [`Board::prepare_extended`]).  Research code for the extended problem
 //! (docs/theory/extended-problem.md); the solver does not use it.  By the exactness theorem (X7,
 //! docs/theory/exactness.md) and the extended exactness theorem (E1, docs/theory/extended-problem.md) the promotion
-//! sets of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as `optimal.json` and
-//! `results/strict.jsonl` do.  With the claims the kept-claims lemma (E4) keeps, the default, Π⁺(∅) is the frame
+//! sets of Π⁺(∅) are those of the frame model, so a chain searched on it must score every game as the table and
+//! `results/optimal.jsonl.gz` do.  With the claims the kept-claims lemma (E4) keeps, the default, Π⁺(∅) is the frame
 //! model's problem itself, so `--compare` shows the same trees (a ratio of 1).  With `--no-claims`, the formulation
 //! of the first certificates (the measurement of stage 1), its root frames keep the pairs `unzip` would claim (only
 //! the root's reduction removes some), so its trees can differ from the default problem's: how many nodes it takes
@@ -20,7 +20,7 @@
 //! claims that lemma allows (`Board::extended`).
 //!
 //! For each board `n` in `FROM..=TO` (2 at least, `TO` at most the largest board the solver supports), one after the
-//! other on one thread, each game built from the game before it: the game of `FROM − 1` is the one of `optimal.json`
+//! other on one thread, each game built from the game before it: the game of `FROM − 1` is the one of the table
 //! (or of the results file given with `--known`, for a board past its end), and after that it is the one this run
 //! found.  A game is set up as `taxman solve` sets it up, but on Π⁺(∅) (`Board::prepare_extended`).  If the problem has
 //! no candidates the game is the one with no promotions (method `trivial`).  Otherwise the problem is searched to the

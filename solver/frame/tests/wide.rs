@@ -3,9 +3,9 @@
 //! The Java stopped at n = 1000, and the sets that hold the numbers of a board are 8 words wide up
 //! to n = 511, then 16, 20, 24, 28, 32, 36, 40, 48 and 56 words up to 1023, 1279, 1535, 1791, 2047, 2303, 2559, 3071
 //! and 3583, 64 up to 4095 and 128 up to 8191 (`bits::WIDTHS`), so the boards above n = 1023 meet few tests besides
-//! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to 5053 and 2049) and the committed results
-//! (`results/strict.jsonl`, n = 1..5053; `optimal.json` has its games to 5053, but that is the solver's own answer and
-//! no check of it).  What is cheap to run here: the same small game at every
+//! these: `tests/board_layer.rs` and `tests/golden_frames.rs` (to the end of the committed results and to 2049) and
+//! the committed results (`results/optimal.jsonl.gz`, whose games past 1000 are the solver's own answer and no check of
+//! it).  What is cheap to run here: the same small game at every
 //! width that holds it (a width-dependent bug changes the tree), games of 1100 to 1250 that need a few thousand
 //! nodes against the committed results, boards of 2048 and more through their setup, and the boards past 4095
 //! (128 words, and the GF(2) bound's engines of four and five block words) through theirs.
@@ -204,7 +204,7 @@ fn the_setups_of_boards_past_2047_are_the_same_at_their_width_at_64_and_at_128()
 // Games of 1100 and more, against the committed results
 
 /// Game 1133 (W = 20, the width of the hardest games) searches in a few thousand nodes: every sound tactic must
-/// give the score of `results/strict.jsonl`, on one thread, and the default also on two.  Nothing else searches at
+/// give the score of `results/optimal.jsonl.gz`, on one thread, and the default also on two.  Nothing else searches at
 /// a width of 20 or more and checks the answer.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is some_tactics_give_the_recorded_score_at_w20")]
@@ -220,7 +220,7 @@ fn some_tactics_give_the_recorded_score_at_w20() {
 
 /// Every `every`th of the variants of the tactics gives the recorded score of game 1133.
 fn tactics_give_the_recorded_score_at_w20(every: usize) {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants().into_iter().step_by(every) {
         for threads in if name == "default" { vec![1, 2] } else { vec![1] } {
@@ -239,7 +239,7 @@ fn tactics_give_the_recorded_score_at_w20(every: usize) {
 /// handed on in memory; `tests/integrity.rs` covers the results file.
 #[test]
 fn a_slice_of_the_chain_reproduces_the_results() {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let opts = options(2);
     let mut prev = prev_of(&games, 1127);
     let mut searched = 0;
@@ -332,7 +332,7 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
 /// game 1133 (not for game 1131, whose bound is larger).
 #[test]
 fn the_sacrifice_bound_proves_a_w20_result() {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let n = 1133;
     let (prev_score, prev) = &games[&(n - 1)];
     let bound = sacrifice_bound(n, prev, *prev_score, None, &PuncturedOptions::default()).unwrap();
@@ -461,7 +461,7 @@ fn old_window(mut opts: SolveOptions) -> SolveOptions {
 /// `D/n1133.ckpt` over the fixture.
 #[test]
 fn a_committed_checkpoint_resumes() {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let dir = TempDir::new("committed-checkpoint");
     let opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
     let checkpoint = opts.checkpoint_file(1133).unwrap();
@@ -486,7 +486,7 @@ fn a_committed_checkpoint_resumes() {
 /// with open sources instead, it is refused, saying why.
 #[test]
 fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let dir = TempDir::new("committed-checkpoint-v4");
     let mut opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
     opts.tactics.set("near_repeat=off").unwrap();
@@ -532,7 +532,7 @@ fn a_w20_search_interrupted_and_resumed_once_gives_the_same_answer() {
 /// The W = 20 search of game 1133 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
 /// the matching path, without the near-repeat cut, by which the game of 1132 ends the search at its first step.
 fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
-    let games = stored_games("strict.jsonl");
+    let games = stored_games();
     let prev = prev_of(&games, 1133);
     for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(sets) {
         let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
@@ -608,7 +608,7 @@ fn single_promotions_agree_with_the_peel_at_wide_widths() {
 // Deep in the tree of a large game
 
 /// The units a node-limited search of game 1215 leaves in its checkpoint (`testdata/n1215_deep_units.txt`; W = 32,
-/// default tactics, 30,000 nodes, one thread, from game 1214 of `strict.jsonl`): the levels of its depth-first
+/// default tactics, 30,000 nodes, one thread, from game 1214 of `results/optimal.jsonl.gz`): the levels of its depth-first
 /// stack, from the root to 34 promotions deep.  Returns the checkpoint's incumbent and the units.
 ///
 /// To make such a file again, run `taxman solve 1215 --use-prev --threads 1 --node-limit 30000 --out R

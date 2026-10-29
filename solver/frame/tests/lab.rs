@@ -4,7 +4,7 @@
 //! take, threads it cannot have, `conflict_branching`, `conflict_look` and the gate switched at every tick, a restart
 //! of a game in the middle of its search, and a redeploy at a commit that is not on master (the solver does not judge
 //! commits: it stops, and the chain's script, which does, runs the build it has again, as the second run here does).
-//! Every bad command is refused with its reason, every game ends with the score of `optimal.json`, and the file passes
+//! Every bad command is refused with its reason, every game ends with the score of the table, and the file passes
 //! the verifier.  The game restarted records it, keeps its first checkpoint aside, and the hook hears of it twice, once
 //! when it runs long and once with its line.  Small games of the default search, two threads.
 //!
@@ -563,7 +563,7 @@ fn a_policy_survives_a_restart_of_the_run() {
 /// tactics bind nothing), so a policy given between the pieces of a search reaches the piece that resumes it.  Game 1000,
 /// whose default search takes more than the 1,024 steps after which a node limit stops it, is stopped again and again
 /// and resumed: the first piece under the run's flags, each piece after it under a policy that differs from the one
-/// before it in both settings.  It finishes with its score in `optimal.json`.
+/// before it in both settings.  It finishes with its score in the table.
 #[test]
 fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
     let optimal = Optimal::built_in();
@@ -612,7 +612,7 @@ fn a_policy_reaches_a_search_resumed_under_the_other_settings() {
 
 /// The gate of a policy reaches the searchers and changes the tree of a game, and not its answer.  Game 1000, searched
 /// from nothing on one thread, is solved with no policy and under a policy whose gate is 0, so that conflict branching
-/// chooses at every check, not only where the gap passes 300.  Each ends with its score in `optimal.json`, the trees
+/// chooses at every check, not only where the gap passes 300.  Each ends with its score in the table, the trees
 /// differ, and the line of the second says which gate the policy gave.
 #[test]
 fn a_policys_gate_changes_the_tree_of_a_game_and_not_its_answer() {

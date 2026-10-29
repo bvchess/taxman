@@ -5,10 +5,12 @@ edition = "2021"
 description = "Independent proofs and checks of the Taxman solver's results"
 publish = false
 
-# Its own workspace: this crate shares no code with the frame solver in ../frame (independence is the point).
+# Its own workspace: this crate shares no proof code with the frame solver in ../frame (independence is the point).
+# The two programs share only the gzip decoder in ../gzip, which reads the committed chain.
 [workspace]
 
 [dependencies]
+taxman-gzip = { path = "../gzip" }
 
 [profile.release]
 lto = "fat"

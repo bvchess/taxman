@@ -5,10 +5,11 @@ Part of the [runbook](../RUNBOOK.md).
 ## What is being computed
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
-Nothing comes from `optimal.json`, which the run only compares with, so the chain assumes nothing.  The
-committed `results/strict.jsonl` is exactly such a file: a laptop made its first 2175 games and cloud machines the rest
-([results/README.md](../../../results/README.md) has its range and how each part was made).  A run from n = 1 reproduces
-its scores, and `verify.sh` checks the run against it.  The production chain can instead start from the committed file,
+Nothing comes from the built-in table, which the run only compares with, so the chain assumes nothing.  The
+committed `results/optimal.jsonl.gz` is exactly such a file, compressed
+([results/README.md](../../../results/README.md#optimaljsonlgz) has its range, and
+[results/runs.md](../../../results/runs.md) how each part was made).  A run from n = 1 reproduces its scores, and
+`verify.sh` checks the run against it.  The production chain can instead start from the committed file,
 as [Run](#run) says, so that the run solves only the games above its end.  The solver is the same code as on a laptop;
 the machine only changes how long it takes.
 
@@ -67,12 +68,12 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
 2225, and a window of 16 20 to 32 % slower than 1 on 64 threads.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
-  committed `results/strict.jsonl` (the scores equal; the moves may differ).  The first 2175 games take minutes on the
-  big machine, and `verify.sh` then checks the machine and the build against the committed file.  To skip those games,
-  copy the committed file in before the first run, once:
+  committed `results/optimal.jsonl.gz` (the scores equal; the moves may differ).  The first 2175 games take minutes on
+  the big machine, and `verify.sh` then checks the machine and the build against the committed file.  To skip those
+  games, decompress the committed file into the run's file before the first run, once:
 
   ```
-  mkdir -p ~/taxman-work/results && cp results/strict.jsonl ~/taxman-work/results/strict.jsonl
+  mkdir -p ~/taxman-work/results && gzip -dc results/optimal.jsonl.gz > ~/taxman-work/results/strict.jsonl
   solver/tools/cloud/chain.sh 8191                    # skips the games it holds and solves the next on
   ```
 
@@ -127,14 +128,14 @@ ones: the log has each game's seconds, and past 1300 they come in waves of a few
 `chain.sh` runs `verify.sh` when the range is complete.  On any copy of the file, anywhere:
 
 ```
-solver/tools/cloud/verify.sh results-from-cloud/strict.jsonl
+solver/tools/cloud/verify.sh results-from-cloud/chain.jsonl
 ```
 
 `verify.sh` runs `taxman verify-results` and `solver/tools/check_results.py` on the file together with the committed
-`results/strict.jsonl`.  The two verifiers check that:
+`results/optimal.jsonl.gz`.  The two verifiers check that:
 
 * every game replays legally, finishes, and opens with the largest prime;
-* each score agrees with `optimal.json`;
+* each score agrees with the built-in table;
 * the chain bounds `score(n-1) <= score(n) <= n + score(n-1)` hold, and each line's arithmetic and provenance;
 * the Franklín–Moniot bound and the best heuristic chain hold;
 * every game that the file shares with the committed file has the same score.
@@ -145,21 +146,30 @@ stopped and resumed left one.)
 
 A run with `--use-prev` ([Launch, watch, stop, clean up](wall.md#launch-watch-stop-clean-up)) holds the committed
 chain's games as `known` lines at the start of its own file, so its file does not continue the committed file as it
-stands.  Append its completed lines past the committed file's last game, byte for byte, and leave out its `known` copies
-of the committed games and its incomplete lines (the committed file has none); then run the referees on the committed
-file.  The first appended line records its game of n − 1 with the proof `known`, as the run's own line, while the
-committed file's line has the proof it was made with.  Both referees accept that record, because the score, the moves
-and the assumptions are the line's.
+stands.  Bring the games of any run home by appending the games past the committed file's end to it as one gzip member,
+which leaves every earlier byte of the file as it was.  In the run's own file (the plain JSONL that the run wrote, not
+in the repository), find the numbers of the lines that are the first completed line of each game past the committed
+file's last game, leaving out the run's `known` copies of the committed games and its incomplete lines (the committed
+file has none).  A is the number of the first of those lines and B of the last.  Where an incomplete line sits between
+two games, give the sed address of each stretch of consecutive lines (`A,Bp;C,Dp`).  Then run both verifiers on the
+file:
+
+```
+grep -n '"completed":true' FILE | cut -c1-40         # each completed line's number, and its first characters
+sed -n 'A,Bp' FILE | gzip -9 -n >> results/optimal.jsonl.gz       # the lines, byte for byte, as one member
+taxman verify-results results/optimal.jsonl.gz
+python3 solver/tools/check_results.py results/optimal.jsonl.gz
+```
+
+The first appended line records its game of n − 1 with the proof `known`, as the run's own line, while the committed
+file's line has the proof it was made with.  Both referees accept that record, because the score, the moves and the
+assumptions are the line's.  The built-in table takes the appended games at the next build, because the binary carries
+the file as it was when it was built.
 
 Then decide what to keep.  [Storage](machine.md#storage) gives the file's size.  Scripts must not overwrite the
-committed `results/`: put a file next to them (say `results/strict-1-N.jsonl`) and update
+committed `results/`: put a file next to them (say `results/chain-1-N.jsonl`) and update
 [`results/README.md`](../../../results/README.md) and the list of results files in `tests/results.rs`.  Logs that a
 measurement needs go to its notebook entry.
-
-To extend the table of optimal games, run `taxman extend-optimal` on the verified file from a checkout:
-`taxman extend-optimal results-from-cloud/strict.jsonl --out /tmp/optimal.json`.  It appends the games past the table's
-end that the file completed, and says where it stopped.  Check the result with `taxman verify-optimal /tmp/optimal.json`
-and `diff`, copy it over `results/optimal.json`, and rebuild, because the binary carries the table it was built with.
 
 ## Examples
 

@@ -74,7 +74,7 @@ fn quantiles(values: &mut [i64]) -> String {
     )
 }
 
-/// The report of the run in `dir` as text, and whether the check against the known optima (optimal.json, with the
+/// The report of the run in `dir` as text, and whether the check against the known optima (the table, with the
 /// completed games of the results files `known`) found nothing wrong.
 pub fn report(dir: &Path, known: &[PathBuf]) -> Result<(String, bool), String> {
     let entries = read_ledger(dir)?;

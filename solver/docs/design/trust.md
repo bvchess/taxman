@@ -11,11 +11,11 @@ results line shows them, [frame-model.md](frame-model.md) says what each kind of
 file is the design behind them; `src/results.rs` has the full rules and the checks.
 
 **What a game assumes** is inherited down the chain: a proof that rests on the game of n − 1, a repeat and a `known`
-proof each assume what the game they rest on assumes.  Only two sources add an assumption, a game taken from
-`optimal.json` and a bound of the bounds store ([REFERENCE.md, "Assumptions"](../REFERENCE.md#assumptions) words them).
-So a chain from n = 1 that takes no game from `optimal.json` or the bounds store assumes nothing: it is proven within
-the frame model, given that the solver is right.  The solver
-refuses no game for what it assumes: the line says it, and the verifiers count it.
+proof each assume what the game they rest on assumes.  Only two sources add an assumption, a game taken from the
+built-in table and a bound of the bounds store ([REFERENCE.md, "Assumptions"](../REFERENCE.md#assumptions) words them).
+So a chain from n = 1 that takes no game from the built-in table or the bounds store assumes nothing: it is proven
+within the frame model, given that the solver is right.  The solver refuses no game for what it assumes: the line says
+it, and the verifiers count it.
 
 **Checks and referees.**  `game::replay_finished` replays every game before it counts, the solver checks its arithmetic
 and the ceilings `score(n−1) ≤ score(n) ≤ n + score(n−1)`, and two verifiers read results files without changing them:
@@ -107,7 +107,7 @@ game may take from that game only what does not rest on its being optimal.  A *s
 use, offered as an incumbent, so it cannot change what a search proves.  Three things do rest on opt(n − 1): the ceiling
 `n + opt(n − 1)` (a `cap` proof), the prime formula (proved at `accelerate::prime_shortcut`), and the tripwire that a
 score above that ceiling proves the game before it not optimal.  The solver takes each of them from a game only if
-`Prev::proven`, which is true of a completed game and of `optimal.json`'s (assumed), and false of the best game of a
+`Prev::proven`, which is true of a completed game and of the built-in table's (assumed), and false of the best game of a
 stopped search.  A repeat rests on the earlier game it repeats, which is a completed game of the file or the range,
 never an unfinished one.  The check that a completed game scores no less than the game before it stays, since a game of
 n − 1 is a game of n, optimal or not.
@@ -120,11 +120,13 @@ solved one at a time, because a game that went on from a game in flight would no
 
 ## Known games
 
-`--use-prev` draws on the games that other work has made (`src/known.rs`): `optimal.json`, the committed chain
-`results/strict.jsonl`, and the proven games of the bounds store `results/bounds.jsonl` (`src/store.rs`; the ledger
-writes it).  They are the repository's `results` (`paths`), and no option names another.  `Known::game(n)` is the game
-of n from the best source that holds one: the committed chain's, which is as proven as its line and assumes what the
-line does, then the store's, then the table's.  A game of the store is *proven* when its best lower bound equals its
+`--use-prev` draws on the games that other work has made (`src/known.rs`): the built-in table, the committed chain, and
+the proven games of the bounds store `results/bounds.jsonl` (`src/store.rs`; the ledger writes it).  The table and the
+committed chain are one file, `results/optimal.jsonl.gz`, read twice: the table is the file as of the build, its games
+assumed optimal, and the committed chain is the file of the checkout, read with its proofs.  The chain and the store are
+the repository's `results` (`paths`), and no option names another.  `Known::game(n)` is the game of n from the best
+source that holds one: the committed chain's, which is as proven as its line and assumes what the line does, then the
+store's, then the table's.  A game of the store is *proven* when its best lower bound equals its
 best upper bound.  Its game is the lower bound's, played by the referee at the value (a line that cites the game of
 another line is carried from it, `store::carried`), and what it rests on is the upper line's `rests_on`.  In the
 options, `SolveOptions::use_prev` turns it on and `SolveOptions::known` names the files and how far it goes; `regress`
@@ -171,7 +173,7 @@ proof it does not know.
 The ledger proves many games at once by bounding each from both sides: for every game of a stretch it keeps a lower
 bound L(n), the score of a finished game that the referee replays, and an upper bound U(n), each with its derivation,
 and it proves a game when they meet.  It is `examples/ledger/`, whose module comment has the commands and the files.  It
-reads nothing of the truth (`optimal.json`, the results files) unless it is given proven games.
+reads nothing of the truth (the built-in table, the results files) unless it is given proven games.
 
 *Its sources of bounds:*
 
@@ -220,7 +222,7 @@ first (`examples/ledger/cost.rs`; with no floor steps, by least `level + gap / g
 with no help from below).
 
 A proven game of the ledger is proven within the frame model, as a game of the chain past 2175 is, given U at the games
-its upper bound came through.  The ledger is not a results file, and nothing of it goes into `results/strict.jsonl`.
+its upper bound came through.  The ledger is not a results file, and nothing of it goes into `results/optimal.jsonl.gz`.
 
 **The bounds store** keeps the bounds that a run finds for good: `results/bounds.jsonl`, one JSON line a bound, in
 schema 1, appended and never changed.  A line is added only when it improves the file's best bound of its game and side,

@@ -1,7 +1,8 @@
 # The solvers
 
-Two programs find optimal games of Taxman.  They share no code, so each checks the other.  This page maps them and
-their documents.
+Two programs find optimal games of Taxman.  They share no proof code, so each checks the other.  Both read the committed
+results through [gzip/](gzip/README.md), a decoder whose CRC-32 check makes a decoding error fail loudly, and never give
+both programs the same wrong game.  This page maps them and their documents.
 
 * **The frame solver**, [frame/](frame/README.md) (the crate `taxman`), finds the games.  It searches the promotions
   of a board's frames, and can run on many CPUs; its long runs can be resumed after an interruption.  Its games are

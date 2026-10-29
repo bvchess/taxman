@@ -20,7 +20,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   `with_width!` picks) and `games_java.txt` (the Java's game of the board's frames, move for move, for 171 sets of
   promotions at 511–2049).
 * **The board layer against the chain** (`tests/board_layer.rs`): for every 25th searched game of
-  `results/strict.jsonl`, and the last, the moves that the game's promotions make and the digest of the board's search
+  `results/optimal.jsonl.gz`, and the last, the moves that the game's promotions make and the digest of the board's search
   problem are the line's, which the golden data (up to 2049) cannot say of the games that matter.  The unit tests of
   `frames` check what the frames remember (which numbers each can take on, which sources `removeImpossible` has been
   through) against a fresh computation.
@@ -36,7 +36,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     optional) both ways, in both formulations (with and without the claims of `unzip`, [E4](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
     with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E4.
-  * `tests/bottom_layers.rs` checks F4 on every game of `optimal.json` to 1300, the committed chain and another run of
+  * `tests/bottom_layers.rs` checks F4 on every game of the committed chain and another run of
     its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
     set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
@@ -48,7 +48,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   * The census of every game (`examples/structure.rs`; its data are in
     `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`) checks what X7's proof says of setup
     one game at a time, that Π⁺(∅) with the claims of `unzip` is Π_n (check H), and that setup builds Π_n (check I).
-* **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against `optimal.json`.
+* **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against the built-in table.
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
   checkpoint is refused when any of the search tactics differs.
 * **Bound soundness**:
@@ -225,7 +225,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   worth; commands that are not commands; restarts with tactics a restart does not take; threads it cannot have;
   `conflict_branching`, `conflict_look` and the gate switched at every tick; a game held, checkpointed and restarted in
   the middle of its search; a redeploy at a commit off master) refuses every bad command with its reason, ends every
-  game with the score of `optimal.json`, keeps the abandoned checkpoint aside, records the restart in the game's line,
+  game with the score of the table, keeps the abandoned checkpoint aside, records the restart in the game's line,
   resumes it after the redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.
   The policy for the games to come has four tests of its own: one gives policies to games in flight and games set up
   later (a `branching` of a game's own holds over them, whichever comes first; a setting left out keeps the one before;
@@ -243,10 +243,10 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
   what it says is refused; an assumption travels down a chain; a score that is not the table's is a hard error; a
   tampered results file, or one whose line contradicts itself or is of another schema, is refused by both verifiers,
-  naming the line; a torn last line is dropped; the committed results pass the verifier with the counts that
-  [`results/README.md`](../../../results/README.md) quotes; a game stopped by a node limit and resumed reads back
-  assuming nothing; a game's line has its own search time (`seconds.own`, zero for a game that runs no search), and its
-  summary line ends with that time and its best promotion sum.  Both verifiers refuse forged repeats (another game
+  naming the line; a torn last line is dropped; the committed results pass the verifier and the built-in table holds
+  their games; a game stopped by a node limit and resumed reads back assuming nothing; a game's line has its own search
+  time (`seconds.own`, zero for a game that runs no search), and its summary line ends with that time and its best
+  promotion sum.  Both verifiers refuse forged repeats (another game
   named; the digests, promotions or promotion sum changed; the game repeated unfinished, after the repeat, or settling
   no search; its assumptions dropped), and `verify-results` refuses two more that only setting the problems up again can
   catch (the Python referee accepts them, as its docstring says).  A search that took no step is the method `start`:
@@ -254,8 +254,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   line that took a node or did not finish.  The line of a search armed with the near-repeat cut counts the nodes it cut
   (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is armed and cuts none, and the first game of
   a run and a run without the tactic have no such key), both verifiers accept the files and count the shortened search,
-  and both refuse the key on a prime game or with a value that is no count; the committed chain has no search that the
-  cut shortened.
+  and both refuse the key on a prime game or with a value that is no count.
 * **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tests/sweep.rs`,
   `solver/tools/test_sweep_plan.py`, `solver/tools/cloud/test/run.sh sweep`):
   * a range whose games all stop at a limit goes on, each game built on the best game of the one before it, with no
@@ -290,7 +289,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   so these tests check the widths past 1023 against each other and against the committed results.
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
     `max_total`, answer and tree.
-  * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against `strict.jsonl`, and a
+  * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against the committed chain, and a
     slice of that chain; the
     sacrifice bound proves game 1133 by an independent route.
   * A game of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at 128 go through the frames, the matching

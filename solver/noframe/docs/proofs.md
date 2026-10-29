@@ -58,8 +58,8 @@ The search:
 The target is the recorded score V(n).  The search proves that no playable set beats it, or, from the roles of F4, none
 that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
 
-Every rule above is tested against brute force or against the recorded score.  The search must still reach
-optimal.json's score from one below it, with each rule on, on every seventh game to 420, and from the roles of F4 on
+Every rule above is tested against brute force or against the recorded score.  The search must still reach the
+committed chain's score from one below it, with each rule on, on every seventh game to 420, and from the roles of F4 on
 every third game of 187-700 that needs a search.  The parity bound's intersection is checked against enumeration on
 random pairs of matroids.
 
@@ -141,8 +141,8 @@ log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 
 swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70
 million nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
-The prover's proofs reach 2175, where the committed chain (`../../results/strict.jsonl`) ended when they were made; the
-next subsection is the run that made them.
+The prover's proofs reach 2175, where the committed chain (`../../results/optimal.jsonl.gz`) ended when they were
+made; the next subsection is the run that made them.
 
 *Details.*  An extrapolation from the bands above, 0.23 decades per 100 in n, made before that run, gave about 57 hours
 of thread time to 2000, and about 3 hours for the hardest proofs.  It was low: 1301–1999 took 164 hours, and the hardest

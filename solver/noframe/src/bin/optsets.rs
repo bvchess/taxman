@@ -1,9 +1,10 @@
 //! Every optimal set, on the whole board: for every game in a range, all playable sets of picks worth the recorded
-//! optimum V(n) (optimal.json, then the solver's results for a game it lacks).  One line per game, resumable:
+//! optimum V(n) (the committed chain and the `--results` files; see solver/noframe/docs/reproducing.md, "The recorded
+//! games").  One line per game, resumable:
 //!
 //!     optsets --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--limit SETS]
 //!             [--upper all|fixed|other] [--derive 0] [--searched-only 1] [--segments 1] [--optimal FILE]
-//!             [--results FILE] --out FILE
+//!             [--results FILE]... --out FILE
 //!
 //! `--upper` splits the question in two: `fixed` lists only the optimal sets whose upper part (the numbers above
 //! n/2) is U\*, descending greedy's upper set, by a search with the upper half fixed; `other` lists only those whose
@@ -34,7 +35,9 @@ use std::time::Instant;
 use taxman_prover::game::{
     derive_optimal_sets, relation, the_prime_of_every_optimal_set, Board, Prover, Relation, Role, Verdict,
 };
-use taxman_prover::jsonl::{campaign, field_nums, field_str, field_u64, parse_items, recorded_games, Obj};
+use taxman_prover::jsonl::{
+    campaign, committed_chain, field_nums, field_str, field_u64, parse_items, recorded_games_to, Obj,
+};
 use taxman_prover::peel::u_star;
 use taxman_prover::primes::smallest_prime_factors;
 
@@ -191,11 +194,9 @@ impl Enumerator {
 
 fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds, mut budget, mut limit) = (1usize, f64::INFINITY, u64::MAX, 0);
     let (mut derive, mut searched_only, mut segments, mut upper) = (true, false, false, String::from("all"));
-    let mut optimal = root.join("../../results/optimal.json");
-    let mut results = root.join("../../results/strict.jsonl");
+    let mut files = vec![committed_chain()];
     let mut out = PathBuf::new();
     for (flag, value) in flags {
         match flag.as_str() {
@@ -207,15 +208,15 @@ fn main() {
             "--searched-only" => searched_only = value == "1" || value == "true",
             "--segments" => segments = value == "1" || value == "true",
             "--upper" => upper = value,
-            "--optimal" => optimal = value.into(),
-            "--results" => results = value.into(),
+            "--optimal" => files[0] = value.into(),
+            "--results" => files.push(value.into()),
             "--out" => out = value.into(),
             _ => panic!("unknown flag {flag}"),
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
     assert!(["all", "fixed", "other"].contains(&upper.as_str()), "--upper is all, fixed or other");
-    let known = recorded_games(&[&optimal, &results]);
+    let known = recorded_games_to(&files, items.iter().copied().max().unwrap_or(0));
     let mut items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && known.contains_key(n)).collect();
     let spf = smallest_prime_factors(items.iter().copied().max().unwrap_or(2) as usize);
     let limit = if limit == 0 { usize::MAX } else { limit };

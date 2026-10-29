@@ -181,7 +181,7 @@ replacement machine printed the game again after an interruption:
   ran no search has an own search of 0.0s;
 * `nodes`: the line's nodes;
 * `state`: `recorded`, the score, and in parentheses the line's method and proof, then `optimal ok` when the score is
-  the one in `optimal.json`.
+  the one in the built-in table.
 
 `status` tells the state of a game in flight from its last progress line in `logs/chain.err`:
 
@@ -248,9 +248,9 @@ and the checkpoints.
 **Drawing on the known games.**  The chain above searches every game from n = 1, which re-proves the committed chain
 with a build.  A run that goes on past what the repository holds needs none of that.  With `--extra-args "--use-prev"`
 (`EXTRA_ARGS`; the machines run `taxman solve 1-N --use-prev ...` in the checkout of the pinned commit), the chain draws
-on the known games of that checkout's `results`: the committed chain `strict.jsonl`, the bounds store `bounds.jsonl`
-([results/README.md](../../../results/README.md#boundsjsonl) says what it holds) and the built-in `optimal.json`
-([README, "Known games"](../../frame/README.md#known-games)):
+on the known games of that checkout's `results`: the committed chain `optimal.jsonl.gz`, the bounds store
+`bounds.jsonl` ([results/README.md](../../../results/README.md#boundsjsonl) says what it holds) and the built-in table,
+the games of the same file as of the build ([README, "Known games"](../../frame/README.md#known-games)):
 
 ```
 solver/tools/cloud/wall.sh launch --commit $COMMIT --until $UNTIL --extra-args "--use-prev"

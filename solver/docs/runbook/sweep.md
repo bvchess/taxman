@@ -23,8 +23,8 @@ the passes, the exit statuses and the variables.
   opt(n − 1), the prime formula and a repeat of an earlier search come only from a proven game ([README, "Keeping going
   past limits"](../../frame/README.md#keeping-going-past-limits-and-the-sweep)).  A block's first game has no game
   before it and is solved standalone, but for the first block's.  If `KNOWN` (default the committed
-  `results/strict.jsonl`) holds a proven game of FIRST − 1, the first block's file starts as a copy of KNOWN's games,
-  and the solver goes on from the last, as it extends a chain.
+  `results/optimal.jsonl.gz`) holds a proven game of FIRST − 1, the first block's file starts with KNOWN's games, and
+  the solver goes on from the last, as it extends a chain.
 * **Passes 2, 3, ...**  A block's first game began without the game before it, which another block made.  So each pass
   searches again, with the same limit, every game that has only unfinished searches and whose game before it, as the
   merged file holds it now, has more to give than when the game was last tried: it is now proven, or it has a better
@@ -46,8 +46,8 @@ start merges them first.  Each line says what its game had from n − 1 in `prev
 the blocks, and a rerun after an interruption counts as another pass.
 
 **`explore.jsonl` is not a chain.**  It has holes, and games built on unfinished ones, so it never goes into
-`results/strict.jsonl`.  [`verify.sh`](chain.md#verifying-and-bringing-the-results-home) accepts it (both referees, and
-the agreement of its scores with the committed chain), and `sweep.sh` runs it when the passes are done.
+`results/optimal.jsonl.gz`.  [`verify.sh`](chain.md#verifying-and-bringing-the-results-home) accepts it (both referees,
+and the agreement of its scores with the committed chain), and `sweep.sh` runs it when the passes are done.
 
 ## What it costs
 

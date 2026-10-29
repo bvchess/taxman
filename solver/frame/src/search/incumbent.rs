@@ -287,7 +287,7 @@ mod tests {
         let board = Board::<W>::for_n(n);
         let prepared = board.prepare(SearchTactics::default()).unwrap();
         let hood = Neighborhood { model: &prepared.model, root: &prepared.root, candidates: &prepared.candidates };
-        let seed = board.seed(Optimal::built_in().moves(n - 1).expect("optimal.json has the game"));
+        let seed = board.seed(Optimal::built_in().moves(n - 1).expect("the table has the game"));
         let starts = [("greedy", prepared.greedy), ("seed", surviving(&prepared, &seed))];
         let mut improved = 0;
         for (what, start) in starts {

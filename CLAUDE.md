@@ -24,11 +24,12 @@ How-to lives in the docs listed at the end.
 ## Where things are
 
 * **solver/frame/**: the frame solver, an exact solver in Rust.  **solver/noframe/**: the prover, a separate program
-  that shares no code with the frame solver and proves its results independently, without the frame model.  Their docs,
-  tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in
+  that shares no proof code with the frame solver and proves its results independently, without the frame model.  Both
+  read the committed results through **solver/gzip/**, a gzip decoder whose CRC-32 check makes a decoding error fail
+  loudly.  Their docs, tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in
   [solver/CLAUDE.md](solver/CLAUDE.md).
-* **results/**: the committed chain of proven games, the table of optimal games (optimal.json, built into the Rust
-  frame solver), the bounds store and the certificates.
+* **results/**: the committed chain of proven games (optimal.jsonl.gz, built into the Rust frame solver), the bounds
+  store and the certificates.
 * **[docs/THEORY.md](docs/THEORY.md)**: the theorems both programs rest on, the index of docs/theory/;
   **[docs/GLOSSARY.md](docs/GLOSSARY.md)**: the terms; **[docs/WRITING.md](docs/WRITING.md)**: how docs are written.
 * **A long document is a folder with an index** (docs/WRITING.md, rule 8): the old file, such as

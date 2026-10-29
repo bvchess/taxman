@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "taxman-gzip"
+version = "0.1.0"
+
+[[package]]
 name = "taxman-prover"
 version = "0.1.0"
+dependencies = [
+ "taxman-gzip",
+]

@@ -7,12 +7,13 @@ A certificate proves, on the whole board, a game whose recorded score is optimal
 prover's barred bounds (`upper_*.jsonl`) say which games need one.  A campaign on a cloud machine certifies them all.
 This script makes the campaign's work list and the cost estimate that the owner approves, from the data files alone.
 
-Inputs, all JSON lines (the flags that take several files read them in order):
-  --results   the chain's results files (results/strict.jsonl format).  Completed lines only; a later line for a
-              board replaces an earlier one.  Fields used: n, score, proof (exhausted, cap, same_search, prime_formula,
-              trivial, known), nodes, threads, seconds.search, same_search.n (the game whose search a repeat repeats)
-              and known.source (where a known game rests: bounds, the bounds store; strict, the committed chain; or
-              optimal, optimal.json).
+Inputs, all JSON lines, and a file whose name ends in .gz is read through gzip, every member of it (the flags that
+take several files read them in order):
+  --results   the chain's results files (the format of results/optimal.jsonl.gz).  Completed lines only; a later line
+              for a board replaces an earlier one.  Fields used: n, score, proof (exhausted, cap, same_search,
+              prime_formula, trivial, known), nodes, threads, seconds.search, same_search.n (the game whose search a
+              repeat repeats) and known.source (where a known game rests: bounds, the bounds store; strict, the
+              committed chain; or optimal, the table of optimal games).
   --upper     the prover's barred bounds.  Fields: n, score, relation (prime; chain, which is a score at its ceiling
               n + score(n-1); none), needs (1 if the game needs a certificate), open (where it needs one: a list of
               [u, omega, margin], so |O| is its length).  A board in two files must have equal lines, but for the
@@ -80,11 +81,13 @@ The exit status is 1 if an input is wrong (the message names the file and line, 
 needs a certificate and shares none (the message names the board).
 """
 import argparse
+import gzip
 import json
 import math
 import re
 import shlex
 import sys
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, Optional
@@ -162,10 +165,15 @@ class Plan:
 
 
 def read_lines(path):
-    """The lines of a JSON-lines file as (line number, object).  A line that is not a JSON object is an error."""
+    """The lines of a JSON-lines file as (line number, object); a file whose name ends in .gz is read through gzip,
+    every member of it.  A line that is not a JSON object is an error."""
     try:
-        text = Path(path).read_text()
-    except (OSError, UnicodeDecodeError) as e:
+        if str(path).endswith(".gz"):
+            with gzip.open(path, "rt", encoding="utf-8") as f:
+                text = f.read()
+        else:
+            text = Path(path).read_text()
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError) as e:
         raise PlanError(f"{path}: cannot read: {getattr(e, 'strerror', None) or e}") from e
     for number, line in enumerate(text.split("\n"), 1):
         if not line.strip():

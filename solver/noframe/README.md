@@ -3,9 +3,11 @@
 The prover proves the frame solver's games optimal on the whole board, without the [frame
 model](../../docs/GLOSSARY.md#the-frame-model); [proofs.md](docs/proofs.md) says how far its proofs reach.  It is
 a branch and bound over sets of moves, which takes the recorded score of game n as its target and proves that no set of
-moves beats it.  It shares no code with the frame solver or with the heuristics, so the frame solver's answers are
-checked without assuming anything of the frame model.  The [glossary](../../docs/GLOSSARY.md) defines the project's
-words.
+moves beats it.  It shares no proof code with the frame solver or with the heuristics, so the frame solver's answers are
+checked without assuming anything of the frame model.  Both programs read the committed chain,
+`results/optimal.jsonl.gz`, through [the gzip decoder](../gzip/README.md), whose CRC-32 check makes a decoding error
+fail loudly rather than give both programs the same wrong game.  The [glossary](../../docs/GLOSSARY.md) defines the
+project's words.
 
 Why that matters: the frame solver ([its README](../frame/README.md)) searches the promotions of the frame model, whose
 answer is opt(n) exactly when [statement U](../../docs/GLOSSARY.md#the-frame-model) holds at n: some optimal game plays

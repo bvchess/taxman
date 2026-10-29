@@ -6,11 +6,13 @@
 //! without assuming the frame model.  It also lists every optimal set, finds the longest games, certifies conjecture
 //! (★) at scale and searches for adversarial instances.
 //!
-//! This crate shares no code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only on the
-//! theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
+//! This crate shares no proof code with the frame solver (`../frame/src`) or with the Python heuristics; it rests only
+//! on the theorems of `docs/theory/` (playability = peel succeeds = no self-covering subset, P2, P4 and P7; residual
 //! confinement, P8; the parity bound, W1, in docs/theory/parity-bound.md; and the bottom layers of every optimal set,
 //! the bottom-layers theorem F4 of docs/theory/frame-model.md, which the proofs of `exact` start from by default) and
-//! on elementary bounds.  The report is `README.md` next to this file.
+//! on elementary bounds.  Both programs read the committed chain through the gzip decoder in `../gzip`, whose CRC-32
+//! check makes a decoding error fail loudly rather than give both programs the same wrong game.  The report is
+//! `README.md` next to this file.
 //!
 //! * [`primes`]: the sieve.
 //! * [`instance`]: reduction instances (members, their maximal factors) and the sources' instance of a game
@@ -29,7 +31,7 @@
 //!   every set beating a recorded score must hold, certified by the parity bound with the two bottom layers fixed
 //!   (F4).
 //! * [`adversary`]: synthetic Taxman-shaped instances for the adversarial search.
-//! * [`jsonl`]: the resumable result files every campaign writes.
+//! * [`jsonl`]: the resumable result files every campaign writes, and the reading of the recorded games.
 
 pub mod adversary;
 pub mod bounds;

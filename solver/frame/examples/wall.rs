@@ -41,7 +41,7 @@
 //! Games are set up as `taxman solve` sets them up (`taxman::board::Board` at the set width `with_width!` picks for
 //! `n`, the search tactics named as for `taxman solve --tactic`).  A board with nothing to promote prints
 //! `{"n":N,"trivial":true}` and is skipped.  `--known FILE` (every command but `frames` and `choice`) is a results
-//! file, such as `results/strict.jsonl`, whose completed games extend the known games beyond optimal.json (as the
+//! file, such as `results/optimal.jsonl.gz`, whose completed games extend the known games beyond the table (as the
 //! ladder's `--known` does), which is how a game gets its optimum, and the game of `n - 1` for its seed and ceiling.  A
 //! range `A-B` stands for every `n` in it, none filtered out (every command but `nodes` and `grow`).  Each command
 //! prints one JSON object per line on stdout; a mistake in the arguments is an error on stderr and exit status 2.
@@ -114,7 +114,7 @@
 //!   tables, the frames, the model and the greedy set, `greedy_s` of it), `start_s` (the matching graph, the dive and
 //!   the local search), `bound_s` (the GF(2) graph, `graph_s` of it, and the bound), `total_s` and `cpu_s` (the CPU
 //!   time of the game's thread, which a load on the other threads moves less than the wall time).  Of a game with a
-//!   known optimum (optimal.json, and `--known FILE`'s completed games), `opt` is its score, `opt_proof` the proof of
+//!   known optimum (the table, and `--known FILE`'s completed games), `opt` is its score, `opt_proof` the proof of
 //!   its line in `--known FILE` (null if that has none), `root_gap` is `upper - opt` and `shortfall` is `opt - lower`
 //!   (the gap is their sum); all four are null for a game with no known optimum.  `--threads K` plays K games at
 //!   once, one a thread (default 1), in the order given.  Each line is printed, and with `--out FILE` appended to it,
@@ -1638,7 +1638,7 @@ mod tests {
     fn bracket_the_optimum(games: impl Iterator<Item = u32>) {
         for n in games {
             let land = landscape_at(n).expect("a board the solver supports");
-            let opt = Optimal::built_in().score(n).unwrap_or_else(|| panic!("n={n}: optimal.json has no game"));
+            let opt = Optimal::built_in().score(n).unwrap_or_else(|| panic!("n={n}: the table has no game"));
             let ends = (land.lower(), land.upper());
             assert!(ends.0 <= opt && opt <= ends.1, "n={n}: lower {} optimum {opt} upper {}", ends.0, ends.1);
         }
@@ -1668,7 +1668,7 @@ mod tests {
     fn the_output_file_is_appended_to_and_a_rerun_skips_what_it_has() {
         let dir = support::TempDir::new("wall-landscape");
         let out = dir.join("landscape.jsonl");
-        let known = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/strict.jsonl");
+        let known = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz");
         let optimal = Optimal::built_in().with_results_files(std::slice::from_ref(&known)).expect("the chain");
         let mut o = Options::new("landscape".to_owned());
         (o.out, o.known, o.threads) = (Some(out.clone()), Some(known), 3);

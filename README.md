@@ -20,11 +20,11 @@ wiki](https://github.com/bvchess/taxman/wiki) explains the game and the algorith
 
 ## The results
 
-The file `results/strict.jsonl` holds a chain of optimal games, one for every n from 1 up to the chain's last game.
-Each game is built from the one before: game n starts from the optimal game of n − 1.  Each is proven within the *frame
-model*, a decomposition of the game that is exact given one open statement about which numbers an optimal game plays,
-called [statement U](docs/theory/exactness.md#statement-u).  The first games of the chain, up to a smaller n, are also
-proven on the whole board by a second program that shares no code with the one that found them.
+The gzip file `results/optimal.jsonl.gz` holds a chain of optimal games, one for every n from 1 up to the chain's last
+game.  Each game is built from the one before: game n starts from the optimal game of n − 1.  Each is proven within the
+*frame model*, a decomposition of the game that is exact given one open statement about which numbers an optimal game
+plays, called [statement U](docs/theory/exactness.md#statement-u).  The first games of the chain, up to a smaller n, are
+also proven on the whole board by a second program that shares no proof code with the one that found them.
 [results/README.md](results/README.md) gives how far the chain reaches, how far each kind of proof reaches, and what
 supports every score.
 
@@ -37,7 +37,8 @@ opt(n) and the best score found.
   numbers, the *frames*, and searches for the best set of numbers to play.  It can run on many CPUs, and its long runs
   can be resumed after an interruption.
 * **The prover** ([solver/noframe](solver/noframe/README.md)) finds optimal solutions over the whole board, without the
-  frame model.  It shares no code with the frame solver, so each checks the other.
+  frame model.  It shares no proof code with the frame solver, so each checks the other.  Both read the results file
+  through one [gzip decoder](solver/gzip/README.md), whose checksums make a decoding error fail loudly.
 * **The heuristics** ([heuristics](heuristics/README.md)) play near-optimal games quickly.
 * **Robert Moniot's seven heuristic strategies** ([moniot](moniot)) provide additional approaches and are redistributed
   with his permission.
@@ -50,7 +51,7 @@ top of the repository:
 ```
 cd solver/frame && cargo build --release && cd ../..
 solver/frame/target/release/taxman solve 1-22
-solver/frame/target/release/taxman verify-results results/strict.jsonl
+solver/frame/target/release/taxman verify-results results/optimal.jsonl.gz
 ```
 
 The first command builds the solver, the second solves the games 1 to 22, and the third checks every game in the

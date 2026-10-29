@@ -57,7 +57,7 @@ say() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 fail() { say "error: $*"; exit 1; }
 
 # --- where the checkout is ---------------------------------------------------------------------------------------
-if [ -f "$here/../../frame/Cargo.toml" ] && [ -f "$here/../../../results/optimal.json" ]; then
+if [ -f "$here/../../frame/Cargo.toml" ] && [ -f "$here/../../../results/optimal.jsonl.gz" ]; then
     root="$(cd "$here/../../.." && pwd)"
 else
     root="${TAXMAN_DIR:-$HOME/taxman}"
@@ -282,12 +282,10 @@ fi
 # built has no check.
 if [ "${SKIP_SMOKE:-0}" != 1 ]; then
     if [ -n "$solver_args" ] && [ -x "$TAXMAN_BIN" ]; then
-        say "smoke: replay optimal.json"
-        "$TAXMAN_BIN" verify-optimal
-        say "smoke: the committed results files, with the solver's verifier and the independent Python one"
+        say "smoke: the committed results file, with the solver's verifier and the independent Python one"
         "$TAXMAN_BIN" verify-results "${COMMITTED_RESULTS[@]}"
         python3 "$TOOLS/check_results.py" "${COMMITTED_RESULTS[@]}"
-        say "smoke: games 1..400 against optimal.json"
+        say "smoke: games 1..400 against the table of optimal games"
         "$TAXMAN_BIN" regress --to 400 --threads "$(( $(ncpu) < 8 ? $(ncpu) : 8 ))"
     else
         say "smoke: none for the solver (not in this build)"

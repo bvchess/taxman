@@ -11,7 +11,7 @@ laptop's dry run, and every launch and what it found.  A launch needs the approv
 the cost below ([rules for every launch](launch.md#rules-for-every-launch)).
 
 `cloud.sh` runs `ledger run`, with no proven game unless `PROVEN` gives some, then `ledger report --known
-results/strict.jsonl`.  The report exits
+results/optimal.jsonl.gz`.  The report exits
 with status 1 if a bound is on the wrong side of the chain's score or a game does not replay: that is a bug, so stop and
 report it.  The script's comment documents its environment.
 
@@ -112,7 +112,7 @@ Then commit the file.  The checkpoints are in S3 only for the searches still goi
   ```
   L=solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/cloud-DATE
   aws s3 sync S3_DEST/out $L/ --exclude 'run/ckpt/*'
-  solver/frame/target/debug/examples/ledger report $L/run --known results/strict.jsonl
+  solver/frame/target/debug/examples/ledger report $L/run --known results/optimal.jsonl.gz
   solver/tools/ledger/events.py $L/run
   ```
 

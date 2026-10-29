@@ -82,8 +82,8 @@ overpredicts every later stretch by 0.2 to 0.6 decades, and the gap scaled by n^
 0.27 over five origins).  The two chains disagree about p (0 to 0.2 across 2175, 0.4 to 0.5 within 2176-3312), so G
 alone is the conservative end of every projection, p = 0.5 the optimistic one, and 0.3 the center.
 
-*Details.*  The first model was fitted to the 314 exhausted searches of 1301-2175 in `results/strict.jsonl` (8 threads,
-the build of feba6d0), against the root GF(2) gaps of
+*Details.*  The first model was fitted to the 314 exhausted searches of 1301-2175 in `results/optimal.jsonl.gz` (8
+threads, the build of feba6d0), against the root GF(2) gaps of
 `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl` (measurements 7.1): log10 nodes ≈ 3.24 + G /
 255 (R² 0.50, residual sd 0.46).  It kept G alone, because n and G/n extrapolated worse past 2175 against the committed
 chain's trees; on one build that is reversed.  The later builds make trees 0.29 times as large: 0.27 at 1301-1500 and
@@ -351,11 +351,11 @@ within one of the size of the GF(2) bound's heaviest set at the root.  *Evidence
 have one size (solver/noframe/docs/uniqueness.md).  The heaviest set has the size of an
 optimal set at all 361 roots of 880-1300 ([the anatomy of the
 gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md), 1), and at 758 of the 760 searched and repeated games
-of 1301-2175 (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against `strict.jsonl`'s
-promotions).  At 1320 and 1322 it has 77 members and the optimal set 78, which is the promotion limit (`max_total`): a
-tie of weights, or a heavier set of the wrong size, which is not known.  So the strict form, the same size, is false or
-rests on ties.  *Why it mattered:* with it, A3 would have searched two values of k at most (it was not needed for A3's
-soundness); A3 is closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
+of 1301-2175 (`solver/notebook/search/the-gf2-bound-in-the-search-2026-10/roots.jsonl`'s `size` against the promotions
+of `results/optimal.jsonl.gz`).  At 1320 and 1322 it has 77 members and the optimal set 78, which is the promotion limit
+(`max_total`): a tie of weights, or a heavier set of the wrong size, which is not known.  So the strict form, the same
+size, is false or rests on ties.  *Why it mattered:* with it, A3 would have searched two values of k at most (it was
+not needed for A3's soundness); A3 is closed.  *Test:* the heaviest set of each size at the roots of 1320 and 1322.
 
 **Conjecture C5 (the gap law).**  *Measured (2026-10-15): both forms hold, and neither regime.*  The true root gap of
 the searched games grows linearly in n past 2175, at a rate between the two regimes of [The diagnosis of the

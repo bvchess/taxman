@@ -7,8 +7,9 @@ load on the machine moves wall times by up to 3×.  Five tools measure it:
 
 * **`taxman bench`** runs a fixed set of games that need a search and take about a second each on one thread: n = 936
   (W = 16), and 1050, 1100, 1133, 1170 and 1184 (W = 20).  It solves them standalone, with acceleration off (the game
-  of n − 1 from `optimal.json`, past it from `results/strict.jsonl`), prints the times of each phase and the node
-  counts, and appends them to `solver/frame/bench/history.jsonl`, so that performance can be followed across changes.
+  of n − 1 from the built-in table, past it from `results/optimal.jsonl.gz`), prints the times of each phase and the
+  node counts, and appends them to `solver/frame/bench/history.jsonl`, so that performance can be followed across
+  changes.
   Each line has the commit the binary was built from, every tactic's value, and for each game the nodes, the seconds
   of each phase and the search's counters.  `--history FILE` and `--known FILE` name other files; by default the
   command finds them in the repository.

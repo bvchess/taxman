@@ -4,7 +4,7 @@
 """Comparison runner: score every strategy against known optimal solutions.
 
 Plays solvent, solvent-b, cascade, and Moniot's onetax/maxturn heuristics on
-every game covered by optimal.json, and reports how each compares -- both
+every game covered by results/optimal.jsonl.gz, and reports how each compares -- both
 against the known optimum and against Robert Moniot's own strategy-comparison
 table (https://www.dsm.fordham.edu/~moniot/taxman-strategies-comparison.html).
 
@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 from core import check_sequence, divisor_lists, maximal_factor_lists
-from evaluation.verify import DEFAULT_OPTIMAL
+from evaluation.verify import DEFAULT_OPTIMAL, load_optimal
 from strategies.cascade import cascade
 from strategies.maxturn import max_turn
 from strategies.onetax import one_tax
@@ -63,7 +63,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--moniot", type=Path, default=DEFAULT_MONIOT)
     args = parser.parse_args(argv)
 
-    optimal = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+    optimal = load_optimal(args.optimal, args.max_n)
     moniot = json.loads(args.moniot.read_text())
     moniot_rows = {int(k): v for k, v in moniot["rows"].items()}
 

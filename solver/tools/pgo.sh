@@ -74,7 +74,7 @@ if [ "$TRAIN" = 1 ]; then
     "$BIN/examples/perf" --reps 1 --tactic gf2=on
     # A game of every width, from W = 8 to W = 128; those at the end of the chain searched longer.
     for game in 480:2 700:2 936:4 1184:8 1300:8 1600:3 1900:3 2200:2 2400:2 2900:2 3300:2 3700:2 4100:2; do
-        "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$REPO/results/strict.jsonl" \
+        "$BIN/examples/ladder" --threads 1 --seconds "${game#*:}" --known "$REPO/results/optimal.jsonl.gz" \
             "${game%:*}" | cut -c1-100
     done
     "$PROFDATA" merge -o "$OUT/merged.profdata" "$OUT/raw"

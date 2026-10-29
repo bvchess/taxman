@@ -16,7 +16,7 @@ The two main strategies:
    [statement U](../docs/GLOSSARY.md#the-frame-model) holds.
 2. **The continuation solver**, which builds each game from its own game of n − 1, scores **99.97% of all optimal
    points**, starting from nothing at n = 2.  It extends to n = 1001..2000, within 0.35% of the Franklín–Moniot upper
-   bound in aggregate.  The optimal games of those n are in `results/strict.jsonl`, and
+   bound in aggregate.  The optimal games of those n are in `results/optimal.jsonl.gz`, and
    [results/README.md](../results/README.md) says how they are proven.
 
 This chart shows the player's share of the pot under each strategy.  Solvent and continuation stay close to the optimal
@@ -82,7 +82,7 @@ What is proven, measured or conjectured:
 | peel's assignment is always schedulable | **theorem** (the soundness half of [the peel theorem (P4)](../docs/theory/playability.md#the-peel-theorem)): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
 | peel's failure means the set is unplayable | **theorem** (the completeness half of P4) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With soundness, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 2175**, the first 2175 games of the file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
+| the games of `results/optimal.jsonl.gz` | independently certified to n=62 by brute force over pot states (`certify.py`); **proven on the whole board** for the games the prover has reached ([results/README.md](../results/README.md#what-supports-the-scores) says how far), by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
 
 ### The proofs
 
@@ -190,15 +190,15 @@ previous game's own output:
 7. replay the result as a legal game (`check_sequence`) before
    recording it.
 
-**The main result** (`results/chain_cold_1000.json`): started cold from n=2, with no optimal.json anywhere in the loop,
-the chain scores **99.972% of all optimal points over 2..1000** (502/999 exact, worst game 99.52%).  It never scores
-below solvent, and it beats the chain seeded with optimal games on points: by mid-range a perfect seed makes no
-difference.  **Past n = 1000** (`results/chain_1001_2000.json`): seeded once from the optimal game of 1000, the chain
+**The main result** (`results/chain_cold_1000.json`): started cold from n=2, with no game of
+`results/optimal.jsonl.gz` anywhere in the loop, the chain scores **99.972% of all optimal points over 2..1000**
+(502/999 exact, worst game 99.52%).  It never scores below solvent, and it beats the chain seeded with optimal games on
+points: by mid-range a perfect seed makes no difference.  **Past n = 1000** (`results/chain_1001_2000.json`): seeded once from the optimal game of 1000, the chain
 solved 1001..2000 at a mean 99.64% of the F–M bound (worst 99.40%), the level the optimal scores reach below 1000,
 where the bound's own looseness averages 0.29%.  It beats solvent in 894 of those games and ties the other 106.  Each
 of the 1000 games has a certified gap, its distance to the bound, which bounds its distance to opt(n) too.  The optimal
-games to compare them with are in `results/strict.jsonl` ([results/README.md](../results/README.md) says how they are
-proven).
+games to compare them with are in `results/optimal.jsonl.gz` ([results/README.md](../results/README.md) says how they
+are proven).
 
 ### Certificates
 
@@ -274,11 +274,11 @@ those two games by hand, so only a blanket claim of a win for every
 N > 3 overstates it), and the descending order over x, though the paper
 specifies it, has no effect on the result.
 
-**Theory-free certification** (`evaluation/certify.py`): optimal.json was produced by the same theory this project
-tests, so the audit uses none of it.  It uses an exhaustive bitmask search, the naive all-divisors matching bound, and
-chains of opt(n) ≤ n + opt(n−1).  The search confirms the unique optimal upper sets through n=62, and enumerates the
-whole optimal pick sets too, which `solver/noframe/tools/crosscheck_optsets.py` compares with the prover's enumeration
-of every optimal set: they agree, one set each, for every n ≤ 57.  No audit has found a contradiction.
+**Theory-free certification** (`evaluation/certify.py`): the games of `results/optimal.jsonl.gz` were produced by the
+same theory this project tests, so the audit uses none of it.  It uses an exhaustive bitmask search, the naive
+all-divisors matching bound, and chains of opt(n) ≤ n + opt(n−1).  The search confirms the unique optimal upper sets
+through n=62, and enumerates the whole optimal pick sets too, which `solver/noframe/tools/crosscheck_optsets.py`
+compares with the prover's enumeration of every optimal set: they agree, one set each, for every n ≤ 57.  No audit has found a contradiction.
 
 ## Performance
 
@@ -342,7 +342,7 @@ python3 -m evaluation.scoreboard        # full strategy comparison (~10 min)
 pypy3   -m strategies.continuation --from 2 --to 1000 --reanchor-solvent   # the cold chain (~80 min)
 python3 -m evaluation.bound 21 128 1000 # F-M bound for specific games
 python3 -m evaluation.bornfree 21 1000  # F-M born-free matching, same games
-python3 -m evaluation.certify           # theory-free audit of optimal.json
+python3 -m evaluation.certify           # theory-free audit of the results file
 python3 -m pytest evaluation/test_taxman.py
 ```
 
@@ -362,11 +362,11 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | `strategies/seteval.py` | incremental set evaluator used by the continuation search |
 | `reference/solvent.py` | the solvent strategy written to be read (and run) |
 | `reference/continuation.py` | the continuation solver written to be read — chains from 2 on top of the reference solvent, printing per-game certificates |
-| `evaluation/verify.py` | checks the upper-half theory against optimal.json, n=1..1000 |
+| `evaluation/verify.py` | checks the upper-half theory against `results/optimal.jsonl.gz`, n=1..1000 |
 | `evaluation/scoreboard.py` | runs every strategy over a range and tabulates vs. optimal |
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
 | `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
-| `evaluation/certify.py` | theory-free certification of optimal.json (uses `evaluation/bitpot.py` bitmask primitives) |
+| `evaluation/certify.py` | theory-free certification of `results/optimal.jsonl.gz` (uses `evaluation/bitpot.py` bitmask primitives) |
 | `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in [solver/notebook/the-wikis-open-questions-2026-10/README.md](../solver/notebook/the-wikis-open-questions-2026-10/README.md)) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |

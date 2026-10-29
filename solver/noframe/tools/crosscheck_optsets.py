@@ -5,11 +5,12 @@
 """Cross-checks the Rust optsets collections of optimal pick sets against theory-free exhaustive search.
 
 Each line of an optsets file lists, for one n, the optimal value ("score") and the optimal pick sets the Rust program
-found using the playability theorems: a canonical set (the line's "canonical" if present, else the moves of
-optimal.json's game) and "others", each given as (canonical - out) | in.  For every game that ended "complete" with
-at most 200 sets and n <= --max, heuristics/evaluation/certify.py's `Exact` (a raw-pot-state brute force that
-assumes no theory) recomputes opt(n) and every optimal whole pick set, and both are compared with the line.  The
-run stops at the first n whose brute force exceeds --budget seconds, or at the first disagreement (reported in full).
+found using the playability theorems: a canonical set (the line's "canonical" if present, else the moves of the
+committed chain's game, results/optimal.jsonl.gz) and "others", each given as (canonical - out) | in.  For every game
+that ended "complete" with at most 200 sets and n <= --max, heuristics/evaluation/certify.py's `Exact` (a raw-pot-state
+brute force that assumes no theory) recomputes opt(n) and every optimal whole pick set, and both are compared with the
+line.  The run stops at the first n whose brute force exceeds --budget seconds, or at the first disagreement (reported
+in full).
 
     crosscheck_optsets.py OPTSETS_FILE [--max N] [--budget SECONDS]
 """
@@ -56,7 +57,8 @@ def main():
     with opener(args.optsets_file, "rt") as f:
         rows = {r["n"]: r for r in map(json.loads, f) if r["n"] <= args.max}
     checkable = [n for n in sorted(rows) if rows[n]["ended"] == "complete" and rows[n]["sets"] <= MAX_SETS]
-    optimal = {g["n"]: g["moves"] for g in json.loads((ROOT / "results/optimal.json").read_text())}
+    with gzip.open(ROOT / "results/optimal.jsonl.gz", "rt") as f:
+        optimal = {r["n"]: r["moves"] for r in map(json.loads, f) if r["n"] <= args.max}
     divs = divisor_lists(max(checkable, default=1))
     sys.setrecursionlimit(100_000)
 

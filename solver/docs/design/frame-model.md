@@ -232,7 +232,7 @@ space, and it reproduces the Java's values exactly, except where the Java's clai
 golden data in `testdata/golden/` is the check.  On eight small boards (8, 12, 13, 16, 17 and 25 to 27) the Java counted
 a frame it had not yet simplified as having freedoms, which blocked a back claim and left a frame another factor;
 `tests/golden_frames.rs` lists these departures with the reason, and the games are the same.  Every final score equals
-optimal.json's.
+the built-in table's.
 
 The search is the frame solver's own.  It started as the Java's loop: its bound, its depth-2 preclusion table, the
 promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was replaced by

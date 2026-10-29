@@ -1,10 +1,10 @@
 //! The longest games against the optimal ones: for every game of a range, M(n), the most moves a game of n can
-//! have, decided by the prover ([`taxman_prover::moves`]), against the moves of the recorded optimal game
-//! (optimal.json and, for a game it lacks, the game of `--results`).  One line per
-//! game, resumable:
+//! have, decided by the prover ([`taxman_prover::moves`]), against the moves of the recorded optimal game (the
+//! committed chain and the `--results` files; see solver/noframe/docs/reproducing.md, "The recorded games").  One line
+//! per game, resumable:
 //!
 //!     moves --from A --to B [--list ...] [--budget NODES] [--heaviest 0] [--seconds S] [--optimal FILE]
-//!           [--results FILE] --out FILE
+//!           [--results FILE]... --out FILE
 //!
 //! The games are worked in increasing order, each from its predecessor's line (in the output file or just
 //! written): a longest game of n − 1 is a game of n, M(n) <= M(n − 1) + 1, and M(n) = M(n − 1) for a prime
@@ -28,7 +28,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use taxman_prover::game::Board;
-use taxman_prover::jsonl::{field_nums, field_u64, parse_items, recorded_games, Appender, Obj};
+use taxman_prover::jsonl::{committed_chain, field_nums, field_u64, parse_items, recorded_games, Appender, Obj};
 use taxman_prover::moves::{heaviest_longest, longest, matching_numbers, play_order};
 use taxman_prover::primes::{is_prime, smallest_prime_factors};
 
@@ -44,24 +44,22 @@ fn sum(set: &[u32]) -> u64 {
 
 fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut budget, mut heaviest, mut seconds) = (u64::MAX, true, f64::INFINITY);
-    let mut optimal = root.join("../../results/optimal.json");
-    let mut results = root.join("../../results/strict.jsonl");
+    let mut files = vec![committed_chain()];
     let mut out = PathBuf::new();
     for (flag, value) in flags {
         match flag.as_str() {
             "--budget" => budget = value.parse().unwrap(),
             "--heaviest" => heaviest = value == "1" || value == "true",
             "--seconds" => seconds = value.parse().unwrap(),
-            "--optimal" => optimal = value.into(),
-            "--results" => results = value.into(),
+            "--optimal" => files[0] = value.into(),
+            "--results" => files.push(value.into()),
             "--out" => out = value.into(),
             _ => panic!("unknown flag {flag}"),
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
-    let recorded = recorded_games(&[&optimal, &results]);
+    let recorded = recorded_games(&files);
     let mut items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && recorded.contains_key(n)).collect();
     items.sort_unstable();
     items.dedup();

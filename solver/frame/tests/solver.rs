@@ -1,5 +1,5 @@
-//! End-to-end tests of the per-game pipeline: whole ranges against `optimal.json`, tactic invariance, checkpoint and
-//! resume through the solver, and boards beyond `optimal.json`.
+//! End-to-end tests of the per-game pipeline: whole ranges against the table, tactic invariance, checkpoint and
+//! resume through the solver, and boards beyond the table.
 
 mod common;
 
@@ -21,7 +21,7 @@ fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
 }
 
 #[test]
-fn a_range_reproduces_optimal_json() {
+fn a_range_reproduces_the_table() {
     let optimal = Optimal::built_in();
     let results = solve_all(1, 300, &options(2));
     for r in &results {
@@ -94,7 +94,7 @@ fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
     every_tuning_gives_the_same_scores_at(931..=940);
 }
 
-/// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games `games`.
+/// Every tactic, alone and in the combinations that matter, finds the scores of the table at the games `games`.
 fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
     let optimal = Optimal::built_in();
     // Each variant is a list of `--tactic` assignments, in the order of the tactics (that of its description).
@@ -151,7 +151,7 @@ fn every_tactic_gives_the_same_scores_at_a_few_games() {
 }
 
 /// Games solved with a directory of stores of carried nogoods (`--carried-dir`, with the tactic `carried_nogoods`)
-/// find the scores of `optimal.json`: the store there is what a search of game 499 learns in its first steps, which
+/// find the scores of the table: the store there is what a search of game 499 learns in its first steps, which
 /// each of the games 500..=510 checks at its own root and searches with, with the stores that the games before it in
 /// the range wrote there.
 #[test]
@@ -182,7 +182,7 @@ fn games_with_a_directory_of_stores_find_their_scores() {
     }
 }
 
-/// Every tactic, alone and in the combinations that matter, finds the scores of `optimal.json` at the games 1..=300.
+/// Every tactic, alone and in the combinations that matter, finds the scores of the table at the games 1..=300.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is every_tactic_gives_the_same_scores_at_a_few_games")]
 fn every_tactic_gives_the_same_scores() {
@@ -289,7 +289,7 @@ fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
 
 /// The finder, started as early as it can be, changes no score: games 600..=604, whose searches on the matching path
 /// take a few thousand steps (no ceiling from the game before, `prev_cap` off, so that they are searched to the end),
-/// have `optimal.json`'s scores with it as without it, and the finder's record is in the lines of the games it started
+/// have the table's scores with it as without it, and the finder's record is in the lines of the games it started
 /// for, which the verifier accepts.
 #[test]
 fn a_finder_started_early_changes_no_score() {

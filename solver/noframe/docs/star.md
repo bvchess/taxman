@@ -67,8 +67,8 @@ certified in milliseconds.
 thresholds, with the laminar family of earlier jams as cardinality constraints and cores as learned clauses.  Both
 engines stay as the fallback for a violation of (♦), and are checked against brute force and against each other on
 random instances where greedy fails.  As cross-checks, the prover's greedy equals `heuristics/core.py`'s `optimize_mini`
-on every n ≤ 1000 and 62 samples to 6000, and its kept set's sum equals the sum of the sources of optimal.json's game
-for every n ≤ 1000 (`tools/crosscheck_greedy.py`).
+on every n ≤ 1000 and 62 samples to 6000, and its kept set's sum equals the sum of the sources of the committed chain's
+game for every n ≤ 1000 (`tools/crosscheck_greedy.py`).
 
 ## Adversarial search: what protects greedy
 

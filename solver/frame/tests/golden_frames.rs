@@ -24,7 +24,7 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
 use taxman::frames::{build_frames, BoardFrames};
-use taxman::game::{replay, Optimal};
+use taxman::game::{largest_prime_at_most, replay, replay_finished, Optimal};
 use taxman::json::Json;
 use taxman::model::FrameGraph;
 use taxman::numtheory::Tables;
@@ -319,7 +319,11 @@ fn wide_boards_match_the_java() {
 // ---------------------------------------------------------------------------------------------------------
 // Where the previous game gives the answer
 
-/// For a prime, the shortcut gives the game that the Java accelerated.
+/// For a prime, the shortcut gives the game that the Java accelerated, from the Java's game of the board before it: that
+/// game with its first move, the largest prime below n, replaced by n.  The Java's game of n − 1 is not in the golden data
+/// (a game of a composite there is in another order), so it is made from the Java's game of n, which the data has.  And
+/// from the committed chain's game of n − 1, which may be another optimal game, the shortcut gives a finished game of n
+/// that scores the table's score.
 #[test]
 fn acceleration_matches_java() {
     let optimal = Optimal::built_in();
@@ -328,11 +332,19 @@ fn acceleration_matches_java() {
     let mut primes = 0;
     for g in golden.iter().filter(|g| Tables::new(g.n).is_prime(g.n)) {
         let n = g.n;
-        let prev: &[u32] = if n == 1 { &[] } else { optimal.moves(n - 1).expect("optimal.json has n-1") };
         let solve = g.field("solve");
+        let java = ints(solve.get("moves").unwrap());
+        let prev: Vec<u32> = largest_prime_at_most(n - 1).into_iter().chain(java.iter().skip(1).copied()).collect();
         primes += 1;
         bad.check(n, "accelerated", true, solve.get("accelerated").and_then(Json::as_bool).unwrap());
-        bad.check(n, "accelerated moves", prime_shortcut(n, prev), ints(solve.get("moves").unwrap()));
+        bad.check(n, "accelerated moves", prime_shortcut(n, &prev), java);
+        let ours = prime_shortcut(n, optimal.moves(n - 1).expect("the table has n-1"));
+        bad.check(
+            n,
+            "the game from the committed chain's",
+            replay_finished(n, &ours),
+            optimal.score(n).ok_or_else(|| "no game".to_owned()),
+        );
     }
     println!("{primes} primes");
     assert!(primes > 50);

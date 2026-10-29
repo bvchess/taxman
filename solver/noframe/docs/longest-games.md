@@ -46,7 +46,8 @@ check](../../notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-
 in Python replays the recorded game and computes ν(n) from scratch by Hopcroft-Karp.
 
 Each game reads its predecessor's line in the output file, so a run that continues an earlier one starts from a copy of
-its output, and `--results` names the file of the recorded games above 1300 (`results/strict.jsonl` by default).
+its output.  The recorded games are the committed chain's, and `--results` adds a file of them ([the recorded
+games](reproducing.md#the-recorded-games)).
 
 ## Results
 
@@ -69,8 +70,8 @@ entry](../../notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-
 | 834 | 363 (315) | 364 | 219,031 | 29 | the same (834 is a game at its ceiling: both games of 833 plus 834) |
 | 835 = 5·167 | 363 (315) | 364 | 219,377 | 29 | the same |
 
-The two games of 833 in full (the optimal one is optimal.json's): above n/2 both play the same 314 moves, U\*; below
-it,
+The two games of 833 in full (the optimal one is the committed chain's): above n/2 both play the same 314 moves, U\*;
+below it,
 
 ```
 optimal game (48):   245 250 252 258 261 273 280 288 294 297 300 306 310 315 322 330 333 336 338 342 343 345 350 357

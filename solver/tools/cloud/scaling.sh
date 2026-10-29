@@ -13,7 +13,7 @@
 #   GAMES          games to sweep, default "1215 1225" (brief proofs, as before-a-big-run.md says)
 #   THREADS        a comma list such as 1,8,64,192, default: 1, 2, 4, ... and the number of CPUs
 #   SECONDS_LIMIT  per game and thread count, default 1800; a search that hits it is marked with * in the tables
-#   KNOWN          the results file the ladder takes games from, default results/strict.jsonl
+#   KNOWN          the results file the ladder takes games from, default results/optimal.jsonl.gz
 #   ENGINE_THREADS, ENGINE_ITEMS, ENGINE_DEPTH   the engine benchmark's sizes (see tests/engine.rs)
 #   PAUSE_GAME     the game of --pauses, default 1230; PAUSE_THREADS its threads, default all CPUs
 
@@ -43,7 +43,7 @@ done
 GAMES="${GAMES:-1215 1225}"
 [ "$quick" = 1 ] && GAMES="${GAMES_QUICK:-1184}"
 SECONDS_LIMIT="${SECONDS_LIMIT:-1800}"
-KNOWN="${KNOWN:-$TAXMAN_ROOT/results/strict.jsonl}"
+KNOWN="${KNOWN:-$TAXMAN_ROOT/results/optimal.jsonl.gz}"
 [ -r "$KNOWN" ] || die "$KNOWN is not readable"
 
 mkdir -p "$LOGS"

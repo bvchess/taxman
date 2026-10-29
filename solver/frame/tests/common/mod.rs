@@ -1,6 +1,6 @@
 //! Helpers shared by the integration tests: temporary directories and a random number generator (`support.rs`, which
 //! the unit tests share), a run of the `taxman` binary or of a Python tool (`binary.rs`), the Java's golden data and
-//! the committed results files as oracles beyond `optimal.json`, one-thread searches at a chosen set width, the oracle
+//! the committed results as an oracle, one-thread searches at a chosen set width, the oracle
 //! for the playability of a set on the whole board (the library's `playable`, which uses nothing of the frame model),
 //! and a few small utilities.
 //!
@@ -15,7 +15,7 @@ pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
 pub use support::QUICK;
 #[allow(unused_imports)]
-pub use support::{Rng, TempDir};
+pub use support::{committed_text, gzip_stored, Rng, TempDir};
 #[allow(unused_imports)]
 pub use taxman::playable::{peel, play_order, playable};
 
@@ -27,6 +27,7 @@ use std::time::Instant;
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
+use taxman::game::Optimal;
 use taxman::gf2::{ForceWindow, Gf2Graph};
 use taxman::json::Json;
 use taxman::matchbound::MatchGraph;
@@ -72,44 +73,27 @@ pub fn golden_files(dir: &str) -> Vec<(u32, Json)> {
         .collect()
 }
 
-/// A committed results file under `results/`.
-pub fn results_path(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results").join(name)
+/// The committed results, the file `results/optimal.jsonl.gz`.
+pub fn committed_results() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../results/optimal.jsonl.gz")
 }
 
-/// One game of a results file: its score and moves.
+/// One game of the committed results: its score and moves.
 pub type StoredGames = BTreeMap<u32, (u64, Vec<u32>)>;
 
-/// The completed games of a committed results file, by n.  Read-only (unlike `ResultsFile::open`, which repairs the
-/// file), so a test never touches a tracked file.  The file (17 MB for `strict.jsonl`) is parsed once for all the tests
-/// of a binary.
-pub fn stored_games(name: &str) -> StoredGames {
-    static READ: Mutex<BTreeMap<String, StoredGames>> = Mutex::new(BTreeMap::new());
-    READ.lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .entry(name.to_owned())
-        .or_insert_with(|| read_stored_games(name))
-        .clone()
+/// The first games of the committed results, 1 to [`FIRST_GAMES`], by n: the games of the table built into the
+/// library, which decodes the members of the file that hold them and no others.  The tests that take their games from
+/// the chain use these, which assume nothing.
+pub fn stored_games() -> StoredGames {
+    let table = Optimal::built_in();
+    let game = |n| (n, (table.score(n).expect("a committed game"), table.moves(n).expect("a committed game").to_vec()));
+    (1..=FIRST_GAMES).map(game).collect()
 }
 
-fn read_stored_games(name: &str) -> StoredGames {
-    let text = fs::read_to_string(results_path(name)).expect("results file");
-    let mut games = BTreeMap::new();
-    for line in text.lines().filter(|l| !l.trim().is_empty()) {
-        let json = Json::parse(line).expect("a results line");
-        if json.get("completed").and_then(Json::as_bool) != Some(true) {
-            continue;
-        }
-        let n = json.get("n").and_then(Json::as_u32).expect("n");
-        let score = json.get("score").and_then(Json::as_u64).expect("score");
-        let moves = json.get("moves").and_then(Json::as_u32_vec).expect("moves");
-        assert!(games.insert(n, (score, moves)).is_none(), "{name}: n={n} twice");
-    }
-    games
-}
+/// How many of the first games of the committed results the tests take from them.
+pub const FIRST_GAMES: u32 = 1300;
 
-/// The game `n − 1` of a committed results file as the previous game of `n`.  The tests take games of
-/// `results/strict.jsonl` below 1300, which assume nothing; the proof only matters to the results lines.
+/// The game `n − 1` of the committed results as the previous game of `n`; the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
     Prev {
@@ -128,7 +112,7 @@ pub fn options(threads: usize) -> SolveOptions {
 }
 
 /// [`options`] with the search tactics of the matching path ([`SearchTactics::matching`], which
-/// `results/strict.jsonl` was made with): for the tests that stop a search of a small game by a node limit.
+/// `results/optimal.jsonl.gz` was made with): for the tests that stop a search of a small game by a node limit.
 pub fn matching_options(threads: usize) -> SolveOptions {
     let mut opts = options(threads);
     opts.tactics.search = SearchTactics::matching();

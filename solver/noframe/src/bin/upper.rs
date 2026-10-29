@@ -1,8 +1,7 @@
 //! The upper part of the optimal sets, game by game: for every game in a range, which members of U\*_{≥3} (the
 //! sources of three or more prime factors that descending greedy keeps) the parity bound certifies to be in every
-//! set beating the recorded score, and which it leaves open.  The recorded games are optimal.json's and, for
-//! a game it lacks, those of the `--results` files (default the solver's `results/strict.jsonl`), read in the order
-//! given after optimal.json, an earlier file winning.  One line per game, resumable:
+//! set beating the recorded score, and which it leaves open.  The recorded games are those of the committed chain and
+//! the `--results` files (solver/noframe/docs/reproducing.md, "The recorded games").  One line per game, resumable:
 //!
 //!     upper --from A --to B [--list ...] [--threads K] [--seconds S] [--optimal FILE] [--results FILE]...
 //!           --out FILE
@@ -21,10 +20,10 @@
 //! member u is certified when the bound with u barred as well is at most the score V (or the roles cannot be met): then
 //! every set that beats V and obeys F4 holds u, so if opt(n) > V every optimal set holds every certified member.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use taxman_prover::game::{relation, Board, Relation};
-use taxman_prover::jsonl::{campaign, parse_items, recorded_games, Obj};
+use taxman_prover::jsonl::{campaign, committed_chain, parse_items, recorded_games_to, Obj};
 use taxman_prover::primes::smallest_prime_factors;
 use taxman_prover::upper::{barred_bounds, low_roles, obeys, recorded_ustar, Open};
 
@@ -36,27 +35,21 @@ fn triple(open: &Open) -> String {
 
 fn main() {
     let (items, flags) = parse_items(std::env::args().skip(1));
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let (mut threads, mut seconds) = (1usize, f64::INFINITY);
-    let mut optimal = root.join("../../results/optimal.json");
-    let mut results: Vec<PathBuf> = Vec::new();
+    let mut files = vec![committed_chain()];
     let mut out = PathBuf::new();
     for (flag, value) in flags {
         match flag.as_str() {
             "--threads" => threads = value.parse().unwrap(),
             "--seconds" => seconds = value.parse().unwrap(),
-            "--optimal" => optimal = value.into(),
-            "--results" => results.push(value.into()),
+            "--optimal" => files[0] = value.into(),
+            "--results" => files.push(value.into()),
             "--out" => out = value.into(),
             _ => panic!("unknown flag {flag}"),
         }
     }
     assert!(!out.as_os_str().is_empty(), "--out is required");
-    if results.is_empty() {
-        results.push(root.join("../../results/strict.jsonl"));
-    }
-    let files: Vec<&Path> = std::iter::once(optimal.as_path()).chain(results.iter().map(PathBuf::as_path)).collect();
-    let known = recorded_games(&files);
+    let known = recorded_games_to(&files, items.iter().copied().max().unwrap_or(0));
     let items: Vec<u64> = items.into_iter().filter(|n| *n >= 2 && known.contains_key(n)).collect();
     let spf = smallest_prime_factors(items.iter().copied().max().unwrap_or(2) as usize);
     campaign("upper", &items, threads, seconds, &out, |n| {

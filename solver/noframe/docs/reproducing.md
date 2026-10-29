@@ -2,8 +2,8 @@
 
 Part of [the prover's README](../README.md).
 
-The prover needs Rust, with the standard library only; the tools need Python 3, with its standard library.  `cargo`
-and the commands below run in `solver/noframe`.
+The prover needs Rust, with the standard library and the repository's gzip decoder only; the tools need Python 3, with
+its standard library.  `cargo` and the commands below run in `solver/noframe`.
 
 ```
 cargo test --release                       # brute-force checks of every bound and search (about a minute)
@@ -35,10 +35,8 @@ tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_par
                                     # every n in 2..2175 proven, scores recorded, and how many proofs rest on it
 ./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min)
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
-./target/release/upper --from 2176 --to 3314 --results ../../results/strict.jsonl --results CHAIN.jsonl \
-    --out data/upper_2176_3314.jsonl          # CHAIN.jsonl: the EC2 chain's results (21 minutes)
-./target/release/upper --from 3315 --to 3440 --results ../../results/strict.jsonl \
-    --out data/upper_3315_3440.jsonl          # the committed chain's games 3315 to 3440 (5 minutes)
+./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
+./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes
 ./target/release/exact --list 1575,1584 --out B.jsonl                   # study E6: the sources of layer >= 3 free
 ./target/release/exact --list 1575,1584 --fix-upper 1 --out D.jsonl     # ... and fixed to U*
 tools/summarize.py sources B.jsonl D.jsonl          # study E6's table and criterion (its entry for the cloud run)
@@ -54,3 +52,15 @@ running it again; `exact` also checkpoints the searches in progress (`work/check
 where large (`gunzip -k` to resume into it).  The commands marked study E6 measure whether leaving the sources of layer
 3 or more free costs the prover's search anything, the theory track's measurement E6 ([its
 entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)).
+
+## The recorded games
+
+`exact`, `upper`, `optsets`, `moves` and the examples `parityroot` and `paritycheck` check games against the recorded
+games of the committed chain, the file `results/optimal.jsonl.gz` ([what it holds](../../../results/README.md)).  They
+read it through [the gzip decoder](../../gzip/README.md), so the commands run from `solver/noframe` need nothing but
+the file.
+
+The four programs take two flags for other files of recorded games.  `--optimal FILE` names a file in place of the
+committed chain, and each `--results FILE` adds one, such as the output of a chain run that reaches past the committed
+chain.  The committed chain, or the `--optimal` file, comes first, then the `--results` files in the order given, and
+the earliest file that has game n gives it.  A path that ends in `.gz` is gzip, and any other is plain result lines.

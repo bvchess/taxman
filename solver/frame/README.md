@@ -26,11 +26,11 @@ divisor left in it, and the taxman takes whatever remains.  An *optimal game* sc
 optimal game 3, 4: the taxman takes 1, then 2, and the player scores 7.  The values of opt(n) are the Taxman sequence
 ([OEIS A019312](https://oeis.org/A019312)).
 
-The solver's results are optimal games, each a sequence of moves with its score.  The file `results/strict.jsonl` holds
-a chain of them for every n from 1 to its end, each built from the one before (section 3, "A chain from n = 1"); this
-page calls it the *committed chain*.  The code can attempt any n up to 8191, the largest board that its bitsets of game
-numbers can hold ([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width
-dispatch").
+The solver's results are optimal games, each a sequence of moves with its score.  The gzip file
+`results/optimal.jsonl.gz` holds a chain of them for every n from 1 to its end, each built from the one before (section
+3, "A chain from n = 1"); this page calls it the *committed chain*.  The code can attempt any n up to 8191, the largest
+board that its bitsets of game numbers can hold ([solver/docs/design/architecture.md](../docs/design/architecture.md),
+the paragraph "Width dispatch").
 
 [results/README.md](../../results/README.md) gives how far the chain reaches and how each game is proven: within the
 frame model, given [statement U](../../docs/theory/exactness.md#statement-u) (below, "What optimal means"), and up to a
@@ -153,11 +153,12 @@ cargo build --release --examples --features studies   # and the study tools: the
 Cargo's commands run in `solver/frame`.  The commands of the other sections run from the top of the repository, where
 `results/` is, and `taxman` in them is `solver/frame/target/release/taxman`.
 
-The binary carries the table of optimal games built in: `results/optimal.json` as it was when the binary was compiled
-([results/README.md](../../results/README.md#optimaljson) says which games it holds and where they came from).  Every
-run checks its scores against that table, wherever the binary runs; only `verify-optimal FILE` and `extend-optimal
---table FILE` name another.  A changed table takes a rebuild, which cargo does by itself when the file has changed.  A
-run reads only the games of the table that it asks for, so the size of the table costs a run nothing.
+The binary carries the table of optimal games built in: the games of `results/optimal.jsonl.gz` as they were when the
+binary was compiled ([results/README.md](../../results/README.md#optimaljsonlgz) says where they came from).  Every run
+checks its scores against that table, wherever the binary runs, and no option names another.  A changed file takes a
+rebuild, which cargo does by itself.  A run decodes the table, through [the gzip decoder](../gzip/README.md), only as
+far as the last game it asks for, and a run that asks for none decodes nothing, so the size of the table costs a run
+nothing.
 
 *Details.*  The study tools, the examples `tune`, `extended`, `structure`, `finder` and `wall`, are behind the feature `studies`,
 which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
@@ -211,7 +212,7 @@ built-in table, the proof, the game's own search time and its best promotion sum
   promotions without a search.
 
 The sixth method, `known`, takes a game that the repository has already proven (section 3, "Known games").  "optimal
-ok" says that the score equals the table's: a check, not a proof.
+ok" says that the score equals the built-in table's: a check, not a proof.
 
 `--show` prints a game's promotions and moves.  Solved alone, game 21 is the example of section 1:
 
@@ -280,7 +281,7 @@ n=480   score=73120     search  nodes=37              0.005 s  optimal ok  proof
   promotions: [68, 138, 147, 153, 168, 175, 180, 182, 190, 195, 196, 198, 200, 207, 208, 210, 220, 222, 224, ...]
   moves: [479, 361, 437, 299, 403, 341, 473, 301, 469, 335, 445, 267, 471, 314, 478, 466, 458, 454, 446, ...]
 $ taxman solve 480 --use-prev
-n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain (strict.jsonl)  own=0.000 s  best=-
+n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof=known from the committed chain  own=0.000 s  best=-
 ```
 
 `--use-prev` draws on the *known games*, the games the repository has already proven (below, "Known games").  The known
@@ -289,7 +290,8 @@ with no search: that is the second command.  The first, with `--force-search`, s
 479.  Without `--use-prev` a single game has no game before it, and is solved standalone (below, "Past the known games").
 
 The node count of a multi-threaded search varies a little from run to run.  "optimal ok" means that the score equals
-the table's, not that it is proven ([the reference, section 4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).
+the built-in table's, not that it is proven
+([the reference, section 4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).
 
 ### Solve a range
 
@@ -307,7 +309,7 @@ Each game of a range is built from the one before it.  Moving from one game to t
 untouched: the game is a [repeat](../../docs/GLOSSARY.md#results-and-trust), concluded at once with the promotions of
 the earlier game that posed the same search problem ([the reference, "Proof kinds"](../docs/REFERENCE.md#proof-kinds)).
 About half of the committed chain's games that need a search are repeats
-([results/README.md](../../results/README.md#strictjsonl) has the counts).
+([results/README.md](../../results/README.md#optimaljsonlgz) has the counts).
 
 With `--out FILE`, each result is appended to the file as soon as it is done: one JSON line per game, flushed and
 synced.  A rerun skips every game the file already completed, whatever the tactics of the rerun, since the file's lines
@@ -321,13 +323,14 @@ skipped 300 games already done in mine.jsonl
 
 ### Past the known games
 
-`optimal.json` and `results/strict.jsonl` end at a game ([results/README.md](../../results/README.md) says which), so a
-game past them needs the game before it from the run or from the results file.  Either extend a copy of a file that has
-it, or give `--use-prev`, which takes the known game of n − 1.  That is the game of `optimal.json` or
-`results/strict.jsonl`, or of the bounds store, where the store has proven the game.  A copy of `results/strict.jsonl`
-extended is such a file.  The copy matters: `--out` appends to the file, and `results/` must not be overwritten.
+The built-in table and the committed chain end at a game ([results/README.md](../../results/README.md#optimaljsonlgz)
+says which), so a game past them needs the game before it from the run or from the results file.  Either extend a copy
+of a file that has it, or give `--use-prev`, which takes the known game of n − 1.  That is the game of the built-in
+table or the committed chain, or of the bounds store, where the store has proven the game.  A decompressed copy of
+`results/optimal.jsonl.gz`, extended, is such a file (`gzip -dc results/optimal.jsonl.gz > mine.jsonl`).  The copy
+matters: `--out` appends to the file, and `results/` must not be overwritten.
 
-The games 1301 and 1302 are known, from `results/strict.jsonl`.  So to search them from the known game of 1300, as a
+The games 1301 and 1302 are known, from the committed chain.  So to search them from the known game of 1300, as a
 range past the known games does, `--force-search` leaves them to their searches:
 
 ```
@@ -350,13 +353,13 @@ reaching the ceiling ([the cost curve](../notebook/search/benchmarks-the-probe-p
 
 ### Known games
 
-`--use-prev` draws on three sources of games that the run has not made.  All three are in the repository's
-`results/`, and no option names another:
+`--use-prev` draws on three sources of games that the run has not made, and no option names another.  The first two are
+the file `results/optimal.jsonl.gz`, read twice:
 
 | source | holds | a game of it rests on |
 |---|---|---|
-| `optimal.json` (built in) | the table of optimal games | nothing but the table's word: the line records that it assumes the game optimal |
-| `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes |
+| the built-in table | the games of `results/optimal.jsonl.gz` as of the build | nothing but the table's word: the line records that it assumes the game optimal |
+| the committed chain | the file `results/optimal.jsonl.gz` of the checkout, each game with its proof | what its line assumes |
 | `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | [statement U](../../docs/theory/exactness.md#statement-u) at the games its upper bound rests on (`rests_on`), one assumption each |
 
 Of a game that several sources hold, the solver takes the committed chain's, then the store's, then the table's.  What
@@ -365,11 +368,11 @@ it does with them:
 * **A game that a source has proven is recorded with no search.**  Its line has the method `known`, the proof `known`,
   no `setup`, and a `known` field that cites the source ([the reference, "Citing a known
   source"](../docs/REFERENCE.md#citing-a-known-source)).  The referee replays it like every game, and it is checked
-  against the game before it (`score(n − 1) <= score(n) <= n + score(n − 1)`) and against the table.  Game n + 1 has the
-  game of n for its ceiling and seed as usual, and a proof that rests on it, by the ceiling or the prime formula,
-  assumes what it does.
+  against the game before it (`score(n − 1) <= score(n) <= n + score(n − 1)`) and against the built-in table.  Game
+  n + 1 has the game of n for its ceiling and seed as usual, and a proof that rests on it, by the ceiling or the prime
+  formula, assumes what it does.
 * **The game before the range** is the known game of A − 1, if `--out` lacks it.  The `prev` of the first line says
-  where it came from: `optimal`, `strict` or `bounds`.
+  where it came from: `optimal` (the built-in table), `strict` (the committed chain) or `bounds`.
 * **A game that the store has not proven** still helps its search, whether the store has a lower bound, an upper bound
   or both with a gap between them.  The game of its best lower bound is a seed beside the game of n − 1, and the one
   that keeps more is used.  Its best upper bound is a ceiling next to the one that the game of n − 1 gives, and a
@@ -385,22 +388,22 @@ again there.  That is for a run that goes past the committed chain
 ### A chain from n = 1
 
 ```
-$ taxman solve 1-2175 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
+$ taxman solve 1-2175 --out chain.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Started at n = 1, a chain takes no game from `optimal.json`, which it only compares with, as far as the table goes; a
-score that differs is a hard error.  So no proof in the file assumes anything beyond the frame model.  A run
-that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof rests on it, that it assumes
-that game optimal ("Known games", above).
+Started at n = 1, a chain takes no game from the built-in table, which it only compares with, as far as the table goes;
+a score that differs is a hard error.  So no proof in the file assumes anything beyond the frame model.  A run that
+takes a game from the table (`--use-prev`) records, in every result whose proof rests on it, that it assumes that game
+optimal ("Known games", above).
 
-`results/strict.jsonl` is such a chain.  This command, up to the paths, the thread count and the progress reports,
-made its games 1 to 2175, and a run of it reproduces their scores.  [results/runs.md](../../results/runs.md) says how
-the rest were made.
+`results/optimal.jsonl.gz` is such a chain, compressed.  This command, up to the paths, the thread count and the
+progress reports, made its games 1 to 2175, and a run of it reproduces their scores.
+[results/runs.md](../../results/runs.md) says how the rest were made.
 
 ### Games in flight
 
 ```
-$ taxman solve 1-2175 --threads 64 --window 4 --out strict.jsonl --checkpoint-dir ckpt
+$ taxman solve 1-2175 --threads 64 --window 4 --out chain.jsonl --checkpoint-dir ckpt
 ```
 
 With `--window K`, a range keeps up to K consecutive games in flight, so that a machine of many threads stays busy
@@ -507,8 +510,8 @@ thread, with a limit on each game's search (`GAME_SECONDS`, 180).  Then passes o
 merged file, so that each game sees the game before it whichever block made it, until a pass changes nothing.
 
 Its file, `explore.jsonl`, holds every line of every block and pass.  It is **not a chain**, and never goes into
-`results/strict.jsonl`: some of its games have only an unfinished search, or none, and each proof in it rests only on
-the games it holds.  Both verifiers accept it ([verifiers.md](../docs/verifiers.md)).
+`results/optimal.jsonl.gz`: some of its games have only an unfinished search, or none, and each proof in it rests only
+on the games it holds.  Both verifiers accept it ([verifiers.md](../docs/verifiers.md)).
 
 **The ledger** works on a whole stretch of games at once instead of in order.  For every game it keeps a lower bound
 with a game that reaches it, and an upper bound, each with how it was derived, and a game is proven when its bounds
