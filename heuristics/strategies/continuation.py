@@ -271,7 +271,7 @@ def tier2_pass(
     before = sum(base[0])
 
     def refill(cands: List[int]) -> None:
-        # Descending value is the load-bearing order: a big blocked add that
+        # Descending value is the order the refill depends on: a big blocked add that
         # is structurally unplayable simply fails and leaves the state
         # untouched, so the smaller genuine beneficiary later in the list
         # still finds its coupon free.  The full playable_add (with the

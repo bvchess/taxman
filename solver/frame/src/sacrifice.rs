@@ -86,8 +86,8 @@
 //!   when, for some `f` with the largest `opt_M(B_f)`, some best game of `B_f` stays acyclic with `n` added.
 //! * `c(f) = 0` whenever some optimal game of `n − 1` replays on `B_f` under the maximal-factor rule (it never
 //!   plays `f` and every move has a maximal factor other than `f` in the pot).  If that holds for some `f`, the
-//!   bound is the trivial `n + opt(n − 1)`.  The bound bites only when every maximal factor of `n` is
-//!   load-bearing.
+//!   bound is the trivial `n + opt(n − 1)`.  The bound bites only when every maximal factor of `n` is one
+//!   that every optimal game of `n − 1` needs.
 //! * Prime `n` (`mf(n) = {1}`).  On `B_1` no prime can be played, and the two rules agree (the other numbers have
 //!   maximal factors above 1).  Let `P` be the largest prime below `n`.  Every optimal game of `n − 1` opens with
 //!   `P` (the prime lemma (N1, docs/theory/neighbors.md)).  Dropping that first move gives

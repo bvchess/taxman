@@ -868,7 +868,11 @@ const RETIRED_IN_THE_SOLVER: &[Retired] = &[
 /// Retired in the README, DESIGN.md with the files of the design, and the code's comments, which name the numbers by
 /// their part in the frame model, and in the docs rewritten to docs/WRITING.md (`REWRITTEN`) but those that speak of
 /// the whole game (`SPEAK_OF_THE_WHOLE_GAME`).
-const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[retired("upper half", "sources"), retired("lower half", "factors")];
+const RETIRED_IN_THE_GUIDE_AND_CODE: &[Retired] = &[
+    retired("upper half", "sources"),
+    retired("lower half", "factors"),
+    retired("load-bearing", "what a proof of a score rests on"),
+];
 
 /// The docs rewritten to docs/WRITING.md, by their paths from the repository.  The vocabulary of docs/GLOSSARY.md
 /// (`RETIRED_IN_THE_REWRITTEN_DOCS`, `RETIRED_CASED`) applies to them; a doc joins the list when it is rewritten.
