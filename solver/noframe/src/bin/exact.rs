@@ -217,7 +217,7 @@ fn main() {
                 panic!("n={n}: the root's parity bound is not certified")
             };
             assert!(root_bound.value >= *score as i64, "n={n}: the parity bound is below a legal game's {score}");
-            // The recorded game's moves are independent in both parity matroids (W1, docs/theory/parity-bound.md).
+            // The recorded game's moves are independent at both parities (W1, docs/theory/parity-bound.md).
             moves.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             let independent = parity_at(&roles);
             assert!(matches!(independent, Outcome::Bound(_)), "n={n}: the recorded game is dependent");

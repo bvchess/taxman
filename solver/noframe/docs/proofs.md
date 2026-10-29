@@ -32,11 +32,11 @@ The search:
   the parent's optimal matching and dual, each freed vertex repaired by one Hungarian step.  That made the search 160
   times faster than solving each node from scratch.
 * **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set is
-  independent in two linear matroids over GF(2), split by the parity of Ω ([the parity
-  matroids](../../../docs/theory/parity-bound.md#the-parity-vectors), W1).  So at a node, the heaviest
-  set independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
+  independent at both parities: its vectors over GF(2), split by the parity of Ω, are linearly independent in each part
+  ([the parity vectors](../../../docs/theory/parity-bound.md#the-parity-vectors), W1).  So at a node, the heaviest set
+  independent at both parities together with the forced picks, and outside the barred numbers, bounds every completion.
   * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.
-  * It is reported only with a weight split that satisfies the local optimality conditions of both matroids, checked
+  * It is reported only with a weight split that satisfies the local optimality conditions of both parities, checked
     explicitly, so the bound rests on the theorem and weak duality, not on the algorithm.
   * It cuts the node, bars the free numbers that depend on the forced picks, and forces the members whose barring alone
     brings it to the target.  The node branches on its heaviest set's conflicts instead of the matching's.
@@ -133,12 +133,13 @@ data/exact_parity_2_1300.jsonl` gives the 557 games that need a search, proven f
 | 1100–1199 | 56 | 111 | 789 | 41,153 (1199) | 264 |
 | 1200–1300 | 56 | 169 | 18,247 | 146,855 (1287) | 2,276 |
 
-The cost follows the root's parity gap as the frame solver's follows its root gap.  Over 900–1300 a search's nodes
-grow tenfold per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76).  The gap grows about 14 points per 100
-in n, with swings of ±50 between bands; that is the matroid study's measurement, which these roots reproduce.  Against
-n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–1300 (R² 0.06 and 0.11: the
-gap's swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent
-50–70 million nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
+The cost follows the root's parity gap as the frame solver's follows its root gap.  Over 900–1300 a search's nodes grow
+tenfold per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76).  The gap grows about 14 points per 100 in n,
+with swings of ±50 between bands; that is the measurement of [matroid intersection
+bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md), which these roots reproduce.  Against n,
+log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–1300 (R² 0.06 and 0.11: the gap's
+swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70
+million nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
 
 The prover's proofs reach 2175, where the committed chain (`../../results/strict.jsonl`) ended when they were made; the
 next subsection is the run that made them.

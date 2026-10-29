@@ -9,12 +9,13 @@ more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound
 bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors
 coordinates over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal
 factors in the frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and
-the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so its condition is a linear
-matroid on the candidates that touch it, contracted by the moves, whose rank is the frame's freedoms.  A candidate of
-home `h` touches frames `h` and `h − 1`, one even and one odd.  So the even frames' matroids are the blocks of a matroid
-`A` on the candidates, the odd frames' the blocks of a matroid `B`, and every promotable set is independent in both.
-The heaviest common independent set of at most `max_add` members (weighted matroid intersection, solved in polynomial
-time), the node's *heaviest set* `I*`, bounds its completions.
+the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so a set of candidates is
+*independent in the frame* when the classes of its members that touch it, modulo the span of the moves' vectors, are
+independent, and the frame's freedoms bound its size.  A candidate of home `h` touches frames `h` and `h − 1`, one even
+and one odd.  So independence in every frame is two conditions on the candidates, the even frames' blocks (side `A`) and
+the odd frames' blocks (side `B`), and every promotable set meets both.  The heaviest set of at most `max_add` members
+that is independent in every frame (found by weighted matroid intersection, solved in polynomial time), the node's
+*heaviest set* `I*`, bounds its completions.
 
 [The frame bound](../../../docs/theory/frame-bounds.md#the-frame-bound) has the proof; it is the frame model's form of
 [the parity bound](../../../docs/theory/parity-bound.md#the-parity-bound), the prover's bound on the whole game.
@@ -22,18 +23,19 @@ The module comments of `src/gf2.rs` and `src/gf2/meet.rs` have the algorithms.  
 matching bound, since independent vectors have a system of distinct representatives, which is a matching.  What it
 misses are the *odd* cores of movers with three or more factors.
 
-* **Kept along the path.**  `gf2::Gf2Graph` builds the root's matroids once a search, and `gf2::Gf2Bound` keeps a level
-  for each node of the searcher's path.  A child's level is its parent's, contracted by what the child promoted, with
-  the candidates it lost deleted.  The promoted members of each block become rows with a pivot each, and each vector of
-  the block is reduced by the rows of the pivots it has (`contract_all`): the vectors that one pivot per member and
-  matroid would make, in one pass over the block, where a child that promotes many members, its node's forced members,
-  made a pass for each.  A candidate that the contraction makes a loop (a zero vector, in no common independent set)
-  leaves the level's live candidates and stays out below it.  The intersection (`gf2::meet`: Lawler's shortest
-  augmenting paths, over a tableau of bitset rows that a pivot updates per exchange) starts from the last of the sets
-  that the parent's augmentations passed through and that the changes keep.  Each such set is the heaviest of its size
-  and heavier than all smaller ones, and when the set kept is the parent's heaviest set, the child inherits it with no
-  solve.  The parent here is the node as it was before it went on without the member the child promotes (the search
-  keeps it aside for that), so that the child finds the node's heaviest set among those sets.
+* **Kept along the path.**  `gf2::Gf2Graph` builds the root's two sides once a search, and `gf2::Gf2Bound` keeps a level
+  for each node of the searcher's path.  A child's level is its parent's with every vector reduced modulo the vectors of
+  what the child promoted (independence together with them), and with the candidates it lost left out.  The promoted
+  members of each block become rows with a pivot each, and each vector of the block is reduced by the rows of the pivots
+  it has (`contract_all`): the vectors that one pivot per member and side would make, in one pass over the block, where
+  a child that promotes many members, its node's forced members, made a pass for each.  A candidate that the reduction
+  leaves with the vector 0 (in no set independent in every frame) leaves the level's live candidates and stays out below
+  it.  The intersection (`gf2::meet`: Lawler's shortest augmenting paths, over a tableau of bitset rows that a pivot
+  updates per exchange) starts from the last of the sets that the parent's augmentations passed through and that the
+  changes keep.  Each such set is the heaviest of its size and heavier than all smaller ones, and when the set kept is
+  the parent's heaviest set, the child inherits it with no solve.  The parent here is the node as it was before it went
+  on without the member the child promotes (the search keeps it aside for that), so that the child finds the node's
+  heaviest set among those sets.
 * **Tableaux derived, not built.**  A solved level needs its tableau for its weight split even when the workspace no
   longer holds it: a child that inherited its heaviest set or was certified, or a node going on without the member it
   branched on.  A solve from `I*` would build the tableau, a pivot per member over its block.  `Meet::derive` makes a
@@ -154,10 +156,10 @@ misses are the *odd* cores of movers with three or more factors.
   one distance sorted once, which come out in the binary heap's order.  A*'s keys are the distance plus the bound,
   with no count of arcs, so they can tie in distance with the last one taken, which the queue allows.
 * **A child's bound from its parent's split.**  The same weak duality bounds a child before it is made.  A child that
-  promotes members `F` of `I*` has the parent's problem contracted by `F`, so each of its common independent sets `J`
-  makes `J ∪ F` one of the parent's, with no candidate the child lacks.  So `w1(J) + w2(J)` is at most the heaviest
-  independent set of `A` for `w1` plus that of `B` for `w2`, each among the sets of the child's candidates that are
-  independent with `F`, and each of those is greedy: two passes over the child's candidates, with no solve and the
+  promotes members `F` of `I*` asks for sets `J` independent in every frame together with `F`, so each makes `J ∪ F` a
+  set of the parent's problem, with no candidate the child lacks.  So `w1(J) + w2(J)` is at most the heaviest set
+  independent on side `A` for `w1` plus that on side `B` for `w2`, each among the sets of the child's candidates that
+  are independent with `F`, and each of those is greedy: two passes over the child's candidates, with no solve and the
   workspace's tableau untouched (`Gf2Bound::child_bound`).  The look of `conflict_look` cuts its child where this is
   below the child's need, and solves the child only where it is not ([search.md](search.md#conflict-branching)).
 * **Exact strong branching.**  The member of the conflict to branch on is the one without which the intersection is
@@ -192,16 +194,16 @@ misses are the *odd* cores of movers with three or more factors.
 
 ## The decomposition bound
 
-[The decomposition bound](../../../docs/theory/frame-bounds.md#the-decomposition-bound) joins the GF(2) bound and signed
-GF(3) frame matroids through Lagrange multipliers.  It is no tactic of the search: the study of the multi-field bound
-computed it ([a bound over GF(2) and GF(3) signed frame
+[The decomposition bound](../../../docs/theory/frame-bounds.md#the-decomposition-bound) joins the GF(2) bound and the
+independence of the frames under signed GF(3) signings through Lagrange multipliers.  It is no tactic of the search: the
+study of the multi-field bound computed it ([a bound over GF(2) and GF(3) signed frame
 matroids](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and `wall choice`
 evaluates it at nodes with that study's code, `examples/wall/fields/`.  The code evaluates the bound exactly in
 integers, so that its floor bounds every promotion sum whatever produced the multipliers: the weights are `x·2^16` and
-the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3) matroid's term
-is its greedy algorithm, all in 64-bit integers, and a sum that would leave them saturates, which keeps the bound valid.
-A floating-point linear program proposes the multipliers by column generation and is no part of the proof.  The
-module comment of `examples/wall/fields/dw.rs` has the details.
+the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3) frame's term is
+the greedy algorithm over its vectors, all in 64-bit integers, and a sum that would leave them saturates, which keeps
+the bound valid.  A floating-point linear program proposes the multipliers by column generation and is no part of the
+proof.  The module comment of `examples/wall/fields/dw.rs` has the details.
 
 ## Prime exchanges
 

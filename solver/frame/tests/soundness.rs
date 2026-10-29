@@ -825,7 +825,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
 
 /// At the nodes of the probe's fixtures (`testdata/perf/`: 300 nodes each of the proofs of 936 and 1215, from the root
 /// to 30 promotions deep), with the oracles that do not use the bound: every completion made by promoting the node's
-/// candidates in a random order, each if it can be, is independent in both of the node's matroids (the bound of the
+/// candidates in a random order, each if it can be, is independent in every frame of the node (the bound of the
 /// node with only its members as candidates is their sum) and no heavier than the bound; and the search of the
 /// matching path, started from the bound, finds no completion above it (where it ends within its time limit, it
 /// proves the bound is at least the best completion).

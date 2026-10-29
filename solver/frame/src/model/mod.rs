@@ -195,11 +195,11 @@ impl FrameGraph {
     /// applied, and the conflicts and nogoods are those of the other frames; each frame's freedoms are still spent, and
     /// a frame with none left still narrows its candidates.  A relaxed frame of a state may be unwinnable; reducing it
     /// still pays each move left with one live factor by it, which takes that factor out of the candidates.  That never
-    /// happens to a member of a set independent in the GF(2) frame matroids: each reduction is a pivot of the frame's
+    /// happens to a member of a set independent in every frame over GF(2): each reduction is a pivot of the frame's
     /// vectors, so a factor it takes has its unit vector in the span of the moves and the factors promoted out, and a
     /// set holding it is dependent.  So such a set can be promoted one member after another, in any order, exactly when
     /// it can be at once.  A search of this model with the GF(2) bound, which promotes only members of its heaviest
-    /// sets, therefore finds the heaviest set that is independent in the frame matroids and leaves the checked frames
+    /// sets, therefore finds the heaviest set that is independent in every frame and leaves the checked frames
     /// winnable: the bound exact in the checked frames and GF(2) in the relaxed ones (`examples/wall/local.rs`).
     #[cfg(feature = "studies")]
     pub fn relaxing(&self, frames: u16) -> FrameGraph {

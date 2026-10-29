@@ -353,7 +353,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 
 | file | contents |
 |---|---|
-| [`../docs/THEORY.md`](../docs/THEORY.md) | the index of the theory's proofs: playability, peel, cores and the residual, [the sources conjecture](../docs/theory/sources.md#the-sources-conjecture) and [the frontier theorem](../docs/theory/sources.md#the-frontier-theorem), and the theorems behind the frame solver (the parity and frame matroids, prime exchanges, the frame model's exactness) |
+| [`../docs/THEORY.md`](../docs/THEORY.md) | the index of the theory's proofs: playability, peel, cores and the residual, [the sources conjecture](../docs/theory/sources.md#the-sources-conjecture) and [the frontier theorem](../docs/theory/sources.md#the-frontier-theorem), and the theorems behind the frame solver (the parity bound, independence in every frame, prime exchanges, the frame model's exactness) |
 | `core.py` | shared foundations: `maximal_factors`, the wiki's `peel` / `optimize_mini`, `order_for_real_game`, `solve_upper_half`, divisor tables, `check_sequence` replay validation |
 | `strategies/solvent.py` | the fast solvent implementation (incremental matching + complete fallback tier) |
 | `strategies/solvent_b.py` | solvent-b: solvent plus the dual-use audit (recovers ~52% of solvent's loss for one factor of n in cost) |

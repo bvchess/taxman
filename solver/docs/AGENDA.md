@@ -25,14 +25,14 @@ project's), and the literature has bounds and one asymptotic result, not values 
 ([agenda-ideas.md](agenda-ideas.md)).
 
 **The theory the search stands on.**  One count decides three conditions on a set of moves ([the counting theorem
-(C2)](../../docs/theory/franklin-moniot.md#the-counting-theorem)): the set is playable exactly when some payment set
-has one payment scheme, independent over GF(2) in the parity matroids when some has an odd number of them, and matchable
-when some has at least one.  The search's GF(2) bound is the frame model's form of the middle condition ([the frame
-bound (B2)](../../docs/theory/frame-bounds.md#the-frame-bound)).
-It equals the parity bound at every root measured, and it is exact on movers with at most two live factors.  It is blind
-only to *odd cores*: self-covering sets with an odd number of schemes, which need movers with three or more distinct
-primes.  At the roots, what the bound gets wrong is which candidates, never how many, through odd cores of frames 1-3
-whose size grows with n ([the anatomy of the gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md)).
+(C2)](../../docs/theory/franklin-moniot.md#the-counting-theorem)): the set is playable exactly when some payment set has
+one payment scheme, independent over GF(2) at both parities when some has an odd number of them, and matchable when some
+has at least one.  The search's GF(2) bound is the frame model's form of the middle condition ([the frame bound
+(B2)](../../docs/theory/frame-bounds.md#the-frame-bound)).  It equals the parity bound at every root measured, and it is
+exact on movers with at most two live factors.  It is blind only to *odd cores*: self-covering sets with an odd number
+of schemes, which need movers with three or more distinct primes.  At the roots, what the bound gets wrong is which
+candidates, never how many, through odd cores of frames 1-3 whose size grows with n ([the anatomy of the
+gap](../notebook/search/the-anatomy-of-the-gap-2026-10/README.md)).
 
 **What has been tried,** by family (the register has every row):
 
@@ -175,9 +175,10 @@ entry](../notebook/search/measurements-made-for-the-research-agenda-2026-10/READ
 
 ### A1. A bound over several fields and signings (a change of slope, if its share holds)
 
-*Closed* (2026-10-18; the slope test killed it in the search on 2026-10-16).  The multi-field bound, the GF(2) frame
-matroids and the signed GF(3) ones coupled by Lagrangian multipliers ([the glossary](../../docs/GLOSSARY.md); [the
-signed frame theorem (B1)](../../docs/theory/frame-bounds.md#the-signed-frame-theorem) and [the decomposition bound
+*Closed* (2026-10-18; the slope test killed it in the search on 2026-10-16).  The multi-field bound, independence in
+every frame over GF(2) and under signed GF(3) signings, coupled by Lagrangian multipliers ([the
+glossary](../../docs/GLOSSARY.md); [the signed frame theorem
+(B1)](../../docs/theory/frame-bounds.md#the-signed-frame-theorem) and [the decomposition bound
 (B4)](../../docs/theory/frame-bounds.md#the-decomposition-bound)), closes a large share of the root's gap ([the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  But in a branch and bound
 its trees shrink by a factor that falls as the gap grows, and at a node it cuts none of gap 500 or more, where the cost
@@ -263,8 +264,8 @@ test](../notebook/search/decomposing-across-the-frames-a5s-cheapest-experiment-2
 ### A6. The prover's node (a constant factor that keeps verification in pace)
 
 *Open.*  A node of the prover costs 9 to 17 times the solver's ([The diagnosis of the
-wall](#2-the-diagnosis-of-the-wall)), because it solves the parity matroids at each node, warm-started from its parent,
-where the solver keeps contracted matroids by pivots along the path ([the GF(2) bound in the
+wall](#2-the-diagnosis-of-the-wall)), because it solves the parity bound's intersection at each node, warm-started from
+its parent, where the solver keeps its vectors reduced by pivots along the path ([the GF(2) bound in the
 search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), item 5).  Reimplementing the technique in the
 prover, without sharing code, which is the point of the prover, would give it most of that factor.  The bound without a
 member, read off the exchange graph, would cut its strong branching.  *Experiment:* the prover's node profile on 1300
@@ -314,10 +315,10 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
 Each opens with where it stands; a settled one keeps its result in a few lines.
 
 **Conjecture C1 (fields).**  *Tested at the roots: not killed, but the share falls with the gap; A1, the avenue it
-served, is closed.*  The LP over the frame matroids of GF(2) and of a few GF(3) signings (0/1 entries, Koszul signs, and
-the signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  At the roots of
-2200-3400 it closes 0.46 of the gap, flat in n there, against 0.62 at 1700-2175, and over 900-3333 the share falls 1.0 ±
-0.34 points per 100 n, and 3.8 ± 1.1 per 100 points of gap ([E2 of the fields
+served, is closed.*  The LP over independence in every frame under GF(2) and a few GF(3) signings (0/1 entries, Koszul
+signs, and the signings built from the cores met) closes a share of the root GF(2) gap that does not fall with n.  At
+the roots of 2200-3400 it closes 0.46 of the gap, flat in n there, against 0.62 at 1700-2175, and over 900-3333 the
+share falls 1.0 ± 0.34 points per 100 n, and 3.8 ± 1.1 per 100 points of gap ([E2 of the fields
 study](../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#e2-past-2175-2026-10)).
 *Evidence before the test:* the heaviest GF(2) set is dependent in another field or signing at 49-73% of the roots of
 300-1300, rising (measurements 7.2), and the signed GF(3) family is complete (Hershkowitz and Schneider,

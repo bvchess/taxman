@@ -115,7 +115,7 @@ pub struct SearchSpace<'a, const W: usize> {
     /// When the search began, and the best incumbent the searchers found (see [`Found`]).
     pub began: Instant,
     pub found: Mutex<Option<Found>>,
-    /// With the tactic `gf2`: the root's GF(2) frame matroids, which bound every node.
+    /// With the tactic `gf2`: the root's frames as GF(2) vectors ([`Gf2Graph`]), which bound every node.
     pub gf2: Option<Gf2Graph>,
     /// With `gf2`: whether the matching bound is kept along the path too, as a cheaper first check.
     pub gf2_prefilter: bool,

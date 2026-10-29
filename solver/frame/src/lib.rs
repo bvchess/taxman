@@ -15,8 +15,8 @@
 //! model* (a restatement of the algorithm of the Java solver) splits the board into independent *frames*, each a group
 //! of sources with the factors they compete for, numbers the ones that have freedoms from the front (0 is played first)
 //! and merges those with the same number, and turns an optimal game into the promotion set with the largest sum that
-//! keeps every frame winnable.  A branch-and-bound over promotion sets, bounded by the heaviest set independent in two
-//! GF(2) matroids of the frames (or by a matching relaxation) and run on many threads, finds that set; a game of `n` is
+//! keeps every frame winnable.  A branch-and-bound over promotion sets, bounded by the heaviest set independent in
+//! every frame over GF(2) (or by a matching relaxation) and run on many threads, finds that set; a game of `n` is
 //! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md` (in
 //! the crate's directory) is the user guide; `docs/GLOSSARY.md` defines the project's words; `DESIGN.md` explains the
 //! design; `solver/notebook/README.md` is the lab notebook of how it got there.
@@ -61,7 +61,7 @@
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
 //! | search | [`matchbound`] | the matching bound, an upper bound on a node's completions; the Lagrangian bound |
-//! | | [`gf2`] | the GF(2) bound, the default node bound: two frame matroids and their weighted intersection |
+//! | | [`gf2`] | the GF(2) node bound (the default): independence in every frame, by weighted matroid intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header, and the finder |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |

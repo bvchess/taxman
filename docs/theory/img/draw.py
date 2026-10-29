@@ -364,7 +364,8 @@ def cycle_21():
 
 
 def graphic_21():
-    """The graphic matroid of the edges 6, 10, 14, 15, 21 on the primes 2, 3, 5, 7, and the scan that keeps 21, 15, 14"""
+    """The edges 6, 10, 14, 15, 21 on the primes 2, 3, 5, 7, whose forests are the independent sets, and the scan that
+    keeps 21, 15, 14"""
     fig = Fig(
         "graphic-21",
         760,
@@ -699,15 +700,15 @@ def frame_matroids_21():
         470,
         "Game 21's root frames 1 and 0, with the candidates 4 and 9 (double outline) as factors of frame 1 and "
         "dashed arrows to the factors 2 and 3 of frame 0, where they would be movers: each candidate touches one "
-        "odd and one even frame.",
+        "odd and one even frame, and in each frame 4 and 9 have one class.",
     )
     d = 84
     x0 = 110
     y1m, y1f, y0m, y0f = 112, 190, 322, 400
     fig.box(x0 - 60, 62, 360, 170, stroke=INK)
     fig.box(x0 - 60, 272, 360, 170, stroke=INK)
-    fig.text(x0 + 290, 84, "Frame 1: B = N₁ (odd)", anchor="end", weight="bold")
-    fig.text(x0 + 290, 294, "Frame 0: A = N₀ (even)", anchor="end", weight="bold")
+    fig.text(x0 + 290, 84, "Frame 1 (odd)", anchor="end", weight="bold")
+    fig.text(x0 + 290, 294, "Frame 0 (even)", anchor="end", weight="bold")
     n1 = draw_frame(fig, {12: 0.5, 18: 1.5}, {4: 0, 6: 1, 9: 2}, y1m + 12, y1f, d, x0, rings={4, 9})
     n0 = draw_frame(fig, {14: 0.5, 21: 1.5}, {2: 0, 7: 1, 3: 2}, y0m + 12, y0f, d, x0)
     fig.edge(n1[4], n0[2], "dashed", head=True)
@@ -717,7 +718,11 @@ def frame_matroids_21():
     fig.lines(
         x1,
         138,
-        ["Unit vectors e₄ and e₉.  The moves span", "e₄ + e₆ and e₆ + e₉, so 4 and 9 are", "parallel in B: rank 1."],
+        [
+            "Unit vectors e₄ and e₉.  The moves span",
+            "e₄ + e₆ and e₆ + e₉, so 4 and 9 have",
+            "the same class in frame 1: rank 1.",
+        ],
         size=13,
         anchor="start",
         fill=MID,
@@ -726,7 +731,11 @@ def frame_matroids_21():
     fig.lines(
         x1,
         348,
-        ["Vectors e₂ and e₃.  The moves span", "e₂ + e₇ and e₃ + e₇, so 4 and 9 are", "parallel in A: rank 1."],
+        [
+            "Vectors e₂ and e₃.  The moves span",
+            "e₂ + e₇ and e₃ + e₇, so 4 and 9 have",
+            "the same class in frame 0: rank 1.",
+        ],
         size=13,
         anchor="start",
         fill=MID,
@@ -853,10 +862,10 @@ def parity_10():
         600,
         "The numbers 2 to 10 in the middle with the coordinates 1 to 5 in two boxes, E0 = {1, 4} on the left and "
         "E1 = {2, 3, 5} on the right: each number's solid lines to its maximal factors land in one box and its "
-        "dashed line to its own coordinate in the other; the numbers above 5 have no own coordinate.",
+        "dashed line to its own coordinate in the other; the numbers above 5 have no coordinate among 1 to 5.",
     )
     n = 10
-    best = {6, 7, 8, 9, 10}  # the heaviest set independent in both parity matroids
+    best = {6, 7, 8, 9, 10}  # the heaviest set independent at both parities
     order = [8, 9, 6, 4, 10, 7, 3, 2, 5]  # top to bottom: layers 3, 2, 1, in the order with the fewest crossings
     coords = {0: [4, 1], 1: [3, 2, 5]}  # the coordinates of each box, top to bottom
     xc, xs = 390, {0: 95, 1: 685}
@@ -899,8 +908,8 @@ def parity_10():
         [
             "Solid line: from a number to each maximal factor.",
             "Dashed line: from a number up to 5 to its own coordinate.",
-            "Double outline: a number above 5, with no coordinate of its own.",
-            "Gray and bold: the heaviest set independent in both matroids, {6, 7, 8, 9, 10}.",
+            "Double outline: a number above 5, with no coordinate among 1 to 5.",
+            "Gray and bold: the heaviest set independent at both parities, {6, 7, 8, 9, 10}.",
         ],
         size=12,
         fill=MID,
@@ -1066,7 +1075,7 @@ def exchange_2873():
         (
             {1573, 1859, 2057, 2197, 2873},
             "Y′ = {1573, 1859, 2057, 2197, 2873}: playable, with five",
-            ["So the playable sets are not the independent sets of a matroid:",
+            ["So the playable sets lack the exchange property:",
              "one maximal set has four members and another five."],
         ),
     ]

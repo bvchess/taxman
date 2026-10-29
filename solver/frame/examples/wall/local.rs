@@ -5,10 +5,10 @@
 //! A set of candidates can be promoted exactly when every frame stays winnable with its part of the set applied
 //! (the exactness theorem (X7), docs/theory/exactness.md), and the GF(2) bound relaxes each frame's winnability to the
 //! independence of its vectors (the frame bound (B2), docs/theory/frame-bounds.md).  The *hybrid bound* of a node that
-//! checks the frames `F` is the heaviest completion that is independent in both frame matroids and leaves every frame
-//! of `F` winnable.  Every promotion set is such a set, so it is an upper bound on the node's completions, never above
-//! the GF(2) bound, and with every frame checked it is the node's best completion.  It is what any bound exact in the
-//! frames `F`, and GF(2) elsewhere, can reach at most.  It is computed by the search itself on a relaxed model
+//! checks the frames `F` is the heaviest completion that is independent in every frame (over GF(2)) and leaves every
+//! frame of `F` winnable.  Every promotion set is such a set, so it is an upper bound on the node's completions, never
+//! above the GF(2) bound, and with every frame checked it is the node's best completion.  It is what any bound exact in
+//! the frames `F`, and GF(2) elsewhere, can reach at most.  It is computed by the search itself on a relaxed model
 //! (`FrameGraph::relaxing`: the frames outside `F` are not checked, so the conflicts it branches on are those of `F`)
 //! with the GF(2) bound, from the node, with a known best set (worth P*) as the incumbent and without the rule of
 //! symmetric pairs.  Its best is the hybrid bound if that beats P*; if it does not, the hybrid bound cuts the node.
@@ -55,8 +55,8 @@
 //! in its `node` line, or null for a unit's own start), `depth`, `subtree`, `bound`, `need`, `max_add`, `promoted`
 //! (its promotions), `frames` (each frame of its state, front first: `[moves, factors, freedoms]`), `cands` (its
 //! candidates, each `[number, home]`), `chosen` (the GF(2) bound's heaviest set) and `flipped` (for each candidate,
-//! the GF(2) bound without it if it is in `chosen`, with it if not, or null for a loop).  For a game with no known
-//! best set only the units' own starts are written, and nothing is searched.
+//! the GF(2) bound without it if it is in `chosen`, with it if not, or null for a candidate whose class in some frame
+//! is 0).  For a game with no known best set only the units' own starts are written, and nothing is searched.
 
 use super::anatomy::suite_units;
 use super::{beyond, Line, Options};
@@ -505,7 +505,7 @@ fn dump_instance<const W: usize>(
     let frames: Vec<String> =
         state.frames().iter().map(|f| format!("[{},{},{}]", list(&f.moves), list(&f.factors), f.freedoms)).collect();
     // Each candidate's GF(2) bound with its membership flipped against the heaviest set: without it for a member,
-    // with it for the others (null for a loop, which no completion holds).
+    // with it for the others (null for a candidate whose class in some frame is 0, which no completion holds).
     let live = bound.live();
     let mut value: HashMap<u32, u64> = HashMap::new();
     for x in eval.chosen.iter() {
@@ -760,7 +760,7 @@ mod tests {
     }
 
     /// The root of 600 written whole: its frames and candidates as the model has them, and each candidate's flipped
-    /// bound at most the root's bound, null exactly for the loops.
+    /// bound at most the root's bound, null exactly for the candidates whose class in some frame is 0.
     fn instance_600<const W: usize>() {
         use taxman::json::Json;
         let board = Board::<W>::for_n(600);

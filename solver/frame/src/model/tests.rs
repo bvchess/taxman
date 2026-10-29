@@ -1195,10 +1195,10 @@ fn one_sided_candidates_count_in_the_narrowing_and_the_bound() {
 }
 
 /// A relaxed model ([`FrameGraph::relaxing`]) promotes a set at once exactly when every frame it checks is winnable
-/// with the whole set applied, and one by one only then; one by one too when the set is independent in the GF(2)
-/// frame matroids (a reduction in a relaxed frame never takes such a set's member); a conflict it finds is a subset of
-/// the set that it cannot promote; and with nothing relaxed it is the model.  On random sets of the golden boards, each
-/// with a random set of frames relaxed.  Returns the sets tried, those independent, and those promoted.
+/// with the whole set applied, and one by one only then; one by one too when the set is independent in every frame over
+/// GF(2) (a reduction in a relaxed frame never takes such a set's member); a conflict it finds is a subset of the set
+/// that it cannot promote; and with nothing relaxed it is the model.  On random sets of the golden boards, each with a
+/// random set of frames relaxed.  Returns the sets tried, those independent, and those promoted.
 #[cfg(feature = "studies")]
 fn relaxed_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64, u64) {
     use crate::gf2::{Gf2Bound, Gf2Graph};
@@ -1212,7 +1212,7 @@ fn relaxed_check<const W: usize>(g: &Golden, rng: &mut Rng) -> (u64, u64, u64) {
         let relaxed = model.relaxing(mask);
         let density = 1 + rng.below(20);
         let set = rng.subset(&candidates, density);
-        // The set is independent in both matroids when it is its own heaviest common independent subset.
+        // The set is independent in every frame when its heaviest subset independent in every frame is the set itself.
         bound.reset(&Bits::EMPTY, &set);
         let free = bound.evaluate(set.len(), None).value == set.sum();
         let mut state = root;

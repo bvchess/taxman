@@ -27,7 +27,7 @@ search stays exhaustive, and its proof is the search's own.  A set that fails th
 finder's settings are.
 
 *What it costs and what it records.*  The finder's units are searched in a space of their own (its matching graph, its
-GF(2) matroids, its symmetric pairs: a second of setup at n near 4,900), so its counters are not the search's.  It takes
+GF(2) vectors, its symmetric pairs: a second of setup at n near 4,900), so its counters are not the search's.  It takes
 one core beside the workers for its seconds.  The result line records it where it ran (`engine.finder`: the search's
 steps when it started, the incumbent then, the best it reached, how many of its sets became the incumbent, its seconds
 and when it reached its best), and `options` records the flags where given.

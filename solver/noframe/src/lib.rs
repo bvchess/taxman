@@ -22,8 +22,9 @@
 //! * [`star`]: the per-threshold check of conjecture (★) on one instance.
 //! * [`game`]: the full game on the whole board: replay, peel, and an exact branch and bound.
 //! * [`moves`]: the longest games (the most moves), against the optimal game's moves.
-//! * [`parity`]: the parity matroids, two GF(2) matroids every playable set is independent in, and their certified
-//!   weighted intersection, a bound on opt(n).
+//! * [`parity`]: the parity vectors, two families of vectors over GF(2) in each of which every playable set is
+//!   independent, and the certified heaviest set independent at both parities (weighted matroid intersection), a
+//!   bound on opt(n).
 //! * [`upper`]: which members of U\*_{≥3}, the sources of three or more prime factors that descending greedy keeps,
 //!   every set beating a recorded score must hold, certified by the parity bound with the two bottom layers fixed
 //!   (F4).

@@ -7,18 +7,19 @@
 //! bound                ⌊L⌋ of the fit below at the root (the lowest L the run evaluated): reproducible
 //! l_best               the lowest L of the run's final family of signings (at least `bound`)
 //! mode                 "certified" or "search" (`dw::FitMode`)
-//! signings             per extra matroid, its signing as `gf3::Signing::to_json` writes it
+//! signings             per extra (independence in a frame under a GF(3) signing; see `dw`), its signing as
+//!                      `gf3::Signing::to_json` writes it
 //! lambda               per signing, its positive multipliers as `dw::multipliers_to_json` writes them
-//! support, columns     the final master's columns, each a list of candidates (common independent sets of the two
-//!                      GF(2) matroids; at most `dw::SAVED_COLUMNS`), the first `support` of them its support (null
-//!                      in the pilot study E3's two fits, written before the format had it)
+//! support, columns     the final master's columns, each a list of candidates (sets independent in every frame over
+//!                      GF(2); at most `dw::SAVED_COLUMNS`), the first `support` of them its support (null in the
+//!                      pilot study E3's two fits, written before the format had it)
 //! cuts                 the final master's rank inequalities [signing, [candidates], rank]; the signing is an index
-//!                      into `signings` (cuts of a matroid the fit does not have are left out), the rank that in the
+//!                      into `signings` (cuts of an extra the fit does not have are left out), the rank that in the
 //!                      final family: a reader takes the ranks again in the signings it loads
 //! ```
 //!
-//! A loaded signing is frozen (`mergeable` false, no cores).  `SavedFit::bound` rebuilds the matroids at a root and
-//! evaluates `L` exactly as the run did, so a round trip checks itself.
+//! A loaded signing is frozen (`mergeable` false, no cores).  `SavedFit::bound` rebuilds the frame vectors at a root
+//! and evaluates `L` exactly as the run did, so a round trip checks itself.
 
 use super::dw::{multipliers_from_json, multipliers_to_json, Ctx, Fit, Outcome, Stats};
 use super::gf3::Signing;

@@ -13,21 +13,22 @@ The theory, in [the uniqueness theorem
 (Q1)](../../../docs/theory/uniqueness-and-longest-games.md#the-uniqueness-theorem) and [the step theorem
 (N6)](../../../docs/theory/neighbors.md#the-step-theorem):
 
-* **The heaviest playable set of sources is unique wherever (★) holds** (Q1), so in every game n ≤ 100,000
-  ([Conjecture (★) at scale](star.md#conjecture--at-scale)).  More precisely, U\* dominates every playable set of
-  sources S termwise: the i-th largest member of S is at most the i-th largest of U\*, so S weighs strictly less unless
-  S = U\*.  The playable sets are not a matroid, but under (♦) they lie inside the GF(2) matroid of which U\* is the
-  greedy basis, and a matroid with distinct weights has one heaviest basis.  This is about the sources' instance alone.
-  It does *not* say that every optimal game's upper part is U\*: a game with a lighter upper part could in principle win
-  the difference back below n/2.
+* **The heaviest playable set of sources is unique wherever (★) holds** (Q1), so in every game n ≤ 100,000 ([Conjecture
+  (★) at scale](star.md#conjecture--at-scale)).  More precisely, U\* dominates every playable set of sources S termwise:
+  the i-th largest member of S is at most the i-th largest of U\*, so S weighs strictly less unless S = U\*.  The
+  playable sets can lack the exchange property, but their vectors are linearly independent, and under (♦) U\* is the
+  greedy basis of the sources' vectors; distinct weights give a family of vectors only one heaviest basis.  This is
+  about the sources' instance alone.  It does *not* say that every optimal game's upper part is U\*: a game with a
+  lighter upper part could in principle win the difference back below n/2.
 * **The prime of every optimal set**: every optimal set of n holds the largest prime q ≤ n, and no other prime.
 * **Optimal sets from the game before** (N6).  If opt(n) = n + opt(n − 1), a game at its ceiling, the optimal
   sets of n are exactly the playable T ∪ {n}, for T optimal for n − 1.  If n is prime, T ↦ T − p + n, with p the
   largest prime below n, is a bijection from the optimal sets of n − 1 onto those of n.  So a game has as many optimal
   sets as its predecessor at a prime, and no more at a game at its ceiling; only a composite game below its ceiling can
   have more.
-* **No matroid relaxation is exact for the whole game**: game 425 has two optimal sets (below), and a matroid with
-  distinct positive weights has one heaviest independent set.
+* **No greedy relaxation is exact for the whole game** ([the relaxation proposition
+  (Q2)](../../../docs/theory/uniqueness-and-longest-games.md#the-relaxation-proposition)): game 425 has two optimal sets
+  (below), and a family on which the greedy algorithm is exact has one heaviest member under distinct positive weights.
 
 ## Method
 

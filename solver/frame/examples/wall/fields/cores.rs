@@ -1,5 +1,6 @@
 //! The cores that a set of candidates runs into in the frames of a state, and the GF(3) signings that make them
-//! dependent.  Part of the multi-field bound of `wall/fields.rs`, beside `gf3` (the signed frame matroids).
+//! dependent.  Part of the multi-field bound of `wall/fields.rs`, beside `gf3` (independence in a frame under a
+//! signing).
 //!
 //! # Cores
 //!
@@ -19,8 +20,8 @@
 //! # Signings
 //!
 //! A signing `σ` whose values make every column of a core sum to 0 over GF(3) makes the members' vectors sum to 0 on
-//! the pool, so `Q`'s part in the frame is dependent in the signed frame matroid `N_h^σ` (the GF(3) proposition
-//! (B5), docs/theory/frame-bounds.md).  The *column-sum signing* values a column with `k = 2a + 3b` listers (`b = 1`
+//! the pool, so `Q`'s part in the frame is dependent in frame `h` under `σ` (the GF(3) proposition (B5),
+//! docs/theory/frame-bounds.md).  The *column-sum signing* values a column with `k = 2a + 3b` listers (`b = 1`
 //! when `k` is odd) by `(1, 2)` on each of `a` pairs and `(1, 1, 1)` on the triple.  [`merge`] puts a core into a
 //! signing that already serves other cores, changing as few of their values as it takes to keep every column of every
 //! one of them summing to 0.

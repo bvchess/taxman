@@ -7,13 +7,14 @@
 //! is the bound that [`nogoods`](super::nogoods) fits at the root, with the GF(2) bound as its inner problem, but with
 //! the multipliers fitted at the node: for the nogoods `N` live there (those whose members outside `P` are all in `C`;
 //! the others are vacuous and only loosen the bound), every completion `F` has `|F ∩ N| ≤ |N - P| - 1`, so for any
-//! multipliers `λ_N ≥ 0` the heaviest common independent set of the node's GF(2) matroids, each candidate `x` weighing
-//! `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N - P| - 1)` bounds every completion (weak duality).  The fit is `--node-steps`
-//! subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the root, and it stops
-//! at the first step whose bound is below what the node needs (the node is then *cut*).
+//! multipliers `λ_N ≥ 0` the heaviest set independent in every frame of the node over GF(2), each candidate `x`
+//! weighing `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N - P| - 1)` bounds every completion (weak duality).  The fit is
+//! `--node-steps` subgradient steps (the root's, `nogoods::fit`), warm-started from the multipliers fitted at the root,
+//! and it stops at the first step whose bound is below what the node needs (the node is then *cut*).
 //!
-//! Two more bounds can be measured at the same nodes, the *multi-field bounds* (A1; [`fields`](super::fields): GF(2)
-//! and signed GF(3) frame matroids coupled by multipliers that a column generation fits, with a certified bracket;
+//! Two more bounds can be measured at the same nodes, the *multi-field bounds* (A1; [`fields`](super::fields):
+//! independence in every frame over GF(2) and under signings over GF(3), coupled by multipliers that a column
+//! generation fits, with a certified bracket;
 //! solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md): **r2**, the study's warm
 //! refit (the multipliers of the game's root fit, then a column generation of at most `--a1-pricings` evaluations from
 //! the root's master columns and rank inequalities that still hold at the node, with no exact check), and **full**, the
@@ -59,17 +60,17 @@
 //! search computes it for a unit, `NodeBound::completions`), `gap` (`today - need`, at least 0 for a node the bound
 //! leaves open), `lower` (path nodes: what the best completion reaches, which no bound may be below; else null),
 //! `hint` (a suite unit's nodes when the suite's default solved it; else null), the CPU seconds `today_s`, `graph_s`
-//! (the node's matroids built afresh) and `plain_s` (the GF(2) bound solved on them, which must give `today`), `pool`
-//! (nogoods in the file) and then
+//! (the node's frame vectors built afresh) and `plain_s` (the GF(2) bound solved on them, which must give `today`),
+//! `pool` (nogoods in the file) and then
 //!
 //! * `strong`: the fit over the pool's nogoods: `live` (nogoods live at the node), `steps` (taken), `cut` (the bound
 //!   fell below `need`), `cut_at` (the step it did, else null), `lows` (the lowest bound so far after each step, as a
 //!   promotion sum of the completions, rounded down; the first is the root's multipliers kept at the node), `ts` (the
 //!   wall seconds into the fit at the end of each step) and `s` (the fit's CPU seconds, the live filter included, the
-//!   matroids not); and `sub`: the same with the nogoods of the solve besides (`extra`: those not in the pool), or
+//!   frame vectors not); and `sub`: the same with the nogoods of the solve besides (`extra`: those not in the pool), or
 //!   null without `--sub-nogoods`.  That is a bound of hindsight, for what a searcher's own table could give;
 //! * `a1`, with `--a1` (else null): the multi-field bounds.  `build_s` is the CPU seconds of the node's GF(2) frame
-//!   matroids as vectors, and `r2` and `full` are the two bounds, each with `bound` (the lowest `⌊L⌋` it evaluated),
+//!   vectors, and `r2` and `full` are the two bounds, each with `bound` (the lowest `⌊L⌋` it evaluated),
 //!   `cut` (it is below `need`), `stop` (how it ended: `Target` when it cut, `Converged` or `Fitted` when it settled,
 //!   `Seconds`, `Pricings`, `Rounds` or `Breakdown` when a budget or the master ended it), `capped` (it ended before
 //!   settling and did not cut: more time might have cut), `pricings` (evaluations of `L`; `r2`'s are those after the
@@ -493,7 +494,7 @@ struct A1 {
     full_seconds: f64,
 }
 
-/// A multi-field bound at a node with the CPU seconds it took (besides the node's frame matroids) and whether it cut.
+/// A multi-field bound at a node with the CPU seconds it took (besides the node's frame vectors) and whether it cut.
 struct Timed {
     refit: Found,
     seconds: f64,
@@ -519,7 +520,7 @@ impl Timed {
     }
 }
 
-/// The multi-field bounds at a node whose bound must fall to `target` to cut it: the cost of its frame matroids, and
+/// The multi-field bounds at a node whose bound must fall to `target` to cut it: the cost of its frame vectors, and
 /// the warm refit and the node's own master (the latter for at most `PATH_SECONDS` at a node on the way to an optimal
 /// set).
 struct A1Bounds {
@@ -558,8 +559,8 @@ struct Refit {
     seconds: f64,
 }
 
-/// The refitted bound of the node with promotions `promoted` and candidates `cands`, whose matroids are `graph`: a fit
-/// of `steps` steps towards a bound below `need`, over the `nogoods` live at the node (each with the multiplier to
+/// The refitted bound of the node with promotions `promoted` and candidates `cands`, whose frame vectors are `graph`: a
+/// fit of `steps` steps towards a bound below `need`, over the `nogoods` live at the node (each with the multiplier to
 /// begin from).
 fn refit<'a, const W: usize>(
     graph: &Gf2Graph,
@@ -664,7 +665,7 @@ fn measure_unit<const W: usize>(
     let plain_value = plain.evaluate(max_add, None).value;
     let plain_s = clock.elapsed();
     if plain_value != today {
-        faults.push(format!("{at}: the bound of its matroids built afresh is {plain_value}, not {today}"));
+        faults.push(format!("{at}: the bound of its frame vectors built afresh is {plain_value}, not {today}"));
     }
 
     // A node on the way to an optimal set is fitted towards what its best completion reaches, which no bound goes
@@ -949,7 +950,7 @@ mod tests {
 
     /// At nodes of game 936 (their best completion found exhaustively), against incumbents the node cannot beat and
     /// incumbents it can: no step of the fit goes below the best completion, a cut agrees with the solve (it finds
-    /// nothing better after a cut, and a node that holds a better set is never cut), and the matroids built afresh
+    /// nothing better after a cut, and a node that holds a better set is never cut), and the frame vectors built afresh
     /// give today's bound.
     fn valid_and_agreeing<const W: usize>() {
         let n = 936;

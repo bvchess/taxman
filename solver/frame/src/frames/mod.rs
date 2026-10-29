@@ -80,9 +80,9 @@
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
 //!   plays.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
 //!   sources conjecture (S1, docs/theory/sources.md) holds (certified on every board to 100,000), although the playable
-//!   subsets of a frame's sources are not a matroid; that an optimal game plays all of U\* is proven for the sources
-//!   with one or two prime factors (the bottom-layers theorem, F4, docs/theory/frame-model.md) and is the open
-//!   statement for the others.
+//!   subsets of a frame's sources lack the exchange property in general (docs/theory/sources.md, "Where exchange
+//!   breaks"); that an optimal game plays all of U\* is proven for the sources with one or two prime factors (the
+//!   bottom-layers theorem, F4, docs/theory/frame-model.md) and is the open statement for the others.
 //! * The *freedoms* (`Frame::freedoms`) are `|factors| − |sources|`: how many factors the frame can
 //!   spare, each promotion out of or into the frame using one up.  A frame with none is *closed* and takes no part
 //!   in the search; one with some goes on to it.  A closed frame's factors all pay its own sources in every game

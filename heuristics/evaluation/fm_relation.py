@@ -2,7 +2,7 @@
 # Copyright (c) Brian Chess 2026
 # SPDX-License-Identifier: MIT
 
-"""Franklín and Moniot's characterization of playability against the parity matroids, by brute force.
+"""Franklín and Moniot's characterization of playability against independence at both parities, by brute force.
 
 docs/theory/franklin-moniot.md has the statements and the proofs this module checks.  A *payment
 scheme* of a pick set S pays each member s with a distinct maximal factor of s outside S: a matching of the
@@ -17,10 +17,11 @@ so playable => independent => matchable, and an independent set that is not play
 
 * `exhaustive` checks every pick set of the boards up to --max-n.  Playability is decided by the rule alone (some order
   of S is legal); Franklín and Moniot's condition literally (a scheme with no flat alternating cycle in the
-  maximal-factor graph); independence twice (the independence lemma's family, and the two parity matroids of the parity
-  bound, W1, docs/theory/parity-bound.md); and each is compared with the permanents and with `core.peel`.  It also
-  prints, board by board, the heaviest playable, independent and matchable sets: opt(n), the parity bound and the F-M
-  bound.  Below 30 every number has at most two distinct primes, so these boards test the graph-like regime only.
+  maximal-factor graph); independence twice (the independence lemma's family, and independence at both parities, the
+  parity bound's, W1, docs/theory/parity-bound.md); and each is compared with the permanents and with `core.peel`.
+  It also prints, board by board, the heaviest playable, independent and matchable sets: opt(n), the parity bound and
+  the F-M bound.  Below 30 every number has at most two distinct primes, so these boards test the graph-like regime
+  only.
 * `sampled` makes the same comparisons on random dense sets of the boards 30..--sample-max, grown around members
   with three or more distinct primes, where the hierarchy is strict.
 * `odd_cores` searches the boards --core-boards for odd cores of at most --core-size members.  Every odd core has a
@@ -208,7 +209,8 @@ def lemma_independent(board: Board, picks: Iterable[int]) -> bool:
 
 
 def parity_independent(board: Board, picks: Iterable[int]) -> bool:
-    """Independence in both parity matroids M_0 and M_1 (W1) (a coloop is independent of everything)."""
+    """Independence at both parities (W1).  A pick with an extra coordinate at a parity (s > n/2, with Ω(s) of that
+    parity) is independent of everything there, so it has no row."""
     picks = list(picks)
     for q in (0, 1):
         rows = [mask_of(board.mf[s]) if board.omega[s] % 2 != q else 1 << s
@@ -237,7 +239,7 @@ class Verdict(NamedTuple):
     peel: bool  # core.peel accepts
     independent: bool  # the family of the independence lemma (P10)
     odd: bool  # per(S, T) odd for some T
-    parity: bool  # independent in both parity matroids
+    parity: bool  # independent at both parities
     matchable: bool  # some payment scheme
 
     def consistent(self) -> bool:
@@ -303,7 +305,7 @@ def exhaustive(max_n: int) -> bool:
                 best[name][top] = sum(picks)
     print(f"every pick set of {{2..{max_n}}} ({time.time() - started:.0f} s): {summary(counts)}")
     print(f"  playable = F-M's condition = (per = 1 for some T) = peel, and independent = (per odd for some T) = "
-          f"independent in both parity matroids, on every set: {'yes' if ok else 'NO'}")
+          f"independent at both parities, on every set: {'yes' if ok else 'NO'}")
     print(f"  the smallest matchable but dependent set: {smallest}")
     print("  board   opt(n)   parity bound   F-M bound   (the heaviest playable, independent, matchable set)")
     running = {name: 0 for name in best}

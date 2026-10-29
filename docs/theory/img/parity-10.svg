@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="780" height="640" viewBox="0 0 780 640" font-family="Helvetica, Arial, sans-serif" font-size="14">
-<title>The numbers 2 to 10 in the middle with the coordinates 1 to 5 in two boxes, E0 = {1, 4} on the left and E1 = {2, 3, 5} on the right: each number&#x27;s solid lines to its maximal factors land in one box and its dashed line to its own coordinate in the other; the numbers above 5 have no own coordinate.</title>
+<title>The numbers 2 to 10 in the middle with the coordinates 1 to 5 in two boxes, E0 = {1, 4} on the left and E1 = {2, 3, 5} on the right: each number&#x27;s solid lines to its maximal factors land in one box and its dashed line to its own coordinate in the other; the numbers above 5 have no coordinate among 1 to 5.</title>
 <rect x="0" y="0" width="780" height="640" fill="#ffffff"/>
 <rect x="55" y="121" width="80" height="350" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
 <rect x="645" y="207.3" width="80" height="226" rx="12" fill="none" stroke="#111111" stroke-width="1.6"/>
@@ -58,6 +58,6 @@
 <text x="390" y="322" text-anchor="middle" dy=".35em" font-size="13" font-weight="bold" fill="#666666" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" paint-order="stroke">Ω = 1</text>
 <text x="390" y="560" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Solid line: from a number to each maximal factor.</text>
 <text x="390" y="578" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Dashed line: from a number up to 5 to its own coordinate.</text>
-<text x="390" y="596" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: a number above 5, with no coordinate of its own.</text>
-<text x="390" y="614" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Gray and bold: the heaviest set independent in both matroids, {6, 7, 8, 9, 10}.</text>
+<text x="390" y="596" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Double outline: a number above 5, with no coordinate among 1 to 5.</text>
+<text x="390" y="614" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Gray and bold: the heaviest set independent at both parities, {6, 7, 8, 9, 10}.</text>
 </svg>

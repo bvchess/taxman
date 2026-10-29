@@ -806,10 +806,10 @@ impl<'a> Prover<'a> {
     }
 
     /// Turns on the parity bound ([`crate::parity`], the parity bound, W1, docs/theory/parity-bound.md) at every node,
-    /// after the matching bound: the heaviest set independent in both parity matroids with the node's forced picks
-    /// contracted and its barred numbers deleted, certified by a weight split.  It cuts the node when it is at most the
-    /// target; it bars every free number that depends on the forced picks in one of the matroids (no playable set of
-    /// the node holds it) and forces every member whose barring alone brings it to the target (by the split); and the
+    /// after the matching bound: the heaviest set independent at both parities together with the node's forced picks,
+    /// leaving out its barred numbers, certified by a weight split.  It cuts the node when it is at most the target;
+    /// it bars every free number that depends on the forced picks at one of the parities (no playable set of the node
+    /// holds it) and forces every member whose barring alone brings it to the target (by the split); and the
     /// node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
     pub fn with_parity(mut self) -> Self {
         self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));

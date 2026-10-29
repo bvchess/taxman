@@ -1,16 +1,18 @@
-//! GF(3) linear algebra and the signed frame matroids of a state: the GF(3) twin of `FrameMatroids` in
-//! `frames.rs`, for the multi-field bound of `wall/fields.rs`.
+//! GF(3) linear algebra and independence in a frame of a state under a signing over GF(3): the GF(3) twin of
+//! `FrameMatroids` in `frames.rs`, for the multi-field bound of `wall/fields.rs`.
 //!
-//! # The signed frame matroids
+//! # Signed frames
 //!
 //! Frame `h` has the vector space over GF(3) whose coordinates are its factors.  A mover `u` of the frame (one of its
 //! moves, or a candidate of home `h + 1`) has the vector `v(u) = Σ σ(u, f) e_f` over its maximal factors `f` among
 //! the frame's factors, where the signing `σ` values each incidence `(u, f)` as 1 or 2.  A candidate `y` of home `h`
 //! that is a factor of the frame has the unit vector `e_y`.  The moves' vectors are independent for every signing
 //! (the signed frame theorem (B1, docs/theory/frame-bounds.md); [`Matroid3::build`] panics if they are not), so
-//! contracting them, that is, taking each candidate's vector modulo their span, gives a linear matroid on the
-//! candidates that touch the frame: `N_h^σ`, the [`Matroid3`] of the frame, of rank the frame's factors minus its
-//! moves.  Its loops are the candidates whose class is zero.
+//! taking each candidate's vector modulo their span gives its class, in a quotient whose dimension is the frame's
+//! factors minus its moves, and a set of the candidates that touch the frame is independent in the frame under the
+//! signing exactly when its classes are linearly independent.  [`Matroid3`] holds the classes: it is the independence
+//! test of the frame over GF(3) and the greedy algorithm on its vectors.  The candidates whose class is zero are in no
+//! independent set.
 //!
 //! With every value 1 the vectors are those of `frames.rs` read over GF(3) instead of GF(2).
 
@@ -376,7 +378,7 @@ impl Signing {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The signed frame matroid of a frame
+// Independence in a frame under a signing
 
 /// One frame's coordinates and the quotient of its space by the span of its moves.
 struct Space {
@@ -451,10 +453,12 @@ impl Space {
     }
 }
 
-/// The signed frame matroid N_h^σ of a state.
+/// Independence in a frame of a state under a signing over GF(3): the classes of the candidates that touch the frame,
+/// with the independence test and the greedy algorithm on them.
 #[derive(Clone, Debug)]
 pub struct Matroid3 {
-    /// The elements: candidate numbers, ascending (the candidates given that touch the frame and are not loops).
+    /// The elements: candidate numbers, ascending (the candidates given that touch the frame, less those whose class is
+    /// zero).
     pub elems: Vec<u32>,
     /// Their classes in the quotient (`rank` coordinates).
     pub vecs: Vec<V3>,
@@ -496,8 +500,9 @@ impl Matroid3 {
         Matroid3 { elems, vecs, rank: space.rank, loops }
     }
 
-    /// A matroid from given vectors (for tests): elements `elems`, classes `vecs` of `rank` coordinates, no loops.
-    /// A zero vector is allowed and is never kept by [`greedy`](Self::greedy), as a loop would not be.
+    /// Built from given vectors (for tests): elements `elems`, classes `vecs` of `rank` coordinates, none of class
+    /// zero.  A zero vector is allowed and is never kept by [`greedy`](Self::greedy), as a candidate of class zero
+    /// would not be.
     #[cfg(test)]
     pub fn from_vectors(elems: Vec<u32>, vecs: Vec<V3>, rank: usize) -> Self {
         assert_eq!(elems.len(), vecs.len(), "an element without a vector");
@@ -532,8 +537,8 @@ impl Matroid3 {
         (value, kept)
     }
 
-    /// Whether the members of `set` (candidate numbers) that touch the frame are independent: false if one is a
-    /// loop; members that are neither elements nor loops are ignored.
+    /// Whether the members of `set` (candidate numbers) that touch the frame are independent: false if one has class
+    /// zero (is in `loops`); members that are neither elements nor in `loops` are ignored.
     #[cfg(test)]
     pub fn independent(&self, set: &[u32]) -> bool {
         let mut basis = Basis3::new(self.rank);
@@ -738,7 +743,7 @@ mod tests {
 
     #[test]
     fn matroid3_independent_and_index() {
-        // Elements 5, 7, 9 with classes e0, e1, e0 + e1 in dimension 2; 3 is a loop, 11 is not a candidate.
+        // Elements 5, 7, 9 with classes e0, e1, e0 + e1 in dimension 2; 3 has class zero, 11 is not a candidate.
         let words = words_for(2);
         let vecs = vec![to_v3(&[1, 0], words), to_v3(&[0, 1], words), to_v3(&[1, 1], words)];
         let mut m = Matroid3::from_vectors(vec![5, 7, 9], vecs, 2);

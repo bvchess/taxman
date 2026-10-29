@@ -18,11 +18,11 @@
 //! * The **rank bound**.  Give each member the vector over GF(2) with a 1 at each of its factors.  A
 //!   playable set's vectors are linearly independent: in a dismantling order x₁, x₂, … each x_i has a factor
 //!   that no later member lists, so in any vanishing sum the earliest member's private coordinate is 1.  So no
-//!   playable subset is larger than the GF(2) rank.  On members with at most two factors this is exactly the
-//!   graphic-matroid rank (the forest bound, which is exact there); on three-prime members, whose factors pq, pr,
-//!   qr are the edges of a triangle on the primes, a dependent set is a 2-cycle mod 2 (a closed surface of
-//!   triangles), invisible to counting bounds like Lorea's.  A minimal dependent set has every factor an even
-//!   number of times, so it is a core.
+//!   playable subset is larger than the GF(2) rank.  On members with at most two factors this is exactly the size of
+//!   a largest forest of the graph whose edges are the members (the forest bound, which is exact there); on
+//!   three-prime members, whose factors pq, pr, qr are the edges of a triangle on the primes, a dependent set is a
+//!   2-cycle mod 2 (a closed surface of triangles), invisible to counting bounds like Lorea's.  A minimal dependent
+//!   set has every factor an even number of times, so it is a core.
 
 use crate::instance::Instance;
 

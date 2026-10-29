@@ -1,15 +1,17 @@
-//! The two GF(2) frame matroids of a state, in the form the multi-field bound reads them (`dw::Ctx` hands their vectors
-//! to the crate's intersection, `taxman::gf2::meet`): the blocks of the even frames' matroid `A` and of the odd frames'
-//! matroid `B`, on the candidates of a state.  They are the matroids of `taxman::gf2::Gf2Graph` (src/gf2.rs has the
-//! claim that every promotable set is independent in both, and its proof is the frame bound (B2,
-//! docs/theory/frame-bounds.md)), built here as plain vectors so that the study can read them; the crate's graph keeps
-//! its own.
+//! The vectors over GF(2) of a state's candidates in its frames, in the form the multi-field bound reads them
+//! (`dw::Ctx` hands them to the crate's intersection, `taxman::gf2::meet`): the blocks of the even frames' side `A` and
+//! of the odd frames' side `B`, on the candidates of a state.  They are the vectors of `taxman::gf2::Gf2Graph`
+//! (src/gf2.rs has the claim that every promotable set is independent in every frame, which is independent on both
+//! sides, and its proof is the frame bound (B2, docs/theory/frame-bounds.md)), built here as plain vectors so that the
+//! study can read them; the crate's graph keeps its own.
 
 use taxman::bits::Bits;
 use taxman::model::{FrameGraph, FrameSet};
 
-/// A linear matroid over GF(2) that is a direct sum of blocks: element `e` lies in block `block[e]` with the vector
-/// `vecs[e]` (as many words as that block's `words`).  A zero vector is a loop.
+/// One side's vectors over GF(2), in blocks on disjoint coordinates (a block a frame): element `e` lies in block
+/// `block[e]` with the vector `vecs[e]` (as many words as that block's `words`).  A set is independent on the side when
+/// its vectors in each block are linearly independent.  A zero vector is a candidate of class 0, which no promotable
+/// set holds.
 #[derive(Clone, Debug)]
 pub struct BlockMatroid {
     pub block: Vec<usize>,
@@ -18,8 +20,8 @@ pub struct BlockMatroid {
     pub words: Vec<usize>,
 }
 
-/// The two frame matroids of a state and its candidates: element `i` is the candidate `elems[i]`; `a` is the direct
-/// sum of the even frames' matroids, `b` of the odd frames'.
+/// The frame vectors of a state's candidates: element `i` is the candidate `elems[i]`; `a` holds its vectors in the
+/// even frames (the even frames' side), `b` in the odd frames (the odd frames' side).
 pub struct FrameMatroids {
     pub elems: Vec<u32>,
     pub a: BlockMatroid,
@@ -143,7 +145,7 @@ fn set_bits(v: &[u64]) -> Vec<usize> {
     out
 }
 
-/// The frame matroids of `state` on the candidates `cands`: those that are loops of a frame matroid are left out (no
+/// The frame vectors of `state` on the candidates `cands`: those whose class in a frame is 0 are left out (no
 /// promotable set holds one).
 pub fn frame_matroids<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> FrameMatroids {
     let frames = state.frames();

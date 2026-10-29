@@ -4,11 +4,11 @@
 //!
 //! A *nogood* is a set of candidates that cannot all be promoted from the root ([`taxman::model::Nogoods`]); it holds
 //! everywhere in the search of its game.  So every completion `F` of the root has `|F ∩ N| ≤ |N| - 1` for each nogood
-//! `N`, and for any multipliers `λ_N ≥ 0` the heaviest common independent set of the root's two GF(2) matroids, with
+//! `N`, and for any multipliers `λ_N ≥ 0` the heaviest set independent in every frame of the root over GF(2), with
 //! each candidate `x` weighing `x - Σ_{N ∋ x} λ_N`, plus `Σ λ_N (|N| - 1)`, is an upper bound on the game's promotion
 //! sum (a Lagrangian bound; weak duality; the matchbound/lagrange module has the same argument for the matching).
 //! With no multipliers it is the root's GF(2) bound, the baseline.  The inner problem is the crate's own GF(2) bound
-//! on `Gf2Graph::reweighted` (the same matroids with the weights above).
+//! on `Gf2Graph::reweighted` (the same graph with the weights above).
 //!
 //! * The *harvest*: [`finder`] runs the finder (large neighborhood search, `search/finder.rs`) from a start incumbent for
 //!   `--cpu` CPU seconds, and [`control`] the sound search standalone from the same start for the same CPU time, and
@@ -151,7 +151,7 @@ pub(super) struct Fit {
     pub(super) at: Vec<f64>,
 }
 
-/// What a fit is asked to lower: the heaviest common independent set of at most `cap` members of the matroids
+/// What a fit is asked to lower: the heaviest set of at most `cap` members that is independent in every frame of
 /// `graph`, with each member weighing its number less the multipliers of the `nogoods` that hold it, plus the
 /// multipliers times the `rooms` (a root's, or a node's).
 pub(super) struct Fitting<'a, const W: usize> {
@@ -196,7 +196,7 @@ fn shifts<const W: usize>(nogoods: &[Bits<W>], rooms: &[i64], lambda: &[i64], sh
     constant
 }
 
-/// The heaviest common independent set of the matroids `graph` (of at most `cap` members) with each element `x`
+/// The heaviest set independent in every frame of `graph` (of at most `cap` members) with each element `x`
 /// weighing `SCALE · x - shift[x]` (`shift` by number, 0 past its end; elements of no positive weight left out): its
 /// weight (scaled) and the set, as numbers.
 fn reweighted_bound<const W: usize>(graph: &Gf2Graph, cap: u32, shift: &[i64]) -> (i64, Bits<W>) {
@@ -211,7 +211,7 @@ fn reweighted_bound<const W: usize>(graph: &Gf2Graph, cap: u32, shift: &[i64]) -
     (eval.value as i64, eval.chosen.iter().map(|k| labels[k as usize - 1]).collect())
 }
 
-/// The heaviest common independent set of the matroids of `fitting` (of at most `cap` members) with the weights the
+/// The heaviest set independent in every frame of `fitting`'s graph (of at most `cap` members) with the weights the
 /// multipliers `lambda` leave (`SCALE · x` less the multipliers of the nogoods holding `x`), as a scaled bound with the
 /// nogoods' constant `Σ λ · room` added, and the set it chooses.  `shift` is scratch, as long as the largest number of
 /// the nogoods plus one.

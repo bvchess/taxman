@@ -16,13 +16,14 @@ factors.
   (P5)](../../../docs/theory/playability.md#the-residual-theorem) and [the core theorem
   (P7)](../../../docs/theory/playability.md#the-core-theorem)).  In a dismantling order x₁, x₂, … each xᵢ has a factor
   that no later member lists, so in any vanishing sum the first member's private coordinate is 1.  So no playable subset
-  of a set K is larger than rank(K).  On members with at most two factors this is the rank of a graphic matroid, exact
-  there.  The factors pq, pr and qr of a three-prime member are the edges of a triangle on the primes, and the
-  dependencies of such members are closed surfaces mod 2, invisible to counting bounds.
+  of a set K is larger than rank(K).  On members with at most two factors this is the size of a largest forest of the
+  graph the members make, exact there.  The factors pq, pr and qr of a three-prime member are the edges of a triangle on
+  the primes, and the dependencies of such members are closed surfaces mod 2, invisible to counting bounds.
 * **(♦) ⟹ (★).**  Suppose every member that descending greedy rejects is a sum of members it kept above it.  Above any
   threshold t, greedy's kept members are independent (playable) and span every member above t, so they are a basis:
   greedy keeps rank(K_{≥t}) members, the most any playable subset has.  That is (★) for every component and every
-  truncation.  Since greedy is optimal on a matroid, it is also [the sources conjecture
+  truncation.  Since [the greedy algorithm](../../../docs/theory/primer.md#the-greedy-algorithm) keeps a heaviest
+  independent set of vectors for every weighting, it is also [the sources conjecture
   (S1)](../../../docs/theory/sources.md#the-sources-conjecture) for every weighting consistent with the order.
 * **Checking (♦) is greedy itself** (`src/span.rs`).  A member with a factor no kept member lists is kept ([the
   extension lemma (P6)](../../../docs/theory/playability.md#the-extension-lemma)).  A member the kept ones span is

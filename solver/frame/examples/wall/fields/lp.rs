@@ -1,5 +1,5 @@
 //! A dense revised simplex method with a partitioned basis inverse, for the master LP of a Dantzig–Wolfe
-//! decomposition.  Part of the multi-field bound of `wall/fields.rs`; it knows nothing of matroids.
+//! decomposition.  Part of the multi-field bound of `wall/fields.rs`; it knows nothing of frames or independence.
 //!
 //! # The LP
 //!

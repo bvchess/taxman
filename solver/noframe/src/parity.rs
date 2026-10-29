@@ -1,4 +1,5 @@
-//! The parity matroids: an upper bound on opt(n) on the whole board by weighted matroid intersection over GF(2).
+//! The parity vectors: an upper bound on opt(n) on the whole board, the heaviest set independent at both parities,
+//! found by weighted matroid intersection over GF(2).
 //!
 //! The parity bound (W1, docs/theory/parity-bound.md).  Give every number s of the board 2..=n the vector v(s) over
 //! GF(2) with a 1 at each of its maximal factors (coordinates 1..=n/2), and, when s <= n/2, also the unit vector e_s.
@@ -8,30 +9,34 @@
 //! last-played member of a vanishing sum has a coordinate no other member of the sum has), and the e_s are exactly the
 //! coordinates in S.  A maximal factor has one prime factor fewer, so v(s) lies in the coordinates whose Ω has the
 //! other parity than Ω(s), and e_s in those of s's own parity.  The coordinates split into the even-Ω and the odd-Ω
-//! ones, every number has one vector in each part (none in its own parity when s > n/2: a coloop there), and a family
-//! of vectors each in one part is independent iff its vectors in each part are.  So every playable set is independent
-//! in two linear matroids on 2..=n, [`Parity`]'s class 0 (even Ω) and class 1 (odd Ω), and the heaviest set independent
-//! in both bounds opt(n).  At a node of a search with forced picks P and barred numbers X, the same holds for the
-//! matroids contracted by P with X deleted: a playable S ⊇ P has S − P independent in both contractions.
+//! ones, every number has one vector in each part (none in its own parity when s > n/2: it gets an extra coordinate of
+//! its own there, so that it is independent of everything at that parity), and a family of vectors each in one part is
+//! independent iff its vectors in each part are.  So every playable set is independent at both parities, the parity-i
+//! vectors being those of [`Parity`]'s class i (class 0 for even Ω, class 1 for odd Ω), and the heaviest set
+//! independent at both parities bounds opt(n).  At a node of a search with forced picks P and barred numbers X, the
+//! same holds together with P and with X left out: a playable S ⊇ P has S − P independent at both parities together
+//! with P.
 //!
-//! [`Meet`] computes the heaviest common independent set of two linear matroids over GF(2) given by sparse vectors
-//! ([`Pair`]), with forced elements (contracted) and barred ones (deleted), and *certifies* it with a weight split.
+//! [`Meet`] computes, by weighted matroid intersection, the heaviest set independent in both of two families of
+//! sparse vectors over GF(2) ([`Pair`]'s class 0, the side A, and class 1, the side B), with forced elements (the set
+//! is independent together with them) and barred ones (left out), and *certifies* it with a weight split.
 //! The value it reports rests only on the certificate, not on the algorithm that found the set:
 //!
 //! * **Weak duality.**  If w = w1 + w2, then every T independent in both satisfies w(T) = w1(T) + w2(T) <=
 //!   max{w1(I) : I independent in A} + max{w2(J) : J independent in B}.
-//! * **Local optimality** (one matroid, weights of any sign, sets of any size).  S independent is a heaviest
+//! * **Local optimality** (one family of vectors, weights of any sign, sets of any size).  S independent is a heaviest
 //!   independent set iff (1) w(x) >= 0 for x ∈ S, (2) w(y) <= 0 whenever S + y is independent, and (3) w(y) <= w(x)
-//!   whenever x is in the circuit of S + y.  (Add r dummy coloops of weight 0 and truncate to rank r: the
-//!   independent sets become bases, padded with dummies, and (1)-(3) are the classical criterion that no single
-//!   exchange improves a basis.)
+//!   whenever x is in the circuit of S + y.  (Add r dummies of weight 0, each with a coordinate of its own, r the rank
+//!   of the family, and keep the independent sets of at most r members: the independent sets become bases, padded with
+//!   dummies, and (1)-(3) are the classical criterion that no single exchange improves a basis.)
 //!
 //! So if S is independent in both and a split satisfies (1)-(3) for S in A with w1 and in B with w2, then w(S) is
 //! the maximum.  [`Meet::solve`] checks (1)-(3) explicitly, against the circuits of S, and reports a value only when
-//! they hold.  The same certificate bounds the maximum with one member x of S barred: in one matroid the heaviest
+//! they hold.  The same certificate bounds the maximum with one member x of S barred: in one family the heaviest
 //! independent set avoiding x is S − x plus the heaviest y with S − x + y independent if that weighs more than 0
-//! (the exchange lemma for a basis of the truncation), so w1(x) − max(0, max w1(y) over the y whose circuit holds
-//! x) comes off the first maximum, and likewise in B ([`Bound::without`]).
+//! (the exchange from a heaviest set, docs/theory/parity-bound.md, "Computing and checking the bound"), so
+//! w1(x) − max(0, max w1(y) over the y whose circuit holds x) comes off the first maximum, and likewise in B
+//! ([`Bound::without`]).
 //!
 //! The set itself comes from the shortest augmenting path algorithm (Lawler; Schrijver, *Combinatorial
 //! Optimization*, Theorem 41.7): from a set I that is heaviest among the sets of its size, the exchange graph has
@@ -52,8 +57,9 @@ use crate::game::{Board, Role};
 const NONE: u32 = u32::MAX;
 const INF: i64 = i64::MAX / 4;
 
-/// Two linear matroids over GF(2) on the elements 0..len: in class q, element e is the vector with ones at
-/// `coords[q][e]` (coordinates 0..dims[q]), or a coloop when that list is empty.
+/// Two families of vectors over GF(2) on the elements 0..len: in class q, element e is the vector with ones at
+/// `coords[q][e]` (coordinates 0..dims[q]), or, when that list is empty, has a coordinate of its own and is
+/// independent of everything in class q.
 #[derive(Clone)]
 pub struct Pair {
     pub dims: [usize; 2],
@@ -71,9 +77,9 @@ impl Pair {
     }
 }
 
-/// The parity matroids of a board: the elements are the numbers 0..=n (0 and 1 are never picked), the coordinates
+/// The parity vectors of a board: the elements are the numbers 0..=n (0 and 1 are never picked), the coordinates
 /// of class q the numbers f <= n/2 whose Ω has parity q (1 among the even ones), and each number s has v(s), its
-/// maximal factors, in the class of the other parity, and e_s (s <= n/2) or a coloop (s > n/2) in its own.
+/// maximal factors, in the class of the other parity, and e_s (s <= n/2) or an extra coordinate (s > n/2) in its own.
 pub struct Parity;
 
 impl Parity {
@@ -229,7 +235,7 @@ fn ones(words: &[u64]) -> impl Iterator<Item = usize> + '_ {
 /// What [`Meet::solve`] returns.
 #[derive(Clone, Debug)]
 pub enum Outcome {
-    /// The forced elements are dependent in one of the matroids: no set holds them all.
+    /// The forced elements are dependent in class 0 or in class 1: no set holds them all.
     Infeasible,
     /// The certificate failed (not expected; see [`MeetStats::uncertified`]): no bound is claimed.
     Uncertified,
@@ -239,12 +245,12 @@ pub enum Outcome {
 /// A certified bound.
 #[derive(Clone, Debug)]
 pub struct Bound {
-    /// The heaviest weight of a set independent in both matroids that holds every forced element and no barred
-    /// one (for the parity matroids: an upper bound on every playable set with these roles).
+    /// The heaviest weight of a set independent in both classes that holds every forced element and no barred
+    /// one (for the parity vectors: an upper bound on every playable set with these roles).
     pub value: i64,
     /// A heaviest such set, forced elements included, ascending.
     pub set: Vec<u32>,
-    /// Free elements that depend on the forced ones in one of the matroids: no set counted by `value` holds one.
+    /// Free elements that depend on the forced ones in one of the classes: no set counted by `value` holds one.
     pub loops: Vec<u32>,
     /// For each free member x of `set`: an upper bound on `value` with x barred.
     pub without: Vec<(u32, i64)>,
@@ -285,11 +291,11 @@ pub struct MeetStats {
 
 /// The weighted intersection of a [`Pair`] (see the module comment).
 ///
-/// The exchange graph's vertices are the candidates (free elements that are not loops) and two hubs: the arcs
-/// x → y from every member x to every y with I + y independent in class 0 run through hub `A` (x → A → y), and
-/// those from every y with I + y independent in class 1 to every member x through hub `B`, each such pair of arcs
-/// counting as one.  The other arcs are the circuits': x → y for x in y's circuit of class 0, y → x for x in its
-/// circuit of class 1.
+/// The exchange graph's vertices are the candidates (free elements that do not depend on the forced ones, in either
+/// class: not the `loops`) and two hubs: the arcs x → y from every member x to every y with I + y independent in
+/// class 0 run through hub `A` (x → A → y), and those from every y with I + y independent in class 1 to every member
+/// x through hub `B`, each such pair of arcs counting as one.  The other arcs are the circuits': x → y for x in y's
+/// circuit of class 0, y → x for x in its circuit of class 1.
 ///
 /// A solve from a parent's certificate ([`solve_from`](Self::solve_from)) starts from the parent's free members
 /// that are still candidates, with the parent's split as potentials, which stay feasible on every circuit arc
@@ -404,7 +410,7 @@ impl Meet {
     }
 
     /// Reduces element `e` in class `q` against the current rows (into `vbuf`, `cbuf`); true iff independent.
-    /// A coloop is independent.
+    /// An element with a coordinate of its own (an empty list) is independent.
     fn reduce(&mut self, q: usize, e: usize) -> bool {
         let coords = &self.pair.coords[q][e];
         coords.is_empty() || self.rref[q].reduce(coords, &mut self.vbuf, &mut self.cbuf)
@@ -436,12 +442,12 @@ impl Meet {
         }
     }
 
-    /// The matroids.
+    /// The two families of vectors.
     pub fn pair(&self) -> &Pair {
         &self.pair
     }
 
-    /// The heaviest set independent in both matroids among those holding every element with role `Pick` and none
+    /// The heaviest set independent in both classes among those holding every element with role `Pick` and none
     /// with role `Barred`, certified (module comment).
     pub fn solve(&mut self, roles: &[Role]) -> Outcome {
         self.solve_from(roles, None)
@@ -493,7 +499,7 @@ impl Meet {
     }
 
     /// Clears the rows, adds the forced elements (untracked), and sorts the free ones into candidates (by weight,
-    /// heaviest first) and loops.  None if the forced elements are dependent.
+    /// heaviest first) and `loops` (those that depend on the forced ones).  None if the forced elements are dependent.
     fn setup(&mut self, roles: &[Role]) -> Option<(i64, Vec<u32>, Vec<u32>)> {
         let len = self.pair.len();
         for q in 0..2 {
@@ -1009,8 +1015,8 @@ mod tests {
         }
     }
 
-    /// Whether the elements `set` are independent in class `q`, by plain elimination (a coloop gets a private
-    /// coordinate).
+    /// Whether the elements `set` are independent in class `q`, by plain elimination (an element with an empty list
+    /// gets a coordinate of its own).
     fn independent(pair: &Pair, q: usize, set: &[usize]) -> bool {
         let dim = pair.dims[q] + set.len();
         let mut basis: Vec<Vec<bool>> = Vec::new();
@@ -1090,8 +1096,8 @@ mod tests {
         }
     }
 
-    /// The certified intersection against enumeration on random pairs of small matroids (sparse vectors, some
-    /// coloops, some repeated vectors), with random weights and roles.
+    /// The certified intersection against enumeration on random pairs of small families of vectors (sparse vectors,
+    /// some elements with a coordinate of their own, some repeated vectors), with random weights and roles.
     #[test]
     fn intersection_against_brute_force() {
         let mut rng = Rng(0x2545_F491_4F6C_DD1D);
@@ -1102,7 +1108,7 @@ mod tests {
             for q in 0..2 {
                 for e in 0..len {
                     if rng.below(8) == 0 {
-                        continue; // a coloop
+                        continue; // an element with a coordinate of its own
                     }
                     let k = 1 + rng.below(3);
                     let mut c: Vec<u32> = (0..k).map(|_| rng.below(dims[q] as u64) as u32).collect();
@@ -1219,8 +1225,8 @@ mod tests {
     }
 
     /// The parity bound (W1, docs/theory/parity-bound.md) on small boards: every playable set of 2..=n is independent
-    /// in both parity matroids, so the heaviest common independent set is at least opt(n); and with random roles the
-    /// bound is at least the heaviest playable set with those roles, and the intersection is exact against enumeration.
+    /// at both parities, so the heaviest set independent at both is at least opt(n); and with random roles the bound
+    /// is at least the heaviest playable set with those roles, and the intersection is exact against enumeration.
     #[test]
     fn playable_sets_are_independent_in_both_parity_matroids() {
         let spf = smallest_prime_factors(64);

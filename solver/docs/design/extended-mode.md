@@ -42,9 +42,9 @@ game, the claims that some O refuses (`m5_refused`).
   `FrameGraph::max_promotions_among` adds their number to the freedoms' count (sound, not tight).
 * **The GF(2) bound** (`gf2`, "One-sided candidates"; [the frame bound for the extended problem
   (B3)](../../../docs/theory/frame-bounds.md#the-frame-bound-for-the-extended-problem)).  A one-sided candidate's
-  element has the vector of its maximal factors in its own frame's matroid, and is a coloop of the other: its own unit
-  vector, in a *free block* after the frames' blocks, `64·words` of them to a block, so that hundreds of them widen no
-  vector.
+  element has the vector of its maximal factors on its own frame's side, even or odd, and a coordinate of its own on the
+  other side: its own unit vector, in a *free block* after the frames' blocks, `64·words` of them to a block, so that
+  hundreds of them widen no vector.
 * **The search.**  `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the
   search.  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header
   (format 5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for

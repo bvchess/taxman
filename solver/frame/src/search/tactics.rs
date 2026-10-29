@@ -49,11 +49,11 @@ pub struct SearchTactics {
     /// duality; see [`crate::matchbound::lagrange`] and `search::lagrange`).  The multipliers are refitted as the
     /// searcher learns, so the tree depends on its history, as with `nogoods`.
     pub lagrange: bool,
-    /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest common independent set of the two GF(2)
-    /// frame matroids, kept along the searcher's path by contraction), branch on the conflicts of its heaviest set,
-    /// and (with `fix_forced`) force the members without which it would cut (proven: the frame bound (B2,
-    /// docs/theory/frame-bounds.md), and weak duality for the forced members).  Replaces the matching bound and its
-    /// refinement as the node bound; the Lagrangian bound over nogoods still applies after it.
+    /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest set independent in every frame over GF(2),
+    /// kept along the searcher's path by reducing the frames' vectors modulo those of the promoted members), branch on
+    /// the conflicts of its heaviest set, and (with `fix_forced`) force the members without which it would cut (proven:
+    /// the frame bound (B2, docs/theory/frame-bounds.md), and weak duality for the forced members).  Replaces the
+    /// matching bound and its refinement as the node bound; the Lagrangian bound over nogoods still applies after it.
     pub gf2: bool,
     /// Cut a node none of whose completions keeps the inequality of every symmetric pair of the root, and drop from a
     /// node's candidates those that no such completion holds ([`crate::search::symmetry`]; proven:

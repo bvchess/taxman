@@ -79,7 +79,7 @@
 <text x="390" y="286" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">no member of Y′ fits into Y.</text>
 <text x="390" y="342" text-anchor="middle" dy=".35em" font-size="15" font-weight="bold" fill="#111111">Y′ = {1573, 1859, 2057, 2197, 2873}: playable, with five</text>
 <text x="610" y="371" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">ground</text>
-<text x="390" y="588" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">So the playable sets are not the independent sets of a matroid:</text>
+<text x="390" y="588" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">So the playable sets lack the exchange property:</text>
 <text x="390" y="606" text-anchor="middle" dy=".35em" font-size="13" font-weight="normal" fill="#666666">one maximal set has four members and another five.</text>
 <text x="390" y="646" text-anchor="middle" dy=".35em" font-size="12" font-weight="normal" fill="#666666">Circles: sources, each joined to its maximal factors (squares).  Solid: in the set.  Dashed: not in it.</text>
 </svg>

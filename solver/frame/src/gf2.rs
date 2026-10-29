@@ -1,61 +1,65 @@
-//! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from two linear
-//! matroids over GF(2) in which every promotable set is independent (tactic `gf2`).  It is never above the matching
-//! bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2, `docs/theory/frame-bounds.md`) has the
-//! proof, and `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
+//! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from the linear
+//! independence over GF(2) that every promotable set has in every frame (tactic `gf2`).  It is never above the
+//! matching bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2,
+//! `docs/theory/frame-bounds.md`) has the proof, and
+//! `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
 //! `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md`, the measurements.
 //!
-//! # The matroids
+//! # Independence in a frame
 //!
 //! Give each frame `h` of a state the vector space over GF(2) whose coordinates are its factors, each *mover* `u`
 //! paying in it (a move of `h`, or a candidate of home `h + 1`, promoted into `h`) the vector of its maximal factors
 //! among them ([`FactorProvider::factors`](crate::model::FactorProvider::factors)), and each candidate `y` of home
 //! `h` the unit vector `e_y`.  If a set `Q` of candidates can be promoted, then in every frame the vectors of its
 //! moves, of `Q`'s members promoted into it and the unit vectors of `Q`'s members promoted out of it are linearly
-//! independent (the signed frame theorem (B1, `docs/theory/frame-bounds.md`): a winnable frame peels completely, each
-//! mover dropped with a live factor no mover still there has).  The moves of a frame are fixed, so the frame's
-//! condition is a linear matroid on the candidates that touch it: their vectors reduced modulo the span of the moves
-//! (contraction), in the quotient's coordinates, whose number is the frame's freedoms.  A candidate touches its home
-//! frame and the one in front of it, one of even index and one of odd, so the even frames' matroids are the blocks of
-//! one matroid `A` on the candidates and the odd frames' of another, `B`.  Every promotable set is independent in both,
-//! and the heaviest common independent set (weighted matroid intersection, [`meet`]) bounds the best completion, with
-//! at most `max_add` members.
+//! independent: `Q` is independent in every frame (the signed frame theorem (B1, with "Signed frames" in
+//! `docs/theory/frame-bounds.md`): a winnable frame peels completely, each mover dropped with a live factor no mover
+//! still there has).  The moves of a frame are fixed, so the frame's condition on the candidates that touch it is that
+//! their vectors, reduced modulo the span of the moves, are linearly independent, in the quotient's coordinates, whose
+//! number is the frame's freedoms.  A candidate touches its home frame and the one in front of it, one of even index
+//! and one of odd, so independence in every frame is two conditions on the candidates: the even frames' side `A`,
+//! whose frames' quotients are blocks of one family of vectors on the candidates, and the odd frames' side `B`, of
+//! another.  Every promotable set is independent on both sides, and the heaviest set independent on both sides
+//! (found by weighted matroid intersection, [`meet`]) bounds the best completion, with at most `max_add` members.
 //!
-//! [`Gf2Graph`] builds the root's matroids once per search; [`Gf2Bound`] keeps one level per node on the search's
+//! [`Gf2Graph`] builds the root's vectors once per search; [`Gf2Bound`] keeps one level per node on the search's
 //! path, like [`MatchBound`](crate::matchbound::MatchBound).
 //!
 //! # One-sided candidates
 //!
 //! In the extended problem ([`crate::frames::build_extended`]) a one-sided candidate `s` of frame `j` is a mover of
 //! frame `j` and touches no other frame (the frame bound for the extended problem (B3), docs/theory/frame-bounds.md).
-//! So its element has the vector of its maximal factors in the matroid of frame `j`, and in the other matroid it is a
-//! *coloop*: it constrains nothing there.  The coloops of a matroid are put in *free blocks* after its frames' blocks,
-//! each element its own unit vector, at most `64·words` of them a block, so that a game with hundreds of one-sided
-//! candidates needs no wider vectors than its frames do.  A free block is no frame: nothing reads a frame from a block
-//! index (the frames' ranks are [`Gf2Graph::ranks`], the free blocks have none), and the intersection ([`meet`]) knows
-//! only blocks.  Contracting by a coloop clears its own coordinate, which no other element has.  Without one-sided
-//! candidates there are no free blocks, and the matroids are those above.
+//! So its element has the vector of its maximal factors on the side of frame `j`, and on the other side a coordinate
+//! of its own: it is independent of everything there and constrains nothing.  These own coordinates of a side are put
+//! in *free blocks* after its frames' blocks, each element its own unit vector, at most `64·words` of them a block, so
+//! that a game with hundreds of one-sided candidates needs no wider vectors than its frames do.  A free block is no
+//! frame: nothing reads a frame from a block index (the frames' ranks are [`Gf2Graph::ranks`], the free blocks have
+//! none), and the intersection ([`meet`]) knows only blocks.  Reducing by an element's own coordinate only clears that
+//! coordinate, which no other element has.  Without one-sided candidates there are no free blocks, and the sides are
+//! those above.
 //!
-//! # Contraction along the path
+//! # Reduction along the path
 //!
-//! A state reached by promoting `x` has `x` among its moves: its matroids are the parent's contracted by `x` in both
-//! of its frames (each vector of the frame reduced by `x`'s, one pivot), and a candidate that the state's reduction
-//! consumed becomes a loop (a zero vector) there.  (Checked against the matroids built from the state itself at
-//! every node of the probe's fixtures by `nodes` of the example `matroid`, removed from master: it builds at commit
-//! 8753189.)  Candidates dropped from a node are deleted:
-//! they leave its *live* set, and so do the loops, for the node and every node below it: no common independent set
-//! holds a loop, and the searches, tableaux and splits of a level would only carry it.
+//! A state reached by promoting `x` has `x` among its moves, so a set is independent in a frame of the state exactly
+//! when it is independent there together with `x` in the parent: the state's vectors are the parent's reduced modulo
+//! `x`'s in the two frames `x` touches (each vector of the frame reduced by `x`'s, one pivot), and a candidate that
+//! the state's reduction consumed has the vector 0 there, in the span of the moves.  (Checked against the vectors
+//! built from the state itself at every node of the probe's fixtures by `nodes` of the example `matroid`, removed from
+//! master: it builds at commit 8753189.)  Candidates dropped from a node are left out: they leave its *live* set, and
+//! so do the candidates with the vector 0 on either side, for the node and every node below it: no set independent on
+//! both sides holds one, and the searches, tableaux and splits of a level would only carry it.
 //!
 //! # Warm starts
 //!
-//! The augmentations of [`meet`] may start from any *dominant* set: the heaviest common independent set of its size,
-//! and heavier than every smaller one.  Every set they pass through is dominant, and each level keeps them (its
+//! The augmentations of [`meet`] may start from any *dominant* set: the heaviest set independent on both sides of its
+//! size, and heavier than every smaller one.  Every set they pass through is dominant, and each level keeps them (its
 //! *history*, by increasing size).  They stay useful below it:
 //!
 //! * Deleting candidates `D` keeps a dominant set that avoids `D` dominant (fewer sets compete).
-//! * Contracting members of a dominant set `S` (promoting `F ⊆ S`) leaves `S − F` dominant in the contraction:
-//!   a common independent set `J` of the contraction makes `J ∪ F` one of the parent's, so the contraction's
-//!   heaviest set of each size `s` weighs at most the parent's of size `s + |F|` less `w(F)`, which is at most
-//!   `w(S) − w(F)` for `s + |F| ≤ |S|` and less for smaller `s`.
+//! * Promoting members `F ⊆ S` of a dominant set `S` leaves `S − F` dominant in the child, whose sets are those
+//!   independent on both sides together with `F`: such a set `J` makes `J ∪ F` independent on both sides of the
+//!   parent, so the child's heaviest set of each size `s` weighs at most the parent's of size `s + |F|` less `w(F)`,
+//!   which is at most `w(S) − w(F)` for `s + |F| ≤ |S|` and less for smaller `s`.
 //!
 //! So a level starts from the last entry of its history that the changes since keep (an entry that holds every
 //! promoted candidate and no deleted one), less what was promoted; and when that is the parent's heaviest set
@@ -88,13 +92,14 @@ use meet::{bit, is_zero, lowest, xor, Cycles, Deletion, Meet, Problem, Snapshot,
 const NONE: u32 = u32::MAX;
 
 // ---------------------------------------------------------------------------------------------------------
-// The root's matroids
+// The root's frames
 
-/// The frame matroids of the root of a search, built once and shared by its searchers.
+/// The root of a search as vectors on the even frames' side `A` and the odd frames' side `B`, built once and shared by
+/// its searchers.
 ///
-/// The *elements* are the root's candidates that are not loops (in both matroids their vectors are not zero),
-/// indexed in increasing order: element `i` is the number `elems[i]`, which is also its weight, so the elements by
-/// decreasing weight are the elements by decreasing index.
+/// The *elements* are the root's candidates whose vectors on both sides are not zero (a candidate whose class is 0 on
+/// either side lies in no promotable set), indexed in increasing order: element `i` is the number `elems[i]`, which
+/// is also its weight, so the elements by decreasing weight are the elements by decreasing index.
 #[derive(Clone, Debug)]
 pub struct Gf2Graph {
     elems: Vec<u32>,
@@ -102,12 +107,12 @@ pub struct Gf2Graph {
     index: Vec<u32>,
     /// Words of a block vector: the largest frame rank, in 64-bit words.
     words: usize,
-    /// Blocks in `A` (frames 0, 2, 4, …) and in `B` (frames 1, 3, 5, …), each followed by its free blocks (the
-    /// coloops of the one-sided candidates; none without them).
+    /// Blocks of side `A` (frames 0, 2, 4, …) and of side `B` (frames 1, 3, 5, …), each followed by its free
+    /// blocks (the own coordinates of the one-sided candidates; none without them).
     blocks: [usize; 2],
-    /// Each element's block in `A` and in `B`.
+    /// Each element's block on side `A` and on side `B`.
     block: [Vec<u8>; 2],
-    /// Each element's vector in `A` and in `B`: `words` words each.
+    /// Each element's vector on side `A` and on side `B`: `words` words each.
     vecs: [Vec<u64>; 2],
     /// The elements of each block.
     block_elems: [Vec<Vec<u32>>; 2],
@@ -209,12 +214,12 @@ impl FrameSpace {
 }
 
 impl Gf2Graph {
-    /// The matroids of `state` (the root of a search, or any state: its frames must all be winnable) and its
-    /// candidates `cands`.  Candidates that are not factors of their home frame, or are loops of either matroid
-    /// (no promotable set holds them), are left out.  A one-sided candidate of the model (the extended problem's) is
-    /// an element whose vector in the matroid of its own frame is its maximal factors there, as for a number promoted
-    /// into that frame, and which is a coloop of the other matroid: its own coordinate in a *free block* of that
-    /// matroid, after the frames' blocks, each free block holding `64·words` of them (see the module docs).
+    /// The vectors on the two sides of the candidates `cands` of `state` (the root of a search, or any state: its
+    /// frames must all be winnable).  Candidates that are not factors of their home frame, or whose vector is zero on
+    /// either side (no promotable set holds them), are left out.  A one-sided candidate of the model (the extended
+    /// problem's) is an element whose vector on the side of its own frame is its maximal factors there, as for a
+    /// number promoted into that frame, and which has a coordinate of its own on the other side: in a *free block* of
+    /// that side, after the frames' blocks, each free block holding `64·words` of them (see the module docs).
     pub fn new<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> Self {
         let frames = state.frames();
         let max = frames.iter().flat_map(|f| f.factors.max().into_iter().chain(f.moves.max())).max().unwrap_or(0);
@@ -241,7 +246,7 @@ impl Gf2Graph {
         let zero = |v: &[u64]| v.iter().all(|&w| w == 0);
         let mut coloops = [0usize; 2];
         for x in cands.iter() {
-            // The element's block and vector in each matroid, by matroid.
+            // The element's block and vector on each side, by side.
             let parts = if let Some(j) = model.own(x) {
                 let into = spaces[j].project(spaces[j].vector(model, x), words);
                 if zero(&into) {
@@ -302,7 +307,7 @@ impl Gf2Graph {
         self.words
     }
 
-    /// The same matroids with block vectors of `words` words (at least [`words`](Self::words)), the words above the
+    /// The same graph with block vectors of `words` words (at least [`words`](Self::words)), the words above the
     /// graph's zero: every bound, and so every search, is the same, but [`Gf2Bound::new`] runs the engine of
     /// `words` words on it.  For tests, to run the engines of four and five words on boards that need fewer.
     pub fn padded(&self, words: usize) -> Gf2Graph {
@@ -315,11 +320,11 @@ impl Gf2Graph {
         Gf2Graph { vecs, words, ..self.clone() }
     }
 
-    /// The same matroids with each element `x` weighing `weight(x)` instead of its number, for bounds that are not the
+    /// The same graph with each element `x` weighing `weight(x)` instead of its number, for bounds that are not the
     /// search's (a Lagrangian bound, whose multipliers lower the weights of the members of nogoods); with the labels,
     /// because the solver wants its elements by increasing weight and the numbers it is asked about to be those
-    /// elements.  An element whose weight is not positive is left out (a heaviest common independent set never needs
-    /// one), and the others are relabeled `1, 2, …` by increasing weight (ties by number): the graph is of those
+    /// elements.  An element whose weight is not positive is left out (a heaviest set independent on both sides never
+    /// needs one), and the others are relabeled `1, 2, …` by increasing weight (ties by number): the graph is of those
     /// labels, and `labels[k - 1]` is the number of label `k`.  Run [`Gf2Bound`] on it with the candidates
     /// `1..=labels.len()`, and map the sets it chooses back through `labels`.
     pub fn reweighted(&self, weight: impl Fn(u32) -> i64) -> (Gf2Graph, Vec<u32>) {
@@ -576,7 +581,7 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         dispatch!(self, l => l.reset(promoted, cands))
     }
 
-    /// For a study: the top level's live candidates (its candidates less the loops of either matroid).
+    /// For a study: the top level's live candidates (its candidates less those whose vector is 0 on either side).
     #[cfg(feature = "studies")]
     pub fn live(&mut self) -> Bits<W> {
         dispatch!(self, l => l.levels[l.depth].live)
@@ -656,11 +661,11 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     /// An upper bound on the bound of the child of the top level that promotes `added` (members of its heaviest set)
     /// with the candidates `child_cands`: what [`push_all`](Self::push_all) and [`evaluate`](Self::evaluate) would
     /// find for the child, or more, with no solve and nothing pushed.  It is the top level's weight split's bound on
-    /// the common independent sets of its problem that hold `added` and no candidate but the child's, less `added`
-    /// ([`Meet::split_bound_among`]): the child's problem is the top level's contracted by `added`, so each set of
-    /// the child's with `added` is one of those.  `None` if the top level has no split (it was not evaluated with a
-    /// need that its bound reaches).  The stack is left as a push and a pop leave it, and the workspace holds the
-    /// tableau it held.
+    /// the sets independent on both sides in its problem that hold `added` and no candidate but the child's, less
+    /// `added` ([`Meet::split_bound_among`]): the child's problem is the top level's with `added` taken in (its vectors
+    /// reduced modulo those of `added`), so each set of the child's together with `added` is one of those.  `None` if
+    /// the top level has no split (it was not evaluated with a need that its bound reaches).  The stack is left as a
+    /// push and a pop leave it, and the workspace holds the tableau it held.
     pub fn child_bound(&mut self, added: &Bits<W>, child_cands: &Bits<W>) -> Option<u64> {
         dispatch!(self, l => l.child_bound(added, child_cands))
     }
@@ -722,12 +727,12 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
     }
 }
 
-/// One node's level: its matroids (the root's contracted by its promotions), its live candidates, and what is
-/// known of its heaviest set.
+/// One node's level: its vectors on the two sides (the root's reduced modulo its promotions' vectors), its live
+/// candidates, and what is known of its heaviest set.
 #[derive(Clone)]
 struct Level<const W: usize, const R: usize> {
     vec: [Vec<Vector<R>>; 2],
-    /// The live candidates (elements only, loops left out).
+    /// The live candidates (elements only, those with the vector 0 left out).
     live: Bits<W>,
     /// Dominant sets of this level's problem by increasing size (see the module docs).  When `solved`, the last
     /// is the heaviest set under `cap`.
@@ -786,7 +791,7 @@ impl<const W: usize> Default for Priced<W> {
 
 /// Where a solved level's tableau can be derived from instead of built ([`meet::Meet::derive`]): the workspace's solve
 /// count when it held a related tableau (0 for none), whose problem is the level's before the members `contracted`
-/// were promoted; and a copy of the level's own tableau, or of one it was certified from (with nothing contracted
+/// were promoted; and a copy of the level's own tableau, or of one it was certified from (with nothing promoted
 /// since), if `saved`, which a derivation takes back once ([`meet::Meet::derive_from`]).  Either serves while the
 /// level's set is the same and its live elements only lose members.
 #[derive(Clone, Default)]
@@ -855,7 +860,7 @@ impl<const W: usize, const R: usize> Level<W, R> {
         }
     }
 
-    /// The level's matroids, of `graph`'s blocks and weights.
+    /// The level's problem for [`meet`]: its vectors on the two sides, with `graph`'s blocks and weights.
     fn problem<'a>(&'a self, graph: &'a Gf2Graph) -> Problem<'a, R> {
         Problem {
             block: [&graph.block[0], &graph.block[1]],
@@ -1082,7 +1087,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         child.copy_from(&lower[d]);
         // The child's candidates are among the top level's, so its live ones are the top level's that it keeps: the
-        // loops of the contractions above stay out of it (`contract` leaves those of its own).
+        // candidates whose vectors the promotions above made 0 stay out of it (`contract` leaves those of its own).
         child.live = child.live.intersect(child_cands);
         child.added = *added;
         #[cfg(debug_assertions)]
@@ -1103,8 +1108,8 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         }
         #[cfg(debug_assertions)]
         {
-            // The candidates that are elements and not loops of the child's matroids (a promoted candidate's vectors
-            // are zero too, and it is no candidate of the child).
+            // The candidates that are elements and whose vectors in the child are not 0 (a promoted candidate's vectors
+            // are 0 too, and it is no candidate of the child).
             let graph = self.graph;
             let elements: Bits<W> = child_cands
                 .iter()
@@ -1126,7 +1131,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         // The parent's heaviest set of all sizes, kept: the child's is that less the promoted.
         let whole = parent.solved && parent.settled && parent.history.last().is_some_and(keeps);
         // The workspace's tableau, if it is the parent's, is the child's to derive its own from (the parent's
-        // problem with the promoted contracted, its set flipped along a cycle if the child is certified).
+        // problem with the promoted taken in, its set flipped along a cycle if the child is certified).
         let held = if parent.meet_solve == self.meet.solves { parent.meet_solve } else { 0 };
         if whole {
             child.solved = true;
@@ -1280,7 +1285,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     }
 
     /// The weight split of the top level, if it is solved, of all sizes, and has none yet: started from its node's last
-    /// split, or else from its parent node's, whose problem is the level's contracted by what it promoted.
+    /// split, or else from its parent node's, whose problem is the level's with what it promoted taken in.
     fn ensure_split(&mut self) {
         let d = self.depth;
         let level = &mut self.levels[d];
@@ -1293,7 +1298,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
         let node = self.nodes[d];
         let from = if self.starts[d].1 == node { Some(d) } else { d.checked_sub(1) };
         let start = from.map(|i| &self.starts[i].0);
-        // The level's problem is its node's last split's, or its parent node's contracted by what it promoted.
+        // The level's problem is its node's last split's, or its parent node's with what it promoted taken in.
         let graph = self.graph;
         let contracted = &mut self.contracted_idx;
         contracted.clear();
@@ -1325,7 +1330,7 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// A cycle within the slack shows every member on it free, so the cycles that the last searches at the parent's
     /// depth, at this one and at the child's found are tried first: each that is still a cycle of this exchange graph
     /// and within the slack ([`Meet::cycle_length`]) frees its members with no search.  A child's exchange graph is
-    /// its parent's less the elements it promoted or dropped (contracting a member keeps the circuits of the others),
+    /// its parent's less the elements it promoted or dropped (promoting a member keeps the circuits of the others),
     /// and no cycle within the slack passes through a forced member, so a child that inherits its parent's heaviest
     /// set finds nearly all its members free on its parent's cycles.  The forced members are those a search for each
     /// would find: a member is free exactly when some cycle within the slack passes through it.  Each search finds the
@@ -1507,12 +1512,12 @@ impl<'g, const W: usize, const R: usize> Levels<'g, W, R> {
     /// With `carry` (a pricing), each member's shortest cycle is first sought in the parent node's last pricing.  It
     /// carries where the level's problem is that pricing's with members of its heaviest set promoted (`added`) and
     /// other candidates dropped, and the level's heaviest set is that pricing's less them.  Then the level's exchange
-    /// graph is that pricing's less the elements promoted or dropped: promoting a member contracts it in both
-    /// matroids, which keeps the circuits of the others and which of them are free, and dropping an element outside
-    /// the set deletes it.  So every cycle of the level's graph is one of the parent's, as long, and a member's
-    /// shortest cycle at the parent that is still a cycle here, every element live and every arc there
-    /// ([`Meet::cycle_length`]), is its shortest here: the search would find one as long.  The bound, and whether it
-    /// certifies, are then found as after a search.  A member the parent found no cycle for is searched.
+    /// graph is that pricing's less the elements promoted or dropped: promoting a member takes it in on both sides
+    /// (the vectors are reduced by its own), which keeps the circuits of the others and which of them are free, and
+    /// dropping an element outside the set leaves it out.  So every cycle of the level's graph is one of the parent's,
+    /// as long, and a member's shortest cycle at the parent that is still a cycle here, every element live and every
+    /// arc there ([`Meet::cycle_length`]), is its shortest here: the search would find one as long.  The bound, and
+    /// whether it certifies, are then found as after a search.  A member the parent found no cycle for is searched.
     fn certified_excluding(&mut self, xs: &[u32], cap: usize, out: &mut Vec<Option<u64>>, carry: bool) {
         out.clear();
         let graph = self.graph;
@@ -1731,8 +1736,8 @@ fn free_members<const W: usize, const R: usize>(graph: &Gf2Graph, meet: &Meet<R>
     }
 }
 
-/// Promotes the element `x` of `level`: contracts both matroids by its vectors and takes it out of the live set;
-/// candidates whose vectors become zero are loops of the contraction and leave the live set too.
+/// Promotes the element `x` of `level`: reduces the vectors on both sides by its own, and takes it out of the live
+/// set; candidates whose vectors become zero (their classes are 0 now that `x` is a move) leave the live set too.
 fn contract<const W: usize, const R: usize>(graph: &Gf2Graph, level: &mut Level<W, R>, x: u32) {
     let e = graph.element(x).expect("a promoted candidate is an element") as usize;
     level.live.remove(x);
@@ -1762,9 +1767,9 @@ struct Contraction<const R: usize> {
 }
 
 /// [`contract`] for every member of `added`, in increasing order, with the same vectors and live set: per block of each
-/// matroid, its promoted members' vectors are brought to rows whose pivots (the lowest bit each has once reduced by
-/// those before it, as the contractions one at a time find them) no other row has, and each element of the block is
-/// reduced by the rows of the pivots it has, in one pass.  One at a time, each contraction clears its pivot from every
+/// side, its promoted members' vectors are brought to rows whose pivots (the lowest bit each has once reduced by
+/// those before it, as the reductions one at a time find them) no other row has, and each element of the block is
+/// reduced by the rows of the pivots it has, in one pass.  One at a time, each reduction clears its pivot from every
 /// vector and sets no pivot cleared before (its vector, reduced by those before it, has none), so the vectors end with
 /// no pivot set, each its own plus a combination of the promoted vectors; and there is only one such vector, since the
 /// promoted vectors are independent and the rows a basis of their span whose pivots are a unit each.
@@ -1982,7 +1987,7 @@ fn certify_child<const W: usize, const R: usize>(
 /// [`Meet::split_from`]).  Then the child is solved: its heaviest set the last one, less the promoted.  Each deletion
 /// only lowers the heaviest set, so with `need` the deletions stop at the first set below it, whose weight, an upper
 /// bound on the child's, is the child's value, marked `below` ([`Gf2Bound::push_all_at`]).  Returns what the child's
-/// tableau, derived from the one the workspace holds, contracts: `added` if that is the parent's, nothing if it is the
+/// tableau, derived from the one the workspace holds, takes in: `added` if that is the parent's, nothing if it is the
 /// last one derived; or `None` (nothing found, the child left as it was, or below, and the workspace possibly holding
 /// another tableau than the parent's).
 #[allow(clippy::too_many_arguments)]
@@ -2119,10 +2124,11 @@ struct WarmFirst<const W: usize> {
 /// parent's problem ([`Meet::without_any_size`]): `I` without the largest member lost, flipped along the shortest cycle
 /// through it, the promoted and the elements the child dropped outside `I` banned.  `live` is `vectors`'s live elements
 /// among the child's candidates (`vectors` is a level with the parent's vectors; `parent` may be a copy of its sets
-/// only): the child's live elements but for the loops of the contraction by `added`, which hold no member of `I` (a
-/// member of a common independent set is no loop of the contraction by others) and so leave the members lost as they
-/// are.  Nor do they change the search: a loop's circuit in the matroid where it is one lies within `added`, all
-/// banned, so its arcs there are only to or from banned members, and no cycle that avoids those passes through it.
+/// only): the child's live elements but for those whose vectors `added` makes 0 on one side, which hold no member of
+/// `I` (no member of a set independent on both sides has the vector 0 once the others are taken in) and so leave the
+/// members lost as they are.  Nor do they change the search: such an element's circuit on the side where its vector
+/// is 0 lies within `added`, all banned, so its arcs there are only to or from banned members, and no cycle that
+/// avoids those passes through it.
 /// With the child's `need`, the search looks for no set below it ([`Meet::without_any_size_reaching`]): where the
 /// heaviest set without the member weighs less than the need, its weight is given as `need − 1`, an upper bound on it,
 /// and its set as empty.  `banned` is scratch.  The workspace's tableau is left as it was.
@@ -2379,7 +2385,7 @@ fn resolve<const W: usize, const R: usize>(
 }
 
 /// The weight split of `level`'s heaviest set (settled), its Bellman–Ford started from `start`, an earlier split,
-/// whose problem the level's is contracted by `contracted` if that is known ([`Meet::split_from`]), and with `bounds`
+/// whose problem the level's is with `contracted` taken in if that is known ([`Meet::split_from`]), and with `bounds`
 /// the bounds without each member ([`Meet::split_bounds_from`]; see [`Level::split`]).  Unless the workspace still
 /// holds the level's last solve, the level's heaviest set is solved again from itself first ([`resolve`]).
 #[allow(clippy::too_many_arguments)]

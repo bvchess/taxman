@@ -9,8 +9,8 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Whether the candidates `set` are elements and independent in both of `graph`'s matroids (at the root): Gaussian
-/// elimination of their vectors, block by block.
+/// Whether the candidates `set` are elements and independent in every frame (at the root), on both of `graph`'s sides,
+/// the even frames' and the odd frames': Gaussian elimination of their vectors, block by block.
 fn independent<const W: usize>(graph: &Gf2Graph, set: &Bits<W>) -> bool {
     let words = graph.words;
     (0..2).all(|m| {
@@ -76,7 +76,7 @@ fn promotable_sets<const W: usize>(
     out
 }
 
-/// On every board up to 400 with at most 22 candidates: every promotable set is independent in both matroids, and
+/// On every board up to 400 with at most 22 candidates: every promotable set is independent in every frame, and
 /// the bound is at least the heaviest of them.  On every board up to 400: the optimal game's promotions (from the
 /// known games) are independent and the bound is at least their sum.
 #[test]
@@ -114,7 +114,7 @@ fn bound_and_independence_on_small_boards() {
     assert!(enumerated > 80, "{enumerated} boards enumerated");
 }
 
-/// The weight of the heaviest set of at most `cap` of the elements of `graph` that is independent in both matroids,
+/// The weight of the heaviest set of at most `cap` of the elements of `graph` that is independent in every frame,
 /// by enumerating every subset of them (at most 16 elements).
 fn heaviest_independent<const W: usize>(graph: &Gf2Graph, weight: impl Fn(u32) -> i64, cap: usize) -> i64 {
     let elems: Vec<u32> = graph.elems.clone();
@@ -244,7 +244,7 @@ struct ExtendedTally {
 
 /// On every board from 2 to 120, for the open sets U\*_{≥3} and three random subsets of it, the bound of the extended
 /// problem Π⁺(O) at the root: every promotion set found by enumeration (at most 2²⁰ of them, for problems of at most
-/// 22 candidates) is independent in both matroids, one-sided members included, and the bound is at least the heaviest
+/// 22 candidates) is independent in every frame, one-sided members included, and the bound is at least the heaviest
 /// of them; and since the optimal game of these boards plays U\*_{≥3} (the table of optimal games has its score), the
 /// bound is at least that score less what the fixed sources bring.
 #[test]
@@ -339,7 +339,7 @@ fn bound_and_independence_in_extended_problems(ns: std::ops::RangeInclusive<u32>
 /// What [`walk_random_paths`] checked, so that the tests can see that their walks reached what they were meant to.
 #[derive(Default)]
 struct Walked {
-    /// Bounds compared with those of matroids built afresh from the node's state.
+    /// Bounds compared with those of a [`Gf2Graph`] built afresh from the node's state.
     checks: u64,
     /// Children that inherited their parent's heaviest set outright.
     inherited: u64,
@@ -364,11 +364,11 @@ struct Walked {
     /// Members priced (`Gf2Bound::prices_excluding`) whose shortest cycle came from the parent's pricing.
     carried: u64,
     /// Children bounded by their parent's weight split (`Gf2Bound::child_bound`), each checked against the bound of
-    /// the matroids built afresh from the child's state, and of those the bounds equal to it.
+    /// a [`Gf2Graph`] built afresh from the child's state, and of those the bounds equal to it.
     child_bounds: u64,
     child_bounds_equal: u64,
     /// Children pushed at a need whose warm start stopped below it (`Gf2Bound::push_all_at`), each checked against the
-    /// bound of the matroids built afresh from the child's state.
+    /// bound of a [`Gf2Graph`] built afresh from the child's state.
     below: u64,
 }
 
@@ -387,17 +387,18 @@ fn agree<const W: usize, T: PartialEq + Debug>(
 
 /// Walks `paths` random paths of the search of `p`, applying every operation to each of `engines` (all of them the
 /// bound of `p`'s game), and checks that every result is the first engine's and that the engines end with the same
-/// stats (but for the members found forced by the searches, of which a window's split bounds take some).  The first engine's bound of a node made by promoting and deleting along the path equals the bound of the
-/// matroids built afresh from the node's state, whatever was inherited, certified or restarted on the way; the forced
-/// members are forced: without each, a fresh solve is below what was asked; the certified bounds without a member
-/// are the fresh solves', and so are the bounds without a candidate that are solved (to the end, where they must be
-/// equal, or stopped early, where they are between the stop and the truth).  Half the promotions go as strong
-/// branching makes them: the bounds without some members of the heaviest set certified, the node going on without
-/// one of them (its level kept, certified or solved), and the child that promotes it pushed after that.  With
-/// `at_need`, half the children are pushed as the search checks them, at a need near what the node's bound leaves them
-/// ([`Gf2Bound::push_all_at`]): one whose warm start shows it below the need is cut, its bound no lower than that of
-/// the matroids built afresh from its state, and the node goes on.  Every
-/// node's members are priced as conflict branching prices them, carrying its parent's cycles, and the prices are the
+/// stats (but for the members found forced by the searches, of which a window's split bounds take some).  The first
+/// engine's bound of a node made by promoting and deleting along the path equals the bound of a [`Gf2Graph`] built
+/// afresh from the node's state, whatever was inherited, certified or restarted on the way; the forced members are
+/// forced: without each, a fresh solve is below what was asked; the certified bounds without a member are the fresh
+/// solves', and so are the bounds without a candidate that are solved (to the end, where they must be equal, or stopped
+/// early, where they are between the stop and the truth).  Half the promotions go as strong branching makes them: the
+/// bounds without some members of the heaviest set certified, the node going on without one of them (its level kept,
+/// certified or solved), and the child that promotes it pushed after that.  With `at_need`, half the children are
+/// pushed as the search checks them, at a need near what the node's bound leaves them ([`Gf2Bound::push_all_at`]): one
+/// whose warm start shows it below the need is cut, its bound no lower than that of a [`Gf2Graph`] built afresh from
+/// its state, and the node goes on.  Every node's members are priced as conflict branching prices them, carrying its
+/// parent's cycles, and the prices are the
 /// bounds found without the carry.  The narrowing of a child's candidates and the count of the promotions left are
 /// the model's, so that `p` may be an extended problem with one-sided candidates (for a problem without them they are
 /// the frame set's own).  Of the forced members of a node, which can be hundreds when the need is close to the bound,
@@ -530,7 +531,7 @@ fn walk_random_paths<const W: usize>(
                     if at_need && rng.chance(50) {
                         // As the search checks a child: pushed at a need near what the node's bound leaves it, which
                         // a warm start may show the child below before its heaviest set is known.  A child below it is
-                        // cut, and the node goes on; another is checked against fresh matroids as every level is.
+                        // cut, and the node goes on; another is checked against a fresh graph as every level is.
                         let room = p.max_total.saturating_sub(promoted.len() + 1);
                         let child_cap = room.min(p.model.max_promotions_among(&next, &child_cands).max(0) as u32);
                         let need = (eval.value.saturating_sub(u64::from(x)) + 10).saturating_sub(rng.below(40));
@@ -605,8 +606,8 @@ fn walk_random_paths<const W: usize>(
 /// The look of the tactic `conflict_look` at a child of the node `(state, promoted, cands)` on top of `engines`,
 /// whose heaviest set is `chosen`: the child promotes a random part of it and leaves out one other member, and its
 /// candidates are narrowed as the search narrows them, with a few more dropped.  The bound from the node's weight
-/// split ([`Gf2Bound::child_bound`]) does no work but its count, and is no lower than the bound of the matroids
-/// built afresh from the child's state.
+/// split ([`Gf2Bound::child_bound`]) does no work but its count, and is no lower than the bound of a
+/// [`Gf2Graph`] built afresh from the child's state.
 fn look_at_a_child<const W: usize>(
     p: &Prepared<W>,
     rng: &mut Rng,
@@ -643,7 +644,7 @@ fn look_at_a_child<const W: usize>(
         "n={}: a child's split bound worked",
         p.n
     );
-    // The child's bound from matroids built afresh from its state, which leaves the engines' workspaces as they were.
+    // The child's bound from a graph built afresh from its state, which leaves the engines' workspaces as they were.
     let fresh_graph = Gf2Graph::new(&p.model, &next, &child_cands);
     let mut fresh = Gf2Bound::<W>::new(&fresh_graph);
     fresh.reset(&Bits::EMPTY, &child_cands);
@@ -655,10 +656,11 @@ fn look_at_a_child<const W: usize>(
 
 /// Walks `paths` random paths of each of `boards` at W = 16 (`walk_random_paths`, with the one engine a board needs,
 /// with the tactic `warm_start` if `warm`), and checks that the walks reached at least `percent` percent of what
-/// [`levels_match_fresh_matroids_along_random_paths`] asks: the bound of every node equals the bound of the matroids
-/// built afresh from its state, and the forced members, the certified bounds and the solved bounds without a candidate
-/// are right.  With `warm`, the children found from their parent's heaviest set count as the certified ones do, some
-/// must have left out more than one member of it, and some nodes must have gone on without a member of their own.
+/// [`levels_match_fresh_matroids_along_random_paths`] asks: the bound of every node equals the bound of a
+/// [`Gf2Graph`] built afresh from its state, and the forced members, the certified bounds and the solved bounds without
+/// a candidate are right.  With `warm`, the children found from their parent's heaviest set count as the certified ones
+/// do, some must have left out more than one member of it, and some nodes must have gone on without a member of their
+/// own.
 fn walk_real_games(boards: &[u32], paths: usize, rng: &mut Rng, percent: u64, warm: bool) {
     const W: usize = 16;
     let mut walked = Walked::default();
@@ -750,7 +752,7 @@ fn split_bounds_found_where_asked_for_agree_with_those_found_with_every_split() 
 }
 
 /// Along random paths of the boards from 60 to 1000 at W = 16 (`walk_random_paths`, with the one engine a board
-/// needs), the bound of every node equals the bound of the matroids built afresh from its state, and the forced
+/// needs), the bound of every node equals the bound of a [`Gf2Graph`] built afresh from its state, and the forced
 /// members, the certified bounds and the solved bounds without a candidate are right.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is levels_match_fresh_matroids_along_a_few_random_paths")]
@@ -873,7 +875,7 @@ fn levels_match_fresh_matroids_along_a_few_random_paths_in_the_extended_problem(
 
 /// Along random paths of the extended problem Π⁺(O) on the boards from 60 to 1000 at W = 16, with O = U\*_{≥3} and with
 /// a random half of it (`walk_random_paths`), the bound of every node, with one-sided candidates promoted, deleted and
-/// forced along the way, equals the bound of the matroids built afresh from its state, and the forced members, the
+/// forced along the way, equals the bound of a [`Gf2Graph`] built afresh from its state, and the forced members, the
 /// certified bounds and the solved bounds without a candidate are right.  Also on the board 1300 at W = 128, where the
 /// frames of Π⁺(U\*_{≥3}) are too wide for the engines of three words that the narrower sets have, and need that of
 /// four.
@@ -906,11 +908,12 @@ fn levels_match_fresh_matroids_along_many_random_paths_in_the_extended_problem()
 }
 
 /// The free blocks of a graph of the extended problem are as described (`Gf2Graph`, "One-sided candidates"), on a
-/// board with many one-sided candidates: the blocks of each matroid are its frames' blocks and `ceil(coloops /
-/// (64·words))` free blocks (the coloops being the one-sided candidates whose own frame is in the other matroid); each
-/// one-sided element is, in the matroid of the other parity, in a free block with a unit vector that no other element
-/// shares, and in the matroid of its own frame in block `own / 2`, a frame's block with a vector that is not zero; and
-/// no free block holds another element or is empty.  Returns the number of free blocks in each matroid.
+/// board with many one-sided candidates: the blocks of each side (side 0 holds the even frames, side 1 the odd ones)
+/// are its frames' blocks and `ceil(coloops / (64·words))` free blocks (the `coloops` being the one-sided candidates
+/// whose own frame is on the other side, so that each has a coordinate of its own on this one); each one-sided element
+/// is, on the side of the other parity, in a free block with a unit vector that no other element shares, and on the
+/// side of its own frame in block `own / 2`, a frame's block with a vector that is not zero; and no free block holds
+/// another element or is empty.  Returns the number of free blocks on each side.
 fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
     let board = Board::<W>::for_n(n);
     let open: Bits<W> = upper_from_3(&board).into_iter().collect();
@@ -921,7 +924,7 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
     let frame_blocks = [frames.div_ceil(2), frames / 2];
     assert_eq!(graph.ranks.len(), frames, "n={n}: a rank for each frame");
 
-    // The one-sided candidates that are elements, by the matroid they are coloops of.
+    // The one-sided candidates that are elements, by the side on which each has a coordinate of its own.
     let mut coloops: [Vec<usize>; 2] = Default::default();
     for &(s, j) in p.model.one_sided() {
         assert_eq!(p.model.own(s), Some(j), "n={n}: the own frame of {s}");
@@ -942,10 +945,10 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
     assert!(total > 100, "n={n}: only {total} one-sided elements");
     for m in 0..2 {
         let free = coloops[m].len().div_ceil(per_block);
-        assert_eq!(graph.blocks[m], frame_blocks[m] + free, "n={n}, matroid {m}: the number of blocks");
-        assert_eq!(graph.block_elems[m].len(), graph.blocks[m], "n={n}, matroid {m}: the lists of the blocks");
+        assert_eq!(graph.blocks[m], frame_blocks[m] + free, "n={n}, side {m}: the number of blocks");
+        assert_eq!(graph.block_elems[m].len(), graph.blocks[m], "n={n}, side {m}: the lists of the blocks");
 
-        // The coordinates of the free blocks: one unit vector for each coloop, each used once.
+        // The coordinates of the free blocks: one unit vector for each of `coloops`, each used once.
         let mut used = HashSet::new();
         for &e in &coloops[m] {
             let block = usize::from(graph.block[m][e]);
@@ -959,7 +962,7 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
                 "n={n}: the coordinate {coordinate:?} of block {block} is shared"
             );
         }
-        // The free blocks hold coloops only, at most `per_block` of them, and none is empty.
+        // The free blocks hold only elements of `coloops`, at most `per_block` of them, and none is empty.
         for block in frame_blocks[m]..graph.blocks[m] {
             let members = &graph.block_elems[m][block];
             assert!(
@@ -973,24 +976,24 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
             );
         }
         let in_free_blocks: usize = (frame_blocks[m]..graph.blocks[m]).map(|b| graph.block_elems[m][b].len()).sum();
-        assert_eq!(in_free_blocks, coloops[m].len(), "n={n}, matroid {m}: coloops in free blocks");
-        // The frames' blocks hold no coloop.
+        assert_eq!(in_free_blocks, coloops[m].len(), "n={n}, side {m}: coloops in free blocks");
+        // The frames' blocks hold none of `coloops`.
         for block in 0..frame_blocks[m] {
             assert!(
                 graph.block_elems[m][block].iter().all(|e| !coloops[m].contains(&(*e as usize))),
-                "n={n}: a coloop in the frame block {block} of matroid {m}"
+                "n={n}: a coloop in the frame block {block} of side {m}"
             );
         }
     }
 
-    // Each one-sided element's block in the matroid of its own frame is the frame's, with a vector that is not zero.
+    // Each one-sided element's block on the side of its own frame is the frame's, with a vector that is not zero.
     for &(s, j) in p.model.one_sided() {
         let Some(e) = graph.element(s) else { continue };
         let e = e as usize;
         assert_eq!(
             usize::from(graph.block[j % 2][e]),
             j / 2,
-            "n={n}: the block of {s} in the matroid of its frame {j}"
+            "n={n}: the block of {s} on the side of its frame {j}"
         );
         assert!(
             graph.vecs[j % 2][e * words..(e + 1) * words].iter().any(|&w| w != 0),
@@ -1007,14 +1010,14 @@ fn check_free_blocks<const W: usize>(n: u32) -> [usize; 2] {
             );
         }
         let listed: usize = graph.block_elems[m].iter().map(Vec::len).sum();
-        assert_eq!(listed, graph.len(), "n={n}, matroid {m}: elements listed in blocks");
+        assert_eq!(listed, graph.len(), "n={n}, side {m}: elements listed in blocks");
     }
     [0, 1].map(|m| graph.blocks[m] - frame_blocks[m])
 }
 
-/// The free blocks of the graph of Π⁺(U\*_{≥3}) on the board 1000, where each matroid has at least one, and on the
-/// board 2000, where there are more coloops than a block holds in one of them and so more than one free block (see
-/// [`check_free_blocks`]).
+/// The free blocks of the graph of Π⁺(U\*_{≥3}) on the board 1000, where each side has at least one, and on the
+/// board 2000, where there are more one-sided elements on one side than a block holds and so more than one free block
+/// (see [`check_free_blocks`]).
 #[test]
 fn free_blocks_hold_the_coloops_of_the_one_sided_candidates() {
     let free = check_free_blocks::<16>(1000);

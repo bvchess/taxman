@@ -35,10 +35,10 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 8. `src/matchbound.rs`: the matching bound; its module comment is the best explanation of it.  Its child
    `src/matchbound/lagrange.rs` is the Lagrangian bound over the nogoods, built on the same levels and repairs.
-9. `src/gf2.rs`: the GF(2) bound, the default node bound.  The module comment explains the two frame matroids, how the
-   search keeps a node's matroids by contraction along its path, and the forced members; `src/gf2/meet.rs` is their
-   weighted intersection (the tableau, the augmenting paths, the weight split).  [The frame bound
-   (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound) is the proof.
+9. `src/gf2.rs`: the GF(2) bound, the default node bound.  The module comment explains independence in every frame (the
+   even frames' side and the odd frames' side), how the search keeps a node's vectors reduced along its path, and the
+   forced members; `src/gf2/meet.rs` is their weighted matroid intersection (the tableau, the augmenting paths, the
+   weight split).  [The frame bound (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound) is the proof.
 10. `src/search/`: the searcher.  `mod.rs` explains the step and says what is where: `searcher.rs` (`TaxSearcher` and
     `Stepper::step`, whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs`
     (`Refiner`: conflicts, refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where it

@@ -1,6 +1,6 @@
 //! The wall regime: how the solver's costs grow with `n` and with the size of a search tree.  What a
 //! game of the chain costs is its search, which grows with the tree, plus everything around the search, which grows
-//! with `n` alone (the tables, the frames, the model, the GF(2) matroids of the root, the replays); the commands
+//! with `n` alone (the tables, the frames, the model, the GF(2) frame vectors of the root, the replays); the commands
 //! measure the two apart.  The study, its data and its conclusions are in
 //! solver/notebook/search/the-wall-regime-2026-10/README.md.
 //!
@@ -174,7 +174,7 @@
 //! many numbers, or of numbers up to `root_max`, would need), and per frame the numbers of moves, factors and
 //! freedoms (`frame_moves`, `frame_factors`, `frame_freedoms`; `moves`, `factors` and `freedoms` for `frames`).
 //!
-//! **The root's GF(2) bound** (`setup` and `nodes`): the time to build the root's matroids (`gf2_graph_s`), their
+//! **The root's GF(2) bound** (`setup` and `nodes`): the time to build the root's frame vectors (`gf2_graph_s`), their
 //! `elements`, per-frame `ranks` and `block_words`; the bound with no incumbent (`root_bound_s` for the reset and
 //! the evaluation, `root_bound`, `root_chosen` the size of its heaviest set, `root_augmentations`); and the same
 //! evaluation asked for the members forced by an incumbent of the start value (`root_split_s`, `root_forced`).
@@ -209,7 +209,8 @@ mod decompose;
 /// `exchanges`: local prime exchanges at the nodes of a search, checked and pruned by.
 #[path = "wall/exchanges.rs"]
 mod exchanges;
-/// The multi-field bound (A1: GF(2) and signed GF(3) frame matroids, fitted multipliers) at a node, for `choice`.
+/// The multi-field bound (A1: independence in every frame over GF(2) and under GF(3) signings, fitted multipliers) at a
+/// node, for `choice`.
 #[path = "wall/fields.rs"]
 mod fields;
 /// `sample` reads the probe's `.nodes` fixtures and the tuning suite's hex sets.
@@ -921,7 +922,7 @@ impl Sizes {
     }
 }
 
-/// The root's GF(2) graph (the matroids of the root's frames over the candidates), and the time it took to build.
+/// The root's GF(2) graph (the vectors of the candidates in the root's frames), and the time it took to build.
 fn root_graph<const W: usize>(p: &Prepared<W>) -> (Gf2Graph, Duration) {
     let t0 = Instant::now();
     let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
@@ -940,8 +941,8 @@ fn root_bound<const W: usize>(p: &Prepared<W>, graph: &Gf2Graph) -> (Eval<W>, u6
     (eval, bound.stats().augmentations, t0.elapsed())
 }
 
-/// The root's GF(2) bound: building the matroids, the bound with no incumbent, and the same evaluation asked for the
-/// members forced by an incumbent worth `start`.  Adds the gaps of the bound over `start` and over `opt`.
+/// The root's GF(2) bound: building the frame vectors, the bound with no incumbent, and the same evaluation asked for
+/// the members forced by an incumbent worth `start`.  Adds the gaps of the bound over `start` and over `opt`.
 fn root_gf2<const W: usize>(line: &mut Line, p: &Prepared<W>, start: u64, opt: Option<u64>) {
     let (graph, graph_time) = root_graph(p);
     let (eval, augmentations, bound_time) = root_bound(p, &graph);

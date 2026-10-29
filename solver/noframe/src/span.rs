@@ -10,8 +10,8 @@
 //! Then greedy's kept members above any threshold t are independent (they are playable) and span every member above t
 //! (the kept ones trivially, the rejected ones by (♦)), so they are a basis of K_{≥t}: greedy keeps rank(K_{≥t})
 //! members, the most any playable subset can have.  That is (★) for every component and every truncation at once (the
-//! span theorem, S6), and with it the sources conjecture (S1) for every weighting consistent with the order (greedy on
-//! a matroid).  (♦) is checked here exactly, one game at a time.
+//! span theorem, S6), and with it the sources conjecture (S1) for every weighting consistent with the order (the greedy
+//! algorithm over the vectors).  (♦) is checked here exactly, one game at a time.
 //!
 //! The run is greedy itself, with linear algebra doing most of the playability work: a member with a factor that no
 //! kept member lists is kept (the extension lemma, P6, docs/theory/playability.md); a member whose vector the kept ones

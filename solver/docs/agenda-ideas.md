@@ -12,9 +12,9 @@ the relevant pages, the others were seen in abstracts.
   and their Example 3.6 shows it fails over GF(2).  With [the counting theorem
   (C2)](../../docs/theory/franklin-moniot.md#the-counting-theorem), a set of moves is playable exactly when it is
   independent under every GF(3) signing.  *Transfers:* the completeness of the signed GF(3) family, and its constructive
-  proof (column sums made to vanish), which turns each core the search meets into a matroid that sees it (A1, closed).
-  The minimum-rank literature (zero forcing bounds the maximum nullity over every field; minimum rank depends on the
-  field for some graphs) is the general setting.
+  proof (column sums made to vanish), which turns each core the search meets into a signing under which the core is
+  dependent (A1, closed).  The minimum-rank literature (zero forcing bounds the maximum nullity over every field;
+  minimum rank depends on the field for some graphs) is the general setting.
 * **Integer linear algebra.**  A set's rows are independent over GF(p) exactly when p does not divide the gcd of its
   maximal minors, the last determinantal divisor of its Smith normal form (R. P. Stanley, "Smith normal form in
   combinatorics", JCTA 144 (2016), arXiv:1602.00166).  *Transfers:* which fixed fields to add (measurements 7.2's census

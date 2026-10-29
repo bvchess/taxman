@@ -1,24 +1,25 @@
-//! The multi-field bound and its multipliers: one GF(2) matroid intersection plus a greedy per signed GF(3) frame
-//! matroid, coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of the fields
-//! study (solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it stood at
-//! commit 8753189, with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no longer
-//! checked against a reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
+//! The multi-field bound and its multipliers: one weighted matroid intersection over GF(2) plus a greedy algorithm per
+//! signed GF(3) frame, coupled by Lagrangian multipliers that Dantzig–Wolfe column generation fits.  It is the code of
+//! the fields study (solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md) as it
+//! stood at commit 8753189, with the refit R1, the refit R3 and the checkpoint formats left out and the intersection no
+//! longer checked against a reference algorithm at run time (`wall/fields.rs` tests it against the crate's own bound).
 //! # The bound
 //!
-//! Let `A`, `B` be the two GF(2) frame matroids of a state (`frames::FrameMatroids`) and `N_1, …, N_K` signed GF(3)
-//! frame matroids (`gf3::Matroid3`, each of one frame `h_k` and one signing, on the candidates touching that frame,
-//! `supp_k`).  Every promotable set `Q` is independent in `A` and `B` (the frame bound (B2),
-//! docs/theory/frame-bounds.md) and has `Q ∩ supp_k` independent in every `N_k` (the signed frame theorem (B1): any
+//! Independence in every frame over GF(2) is two conditions, the even frames' side `A` and the odd frames' side `B`
+//! (their vectors are `frames::FrameMatroids`).  Let there also be K *extras* `1, …, K`, each independence in one frame
+//! `h_k` under one GF(3) signing, on the candidates touching that frame, `supp_k` (`gf3::Matroid3`: the test and the
+//! greedy algorithm on its vectors).  Every promotable set `Q` is independent on both sides (the frame bound (B2),
+//! docs/theory/frame-bounds.md) and has `Q ∩ supp_k` independent in every extra `k` (the signed frame theorem (B1): any
 //! field, any nonzero entries).  For any multipliers `λ_k ≥ 0` on `supp_k`,
 //!
 //! ```text
 //! w(Q) = (w − Σ_k λ_k)(Q) + Σ_k λ_k(Q ∩ supp_k) ≤ MI_cap(w − Σ_k λ_k) + Σ_k G_k(λ_k) = L(λ)     (B4)
 //! ```
 //!
-//! with `MI_cap(c)` the heaviest common independent set of `A` and `B` of at most `cap` elements (elements of weight
-//! at most 0 left out, which loses nothing over a down-closed family) and `G_k(μ)` the heaviest independent set of
-//! `N_k` (greedy).  A candidate that is a loop of some `N_k` is in no promotable set and is left out of the
-//! intersection (it is `L` at `λ_{k,x} = w_x`, so B4 covers it).  The bound reported is `⌊L⌋` evaluated exactly
+//! with `MI_cap(c)` the heaviest set of at most `cap` elements independent on both sides (elements of weight at most 0
+//! left out, which loses nothing over a down-closed family) and `G_k(μ)` the heaviest set independent in extra `k`
+//! (greedy).  A candidate whose class is 0 in some extra is in no promotable set and is left out of the intersection
+//! (it is `L` at `λ_{k,x} = w_x`, so B4 covers it).  The bound reported is `⌊L⌋` evaluated exactly
 //! in integers: weights `x·S` and multipliers rounded to the grid `1/S` (`S = 2^16`, [`SCALE`]), the intersection by
 //! the crate's `taxman::gf2::meet::Meet` and the greedies over GF(3), all in `i64` (sums that would leave it saturate,
 //! which keeps the bound valid whatever multipliers are proposed: [`evaluate_grid`]).  Its soundness rests on the
@@ -27,20 +28,22 @@
 //!
 //! # The multipliers
 //!
-//! `min_λ L(λ)` is the LP over `P(A) ∩ P(B) ∩ ⋂_k P(N_k)` with `Σ z ≤ cap` (Lagrangian decomposition with integral
-//! subproblems; Edmonds).  Its Dantzig–Wolfe master has a column `α_j` per common independent set `Q_j` of `A`, `B`
-//! (cost `w(Q_j)`) and a convexity row, as the design has it, but each `P(N_k)` enters by its rank inequalities
-//! `z(S) ≤ r_k(S)` (Edmonds' description of a matroid's polytope) rather than by columns of independent sets linked
+//! `min_λ L(λ)` is the LP over `P_A ∩ P_B ∩ ⋂_k P_k` with `Σ z ≤ cap`, where `P_A`, `P_B` and `P_k` are the polytopes
+//! (convex hulls of the indicator vectors) of the sets independent on side `A`, on side `B` and in extra `k`
+//! (Lagrangian decomposition with integral subproblems; Edmonds).  Its Dantzig–Wolfe master has a column `α_j` per set
+//! `Q_j` independent on both sides (cost `w(Q_j)`) and a convexity row, as the design has it, but each `P_k` enters by
+//! its rank inequalities `z(S) ≤ r_k(S)` (Edmonds' description of the hull of the independent sets of a family of
+//! vectors, `r_k` the rank of the classes in extra `k`) rather than by columns of independent sets linked
 //! element by element: that master (link rows `Σ_j α_j [x ∈ Q_j] − Σ_i β_{k,i} [x ∈ I_{k,i}] ≤ ε`, the design's) was
 //! built and measured first, and its simplex spent nearly all its pivots in steps of the size of the perturbation
 //! (solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md).  A rank inequality's dual
 //! `μ_{k,S} ≥ 0` gives `λ_{k,x} = Σ_{S ∋ x} μ_{k,S}`, and then `G_k(λ_k) ≤ Σ_S μ_{k,S} r_k(S)`, so the master's dual is
 //! a Lagrangian bound's, and at the LP's optimal duals they coincide.  A pricing at multipliers `λ` is one evaluation
 //! of `L(λ)`, a valid bound, and its intersection's set is a column.  The inequalities are found from the master's
-//! point `z = Σ_j α_j 1_{Q_j}`: cheaply (in each matroid the most violated level set of `z`, and the dependent support
-//! sets), and when that finds none, exactly (for each matroid, the largest `y ≤ z` in its polytope, by a small column
+//! point `z = Σ_j α_j 1_{Q_j}`: cheaply (in each extra the most violated level set of `z`, and the dependent support
+//! sets), and when that finds none, exactly (for each extra, the largest `y ≤ z` in its polytope, by a small column
 //! generation over its independent sets; `y = z` exactly when `z` is in the polytope, and otherwise a level set of its
-//! final duals is violated).  When every matroid's check passes, `ẑ = min(z, y_1, y_2, …)` lies in every polytope (all
+//! final duals is violated).  When every extra's check passes, `ẑ = min(z, y_1, y_2, …)` lies in every polytope (all
 //! are down-closed), and its weight is a *certified* lower bound `LB` on the LP; with the lowest `L` found it brackets
 //! the LP.
 //!
@@ -49,14 +52,15 @@
 //! the lowest `L` is within [`CLOSE`] of the master's value, then the cuts and the certificate, or until a budget
 //! ends.  With separation, after each bracket the cores that the master's columns run into (`cores::cores_of`) are
 //! merged into core-derived signings (first fit, at most `per_frame` a frame), and the master is rebuilt for the
-//! changed family from its columns (but those holding a new loop) and its inequalities (ranks taken again).
+//! changed family from its columns (but those holding a candidate whose class has become 0) and its inequalities (ranks
+//! taken again).
 //!
 //! In [`FitMode::Search`] the exact checks are not run: a family's generation ends when nothing prices out and no
 //! cheap inequality is violated, and the computation when the separation finds no new core ([`Stop::Fitted`]); `LB`
 //! stays 0.  The result is a fit ([`Fit`]: signings and multipliers) with a valid bound and no certified bracket.
 //! [`Outcome::fit`] is the fit of the lowest `L` ever evaluated, which can be lower than the final family's lowest
-//! `L`: merging cores into a signing changes its matroid, which is not a restriction of the old one, so a later
-//! family's LP can be the higher.  `fit.rs` writes a fit to disk.
+//! `L`: merging cores into a signing changes which sets are independent in its frame, the new ones not a subfamily of
+//! the old, so a later family's LP can be the higher.  `fit.rs` writes a fit to disk.
 //!
 //! # Warm states and the node methods
 //!
@@ -115,7 +119,7 @@ const CUTS_PER_CHECK: usize = 5;
 const KEEP: usize = 300;
 /// The most columns of the final master an outcome carries (so a fit file and a [`Warm`] state).
 pub const SAVED_COLUMNS: usize = 300;
-/// The independent sets an extra matroid's pool keeps.
+/// The independent sets an extra's pool keeps.
 const POOL: usize = 400;
 /// The largest perturbation of a rank inequality's right-hand side in the master, and of a bound `y ≤ z` in the exact
 /// check, against degeneracy (uniform in `[0, PERTURB]`).
@@ -132,7 +136,7 @@ const NONE: u32 = u32::MAX;
 // ---------------------------------------------------------------------------------------------------------
 // The setting
 
-/// One bound computation's state: the frames, the GF(2) matroids, the ceiling and the target.
+/// One bound computation's state: the frames, the GF(2) frame vectors, the ceiling and the target.
 pub struct Ctx<'a, const W: usize> {
     pub n: u32,
     pub model: &'a FrameGraph,
@@ -149,7 +153,8 @@ pub struct Ctx<'a, const W: usize> {
     pub gap: Option<i64>,
     /// The GF(2) element of each number (`NONE` for the others).
     index: Vec<u32>,
-    /// Words of a block vector in the intersection, and each element's vectors in `A` and `B`, that many words each.
+    /// Words of a block vector in the intersection, and each element's vectors on sides `A` and `B`, that many words
+    /// each.
     words: usize,
     va: Vec<u64>,
     vb: Vec<u64>,
@@ -264,9 +269,10 @@ impl Default for Settings {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The family of extra matroids
+// The family of extras
 
-/// One extra matroid: a signing, its matroid at the state, and where its elements sit among the GF(2) elements.
+/// One extra: a signing, the classes of the candidates in its frame at the state, and where its elements sit among
+/// the GF(2) elements.
 pub struct Extra {
     pub signing: Signing,
     pub m: Matroid3,
@@ -305,7 +311,7 @@ impl Extra {
     }
 }
 
-/// The extra matroids and the GF(2) elements that are loops of one of them.
+/// The extras and the GF(2) elements whose class is 0 in one of them.
 pub struct Family {
     pub extras: Vec<Extra>,
     pub banned: Vec<bool>,
@@ -334,7 +340,7 @@ impl Family {
     }
 
     /// The multipliers `lambda` (per signing, by candidate number; zero where missing) as vectors indexed like each
-    /// matroid's elements; signings past the end of `lambda` get zeros.
+    /// extra's elements; signings past the end of `lambda` get zeros.
     pub fn multipliers_of(&self, lambda: &[HashMap<u32, f64>]) -> Vec<Vec<f64>> {
         let none = HashMap::new();
         self.extras
@@ -347,7 +353,7 @@ impl Family {
             .collect()
     }
 
-    /// The multipliers `lam` (indexed like each matroid's elements) by candidate number, the positive ones.
+    /// The multipliers `lam` (indexed like each extra's elements) by candidate number, the positive ones.
     fn by_number(&self, lam: &[Vec<f64>]) -> Vec<HashMap<u32, f64>> {
         self.extras
             .iter()
@@ -367,7 +373,7 @@ pub struct Fit {
 }
 
 impl Fit {
-    /// The family `fam` at the multipliers `lam` (indexed like each matroid's elements).
+    /// The family `fam` at the multipliers `lam` (indexed like each extra's elements).
     fn of(fam: &Family, lam: &[Vec<f64>]) -> Fit {
         Fit { signings: fam.extras.iter().map(|ex| ex.signing.clone()).collect(), lambda: fam.by_number(lam) }
     }
@@ -461,7 +467,7 @@ pub struct Stats {
     pub ms_greedy: f64,
     pub ms_simplex: f64,
     /// Time in the exact checks, in the separation rounds (finding and merging cores), and in building masters and
-    /// the changed matroids.
+    /// the changed extras.
     pub ms_exact: f64,
     pub ms_separate: f64,
     pub ms_build: f64,
@@ -473,7 +479,7 @@ fn grid(lam: &[Vec<f64>]) -> Vec<Vec<i64>> {
     lam.iter().map(|l| l.iter().map(|&v| (v * SCALE as f64).round().max(0.0) as i64).collect()).collect()
 }
 
-/// `L` at `lam` (one vector per extra matroid, indexed like its elements), exactly.
+/// `L` at `lam` (one vector per extra, indexed like its elements), exactly.
 pub fn evaluate<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, lam: &[Vec<f64>], stats: &mut Stats) -> Eval {
     let lhat = grid(lam);
     evaluate_grid(ctx, fam, &lhat, stats)
@@ -526,7 +532,7 @@ pub fn evaluate_grid<const W: usize>(ctx: &Ctx<'_, W>, fam: &Family, lhat: &[Vec
     Eval { value, q, sets }
 }
 
-/// The heaviest common independent set of `A` and `B` of at most `cap` of the elements `order` (ascending by weight
+/// The heaviest set independent on both sides `A` and `B` of at most `cap` of the elements `order` (ascending by weight
 /// `c`, all positive), by the crate's intersection on the elements renumbered in that order: its weight and its
 /// elements (indices into the GF(2) elements).  `R` is the words of a block vector in the context.
 fn intersection<const W: usize, const R: usize>(ctx: &Ctx<'_, W>, order: &[usize], c: &[i64]) -> (i64, Vec<usize>) {
@@ -555,15 +561,15 @@ fn intersection<const W: usize, const R: usize>(ctx: &Ctx<'_, W>, order: &[usize
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Ranks and the polytopes of the extra matroids
+// Ranks and the polytopes of the extras
 
-/// The rank in an extra matroid of its elements at the positions `positions`.
+/// The rank in an extra (of the span of the classes) of its elements at the positions `positions`.
 fn rank_at(ex: &Extra, positions: impl Iterator<Item = usize>) -> usize {
     let mut basis = Basis3::new(ex.m.rank);
     positions.filter(|&i| basis.try_insert(ex.m.vecs[i].clone())).count()
 }
 
-/// The rank in an extra matroid of the GF(2) elements `set` (its loops and the elements it does not have count 0).
+/// The rank in an extra of the GF(2) elements `set` (those of class 0 and those it does not have count 0).
 fn rank(ex: &Extra, set: &[usize]) -> usize {
     rank_at(ex, set.iter().filter_map(|&e| ex.position(e)))
 }
@@ -597,8 +603,8 @@ fn violated_prefixes(ex: &Extra, order: &[usize], z: &[f64], most: usize) -> Vec
         .collect()
 }
 
-/// The closure of `set` in an extra matroid among the GF(2) elements `within`: `set` and every element of `within`
-/// that its vectors span, ascending.  Its rank is `set`'s, so its rank inequality is at least as violated.
+/// `set` closed in an extra among the GF(2) elements `within`: `set` and every element of `within` whose class lies in
+/// the span of `set`'s classes, ascending.  Its rank is `set`'s, so its rank inequality is at least as violated.
 fn closure(ex: &Extra, set: &[usize], within: &[usize]) -> Vec<usize> {
     let mut basis = Basis3::new(ex.m.rank);
     for &e in set {
@@ -621,9 +627,9 @@ fn closure(ex: &Extra, set: &[usize], within: &[usize]) -> Vec<usize> {
     out
 }
 
-/// The rank inequalities of the extra matroids that the master's point `z` violates, found cheaply: in each
-/// matroid, the most violated set of its elements by decreasing `z` (the level sets of `z`) and each support set,
-/// each closed among the elements where `z` is positive (a closed set is at least as violated).
+/// The rank inequalities of the extras that the master's point `z` violates, found cheaply: in each extra, the most
+/// violated set of its elements by decreasing `z` (the level sets of `z`) and each support set, each closed among the
+/// elements where `z` is positive (a closed set is at least as violated).
 fn violated_cuts(fam: &Family, z: &[f64], support: &[(f64, Vec<usize>)]) -> Vec<(usize, Vec<usize>)> {
     let mut out = Vec::new();
     for (k, ex) in fam.extras.iter().enumerate() {
@@ -645,7 +651,7 @@ fn violated_cuts(fam: &Family, z: &[f64], support: &[(f64, Vec<usize>)]) -> Vec<
     out
 }
 
-/// What the exact check of one extra matroid found: the largest point `y ≤ z` of its polytope (on its elements,
+/// What the exact check of one extra found: the largest point `y ≤ z` of its polytope (on its elements,
 /// by GF(2) element), and violated rank inequalities if `z` is not in the polytope.
 struct Check {
     y: Vec<(usize, f64)>,
@@ -685,8 +691,8 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
         let y = t.iter().map(|&e| (e, y.get(&e).copied().unwrap_or(0.0).min(z[e]))).collect();
         return Check { y, cuts: Vec::new(), pivots: 0, capped: false };
     }
-    // The coloops of the matroid restricted to T (elements in no circuit inside T) are a direct summand: the polytope
-    // is the product of theirs, [0, 1] each, and the rest's, so the LP is over the rest.
+    // The elements of T in no dependent subset of T (those whose removal lowers the rank of T) are free of the rest:
+    // the polytope is the product of theirs, [0, 1] each, and the rest's, so the LP is over the rest.
     let r_t = rank(ex, &t);
     let (t, free): (Vec<usize>, Vec<usize>) = t.iter().partition(|&&x| {
         let rest: Vec<usize> = t.iter().copied().filter(|&e| e != x).collect();
@@ -781,7 +787,7 @@ fn check(ex: &mut Extra, z: &[f64], support: &[(f64, Vec<usize>)], deadline: Ins
     Check { y, cuts, pivots, capped }
 }
 
-/// A maximal independent subset of `set` in an extra matroid (its members in order, each kept if independent of
+/// A maximal independent subset of `set` in an extra (its members in order, each kept if independent of
 /// those kept), ascending.
 fn independent_part(ex: &Extra, set: &[usize]) -> Vec<usize> {
     let mut basis = Basis3::new(ex.m.rank);
@@ -805,7 +811,7 @@ struct Col {
     set: Vec<usize>,
 }
 
-/// A rank inequality `z(S) ≤ r_k(S)` of extra matroid `k` in the master: its set (GF(2) elements, ascending), rank
+/// A rank inequality `z(S) ≤ r_k(S)` of extra `k` in the master: its set (GF(2) elements, ascending), rank
 /// and row.
 struct Cut {
     k: usize,
@@ -890,7 +896,7 @@ impl Master {
         Some(j)
     }
 
-    /// Adds the rank inequality of `set` in extra matroid `k` (the current point may violate it: the next solve starts
+    /// Adds the rank inequality of `set` in extra `k` (the current point may violate it: the next solve starts
     /// with the dual simplex); false if the set is there with a rank as low.
     fn add_cut(&mut self, fam: &Family, k: usize, set: Vec<usize>) -> bool {
         let r = rank(&fam.extras[k], &set);
@@ -912,8 +918,8 @@ impl Master {
         true
     }
 
-    /// The master's multipliers, one vector per extra matroid indexed like its elements: `λ_{k,x}` is the sum of
-    /// the duals of matroid `k`'s inequalities whose sets hold `x`.
+    /// The master's multipliers, one vector per extra indexed like its elements: `λ_{k,x}` is the sum of the duals of
+    /// extra `k`'s inequalities whose sets hold `x`.
     fn multipliers(&self, fam: &Family) -> Vec<Vec<f64>> {
         let mut lam = fam.zeros();
         let y = self.lp.duals();
@@ -1097,7 +1103,7 @@ pub struct Outcome {
     /// The final master's columns as candidate numbers (ascending each): the support first, by decreasing value,
     /// then its other nonempty columns in its order; at most [`SAVED_COLUMNS`].
     pub master_columns: Vec<Vec<u32>>,
-    /// The final master's rank inequalities: (index of the matroid in the final family, candidates ascending, rank).
+    /// The final master's rank inequalities: (index of the extra in the final family, candidates ascending, rank).
     pub master_cuts: Vec<(usize, Vec<u32>, usize)>,
     pub stats: Stats,
 }
@@ -1118,8 +1124,8 @@ impl Best {
     }
 }
 
-/// The subgradient of `L` at the evaluation `ev`, `g_{k,x} = [x ∈ I_k] − [x ∈ Q]` (one vector per extra matroid,
-/// indexed like its elements), and its squared norm.
+/// The subgradient of `L` at the evaluation `ev`, `g_{k,x} = [x ∈ I_k] − [x ∈ Q]` (one vector per extra, indexed like
+/// its elements), and its squared norm.
 fn subgradient(fam: &Family, ev: &Eval) -> (Vec<Vec<f64>>, f64) {
     let mut g: Vec<Vec<f64>> = fam.zeros();
     let mut norm = 0.0;
@@ -1146,7 +1152,8 @@ fn descend(lam: &mut [Vec<f64>], step: f64, d: &[Vec<f64>]) {
     }
 }
 
-/// A signing as a search keeps it: nothing merges into it (`mergeable` false, no cores), so its matroid stays.
+/// A signing as a search keeps it: nothing merges into it (`mergeable` false, no cores), so its frame's independence
+/// stays.
 pub fn frozen(s: &Signing) -> Signing {
     Signing { mergeable: false, cores: Vec::new(), ..s.clone() }
 }
@@ -1268,7 +1275,7 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
         self.note(ev.value, at)
     }
 
-    /// Polyak steps from the start towards the target (`settings.polyak`; one without extra matroids), every
+    /// Polyak steps from the start towards the target (`settings.polyak`; one without extras), every
     /// intersection they produce a column of the master.
     fn polyak(&mut self) {
         let steps = if self.fam.extras.is_empty() { 1 } else { self.settings.polyak.max(1) };
@@ -1357,7 +1364,7 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
                 continue;
             }
             // No column prices out (or the bracket against the master is closed): the master's point must lie in
-            // every extra matroid's polytope.  Cheap cuts first, then the exact check.
+            // every extra's polytope.  Cheap cuts first, then the exact check.
             let z = self.master.point(ctx);
             let support = self.master.support();
             let mut new_cuts = 0;
@@ -1502,9 +1509,10 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
         Some(existing + opened.len() - 1)
     }
 
-    /// The family changed (the signings `changed` took cores, `opened` are new): rebuild the changed matroids and
-    /// add the new ones; keep the master's columns (but those with a new loop) and its rank inequalities (their
-    /// ranks taken again in the changed matroids); the lowest `L` of the new family starts at the old multipliers.
+    /// The family changed (the signings `changed` took cores, `opened` are new): rebuild the changed extras and add
+    /// the new ones; keep the master's columns (but those holding a candidate whose class has become 0) and its rank
+    /// inequalities (their ranks taken again in the changed extras); the lowest `L` of the new family starts at the old
+    /// multipliers.
     fn rebuild(&mut self, changed: &[bool], opened: Vec<Signing>) {
         let ctx = self.ctx;
         let t = Instant::now();
@@ -1570,7 +1578,7 @@ impl<'r, 'a, const W: usize> Fitter<'r, 'a, W> {
     }
 }
 
-/// The bound at a state with the extra matroids of `signings` (and, with `separate`, the core-derived signings the
+/// The bound at a state with the extras of `signings` (and, with `separate`, the core-derived signings the
 /// separation adds), the multipliers started at `start` (per signing, by candidate number; zero elsewhere).
 pub fn bound<const W: usize>(
     ctx: &Ctx<'_, W>,
@@ -1643,7 +1651,7 @@ pub struct Warm {
     pub signings: Vec<Signing>,
     /// Per signing, its positive multipliers by candidate number.
     pub lambda: Vec<HashMap<u32, f64>>,
-    /// Common independent sets of the GF(2) matroids (candidate numbers, ascending), the master's columns.
+    /// Sets independent in every frame over GF(2) (candidate numbers, ascending), the master's columns.
     pub columns: Vec<Vec<u32>>,
     /// Rank inequalities (signing index, candidate numbers ascending); ranks are taken again where they are used.
     pub cuts: Vec<(usize, Vec<u32>)>,
@@ -1724,11 +1732,11 @@ fn warm_fitter<'r, 'a, const W: usize>(
     assert_eq!(fam.extras.len(), warm.signings.len(), "a family of the warm state's signings");
     let t0 = Instant::now();
     let elements = |set: &[u32]| -> Vec<usize> { set.iter().filter_map(|&x| ctx.element(x)).collect() };
-    // Columns with a loop of the node's family are no common independent set of the intersection's.
+    // Columns with a candidate of class 0 in the node's family are no set independent on both sides.
     let mut columns: Vec<Vec<usize>> =
         warm.columns.iter().map(|c| elements(c)).filter(|c| c.iter().all(|&e| !fam.banned[e])).collect();
     columns.push(first.q.clone());
-    // A rank inequality is over its matroid's elements; one whose rank is its size holds at every master point.
+    // A rank inequality is over its extra's elements; one whose rank is its size holds at every master point.
     let cuts: Vec<(usize, Vec<usize>)> = warm
         .cuts
         .iter()
@@ -1853,10 +1861,10 @@ mod tests {
         }
     }
 
-    /// The intersection `evaluate_grid` makes, on the vectors of this module's frame matroids, equals the crate's own
-    /// bound on `Gf2Graph::reweighted` (the matroids the search builds) at random reweightings, in value and in the
-    /// weight of the set it chooses, which has at most `cap` elements.  This is what the run-time check of the study
-    /// (against a reference algorithm) was.
+    /// The intersection `evaluate_grid` makes, on the frame vectors of this module (`frame_matroids`), equals the
+    /// crate's own bound on `Gf2Graph::reweighted` (the frame vectors the search builds) at random reweightings, in
+    /// value and in the weight of the set it chooses, which has at most `cap` elements.  This is what the run-time
+    /// check of the study (against a reference algorithm) was.
     fn intersection_matches_the_crates_bound<const W: usize>(n: u32, rounds: usize) -> usize {
         let p = prepared::<W>(n);
         let fm = frame_matroids(&p.model, &p.root, &p.candidates);
@@ -1904,7 +1912,7 @@ mod tests {
 
     /// The fits of `testdata/fits` give their bounds again at the roots they were fitted at: the study's own numbers
     /// (studies E1 and E2, the pilot), computed by its code with the intersection checked against a reference.  Among
-    /// them 2700 and 3300, with frame matroids of more than 64 and more than 128 coordinates.
+    /// them 2700 and 3300, with frame vectors of more than 64 and more than 128 coordinates.
     #[test]
     fn the_study_fits_give_their_bounds_again() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/fits");

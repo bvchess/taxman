@@ -1,6 +1,7 @@
 //! Weighted matroid intersection for two linear matroids over GF(2) that are direct sums of blocks of rank at most
-//! `64·R`: the solver behind [`super::Gf2Bound`].  The matroids, and why every promotable set is independent in
-//! both, are in the parent module's docs; this module knows nothing of frames or promotions.
+//! `64·R`: the solver behind [`super::Gf2Bound`].  The two matroids, `A` and `B`, are there the even frames' side and
+//! the odd frames' side; what they are, and why every promotable set is independent in both, are in the parent
+//! module's docs ("Independence in a frame"); this module knows nothing of frames or promotions.
 //!
 //! # The algorithm
 //!
@@ -169,7 +170,7 @@ pub enum Deletion {
 }
 
 /// The two matroids: for each element, its block in `A` and in `B` and its vectors there.  An element whose vector
-/// is zero in either is a loop: no common independent set holds it.
+/// is zero in either is in no common independent set.
 pub struct Problem<'a, const R: usize> {
     pub block: [&'a [u8]; 2],
     pub vector: [&'a [Vector<R>]; 2],
@@ -1209,7 +1210,7 @@ impl<const R: usize> Meet<R> {
     /// independent set of `A` for `w1` plus that of `B` for `w2`, each among the sets of `live` elements that are
     /// independent with `fixed` (weak duality, see the module docs, "The weight split": `w = w1 + w2` on every
     /// element, so a common independent set `J` of `live` elements with `fixed` weighs `w1(J) + w2(J)`, each at
-    /// most its matroid's heaviest).  Each heaviest set is greedy (a matroid's, contracted by `fixed`): the elements
+    /// most its matroid's heaviest).  Each heaviest set is greedy (a matroid's, together with `fixed`): the elements
     /// of positive weight there, by decreasing weight, each kept while independent.  It uses the spans of the
     /// uncontended elements, not the tableau, so the workspace still holds its solve.
     pub fn split_bound_among(&mut self, p: &Problem<'_, R>, pot: &[i64], live: &[u32], fixed: &[u32]) -> i64 {
@@ -1331,9 +1332,9 @@ impl<const R: usize> Meet<R> {
     /// for.  Where it can, it derives the tableau from the one the workspace holds, of a set `S` of elements `L` of a
     /// problem `q`, instead of building it (see "Deriving a tableau" in the docs of [`Meet`]); for that `p` must be
     /// `q` contracted by `contracted` (members of `start ∪ contracted`, which must be common independent in `q`), and
-    /// `L` must hold `start` and `contracted` (an element of `live` outside `L`, a loop of `q` in one matroid, say,
-    /// has its circuits found by reduction).  If the workspace holds no tableau, or `L` does not hold those, every
-    /// block is built.
+    /// `L` must hold `start` and `contracted` (an element of `live` outside `L`, with the vector 0 in `q` in one
+    /// matroid, say, has its circuits found by reduction).  If the workspace holds no tableau, or `L` does not hold
+    /// those, every block is built.
     pub fn derive(&mut self, p: &Problem<'_, R>, live: &[u32], start: &[u32], contracted: &[u32]) {
         const SOURCE: u8 = 1;
         const LIVE: u8 = 2;
@@ -3980,11 +3981,11 @@ mod tests {
     }
 
     /// A random problem like [`random`], some of whose elements are one-sided as the extended problem's candidates are:
-    /// in one matroid such an element has a random vector in a random block, and in the other it is a coloop, its own
-    /// unit vector in one of one or two *free blocks* appended after that matroid's random blocks, where no other
-    /// element has that coordinate.  There are between one and `n` of them; they are the heaviest elements if `last`
-    /// (as the search orders them) and otherwise at random places of the weight order, which the solver must not care
-    /// about.  Returns the problem and which elements are one-sided.
+    /// in one matroid such an element has a random vector in a random block, and in the other it has a coordinate of
+    /// its own, independent of everything there: its own unit vector in one of one or two *free blocks* appended after
+    /// that matroid's random blocks, where no other element has that coordinate.  There are between one and `n` of
+    /// them; they are the heaviest elements if `last` (as the search orders them) and otherwise at random places of
+    /// the weight order, which the solver must not care about.  Returns the problem and which elements are one-sided.
     fn random_one_sided(rng: &mut Rng, n: usize, dim: u64, last: bool) -> (Owned<1>, Vec<bool>) {
         let blocks = [1 + rng.below(3) as usize, 1 + rng.below(3) as usize];
         let free = [1 + rng.below(2) as usize, 1 + rng.below(2) as usize];
@@ -4004,7 +4005,7 @@ mod tests {
         let mut vector = [Vec::new(), Vec::new()];
         let mut coloops = [[0u32; 2]; 2];
         for &is_one_sided in &one_sided {
-            // The matroid of the element's own frame, the other being the one it is a coloop of.
+            // The side of the element's own frame, the other being the one where it has a coordinate of its own.
             let own = rng.below(2) as usize;
             for m in 0..2 {
                 if is_one_sided && m != own {
@@ -4033,7 +4034,8 @@ mod tests {
         warm_with_one_sided: usize,
         splits: usize,
         exact_losses: usize,
-        /// Heaviest sets of all sizes, and those that hold a one-sided element (a coloop of one matroid).
+        /// Heaviest sets of all sizes, and those that hold a one-sided element (one with a coordinate of its own in one
+        /// matroid).
         heaviest: usize,
         heaviest_with_one_sided: usize,
         /// Members of the heaviest set that the bound without a member was asked for, and those it certified; of
@@ -4294,11 +4296,11 @@ mod tests {
         assert!(at_least(warm, 10_000) && at_least(splits, 2_000), "{warm} warm starts, {splits} splits");
     }
 
-    /// The same checks on problems with one-sided elements, whose coloops are in free blocks after the random blocks
-    /// of the other matroid (see [`random_one_sided`]), at the end of the weight order and at random places in it:
-    /// the solver, which knows blocks and not frames, must find the heaviest sets, split and warm-start as it does
-    /// without them.  Many of the heaviest sets must hold coloops, and many of the warm starts start from, or delete,
-    /// a one-sided element.
+    /// The same checks on problems with one-sided elements, whose own coordinates are in free blocks after the random
+    /// blocks of the other matroid (see [`random_one_sided`]), at the end of the weight order and at random places in
+    /// it: the solver, which knows blocks and not frames, must find the heaviest sets, split and warm-start as it does
+    /// without them.  Many of the heaviest sets must hold one-sided elements, and many of the warm starts start from,
+    /// or delete, one.
     #[test]
     #[cfg_attr(
         debug_assertions,
@@ -4374,7 +4376,7 @@ mod tests {
     }
 
     /// The same checks on problems with one-sided elements, as for the warm starts above.  The heaviest sets must hold
-    /// coloops, and the bounds without a member must be asked for, and certified for, one-sided members.
+    /// one-sided elements, and the bounds without a member must be asked for, and certified for, one-sided members.
     #[test]
     #[cfg_attr(
         debug_assertions,
