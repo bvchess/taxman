@@ -48,9 +48,12 @@ requires arguments with no shared assumptions -- replay, exhaustion,
 an independent bound, and an induction (technique 3) whose entire
 proof fits in one paragraph.
 
+The replay costs about n cubed over the games audited, so --max-n (default 1300) leaves the games above it
+unaudited; the 5000 games of the whole table take some 50 times as long.
+
 Usage:
     python3 -m evaluation.certify [--budget 30] [--brute-max 64]
-                       [--matching-max 300] [--optimal PATH]
+                       [--matching-max 300] [--max-n 1300] [--optimal PATH]
 """
 
 from __future__ import annotations
@@ -178,10 +181,12 @@ def main(argv: List[str] | None = None) -> int:
                         help="seconds of brute force per game")
     parser.add_argument("--brute-max", type=int, default=64)
     parser.add_argument("--matching-max", type=int, default=300)
+    parser.add_argument("--max-n", type=int, default=1300,
+                        help="audit the games of optimal.json up to this n")
     parser.add_argument("--optimal", type=Path, default=DEFAULT_OPTIMAL)
     args = parser.parse_args(argv)
 
-    games = {g["n"]: g for g in json.loads(args.optimal.read_text())}
+    games = {g["n"]: g for g in json.loads(args.optimal.read_text()) if g["n"] <= args.max_n}
     top = max(games)
     divs = divisor_lists(top)
     spf = smallest_prime_factors(top)

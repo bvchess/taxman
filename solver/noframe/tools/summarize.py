@@ -27,8 +27,8 @@ from itertools import combinations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-OPTIMAL_JSON = ROOT / "results/optimal.json"  # the recorded games n = 1..1300
-STRICT_JSONL = ROOT / "results/strict.jsonl"  # the recorded games beyond that (the first line for an n)
+OPTIMAL_JSON = ROOT / "results/optimal.json"  # the table of recorded games
+STRICT_JSONL = ROOT / "results/strict.jsonl"  # the committed chain (the first line for an n)
 OPTIMAL_JSON_LAST_N = 1000  # recorded_moves reads the games above it from STRICT_JSONL
 UPPER_MODES = {
     "all": "every optimal set",

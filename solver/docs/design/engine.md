@@ -216,6 +216,11 @@ names the game.  No option of `solve`, `regress` or `certify` names another tabl
 against anything else (`verify-optimal FILE` and `extend-optimal --table FILE` take one); the library takes
 another table where a test needs one (`solver::solve_range_each_with`, `results::read_results`).
 
+The file is tens of megabytes, so the table is not parsed when a process starts.  `Optimal::built_in` finds the line of
+a game by bisection and parses that line the first time the game is asked for; the lines are one game each, in ascending
+order of n, as `Optimal::to_file_text` writes them.  A process that asks for no game reads none, one that asks for a few
+reads those, and what goes over every game (`verify-optimal`, `extend-optimal`) parses them all.
+
 ## The profile of a search
 
 The profile of a search records where the search's steps go, while it runs, so that the shape of a tree is measured

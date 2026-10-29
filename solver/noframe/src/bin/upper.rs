@@ -1,6 +1,6 @@
 //! The upper part of the optimal sets, game by game: for every game in a range, which members of U\*_{≥3} (the
 //! sources of three or more prime factors that descending greedy keeps) the parity bound certifies to be in every
-//! set beating the recorded score, and which it leaves open.  The recorded games are optimal.json's (to 1300) and, for
+//! set beating the recorded score, and which it leaves open.  The recorded games are optimal.json's and, for
 //! a game it lacks, those of the `--results` files (default the solver's `results/strict.jsonl`), read in the order
 //! given after optimal.json, an earlier file winning.  One line per game, resumable:
 //!

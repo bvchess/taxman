@@ -36,7 +36,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     optional) both ways, in both formulations (with and without the claims of `unzip`, [E4](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)): on every set of
     every game to 80 (to 60 with every such source open) and on random sets to 1300 (to 4095 ignored).  It checks that
     with none open the promotion sets are the frame model's, and catches a mutant that skips the check of E4.
-  * `tests/bottom_layers.rs` checks F4 on every game of `optimal.json`, the committed chain and another run of
+  * `tests/bottom_layers.rs` checks F4 on every game of `optimal.json` to 1300, the committed chain and another run of
     its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
     set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what

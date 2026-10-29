@@ -52,8 +52,8 @@ table.  A score that differs stops it, as it stops any run.
 
 ```
 $ taxman verify-optimal                         # replay every game of optimal.json
-verified 1300 games (n up to 1300, 367449 moves)
-load+parse 12.8 ms, replay 18.6 ms
+verified 5000 games (n up to 5000, 5417028 moves)
+load+parse 847.9 ms, replay 2356.4 ms
 $ taxman verify-results results/strict.jsonl    # see section 4
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json     # the table plus the games it lacks
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
@@ -79,8 +79,9 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   differs from the table's for any n they share.  Then, from the game after the table's last, it takes each game that
   RESULTS completed, up to the first that is missing or only an unfinished search, and says which and why.  A game that
   assumes a game of the table optimal is taken too: it assumes nothing the table does not stand for.  The old games are
-  written back byte for byte, FILE is written whole or not at all, and RESULTS can never be FILE.  The table stays at
-  1300, so the command adds every game of `results/strict.jsonl` past it; on 2026-10-27 it said:
+  written back byte for byte, FILE is written whole or not at all, and RESULTS can never be FILE.  Given the table of
+  1300 games and `results/strict.jsonl`, the command added every game of the file past the table's end, and on 2026-10-28
+  it said:
 
   ```
   $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json
@@ -100,7 +101,10 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
   `OUT.counterexample.jsonl` too, and the run exits with the status 2.  `certify` takes `--threads`, `--background`, the
   checkpoint flags and the limits of `solve`, and resumes like it.  The extended problem keeps the claims of `unzip`
   that [the kept-claims lemma (E4)](../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows, unless
-  `--no-claims`, the formulation of the certificates made before it; a line records which.
+  `--no-claims`, the formulation of the certificates made before it; a line records which.  The recorded games are
+  those of the `--results` files, with the table's for any game they lack; where a file scores a game differently from
+  the table, the file's game is the one certified, and a wrong score comes out `beaten` (`verify-results` is the check
+  of a file against the table).
 * **`verify-certificates CERTS... --results FILE... --upper FILE... [--exact FILE...] [--threads K]`** checks the files
   that `certify` wrote, without changing them, line by line.  It says how far the proofs of the recorded scores reach:
   the prover's, the certificates' and the ceilings'.  [design/certificates.md](design/certificates.md) has what they
@@ -116,8 +120,8 @@ Five lines from different runs:
 n=250   score=19533     search  nodes=34   0.003 s  optimal ok  proof=exhausted  own=0.003 s  best=1213
 n=1220  score=468662    search  nodes=1375952   8.209 s  incomplete  own=8.151 s  best=35959
 n=1299  score=531389    repeat  nodes=0               0.079 s  optimal ok  proof=same_search of 1298  own=0.000 s  best=40571
-n=1301  score=532272    prime   nodes=0               0.016 s  optimal unknown  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal  own=0.000 s  best=-
-n=4754  score=7106699   known   nodes=0               0.147 s  optimal unknown  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753  own=0.000 s  best=-
+n=1301  score=532272    prime   nodes=0               0.016 s  optimal ok  proof=prime_formula  assumes the game of 1300 in optimal.json is optimal  own=0.000 s  best=-
+n=4754  score=7106699   known   nodes=0               0.147 s  optimal ok  proof=known from the bounds store (bounds.jsonl)  assumes statement U holds at n=4753  own=0.000 s  best=-
 ```
 
 The fields, in order:
@@ -127,8 +131,8 @@ The fields, in order:
 3. the method: `trivial`, `prime`, `repeat`, `start`, `search` or `known`;
 4. the search's nodes, which are steps ([glossary](../../docs/GLOSSARY.md#the-search));
 5. the seconds the game took in this invocation;
-6. how the score compares with `optimal.json`: `optimal ok`, equal; `optimal unknown`, the table has no game of n; or
-   `incomplete`.  A score that differs is a hard error, which stops the run, naming the game;
+6. how the score compares with `optimal.json`: `optimal ok`, equal; `optimal unknown`, the table has no game of n (a
+   game past its end); or `incomplete`.  A score that differs is a hard error, which stops the run, naming the game;
 7. the proof, with the game whose search a `same_search` repeats and the source that a `known` cites;
 8. what the proof assumes, if anything (section 4);
 9. `own=`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) in seconds, over every invocation

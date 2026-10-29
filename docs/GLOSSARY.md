@@ -365,10 +365,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
   game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
   score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).
-* **optimal.json**: the table of optimal games, n ≤ 1300, built into the binary
-  ([results/README.md](../results/README.md#optimaljson) says where its games came from).  **optimal ok**: a score
-  equals the table's.  That is not a proof, and above the table's last game there is no table to match; a score that
-  differs is a hard error.
+* **optimal.json**: the table of optimal games, built into the binary
+  ([results/README.md](../results/README.md#optimaljson) says which games it holds and where they came from).
+  **optimal ok**: a score equals the table's.  That is not a proof, and above the table's last game there is no table to
+  match; a score that differs is a hard error.
 * **referee**: code that replays one game and checks it: legal, over, opening with the largest prime, scoring what is
   recorded.  `game::replay` and `game::replay_finished` are the frame solver's.  A game that fails after it was found
   is **rejected**, written to `<results>.rejected.jsonl`.

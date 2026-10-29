@@ -76,11 +76,17 @@ fn upper_files() -> Vec<PathBuf> {
         .collect()
 }
 
-/// The recorded games (the built-in table, then `results/strict.jsonl`) and the barred bounds, read once.
+/// The games the commands take as recorded when they are given the results `file`: its games, over the built-in table's,
+/// with no check that they agree (a wrong score is what `certify` is there to find).
+fn recorded_in(file: &Path) -> Optimal {
+    Optimal::built_in().clone().with_results(file).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The recorded games (`results/strict.jsonl`, over the built-in table) and the barred bounds, read once.
 fn fixtures() -> &'static Fixtures {
     static FIXTURES: OnceLock<Fixtures> = OnceLock::new();
     FIXTURES.get_or_init(|| {
-        let known = Optimal::built_in().with_results_files(&[results_path("strict.jsonl")]).expect("the chain");
+        let known = recorded_in(&results_path("strict.jsonl"));
         let upper = read_upper(&upper_files()).expect("the barred bounds");
         Fixtures { known, upper }
     })
@@ -148,7 +154,7 @@ fn certify_all(boards: &[u32]) -> (u64, f64) {
 type Game<'a> = (u32, u64, &'a [u32]);
 
 /// Writes a results file with `games` (a completed search a line; the reader of the chain takes only `n`, `score`,
-/// `moves` and `completed` from a line) and returns the table of optimal games over which it is read.
+/// `moves` and `completed` from a line) and returns the games the commands take as recorded when they are given it.
 fn known_with(file: &Path, games: &[Game]) -> Optimal {
     let line = |&(n, score, moves): &Game| {
         let line = Json::object([
@@ -160,7 +166,7 @@ fn known_with(file: &Path, games: &[Game]) -> Optimal {
         format!("{line}\n")
     };
     fs::write(file, games.iter().map(line).collect::<String>()).unwrap();
-    Optimal::built_in().with_results_files(&[file.to_owned()]).unwrap()
+    recorded_in(file)
 }
 
 /// A wrong game for board `n`: the chain's game with its smallest move up to n/2 left out and its score lowered by that
@@ -266,8 +272,8 @@ fn every_game_that_needs_a_certificate_to_1300_is_certified() {
     println!("{} games certified: {nodes} nodes, {seconds:.1} s", boards.len());
 }
 
-/// Games past the table built into the binary (it ends at 1300), where the games of n − 1 and n come from the committed
-/// chain alone and the open members from the second file of bounds: a few of the cheap ones are certified too.
+/// Games past 1300, where the open members come from the second file of bounds: a few of the cheap ones are certified
+/// too.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -399,7 +405,7 @@ fn planted_wrong_scores_are_beaten(boards: &[u32]) {
     for &n in boards {
         let dir = TempDir::new("certify-planted");
         let (file, planted, left_out) = plant_wrong_score(&dir, n);
-        let table = Optimal::built_in().with_results_files(&[file]).unwrap();
+        let table = recorded_in(&file);
         assert_eq!(table.score(n), Some(planted));
 
         let c = certify_game(n, &table, &upper[&n], true, &options(1)).unwrap_or_else(|e| panic!("{e}"));
@@ -409,6 +415,7 @@ fn planted_wrong_scores_are_beaten(boards: &[u32]) {
 }
 
 /// The same through the binary: status 2, the `beaten` line in `--out` and the same line in `OUT.counterexample.jsonl`.
+/// The planted score is not the built-in table's, and the command takes the results' game over the table's.
 #[test]
 fn the_command_exits_with_status_2_on_a_planted_wrong_score_and_writes_the_counterexample() {
     let n = 1302;
@@ -463,7 +470,7 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
     refused(known, &upper[&1304], "the barred bounds given are those of n=1304");
     let higher = Upper { score: score + 1, ..line.clone() };
     refused(known, &higher, &format!("found against {}, more: not a certificate", score + 1));
-    refused(Optimal::built_in(), line, "the results have no game of n");
+    refused(&Optimal::default(), line, "the results have no game of n");
 
     let wrong = known_with(
         &dir.join("score.jsonl"),
@@ -1120,7 +1127,7 @@ fn a_planted_wrong_score_on_a_repeat_is_beaten() {
 
     let dir = TempDir::new("certify-planted-repeat");
     let (file, planted, left_out) = plant_wrong_score(&dir, n);
-    let table = Optimal::built_in().with_results_files(&[file]).unwrap();
+    let table = recorded_in(&file);
     let c = certify_game_with(n, &table, &upper[&n], true, &options(1), &mut earlier).unwrap_or_else(|e| panic!("{e}"));
     println!("{} (the smallest move up to n/2, {left_out}, left out)", c.summary_line());
     assert_beaten_by_the_optimum(&c, n, planted);
@@ -1770,9 +1777,8 @@ fn an_incomplete_and_a_torn_and_a_bad_line_of_a_short_stretch_are_handled() {
     assert_eq!(run.stdout, "");
 }
 
-/// The check of [`a_line_whose_score_is_not_the_results_is_refused`] on the game 1305, the cheapest past the table
-/// that the results are not known by (the table ends at 1300): a score changed in the results' game, with the line
-/// right, is refused.
+/// The check of [`a_line_whose_score_is_not_the_results_is_refused`] on the game 1305, the cheapest past 1300 that needs
+/// a certificate: a score changed in the results' game, with the line right, is refused.
 #[test]
 #[cfg_attr(
     debug_assertions,

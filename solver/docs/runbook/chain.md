@@ -5,7 +5,7 @@ Part of the [runbook](../RUNBOOK.md).
 ## What is being computed
 
 `chain.sh N` runs `taxman solve 1-N` into one results file: every game from n = 1, each built from the one before.
-Nothing comes from `optimal.json`, which the run only compares with, to n = 1300, so the chain assumes nothing.  The
+Nothing comes from `optimal.json`, which the run only compares with, so the chain assumes nothing.  The
 committed `results/strict.jsonl` is exactly such a file: a laptop made its first 2175 games and cloud machines the rest
 ([results/README.md](../../../results/README.md) has its range and how each part was made).  A run from n = 1 reproduces
 its scores, and `verify.sh` checks the run against it.  The production chain can instead start from the committed file,

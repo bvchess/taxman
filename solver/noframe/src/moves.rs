@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn game_833_has_a_longer_game_than_its_optimal_one() {
         let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let (score, moves) = crate::jsonl::recorded_games(&[path])[&833].clone();
+        let (score, moves) = crate::jsonl::recorded_games_to(&[path], 833)[&833].clone();
         let spf = smallest_prime_factors(833);
         let board = Board::new(833, &spf);
         let mut longer: Vec<u32> = moves
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn play_order_replays_the_recorded_games() {
         let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let known = crate::jsonl::recorded_games(&[path]);
+        let known = crate::jsonl::recorded_games_to(&[path], 400);
         let spf = smallest_prime_factors(400);
         for n in 2..=400u32 {
             let (score, moves) = &known[&u64::from(n)];

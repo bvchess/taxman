@@ -219,15 +219,20 @@ pub fn barred_bounds(board: &Board, spf: &[u32], v: u64, ustar: &[u32]) -> Barre
 mod tests {
     use super::*;
     use crate::game::{relation, Prover, Relation, Verdict};
-    use crate::jsonl::recorded_games;
+    use crate::jsonl::recorded_games_to;
     use crate::primes::smallest_prime_factors;
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::Path;
     use std::time::Instant;
 
-    /// The games of optimal.json: n -> (score, moves).
+    /// The last game of optimal.json that these tests check; the table goes on past it, to games that other files of
+    /// barred bounds cover.
+    const TABLE_CHECKED_TO: u64 = 1300;
+
+    /// The games of optimal.json to [`TABLE_CHECKED_TO`]: n -> (score, moves).
     fn optimal() -> BTreeMap<u64, (u64, Vec<u32>)> {
-        recorded_games(&[Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"))])
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
+        recorded_games_to(&[path], TABLE_CHECKED_TO)
     }
 
     /// The boards the enumerating tests cover.

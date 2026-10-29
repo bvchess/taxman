@@ -43,6 +43,7 @@ from strategies.solvent import _playable_order
 
 DEFAULT_CHAIN = DEFAULT_OPTIMAL.parent / "strict.jsonl"
 TOP = 2175
+TABLE_TOP = 1300  # the last game of optimal.json that the study reads; the file goes on with the chain's games
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -50,12 +51,12 @@ TOP = 2175
 
 
 def load_games(optimal: Path, chain: Path) -> Tuple[Dict[int, List[int]], Dict[int, dict]]:
-    """optimal.json's moves by n, and the chain's completed lines by n."""
-    table = {g["n"]: g["moves"] for g in json.loads(optimal.read_text())}
+    """optimal.json's moves by n, to TABLE_TOP, and the chain's completed lines by n, to TOP."""
+    table = {g["n"]: g["moves"] for g in json.loads(optimal.read_text()) if g["n"] <= TABLE_TOP}
     lines = {}
     for text in chain.read_text().splitlines():
         line = json.loads(text)
-        if line.get("completed"):
+        if line.get("completed") and line["n"] <= TOP:
             lines[line["n"]] = line
     return table, lines
 

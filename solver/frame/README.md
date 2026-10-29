@@ -153,10 +153,11 @@ cargo build --release --examples --features studies   # and the study tools: the
 Cargo's commands run in `solver/frame`.  The commands of the other sections run from the top of the repository, where
 `results/` is, and `taxman` in them is `solver/frame/target/release/taxman`.
 
-The binary carries the table of optimal games built in: `results/optimal.json` as it was when the binary was compiled,
-the games 1 to 1300 ([results/README.md](../../results/README.md#optimaljson) says where they came from).  Every run
-checks its scores against that table, wherever the binary runs; only `verify-optimal FILE` and `extend-optimal --table
-FILE` name another.  A changed table takes a rebuild, which cargo does by itself when the file has changed.
+The binary carries the table of optimal games built in: `results/optimal.json` as it was when the binary was compiled
+([results/README.md](../../results/README.md#optimaljson) says which games it holds and where they came from).  Every
+run checks its scores against that table, wherever the binary runs; only `verify-optimal FILE` and `extend-optimal
+--table FILE` name another.  A changed table takes a rebuild, which cargo does by itself when the file has changed.  A
+run reads only the games of the table that it asks for, so the size of the table costs a run nothing.
 
 *Details.*  The study tools, the examples `tune`, `extended`, `structure`, `finder` and `wall`, are behind the feature `studies`,
 which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
@@ -285,7 +286,7 @@ n=480   score=73120     known   nodes=0               0.001 s  optimal ok  proof
 `--use-prev` draws on the *known games*, the games the repository has already proven (below, "Known games").  The known
 game of n − 1 seeds the search and gives it a ceiling.  A game that a known source has proven is recorded as it is,
 with no search: that is the second command.  The first, with `--force-search`, searches 480 from the known game of
-479.  Without `--use-prev` a single game has no game before it, and is solved standalone (below, "Past n = 1300").
+479.  Without `--use-prev` a single game has no game before it, and is solved standalone (below, "Past the known games").
 
 The node count of a multi-threaded search varies a little from run to run.  "optimal ok" means that the score equals
 the table's, not that it is proven ([the reference, section 4](../docs/REFERENCE.md#4-why-the-answers-can-be-trusted)).
@@ -318,24 +319,24 @@ $ taxman solve 1-300 --out mine.jsonl
 skipped 300 games already done in mine.jsonl
 ```
 
-### Past n = 1300
+### Past the known games
 
-`optimal.json` stops at 1300, so a game above 1300 needs the game before it from the run or from the results file.
-Either extend a copy of a file that has it, or give `--use-prev`, which takes the known game of n − 1.  That is the
-game of `results/strict.jsonl`, or of the bounds store, where the store has proven the game.  A copy of
-`results/strict.jsonl` extended is such a file.  The copy matters: `--out` appends to the file, and `results/` must not
-be overwritten.
+`optimal.json` and `results/strict.jsonl` end at a game ([results/README.md](../../results/README.md) says which), so a
+game past them needs the game before it from the run or from the results file.  Either extend a copy of a file that has
+it, or give `--use-prev`, which takes the known game of n − 1.  That is the game of `optimal.json` or
+`results/strict.jsonl`, or of the bounds store, where the store has proven the game.  A copy of `results/strict.jsonl`
+extended is such a file.  The copy matters: `--out` appends to the file, and `results/` must not be overwritten.
 
 The games 1301 and 1302 are known, from `results/strict.jsonl`.  So to search them from the known game of 1300, as a
-range past the table does, `--force-search` leaves them to their searches:
+range past the known games does, `--force-search` leaves them to their searches:
 
 ```
 $ taxman solve 1301-1302 --use-prev --force-search --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
 n=1301 0.1s nodes 3251 (done) best 40800 queue 0 spilled 0 | eff 96.0% idle 3.8% lock 0.0% ...
-n=1301  score=532272    search  nodes=3251            0.151 s  optimal unknown  proof=exhausted  own=0.144 s  best=40800
+n=1301  score=532272    search  nodes=3251            0.151 s  optimal ok  proof=exhausted  own=0.144 s  best=40800
 n=1302 0.1s nodes 3867 (done) best 41436 queue 0 spilled 0 | eff 97.0% idle 2.8% lock 0.0% ...
-n=1302  score=533559    search  nodes=3867            0.125 s  optimal unknown  proof=exhausted  own=0.118 s  best=41436
+n=1302  score=533559    search  nodes=3867            0.125 s  optimal ok  proof=exhausted  own=0.118 s  best=41436
 ```
 
 Game 1301 is a prime, but `--force-search` also skips the prime formula.  Game 1302 started from 1301.  A node limit
@@ -354,7 +355,7 @@ reaching the ceiling ([the cost curve](../notebook/search/benchmarks-the-probe-p
 
 | source | holds | a game of it rests on |
 |---|---|---|
-| `optimal.json` (built in) | the table of optimal games, n ≤ 1300 | nothing but the table's word: the line records that it assumes the game optimal |
+| `optimal.json` (built in) | the table of optimal games | nothing but the table's word: the line records that it assumes the game optimal |
 | `results/strict.jsonl` | the committed chain, each game with its proof | what its line assumes |
 | `results/bounds.jsonl` | the bounds the ledger found ([results/README.md](../../results/README.md#boundsjsonl)); a game whose best lower bound is its best upper bound is *proven* | [statement U](../../docs/theory/exactness.md#statement-u) at the games its upper bound rests on (`rests_on`), one assumption each |
 
@@ -387,8 +388,8 @@ again there.  That is for a run that goes past the committed chain
 $ taxman solve 1-2175 --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 60
 ```
 
-Started at n = 1, a chain takes no game from `optimal.json`, which it only compares with, up to 1300, where the table
-ends; a score that differs is a hard error.  So no proof in the file assumes anything beyond the frame model.  A run
+Started at n = 1, a chain takes no game from `optimal.json`, which it only compares with, as far as the table goes; a
+score that differs is a hard error.  So no proof in the file assumes anything beyond the frame model.  A run
 that takes a game from `optimal.json` (`--use-prev`) records, in every result whose proof rests on it, that it assumes
 that game optimal ("Known games", above).
 

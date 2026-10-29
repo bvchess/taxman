@@ -1652,7 +1652,7 @@ mod tests {
     #[test]
     fn derived_optimal_sets_are_the_enumerated_ones() {
         let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let known = crate::jsonl::recorded_games(&[path]);
+        let known = crate::jsonl::recorded_games_to(&[path], 300);
         let spf = smallest_prime_factors(300);
         let all = |n: u64| -> Vec<Vec<u32>> {
             if n < 2 {
@@ -1693,7 +1693,7 @@ mod tests {
     #[test]
     fn game_425_has_two_optimal_sets() {
         let path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../results/optimal.json"));
-        let known = crate::jsonl::recorded_games(&[path]);
+        let known = crate::jsonl::recorded_games_to(&[path], 500);
         let spf = smallest_prime_factors(500);
         let sets = |n: u64| {
             let board = Board::new(n as u32, &spf);

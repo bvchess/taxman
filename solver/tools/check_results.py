@@ -103,6 +103,35 @@ DIGEST = re.compile("[0-9a-f]{16}")
 PREV_SOURCES = {"run", "results", "optimal", "strict", "bounds"}
 
 
+class Table:
+    """The games of optimal.json by n, a mapping that parses a game when it is first asked for.
+
+    The file is tens of megabytes, one game a line as `taxman extend-optimal` writes it.  Parsing all of it takes
+    seconds, and the check of a file asks for the few games it names.
+    """
+
+    GAME = re.compile(r'\s*\{\s*"n":\s*(\d+)')
+
+    def __init__(self, text):
+        self.lines = {}
+        for line in text.splitlines():
+            found = self.GAME.match(line)
+            if found:
+                self.lines[int(found.group(1))] = line
+        self.parsed = {}
+
+    def __contains__(self, n):
+        return n in self.lines
+
+    def __getitem__(self, n):
+        if n not in self.parsed:
+            self.parsed[n] = json.loads(self.lines[n].rstrip().rstrip(","))
+        return self.parsed[n]
+
+    def get(self, n, default=None):
+        return self[n] if n in self else default
+
+
 def assumed_optimal(n):
     """What a proof that rests on optimal.json's game of n assumes."""
     return f"the game of {n} in optimal.json is optimal"
@@ -642,7 +671,7 @@ def main():
     files = args.files or sorted(f for f in RESULTS.glob("*.jsonl") if f.name != BOUNDS.name)
     files = [f for f in files if not f.name.endswith(".rejected.jsonl")]
 
-    optimal = {entry["n"]: entry for entry in json.loads(OPTIMAL.read_text())}
+    optimal = Table(OPTIMAL.read_text())
     sources = Sources(optimal, args.committed if args.committed.is_file() else None,
                       args.bounds if args.bounds.is_file() else None)
     fm = json.loads(args.fm.read_text())

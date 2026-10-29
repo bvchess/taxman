@@ -82,7 +82,7 @@ What is proven, measured or conjectured:
 | peel's assignment is always schedulable | **theorem** (the soundness half of [the peel theorem (P4)](../docs/theory/playability.md#the-peel-theorem)): the peel rules cannot emit a cyclic assignment.  Still asserted at runtime, as a defense in depth |
 | peel's failure means the set is unplayable | **theorem** (the completeness half of P4) — not reducible to "no matching exists": matchable-but-unplayable sets are real (n=21 holds a 145-sum set whose every matching is precedence-cyclic; opt(21) is 144) and peel provably rejects exactly the unplayable.  With soundness, peel is a proven playability oracle |
 | opt delta = U\* delta (the upper-delta certificate) | conjecture, holds on 70.4% of transitions where it applies, zero contradictions |
-| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 1300**, the whole file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
+| optimal.json itself | independently certified to n=62 by brute force over pot states (`certify.py`); **verified for every n ≤ 2175**, the first 2175 games of the file, by the prover (`solver/noframe`), an exact branch and bound on the whole board that uses only the playability theorems, the Franklín–Moniot bound, [the parity bound (W1)](../docs/theory/parity-bound.md#the-parity-bound), the ceiling and the prime formula |
 
 ### The proofs
 

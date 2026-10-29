@@ -1,6 +1,6 @@
 //! The longest games against the optimal ones: for every game of a range, M(n), the most moves a game of n can
 //! have, decided by the prover ([`taxman_prover::moves`]), against the moves of the recorded optimal game
-//! (optimal.json, which reaches 1300, and, for a game it lacks, the game of `--results`).  One line per
+//! (optimal.json and, for a game it lacks, the game of `--results`).  One line per
 //! game, resumable:
 //!
 //!     moves --from A --to B [--list ...] [--budget NODES] [--heaviest 0] [--seconds S] [--optimal FILE]

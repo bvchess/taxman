@@ -321,7 +321,8 @@ fn a_game_that_passes_the_wall_goes_on_from_its_clock(lo: u32, hi: u32) {
 #[test]
 fn a_score_that_is_not_the_tables_fails_the_range_at_that_game_with_any_window() {
     let wrong_at = 300;
-    let games = Optimal::built_in().games().map(|(n, score, moves)| {
+    // The games to 400, which the range 280..320 and its previous game need.
+    let games = Optimal::built_in().games().take(400).map(|(n, score, moves)| {
         let score = if n == wrong_at { score + 1 } else { score };
         Json::object([
             ("n", Json::from(n)),

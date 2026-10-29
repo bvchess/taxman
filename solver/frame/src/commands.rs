@@ -58,6 +58,15 @@ fn known_in_repository(optimal: &Optimal) -> Result<Known<'_>, CliError> {
     Known::load(optimal, &sources).map_err(failed)
 }
 
+/// The games that `certify` and `verify-certificates` take as recorded: those of the results files, and the built-in
+/// table's for any they lack.  A file's game stands where it scores differently from the table's: what is certified is
+/// the file's score, and a wrong score is the counterexample that `certify` is there to find, not a refused file
+/// (`verify-results` is the check of a file against the table).
+fn recorded_games(results: &[PathBuf]) -> Result<Optimal, CliError> {
+    let table = Optimal::built_in().clone();
+    results.iter().try_fold(table, |recorded, path| recorded.with_results(path)).map_err(failed)
+}
+
 /// Flags that take a value: the solver's and the command's own.
 fn flags_with(own: &[&'static str]) -> Vec<&'static str> {
     [&SOLVER_FLAGS[..], own].concat()
@@ -275,8 +284,8 @@ const CERTIFY_FLAGS: [&str; 5] = ["--results", "--upper", "--out", "--threads", 
 /// `certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE [options]`: certifies, game by game, the
 /// recorded scores of A..B, or of the boards of the list FILE in its order (one n a line, `#` for comments;
 /// [`read_board_list`]), that rest on the frame model, by a search of the extended problem ([`taxman::certify`]).  The
-/// scores and games come from the results files (over the table of optimal games, which must agree with them), the open
-/// members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a prime, or
+/// scores and games come from the results files ([`recorded_games`]: the table of optimal games has any they lack), the
+/// open members from the prover's barred bounds (`upper` files).  A game whose line there does not say `needs` (a prime, or
 /// a score at its ceiling, which rest on n − 1) is passed over.  Each game's certificate is appended to `--out` as it
 /// is made, and a rerun skips the games the file has a certificate for and resumes a stopped search from its
 /// checkpoint.  The extended problem is searched with the claims of `unzip` that the kept-claims lemma (E4,
@@ -326,7 +335,7 @@ pub fn certify(args: &[String]) -> CliResult {
     }
     search_options(&args, &mut opts)?;
 
-    let known = Optimal::built_in().with_results_files(&results).map_err(failed)?;
+    let known = recorded_games(&results)?;
     let upper = read_upper(&uppers).map_err(failed)?;
     let mut file = CertificateFile::open(&out).map_err(failed)?;
     let mut earlier = EarlierCertificates::of_file(&file);
@@ -421,7 +430,7 @@ pub fn verify_certificates(args: &[String]) -> CliResult {
         _ => paths::exact_files_in_repository().map_err(failed)?,
     };
 
-    let known = Optimal::built_in().with_results_files(&results).map_err(failed)?;
+    let known = recorded_games(&results)?;
     let upper = read_upper(&uppers).map_err(failed)?;
     let verified = verify_certificates_in(&certificates, &known, &upper, threads).map_err(failed)?;
     for file in verified.files.iter().filter(|file| file.torn) {
@@ -609,13 +618,15 @@ pub fn verify_optimal(args: &[String]) -> CliResult {
         [file] => Optimal::load(file).map_err(CliError::Failed)?,
         _ => return Err(CliError::Usage("verify-optimal takes at most one argument".into())),
     };
+    // The built-in table parses a game when it is asked for, and counting the moves asks for every game: so the time
+    // taken is that of having the whole table, as it is for a file.
+    let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
     let load_ms = millis(start);
 
     let start = Instant::now();
     let checked = optimal.verify_all().map_err(CliError::Failed)?;
     let replay_ms = millis(start);
 
-    let total_moves: usize = optimal.games().map(|(_, _, moves)| moves.len()).sum();
     outln!("verified {checked} games (n up to {}, {total_moves} moves)", optimal.max_n());
     outln!("load+parse {load_ms:.1} ms, replay {replay_ms:.1} ms");
     Ok(())

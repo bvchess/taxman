@@ -193,6 +193,12 @@ where
 /// The recorded game of each n, (score, moves), from files in optimal.json's or the solver's results format
 /// (the first "n", "score" and "moves" of each line holding an "n"); an earlier file wins over a later one.
 pub fn recorded_games(paths: &[&Path]) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
+    recorded_games_to(paths, u64::MAX)
+}
+
+/// [`recorded_games`] for the games of n <= `last`; a line of a larger game is skipped before its score and moves are
+/// read, so a check of the small boards does not parse the large games of a table that reaches 5000.
+pub fn recorded_games_to(paths: &[&Path], last: u64) -> std::collections::BTreeMap<u64, (u64, Vec<u32>)> {
     fn after<'a>(line: &'a str, key: &str) -> Option<&'a str> {
         let at = line.find(&format!("\"{key}\""))? + key.len() + 2;
         Some(line[at..].trim_start().strip_prefix(':')?.trim_start())
@@ -203,7 +209,7 @@ pub fn recorded_games(paths: &[&Path]) -> std::collections::BTreeMap<u64, (u64, 
         let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for line in text.lines() {
             let game = || {
-                let n = number(after(line, "n")?)?;
+                let n = number(after(line, "n")?).filter(|&n| n <= last)?;
                 let score = number(after(line, "score")?)?;
                 let moves = after(line, "moves")?.strip_prefix('[')?;
                 let moves = &moves[..moves.find(']')?];

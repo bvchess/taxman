@@ -239,15 +239,18 @@ fn certify_names_the_input_that_is_missing() {
     assert!(run.stderr.contains("missing.jsonl"), "{}", run.stderr);
     assert_eq!(run.stdout, "");
 
-    // The barred bounds say that 1302 needs a certificate, and the table built into the binary ends at 1300.
+    // The barred bounds say that the first board past the end of the table built into the binary needs a certificate,
+    // and the results given have no game of it.
+    let past = Optimal::built_in().max_n() + 1;
     let needs = dir.join("needs.jsonl");
-    fs::write(&needs, "{\"n\":1302,\"score\":533559,\"needs\":1,\"open\":[[682,3,87]]}\n").unwrap();
+    fs::write(&needs, format!("{{\"n\":{past},\"score\":533559,\"needs\":1,\"open\":[[682,3,87]]}}\n")).unwrap();
     let alone = dir.join("alone.jsonl");
     fs::write(&alone, "").unwrap();
-    let args = ["certify", "1302", "--results", path(&alone), "--upper", path(&needs), "--out", path(&out)];
+    let board = past.to_string();
+    let args = ["certify", &board, "--results", path(&alone), "--upper", path(&needs), "--out", path(&out)];
     let run = taxman(&args);
     assert_eq!(run.code, Some(1), "{}", run.stderr);
-    assert!(run.stderr.contains("n=1302: the results have no game of n"), "{}", run.stderr);
+    assert!(run.stderr.contains(&format!("n={past}: the results have no game of n")), "{}", run.stderr);
 }
 
 /// `verify-results` reports the same on one thread and on several (the games of 22, 34 and 38 are repeats, whose
@@ -282,14 +285,22 @@ fn tables_prints_the_maximal_factors_and_composites() {
     assert_eq!(lines[1], "30: maximal factors [6, 10, 15]; maximal composites []");
 }
 
+/// `verify-optimal` with no file replays the built-in table, every game of it.
 #[test]
-fn verify_optimal_replays_a_file_and_names_the_game_that_fails() {
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is verify_optimal_replays_a_file_and_names_the_game_that_fails"
+)]
+fn verify_optimal_replays_the_built_in_table() {
     let run = taxman(&["verify-optimal"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     let table = Optimal::built_in();
     let (games, top) = (table.sizes().count(), table.max_n());
     assert!(run.stdout.contains(&format!("verified {games} games (n up to {top},")), "{}", run.stdout);
+}
 
+#[test]
+fn verify_optimal_replays_a_file_and_names_the_game_that_fails() {
     let dir = TempDir::new("verify");
     let good = dir.join("optimal.json");
     fs::write(&good, mini_optimal(None)).unwrap();
@@ -384,16 +395,23 @@ fn extended_text(kept: &str, results: &str, first: u32, last: u32) -> String {
     format!("{},\n{}\n]", kept.strip_suffix("\n]").unwrap(), new.join(",\n"))
 }
 
-#[test]
-fn extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte() {
+/// `extend-optimal` with a results file whose games the table has already adds none and writes the table back byte for
+/// byte, for the first `games` games of the built-in table as a file of their own, or for the built-in table itself.
+fn extending_a_table_by_games_it_has_writes_it_back(games: Option<usize>) {
     let dir = TempDir::new("extend-nothing");
     let results = solve_into(&dir, "r.jsonl", "1-12");
     let out = dir.join("out.json");
-    let run = taxman(&["extend-optimal", &results, "--out", path(&out)]);
+    let (table, top, text) = match games {
+        Some(count) => (Some(write_table(&dir, "table.json", count)), count as u32, table_text(count)),
+        None => (None, Optimal::built_in().max_n(), taxman::game::BUILT_IN.to_owned()),
+    };
+    let mut args = vec!["extend-optimal", results.as_str()];
+    args.extend(table.iter().flat_map(|table| ["--table", table.as_str()]));
+    args.extend(["--out", path(&out)]);
+    let run = taxman(&args);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert_eq!(fs::read_to_string(&out).unwrap(), taxman::game::BUILT_IN);
+    assert_eq!(fs::read_to_string(&out).unwrap(), text);
 
-    let top = Optimal::built_in().max_n();
     assert!(run.stdout.contains("added no games; the table has "), "{}", run.stdout);
     assert!(run.stdout.contains(&format!("n up to {top}; wrote ")), "{}", run.stdout);
     let end = format!("stopped at n = {}: the results end at n = 12", top + 1);
@@ -402,7 +420,25 @@ fn extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte() {
     let mut names: Vec<_> =
         fs::read_dir(&*dir).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
     names.sort();
-    assert_eq!(names, ["out.json", "r.jsonl"]);
+    let expected: &[&str] =
+        if games.is_some() { &["out.json", "r.jsonl", "table.json"] } else { &["out.json", "r.jsonl"] };
+    assert_eq!(names, expected);
+}
+
+#[test]
+fn extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte() {
+    extending_a_table_by_games_it_has_writes_it_back(Some(300));
+}
+
+/// [`extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte`] for the built-in table, which the command
+/// reads and writes whole.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is extend_optimal_with_nothing_to_add_writes_the_table_back_byte_for_byte"
+)]
+fn extend_optimal_with_nothing_to_add_writes_the_built_in_table_back_byte_for_byte() {
+    extending_a_table_by_games_it_has_writes_it_back(None);
 }
 
 #[test]

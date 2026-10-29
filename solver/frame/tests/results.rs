@@ -642,8 +642,10 @@ fn clean(file: &FileReport) -> usize {
 }
 
 /// The last game of the committed results; of the run on a laptop that made their first part, which the prover
-/// proved on the whole board; of the second run, which made the games past the first, on EC2; and of `optimal.json`,
-/// which they reproduce.  The third run, also on EC2, made the games past the second, the fourth the games past the
+/// proved on the whole board; of the second run, which made the games past the first, on EC2; and of the games of
+/// `optimal.json` that the lines were checked against when they were written (the lines past it say `optimal_match`
+/// null, the table having had no game of them then).  The third run, also on EC2, made the games past the second, the
+/// fourth the games past the
 /// third, the fifth the games past the fourth, and the sixth, on another machine, the games past the fifth.
 const LAST: u32 = 5000;
 const LAST_OF_FIFTH_RUN: u32 = 4874;
@@ -764,8 +766,8 @@ fn check_the_committed_results_to(last: u32) {
     // Every line records the one clean build that made its part of the file (the first run's to 2175, the second's to
     // 3440, the third's to 3914, the fourth's to 4547, the fifth's to 4874, the sixth's eleven after), a single
     // invocation but at the games that the stop of an instance or of the solver interrupted, and the verdict on
-    // optimal.json, which has the games to 1300 and none beyond: `optimal_match` is true where it has the game and
-    // null where it has not.
+    // optimal.json as it was when the lines were written, with the games to 1300 and none beyond: `optimal_match` is
+    // true where it had the game and null where it had not.
     for (k, line) in text.lines().enumerate() {
         let (n, line) = (k as u32 + 1, Json::parse(line).unwrap_or_else(|e| panic!("line {}: {e:?}", k + 1)));
         let build = line.get("build").unwrap_or_else(|| panic!("n={n}: no build"));
@@ -790,9 +792,9 @@ fn check_the_committed_results_to(last: u32) {
         let matched = if n <= LAST_OF_TABLE { Json::Bool(true) } else { Json::Null };
         assert_eq!(line.get("optimal_match"), Some(&matched), "n={n}");
     }
-    // The chain from n = 1 reproduces optimal.json: its scores are the table's, which are the Java's to 1000 and
-    // those of an earlier chain of this solver from 1001 to 1300.
-    let in_table = 1..=LAST_OF_TABLE.min(last);
+    // The chain from n = 1 reproduces optimal.json: its scores are the table's, which are the Java's to 1000, those of
+    // an earlier chain of this solver from 1001 to 1300, and the chain's own past it.
+    let in_table = 1..=last;
     for n in in_table.clone() {
         assert_eq!(Some(strict.contents.games[&n].score), optimal.score(n), "n={n}");
     }
@@ -809,17 +811,25 @@ fn check_the_committed_results_to(last: u32) {
         in_table.filter(|&n| sorted(&strict.contents.games[&n].moves) != sorted(optimal.moves(n).unwrap())).collect();
     let expected: Vec<u32> = [539, 770, 771, 772, 773, 1215].into_iter().filter(|&n| n <= last).collect();
     assert_eq!(other_set, expected);
-    // The games the table holds past 1000 were copied from that earlier chain (`taxman extend-optimal`), and this
-    // one has them move for move but at 1215.
-    for (n, score, moves) in optimal.games().filter(|&(n, _, _)| n > 1000 && n != 1215 && n <= last) {
+    // The games the table holds past 1000 were copied from the chains (`taxman extend-optimal`): those to 1300 from
+    // that earlier chain, which assumed nothing, and this one has them move for move but at 1215; those past 1300
+    // from this chain, some of which assume statement U.
+    for (n, score, moves) in
+        optimal.games().take_while(|&(n, _, _)| n <= last).filter(|&(n, _, _)| n > 1000 && n != 1215)
+    {
         let game =
             strict.contents.games.get(&n).unwrap_or_else(|| panic!("optimal.json has a game of {n}, strict.jsonl not"));
-        assert_eq!((score, moves, game.assumes.is_empty()), (game.score, &game.moves[..], true), "n={n}");
+        assert_eq!((score, moves), (game.score, &game.moves[..]), "n={n}");
+        assert!(
+            n > LAST_OF_TABLE || game.assumes.is_empty(),
+            "n={n}: a game of the earlier chain assumes {:?}",
+            game.assumes
+        );
     }
 
     // Its proofs, in the order trivial, prime formula, `cap`, exhausted, same search, known (taken from the bounds
-    // store, with no search): in all, in the games of the table (where the previous chain, of commit 271c817, had
-    // every one of them), and past it, in the first run's, in the second's, in the third's, in the fourth's, in the
+    // store, with no search): in all, in the games to 1300 (where the previous chain, of commit 271c817, had
+    // every one of them), and past them, in the first run's, in the second's, in the third's, in the fourth's, in the
     // fifth's and in the sixth's.  The known games, which only the fourth and fifth runs made, assume statement U;
     // every other game assumes nothing.
     let kinds = [Proof::Trivial, Proof::PrimeFormula, Proof::Cap, Proof::Exhausted, Proof::SameSearch, Proof::Known];

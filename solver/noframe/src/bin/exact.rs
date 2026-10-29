@@ -1,6 +1,6 @@
 //! The prover's proofs of optimal scores: for every game in a range, an upper bound on opt(n) proven without the
-//! frame model, compared with the recorded optimum V(n) (optimal.json, which reaches 1300, and, for a game it
-//! lacks, the game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
+//! frame model, compared with the recorded optimum V(n) (optimal.json and, for a game it lacks, the
+//! game of `--results`, by default the solver's `results/strict.jsonl`).  One line per game, resumable:
 //!
 //!     exact --from A --to B [--list ...] [--threads T] [--seconds S] [--budget NODES] [--all 1] [--parity 0]
 //!           [--segments 1] [--lagrangian 0|1] [--fix-low 0 | --fix-upper 1] [--checkpoints DIR]

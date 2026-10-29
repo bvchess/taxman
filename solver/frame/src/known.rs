@@ -2,7 +2,7 @@
 //!
 //! Three sources hold games the run has not solved, each with what its game rests on:
 //!
-//! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary, to game 1300.  It
+//! * **optimal.json** ([`Origin::Optimal`]), the table of optimal games built into the binary.  It
 //!   records no proofs, so a game of it is *assumed* optimal (`the game of n in optimal.json is optimal`).
 //! * **the committed chain** ([`Origin::Strict`]), `results/strict.jsonl`: a chain from n = 1, each game with its proof
 //!   and what it assumes.  A game of it is as proven as its line is.

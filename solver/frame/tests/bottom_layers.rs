@@ -21,7 +21,7 @@
 //! * [`layer_2_greedy_is_what_setup_keeps`]: the numbers of layer 2 above n/2 in the game with no promotions
 //!   (`Board::plain`) are Kruskal's, on every board to 400 and on a sample of the boards to 8191 (an ignored test
 //!   takes every 25th).
-//! * [`theorem_b_holds_for_every_recorded_game`]: the games of the table `optimal.json`, of the committed chain
+//! * [`theorem_b_holds_for_every_recorded_game`]: the games of the table `optimal.json` to 1300, of the committed chain
 //!   `results/strict.jsonl` (2..5000) and of the chain 2176 to 2276 of the Graviton calibration, another run of games
 //!   the committed chain has.  The frame solver's games play numbers of layer 2 up to n/2 only on small boards, where
 //!   the frames of layer 2 have freedoms.
@@ -341,8 +341,9 @@ fn check_games(source: &str, games: &[(u32, Vec<u32>)]) -> Vec<String> {
     failures
 }
 
-/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on the games of the table `optimal.json`, of the
-/// committed chain `results/strict.jsonl` and of the chain 2176 to 2276 of the Graviton calibration.
+/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on the games of the table `optimal.json` that are not the
+/// committed chain's, of the committed chain `results/strict.jsonl` and of the chain 2176 to 2276 of the Graviton
+/// calibration.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is theorem_b_holds_for_every_20th_recorded_game")]
 fn theorem_b_holds_for_every_recorded_game() {
@@ -355,11 +356,19 @@ fn theorem_b_holds_for_every_20th_recorded_game() {
     theorem_b_holds_for_the_recorded_games(20);
 }
 
-/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on every `every`th game of the table, the chain and the
-/// calibration's chain.
+/// The last game of the table `optimal.json` that is not the committed chain's own: the table has the Java's games to
+/// 1000 and those of an earlier chain to 1300, and from 1301 the games of the committed chain, which it checks itself.
+const TABLE_NOT_THE_CHAIN: usize = 1300;
+
+/// The bottom-layers theorem (F4, docs/theory/frame-model.md) on every `every`th game of the table (to
+/// [`TABLE_NOT_THE_CHAIN`]), the chain and the calibration's chain.
 fn theorem_b_holds_for_the_recorded_games(every: usize) {
-    let table: Vec<(u32, Vec<u32>)> =
-        Optimal::built_in().games().filter(|&(n, _, _)| n >= 2).map(|(n, _, moves)| (n, moves.to_vec())).collect();
+    let table: Vec<(u32, Vec<u32>)> = Optimal::built_in()
+        .games()
+        .skip_while(|&(n, _, _)| n < 2)
+        .take(TABLE_NOT_THE_CHAIN - 1)
+        .map(|(n, _, moves)| (n, moves.to_vec()))
+        .collect();
     let chain = completed_games(&results_path("strict.jsonl"));
     let ec2 = completed_games(&crate_path("testdata/c8g.chain-2176.jsonl"));
     assert!(table.len() >= 1299, "the table has the games of 2 to 1300, not {}", table.len());
