@@ -647,21 +647,24 @@ fn clean(file: &FileReport) -> usize {
 /// null, the table having had no game of them then).  The third run, also on EC2, made the games past the second, the
 /// fourth the games past the
 /// third, the fifth the games past the fourth, and the sixth, on another machine, the games past the fifth.
-const LAST: u32 = 5000;
+const LAST: u32 = 5053;
+/// The last game of the sixth run's first stretch, which the README's table of proofs by range has a column for
+/// (4875 to here); the games past it, to [`LAST`], have a column of their own.
+const LAST_OF_SIXTH_RUNS_FIRST_STRETCH: u32 = 5000;
 const LAST_OF_FIFTH_RUN: u32 = 4874;
 const LAST_OF_FOURTH_RUN: u32 = 4547;
 const LAST_OF_THIRD_RUN: u32 = 3914;
 const LAST_OF_SECOND_RUN: u32 = 3440;
 const LAST_OF_FIRST_RUN: u32 = 2175;
 const LAST_OF_TABLE: u32 = 1300;
-/// The builds that made the six runs (a prefix of the commit each line records).  The sixth run had eleven: its
+/// The builds that made the six runs (a prefix of the commit each line records).  The sixth run had fourteen: its
 /// stops and restarts took in newer ones, so each stretch of its games, up to the game given, has a build of its own.
 const FIRST_BUILD: &str = "feba6d0";
 const SECOND_BUILD: &str = "55287ff";
 const THIRD_BUILD: &str = "eb84a6f";
 const FOURTH_BUILD: &str = "ca357bf";
 const FIFTH_BUILD: &str = "4974a71";
-const SIXTH_BUILDS: [(u32, &str); 11] = [
+const SIXTH_BUILDS: [(u32, &str); 14] = [
     (4879, "a88dc7f"),
     (4898, "bcfde26"),
     (4913, "551f883"),
@@ -672,11 +675,14 @@ const SIXTH_BUILDS: [(u32, &str); 11] = [
     (4983, "c3357cd"),
     (4990, "88b1228"),
     (4991, "947946a"),
-    (LAST, "29aa8ba"),
+    (5036, "29aa8ba"),
+    (5046, "7140548"),
+    (5048, "ee9d945"),
+    (LAST, "1b59354"),
 ];
 /// The games that several invocations solved, and how many: they were in flight when an instance of the second or the
 /// fourth run, or the solver of the sixth, was stopped, and the next took them up.
-const RESUMED: [(u32, u32); 28] = [
+const RESUMED: [(u32, u32); 34] = [
     (3311, 2),
     (3312, 2),
     (3315, 2),
@@ -705,6 +711,12 @@ const RESUMED: [(u32, u32); 28] = [
     (4991, 2),
     (4992, 3),
     (4995, 2),
+    (5037, 2),
+    (5040, 2),
+    (5047, 2),
+    (5048, 2),
+    (5049, 4),
+    (5052, 2),
 ];
 
 /// The games of the committed chain that the quick check verifies: the first of them, which cost little to set up.
@@ -758,13 +770,14 @@ fn check_the_committed_results_to(last: u32) {
         (4900, 7_557_145),
         (4949, 7_711_701),
         (4983, 7_819_431),
-        (LAST, 7_868_316),
+        (LAST_OF_SIXTH_RUNS_FIRST_STRETCH, 7_868_316),
+        (LAST, 8_031_371),
     ];
     for (n, score) in last_scores {
         assert!(n > last || games[&n].score == score, "n={n}");
     }
     // Every line records the one clean build that made its part of the file (the first run's to 2175, the second's to
-    // 3440, the third's to 3914, the fourth's to 4547, the fifth's to 4874, the sixth's eleven after), a single
+    // 3440, the third's to 3914, the fourth's to 4547, the fifth's to 4874, the sixth's fourteen after), a single
     // invocation but at the games that the stop of an instance or of the solver interrupted, and the verdict on
     // optimal.json as it was when the lines were written, with the games to 1300 and none beyond: `optimal_match` is
     // true where it had the game and null where it had not.
@@ -837,25 +850,27 @@ fn check_the_committed_results_to(last: u32) {
     assert_eq!(by(1..=last).iter().sum::<usize>(), last as usize, "every game has one of the proofs");
     let from_store = by(1..=last)[5];
     assert_eq!(clean(strict), last as usize - from_store);
-    // The cut was armed from game 4914 on, and shortened the searches of 4929, 4936, 4952, 4953 and 4991 only: the
-    // README's row of them is 0 in every range but the sixth run's, where it is 5.
-    assert_eq!(shortened(strict, 1..=last), if last == LAST { 5 } else { 0 });
+    // The cut was armed from game 4914 on, and shortened the searches of 4929, 4936, 4952, 4953, 4991, 5037, 5043, 5047
+    // and 5048 only: the README's row of them is 0 in every range but the sixth run's last two, 5 to 5000 and 4 after.
+    assert_eq!(shortened(strict, 1..=last), if last == LAST { 9 } else { 0 });
     if last == LAST {
         assert_eq!(shortened(strict, 1..=LAST_OF_FIFTH_RUN), 0);
-        assert_eq!(shortened(strict, LAST_OF_FIFTH_RUN + 1..=LAST), 5);
+        assert_eq!(shortened(strict, LAST_OF_FIFTH_RUN + 1..=LAST_OF_SIXTH_RUNS_FIRST_STRETCH), 5);
+        assert_eq!(shortened(strict, LAST_OF_SIXTH_RUNS_FIRST_STRETCH + 1..=LAST), 4);
     }
     if last == LAST {
-        assert_eq!(by(1..=LAST), [13, 626, 436, 1590, 1953, 382]);
+        assert_eq!(by(1..=LAST), [13, 633, 442, 1609, 1974, 382]);
         assert_eq!(by(1..=LAST_OF_TABLE), [13, 211, 115, 416, 545, 0]);
         assert_eq!(by(LAST_OF_TABLE + 1..=LAST_OF_FIRST_RUN), [0, 115, 77, 314, 369, 0]);
         assert_eq!(by(LAST_OF_FIRST_RUN + 1..=LAST_OF_SECOND_RUN), [0, 155, 119, 448, 543, 0]);
         assert_eq!(by(LAST_OF_SECOND_RUN + 1..=LAST_OF_THIRD_RUN), [0, 60, 43, 178, 193, 0]);
         assert_eq!(by(LAST_OF_THIRD_RUN + 1..=LAST_OF_FOURTH_RUN), [0, 55, 57, 150, 204, 167]);
         assert_eq!(by(LAST_OF_FOURTH_RUN + 1..=LAST_OF_FIFTH_RUN), [0, 13, 14, 35, 50, 215]);
-        assert_eq!(by(LAST_OF_FIFTH_RUN + 1..=LAST), [0, 17, 11, 49, 49, 0]);
+        assert_eq!(by(LAST_OF_FIFTH_RUN + 1..=LAST_OF_SIXTH_RUNS_FIRST_STRETCH), [0, 17, 11, 49, 49, 0]);
+        assert_eq!(by(LAST_OF_SIXTH_RUNS_FIRST_STRETCH + 1..=LAST), [0, 7, 6, 19, 21, 0]);
         // Scores at a proven ceiling given the game of n − 1 (what certifies a game whatever found it).
         let ceilings = [CeilingProof::NPlusPrev, CeilingProof::PrimeFormula].map(|c| ceiling_proofs(strict, c));
-        assert_eq!(ceilings, [1619, 668]);
+        assert_eq!(ceilings, [1637, 675]);
     }
 }
 
@@ -866,7 +881,7 @@ fn the_start_of_the_committed_results_passes_the_verifier() {
     check_the_committed_results_to(QUICK_LAST);
 }
 
-/// All 5000 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
+/// All 5053 games of the committed chain pass the verifier, with the counts `results/README.md` quotes.
 #[test]
 #[cfg_attr(
     debug_assertions,

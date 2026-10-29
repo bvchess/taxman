@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-28.
+Updated 2026-10-29.
 
 The state of the work as of the date above: the priority, and the projects in flight.  This page is rewritten, not
 appended to, when the state changes.  What was done and why is in the [lab notebook](../notebook/README.md), how far the
@@ -8,7 +8,7 @@ chain reaches in [results/README.md](../../results/README.md), and the research 
 
 ## The priority: a larger n
 
-The chain has passed game 5000, and the committed chain reaches it.  The priority is to push it further, with the least
+The chain has passed game 5000, and so has the committed chain.  The priority is to push it further, with the least
 computation.  Certifying [statement U](../../docs/theory/exactness.md#statement-u), for particular games or in general,
 is not a priority.  `optimal.json` follows the committed chain: its games past the chain's end come from the chain
 (`taxman extend-optimal`, [the runbook](runbook/chain.md)).

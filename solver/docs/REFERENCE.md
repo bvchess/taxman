@@ -53,8 +53,8 @@ table.  A score that differs stops it, as it stops any run.
 
 ```
 $ taxman verify-optimal                         # replay every game of optimal.json
-verified 5000 games (n up to 5000, 5417028 moves)
-load+parse 847.9 ms, replay 2356.4 ms
+verified 5053 games (n up to 5053, 5532339 moves)
+load+parse 657.3 ms, replay 2581.4 ms
 $ taxman verify-results results/strict.jsonl    # see section 4
 $ taxman extend-optimal results/strict.jsonl --out /tmp/optimal.json     # the table plus the games it lacks
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85

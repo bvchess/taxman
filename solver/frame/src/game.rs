@@ -686,8 +686,9 @@ mod tests {
         assert!(complete(4, &[1]).is_err(), "an illegal prefix is refused");
     }
 
-    /// The games of the table that a test goes over every one of: 1 to 1300.  The table reaches 5000, and parsing and
-    /// replaying all of it takes seconds, so a test of every game of it is ignored in a debug build.
+    /// The games of the table that a test goes over every one of: 1 to 1300.  The table reaches the committed chain's
+    /// end, and parsing and replaying all of it takes seconds, so a test of every game of it is ignored in a debug
+    /// build.
     const SMALL_GAMES: u32 = 1300;
 
     /// The first `count` games of the built-in file, as a file of their own.
