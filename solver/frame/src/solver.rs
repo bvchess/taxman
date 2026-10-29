@@ -102,7 +102,7 @@ use crate::results::{
     SCHEMA,
 };
 use crate::search::{
-    self, finder, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
+    self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
     SearchTactics,
 };
 use crate::tactics::Tactics;
@@ -210,6 +210,11 @@ pub struct SolveOptions {
     /// checked at its root ([`crate::model::CarriedNogoods::from_dir`]).  They only prune, so the results are the same
     /// with any stores or none.  None by default.
     pub carried_dir: Option<PathBuf>,
+    /// The gate trial (`--gate-trial`): each game's search with conflict branching on tries these gates on a sample
+    /// of its own units once it has taken the plan's steps, and branches with the one that took the least CPU
+    /// ([`search::gate_trial`]); a game whose own lab record has a gate keeps that.  It changes only the gate, which
+    /// changes no answer, and is no tactic and no part of a checkpoint.  None by default.
+    pub gate_trial: Option<search::gate_trial::Plan>,
 }
 
 impl Default for SolveOptions {
@@ -241,6 +246,7 @@ impl Default for SolveOptions {
             profile: None,
             profile_depth: search::PROFILE_DEPTH,
             carried_dir: None,
+            gate_trial: None,
         }
     }
 }
@@ -624,6 +630,9 @@ pub struct GameResult {
     pub finder_budget: Duration,
     /// What the finder did in the last invocation, if it started.
     pub finder: Option<finder::Report>,
+    /// The gate trial's gates (`--gate-trial`), and what the trial did in the last invocation, if it ran to its end.
+    pub gate_trial_gates: Option<Vec<u64>>,
+    pub gate_trial: Option<gate_trial::Report>,
     /// `Some(true)` when `optimal.json` has the game, whose score the game's equals (else it is rejected); `None`
     /// if the game is incomplete or the table lacks `n`.
     pub optimal_match: Option<bool>,
@@ -673,6 +682,8 @@ impl GameResult {
             finder_after: opts.finder_after,
             finder_budget: opts.finder_budget,
             finder: None,
+            gate_trial_gates: opts.gate_trial.as_ref().map(|plan| plan.gates.clone()),
+            gate_trial: None,
             optimal_match: None,
             prev: prev.map(|p| p.info(n)),
             same_search: None,
@@ -709,6 +720,27 @@ impl GameResult {
             ]);
             ("finder", report)
         });
+        // What the gate trial did is there only on a line whose search ran one to its end.
+        let trial = self.gate_trial.as_ref().map(|t| {
+            let scores = t.scores.iter().map(|s| {
+                Json::object([
+                    ("gate", Json::from(s.gate)),
+                    ("steps", Json::from(s.steps)),
+                    ("cpu_seconds", Json::Num(s.cpu)),
+                    ("stopped", Json::from(s.stopped)),
+                ])
+            });
+            let report = Json::object([
+                ("at_nodes", Json::from(t.at_nodes)),
+                ("units", Json::from(t.units)),
+                ("from", Json::from(t.from)),
+                ("scores", Json::array(scores)),
+                ("chosen", Json::from(t.chosen)),
+                ("applied", Json::Bool(t.applied)),
+                ("seconds", Json::Num(t.seconds)),
+            ]);
+            ("gate_trial", report)
+        });
         let engine = Json::object(
             [
                 ("splits", Json::from(c.splits)),
@@ -717,7 +749,8 @@ impl GameResult {
                 ("max_queue", Json::from(c.max_queue)),
             ]
             .into_iter()
-            .chain(finder),
+            .chain(finder)
+            .chain(trial),
         );
         let setup = self.setup.map_or(Json::Null, |s| {
             Json::object([
@@ -749,6 +782,8 @@ impl GameResult {
         let finder_after = (self.finder_after > 0).then(|| ("finder_after", Json::from(self.finder_after)));
         let finder_seconds =
             (self.finder_after > 0).then_some(("finder_seconds", Json::Num(self.finder_budget.as_secs_f64())));
+        let trial_gates =
+            self.gate_trial_gates.as_ref().map(|gates| ("gate_trial", Json::array(gates.iter().copied())));
         let options = Json::object(
             [("force_search", Json::Bool(self.force_search)), ("use_prev", Json::Bool(self.use_prev))]
                 .into_iter()
@@ -758,7 +793,8 @@ impl GameResult {
                 .chain(pass)
                 .chain(background)
                 .chain(finder_after)
-                .chain(finder_seconds),
+                .chain(finder_seconds)
+                .chain(trial_gates),
         );
         // The citation of a known source is there only on a line that has one: the lines made before it do not.
         let known = self.known.as_ref().map(|cited| ("known", cited.cite.to_json()));
@@ -1024,6 +1060,8 @@ struct Outcome {
     time_all_runs: Duration,
     /// What the finder did, if it started.
     finder: Option<finder::Report>,
+    /// What the gate trial did, if it ran to its end.
+    gate_trial: Option<gate_trial::Report>,
     /// The nodes the near-repeat cut cut, if the search was armed with it ([`Job::arm`]).
     near_repeat_cut: Option<u64>,
 }
@@ -1088,6 +1126,8 @@ struct SearchJob<const W: usize> {
     store_game: Option<Vec<u32>>,
     /// The branching settings the search starts with and the lab may change ([`search::search_steered`]).
     branching: Arc<Branching>,
+    /// Whether the game's own lab record sets its gate, which the gate trial then leaves alone.
+    lab_gate: bool,
     /// The near-repeat cut, once it is armed ([`Job::arm`]): the search reads it from here.
     near: OnceLock<NearRepeat<W>>,
 }
@@ -1214,8 +1254,10 @@ impl<const W: usize> Job for SearchJob<W> {
         let profile = opts.profile.as_deref().map(|dir| ProfilePlan::in_dir(dir, n, opts.profile_depth));
         let near = &self.near;
         let (profile, carried) = (profile.as_ref(), opts.carried_dir.as_deref());
-        let found =
-            search::search_steered(prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile, carried);
+        let trial = opts.gate_trial.as_ref().filter(|_| !self.lab_gate);
+        let found = search::search_steered(
+            prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile, carried, trial,
+        );
         if own {
             // Only removes the directory if the engine left nothing in it.
             let _ = fs::remove_dir(&spill_dir);
@@ -1230,6 +1272,7 @@ impl<const W: usize> Job for SearchJob<W> {
             time: found.time,
             time_all_runs: found.time_all_runs,
             finder: found.finder,
+            gate_trial: found.gate_trial,
             near_repeat_cut: self.near.get().map(NearRepeat::nodes_cut),
         })
     }
@@ -1363,7 +1406,8 @@ fn set_up_with_width<const W: usize>(
     // is no tactic, from the lab's record or the policy.
     let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.gate())));
     let (control, near) = (Control::new(), OnceLock::new());
-    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, near });
+    let lab_gate = lab.gate.is_some();
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, lab_gate, near });
     let lab = Box::new(lab);
     Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy, lab }, problem))
 }
@@ -1482,6 +1526,7 @@ fn conclude_game(
             result.near_repeat_cut = searched.near_repeat_cut;
             result.counters = searched.counters;
             result.finder = searched.finder;
+            result.gate_trial = searched.gate_trial.clone();
             result.phases.search = searched.time;
             result.phases.search_all_runs = searched.time_all_runs;
             if set.job.resuming() {

@@ -357,7 +357,19 @@ fn run<const W: usize>(n: u32, o: &Options, optimal: &Optimal) -> Vec<Row> {
             // As `search_with` without diagnostics, but for the profile.
             let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
             let seeds: Vec<_> = seed.into_iter().collect();
-            search_steered(&p, &cfg, &seeds, cap, false, None, &branching, &OnceLock::new(), profile.as_ref(), None)
+            search_steered(
+                &p,
+                &cfg,
+                &seeds,
+                cap,
+                false,
+                None,
+                &branching,
+                &OnceLock::new(),
+                profile.as_ref(),
+                None,
+                None,
+            )
         }
         .expect("search");
         let (cpu_after, cycles_after) = (counters::cpu_seconds(), counters::now());

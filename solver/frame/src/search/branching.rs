@@ -89,9 +89,23 @@ impl Branching {
         self.change(|now| now.gate = gate);
     }
 
-    /// Applies `edit` to the settings, and raises the generation after they are stored.
+    /// Sets the gate, as [`set_gate`](Self::set_gate) does, only if no change has come since the generation `seen`
+    /// (read before the settings it was decided from): whether it did.  A change made meanwhile, by the lab, stands.
+    pub(super) fn set_gate_unchanged(&self, seen: u64, gate: u64) -> bool {
+        let mut settings = self.settings.lock().unwrap_or_else(PoisonError::into_inner);
+        // Every change raises the generation while it holds the lock, so under the lock it is current.
+        if self.generation.load(Ordering::Acquire) != seen {
+            return false;
+        }
+        settings.gate = gate;
+        self.generation.fetch_add(1, Ordering::Release);
+        true
+    }
+
+    /// Applies `edit` to the settings, and raises the generation after they are stored, while it still holds the lock.
     fn change(&self, edit: impl FnOnce(&mut BranchSettings)) {
-        edit(&mut self.settings.lock().unwrap_or_else(PoisonError::into_inner));
+        let mut settings = self.settings.lock().unwrap_or_else(PoisonError::into_inner);
+        edit(&mut settings);
         self.generation.fetch_add(1, Ordering::Release);
     }
 
@@ -170,5 +184,18 @@ mod tests {
         assert_eq!(settings.with_gate(None), settings);
         assert_eq!(settings.with_gate(Some(500)).gate, 500);
         assert_eq!(settings.with_gate(Some(500)).conflict_gap(), Some(500));
+    }
+
+    #[test]
+    fn a_gate_set_unless_changed_yields_to_a_change_made_since() {
+        let live = Branching::new(BranchSettings::of(&SearchTactics::default()));
+        let seen = live.generation();
+        assert!(live.set_gate_unchanged(seen, 600));
+        assert_eq!(live.settings().gate, 600);
+        assert_ne!(live.generation(), seen);
+        let seen = live.generation();
+        live.set_gate(900);
+        assert!(!live.set_gate_unchanged(seen, 1200));
+        assert_eq!(live.settings().gate, 900);
     }
 }

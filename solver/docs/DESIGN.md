@@ -50,6 +50,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | price reuse | [price-reuse.md](design/price-reuse.md) | change how conflict branching keeps its prices from one check to the next, and see why that keeps the search exact |
 | carried nogoods | [carried-nogoods.md](design/carried-nogoods.md) | carry the nogoods of another search into a search, to prune with, and see why that keeps the search exact |
 | the finder | [finder.md](design/finder.md) | see how a thread beside a long search looks for a better incumbent, and why it cannot make an answer wrong |
+| the gate trial | [gate-trial.md](design/gate-trial.md) | see how a search tries gates of conflict branching on its own units and keeps the cheapest, and why that changes no answer |
 | extended mode | [extended-mode.md](design/extended-mode.md) | search the extended problem, with one-sided candidates, that a certificate of U searches |
 | the GF(2) bound, prime exchanges | [gf2-bound.md](design/gf2-bound.md) | change the GF(2) bound, or the symmetries of the promotions that prime exchanges give |
 | the tactics | [tactics.md](design/tactics.md) | add, change or switch off a tactic, and see what each one is proven or sound by |

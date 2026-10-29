@@ -99,6 +99,20 @@ impl<const W: usize> NearRepeat<W> {
         Ok(NearRepeat { model: m_model, root: m_root, marked, same_home, by_home, bound, cut: AtomicU64::new(0) })
     }
 
+    /// The same cut, with a count of its own of the nodes it cut (none yet): for searches beside the search that has
+    /// this one, whose count stays that search's own (the gate trial, `gate_trial`).
+    pub(super) fn copy(&self) -> Self {
+        NearRepeat {
+            model: Arc::clone(&self.model),
+            root: self.root,
+            marked: self.marked,
+            same_home: self.same_home,
+            by_home: self.by_home,
+            bound: self.bound,
+            cut: AtomicU64::new(0),
+        }
+    }
+
     /// B: the proven bound of P\*(Π_M) that the incumbent must reach.
     pub fn bound(&self) -> u64 {
         self.bound

@@ -100,6 +100,7 @@ mod branching;
 mod diagnostics;
 mod dual;
 pub mod finder;
+pub mod gate_trial;
 mod header;
 #[cfg(feature = "studies")]
 mod hooks;
@@ -209,6 +210,9 @@ pub struct SearchResult<const W: usize> {
     pub found: Option<Found>,
     /// What the finder did, if it started ([`finder`]: a search is given a [`finder::Plan`] by [`search_beside`]).
     pub finder: Option<finder::Report>,
+    /// What the gate trial did, if it ran to its end ([`gate_trial`]: a search is given a [`gate_trial::Plan`] by
+    /// [`search_steered`]).
+    pub gate_trial: Option<gate_trial::Report>,
     /// The incumbent the search started from: the best start of any seed ([`start_incumbent`]), each the best of the
     /// greedy set, the seed's survivors and the matching dive, improved by the local search (the dive and the local
     /// search are skipped when the set before them reaches the ceiling, and the local search ends when its set does).
@@ -275,7 +279,22 @@ pub fn search_above<const W: usize>(
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, &[], cap, resume, None, forgetting, Some(floor), None, None, None, None, None)
+    search_forgetting(
+        prepared,
+        cfg,
+        &[],
+        cap,
+        resume,
+        None,
+        forgetting,
+        Some(floor),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
 }
 
 /// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
@@ -288,7 +307,22 @@ pub fn search_with<const W: usize>(
     diagnostics: Option<&Mutex<Diagnostics>>,
 ) -> io::Result<SearchResult<W>> {
     let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
-    search_forgetting(prepared, cfg, seeds, cap, resume, diagnostics, forgetting, None, None, None, None, None, None)
+    search_forgetting(
+        prepared,
+        cfg,
+        seeds,
+        cap,
+        resume,
+        diagnostics,
+        forgetting,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -305,7 +339,7 @@ pub fn search_beside<const W: usize>(
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
@@ -326,6 +360,10 @@ pub fn search_beside<const W: usize>(
 /// there of its game and the games before it, validated at its root, at its start and at each resume
 /// ([`CarriedNogoods::from_dir`]); they only prune (solver/docs/design/carried-nogoods.md).  It writes its own store
 /// there too, of the nogoods its searchers learn ([`Harvest`]), before each checkpoint and at its end.
+///
+/// With `trial`, and the tactic `gf2`, conflict branching on and a checkpoint, the search tries the gates of the plan on
+/// a sample of its own units once it has taken the plan's steps, and branches from then on with the gate that took the
+/// least CPU ([`gate_trial`]); the trial changes only the gate, so the search's answer is the same.
 #[allow(clippy::too_many_arguments)]
 pub fn search_steered<const W: usize>(
     prepared: &Prepared<W>,
@@ -338,6 +376,7 @@ pub fn search_steered<const W: usize>(
     near_repeat: &OnceLock<NearRepeat<W>>,
     profile: Option<&ProfilePlan>,
     carried: Option<&Path>,
+    trial: Option<&gate_trial::Plan>,
 ) -> io::Result<SearchResult<W>> {
     let (forgetting, near_repeat, branching) = (prepared.tactics.forgetting(), Some(near_repeat), Some(branching));
     search_forgetting(
@@ -354,14 +393,16 @@ pub fn search_steered<const W: usize>(
         near_repeat,
         profile,
         carried,
+        trial,
     )
 }
 
 /// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
 /// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
 /// settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
-/// comes to hold, if given, keeping the profile `profile` asks for, if given, and carrying the nogoods of the directory
-/// of stores `carried_dir`, if given, with the tactic `carried_nogoods` ([`search_steered`]).
+/// comes to hold, if given, keeping the profile `profile` asks for, if given, carrying the nogoods of the directory
+/// of stores `carried_dir`, if given, with the tactic `carried_nogoods`, and with the gate trial of `trial`, if given
+/// ([`search_steered`]).
 #[allow(clippy::too_many_arguments)]
 fn search_forgetting<const W: usize>(
     prepared: &Prepared<W>,
@@ -377,6 +418,7 @@ fn search_forgetting<const W: usize>(
     near_repeat: Option<&OnceLock<NearRepeat<W>>>,
     profile: Option<&ProfilePlan>,
     carried_dir: Option<&Path>,
+    trial: Option<&gate_trial::Plan>,
 ) -> io::Result<SearchResult<W>> {
     debug_assert!(floor.is_none() || seeds.is_empty(), "a floor is the start: there are no seeds");
     let t0 = Instant::now();
@@ -424,6 +466,7 @@ fn search_forgetting<const W: usize>(
             time_all_runs: earlier + t0.elapsed(),
             found: None,
             finder: None,
+            gate_trial: None,
             start: incumbent,
         });
     }
@@ -510,6 +553,23 @@ fn search_forgetting<const W: usize>(
             })))
         }
     };
+    // The gate trial, which needs the GF(2) bound for the units' gaps and a checkpoint for its units, takes the first
+    // checkpoint written at its plan's steps or more.
+    let trial = trial
+        .filter(|_| space.gf2.is_some() && checkpoint.is_some())
+        .map(|plan| (plan, gate_trial::Checkpoints::new(plan.after)));
+    let hook = match &trial {
+        None => hook,
+        Some((_, (checkpoints, _))) => {
+            let checkpoints = Arc::clone(checkpoints);
+            Some(CheckpointHook(Arc::new(move |event| {
+                if let Some(CheckpointHook(inner)) = &hook {
+                    inner(event);
+                }
+                checkpoints.event(event);
+            })))
+        }
+    };
     let cfg = &EngineConfig { progress_note: Some(note), checkpoint_hook: hook, ..cfg.clone() };
     let start = match checkpoint.filter(|_| resume) {
         Some(path) => Start::Resume(path.to_path_buf()),
@@ -534,12 +594,33 @@ fn search_forgetting<const W: usize>(
     };
     let engine_start = Instant::now();
     let label = cfg.progress.map(|_| cfg.label.as_str());
+    // The branching settings as the search starts: a change of them since then is the lab's, which the trial leaves.
+    let armed = space.branching.generation();
     let run = || {
-        finder::run_beside(prepared, &control, plan, before.nodes, label, || {
-            engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))
-        })
+        let trial = trial.map(|(plan, (checkpoints, receiver))| {
+            let trial = gate_trial::Trial {
+                plan,
+                prepared,
+                match_graph: &match_graph,
+                gf2: space.gf2.as_ref().expect("a trial needs the GF(2) bound"),
+                branching: &space.branching,
+                armed,
+                near_repeat,
+                carried: carried.as_ref(),
+                forgetting,
+                background: cfg.background,
+                label: &cfg.label,
+            };
+            (trial, checkpoints, receiver)
+        });
+        let ((outcome, finder), trial) = gate_trial::run_beside(trial, || {
+            finder::run_beside(prepared, &control, plan, before.nodes, label, || {
+                engine::run(cfg, start, &header, |_| TaxSearcher::new(&space))
+            })
+        });
+        (outcome, finder, trial)
     };
-    let (outcome, finder) = match profile.as_deref() {
+    let (outcome, finder, trial) = match profile.as_deref() {
         None => run(),
         // Beside the search, a thread summarizes the open units of each checkpoint; the profile ends with the run.
         Some(profile) => thread::scope(|scope| {
@@ -588,6 +669,7 @@ fn search_forgetting<const W: usize>(
         time_all_runs: time + earlier_runs,
         found: space.found.into_inner().unwrap_or_else(PoisonError::into_inner),
         finder,
+        gate_trial: trial,
         start: incumbent,
     })
 }

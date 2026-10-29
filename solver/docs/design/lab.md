@@ -242,7 +242,8 @@ chosen on one game reaches the next without a command each game.
   it, and the settings of the policy for it (null where none gave one).  `tactic_switches` has the switches the search
   ended with, which differ from the policy's where the game's own record held over it.  The gate is in the line as
   `lab.gate`, the game's own, and `lab.policy.gate`, the policy's; the search ran with the first that is not null, and
-  with the default gate if both are ([search.md, "Conflict branching"](search.md#conflict-branching)).
+  with the default gate if both are ([search.md, "Conflict branching"](search.md#conflict-branching)), until a gate
+  trial chose another, which the line has in `engine.gate_trial` ([gate-trial.md](gate-trial.md)).
 
 **Why it is exact.**  A policy sets what `branching` sets, the switches and the gate, the choice between true conflicts
 that (b) shows exact at any unit, and a searcher reads it only when it starts a unit.  It only moves that choice from

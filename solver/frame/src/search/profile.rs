@@ -1037,7 +1037,8 @@ mod tests {
             ..EngineConfig::default()
         };
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
-        search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), plan, None).expect("the search")
+        search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), plan, None, None)
+            .expect("the search")
     }
 
     /// The lines of the profile `path`.
@@ -1167,7 +1168,7 @@ mod tests {
         let cfg =
             EngineConfig { threads: 1, progress: None, node_limit, time_limit, checkpoint, ..EngineConfig::default() };
         let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics)));
-        let r = search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), Some(plan), None);
+        let r = search_steered(p, &cfg, &[], None, resume, None, &branching, &OnceLock::new(), Some(plan), None, None);
         let r = r.expect("the search");
         assert!(!r.completed, "the limit stops the search");
         r.stats.nodes

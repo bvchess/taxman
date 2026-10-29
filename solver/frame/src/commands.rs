@@ -44,7 +44,7 @@ use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
 use taxman::paths;
 use taxman::results::{build, verify_files_with, Build};
-use taxman::search::finder;
+use taxman::search::{finder, gate_trial, MAX_GATE};
 use taxman::solver::{self, GameResult, Method, Prev, SolveOptions, Wall};
 
 fn failed(message: String) -> CliError {
@@ -122,6 +122,17 @@ fn guard_checkpoints(opts: &SolveOptions) -> Result<Option<engine::DirLock>, Cli
     Ok(lock)
 }
 
+/// The gates of `--gate-trial`: whole numbers from 0 to [`MAX_GATE`], separated by commas.
+fn trial_gates(list: &str) -> Result<Vec<u64>, CliError> {
+    let bad = || CliError::Usage(format!("--gate-trial takes gates from 0 to {MAX_GATE} separated by commas: {list}"));
+    let gates: Vec<u64> =
+        list.split(',').map(|gate| gate.trim().parse().map_err(|_| bad())).collect::<Result<_, _>>()?;
+    if gates.is_empty() || gates.iter().any(|&gate| gate > MAX_GATE) {
+        return Err(bad());
+    }
+    Ok(gates)
+}
+
 /// The line that says why the search of `n` stopped before it finished, and how to go on.
 fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     let resume =
@@ -132,7 +143,7 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 12] = [
+const SOLVE_FLAGS: [&str; 14] = [
     "--out",
     WINDOW_FLAG,
     "--game-hours",
@@ -145,6 +156,8 @@ const SOLVE_FLAGS: [&str; 12] = [
     "--profile",
     "--profile-depth",
     "--carried-dir",
+    "--gate-trial",
+    "--gate-trial-plan",
 ];
 
 /// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
@@ -228,6 +241,13 @@ pub fn solve(args: &[String]) -> CliResult {
     opts.carried_dir = args.value("--carried-dir").map(PathBuf::from);
     if opts.carried_dir.is_some() {
         opts.tactics.search.carried_nogoods = true;
+    }
+    if let Some(gates) = args.value("--gate-trial") {
+        let plan = gate_trial::Plan::of(trial_gates(gates)?);
+        let spec = args.value("--gate-trial-plan").unwrap_or_default();
+        opts.gate_trial = Some(plan.with(spec).map_err(|e| CliError::Usage(format!("--gate-trial-plan: {e}")))?);
+    } else if args.value("--gate-trial-plan").is_some() {
+        return Err(CliError::Usage("--gate-trial-plan sets the trial of --gate-trial: give it too".into()));
     }
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);
