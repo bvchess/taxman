@@ -2,14 +2,15 @@
 
 Part of [the theory](../THEORY.md).
 
-Linear algebra over GF(2) bounds the best score of a game from above.  Every playable set is independent in two matroids
-over GF(2), one for each parity of the number of prime factors, so the heaviest set independent in both bounds opt(n):
-[the parity bound (W1)](#the-parity-bound).  Weighted matroid intersection computes it in polynomial time, and a weight
-split checks its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed out,
-it bounds the sets that make the same choices.  [The barred bound (W2)](#the-barred-bound) fixes the bottom two layers
-as every optimal set has them and leaves out one more number: when it is at most a score, every set that beats the score
-plays that number.  The sources are the largest numbers, and the heaviest common independent set holds those that the
-greedy algorithm of their own linear matroid keeps, which are U\* exactly when [the span conjecture
+Linear algebra over GF(2) bounds the best score of a game from above.  Each number gets a vector over GF(2) for each
+parity of the number of prime factors, and every playable set is *independent at both parities*: its vectors at each
+are linearly independent.  So the heaviest set independent at both parities bounds opt(n): [the parity bound
+(W1)](#the-parity-bound).  A classical algorithm, weighted matroid intersection, computes it in polynomial time, and a
+weight split checks its value without trusting the algorithm that found it.  With some numbers fixed in and others fixed
+out, it bounds the sets that make the same choices.  [The barred bound (W2)](#the-barred-bound) fixes the bottom two
+layers as every optimal set has them and leaves out one more number: when it is at most a score, every set that beats
+the score plays that number.  The sources are the largest numbers, and the heaviest set independent at both parities
+holds those that the greedy algorithm keeps from their vectors, which are U\* exactly when [the span conjecture
 (♦)](sources.md#the-span-conjecture) holds: [the greedy-basis proposition (W3)](#the-greedy-basis-proposition).  All
 three results are proved.  The prover bounds its searches by W1.  W2 settles most of [statement
 U](exactness.md#statement-u), the open statement that some optimal set plays every member of U\* with three or more
@@ -21,110 +22,142 @@ promotions](frame-bounds.md)).
 [sources.md](sources.md#descending-greedy).  The incidence vector v(s) of a number s, the unit vector e_s of s ≤ n/2,
 and a set *independent with its own coordinates* (its members' v(s) together with the e_s of its members up to n/2) are
 those of [playability.md](playability.md#independence).  GF(2) is explained in [the
-primer](primer.md#finite-fields-and-gf2), and matroids, parallel elements, coloops, contraction and deletion in [its
-section on matroids](primer.md#matroids).
+primer](primer.md#finite-fields-and-gf2), and linear independence, spans, circuits and quotients by a span in [its
+section on linear independence](primer.md#linear-independence).
 
-## The parity matroids
+## The parity vectors
 
 Fix a board n ≥ 2, with the coordinates 1 to ⌊n/2⌋.  Split them by the parity of their layer Ω, with Ω(1) = 0 even:
 E₀ holds the coordinates with Ω even, and E₁ those with Ω odd.  A maximal factor f of s has Ω(f) = Ω(s) − 1, so v(s)
 lies in the part whose parity is not Ω(s)'s, and e_s in the part of Ω(s)'s own parity.  Each number has at most one
 vector in each part.
 
-**Definition (the parity matroids).**  For i = 0 and i = 1, the parity matroid M_i is the linear matroid on {2, …, n}
-over GF(2) in which s is represented by its vector in E_i:
+**Definition (the parity vectors).**  For i = 0 and i = 1, the *parity-i vector* of a number s of 2..n is
 
-* by v(s), if Ω(s) and i have different parities;
-* by e_s, if they have the same parity and s ≤ n/2;
-* as a coloop, if they have the same parity and s > n/2, since s then has no vector in E_i.
+* v(s), if Ω(s) and i have different parities;
+* e_s, if they have the same parity and s ≤ n/2;
+* the unit vector of an *extra coordinate*, a coordinate of s's own beside E_i, if they have the same parity and
+  s > n/2, since s then has no vector in E_i.
 
-*Example.*  On the board of 10 the coordinates are 1 to 5, with E₀ = {1, 4} and E₁ = {2, 3, 5}.
+A set S ⊆ {2, …, n} is *independent at parity i* when the parity-i vectors of its members are linearly independent over
+GF(2), and *independent at both parities* when it is independent at parity 0 and at parity 1.  A *circuit at parity i*
+is a set whose parity-i vectors sum to 0 while those of no smaller nonempty part of it do.  For a set Y, a set I
+disjoint from Y is independent at parity i *together with Y* when Y ∪ I is independent at parity i, and at both
+parities together with Y when it is at each.  When Y is independent at parity i, this says that the classes of I's
+parity-i vectors modulo the span of Y's are independent ([the primer](primer.md#linear-independence)).
 
-| number | Ω | in M₀ | in M₁ |
+*Extra coordinates.*  A number with an extra coordinate at parity i is independent of everything at that parity: no
+other parity-i vector has a 1 there, so no nonempty set whose parity-i vectors sum to 0 holds it.  So a set is
+independent at parity i exactly when its members without an extra coordinate at parity i are.  A member with one lies in
+no circuit at parity i, and it joins any set independent at parity i without making it dependent.
+
+*Example.*  On the board of 10 the coordinates are 1 to 5, with E₀ = {1, 4} and E₁ = {2, 3, 5}.  In the table,
+*extra* stands for a number's extra coordinate.
+
+| number | Ω | at parity 0 | at parity 1 |
 |---|---|---|---|
 | 2, 3, 5 | 1 | e₁ | e₂, e₃, e₅ |
-| 7 | 1 | e₁ | coloop |
+| 7 | 1 | e₁ | extra |
 | 4 | 2 | e₄ | e₂ |
-| 6, 9, 10 | 2 | coloops | e₂ + e₃, e₃, e₂ + e₅ |
-| 8 | 3 | e₄ | coloop |
+| 6, 9, 10 | 2 | extra | e₂ + e₃, e₃, e₂ + e₅ |
+| 8 | 3 | e₄ | extra |
 
-In M₀ the primes are parallel, since 1 is the only maximal factor of each, so a set independent in M₀ holds at most one
-prime, as a game does.  The numbers 4 and 8 are parallel too, and no game plays both, since 4 is the only maximal
-factor of 8.  In M₁, {4, 6, 9} is dependent (v(4) + v(9) = v(6)), though M₀ sees nothing wrong with it, and it is
-unplayable: its three members have only the two maximal factors 2 and 3 between them.  The heaviest set independent in
-both is {6, 7, 8, 9, 10}, worth 40.  It is playable, in the order 7, 9, 6, 10, 8, so here the bound is opt(10) = 40.
+At parity 0 the primes all have the vector e₁, since 1 is the only maximal factor of each, so a set independent at
+parity 0 holds at most one prime, as a game does.  The numbers 4 and 8 share the vector e₄ there too, and no game plays
+both, since 4 is the only maximal factor of 8.  At parity 1, {4, 6, 9} is dependent (v(4) + v(9) = v(6)), though it is
+independent at parity 0, and it is unplayable: its three members have only the two maximal factors 2 and 3 between
+them.  The heaviest set independent at both parities is {6, 7, 8, 9, 10}, worth 40.  It is playable, in the order 7, 9,
+6, 10, 8, so here the bound is opt(10) = 40.
 
-![The numbers 2 to 10 between two boxes of coordinates, E₀ = {1, 4} on the left and E₁ = {2, 3, 5} on the right, with solid lines to maximal factors and dashed lines to own coordinates](img/parity-10.svg)
+![The numbers 2 to 10 between two boxes of coordinates, E₀ = {1, 4} on the left and E₁ = {2, 3, 5} on the right, with solid lines to maximal factors and dashed lines from the numbers up to 5 to their own coordinates e_s](img/parity-10.svg)
 
-*A number's solid lines land in one box and its dashed line in the other.  The numbers above 5 have no coordinate of
-their own (double outline); gray and bold: the heaviest set independent in both.*
+*A number's solid lines land in one box and its dashed line in the other.  The numbers above 5 have no coordinate in
+either box (double outline), and each has an extra coordinate, not drawn, at the parity of its layer.  Gray and bold:
+the heaviest set independent at both parities.*
 
 ## The parity bound
 
 **Theorem W1 (the parity bound).**  Let n ≥ 2, and let Y and Z be disjoint sets of numbers of 2..n, the *picks* and the
-*bars*.  Every playable set S ⊆ {2, …, n} is independent in both parity matroids M₀ and M₁.  Hence, if Y is independent
-in both, every playable S with Y ⊆ S and S ∩ Z = ∅ satisfies
+*bars*.  Every playable set S ⊆ {2, …, n} is independent at both parities.  Hence, if Y is independent at both
+parities, every playable S with Y ⊆ S and S ∩ Z = ∅ satisfies
 
-    ΣS ≤ ΣY + max { ΣI : I independent in M₀/Y ∖ Z and in M₁/Y ∖ Z },
+    ΣS ≤ ΣY + max { ΣI : I ⊆ {2, …, n} ∖ (Y ∪ Z) independent at both parities together with Y },
 
-and if Y is dependent in either matroid, there is no such S.  In particular, with no picks and no bars, opt(n) is at
-most the heaviest sum ΣI of a set I independent in M₀ and in M₁.
+and if Y is dependent at either parity, there is no such S.  In particular, with no picks and no bars, opt(n) is at most
+the heaviest sum ΣI of a set I independent at both parities.
 
-The right side is the *parity bound of n with the picks Y and the bars Z*, taken as −∞ when Y is dependent in either
-matroid; with no picks and no bars it is *the parity bound of n*.
+The right side is the *parity bound of n with the picks Y and the bars Z*, taken as −∞ when Y is dependent at either
+parity; with no picks and no bars it is *the parity bound of n*.
 
 *Proof.*  The idea: a playable set is independent with its own coordinates, each of those vectors lies in one parity's
-part, and the two halves are exactly the set's representations in M₀ and M₁.
+part, and the two halves are exactly the set's parity-0 and parity-1 vectors but for the extra coordinates, which change
+nothing.
 
-1. *A set S is independent in M₀ and in M₁ iff it is independent with its own coordinates.*  Every vector of that
-   family lies in E₀ or in E₁, and GF(2)^{⌊n/2⌋} is the direct sum of the two parts, so the family is independent iff
-   its vectors in E₀ are and its vectors in E₁ are ([direct sums](primer.md#deletion-contraction-direct-sums-and-truncation)).  Its
-   vectors in E_i are exactly those that represent in M_i the members of S that are not coloops of M_i: v(s) when Ω(s)
-   and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is independent in M_i iff its members that
-   are not coloops are, since a coloop joins any independent set ([the primer](primer.md#matroids)).
+1. *A set S is independent at both parities iff it is independent with its own coordinates.*  Every vector of that
+   family lies in E₀ or in E₁, two disjoint blocks of coordinates, so the family is independent iff its vectors in E₀
+   are and its vectors in E₁ are ([the primer](primer.md#linear-independence)): a nonempty part of the family whose
+   vectors sum to 0 splits into its vectors in E₀ and its vectors in E₁, each of which sums to 0 alone, and one of them
+   is nonempty.  Its vectors in E_i are exactly the parity-i vectors of the members of S that have no extra
+   coordinate at parity i: v(s) when Ω(s) and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is
+   independent at parity i iff those members are, since an extra coordinate makes its number independent of everything
+   ([the parity vectors](#the-parity-vectors), the paragraph "Extra coordinates").
 2. *A playable set is independent with its own coordinates,* by [the independence lemma
    (P10)](playability.md#the-independence-lemma), over GF(2).
 3. *The bound.*  The moves of a game form a playable set, and a playable set can be played and the game continued, so
-   opt(n) is the largest sum of a playable set; by steps 1 and 2 it is at most the heaviest sum of a common independent
-   set.
-4. *Picks and bars.*  Let S be playable, with Y ⊆ S and S ∩ Z = ∅.  By steps 1 and 2, S is independent in M_i, so its
-   subset Y is, and S ∖ Y is independent in the contraction M_i/Y, by the definition of contraction.  It avoids Z, so
-   it is independent in M_i/Y ∖ Z, for i = 0 and 1, and ΣS = ΣY + Σ(S ∖ Y).  If Y is dependent in either matroid, no
-   playable set contains it.  ∎
+   opt(n) is the largest sum of a playable set; by steps 1 and 2 it is at most the heaviest sum of a set independent at
+   both parities.
+4. *Picks and bars.*  Let S be playable, with Y ⊆ S and S ∩ Z = ∅.  By steps 1 and 2, S is independent at both
+   parities, so its subset Y is, since part of an independent family is independent.  The set S ∖ Y is disjoint from
+   Y, and Y ∪ (S ∖ Y) = S, so S ∖ Y is independent at both parities together with Y.  It avoids Y and Z, so it is one
+   of the sets I of the maximum, and ΣS = ΣY + Σ(S ∖ Y).  If Y is dependent at either parity, no playable set contains
+   it, since every subset of a playable set is independent at both parities.  ∎
 
-By step 1, the sets independent in both parity matroids are exactly the sets independent with their own coordinates:
-the parity bound is the heaviest of these.
+By step 1, the sets independent at both parities are exactly the sets independent with their own coordinates: the
+parity bound is the heaviest of these.
 
 ### Computing and checking the bound
 
 Three properties make the bound useful.
 
-* **It takes polynomial time.**  The heaviest common independent set of two matroids is found by weighted matroid
-  intersection ([the primer](primer.md#matroid-intersection)), and the matroids here are given by sparse vectors over
-  GF(2).
-* **Its value can be checked without trusting the algorithm.**  A split w = w₀ + w₁ of the weights under which a common
-  independent set I is heaviest in M₀ for w₀ and in M₁ for w₁ proves w(I) the maximum, whatever produced I ([the
-  primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "Certificates"), and for two matroids such a
-  split always exists ([the primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "For matroids").
-  The prover accepts a value only with its split.
-* **The same split bounds the sets that avoid a member x of I.**  Such a set weighs at most the heaviest independent set
-  of M₀ ∖ x for w₀ plus that of M₁ ∖ x for w₁, by the same weak duality, and each term is one exchange from I.  The
-  prover's search relies on this: a member whose bound without it is at most the value to beat is held by every set
-  that beats it, so the search picks it.
+* **It takes polynomial time.**  The heaviest set independent at both parities is found by weighted matroid
+  intersection, a classical algorithm ([the primer](primer.md#two-families-at-once)), which needs only a test of
+  independence at each parity, here on sparse vectors over GF(2).  No proof depends on the algorithm, since the next
+  property certifies its answer.
+* **Its value can be checked without trusting the algorithm.**  Let w = w₀ + w₁ be a split of the weights under which
+  a set I independent at both parities is a heaviest set independent at parity 0 for w₀ and a heaviest set independent
+  at parity 1 for w₁.  Then every set J independent at both parities has w(J) = w₀(J) + w₁(J) ≤ w₀(I) + w₁(I) = w(I),
+  so the split proves w(I) the maximum, whatever produced I ([the
+  primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "Certificates").  For the two parities such
+  a split always exists, by the same section.  The prover accepts a value only with its split.
+* **The same split bounds the sets that avoid a member x of I.**  Such a set weighs at most the heaviest set without x
+  that is independent at parity 0, for w₀, plus the heaviest without x that is independent at parity 1, for w₁, by the
+  same weak duality, and each term is one exchange from I.  The prover's search relies on this: a member whose bound
+  without it is at most the value to beat is held by every set that beats it, so the search picks it.
 
-**The exchange from a heaviest set.**  Let I be a heaviest independent set of a matroid for weights w of either sign,
-and x a member of I.  Let y be the heaviest element outside I with I − x + y independent, if there is one.  Then a
-heaviest independent set that avoids x is I − x + y if y exists and w(y) > 0, and I − x otherwise; it weighs
-w(I) − w(x) + max(0, w(y)).
+**The exchange from a heaviest set.**  Give each member of a finite set E a vector over a field, and call a subset of E
+independent when its members' vectors are linearly independent.  Let I be a heaviest independent set for weights w of
+either sign, and x a member of I.  Let y be the heaviest member outside I with I − x + y independent, if there is one.
+Then a heaviest independent set that avoids x is I − x + y if y exists and w(y) > 0, and I − x otherwise; it weighs
+w(I) − w(x) + max(0, w(y)), where max(0, w(y)) is 0 if there is no y.
 
-*Proof.*  Add as many coloops of weight 0, the *dummies*, as the matroid's rank r, and truncate to rank r.  The bases of
-the result are the independent sets padded with dummies, at the same weights, so I padded is a heaviest basis G.  Let
-G′ be any basis that avoids x.  By the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in
-dependence structures", *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), some y′ ∈ G′ ∖ G makes
-both G − x + y′ and G′ − y′ + x bases.  Since G is heaviest, w(G′ − y′ + x) ≤ w(G), that is w(G′) ≤ w(G − x + y′).
-If y′ is a dummy, G − x + y′ is I − x padded, worth w(I) − w(x).  If y′ is an element, I − x + y′ is independent, so
-y exists and w(y′) ≤ w(y), and G − x + y′ is worth at most w(I) − w(x) + w(y).  Either way
-w(G′) ≤ w(I) − w(x) + max(0, w(y)), and the set named in the statement avoids x, is independent, and has that weight.  ∎
+*Proof.*  The idea is the symmetric exchange property of bases (R. A. Brualdi, "Comments on bases in dependence
+structures", *Bulletin of the Australian Mathematical Society* 1 (1969) 161–167), here for vectors and for sets of any
+size: a set that avoids x either admits x as it is, or trades for x one of its members that can replace x in I.  The
+set named in the statement avoids x, since y is outside I, and it is independent and has that weight.  It remains to
+show that every independent set J that avoids x has w(J) ≤ w(I) − w(x) + max(0, w(y)).
+
+1. *If J + x is independent,* then w(J) + w(x) ≤ w(I), since I is heaviest, so w(J) ≤ w(I) − w(x).
+2. *Otherwise* x's vector is a linear combination of the vectors of J, since J is independent; let C be the members of
+   J with a nonzero coefficient in it.  Not every member of C has its vector in the span of the vectors of I − x, or
+   x's vector would be there too, and I would be dependent.  Take y′ in C with its vector outside that span.  Then
+   I − x + y′ is independent, and y′ is outside I, since it is not in I − x and J avoids x; so y exists and
+   w(y′) ≤ w(y).
+3. *Then J − y′ + x is independent.*  In a vanishing combination of its vectors, x has the coefficient 0: otherwise x's
+   vector would be a combination of the vectors of J − y′, as well as one in which y′ has a nonzero coefficient, and
+   the difference of the two would make J dependent.  Then the vectors of J − y′ have the coefficient 0 too.  Since I
+   is heaviest, w(J) − w(y′) + w(x) ≤ w(I), that is w(J) ≤ w(I) − w(x) + w(y′) ≤ w(I) − w(x) + w(y).
+
+Either way w(J) ≤ w(I) − w(x) + max(0, w(y)).  ∎
 
 The prover bounds every node of its searches by W1, with the node's picks and bars ([solver/noframe/docs/proofs.md,
 "With the parity bound (to 1300)"](../../solver/noframe/docs/proofs.md#with-the-parity-bound-to-1300)).
@@ -169,47 +202,51 @@ game"](../../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
 
 ## The greedy-basis proposition
 
-The sources are the largest numbers, and each is a coloop of one parity matroid, so the parity bound takes them as the
-greedy algorithm of the other would: by decreasing value, each one whose vector is no sum of those taken before it.
-The *sources' linear matroid* of game n is the linear matroid over GF(2) on its sources, each source s represented by
-v(s).  Its *greedy basis* is the set that its [greedy algorithm](primer.md#the-greedy-algorithm-of-a-matroid) keeps when
-it takes the sources by decreasing value.
+The sources are the largest numbers, and each has an extra coordinate at one parity, so the parity bound takes them as
+the greedy algorithm would at the other: by decreasing value, each one whose vector is no sum of those taken before it.
+The *sources' vectors* of game n are the incidence vectors v(s) over GF(2) of its sources s.  Their *greedy basis* is
+the set of sources that [the greedy algorithm](primer.md#the-greedy-algorithm) keeps when it takes the sources by
+decreasing value and keeps each whose vector is not in the span of the vectors of those kept.
 
-**Proposition W3 (the greedy-basis proposition).**  Let n ≥ 2.  Every heaviest set independent in M₀ and M₁ holds,
-among the sources, exactly the greedy basis of the sources' linear matroid.  The greedy basis is U\* if and only if
+**Proposition W3 (the greedy-basis proposition).**  Let n ≥ 2.  Every heaviest set independent at both parities holds,
+among the sources, exactly the greedy basis of the sources' vectors.  The greedy basis is U\* if and only if
 [(♦)](sources.md#the-span-conjecture) holds in game n, and then the parity bound of n equals the parity bound with the
 picks U\* and with the bars the other sources.
 
 *Proof.*  The idea: a source left out of a heaviest set could replace any smaller member of its circuit, so its circuit
 is made of larger sources, which is how the greedy algorithm rejects.
 
-1. *Sources in the parity matroids.*  A source s of layer k has no coordinate of its own, so it is a coloop of the
-   parity matroid of k's parity, and v(s) represents it in the other.  So a set of sources is independent in M₀ and M₁
-   exactly when its vectors v(s) are independent, by step 1 of the proof of [W1](#the-parity-bound): exactly when it
-   is independent in the sources' linear matroid.
-2. *The first difference.*  Let I be a heaviest set independent in both, G the greedy basis, and suppose that they
-   hold different sources.  Let d be the largest source in one of them and not the other; above d they agree.
+1. *Sources at the two parities.*  A source s of layer k exceeds n/2, so it has an extra coordinate at the parity of k,
+   and its vector at the other parity is v(s).  So a set of sources is independent at both parities exactly when its
+   vectors v(s) are independent, by step 1 of the proof of [W1](#the-parity-bound), since sources have no e_s.
+2. *The first difference.*  Let I be a heaviest set independent at both parities, G the greedy basis, and suppose that
+   they hold different sources.  Let d be the largest source in one of them and not the other; above d they agree.
 3. *d is not in I alone.*  The greedy algorithm rejected d, so v(d) is a sum of vectors of members of G above d, which
-   are members of I.  Then I is dependent, by step 1.
-4. *d is not in G alone.*  The set I + d is independent in the parity matroid in which d is a coloop.  In the other,
-   M_i, it is dependent, or it would outweigh I.  Let H be the fundamental circuit of d over I in M_i ([the
-   primer](primer.md#matroids)).  If H held a member e smaller than d, I − e + d would be independent in M_i, and in the
-   other matroid too, since d is a coloop there, and it would outweigh I.  So the other members of H are larger than d:
-   sources above d, members of G.  A coloop lies in no circuit, so each is represented by its v in M_i, and these
-   vectors sum to v(d).  Then the greedy algorithm would have rejected d.
+   are members of I.  Then I is dependent at a parity, by step 1.
+4. *d is not in G alone.*  The set I + d is independent at the parity of d's extra coordinate ([the parity
+   vectors](#the-parity-vectors), the paragraph "Extra coordinates").  At the other parity, i, it is dependent, or it
+   would be independent at both and outweigh I.  So v(d), the parity-i vector of d, is the sum of the parity-i vectors
+   of exactly one set of members of I, since I is independent at parity i.  With d, this set is the circuit H of I + d
+   at parity i, and a member e of I lies in H exactly when I − e + d is independent at parity i ([the
+   primer](primer.md#linear-independence)).  If H held a member e smaller than d, I − e + d would be independent at
+   parity i, and at the other parity too, where d has its extra coordinate, and it would outweigh I.  So the other
+   members of H are larger than d: sources above d, members of G.  A member with an extra coordinate at parity i lies
+   in no circuit at parity i, so the parity-i vector of each is its v, and these vectors sum to v(d).  Then the greedy
+   algorithm would have rejected d.
 5. *U\* and (♦).*  The set U\* is playable, so its vectors are independent ([the independence lemma
    (P10)](playability.md#the-independence-lemma)).  If (♦) holds, the greedy algorithm decides every source as
    descending greedy does, by induction down the sources: where descending greedy keeps x, v(x) is no sum of vectors of
    U\* above x, by that independence, and where it rejects x, (♦) makes v(x) such a sum.  Conversely, if G = U\*, the
    vector of each source that descending greedy rejects is a sum of vectors of members of U\* above it: (♦).
-6. *The bound.*  Given (♦), a heaviest set I independent in both holds U\* and no other source, so I ∖ U\* is
-   independent in M_i/U\* less the other sources, for i = 0 and 1, and the parity bound with those picks and bars is at
-   least ΣI.  It is at most ΣI, since every set it counts, together with U\*, is independent in both.  ∎
+6. *The bound.*  Given (♦), a heaviest set I independent at both parities holds U\* and no other source.  So I ∖ U\*
+   avoids U\* and the other sources, and it is independent at both parities together with U\*, since
+   U\* ∪ (I ∖ U\*) = I; the parity bound with those picks and bars is at least ΣI.  It is at most ΣI, since every set
+   it counts, together with U\*, is independent at both parities.  ∎
 
 The span conjecture holds in game 21, so the parity bound's heaviest set of 21 holds
 U\* = {12, 14, 15, 16, 18, 19, 20, 21} and no other source: it is U\* and 9, worth 144.  The conjecture holds in every
 game checked ([evidence.md](evidence.md#the-open-statements-about-the-sources)), so W3 settles the sources of the parity
-bound in all of them.  [The contraction theorem (B6)](frame-bounds.md#the-contraction-theorem) uses it to compare the
+bound in all of them.  [The comparison theorem (B6)](frame-bounds.md#the-comparison-theorem) uses it to compare the
 parity bound with the frame bound.
 
 ## What the parity bound misses
@@ -224,17 +261,21 @@ Between it and the bounds it is compared with:
 
 * It is never above the [Franklín–Moniot bound](franklin-moniot.md#what-the-paper-proves), the heaviest set whose
   members can be paid with distinct maximal factors outside it, since a set independent with its own coordinates has
-  such a payment ([playability.md](playability.md#the-independence-lemma), the paragraph "Between playability and
-  payment").
-* It is never below ΣU\* plus the frame bound at the root, since on the candidates the frame matroids are the parity
-  matroids contracted by U\* ([the contraction theorem (B6)](frame-bounds.md#the-contraction-theorem)), and the two
-  are equal on every board measured ([frame-bounds.md](frame-bounds.md#the-frame-bound), the paragraph "Against the
-  parity bound").
+  such a payment ([the counting theorem (C2)](franklin-moniot.md#the-counting-theorem)).
+* It is never below ΣU\* plus the frame bound at the root, since a set X of candidates is independent in every frame
+  exactly when X ∪ U\* is independent at both parities ([the comparison theorem
+  (B6)](frame-bounds.md#the-comparison-theorem)), and the two are equal on every board measured
+  ([frame-bounds.md](frame-bounds.md#the-frame-bound), the paragraph "Against the parity bound").
 * A bound built the same way over the rationals would admit every set that the parity bound admits ([the
   primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and more.  The triangle {6, 10, 15} is
   unplayable, since whichever member is played first leaves at most one of the factors 2, 3 and 5 for the other two,
   and its vectors are dependent over GF(2) but independent over the rationals ([the
   primer](primer.md#finite-fields-and-gf2), the paragraph "Example").
-* The bound joins two matroids, not one, so [the matroid proposition
-  (Q2)](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board), by which no single matroid is exact for the
-  whole game, does not apply to it.
+* The bound asks for independence at two parities at once, and there [the greedy
+  algorithm](primer.md#the-greedy-algorithm) can miss the heaviest set.  On every board from 4 up, give 2 the weight
+  3, give 3 and 4 the weight 2, and give every other number 0.  The greedy algorithm keeps 2 and then neither 3 nor 4,
+  since 2 shares the vector e₁ with 3 at parity 0 and e₂ with 4 at parity 1, so what it keeps weighs 3, while {3, 4}
+  is independent at both parities and weighs 4.  So [the relaxation proposition
+  (Q2)](uniqueness-and-longest-games.md#the-relaxation-proposition), by which no greedy relaxation of a game with two
+  or more optimal sets is exact, does not apply to it: a greedy relaxation is a family on which the greedy algorithm
+  finds a heaviest set for every weighting.
