@@ -63,6 +63,14 @@ mod tests {
     #[cfg(feature = "extra")]
     #[test]
     fn only_with_the_feature() {}
+
+    macro_rules! cheap {
+        ($($name:ident)*) => { $(#[test] fn $name() {})* };
+    }
+
+    // Eight tests that cost nothing: with the other tests of the crate there are more than ten, and the summary has
+    // them all.
+    cheap!(cheap_a cheap_b cheap_c cheap_d cheap_e cheap_f cheap_g cheap_h);
 }
 """
 
@@ -124,14 +132,14 @@ class Toy(unittest.TestCase):
     def test_a_passing_suite_counts_every_kind_of_test(self):
         done, summary, report = self.run_suite()
         self.assertEqual(done.returncode, 0, done.stderr)
-        # lib: doubles, slow, fails_only_when_told; bin: 1; it.rs: 2; the doc test: 1 (7).  One ignored.
-        self.assertEqual(summary["crates"], {"solver": {"passed": 7, "failed": 0, "ignored": 1}}, done.stderr)
-        self.assertIn("solver: 7 passed, 0 failed, 1 ignored", report)
+        # lib: doubles, slow, fails_only_when_told, 8 cheap ones; bin: 1; it.rs: 2; the doc test: 1 (15).  One ignored.
+        self.assertEqual(summary["crates"], {"solver": {"passed": 15, "failed": 0, "ignored": 1}}, done.stderr)
+        self.assertIn("solver: 15 passed, 0 failed, 1 ignored", report)
 
     def test_a_feature_is_given_to_the_crate_it_names_and_to_no_other(self):
         done, summary, _ = self.run_suite("--features", "solver=extra")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(summary["crates"]["solver"]["passed"], 8)  # the test that only the feature builds is one more
+        self.assertEqual(summary["crates"]["solver"]["passed"], 16)  # the test that only the feature builds is one more
         done, summary, _ = self.run_suite("--features", "prover=extra")
         self.assertEqual(done.returncode, 2, done.stderr)  # there is no such crate in this run
         self.assertIsNone(summary)
@@ -140,7 +148,7 @@ class Toy(unittest.TestCase):
         done, summary, report = self.run_suite(env={**os.environ, "TOY_FAIL": "1"})
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertEqual(summary["crates"]["solver"]["failed"], 1)
-        self.assertEqual(summary["crates"]["solver"]["passed"], 6)
+        self.assertEqual(summary["crates"]["solver"]["passed"], 14)
         self.assertIn("solver/lib:toy/tests::fails_only_when_told", report)
         self.assertIn("told to fail", report)
         self.assertIn("fails alone too", report)
@@ -170,15 +178,19 @@ class Toy(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stderr)
         self.assertIn("TIMED OUT", report)
 
-    def test_the_summary_says_which_tests_used_the_most_cpu_and_a_wait_is_no_cpu(self):
+    def test_the_summary_has_the_cpu_of_every_test_the_costliest_first_and_a_wait_is_no_cpu(self):
         done, summary, report = self.run_suite()
         self.assertEqual(done.returncode, 0, done.stderr)
-        costliest = {test["id"]: test for test in summary["costliest"]}
-        self.assertEqual(set(costliest["solver/lib:toy/tests::slow"]), {"id", "seconds", "cpu"})
-        slow = costliest["solver/lib:toy/tests::slow"]  # sleeps for 1.2 s
+        costs = {test["id"]: test for test in summary["costs"]}
+        passed = summary["crates"]["solver"]["passed"]
+        self.assertGreater(passed, 10)  # more tests than a short list of the costliest would hold
+        self.assertEqual((len(summary["costs"]), len(costs)), (passed, passed))  # every test once
+        self.assertIn("solver/lib:toy/tests::cheap_h", costs)  # a test of no cost is there too
+        self.assertEqual(set(costs["solver/lib:toy/tests::slow"]), {"id", "seconds", "cpu"})
+        slow = costs["solver/lib:toy/tests::slow"]  # sleeps for 1.2 s
         self.assertGreaterEqual(slow["seconds"], 1.2)
         self.assertLess(slow["cpu"], 0.5)
-        self.assertEqual(summary["costliest"], sorted(summary["costliest"], key=lambda t: -t["cpu"]))
+        self.assertEqual(summary["costs"], sorted(summary["costs"], key=lambda t: -t["cpu"]))
         self.assertIn("most CPU: ", report)
 
     def test_a_crate_that_does_not_build_is_an_error_of_its_own(self):

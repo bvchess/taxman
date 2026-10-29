@@ -241,12 +241,12 @@ def problems(summary: dict) -> List[str]:
     found = []
     seconds = summary["seconds"]
     if seconds > TOTAL_LIMIT:
-        slowest = ", ".join(f"{t['id']} ({t['cpu']:.1f} s of CPU)" for t in summary["costliest"][:5])
+        slowest = ", ".join(f"{t['id']} ({t['cpu']:.1f} s of CPU)" for t in summary["costs"][:5])
         found.append(
             f"the tests took {seconds:.1f} s; the limit is {TOTAL_LIMIT:.0f} s (the target is {TOTAL_TARGET:.0f} s).  "
             f"The tests that used the most CPU: {slowest}"
         )
-    for test in summary["costliest"]:
+    for test in summary["costs"]:  # every test, not only the costliest few
         if test["cpu"] > TEST_LIMIT:
             found.append(
                 f"{test['id']} used {test['cpu']:.1f} s of CPU ({test['seconds']:.1f} s on the clock); "

@@ -20,8 +20,9 @@ usage: run_tests.py [options] LABEL=DIR [LABEL=DIR ...]      (DIR holds a Cargo.
   --report FILE    a text report: the totals, the slowest tests and those that used the most CPU, and each failure
                    with its output
   --summary FILE   the counts as JSON (build_cache.py put reads it): crates -> passed, failed, ignored; seconds; jobs;
-                   and the 10 tests that used the most CPU (their seconds, and their seconds of CPU, which do not grow
-                   when the machine is busy)
+                   and every test's seconds and its seconds of CPU, which do not grow when the machine is busy, the
+                   one that used the most CPU first (whoever judges the CPU of the tests, as quick_check.py does,
+                   holds the limit, not this script)
   --timeout S      a test that runs longer than S seconds (default 3600) is killed and counted as failed
   --filter TEXT    only the tests whose name has TEXT in it (the times file keeps the other tests' entries)
   --no-doc         leave out the doc tests
@@ -345,7 +346,7 @@ def main() -> int:
         counts[outcome.label]["failed"] += outcome.failed
 
     slowest = sorted(outcomes, key=lambda o: -o.seconds)[:8]
-    costliest = sorted(outcomes, key=lambda o: -o.cpu)[:10]
+    costliest = sorted(outcomes, key=lambda o: -o.cpu)
     lines = [f"{label}: {c['passed']} passed, {c['failed']} failed, {c['ignored']} ignored"
              for label, c in counts.items()]
     lines.append(f"{seconds:.0f} s for the tests ({time.monotonic() - started:.0f} s with the build), "
@@ -362,9 +363,9 @@ def main() -> int:
             text += f" ====\n{outcome.output}"
         Path(args.report).write_text(text)
     if args.summary:
-        costly = [{"id": o.id, "seconds": round(o.seconds, 2), "cpu": round(o.cpu, 2)} for o in costliest]
+        costs = [{"id": o.id, "seconds": round(o.seconds, 2), "cpu": round(o.cpu, 2)} for o in costliest]
         Path(args.summary).write_text(json.dumps({"crates": counts, "seconds": seconds, "cpu_seconds": cpu,
-                                                  "jobs": args.jobs, "tests": len(tests), "costliest": costly}) + "\n")
+                                                  "jobs": args.jobs, "tests": len(tests), "costs": costs}) + "\n")
     if args.times:
         write_times(Path(args.times), outcomes, listed, times, bool(args.filter))
     return 1 if failed else 0

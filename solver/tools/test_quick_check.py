@@ -21,9 +21,9 @@ import quick_check  # noqa: E402
 
 
 def summary(seconds, *tests):
-    """What run_tests.py writes: the seconds of the tests and the tests that used the most CPU (id, seconds, cpu)."""
-    costliest = [{"id": name, "seconds": wall, "cpu": cpu} for name, wall, cpu in tests]
-    return {"seconds": seconds, "costliest": sorted(costliest, key=lambda t: -t["cpu"])}
+    """What run_tests.py writes: the seconds of the tests and every test's id, seconds and cpu, the costliest first."""
+    costs = [{"id": name, "seconds": wall, "cpu": cpu} for name, wall, cpu in tests]
+    return {"seconds": seconds, "costs": sorted(costs, key=lambda t: -t["cpu"])}
 
 
 class Limits(unittest.TestCase):
@@ -41,6 +41,14 @@ class Limits(unittest.TestCase):
         found = quick_check.problems(summary(1.0, ("slow", 9.0, quick_check.TEST_LIMIT + 0.1), ("fine", 9.0, 1.0)))
         self.assertEqual(len(found), 1)
         self.assertIn("slow used", found[0])
+
+    def test_every_test_over_the_cpu_limit_is_named_however_many_there_are(self):
+        over = [(f"over{i}", 9.0, quick_check.TEST_LIMIT + 0.1 + i / 10) for i in range(12)]
+        under = [(f"under{i}", 1.0, quick_check.TEST_LIMIT - 0.1) for i in range(20)]
+        found = quick_check.problems(summary(1.0, *over, *under))
+        self.assertEqual(len(found), len(over))
+        for name, _, _ in over:
+            self.assertEqual(sum(f"{name} used" in message for message in found), 1, name)
 
     def test_a_test_that_takes_long_on_a_busy_machine_but_uses_little_cpu_is_not_a_problem(self):
         self.assertEqual(quick_check.problems(summary(1.0, ("waits", 30.0, 0.4))), [])

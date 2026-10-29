@@ -110,9 +110,9 @@ each run, kept in the cache), so that the longest does not start last.  The doc 
 * **A failing test** does not stop the others (as `--no-fail-fast`); the first 20 are run once more alone afterwards, so
   that the
   report says whether it fails only in company.  A test that outlasts `TEST_TIMEOUT` is killed and fails.
-* **The summary** (`--summary`) names the ten tests that used the most CPU, with their seconds of CPU: a test's own,
-  which do not grow when the machine is busy.  `solver/tools/quick_check.py` runs the suite without `--release` and
-  judges it by them ([solver/docs/design/testing.md](../design/testing.md)).
+* **The summary** (`--summary`) gives every test's seconds and seconds of CPU, the one that used the most CPU first: a
+  test's CPU seconds are its own, and do not grow when the machine is busy.  `solver/tools/quick_check.py` runs the
+  suite without `--release` and judges it by them ([solver/docs/design/testing.md](../design/testing.md)).
 * **Every test in its own process** is stricter than threads of one process (no shared statics, no leftover
   environment), and costs each test its own start; the suite passes that way.  Tests that start a thread per CPU
   themselves share the machine with all the others, so a test that depends on its speed shows it: lower `TEST_JOBS` to
