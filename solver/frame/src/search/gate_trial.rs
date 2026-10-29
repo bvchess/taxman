@@ -481,11 +481,12 @@ mod tests {
 
     #[test]
     fn a_trial_solves_its_units_under_each_gate_and_sets_the_cheapest() {
-        // Game 1020's search, about 8,900 steps, stopped at its first check of the node limit (1,024 steps), leaves its
-        // units in its checkpoint.
-        let p = game(1020);
+        // Game 800's search, about 1,400 steps, stopped at its first check of the node limit (1,024 steps), leaves its
+        // units in its checkpoint; the two that the trial picks take under 100 steps each under either gate, within the
+        // plan's 300.
+        let p = game(800);
         let dir = TempDir::new("gate-trial");
-        let path = dir.join("n1020.ckpt");
+        let path = dir.join("n800.ckpt");
         let every = Duration::from_secs(3600);
         let cfg = EngineConfig {
             threads: 1,
@@ -511,7 +512,7 @@ mod tests {
             carried: None,
             forgetting: p.tactics.forgetting(),
             background: false,
-            label: "n=1020",
+            label: "n=800",
         };
         let (checkpoints, taken) = Checkpoints::new(plan.after);
         checkpoints.event(CheckpointEvent::Written {
