@@ -83,9 +83,10 @@ nonnegative weighting, some member weighs more than opt(n), with the values as w
 be a heaviest one.
 
 1. *One heaviest member.*  In a greedy relaxation of game n, let G be the set that the greedy algorithm keeps, taking
-   the numbers in decreasing order.  The values are positive and distinct, so G is the only heaviest member: every
-   other member I has w(I) < w(G).  This is the primer's general greedy theorem: with positive weights a heaviest
-   member is a basis, a member that no further number can join, and distinct weights give only one heaviest basis.
+   the numbers in decreasing order.  The values are positive and distinct, so G is the only heaviest member: every other
+   member I has w(I) < w(G).  This is the primer's greedy theorem ([matroids](primer.md#matroids)): with positive
+   weights a heaviest member is a basis, a member that no further number can join, and distinct weights give only one
+   heaviest basis.
 2. *Every optimal set would be it.*  Every optimal set is playable, so a member, and the heaviest member weighs at least
    opt(n).  If it weighed exactly opt(n), every optimal set would be a heaviest member, and so equal to G; but there are
    two.  ∎

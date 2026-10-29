@@ -22,8 +22,8 @@ promotions](frame-bounds.md)).
 [sources.md](sources.md#descending-greedy).  The incidence vector v(s) of a number s, the unit vector e_s of s ≤ n/2,
 and a set *independent with its own coordinates* (its members' v(s) together with the e_s of its members up to n/2) are
 those of [playability.md](playability.md#independence).  GF(2) is explained in [the
-primer](primer.md#finite-fields-and-gf2), and linear independence, spans, circuits and quotients by a span in [its
-section on linear independence](primer.md#linear-independence).
+primer](primer.md#finite-fields-and-gf2), and linear independence, spans, circuits, private coordinates and quotients by
+a span in [its section on linear independence](primer.md#linear-independence).
 
 ## The parity vectors
 
@@ -36,20 +36,20 @@ vector in each part.
 
 * v(s), if Ω(s) and i have different parities;
 * e_s, if they have the same parity and s ≤ n/2;
-* the unit vector of an *extra coordinate*, a coordinate of s's own beside E_i, if they have the same parity and
-  s > n/2, since s then has no vector in E_i.
+* the unit vector of an *extra coordinate*, a private coordinate beside E_i, if they have the same parity and s > n/2,
+  since s then has no vector in E_i.
 
 A set S ⊆ {2, …, n} is *independent at parity i* when the parity-i vectors of its members are linearly independent over
 GF(2), and *independent at both parities* when it is independent at parity 0 and at parity 1.  A *circuit at parity i*
-is a set whose parity-i vectors sum to 0 while those of no smaller nonempty part of it do.  For a set Y, a set I
-disjoint from Y is independent at parity i *together with Y* when Y ∪ I is independent at parity i, and at both
+is a nonempty set whose parity-i vectors sum to 0 while those of no smaller nonempty part of it do.  For a set Y, a set
+I disjoint from Y is independent at parity i *together with Y* when Y ∪ I is independent at parity i, and at both
 parities together with Y when it is at each.  When Y is independent at parity i, this says that the classes of I's
 parity-i vectors modulo the span of Y's are independent ([the primer](primer.md#linear-independence)).
 
-*Extra coordinates.*  A number with an extra coordinate at parity i is independent of everything at that parity: no
-other parity-i vector has a 1 there, so no nonempty set whose parity-i vectors sum to 0 holds it.  So a set is
-independent at parity i exactly when its members without an extra coordinate at parity i are.  A member with one lies in
-no circuit at parity i, and it joins any set independent at parity i without making it dependent.
+*Extra coordinates.*  At parity i, no vector but a number's own has a 1 at its extra coordinate, so no combination of
+the other members' parity-i vectors reaches the number's, and no nonempty set whose parity-i vectors sum to 0 holds it.
+So a set is independent at parity i exactly when its members without an extra coordinate at parity i are.  A member with
+one lies in no circuit at parity i, and it joins any set independent at parity i without making it dependent.
 
 *Example.*  On the board of 10 the coordinates are 1 to 5, with E₀ = {1, 4} and E₁ = {2, 3, 5}.  In the table,
 *extra* stands for a number's extra coordinate.
@@ -71,7 +71,7 @@ them.  The heaviest set independent at both parities is {6, 7, 8, 9, 10}, worth 
 
 ![The numbers 2 to 10 between two boxes of coordinates, E₀ = {1, 4} on the left and E₁ = {2, 3, 5} on the right, with solid lines to maximal factors and dashed lines from the numbers up to 5 to their own coordinates e_s](img/parity-10.svg)
 
-*A number's solid lines land in one box and its dashed line in the other.  The numbers above 5 have no coordinate in
+*A number's solid lines land in one box and its dashed line in the other.  The numbers above 5 have no coordinate e_s in
 either box (double outline), and each has an extra coordinate, not drawn, at the parity of its layer.  Gray and bold:
 the heaviest set independent at both parities.*
 
@@ -99,8 +99,8 @@ nothing.
    vectors sum to 0 splits into its vectors in E₀ and its vectors in E₁, each of which sums to 0 alone, and one of them
    is nonempty.  Its vectors in E_i are exactly the parity-i vectors of the members of S that have no extra
    coordinate at parity i: v(s) when Ω(s) and i differ in parity, and e_s when they agree and s ≤ n/2.  And a set is
-   independent at parity i iff those members are, since an extra coordinate makes its number independent of everything
-   ([the parity vectors](#the-parity-vectors), the paragraph "Extra coordinates").
+   independent at parity i iff those members are, since a member with an extra coordinate joins every set independent
+   at parity i ([the parity vectors](#the-parity-vectors), the paragraph "Extra coordinates").
 2. *A playable set is independent with its own coordinates,* by [the independence lemma
    (P10)](playability.md#the-independence-lemma), over GF(2).
 3. *The bound.*  The moves of a game form a playable set, and a playable set can be played and the game continued, so
@@ -126,9 +126,9 @@ Three properties make the bound useful.
 * **Its value can be checked without trusting the algorithm.**  Let w = w₀ + w₁ be a split of the weights under which
   a set I independent at both parities is a heaviest set independent at parity 0 for w₀ and a heaviest set independent
   at parity 1 for w₁.  Then every set J independent at both parities has w(J) = w₀(J) + w₁(J) ≤ w₀(I) + w₁(I) = w(I),
-  so the split proves w(I) the maximum, whatever produced I ([the
-  primer](primer.md#weak-duality-and-lagrangian-relaxation), the paragraph "Certificates").  For the two parities such
-  a split always exists, by the same section.  The prover accepts a value only with its split.
+  so the split proves w(I) the maximum, whatever produced I ([the primer](primer.md#two-families-at-once), the
+  paragraph "Certificates").  For the two parities such a split always exists (the primer, the paragraph "For families
+  of vectors").  The prover accepts a value only with its split.
 * **The same split bounds the sets that avoid a member x of I.**  Such a set weighs at most the heaviest set without x
   that is independent at parity 0, for w₀, plus the heaviest without x that is independent at parity 1, for w₁, by the
   same weak duality, and each term is one exchange from I.  The prover's search relies on this: a member whose bound
@@ -271,11 +271,11 @@ Between it and the bounds it is compared with:
   unplayable, since whichever member is played first leaves at most one of the factors 2, 3 and 5 for the other two,
   and its vectors are dependent over GF(2) but independent over the rationals ([the
   primer](primer.md#finite-fields-and-gf2), the paragraph "Example").
-* The bound asks for independence at two parities at once, and there [the greedy
-  algorithm](primer.md#the-greedy-algorithm) can miss the heaviest set.  On every board from 4 up, give 2 the weight
-  3, give 3 and 4 the weight 2, and give every other number 0.  The greedy algorithm keeps 2 and then neither 3 nor 4,
-  since 2 shares the vector e₁ with 3 at parity 0 and e₂ with 4 at parity 1, so what it keeps weighs 3, while {3, 4}
-  is independent at both parities and weighs 4.  So [the relaxation proposition
-  (Q2)](uniqueness-and-longest-games.md#the-relaxation-proposition), by which no greedy relaxation of a game with two
-  or more optimal sets is exact, does not apply to it: a greedy relaxation is a family on which the greedy algorithm
-  finds a heaviest set for every weighting.
+* The bound asks for independence at two parities at once, and there the greedy algorithm, which takes the numbers in
+  decreasing order of weight and keeps each that leaves the kept set independent at both parities, can miss the
+  heaviest set.  On every board from 4 up, give 2 the weight 3, give 3 and 4 the weight 2, and give every other
+  number 0.  The greedy algorithm keeps 2 and then neither 3 nor 4, since 2 shares the vector e₁ with 3 at parity 0 and
+  e₂ with 4 at parity 1, so what it keeps weighs 3, while {3, 4} is independent at both parities and weighs 4.  So [the
+  relaxation proposition (Q2)](uniqueness-and-longest-games.md#the-relaxation-proposition), by which no greedy
+  relaxation of a game with two or more optimal sets is exact, does not apply to it: a greedy relaxation, as Q2 defines
+  it, is a family on which the greedy algorithm finds a heaviest set for every nonnegative weighting.

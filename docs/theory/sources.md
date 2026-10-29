@@ -100,12 +100,13 @@ playable set S of sources has ΣS ≤ ΣU\*.
 [The greedy algorithm](primer.md#the-greedy-algorithm), which runs like descending greedy, finds a heaviest set of
 linearly independent vectors, or a heaviest forest of a graph.  Both have the *exchange property*: within any set, all
 the maximal independent subsets have one size ([linear independence](primer.md#linear-independence),
-[forests](primer.md#forests)).  The greedy algorithm finds a heaviest member of exactly the families closed under
-subsets that have it, the *matroids* ([the primer](primer.md#matroids)).  Playable sets of sources have it as long as
-every member has at most two maximal factors.  Draw the factors as vertices, with one more vertex, the ground, and each
-member as an edge between its two maximal factors, or between its one maximal factor and the ground.  By [the two-factor
-proposition (P11)](playability.md#the-two-factor-proposition), a set of such members is playable exactly when its edges
-form a forest, and descending greedy is then the greedy algorithm on the forests of that graph.
+[forests](primer.md#forests)).  The greedy algorithm finds a heaviest member for every nonnegative weighting, exactly on
+the families closed under subsets that have it, the *matroids* ([the primer](primer.md#matroids)).  Playable sets of
+sources have the exchange property as long as every member has at most two maximal factors.  Draw the factors as
+vertices, with one more vertex, the ground, and each member as an edge between its two maximal factors, or between its
+one maximal factor and the ground.  By [the two-factor proposition (P11)](playability.md#the-two-factor-proposition), a
+set of such members is playable exactly when its edges form a forest, and descending greedy is then the greedy algorithm
+on the forests of that graph.
 
 A member with three or more maximal factors is a hyperedge, and with hyperedges the exchange property can fail.  It
 fails in game 2873, on six sources built from the primes 11, 13 and 17; among the sources, no failure in a smaller game

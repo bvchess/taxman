@@ -49,19 +49,20 @@ state form a promotion set (at the root P is empty, a promotion set by [the exac
 applied, its moves peel completely ([the peel theorem (P4)](playability.md#the-peel-theorem)), and [the peel-order lemma
 (P9)](playability.md#the-peel-order-lemma), part 2, applies.  A family made of the moves' vectors and others is then
 independent exactly when the others' *classes* modulo the moves' span are ([quotients](primer.md#linear-independence)):
-a set is independent in frame h exactly when the classes of its members that touch frame h are, that of v_σ(x) for x of
-home h + 1 and of e_y for y of home h.  The quotient has dimension |Q_h| less the number of moves, the frame's freedoms,
-so a set independent in frame h has at most that many members in T_h.
+a set is independent in frame h exactly when the classes of its members that touch frame h are.  The quotient has
+dimension |Q_h| less the number of moves, the frame's freedoms, so a set independent in frame h has at most that many
+members in T_h.
 
-**Every frame at once.**  A set of candidates is *independent in every frame* when it is independent in each frame under
-the plain signing over GF(2).  A candidate of home h touches frames h and h − 1 only, one even and one odd, so the even
-frames' sets T_h partition the candidates, as do the odd frames'.  Independence in every frame is then two conditions,
-the even frames' and the odd frames', each the independence of one family of vectors: with the even frames' quotients on
-disjoint coordinates, a candidate's vector is its class in the even frame it touches, and vectors on disjoint
-coordinates are independent exactly when their parts on each block are.  Likewise for the odd frames.  Weighted matroid
-intersection finds a heaviest set independent in two such families, within a limit on its size ([the
-primer](primer.md#two-families-at-once)), and a weight split between them checks its value ([weak
-duality](primer.md#weak-duality-and-lagrangian-relaxation)): no proof depends on the algorithm.
+**Every frame at once.**  A set X of candidates is *independent in every frame* when it is independent in each frame
+under the plain signing over GF(2), and *together with* a set P when P ∪ X is.  A candidate of home h touches frames h
+and h − 1 only, one even and one odd, so the even frames' sets T_h partition the candidates, as do the odd frames'.
+Independence in every frame is then two conditions, the even frames' and the odd frames', each the independence of one
+family of vectors: give each candidate its class in the even frame it touches, in the direct sum of the even frames'
+quotient spaces, where each frame's quotient meets the sum of the others only in 0, so that a set is independent exactly
+when its part in each even frame is (the primer, the item "Disjoint blocks").  Likewise for the odd frames.  Weighted
+matroid intersection finds a heaviest set independent in two such families, within a limit on its size ([the
+primer](primer.md#two-families-at-once)).  The frame bound needs only weak duality, by which a weight split that attains
+a value proves it; one exists under the limit too (the primer's paragraph "For families of vectors").
 
 *Example.*  On the board of 21, setup leaves two frames with freedoms: frame 0, with the moves 14 and 21 and the factors
 2, 3 and 7, and frame 1, with the moves 12 and 18 and the factors 4, 6 and 9 (15 has taken 5, and 20 has taken 10).  The
@@ -111,14 +112,15 @@ their nonzero entries.
    in frame h together with P.
 6. *Together with P is the node's frame.*  By step 2 for P, the moves' vectors and those of P's members that touch frame
    h are independent, so X is independent together with P exactly when its classes modulo the span of all of these are
-   (the quotient form).  Adding the vectors of P's members of home h + 1 to the span makes them moves, as they are in
-   state(P).  Quotienting by the e_y of P's members y of home h deletes the coordinates y: they leave the factors, as in
-   state(P).  The frames of state(P) are then reduced, as [its definition](frame-model.md#searching-the-frame-model) has
-   it: a move a left with a single factor f among the factors that remain is dropped with f.  Modulo the coordinates
-   already deleted, v_σ(a) is σ(a, f) e_f, so the quotient by it deletes the coordinate f, and every other number's
-   class is its vector on the factors left, modulo the moves left, as in the reduced frame.  So, by the quotient form in
-   state(P), X is independent together with P exactly when it is independent in frame h of state(P).  If f is a
-   candidate of home h, its class e_f is now 0: P ∪ {f} is dependent in frame h.  ∎
+   ([independence together with a set](primer.md#linear-independence)).  Adding the vectors of P's members of home
+   h + 1 to the span makes them moves, as they are in state(P).  Quotienting by the e_y of P's members y of home h
+   deletes the coordinates y: they leave the factors, as in state(P).  The frames of state(P) are then reduced, as [its
+   definition](frame-model.md#searching-the-frame-model) has it: a move a left with a single factor f among the factors
+   that remain is dropped with f.  Modulo the coordinates already deleted, v_σ(a) is σ(a, f) e_f, so the quotient by it
+   deletes the coordinate f, and every other number's class is its vector on the factors left, modulo the moves left,
+   as in the reduced frame.  So, by the quotient form in state(P), X is independent together with P exactly when it is
+   independent in frame h of state(P).  If f is a candidate of home h, its class e_f is now 0: P ∪ {f} is dependent in
+   frame h.  ∎
 
 *Example.*  At the node of game 21 that promotes 9, root frame 1 loses the factor 9, so 18 is left with 6 alone and
 drops with it, and then 12 drops with 4: state({9}) has taken 4 out of its home.  So {4} is dependent together with 9 in
@@ -200,9 +202,9 @@ So at a node with the promotions P and the candidates C, every completion P ∪ 
 sets I ⊆ C independent in every frame together with P, with no more members than that promotion limit plus the number of
 one-sided candidates in C.
 
-In the two families of vectors of [signed frames](#signed-frames), a one-sided candidate is a mover in its own frame's
-family and has a coordinate of its own in the other, which joins any independent set, so the bound is computed as the
-frame bound is.
+In the two families of vectors of [signed frames](#signed-frames), a one-sided candidate is a mover in the family of its
+own frame's parity, by its class there, and has a private coordinate in the other, so it joins any set independent
+there, and the bound is computed as the frame bound is.
 
 *Proof.*
 
@@ -251,20 +253,20 @@ L holds no candidate of class 0 in any frame h_j under σ_j (B1 (1)), so keeping
 At a node, the same argument runs with X in place of L, by B1 (2) and B2.  ∎
 
 Each term is a standard computation: MI weighs a heaviest set independent in the two families of [signed
-frames](#signed-frames), which weighted matroid intersection finds and a weight split checks ([the
-primer](primer.md#two-families-at-once)), and max_j the greedy algorithm on frame h_j's classes under σ_j ([the
-primer](primer.md#the-greedy-algorithm)).  At λ = 0 the sum is 0 and dec(0) is the frame bound, so the best multipliers
-do at least as well.  The least value of dec over the multipliers is that of a linear program over the convex hulls of
-the sets that each condition admits (the primer, the paragraph "The best bound"), whose parts have the hulls that the
-primer, the paragraph "For matroids", describes.  That says what the bound can reach; it holds at every λ, so nothing
-rests on how the multipliers are found.  [solver/docs/design/gf2-bound.md, "The decomposition
+frames](#signed-frames) within the promotion limit, which weighted matroid intersection finds and a weight split checks
+([the primer](primer.md#two-families-at-once); under the limit, the paragraph "For families of vectors"), and max_j the
+greedy algorithm on frame h_j's classes under σ_j ([the primer](primer.md#the-greedy-algorithm)).  At λ = 0 the sum is
+0 and dec(0) is the frame bound, so the best multipliers do at least as well.  The least value of dec over the
+multipliers is that of a linear program over the convex hulls of the sets that each condition admits (the primer, the
+paragraph "The best bound"), whose parts have the hulls that the paragraph "For families of vectors" describes.  That
+says what the bound can reach; it holds at every λ, so nothing rests on how the multipliers are found.
+[solver/docs/design/gf2-bound.md, "The decomposition
 bound"](../../solver/docs/design/gf2-bound.md#the-decomposition-bound) says how a study's code evaluates it exactly.
 
 ## The GF(3) proposition
 
-Over GF(3), the signings of a frame together see every way the frame can fail: a frame that is not winnable has a
-signing that shows it.  This is explanatory, and nothing rests on it; it says why frames signed over GF(3) can close
-what the frame bound misses.
+Over GF(3), a frame that is not winnable has a signing that shows it.  This is explanatory, and nothing rests on it; it
+says why frames signed over GF(3) can close what the frame bound misses.
 
 **Proposition B5 (the GF(3) proposition).**  Let L be a set of candidates of a state of the frame model, and h a frame
 of the state.  Frame h is winnable with L applied if and only if L is independent in frame h under every signing of
@@ -356,16 +358,15 @@ candidates.
 
 1. *Blocks.*  Let block j be the coordinates up to n/2 in layer j.  A number s has v(s) in block Ω(s) − 1 and, if
    s ≤ n/2, e_s in block Ω(s), so each parity-i vector lies in a block of parity i or, for a number above n/2, on a
-   coordinate of its own, and a set is independent at parity i exactly when its vectors in each block are ([vectors on
+   private coordinate, and a set is independent at parity i exactly when its vectors in each block are ([vectors on
    disjoint coordinates](primer.md#linear-independence)).  Block j is the union of the pools F_D of the frames D of
    layer j + 1 ([the frame lemma (F1)](frame-model.md#the-frame-lemma)).
 2. *Working modulo U\*.*  U\* is playable, so independent at both parities (W1), and X ∪ U\* is independent at parity i
    exactly when the classes of X's parity-i vectors modulo the span of U\*'s are.  At parity i a member of U\* has a
-   coordinate of its own, which no number up to n/2 uses, or has its v(s) in a block, on the pool of its own frame.  For
-   a closed frame D, U\* ∩ D is playable against F_D, so its |F_D| vectors on F_D are independent
-   ([P10](playability.md#the-independence-lemma)) and span all of them.  So, modulo U\*'s vectors, block j becomes the
-   vectors on F_h, where h = j + 1 − k₀, modulo the span of frame h's moves, or nothing if layer j + 1 has no frame with
-   freedoms.
+   private coordinate or has its v(s) in a block, on the pool of its own frame.  For a closed frame D, U\* ∩ D is
+   playable against F_D, so its |F_D| vectors on F_D are independent ([P10](playability.md#the-independence-lemma)) and
+   span all of them.  So, modulo U\*'s vectors, block j becomes the vectors on F_h, where h = j + 1 − k₀, modulo the
+   span of frame h's moves, or nothing if layer j + 1 has no frame with freedoms.
 3. *The candidates.*  A candidate x of home h + 1 has v(x) in block k₀ + h − 1, with the class of its vector on F_h, and
    a candidate y of home h has e_y there too.  So X ⊆ C has X ∪ U\* independent at parity a exactly when, for every even
    h, the classes of X's members that touch frame h are independent modulo frame h's moves on F_h, and at parity b
