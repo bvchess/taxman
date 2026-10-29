@@ -47,8 +47,7 @@ const TABLE_GAMES: usize = 400;
 /// time.  Its table is the first [`TABLE_GAMES`] games of the committed results, in a file beside the first of `paths`.
 fn python_referee(paths: &[PathBuf]) -> std::process::Output {
     let none = "/nonexistent/none.jsonl";
-    let table = paths[0].with_file_name("table.jsonl");
-    fs::write(&table, common::committed_text(TABLE_GAMES)).unwrap();
+    let table = common::referee_table(&paths[0], TABLE_GAMES);
     let mut command = Command::new("python3");
     command.arg("-I").arg(crate_path("../tools/check_results.py")).args(["--committed", none, "--bounds", none]);
     command.arg("--table").arg(&table);

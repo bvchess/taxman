@@ -120,10 +120,7 @@ fn python_verdict(file: &Path, sources: &KnownSources) -> (Option<i32>, String) 
     let committed = sources.committed.as_deref().unwrap_or(none);
     let bounds = sources.bounds.as_deref().unwrap_or(none);
     // Its table, as the Rust verifier's built-in one: the first games of the committed results, in a file beside `file`.
-    let table = file.with_file_name("table.jsonl");
-    if !table.exists() {
-        fs::write(&table, common::committed_text(common::FIRST_GAMES as usize)).unwrap();
-    }
+    let table = common::referee_table(file, common::FIRST_GAMES as usize);
     let args = [
         common::path(file),
         "--committed",
@@ -507,6 +504,7 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
     let out = dir.join("table.jsonl");
     let from_table = options(KnownSources { boards: true, ..KnownSources::default() });
     let games = run_with(&from_table, 40, 45, &out, Optimal::built_in());
+    assert_eq!(games.iter().map(|g| g.n).collect::<Vec<_>>(), (40..=45).collect::<Vec<_>>());
     for game in &games {
         assert_eq!(game.known.as_ref().map(|cited| &cited.cite), Some(&Cite::Optimal), "n={}", game.n);
         assert_eq!(game.assumes, Assumptions::from([assumed_optimal(game.n)]), "n={}", game.n);

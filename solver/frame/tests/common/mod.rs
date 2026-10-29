@@ -15,7 +15,7 @@ pub use binary::{path, python, taxman, Run};
 #[allow(unused_imports)]
 pub use support::QUICK;
 #[allow(unused_imports)]
-pub use support::{committed_text, gzip_stored, Rng, TempDir};
+pub use support::{committed_text, gzip_stored, referee_table, Rng, TempDir};
 #[allow(unused_imports)]
 pub use taxman::playable::{peel, play_order, playable};
 

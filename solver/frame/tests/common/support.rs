@@ -61,6 +61,18 @@ pub fn committed_text(count: usize) -> String {
     text.split_inclusive('\n').take(count).collect()
 }
 
+/// The table of the Python referee (`check_results.py --table`), as the Rust verifiers' built-in one: the first `games`
+/// games of the committed results, in a file beside `beside` (written the first time it is asked for).  Its name is
+/// this function's alone and holds `games`: no results file that a test writes in the directory is this file, which a
+/// run would open as its own results and check, and a file already there has the games asked for.
+pub fn referee_table(beside: &Path, games: usize) -> PathBuf {
+    let table = beside.with_file_name(format!("referee-table-{games}.jsonl"));
+    if !table.exists() {
+        fs::write(&table, committed_text(games)).unwrap_or_else(|e| panic!("{}: {e}", table.display()));
+    }
+    table
+}
+
 /// A gzip file whose members are the texts `members`, in order, each stored in deflate blocks that are not compressed
 /// (at most 65,535 bytes each): a file made by hand, so that a test of the reading of gzip files needs no compressor.
 pub fn gzip_stored(members: &[&str]) -> Vec<u8> {
