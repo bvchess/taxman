@@ -30,13 +30,12 @@ lemma](uniqueness-and-longest-games.md#the-length-lemma) (Q3) assume (★).  The
 rest on statement U.
 
 The rest of the file is explanatory, and follows the ways a proof has been tried.  The textbook proof that a procedure
-like descending greedy finds a heaviest set needs the exchange property of a matroid, which playable sets can lack
-([where exchange breaks](#where-exchange-breaks)).  A direct proof compares U\* with a heavier set at their largest
-disagreement.  It works where the obstruction there is made of members with at most two maximal factors ([the victim
-law (S2)](#the-victim-law) and [the frontier theorem (S3)](#the-frontier-theorem)), and stops at a configuration of
-sources built from the primes 17, 19 and 23.  Dropping the weights turns the conjecture into (★), and linear algebra
-over GF(2) gives (♦).  The last sections list what the measurements say a proof must use, and prove the frontier
-theorem.
+like descending greedy finds a heaviest set needs the exchange property, which playable sets can lack ([where exchange
+breaks](#where-exchange-breaks)).  A direct proof compares U\* with a heavier set at their largest disagreement.  It
+works where the obstruction there is made of members with at most two maximal factors ([the victim law
+(S2)](#the-victim-law) and [the frontier theorem (S3)](#the-frontier-theorem)), and stops at a configuration of sources
+built from the primes 17, 19 and 23.  Dropping the weights turns the conjecture into (★), and linear algebra over GF(2)
+gives (♦).  The last sections list what the measurements say a proof must use, and prove the frontier theorem.
 
 ## Definitions
 
@@ -98,14 +97,15 @@ playable set S of sources has ΣS ≤ ΣU\*.
 
 ## Where exchange breaks
 
-[The greedy algorithm of a matroid](primer.md#the-greedy-algorithm-of-a-matroid), which runs like descending greedy,
-finds a heaviest independent set.  The independent sets of a matroid have the *exchange property*: within any set, all
-the maximal independent subsets have one size ([matroids](primer.md#matroids)).  Playable sets of sources have it as
-long as every member has at most two maximal factors.  Draw the factors as vertices, with one more vertex, the ground,
-and each member as an edge between its two maximal factors, or between its one maximal factor and the ground.  By [the
-two-factor proposition (P11)](playability.md#the-two-factor-proposition), a set of such members is playable exactly
-when its edges form a forest.  The forests of a graph are the independent sets of its graphic matroid, and descending
-greedy is that matroid's greedy algorithm.
+[The greedy algorithm](primer.md#the-greedy-algorithm), which runs like descending greedy, finds a heaviest set of
+linearly independent vectors, or a heaviest forest of a graph.  Both have the *exchange property*: within any set, all
+the maximal independent subsets have one size ([linear independence](primer.md#linear-independence),
+[forests](primer.md#forests)).  The greedy algorithm finds a heaviest member of exactly the families closed under
+subsets that have it, the *matroids* ([the primer](primer.md#matroids)).  Playable sets of sources have it as long as
+every member has at most two maximal factors.  Draw the factors as vertices, with one more vertex, the ground, and each
+member as an edge between its two maximal factors, or between its one maximal factor and the ground.  By [the two-factor
+proposition (P11)](playability.md#the-two-factor-proposition), a set of such members is playable exactly when its edges
+form a forest, and descending greedy is then the greedy algorithm on the forests of that graph.
 
 A member with three or more maximal factors is a hyperedge, and with hyperedges the exchange property can fail.  It
 fails in game 2873, on six sources built from the primes 11, 13 and 17; among the sources, no failure in a smaller game
@@ -122,8 +122,8 @@ is known (on the whole board the primer shows one in game 4):
 
 The sets Y = {1573, 2057, 2431, 2873} and Y′ = {1573, 1859, 2057, 2197, 2873} are both playable.  No member of Y′ fits
 into Y: Y ∪ {1859} and Y ∪ {2197} are themselves cores.  So among these six sources Y is a maximal playable set of size
-4 and Y′ one of size 5, and the playable subsets of the six are not the independent sets of any matroid.  The textbook
-proof does not apply.
+4 and Y′ one of size 5, and the playable subsets of the six lack the exchange property.  The textbook proof does not
+apply.
 
 ![Game 2873's six sources as edges on the factors 121, 143, 169, 187, 221 and the ground, with 2431 joined to three factors, showing the maximal playable sets Y and Y′](img/exchange-2873.svg)
 
@@ -263,9 +263,9 @@ vectors are independent over GF(2), could break (♦) without breaking (★).  O
 {1573, 1859, 2057, 2431, 2873} of game 2873 is one, since its five vectors are independent over GF(2).  The failure of
 exchange there needs one.  A set that is not playable but whose vectors are independent holds an odd core, so without
 one the playable sets among the six would be exactly the sets with independent vectors ([the independence lemma
-(P10)](playability.md#the-independence-lemma) gives the other direction), and those are a matroid's.  A rejection of x
-forced only by an odd core is one where x's vector is not a sum of kept vectors, so the check of (♦) passing in a game
-says exactly that descending greedy rejected no source of it because of an odd core.
+(P10)](playability.md#the-independence-lemma) gives the other direction), and those have the exchange property.  A
+rejection of x forced only by an odd core is one where x's vector is not a sum of kept vectors, so the check of (♦)
+passing in a game says exactly that descending greedy rejected no source of it because of an odd core.
 
 ## The span theorem
 

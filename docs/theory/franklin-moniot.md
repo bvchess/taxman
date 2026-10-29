@@ -133,9 +133,9 @@ heaviest subsets of {2, …, n} that meet the three conditions in turn.
    precedence.  By [C1](#the-bridge-lemma), a scheme has one iff no other scheme has its payments T, that is, iff per(S,
    T) = 1.
 4. *The bounds.*  The Franklín–Moniot bound is the heaviest set with a payment scheme, as above.  The parity bound is
-   the heaviest set independent in both parity matroids, which are the sets independent with their own coordinates
-   ([what the parity bound misses](parity-bound.md#what-the-parity-bound-misses)).  And opt(n) is the heaviest playable
-   set.  ∎
+   the heaviest set [independent at both parities](parity-bound.md#the-parity-vectors), and those are the sets
+   independent with their own coordinates ([what the parity bound
+   misses](parity-bound.md#what-the-parity-bound-misses)).  And opt(n) is the heaviest playable set.  ∎
 
 Both inclusions are strict, and the counts show why.  The triangle {6, 10, 15} has two schemes, both onto {2, 3, 5}: it
 has a scheme and is dependent, and no board below 15 has such a set.  The odd core {12, 18, 20, 30, 45} has three
@@ -145,9 +145,10 @@ board below 45 has such a set.
 *What the count keeps.*  By steps 4 and 5 of C1's proof, the schemes onto T are one of them flipped along the sets of
 pairwise disjoint flat alternating cycles of it, the empty set included, so per(S, T) counts those sets.  Their
 characterization asks that some set of factors receive one scheme only.  The parity bound asks only that the count be
-odd: it keeps the part of the condition that is linear, which matroid intersection computes in polynomial time, and
-drops uniqueness.  So the sets that the parity bound admits and the game does not are those with an odd count onto some
-T but no count of 1: by C2 they are independent and not playable, and each holds an odd core.
+odd: it keeps the part of the condition that is linear, under which the heaviest set can be found in polynomial time
+([computing the bound](parity-bound.md#computing-and-checking-the-bound)), and drops uniqueness.  So the sets that the
+parity bound admits and the game does not are those with an odd count onto some T but no count of 1: by C2 they are
+independent and not playable, and each holds an odd core.
 
 *Which field.*  GF(2) is stricter than the rationals: vectors of integers independent over GF(2) are independent over
 the rationals ([the primer](primer.md#finite-fields-and-gf2), the paragraph "Comparing fields"), and a bound built over
@@ -220,10 +221,11 @@ The parity bound extends to their game.  On a graded poset, give each element th
 each element that something covers its unit vector, and split the coordinates by the parity of their rank.  By their
 Theorem 1, a playable set has a matching of its members to elements they cover with no flat alternating cycle, and step
 5 of [C1](#the-bridge-lemma)'s proof, which uses only the ranks, makes it the only matching onto its lower ends.  So its
-count is 1, its determinant odd, and its family independent over GF(2), as in Taxman.  The heaviest set independent in
-both parity matroids therefore bounds their game, and weighted matroid intersection computes it in polynomial time.  On
-two ranks with unit weights the bound is the GF(2) rank of the bipartite adjacency matrix, which lies between the
-uniquely restricted matching number and the matching number.  Three consequences follow.
+count is 1, its determinant odd, and its family independent over GF(2), as in Taxman.  The heaviest set independent at
+both parities therefore bounds their game, and it can be computed in polynomial time, as the parity bound of Taxman is
+([computing the bound](parity-bound.md#computing-and-checking-the-bound)).  On two ranks with unit weights the bound is
+the GF(2) rank of the bipartite adjacency matrix, which lies between the uniquely restricted matching number and the
+matching number.  Three consequences follow.
 
 * Unless P = NP, no bound computable in polynomial time equals the best score on every graded poset.  For the parity
   bound the difference is the odd cores.
@@ -252,8 +254,8 @@ file on small boards, in under two minutes on one thread.  From the folder `heur
     ../.venv/bin/python -m evaluation.fm_relation
 
 It decides playability by the rules alone, and their condition literally, as a scheme with no flat alternating cycle,
-and compares both with peel, the counts per(S, T) and independence in the parity matroids.  It runs on every set of
-moves of the boards up to 22, on random sets of the boards 30 to 120 grown around members with three or more distinct
-primes, and on the sets of at most six members of the boards 44 and 45, for odd cores.  Every result it checks is
-proved, so it tests the programs, not the results; [the tests of the theory's
+and compares both with peel, the counts per(S, T) and independence at both parities.  It runs on every set of moves of
+the boards up to 22, on random sets of the boards 30 to 120 grown around members with three or more distinct primes, and
+on the sets of at most six members of the boards 44 and 45, for odd cores.  Every result it checks is proved, so it
+tests the programs, not the results; [the tests of the theory's
 results](../../solver/docs/design/tests.md#the-theorys-results) give its counts.

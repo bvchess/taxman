@@ -40,12 +40,13 @@ weights.
    into the order of the members, and into w(S) ≤ w(U\*) for every positive, strictly increasing weighting w, with
    equality only if S = U\*.  ∎
 
-This is the textbook fact that distinct weights give a matroid only one heaviest basis, transplanted.  The playable sets
-of sources need not be a matroid's independent sets, as in game 2873 ([where exchange
-breaks](sources.md#where-exchange-breaks)); in game 21 they are the forests of a graph ([the two-factor proposition
-(P11)](playability.md#the-two-factor-proposition)).  They are always independent in the GF(2) matroid of their incidence
-vectors ([the independence lemma (P10)](playability.md#the-independence-lemma)), and where (♦) holds U\* is that
-matroid's greedy basis; the count form needs only (★).
+This is the textbook fact that distinct weights give a family of vectors only one heaviest basis, the one [the greedy
+algorithm](primer.md#the-greedy-algorithm) keeps, transplanted.  The textbook fact rests on the exchange property, which
+the playable sets of sources can lack, as in game 2873 ([where exchange breaks](sources.md#where-exchange-breaks)); in
+game 21 they are the forests of a graph ([the two-factor proposition (P11)](playability.md#the-two-factor-proposition)).
+Their incidence vectors are always linearly independent over GF(2) ([the independence lemma
+(P10)](playability.md#the-independence-lemma)), and where (♦) holds U\* is the greedy basis of the sources' vectors; the
+count form needs only (★).
 
 ### Optimal sets on the whole board
 
@@ -63,30 +64,34 @@ On the whole board the optimal set need not be unique.  Game 425 has two optimal
 three numbers up to n/2 of equal sum, {110, 132, 168} ↔ {98, 150, 162}, each summing to 410; both sets replay by the
 rules and score opt(425) = 57,010.
 
-#### The matroid proposition
+#### The relaxation proposition
 
-A second optimal set rules out a matroid that is exact for the whole game.  A *matroid relaxation* of game n is a
-matroid on the numbers 2 to n in which every playable set of game n is independent.  Its heaviest independent set, with
-the values as weights, weighs at least opt(n), since the optimal sets are independent; the relaxation is *exact* when it
-weighs exactly opt(n).
+A second optimal set rules out a relaxation that is exact for the whole game and that the greedy algorithm solves.  A
+*greedy relaxation* of game n is a family of subsets of the numbers 2 to n that is closed under taking subsets, holds
+every playable set of game n, and on which [the greedy algorithm](primer.md#the-greedy-algorithm) finds a heaviest
+member for every nonnegative weighting: taking the numbers in decreasing order of weight, it keeps each one that leaves
+the kept set in the family.  These families are the matroids ([the primer](primer.md#matroids)).  The heaviest member,
+with the values as weights, weighs at least opt(n), since the optimal sets are members; the relaxation is *exact* when
+it weighs exactly opt(n).
 
-**Proposition Q2 (the matroid proposition).**  Let n be a game with two or more optimal sets, such as 425.  Then no
-matroid relaxation of game n is exact: in every matroid on the numbers 2 to n in which every playable set of game n is
-independent, some independent set weighs more than opt(n), with the values as weights.
+**Proposition Q2 (the relaxation proposition).**  Let n be a game with two or more optimal sets, such as 425.  Then no
+greedy relaxation of game n is exact: in every family of subsets of the numbers 2 to n that is closed under taking
+subsets, holds every playable set of game n, and on which the greedy algorithm finds a heaviest member for every
+nonnegative weighting, some member weighs more than opt(n), with the values as weights.
 
-*Proof.*  A matroid whose weights are positive and distinct has only one heaviest independent set, and every optimal
-set would be a heaviest one.
+*Proof.*  On such a family, positive and distinct weights give only one heaviest member, and every optimal set would
+be a heaviest one.
 
-1. *One heaviest independent set.*  In a matroid on 2, …, n, let G be the set that [the greedy algorithm of a
-   matroid](primer.md#the-greedy-algorithm-of-a-matroid) keeps, taking the elements in decreasing order.  The values
-   are positive and distinct, so by part (d) of the primer's paragraph "What the scan finds", G is the only heaviest
-   independent set: every other independent set I has w(I) < w(G).
-2. *Every optimal set would be it.*  Every optimal set is playable, so independent, and the heaviest independent set
-   weighs at least opt(n).  If it weighed exactly opt(n), every optimal set would be a heaviest independent set, and so
-   equal to G; but there are two.  ∎
+1. *One heaviest member.*  In a greedy relaxation of game n, let G be the set that the greedy algorithm keeps, taking
+   the numbers in decreasing order.  The values are positive and distinct, so G is the only heaviest member: every
+   other member I has w(I) < w(G).  This is the primer's general greedy theorem: with positive weights a heaviest
+   member is a basis, a member that no further number can join, and distinct weights give only one heaviest basis.
+2. *Every optimal set would be it.*  Every optimal set is playable, so a member, and the heaviest member weighs at least
+   opt(n).  If it weighed exactly opt(n), every optimal set would be a heaviest member, and so equal to G; but there are
+   two.  ∎
 
-So the certificate that settles the sources, a matroid whose greedy basis is U\*, has no analogue that is exact for the
-whole game.
+So the certificate that settles the sources, a family of vectors whose greedy basis is U\*, has no analogue that is
+exact for the whole game.
 
 *The uniqueness of the optimal set to 424* (measured).  The prover enumerates the optimal sets of the games it has
 proved.  The optimal set is unique in every game n ≤ 424; from 425 on a few games have two or three, and most have one.
@@ -104,8 +109,8 @@ is one with ℓ(n) moves.  Write ν(n) for the matching number of the board's [m
 graph](../GLOSSARY.md#the-game), which joins each number to its maximal factors.  A game can be over with fewer than
 ℓ(n) moves for two reasons.  Its set need not be a maximal playable set: the game 9, 15, 21, 14, 18, 12, 20, 16 of 21 is
 over, yet its set with 19 is playable, if 19 is played first ([the prime lemma (N1)](neighbors.md#the-prime-lemma)).
-And maximal playable sets can have different sizes: in game 4, {2} and {3, 4} are both maximal ([the greedy algorithm of
-a matroid](primer.md#the-greedy-algorithm-of-a-matroid)).
+And maximal playable sets can have different sizes: in game 4, {2} and {3, 4} are both maximal, since 3 would need the
+1 that 2 needs, and 4's only maximal factor is 2 itself.
 
 ### The length lemma
 
