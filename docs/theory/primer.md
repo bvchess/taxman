@@ -47,81 +47,64 @@ is −2, which is not 0 over the rationals and is 1 over GF(3), so they are inde
 rationals; the example shows the converse failing at p = 2.  *Proof.*  Suppose d vectors are independent over GF(p).
 Some d × d submatrix has a determinant that is nonzero mod p, so an integer that p does not divide, so not 0.  ∎
 
-## Matroids
+## Linear independence
 
-A matroid keeps what linearly independent vectors and the forests of a graph have in common, which is what the greedy
-algorithm of a matroid needs.
+A *family of vectors* is a finite set E of *members*, each with a vector over a field 𝔽, two members possibly with the
+same one.  A set I ⊆ E is *independent* when its members' vectors, one for each, are linearly independent, and
+*dependent* otherwise.  Every subset of an independent set is independent, the empty set included.
 
-**Definition.**  A *matroid* M on a finite *ground set* E is a family of subsets of E, the *independent sets*, such that
-(1) the empty set is independent, (2) every subset of an independent set is independent, and (3) *augmentation*: if I
-and I′ are independent and |I| < |I′|, some x in I′ ∖ I has I + x independent.  A set that is not independent is
-*dependent*.  The models, below, are vectors and the forests of a graph.
+**Rank, span and bases.**  The *rank* rk(Y) of Y ⊆ E is the rank of Y's vectors, the dimension of their span, and a set
+I *spans* a member, or a set, when the span of I's vectors holds its vectors.  For an independent I and y outside it,
+I + y is dependent exactly when I spans y.  So an independent subset of Y is maximal exactly when it spans Y, and then
+its vectors are a basis of the span of Y's: all the maximal independent subsets of Y have rk(Y) members, and no
+independent one has more.  This is the *exchange property*.  Equivalently, if I and I′ are independent and |I| < |I′|,
+some x in I′ ∖ I has I + x independent, as I's span cannot hold all of I′'s vectors.  A *basis* is a maximal independent
+subset of E.
 
-**Terms.**
+**Circuits.**  A *circuit* is a minimal dependent set.  A nontrivial vanishing combination of its vectors has no
+coefficient 0, or a smaller set would be dependent, so over GF(2) a circuit is a set whose vectors sum to 0, no smaller
+nonempty part of which does.  A member with the vector 0 is a circuit alone, and two with the same nonzero vector form
+one.  A member x has a *coordinate of its own* when its vector is not 0 at a coordinate where every other member's is 0;
+that coordinate gives x the coefficient 0 in every vanishing combination, so x joins every independent set, lies in no
+circuit and is in every basis.
 
-* A *basis* is a maximal independent set.  If one basis had fewer elements than another, augmentation would extend it,
-  so all bases have one size.  The same argument inside any Y ⊆ E shows that the maximal independent subsets of Y have
-  one size, the *rank* rk(Y) of Y, and that every independent subset of Y has at most rk(Y) members.
-* A *circuit* is a minimal dependent set.  A *loop* is an element x with {x} dependent.  Two elements are *parallel*
-  when they form a circuit.  A *coloop* is an element in every basis; if x is a coloop and I − x is independent, so is
-  I, since I − x extends to a basis, which holds x.
-* An independent set I *spans* an element y when y is in I or I + y is dependent, and spans a set when it spans each of
-  its elements; for vectors, I spans y when y is in their span.  An independent subset of Y is maximal exactly when it
-  spans Y.
+**The circuit of I + y.**  Let I be independent and y a member outside I that I spans.  Then y's vector is a combination
+of I's in one way only, as two would differ by a vanishing combination of I; say it uses the members C.  Then C + y, the
+*circuit of I + y*, is the one circuit inside the dependent set I + y: every circuit inside it holds y, since I is
+independent, and its vanishing combination, with no coefficient 0, writes y's vector by its other members, which must be
+C.  A member x of I lies in C exactly when I − x does not span y, that is, when I − x + y is independent.
 
-**The fundamental circuit.**  If I is independent and I + y is dependent, then I + y holds exactly one circuit, and it
-contains y (Oxley, Section 1.1).  We call it the *fundamental circuit* of y over I, or *the circuit of I + y*.  An
-element x of I lies in it exactly when I − x + y is independent.  *Proof.*  Call the circuit H.  If x is in H, a circuit
-inside I − x + y would be inside I + y, so would be H, which is impossible since H holds x; so I − x + y has no circuit.
-If x is not in H, then H lies inside I − x + y, which is dependent.  ∎
+**Changing the family.**
 
-### Linear and graphic matroids
+* *Outside Z.*  The independent sets that avoid a set Z are those of the family on E ∖ Z.
+* *Together with Y.*  For an independent Y, a set I outside Y is *independent together with Y* when Y ∪ I is
+  independent; for a dependent Y, none is.  This holds exactly when the classes of I's vectors modulo the span W of Y's
+  are independent, a family of vectors in the quotient space.  *Proof.*  The classes are dependent exactly when a
+  vanishing combination of the vectors of Y ∪ I has a coefficient of I that is not 0, and every nontrivial one does,
+  since Y is independent.  ∎  A member with its vector in W has the class 0, and two whose vectors differ by one in W
+  share a class.  If Y's vectors are unit vectors, working modulo W deletes their coordinates.
+* *At most k members.*  The independent sets with at most k members keep the exchange property: if |I| < |I′| ≤ k, the x
+  of I′ that can join I leaves I + x with at most k members.
+* *Disjoint blocks.*  If each member's vector is 0 outside one of some disjoint blocks of coordinates, a set is
+  independent exactly when its part on each block is, as a vanishing combination splits into one on each block.  The
+  same holds if the vectors of E₁ lie in a subspace W₁ and those of E₂ in W₂, with only 0 in both.
 
-Give each element of a finite set E a vector over a field 𝔽.  The sets whose vectors are linearly independent form a
-matroid, the *linear matroid* of the vectors (Oxley, Section 1.1).  *Proof of (3).*  If |I| < |I′|, the vectors of I′
-cannot all lie in the span of I, which holds at most |I| independent vectors; so some x in I′ lies outside it, and I + x
-is independent.  ∎
+### Forests
 
-The edges of a graph form a matroid whose independent sets are the forests, the edge sets with no cycle: the *graphic
-matroid*.  Its circuits are the cycles, and its rank is the number of vertices less the number of components.  It is the
-linear matroid over GF(2) of the vectors e_x + e_y, one for each edge xy (Oxley, Section 5.1).  *Proof.*  The edges of a
-cycle sum to zero, so a set that is not a forest is dependent.  A forest is independent: each of its nonempty subsets is
-a forest, and a nonempty forest has a vertex of degree 1, where the sum of its vectors has a 1.  ∎
+Over GF(2), with a coordinate for each vertex, the edge pq of a graph has the vector e_p + e_q.  A set of edges is
+independent exactly when it is a *forest*, with no cycle.  *Proof.*  The edges of a cycle sum to zero, each of its
+vertices ending two of them.  Each nonempty subset of a forest has a vertex of degree 1, where the sum of its vectors
+has a 1.  ∎  So the circuits are the cycles, and a forest spans an edge outside it exactly when the edge closes a cycle
+with it.  A maximal forest is a spanning tree of each component, so the rank is the number of vertices less the number
+of components (Oxley, Section 5.1), and a set is a forest exactly when its part in each component, a block of
+coordinates, is one.
 
 **Example.**  A number pq with two different primes has the maximal factors p and q, so its vector is e_p + e_q: the
 edge pq of a graph on the primes.  In the game of 21, the numbers 6, 10, 14, 15 and 21 are the edges 2–3, 2–5, 2–7, 3–5
-and 3–7 on the primes 2, 3, 5, 7.  The circuits are the triangles {6, 10, 15} and {6, 14, 21} and the 4-cycle
-{10, 14, 15, 21}.  The rank is 3, and there are 8 bases.
-
-### Deletion, contraction, direct sums and truncation
-
-* *Deletion.*  The matroid M ∖ Y has the ground set E ∖ Y and the independent sets of M that avoid Y.
-* *Contraction.*  For an independent set Z, the matroid M/Z has the ground set E ∖ Z, and a set I is independent in M/Z
-  exactly when I ∪ Z is independent in M.  It is a matroid: augment I ∪ Z from I′ ∪ Z in M, and the new element lies in
-  I′ ∖ I.  A dependent Z would leave nothing independent, not even the empty set.  (The general definition is in Oxley,
-  Section 3.1.)
-* *Direct sum.*  If E splits into E₁ and E₂ with a matroid on each, the sets I with I ∩ E₁ and I ∩ E₂ independent form a
-  matroid, the *direct sum*, whose *blocks* are the two.  Augment inside a block where I is smaller than I′.
-* *Truncation.*  For a number d, the sets of M with at most d elements form a matroid, the *truncation* of M to d.
-  *Proof.*  If |I| < |I′| ≤ d, the element x of I′ that can join I in M gives I + x with at most d elements.  ∎  (The
-  theory's *truncation* of a set of sources is another thing, its part above a threshold:
-  [sources.md](sources.md#components-and-truncations).)
-
-For vectors, contraction and direct sum are linear algebra.
-
-* *Contraction is a quotient.*  Vectors are *dependent modulo* a subspace W when some nontrivial combination of them
-  lies in W.  The matroid M/Z of vectors over 𝔽 is the linear matroid of the same vectors modulo the span of Z's.
-  *Proof.* The vectors of I are dependent modulo the span exactly when some vanishing combination of the vectors of
-  I ∪ Z has a coefficient of I that is not 0; and since Z is independent, every nontrivial vanishing combination does.
-  ∎  If Z's vectors are unit vectors, working modulo their span deletes those coordinates.
-* *A direct sum of spaces gives a direct sum.*  If the vectors of E₁ lie in a subspace W₁, those of E₂ in a subspace W₂,
-  and only the zero vector lies in both, then the linear matroid of all the vectors is the direct sum of the two, since
-  a vanishing combination splits into one in W₁ and one in W₂.  A graphic matroid is the direct sum of those of its
-  components: in the game of 35, the numbers 6 and 35 are the edges 2–3 and 5–7, with no prime in common, so the matroid
-  of {6, 35} is the direct sum of two one-element blocks, and each element is a coloop.
-
-**Example.**  Contract the edge 6, which is 2–3, in the graph above.  Its ends merge, 10 and 15 both join the merged
-vertex to 5 and become parallel, and so do 14 and 21; every other pair stays independent.
+and 3–7 on the primes 2, 3, 5, 7.  The circuits are the triangles {6, 10, 15} and {6, 14, 21} and the 4-cycle {10, 14,
+15, 21}.  The rank is 3, and there are 8 bases.  Together with 6, the edges 10 and 15 share a class, their vectors
+differing by 6's, and so do 14 and 21: the ends of 6 merge.  Every other pair stays independent together with 6.  In the
+game of 35, the edges 6 = 2–3 and 35 = 5–7 share no prime, so each has a coordinate of its own in {6, 35}.
 
 ## Sums over thresholds
 
@@ -151,36 +134,38 @@ such weighting needs dominance at every threshold.
 
 **Example.**  Among the numbers 10, 14, 15, 21, let S = {10, 15, 21} and S′ = {14, 15, 21}.  The counts at the
 thresholds 21, 15, 14, 10 are 1, 2, 2, 3 for S and 1, 2, 3, 3 for S′, so S′ dominates S, and with w(x) = x the identity
-gives 46 for S and 50 for S′.  They are two bases of [the graphic matroid](#linear-and-graphic-matroids) above, and S′
-is the scan's.
+gives 46 for S and 50 for S′.  They are two spanning trees of the graph in [Forests](#forests), and S′ is the scan's.
 
-## The greedy algorithm of a matroid
+## The greedy algorithm
 
-In a matroid, the greedy algorithm (the scan) goes through the elements from heaviest to lightest and keeps each one
-that stays independent.  It finds a heaviest basis for any weights and, once its members of weight at most 0 are
-dropped, a heaviest independent set; and a set is heaviest exactly when no single change improves it.
+On a family of vectors, the greedy algorithm (the scan) goes through the members from heaviest to lightest and keeps
+each one whose vector is not in the span of those kept.  It finds a heaviest basis for any weights and, once its members
+of weight at most 0 are dropped, a heaviest independent set; and a set is heaviest exactly when no single change
+improves it.
 
 *Three kinds of greedy.*  The scan is not the Taxman strategy that is often called greedy, which takes the largest legal
 move, and it is not the theory's *descending greedy* ([sources.md](sources.md#descending-greedy)), which runs the same
 scan on playable sets.
 
-*Playable sets are no matroid.*  Already in the game of 4, {2} and {3, 4} are playable, but neither 3 nor 4 can join 2:
-3 would need the 1 that 2 needs, and 4's only maximal factor is 2 itself.  Augmentation fails, so the theorem below does
-not cover descending greedy.
+*Playable sets are not independent sets of vectors.*  Already in the game of 4, {2} and {3, 4} are playable, but neither
+3 nor 4 can join 2: 3 would need the 1 that 2 needs, and 4's only maximal factor is 2 itself.  So the maximal playable
+subsets of {2, 3, 4} differ in size, against [the exchange property](#linear-independence) of vectors, and the theorem
+below does not cover descending greedy.
 
-**The scan.**  Let M be a matroid on E and w a weight function on E.  List E in decreasing order of weight, with ties in
-any order.  Start with G empty, and for each element x in turn, put x in G if G + x is independent.
+**The scan.**  Let E be a family of vectors and w a weight function on E.  List E in decreasing order of weight, with
+ties in any order.  Start with G empty, and for each member x in turn, put x in G if G + x is independent.
 
-**Example.**  Take the graphic matroid above on 6, 10, 14, 15, 21, and let w be the number itself.  The scan keeps 21
-(the edge 3–7), 15 (3–5) and 14 (2–7).  It rejects 10, which would close the 4-cycle, and 6, which would close the
-triangle {6, 14, 21}.  So G = {21, 15, 14}, which weighs 50; the other seven bases weigh 30, 35, 37, 39, 42, 45 and 46.
+**Example.**  Take the edges 6, 10, 14, 15 and 21 of [the example](#forests), and let w be the number itself.  The scan
+keeps 21 (the edge 3–7), 15 (3–5) and 14 (2–7).  It rejects 10, which would close the 4-cycle, and 6, which would close
+the triangle {6, 14, 21}.  So G = {21, 15, 14}, which weighs 50; the other seven bases weigh 30, 35, 37, 39, 42, 45
+and 46.
 
 ![The edges 6, 10, 14, 15 and 21 on the primes 2, 3, 5, 7, with the scan keeping 21, 15 and 14 and rejecting 10 and 6](img/graphic-21.svg)
 
 *The graph, each edge a number between its two primes.  Thick: the edges the scan keeps.  Dashed: the edges it rejects.*
 
-**What the scan finds.**  Let M be a matroid on E, w a real weight function on E, and G the scan's set for any order of
-ties.  Let G⁺ be the part of G with positive weight.
+**What the scan finds.**  Let E be a family of vectors, w a real weight function on E, and G the scan's set for any
+order of ties.  Let G⁺ be the part of G with positive weight.
 
 * (a) G is a basis.
 * (b) For every real t, G ∩ {w ≥ t} is a maximal independent subset of {w ≥ t}, that is, it spans {w ≥ t}.  So every
@@ -189,34 +174,32 @@ ties.  Let G⁺ be the part of G with positive weight.
 * (d) If the weights are distinct, G is the only heaviest basis, and if they are distinct and not 0, G⁺ is the only
   heaviest independent set.
 
-*Proof.*  The idea is that the scan settles every element of weight at least t before it looks at a lighter one.
+*Proof.*  The idea is that the scan settles every member of weight at least t before it looks at a lighter one.
 
-(b) Put Y = {w ≥ t}.  Every element of Y comes before every element outside it.  Take x in Y ∖ G.  The scan rejected x,
-so the set kept before x, plus x, was dependent, and that kept set lies in G ∩ Y because only elements of Y came
-earlier.  So (G ∩ Y) + x is dependent.  Nothing in Y can join G ∩ Y, which is independent as a subset of G, so G ∩ Y
-spans Y and is a maximal independent subset of Y.  It has rk(Y) members, and an independent I ∩ Y has at most rk(Y).
+(b) Put Y = {w ≥ t}.  Every member of Y comes before every member outside it.  Take x in Y ∖ G.  The scan rejected x, so
+the set kept before x, plus x, was dependent, and that kept set lies in G ∩ Y because only members of Y came earlier.
+So (G ∩ Y) + x is dependent.  Nothing in Y can join G ∩ Y, which is independent as a subset of G, so G ∩ Y spans Y and
+is a maximal independent subset of Y.  It has rk(Y) members, and an independent I ∩ Y has at most rk(Y).
 
 (a) Take t at the least weight, so that Y = E.
 
 (c) By the identity of [Sums over thresholds](#sums-over-thresholds), a set of positive weights has a weight that is a
 positive combination of its counts |· ∩ {w ≥ t}|, and (b) bounds each count of an independent I by that of G.  Bases
 have one size, so adding a constant to every weight leaves w(I) − w(G) unchanged; add one that makes all weights
-positive.  For G⁺: w(I) ≤ w(I⁺), and the identity over the elements of positive weight bounds w(I⁺) by w(G⁺).
+positive.  For G⁺: w(I) ≤ w(I⁺), and the identity over the members of positive weight bounds w(I⁺) by w(G⁺).
 
 (d) Make the weights positive as in (c); they stay distinct.  By (b) and Dominance, w(I) ≤ w(G) for every basis I, with
 equality only if I = G.  For G⁺: a heaviest I has w(I) = w(I⁺), so no member of weight below 0, and none of weight 0, so
-I = I⁺; Dominance on the elements of positive weight, with (b), gives I = G⁺.  ∎
+I = I⁺; Dominance on the members of positive weight, with (b), gives I = G⁺.  ∎
 
-The weights must not be 0 for the last claim: in the matroid on {x, z} in which every set is independent, with w(x) = 1
-and w(z) = 0, the sets {x} and {x, z} are both heaviest.  Only matroids have the property: if the scan finds a heaviest
-set for every nonnegative weight function, a family closed under subsets is a matroid (Schrijver, Theorem 40.1; Edmonds
-1971; Oxley, Section 1.8).
+The weights must not be 0 for the last claim: with two members x and z of the vectors e₁ and e₂, w(x) = 1 and w(z) = 0,
+the sets {x} and {x, z} are both heaviest.  [The last section](#matroids) says on which other families the scan works.
 
 ### The optimality criterion
 
 A set can be certified heaviest by checking single changes, whatever algorithm produced it.
 
-**The criterion.**  Let M be a matroid on E, w a real weight function on E, and I an independent set.  Then I is a
+**The criterion.**  Let E be a family of vectors, w a real weight function on E, and I an independent set.  Then I is a
 heaviest independent set, among the independent sets of every size, exactly when
 
 1. w(x) ≥ 0 for every x in I;
@@ -225,8 +208,8 @@ heaviest independent set, among the independent sets of every size, exactly when
 
 *Proof.*  The idea is that each condition guards against one improving change, and when none is left the proof of (c)
 applies to I.  If I is heaviest, the conditions hold: a violation of (1) gives the heavier set I − x, one of (2) gives
-the heavier independent set I + y, and one of (3) gives I − x + y, independent by the fact on the circuit of I + y and
-heavier by w(y) − w(x).
+the heavier independent set I + y, and one of (3) gives I − x + y, independent by [the circuit of
+I + y](#linear-independence) and heavier by w(y) − w(x).
 
 Now suppose (1) to (3).  For t > 0 we claim that I ∩ {w ≥ t} spans {w ≥ t}.  Take y in {w ≥ t} ∖ I.  By (2), I + y is
 dependent, since w(y) ≥ t > 0.  Let H be its circuit.  By (3), each x in H − y has w(x) ≥ w(y) ≥ t, so H − y lies in
@@ -234,15 +217,15 @@ I ∩ {w ≥ t}, and (I ∩ {w ≥ t}) + y holds H and is dependent.  So the cla
 |I′ ∩ {w ≥ t}| ≤ |I ∩ {w ≥ t}| for t > 0.  By (1), w(I) = w(I⁺), and the argument of (c) gives w(I′) ≤ w(I′⁺) ≤
 w(I⁺) = w(I).  ∎
 
-**Example.**  In the graphic matroid above, with w the number itself, I = {21, 15, 14} meets the criterion.  Condition
-(1) holds and (2) is empty, since I is a basis.  For (3), the circuits of I + 10 and I + 6 are {10, 14, 15, 21} and {6,
-14, 21}, and their members in I are larger than 10 and 6.  The basis I′ = {10, 15, 21} fails (3): the circuit of I′ + 14
-holds 10, which is less than 14, and I′ − 10 + 14 = I is heavier.
+**Example.**  Among the forests of [the example](#forests), with w the number itself, I = {21, 15, 14} meets the
+criterion.  Condition (1) holds and (2) is empty, since I is a basis.  For (3), the circuits of I + 10 and I + 6 are
+{10, 14, 15, 21} and {6, 14, 21}, and their members in I are larger than 10 and 6.  The basis I′ = {10, 15, 21} fails
+(3): the circuit of I′ + 14 holds 10, which is less than 14, and I′ − 10 + 14 = I is heavier.
 
-*Dummy coloops.*  Equivalently, add rk(M) coloops of weight 0 to M and truncate the result to rk(M).  The independent
-sets of M, padded with dummies, are the bases of the result, and (1), (2) and (3) are the exchanges of an element for a
-dummy, a dummy for an element, and an element for an element: the classical test that no single exchange improves a
-basis (Korte and Vygen, Section 13.4, Theorem 13.23).
+*Dummy members.*  Equivalently, add rk(E) *dummies* of weight 0, each with a coordinate of its own, and keep the
+independent sets with at most rk(E) members.  The independent sets of E, padded with dummies, are the bases of the
+result, and (1), (2) and (3) are the exchanges of a member for a dummy, a dummy for a member, and a member for a member:
+the classical test that no single exchange improves a basis (Korte and Vygen, Section 13.4, Theorem 13.23).
 
 ## Matchings, permanents and determinants
 
@@ -280,48 +263,60 @@ Its graph has two perfect matchings, {(6, 2), (10, 5), (15, 3)} and {(6, 3), (10
 the columns, so both have sign −1.  (These are the payment schemes of the set {6, 10, 15}.)  So per = 2 and det = −2: an
 even count, nonsingular over the rationals and singular modulo 2.
 
-## Matroid intersection
+## Two families at once
 
-Two matroids on one ground set can be combined by asking for sets that are independent in both.  These sets are in
-general not a matroid, but a heaviest one can still be found in polynomial time.
+For the sets independent in two families of vectors at once, the greedy algorithm fails, but a classical algorithm finds
+a heaviest one, and a split of the weights proves its value.
 
-**Definition.**  Let M and M′ be matroids on the same set E.  A *common independent set* is independent in both.
+**Definition.**  Let each member of a finite set E have a vector in family 0 and one in family 1; a set is *independent
+in both* when it is in each.  If every set of some kind is independent in both, a heaviest set independent in both
+bounds their weights.
 
-**Matchings.**  Split E into classes.  The sets with at most one element in each class form a matroid, a *partition
-matroid*: I′ meets more classes than I does, and an element of I′ in a class that I misses can join I.  In a bipartite
-graph, let M allow one edge at each vertex on the left and M′ one edge at each vertex on the right.  The common
-independent sets are the [matchings](#matchings-permanents-and-determinants) of the graph.
+**Matchings.**  In a bipartite graph, give the edge xy, with x on the left, the unit vector e_x in family 0 and e_y in
+family 1.  Equal unit vectors are dependent and distinct ones are not, so the sets independent in both are the
+[matchings](#matchings-permanents-and-determinants), no two of whose edges share a vertex.
 
 **Example.**  A [payment scheme](playability.md#payment-schemes) pays each of several numbers with a different maximal
 factor, so it is a matching from the numbers to their factors.  For 10, 14, 15 and 21 the edges (s, f), with f a maximal
 factor of s, form the 8-cycle 10–2–14–7–21–3–15–5–10, which has two perfect matchings.  Yet
 I = {(10, 2), (14, 7), (15, 3)} cannot be extended: each of the other five edges shares a number or a factor with an
-edge of I, and paying 15 with 3 strands 21.  So the matchings have maximal sets of 3 and of 4 edges, and augmentation
-fails for I and a perfect matching: *common independent sets are in general not a matroid*.
+edge of I, and paying 15 with 3 strands 21.  So the matchings have maximal sets of 3 and of 4 edges, and the exchange
+property fails: *the sets independent in two families are in general not the independent sets of one*.
 
 ![The eight-cycle joining 10, 14, 15 and 21 to the primes of their maximal factors, with a matching of three edges that cannot be extended and a perfect matching of four](img/payment-graph-21.svg)
 
 *The 8-cycle drawn on the square of 21.  Thick: the matching I (left) and a perfect matching (right).*
 
-**What can be computed.**
+**The split.**  For weights u of either sign, write max_i u for the largest weight of an independent set of family i, of
+any size: u(G⁺) for the scan's set G.  For any split w = w₀ + w₁ into real weight functions, every set Y independent in
+both has
 
-* *The weight.*  Give the matroids by tests of independence.  A heaviest common independent set, for weights of either
-  sign and sets of any size, can be found in time polynomial in |E| and the cost of a test (Edmonds 1979; Lawler 1975;
-  Frank 1981).  The algorithms build a heaviest set of d elements from one of d − 1 by an augmenting path, and the best
-  over d is the heaviest of any size (Schrijver, Section 41.3 and Theorem 41.7; Korte and Vygen, Sections 13.5 and
-  13.7).  So the matching number of a bipartite graph can be computed: it is the size of the largest common independent
-  set of the two partition matroids.
-* *A limit on the size.*  The heaviest common independent sets of M and M′ with at most d elements are those of M and
-  the truncation of M′ to d, so the limit costs nothing.
+    w(Y) ≤ max₀ w₀ + max₁ w₁
+
+by [weak duality](#weak-duality-and-lagrangian-relaxation), each term one run of the greedy algorithm.
+
+**Certificates.**  Suppose that for some split, a set I independent in both meets [the optimality
+criterion](#the-optimality-criterion) in family 0 for w₀ and in family 1 for w₁.  Then w(I) = max₀ w₀ + max₁ w₁, and no
+set independent in both weighs more: the split proves that I is heaviest, whatever algorithm produced I.
+
+**Example.**  In the set {2, 10, 14, 15, 21} the move 2 is paid by 1, and a member of the set cannot pay for another, so
+the others are left with the factors 3, 5 and 7: the edges (10, 5), (14, 7), (15, 3), (15, 5), (21, 3) and (21, 7).  Let
+the edge (s, f) weigh s.  A heaviest matching is {(14, 7), (15, 5), (21, 3)}, which weighs 50.  Price each factor at 10:
+let family 1, one edge per factor, carry the weight 10 on every edge, and let family 0, one edge per number, carry the
+excess s − 10.  Then max₁ is 3 · 10 = 30 and max₀ is 0 + 4 + 5 + 11 = 20, so no matching weighs more than 50.
+
+**What can be computed.**  Given the families by tests of independence, *weighted matroid intersection*, a classical
+algorithm, finds a heaviest set independent in both, for weights of either sign, in time polynomial in |E| and the cost
+of a test (Edmonds 1979; Lawler 1975; Frank 1981).  It builds a heaviest set of d members from one of d − 1 by an
+augmenting path, so it finds the heaviest of any size or of at most a given size (Schrijver, Section 41.3 and Theorem
+41.7; Korte and Vygen, Sections 13.5 and 13.7), and the matching number of a bipartite graph.  A split that certifies
+its answer always exists (the paragraph "For families of vectors" below).
 
 ## Weak duality and Lagrangian relaxation
 
-To bound the weight of every set that satisfies several constraints, split the weight among the constraints, and bound
-each part by the best set that satisfies its own constraint alone.  Every split gives a valid bound, and for two
-matroids the best split gives the exact answer.
-
-For a matroid M and a weight function w, write max_M w for the weight of a heaviest independent set of M, of any size
-and for weights of either sign: it is w(G⁺) for the scan's set G.
+To bound the weight of every set that meets several constraints, split the weight among them, and bound each part by the
+best set that meets its own constraint alone.  Every split gives a bound; for two families of vectors the best one is
+exact.
 
 **Weak duality.**  Let Γ_i be families of subsets of E, one for each constraint i, and let w = Σ_i w_i be any split of
 the weights into real weight functions.  Every set Y that is in all the families has
@@ -330,20 +325,8 @@ the weights into real weight functions.  Every set Y that is in all the families
 
 *Proof.*  w(Y) = Σ_i w_i(Y), and w_i(Y) ≤ max over Γ_i since Y is in Γ_i.  ∎
 
-For two matroids M and M′ and a split w = w₀ + w₁, every common independent set Y has w(Y) ≤ max_M w₀ + max_{M′} w₁.  A
-matroid on a part E′ of E also fits: take the sets Y with Y ∩ E′ independent in it, and a weight function that is 0
-outside E′.
-
-**Certificates.**  Suppose I is a common independent set, and for some split I meets the criterion of [The optimality
-criterion](#the-optimality-criterion) in M for w₀ and in M′ for w₁.  Then w(I) = w₀(I) + w₁(I) = max_M w₀ + max_{M′} w₁,
-and weak duality says that no common independent set weighs more.  The split proves that I is heaviest, whatever
-algorithm produced I.
-
-**Example.**  In the set {2, 10, 14, 15, 21} the move 2 is paid by 1, and a member of the set cannot pay for another, so
-the others are left with the factors 3, 5 and 7: the edges (10, 5), (14, 7), (15, 3), (15, 5), (21, 3) and (21, 7).  Let
-the edge (s, f) weigh s.  A heaviest matching is {(14, 7), (15, 5), (21, 3)}, which weighs 50.  Price each factor at 10:
-let M′, one edge per factor, carry the weight 10 on every edge, and let M, one edge per number, carry the excess s − 10.
-Then max_{M′} is 3 · 10 = 30 and max_M is 0 + 4 + 5 + 11 = 20, so no matching weighs more than 50.
+For two families of vectors it is [the split](#two-families-at-once).  A family of vectors on a part E′ of E also fits:
+take the sets Y whose part in E′ is independent, and a weight function 0 outside E′.
 
 **Relaxing a constraint.**  Let Y range over a family Γ, subject to one more linear constraint g(Y) ≤ b, with g a weight
 function.  For every multiplier λ ≥ 0, each feasible Y has
@@ -366,11 +349,12 @@ program,
 {b_i · y_i : y_i ≥ 0, Θ_iᵀ y_i = w_i}, so the least bound is min {Σ b_i · y_i : y_i ≥ 0, Σ Θ_iᵀ y_i = w}, which is the
 dual of the program above.  ∎  (Guignard and Kim call the split Lagrangian decomposition.)
 
-**For matroids.**  The hull of a matroid's independent sets is {x ≥ 0 : x(Y) ≤ rk(Y) for every Y ⊆ E}, where x(Y) is the
-sum of x over Y (Edmonds 1970; Schrijver, Corollary 40.2b).  For two matroids, the hull of the common independent sets
-is the intersection of their two hulls, so that its vertices are common independent sets (Edmonds 1970; Schrijver,
-Corollary 41.12b).  So for two matroids the best split gives the weight of a heaviest common independent set exactly.
-For three matroids it can give more (Schrijver, Section 41.4).
+**For families of vectors.**  The hull of the independent sets of a family of vectors is {x ≥ 0 : x(Y) ≤ rk(Y) for every
+Y ⊆ E}, where x(Y) is the sum of x over Y (Edmonds 1970; Schrijver, Corollary 40.2b).  For two families, the hull of the
+sets independent in both is the intersection of the two hulls, whose vertices are thus sets independent in both (Edmonds
+1970; Schrijver, Corollary 41.12b).  So for two families the best split gives exactly the weight of a heaviest set
+independent in both, which is then heaviest in each family for its part.  For three it can give more (Schrijver, Section
+41.4).
 
 ## Topological orders
 
@@ -395,6 +379,27 @@ scheme](playability.md#payment-schemes) does, and let x come before y when x's p
 edges are 6 → 12 and 6 → 18 and no more, and the topological orders are 6, 12, 18 and 6, 18, 12.  Both are legal games
 on the board of 18, and the four other orders are not.  In the set {6, 10, 15}, paying 6 with 2, 10 with 5 and 15 with 3
 gives the cycle 6 → 10 → 15 → 6, so there is no topological order for this payment.
+
+## Matroids
+
+A matroid keeps what families of vectors and forests have in common: all that the greedy algorithm needs.
+
+**Definition.**  A *matroid* on a finite *ground set* E is a family of subsets of E, the *independent sets*, such that
+(1) the empty set is independent, (2) every subset of an independent set is independent, and (3) *augmentation*: if I
+and I′ are independent and |I| < |I′|, some x in I′ ∖ I has I + x independent.  Given (1) and (2), augmentation is the
+exchange property, that within any set the maximal independent subsets have one size: in I ∪ I′, one holding I′ is
+larger than I.
+
+**Examples.**  The independent sets of a family of vectors form a *linear* matroid, and the forests of a graph a
+*graphic* one (Oxley, Sections 1.1 and 5.1), so the sections above are its main case.  Outside Z and together with Y, a
+matroid gives matroids, its *deletion* and *contraction* (Oxley, Section 3.1).
+
+**The greedy theorem.**  [The scan](#the-greedy-algorithm), run on a family F of subsets of E with (1) and (2), keeps x
+when G + x is in F.  It finds a heaviest set of F for every nonnegative weight function exactly when F is a matroid
+(Schrijver, Theorem 40.1; Edmonds 1971; Oxley, Section 1.8): in a matroid, the proofs of (a) to (d) and of [the
+optimality criterion](#the-optimality-criterion) use only (1), (2), the exchange property and the paragraph "The circuit
+of I + y", which holds in every matroid (Oxley, Section 1.1).  So distinct positive weights give a matroid one heaviest
+independent set.
 
 ## References
 
