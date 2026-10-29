@@ -282,10 +282,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **matching bound** (`matchbound`; the tactic `gf2=off`): relaxes winnability to matchability.  It is the largest sum
   of promotions such that every move and every promoted number gets a distinct maximal factor in its frame.  It is a
   maximum-weight bipartite matching, kept along the search path.
-* **GF(2) bound** (`gf2`, the default node bound): the heaviest set, with at most the promotion limit members, that is
-  independent in two matroids over GF(2), the *frame matroids* A and B, one for the even frames and one for the odd ones
-  ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound); [solver/docs/design/gf2-bound.md, "The GF(2)
-  bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
+* **GF(2) bound** (`gf2`, the default node bound): the heaviest set of candidates, with at most the promotion limit
+  members, that is *independent in every frame* over GF(2): in each frame, the vectors of its moves together with those
+  of the set are linearly independent ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound);
+  [solver/docs/design/gf2-bound.md, "The GF(2) bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 * **the Lagrangian bound over the nogoods**: an inner bound, either the matching bound or the GF(2) bound, with each
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
   inner bound when it matters.  It comes in three forms:
@@ -296,18 +296,17 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.
-* **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in the frame
-  matroids over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  A *signing* gives
-  each pair of a number and a maximal factor in a frame a nonzero value in a field, and the frame's *signed frame
-  matroid* represents the candidates that touch the frame modulo its moves ([the signed frame theorem
+* **the multi-field bound**: the bound of the agenda's avenue A1.  Every promotion set is independent in every frame
+  over several fields and signings: GF(2), GF(3) with 0/1 entries, and GF(3) with signs.  A *signing* gives each pair of
+  a number and a maximal factor in a frame a nonzero value in a field, and a set is independent in a frame under it when
+  its signed vectors, together with the moves', are linearly independent ([the signed frame theorem
   (B1)](theory/frame-bounds.md#the-signed-frame-theorem)); the GF(3) signings together lose nothing that winnability
-  keeps ([the GF(3) proposition (B5)](theory/frame-bounds.md#the-gf3-proposition)).  The bound is the
-  linear program over all of them, computed by Lagrangian decomposition ([the decomposition bound
-  (B4)](theory/frame-bounds.md#the-decomposition-bound);
-  [the fields study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The
-  agenda's A1 measured it and is closed ([solver/docs/AGENDA.md, "Ranked
-  avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The notebook's entries call it the "fields bound" or the "A1
-  bound".
+  keeps ([the GF(3) proposition (B5)](theory/frame-bounds.md#the-gf3-proposition)).  The bound is the linear program
+  over all of them, computed by Lagrangian decomposition ([the decomposition bound
+  (B4)](theory/frame-bounds.md#the-decomposition-bound); [the fields
+  study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The agenda's A1
+  measured it and is closed ([solver/docs/AGENDA.md, "Ranked avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The
+  notebook's entries call it the "fields bound" or the "A1 bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
   [the dual-bound lemma (R4)](theory/search-rules.md#the-dual-bound-lemma)).  A search stopped before its first node has
@@ -317,11 +316,11 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **Franklín–Moniot bound**: the maximum-weight matching relaxation of the whole game, an upper bound on opt(n), from
   [Franklín and Moniot (2023)](https://arxiv.org/abs/2211.00461).  `solver/tools/check_results.py` compares each score
   with it where `heuristics/results` has the bound.
-* **parity bound**: the prover's bound.  Every playable set is independent in two matroids over GF(2), the *parity
-  matroids*, split by the parity of the number of prime factors, and the bound is their heaviest common independent set
-  ([the parity bound (W1)](theory/parity-bound.md#the-parity-bound)).  Independence holds because a playable set's
-  incidence vectors, a 1 at each maximal factor, are linearly independent ([the independence lemma
-  (P10)](theory/playability.md#the-independence-lemma)).
+* **parity bound**: the prover's bound.  Every playable set is *independent at both parities*: split by the parity of
+  the number of prime factors, its vectors over GF(2) are linearly independent at each parity, and the bound is the
+  heaviest set independent at both ([the parity bound (W1)](theory/parity-bound.md#the-parity-bound)).  Independence
+  holds because a playable set's incidence vectors, a 1 at each maximal factor, are linearly independent ([the
+  independence lemma (P10)](theory/playability.md#the-independence-lemma)).
 * **barred bound**: the parity bound with one member u of U\* barred ([the barred bound
   (W2)](theory/parity-bound.md#the-barred-bound)).  The prover *certifies* u when the barred bound is
   at most the recorded score: then every set of moves that beats the score, and keeps the layers 1 and 2 that [the

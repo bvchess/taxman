@@ -45,12 +45,8 @@ t and ρ, are local: each file defines those it uses.
 | state(P) | the root frames with the promotions P applied, then reduced | [searching the frame model](frame-model.md#searching-the-frame-model) |
 | the promotion limit | the most promotions that the freedoms and the candidates allow, written in words | [searching the frame model](frame-model.md#searching-the-frame-model) |
 | V | a score of a game, or the value of a search's incumbent | [exact searches](search-rules.md#exact-searches), [the certificate theorem](extended-problem.md#the-certificate-theorem) |
-| T_h | the candidates that touch frame h: those of home h and of home h + 1 | [signed frame matroids](frame-bounds.md#signed-frame-matroids) |
-| σ | a signing of a frame | [signed frame matroids](frame-bounds.md#signed-frame-matroids) |
-| M | a matroid, in the primer | [matroids](primer.md#matroids) |
-| M₀, M₁ | the parity matroids | [the parity matroids](parity-bound.md#the-parity-matroids) |
-| A, B | the frame matroids of the even and of the odd frames | [signed frame matroids](frame-bounds.md#signed-frame-matroids) |
-| N_h^σ | the signed frame matroid of frame h under σ | [signed frame matroids](frame-bounds.md#signed-frame-matroids) |
+| T_h | the candidates that touch frame h: those of home h and of home h + 1 | [signed frames](frame-bounds.md#signed-frames) |
+| σ | a signing of a frame | [signed frames](frame-bounds.md#signed-frames) |
 | w, λ | weights, and multipliers | [weak duality](primer.md#weak-duality-and-lagrangian-relaxation) |
 | π_{p,q}, c_r(S) | the exchange of the primes p and q, and the sum of S's cofactors of r | [the prime-exchange theorem](search-rules.md#the-prime-exchange-theorem) |
 | lo(n), hi(n) | a lower and an upper bound on opt(n) | [bounds carried between games](search-rules.md#bounds-carried-between-games) |
@@ -130,8 +126,8 @@ reach.
 | label | result | statement | standing |
 |---|---|---|---|
 | Q1 | [the uniqueness theorem](uniqueness-and-longest-games.md#the-uniqueness-theorem) | in a game where (★) holds, every playable set of sources lies termwise below U\*, and for every positive, strictly increasing weighting U\* is the only heaviest | proved given (★) |
-| Q2 | [the matroid proposition](uniqueness-and-longest-games.md#the-matroid-proposition) | a matroid relaxation of game n, a matroid on 2..n in which every playable set is independent, is exact when its heaviest independent set weighs opt(n); in a game with two or more optimal sets, such as 425, none is | proved |
-| | [the uniqueness of the optimal set to 424](uniqueness-and-longest-games.md#the-matroid-proposition) | every game n ≤ 424 has one optimal set, and game 425 has two; in every game enumerated, the optimal sets share their size and differ by exchanges of equal sum below n/2 | measured to 424; false at 425 |
+| Q2 | [the relaxation proposition](uniqueness-and-longest-games.md#the-relaxation-proposition) | a greedy relaxation of game n, a family of subsets of 2..n that is closed under subsets, holds every playable set and on which the greedy algorithm finds a heaviest member for every nonnegative weighting, is exact when its heaviest member weighs opt(n); in a game with two or more optimal sets, such as 425, none is | proved |
+| | [the uniqueness of the optimal set to 424](uniqueness-and-longest-games.md#the-relaxation-proposition) | every game n ≤ 424 has one optimal set, and game 425 has two; in every game enumerated, the optimal sets share their size and differ by exchanges of equal sum below n/2 | measured to 424; false at 425 |
 | | [the strong form of U](uniqueness-and-longest-games.md#optimal-sets-on-the-whole-board) | every optimal set contains all of U\* | open; measured on every game whose optimal sets were all enumerated |
 | Q3 | [the length lemma](uniqueness-and-longest-games.md#the-length-lemma) | ℓ(n) ≤ ν(n); ℓ(n − 1) ≤ ℓ(n) ≤ ℓ(n − 1) + 1, with ℓ(n) = ℓ(n − 1) at a prime n ≥ 3; a playable set has at most \|U\*\| members above n/2 | proved; the last part given (★) |
 | Q4 | [the length proposition](uniqueness-and-longest-games.md#the-length-proposition) | in game 833 every optimal game has 362 moves and ℓ(833) = 363, and a heaviest longest game scores 29 less than opt(833) | proved by computation |
@@ -171,9 +167,9 @@ reach.
 
 | label | result | statement | standing |
 |---|---|---|---|
-| W1 | [the parity bound](parity-bound.md#the-parity-bound) | a playable set is independent in both parity matroids, so the heaviest set independent in both bounds opt(n), and with picks and bars the playable sets that hold the picks and avoid the bars | proved |
+| W1 | [the parity bound](parity-bound.md#the-parity-bound) | a playable set is independent at both parities (its parity-0 vectors and its parity-1 vectors are each linearly independent over GF(2)), so the heaviest set independent at both bounds opt(n); with picks and bars, the playable sets that hold the picks and avoid the bars are bounded through the sets outside the bars that are independent at both parities together with the picks | proved |
 | W2 | [the barred bound](parity-bound.md#the-barred-bound) | for a number b that is not a pick of [F4](frame-model.md#the-bottom-layers-theorem), if b's barred bound is at most V, every playable set that obeys F4 and weighs more than V holds b | proved |
-| W3 | [the greedy-basis proposition](parity-bound.md#the-greedy-basis-proposition) | every heaviest set independent in both parity matroids holds, of the sources, the greedy basis of their GF(2) linear matroid, which is U\* iff (♦) holds in game n; then the parity bound equals the bound with the picks U\* | proved |
+| W3 | [the greedy-basis proposition](parity-bound.md#the-greedy-basis-proposition) | every heaviest set independent at both parities holds, of the sources, the greedy basis of their vectors over GF(2), which is U\* iff (♦) holds in game n; then the parity bound equals the bound with the picks U\* | proved |
 | | [the exactness of the parity bound to 77](parity-bound.md#what-the-parity-bound-misses) | the parity bound equals opt(n) for every n ≤ 77, and exceeds it at 78 | measured |
 
 ### Franklín and Moniot's paper
@@ -200,14 +196,14 @@ reach.
 
 | label | result | statement | standing |
 |---|---|---|---|
-| B1 | [the signed frame theorem](frame-bounds.md#the-signed-frame-theorem) | a promotion set is independent in every signed frame matroid, over every field; a loop lies in no promotion set; at a node, the contraction by P is the matroid of state(P), in which a candidate taken out of its home is a loop | proved |
-| B2 | [the frame bound](frame-bounds.md#the-frame-bound) | the heaviest set independent in both frame matroids, within the node's promotion limit, bounds every completion of a node, the root included | proved |
-| | [the frame bound against the parity bound](frame-bounds.md#the-frame-bound) | the parity bound equals ΣU\* plus the frame bound at every board 2..8191, including the 5,496 boards from 1173 on where the last part of [B6](frame-bounds.md#the-contraction-theorem) does not apply | measured |
+| B1 | [the signed frame theorem](frame-bounds.md#the-signed-frame-theorem) | a promotion set is independent in every frame under every signing, over every field; a candidate whose vector lies in the span of the moves' vectors is in no promotion set; at a node, independence together with P is independence in the frames of state(P), and a candidate taken out of its home is dependent together with P | proved |
+| B2 | [the frame bound](frame-bounds.md#the-frame-bound) | the heaviest set of candidates independent in every frame (together with the node's promotions), within the node's promotion limit, bounds every completion of a node, the root included | proved |
+| | [the frame bound against the parity bound](frame-bounds.md#the-frame-bound) | the parity bound equals ΣU\* plus the frame bound at every board 2..8191, including the 5,496 boards from 1173 on where the last part of [B6](frame-bounds.md#the-comparison-theorem) does not apply | measured |
 | | [the frame bound's gap](franklin-moniot.md#the-hardness) | at the roots measured, the heaviest set of the frame bound fails only through odd cores, in the frames numbered 1 to 3 | measured |
-| B3 | [the frame bound for the extended problem](frame-bounds.md#the-frame-bound-for-the-extended-problem) | B2 holds for Π⁺(O), with its one-sided candidates added to both matroids, and with the promotion limit of the freedoms that the node's promotions leave | proved |
-| B4 | [the decomposition bound](frame-bounds.md#the-decomposition-bound) | the frame matroids and signed frame matroids combine into a Lagrangian bound on P\*, valid for every multiplier | proved |
-| B5 | [the GF(3) proposition](frame-bounds.md#the-gf3-proposition) | a frame of a state is winnable with L applied iff L ∩ T_h is independent under every signing over GF(3) | proved; explanatory |
-| B6 | [the contraction theorem](frame-bounds.md#the-contraction-theorem) | on the candidates the frame matroids are the parity matroids contracted by U\*; the promotion limit never lowers the frame bound at the root; ΣU\* plus the frame bound is the parity bound with the picks U\* and the bars outside U\* ∪ C, so at most the parity bound; given (♦), equal to it when every number up to n/2 that is a loop of neither contraction is a candidate | proved, the last part given (♦); explanatory |
+| B3 | [the frame bound for the extended problem](frame-bounds.md#the-frame-bound-for-the-extended-problem) | B2 holds for Π⁺(O), each one-sided candidate a mover of its own frame alone, with the promotion limit of the freedoms that the node's promotions leave | proved |
+| B4 | [the decomposition bound](frame-bounds.md#the-decomposition-bound) | independence in every frame and independence in frames under other signings combine into a Lagrangian bound on P\*, valid for every multiplier | proved |
+| B5 | [the GF(3) proposition](frame-bounds.md#the-gf3-proposition) | a frame of a state is winnable with L applied iff L is independent in it under every signing over GF(3) | proved; explanatory |
+| B6 | [the comparison theorem](frame-bounds.md#the-comparison-theorem) | a set of candidates is independent in every frame iff, with U\*, it is independent at both parities; the promotion limit never lowers the frame bound at the root; ΣU\* plus the frame bound is the parity bound with the picks U\* and the bars outside U\* ∪ C, so at most the parity bound; given (♦), equal to it when every number up to n/2 that is independent at both parities together with U\* is a candidate | proved, the last part given (♦); explanatory |
 
 ### The rules of a search
 

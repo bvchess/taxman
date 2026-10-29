@@ -8,7 +8,7 @@ Started 2026-10-24.  Concluded 2026-10-24.
 it was at the 361 roots of 880-1300 that [matroid intersection bounds](../matroid-intersection-bounds-2026-10/README.md)
 measured, and why?  **Answer.**  It is, at every board from 2 to 8191.  One side is proved for every board: on the
 candidates, the frame matroids are the parity matroids contracted by U\*, so ΣU\* plus the frame bound is never above
-the parity bound ([the contraction theorem (B6)](../../../../docs/theory/frame-bounds.md#the-contraction-theorem)).  The
+the parity bound ([the contraction theorem (B6)](../../../../docs/theory/frame-bounds.md#the-comparison-theorem)).  The
 other side is proved, given the span conjecture (♦), wherever every number up to n/2 that the contraction leaves free
 is a candidate; that fails on 5,496 boards from 1173 on, where the equality holds with room to spare: forcing such a
 number y into the parity bound costs it within a few hundred of n/2 − y, and at least 187 on the boards sampled.
@@ -140,5 +140,5 @@ minutes on the laptop.
 ## Commits
 
 * The commit that adds this entry (2026-10-24): the entry, its row in the register, [the contraction theorem
-  (B6)](../../../../docs/theory/frame-bounds.md#the-contraction-theorem) and [the greedy-basis proposition
+  (B6)](../../../../docs/theory/frame-bounds.md#the-comparison-theorem) and [the greedy-basis proposition
   (W3)](../../../../docs/theory/parity-bound.md#the-greedy-basis-proposition).

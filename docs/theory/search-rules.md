@@ -314,7 +314,7 @@ most of the search ([what carries from one game's search to the
 next](../../solver/notebook/search/what-carries-from-one-games-search-to-the-next-2026-10/README.md)).
 
 Below, state_m(P) and state_n(P) are the states that P leaves in Π_m and in Π_n, and a set C of candidates *touches*
-frame j when one of its members [touches](frame-bounds.md#signed-frame-matroids) it, having the home j or j + 1.
+frame j when one of its members [touches](frame-bounds.md#signed-frames) it, having the home j or j + 1.
 
 **Lemma R7 (the near-repeat lemma).**  Let m and n be games, Z a number with P\*(Π_m) ≤ Z, and (P, C) a node of a
 search of Π_n.  Suppose that

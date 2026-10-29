@@ -19,7 +19,7 @@ places.
 
 | file | letter | read it for |
 |---|---|---|
-| [primer.md](theory/primer.md) | | the standard mathematics: GF(2), matroids, matroid intersection, Lagrangian relaxation, permanents |
+| [primer.md](theory/primer.md) | | the standard mathematics: GF(2), linear independence and forests, the greedy algorithm, weight splits, permanents |
 | [statements.md](theory/statements.md) | | every result with its standing and a link to it, the notation, and the open questions |
 | [playability.md](theory/playability.md) | P | when a set of moves can be played: payment schemes, peel, cores, linear independence |
 | [neighbors.md](theory/neighbors.md) | N | what passes from game n − 1 to game n: [the prime lemma](theory/neighbors.md#the-prime-lemma), monotonicity, the ceiling, the prime formula |
@@ -30,7 +30,7 @@ places.
 | [parity-bound.md](theory/parity-bound.md) | W | the parity bound on opt(n), which bounds the prover's searches, and the barred bound |
 | [franklin-moniot.md](theory/franklin-moniot.md) | C | how the theory relates to Franklín and Moniot's paper, through a count of payment schemes |
 | [extended-problem.md](theory/extended-problem.md) | E | the extended problem, and the certificates of statement U that search it |
-| [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: signed frame matroids, the frame bound, the decomposition bound |
+| [frame-bounds.md](theory/frame-bounds.md) | B | the bounds on the promotions: the frame bound and the decomposition bound |
 | [search-rules.md](theory/search-rules.md) | R | what a search of the frame model proves, every rule it may cut by, and the bounds carried between games |
 | [arrival.md](theory/arrival.md) | J | the frame model from game n − 1 to game n: the arrival lemma, the shadow law, the cofactor rule |
 | [evidence.md](theory/evidence.md) | | the computations behind the statements that are not proved |
@@ -47,10 +47,10 @@ U\*, and its exactness needs neither (★) nor (♦).
   U, X8](theory/exactness.md#statement-u)); the parity and barred bounds (W1 to W3); the extended problem and its
   certificates (E1 to E6); the bounds on the promotions (B1 to B5, and B6 but its last part); the rules of a search (R1
   to R5, [the near-repeat lemma R7](theory/search-rules.md#the-near-repeat-lemma), and the first part of [the repeat
-  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 and J2; the matroid and length propositions (Q2, Q4) and the
-  first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the equivalence
-  in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory [victim
-  law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
+  lemma R6](theory/search-rules.md#the-repeat-lemma)); J1 and J2; the relaxation and length propositions (Q2, Q4) and
+  the first two parts of [the length lemma (Q3)](theory/uniqueness-and-longest-games.md#the-length-lemma); the
+  equivalence in [the cardinality conjecture (S4)](theory/sources.md#the-cardinality-conjecture); and the explanatory
+  [victim law](theory/sources.md#the-victim-law), [frontier theorem](theory/sources.md#the-frontier-theorem), [span
   theorem](theory/sources.md#the-span-theorem) and Franklín–Moniot results (S2, S3, S6, C1 to C3).
 * **Given statement U at n:** the equality of the corollary of U (X8), and the inequality and last part of the repeat
   lemma (R6).

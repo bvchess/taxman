@@ -33,7 +33,7 @@ The search:
   times faster than solving each node from scratch.
 * **The parity bound** (`src/parity.rs`, `Prover::with_parity`; on in `exact` since 2026-10).  Every playable set is
   independent in two linear matroids over GF(2), split by the parity of Ω ([the parity
-  matroids](../../../docs/theory/parity-bound.md#the-parity-matroids), W1).  So at a node, the heaviest
+  matroids](../../../docs/theory/parity-bound.md#the-parity-vectors), W1).  So at a node, the heaviest
   set independent in both, with the forced picks contracted and the barred numbers deleted, bounds every completion.
   * It is computed by shortest augmenting paths, a child starting from its parent's set and weight split.
   * It is reported only with a weight split that satisfies the local optimality conditions of both matroids, checked
