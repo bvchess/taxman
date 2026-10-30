@@ -79,9 +79,6 @@
 //! * `refine`: the matching path's check (`Refiner`) and strong branching on it (`strongest`).
 //! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
 //! * `header`: the checkpoint's header.
-//! * `diagnostics`: [`Diagnostics`], for tuning.
-//! * `hooks`: `StepHook`, what a study is told of every step and asked by it; built only with the feature `studies`,
-//!   so that a default build's searcher has no site of it.
 //! * `dual`: [`dual_bound`], the upper bound that a stopped search's checkpoint proves, and [`NodeBound`], the bound
 //!   of a unit's node as the search computes it when it starts the unit.
 //! * [`symmetry`]: the root's prime exchanges (symmetric pairs of primes) and the rule they give the search.
@@ -97,13 +94,10 @@
 //!   gate trial may change as it runs.
 
 mod branching;
-mod diagnostics;
 mod dual;
 pub mod finder;
 pub mod gate_trial;
 mod header;
-#[cfg(feature = "studies")]
-mod hooks;
 mod incumbent;
 pub mod lagrange;
 mod near_repeat;
@@ -117,10 +111,7 @@ pub mod symmetry;
 mod tactics;
 
 pub use branching::{BranchSettings, Branching};
-pub use diagnostics::{cut, Diagnostics, GAP_BUCKETS};
 pub use dual::{dual_bound, DualBound, NodeBound};
-#[cfg(feature = "studies")]
-pub use hooks::{BoundCheck, MakeHook, StepEnd, StepHook, StepRecord};
 pub use incumbent::Neighborhood;
 pub use near_repeat::NearRepeat;
 pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
@@ -143,7 +134,7 @@ use profile::Begin;
 use searcher::{get_bits, put_bits};
 use std::io;
 use std::path::Path;
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -254,7 +245,7 @@ pub fn search<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    search_with(prepared, cfg, seed, cap, resume, None)
+    search_beside(prepared, cfg, seed.map(std::slice::from_ref).unwrap_or_default(), cap, resume, None)
 }
 
 /// [`search`] from a *floor* instead of a start incumbent: a search for a promotion set worth more than `floor`, a
@@ -279,50 +270,7 @@ pub fn search_above<const W: usize>(
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(
-        prepared,
-        cfg,
-        &[],
-        cap,
-        resume,
-        None,
-        forgetting,
-        Some(floor),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-}
-
-/// [`search`], collecting [`Diagnostics`] into `diagnostics` if given.
-pub fn search_with<const W: usize>(
-    prepared: &Prepared<W>,
-    cfg: &EngineConfig,
-    seed: Option<&Bits<W>>,
-    cap: Option<u64>,
-    resume: bool,
-    diagnostics: Option<&Mutex<Diagnostics>>,
-) -> io::Result<SearchResult<W>> {
-    let (seeds, forgetting) = (seed.map(std::slice::from_ref).unwrap_or_default(), prepared.tactics.forgetting());
-    search_forgetting(
-        prepared,
-        cfg,
-        seeds,
-        cap,
-        resume,
-        diagnostics,
-        forgetting,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
+    search_forgetting(prepared, cfg, &[], cap, resume, forgetting, Some(floor), None, None, None, None, None, None)
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -339,7 +287,7 @@ pub fn search_beside<const W: usize>(
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
     let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None, None, None)
+    search_forgetting(prepared, cfg, seeds, cap, resume, forgetting, None, plan, None, None, None, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, whose gate the search's gate trial may change while the
@@ -386,7 +334,6 @@ pub fn search_steered<const W: usize>(
         seeds,
         cap,
         resume,
-        None,
         forgetting,
         None,
         plan,
@@ -398,7 +345,7 @@ pub fn search_steered<const W: usize>(
     )
 }
 
-/// [`search_with`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
+/// [`search`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
 /// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
 /// settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
 /// comes to hold, if given, keeping the profile `profile` asks for, if given, carrying the nogoods of the directory
@@ -411,7 +358,6 @@ fn search_forgetting<const W: usize>(
     seeds: &[Bits<W>],
     cap: Option<u64>,
     resume: bool,
-    diagnostics: Option<&Mutex<Diagnostics>>,
     forgetting: Forgetting,
     floor: Option<u64>,
     plan: Option<&finder::Plan<W>>,
@@ -499,7 +445,6 @@ fn search_forgetting<const W: usize>(
     });
     let space = SearchSpace {
         forgetting,
-        diagnostics,
         began: t0,
         near_repeat,
         carried: carried.as_ref(),

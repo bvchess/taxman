@@ -33,8 +33,8 @@ depends on:
 * **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
   `--example X` by `--example X` or `--examples`.  The release holds everything (the default of `setup.sh`), so it
   serves any `BUILD`.  An entry is never completed: a request that no entry covers builds what it needs and stores
-  nothing.  The Cargo feature `studies` is a part of its own, so a default build never claims to hold it, and an entry
-  with it also serves a request without it (the smaller entry first, when both exist).
+  nothing.  A Cargo feature (`--features NAME`) is a part of its own, so a default build never claims to hold it, and an
+  entry with it also serves a request without it (the smaller entry first, when both exist).
 * **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result
   (`tests=passed`, the counts in lines such as `tests_solver=P passed, 0 failed, I ignored`, its seconds and the
   tests at once); an entry without one does not exist.  The tarball holds the executables only
@@ -60,8 +60,7 @@ the machine at once and costs minutes, not a run of untested binaries.
 **Build only what a run needs**, with `BUILD`, cargo's arguments for `solver/frame/` (`--bins`, `--examples`,
 `--bin NAME`, `--example NAME`; default `--bins --examples`).  A `BUILD` leaves the prover out, unless `BUILD_PROVER`
 asks for it (the same for `solver/noframe/`; `none` for none; `PROVER_ONLY=1` is the prover alone).  The smoke checks of
-a part that is not built are left out.  `STUDIES=1` adds `--features studies` to the solver's build and to its tests
-(the release suite, `cargo test`), which a build without it skips.  What the jobs need:
+a part that is not built are left out.  What the jobs need:
 
 | job | `BUILD` |
 |---|---|
@@ -79,9 +78,7 @@ The release is `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` on **one machine, o
 default `BUILD`: everything, so that every smaller request hits it.  It is a launch under the [rules for every
 launch](launch.md#rules-for-every-launch): a `c8g.16xlarge` at spot for about 10 to 20 minutes, **about $0.15 to
 $0.25**, after the account owner's yes.  Any size serves, since the key is the CPU, which every `c8g` shares; the suite
-gains nothing past about 64 vCPUs.  The feature `studies` is the one thing that "everything" leaves out: `STUDIES=1`
-makes a release with it.  Its suite runs the tests of the feature too, and its entry serves every smaller request as
-well.
+gains nothing past about 64 vCPUs.
 
 ```
 export S3_DEST=s3://taxman-013764204840-us-east-1/release-COMMIT       # where a failure is reported
@@ -127,10 +124,10 @@ suite's times on a laptop are in solver/docs/design/testing.md.
 
 * **On the laptop** (macOS, bash 3.2 and 5): `python3 -I test/test_build_cache.py` (the key, the dirty and the
   commit-less refusals, other `RUSTFLAGS`, which entry serves which request, a corrupted tarball, an entry without its
-  manifest or its passed suite, a build that lacks a file, a stranger in the tarball, a build with the studies as an
+  manifest or its passed suite, a build that lacks a file, a stranger in the tarball, a build with a feature as an
   entry of its own, the same through the stand-in for aws); `python3 -I test/test_run_tests.py` (a toy crate: a failure,
   an ignored test, a doc test, a timeout, the order, a feature, a build that fails); `python3 -I test/test_setup.py`
-  (`setup.sh` with a stand-in for cargo: what `BUILD` and `STUDIES` build, a hit and a miss, the release suite on a pass
+  (`setup.sh` with a stand-in for cargo: what `BUILD` builds, a hit and a miss, the release suite on a pass
   and on a failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once); and `test/run.sh node launch` (the
   settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both crates in the test profile; no
   release build was made on the laptop.

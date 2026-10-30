@@ -543,7 +543,6 @@ impl<const W: usize> Game<W> {
             candidates: self.candidates,
             root_max: self.root_max(),
             max_total: self.max_total,
-            diagnostics: None,
             began: Instant::now(),
             found: Mutex::new(None),
             gf2: cfg.gf2.then(|| {
@@ -573,8 +572,6 @@ impl<const W: usize> Game<W> {
             carried: cfg.carried.then(|| self.carried()),
             harvest: None,
             profile: None,
-            #[cfg(feature = "studies")]
-            hooks: None,
         }
     }
 

@@ -17,7 +17,7 @@ Common options (setup.sh passes them):
                   $BUILD_CACHE, else s3://taxman-013764204840-us-east-1/builds
   --solver ARGS   what was (or is to be) built in solver/frame/: cargo arguments, "--bins --examples" or
                   "--bin taxman";
-                  `--features studies` builds the feature of that name too, and is a part of the set (see below)
+                  `--features F` builds the feature of that name too, and is a part of the set (see below)
   --prover ARGS   what was built in solver/noframe/ (default none): the same
   --tmp DIR       where files are staged and downloaded (default: the system's temporary directory)
 
@@ -35,7 +35,7 @@ binary for the CPU that built it.  Under it, one directory a set of binaries:
 An entry is never changed by a later run except by a release run of the same set, which replaces it.  A request is
 covered by an entry that holds each of its parts: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or
 `--examples`, `--features F` by `--features F`.  The entry of a larger set serves a smaller request; there is no
-half-built entry to complete.  A feature is a part like the others: the entry of `--bins --examples --features studies`
+half-built entry to complete.  A feature is a part like the others: the entry of `--bins --examples --features F`
 serves a request for `--bins --examples`, and an entry without the feature never serves a request with it, so a
 default build is not taken for one with the feature.
 
@@ -89,7 +89,7 @@ def say(message: str) -> None:
 # --- what is asked for ----------------------------------------------------------------------------------------------
 def parse_selectors(crate: str, text: str) -> FrozenSet[Selector]:
     """The parts of a cargo build that `text` (`--bins --examples`, `--bin taxman --example ledger`) asks for.  A
-    feature (`--features studies`) is a part of its own: it makes the build another one, whose entry serves a request
+    feature (`--features F`) is a part of its own: it makes the build another one, whose entry serves a request
     that does not name the feature but not the other way round."""
     found = set()
     words = text.split()

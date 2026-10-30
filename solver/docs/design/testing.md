@@ -51,9 +51,7 @@ shared with the unit tests: the engine's instances, the random configurations of
 The *full suite* is `cargo test --release`: every test, the long ones too, about 3 minutes of tests after a build of 6
 minutes.  It runs before a cloud run, after any change that changes search trees or results, and in the gates (the
 one-thread re-solve of 1301-2175).  A default build, and so every run above and the cloud setup, covers the library, the
-binary, the tests, and the examples `ledger` and `perf`.  The Cargo feature `studies` adds the hook of the
-searcher and its sites: run `cargo test --features studies` and `cargo clippy --all-targets --features studies` after a
-change to the searcher.
+binary, the tests, and the examples `ledger` and `perf`.
 
 **Before a change is merged** (what a reviewer of a change runs, besides reading it; the tests are described below, the
 probe in [performance.md](performance.md)):

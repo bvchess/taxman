@@ -69,9 +69,7 @@ impl FrameGraph {
     ) -> Option<(usize, Option<usize>)> {
         let into_wins = |scratch: &mut Scratch<W>, i: usize| {
             let into = &state.frames[i];
-            !self.checks(i)
-                || self.has_unused_factor(into, n)
-                || scratch.winnable(&into.moves.with(n), &into.factors, &self.graph)
+            self.has_unused_factor(into, n) || scratch.winnable(&into.moves.with(n), &into.factors, &self.graph)
         };
         if let Some(j) = self.own(n) {
             return into_wins(scratch, j).then_some((j, None));
@@ -81,8 +79,7 @@ impl FrameGraph {
             return None;
         }
         let out = &state.frames[h];
-        let ok = into_wins(scratch, h - 1)
-            && (!self.checks(h) || scratch.winnable(&out.moves, &out.factors.without(n), &self.graph));
+        let ok = into_wins(scratch, h - 1) && scratch.winnable(&out.moves, &out.factors.without(n), &self.graph);
         ok.then_some((h - 1, Some(h)))
     }
 
@@ -189,10 +186,9 @@ impl FrameGraph {
 
     /// Whether every frame of `state` stays winnable with `edits` applied.
     fn frames_winnable<const W: usize>(&self, scratch: &mut Scratch<W>, state: &FrameSet<W>, edits: &Edits<W>) -> bool {
-        let frames = state.frames().iter().zip(edits.gained.iter().zip(&edits.lost));
-        frames.enumerate().all(|(i, (frame, (gained, lost)))| {
+        let mut frames = state.frames().iter().zip(edits.gained.iter().zip(&edits.lost));
+        frames.all(|(frame, (gained, lost))| {
             (gained.is_empty() && lost.is_empty())
-                || !self.checks(i)
                 || scratch.winnable(&(frame.moves | *gained), &(frame.factors - *lost), &self.graph)
         })
     }

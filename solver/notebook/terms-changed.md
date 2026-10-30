@@ -66,3 +66,12 @@ The speed tools were removed on 2026-10-30: the command `taxman bench` (its hist
 `solver/tools/profile/` (`profile.sh` and `attribute.py`), and the profile-guided build `solver/tools/pgo.sh` (it gained
 0 to 2% on the M1 and no chain ran on it).  They build at commit 3ca11bf, and the entries that used them keep the paths
 and commands of their time.
+
+The Cargo feature `studies` was removed on 2026-10-30, with what only it built: the searcher's hook
+(`solver/frame/src/search/hooks.rs`, with `StepHook`, which told a study of every step and let it choose the member of a
+conflict to branch on) and its sites in the searcher, `FrameGraph::relaxing` (a model that does not check some frames)
+and `Gf2Bound::live` with their tests, and the setup switch `STUDIES=1`.  The search diagnostics went the same day
+(`solver/frame/src/search/diagnostics.rs`, with `Diagnostics`, the cut reasons `cut`, `GAP_BUCKETS`, the argument that
+collected them through the searcher, and `search::search_with`, which took it), and so did the counters of the
+searcher that only they read.  They build at commit 3ca11bf, and the entries that used them keep the paths and commands
+of their time.

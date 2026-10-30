@@ -35,7 +35,7 @@ trace of every step: the biggest, another big one, and a small subtree of the sa
 ### What was run
 
 * **A hook on the searcher,** the solver's one change, inert by default.  `search::StepHook`
-  ([src/search/hooks.rs](../../../frame/src/search/hooks.rs)) is told after every step what the step saw and did, and
+  ([src/search/hooks.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/src/search/hooks.rs)) is told after every step what the step saw and did, and
   may choose which member of a conflict to branch on, which keeps the search exact.  The trees are unchanged: the three
   units take exactly the suite's steps, and the test of `wall anatomy` runs a whole search with and without the hook.
 * **`wall anatomy`** ([examples/wall/anatomy.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/anatomy.rs), with a test) solves units as

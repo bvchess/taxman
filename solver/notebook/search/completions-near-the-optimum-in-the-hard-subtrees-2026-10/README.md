@@ -32,7 +32,7 @@ completions within 91 of the optimum, a few thousand leaves against the tree's 1
 
 **The count is the solver's own search, made to count** (`wall near`,
 [examples/wall/near.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/near.rs); `StepHook::counting`, in
-[src/search/hooks.rs](../../../frame/src/search/hooks.rs), in the studies build only).  A counting search makes every
+[src/search/hooks.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/src/search/hooks.rs), in the studies build only).  A counting search makes every
 completion that reaches its floor as a child exactly once, and a hook counts the children. It offers nothing, so the
 incumbent stays one below the floor; a node whose heaviest set can be promoted branches on that set's members as on a
 conflict's, so that the branches make the set and every other completion; and the rule of symmetric pairs is off.  The

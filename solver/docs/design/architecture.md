@@ -47,9 +47,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
     a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, whose gate the
     gate trial may change while a search runs), `price_memo.rs` (the prices of conflict branching kept from one check to
     the next, [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), and `profile.rs`
-    (the profile of a search, [engine.md](engine.md#the-profile-of-a-search)).  The `if let Some(p) = &mut self.probe` lines in
-    `searcher.rs` are instrumentation (`diagnostics.rs`), and so are those of `tags`, the profile's; a first read can
-    skip them.
+    (the profile of a search, [engine.md](engine.md#the-profile-of-a-search)).  The lines of `searcher.rs` that read
+    `tags` or `phases` are the profile's instrumentation; a first read can skip them.
 11. `src/bounds.rs`: two small functions, the limit on a node's further promotions (`max_additional`) and the greedy
     incumbent.
 

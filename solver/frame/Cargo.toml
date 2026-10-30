@@ -14,11 +14,6 @@ path = "src/lib.rs"
 name = "taxman"
 path = "src/main.rs"
 
-[features]
-# The hook of the searcher for studies (`search/hooks.rs`) and the sites of it.  No example uses it now, and a default
-# build, `cargo test` and `cargo clippy --all-targets` skip it; `--features studies` builds the sites.
-studies = []
-
 # The ledger has tests of its own (its relations bracket the optimum, its runs prove at the optimum), which `cargo test`
 # runs; no other example has any.
 [[example]]

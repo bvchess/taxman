@@ -99,7 +99,7 @@ PS = """\
   200   100  60.0 /usr/bin/python3
   300   200  90.0 /Users/me/.cargo/bin/cargo
   301   300 100.0 /Users/me/target/debug/deps/taxman-abc
-  400     1 100.0 /Users/me/target/debug/examples/wall
+  400     1 100.0 /Users/me/target/debug/examples/perf
   401     1  45.5 /Applications/Microsoft Excel.app/Contents/MacOS/Microsoft Excel
   402     1   4.0 /usr/bin/quiet
   403     1  30.0 /usr/sbin/mds
@@ -108,7 +108,7 @@ PS = """\
 
 class Culprits(unittest.TestCase):
     def test_the_busiest_processes_not_ours_are_named_busiest_first(self):
-        self.assertEqual(quick_check.busiest(PS, own_pid=200), "wall (100%), Microsoft Excel (46%), mds (30%)")
+        self.assertEqual(quick_check.busiest(PS, own_pid=200), "perf (100%), Microsoft Excel (46%), mds (30%)")
 
     def test_our_own_processes_are_left_out_whoever_started_them(self):
         self.assertNotIn("taxman-abc", quick_check.busiest(PS, own_pid=200, count=10))
@@ -174,12 +174,12 @@ class Waiting(unittest.TestCase):
 
     def test_a_busy_machine_is_waited_for_until_it_is_quiet_and_the_wait_says_why(self):
         machine = Machine(0.9, 0.6, 0.3, 0.1)
-        self.assertIsNone(machine.waited(lambda: "wall (100%)"))
+        self.assertIsNone(machine.waited(lambda: "perf (100%)"))
         self.assertEqual(machine.samples, 4)
         self.assertEqual(len(machine.said), 2, machine.said)
         self.assertIn("machine busy", machine.said[0])
         self.assertIn("90.0%", machine.said[0])
-        self.assertIn("the busiest: wall (100%)", machine.said[0])
+        self.assertIn("the busiest: perf (100%)", machine.said[0])
         self.assertIn("quiet", machine.said[1])
         self.assertIn("after 8 s", machine.said[1])
 
@@ -192,11 +192,11 @@ class Waiting(unittest.TestCase):
 
     def test_a_machine_that_never_gets_quiet_fails_with_machine_busy_after_the_wait(self):
         machine = Machine(0.8)
-        failure = machine.waited(lambda: "wall (100%)")
+        failure = machine.waited(lambda: "perf (100%)")
         self.assertIsNotNone(failure)
         self.assertIn("machine busy", failure)
         self.assertIn("80.0%", failure)
-        self.assertIn("wall (100%)", failure)
+        self.assertIn("perf (100%)", failure)
         self.assertGreaterEqual(machine.now, quick_check.BUSY_WAIT)
         self.assertLess(machine.now, quick_check.BUSY_WAIT + 2 * quick_check.BUSY_SAMPLE)
 

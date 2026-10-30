@@ -31,11 +31,8 @@ case "$1" in
     build)
         shift
         echo "   Compiling the stand-in of the $crate"
-        all_examples=0
-        studies=0
         while [ $# -gt 0 ]; do
             case "$1" in
-                --features) shift; [ "$1" != studies ] || studies=1 ;;
                 --bins)
                     if [ "$crate" = solver ]; then
                         tool $release/taxman
@@ -45,7 +42,6 @@ case "$1" in
                     fi
                     ;;
                 --examples)
-                    all_examples=1
                     if [ "$crate" = solver ]; then
                         tool $release/examples/perf
                         tool $release/examples/ledger
@@ -58,8 +54,6 @@ case "$1" in
             esac
             shift
         done
-        # the feature adds the study examples to all the examples
-        [ "$crate$all_examples$studies" != solver11 ] || tool $release/examples/wall
         ;;
     test)
         case " $* " in
@@ -153,8 +147,7 @@ class Setup(unittest.TestCase):
                            STUB_TESTBIN=str(self.bin / "testbin"),
                            FAKE_S3=str(self.base / "s3"), FAKE_STATE=str(self.base / "state"),
                            FAKE_LOG=str(self.base / "aws.log"))
-        for name in ("BUILD", "BUILD_PROVER", "STUDIES", "RELEASE_TESTS", "REQUIRE_CACHED", "S3_DEST", "PROVER_ONLY",
-                     "FAIL_TEST"):
+        for name in ("BUILD", "BUILD_PROVER", "RELEASE_TESTS", "REQUIRE_CACHED", "S3_DEST", "PROVER_ONLY", "FAIL_TEST"):
             environment.pop(name, None)
         environment.update({name: str(value) for name, value in variables.items()})
         done = subprocess.run([BASH, str(machine / "solver" / "tools" / "cloud" / "setup.sh")], capture_output=True,
@@ -234,24 +227,6 @@ class Setup(unittest.TestCase):
         self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman",
                                               "cargo frame test -- --test-threads=4"])
 
-    def test_studies_adds_the_feature_to_the_solvers_build_and_tests_and_to_nothing_else(self):
-        machine = self.machine()
-        status, logged, _ = self.setup(machine, STUDIES="1", BUILD_PROVER="none", SKIP_TESTS="0")
-        self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples --features studies",
-                                              "cargo frame test --features studies -- --test-threads=4"])
-        self.assertTrue((machine / "solver/frame/target/release/examples/wall").exists())
-        status, logged, _ = self.setup(self.machine(), STUDIES="1", BUILD="--bin taxman --example wall")
-        self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(),
-                         ["cargo frame build --release --bin taxman --example wall --features studies"])
-        status, logged, _ = self.setup(self.machine(), STUDIES="1", PROVER_ONLY="1")
-        self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo noframe build --release --bins --examples"])
-        plain = self.machine()
-        self.assertEqual(self.setup(plain)[0], 0)
-        self.assertFalse((plain / "solver/frame/target/release/examples/wall").exists())
-
     # --- the release suite and the cache ---
     def test_a_release_run_tests_stores_and_a_second_machine_takes_it(self):
         first = self.machine()
@@ -277,34 +252,6 @@ class Setup(unittest.TestCase):
         self.assertIn("release suite: not run", logged)
         self.assertTrue(os.access(second / "solver/frame/target/release/taxman", os.X_OK))
         self.assertIn("smoke: the committed results file", logged)  # the smoke checks still show the machine runs them
-
-    def test_a_build_with_the_studies_is_cached_apart_from_one_without(self):
-        default_entry = "prover-bins+prover-examples+solver-bins+solver-examples"
-        studies_entry = default_entry + "+solver-features-studies"
-        self.assertEqual(self.setup(self.machine(), RELEASE_TESTS="1")[0], 0)
-        self.assertEqual(self.entries(), [default_entry])
-        self.cargo_calls()
-        # the default build holds no study tool: a launch that needs `wall` finds nothing and builds nothing
-        status, logged, _ = self.setup(self.machine(), REQUIRE_CACHED="1", STUDIES="1", BUILD="--example wall")
-        self.assertEqual(status, 1, logged)
-        self.assertEqual(self.cargo_calls(), [])
-
-        status, logged, _ = self.setup(self.machine(), RELEASE_TESTS="1", STUDIES="1")
-        self.assertEqual(status, 0, logged)
-        calls = self.cargo_calls()
-        self.assertIn("cargo frame build --release --bins --examples --features studies", calls)
-        self.assertIn("cargo frame test --release --features studies --no-run --message-format=json", calls)
-        self.assertIn("cargo noframe test --release --no-run --message-format=json", calls)  # the prover has none
-        self.assertEqual(self.entries(), [default_entry, studies_entry])
-
-        with_wall = self.machine()
-        status, logged, _ = self.setup(with_wall, REQUIRE_CACHED="1", STUDIES="1", BUILD="--example wall")
-        self.assertEqual(status, 0, logged)
-        self.assertTrue(os.access(with_wall / "solver/frame/target/release/examples/wall", os.X_OK))
-        without = self.machine()  # a request without the studies takes the entry without them
-        self.assertEqual(self.setup(without, REQUIRE_CACHED="1")[0], 0)
-        self.assertFalse((without / "solver/frame/target/release/examples/wall").exists())
-        self.assertEqual(self.cargo_calls(), [])
 
     def test_a_failing_suite_stores_nothing_and_says_which_test_failed(self):
         machine = self.machine()

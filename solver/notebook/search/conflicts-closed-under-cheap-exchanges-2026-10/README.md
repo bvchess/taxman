@@ -34,7 +34,7 @@ of [the anatomy](../the-anatomy-of-a-hard-subtree-2026-10/README.md).
 ## Method
 
 **The instrument** is `wall images` ([examples/wall/images.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/images.rs), with tests), on
-three hooks of the studies build ([src/search/hooks.rs](../../../frame/src/search/hooks.rs)): `StepHook::excluding` is
+three hooks of the studies build ([src/search/hooks.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/src/search/hooks.rs)): `StepHook::excluding` is
 told the conflict the node branches on as well, `StepHook::propose` is asked, whenever a bound check computes and
 learns a conflict, for more sets to learn, and `StepHook::learned` is told what the searcher learned from them.  The
 searcher learns, of each set proposed, a minimal conflict that a peel finds within it (`FrameGraph::conflict_using`), as

@@ -581,12 +581,6 @@ impl<'g, const W: usize> Gf2Bound<'g, W> {
         dispatch!(self, l => l.reset(promoted, cands))
     }
 
-    /// For a study: the top level's live candidates (its candidates less those whose vector is 0 on either side).
-    #[cfg(feature = "studies")]
-    pub fn live(&mut self) -> Bits<W> {
-        dispatch!(self, l => l.levels[l.depth].live)
-    }
-
     /// Pushes the child of the top level made by promoting `added` (each a candidate of the top level, or removed
     /// from them since), with the candidates `child_cands` (among the top level's, less `added`).
     pub fn push_all(&mut self, added: &Bits<W>, child_cands: &Bits<W>) {
