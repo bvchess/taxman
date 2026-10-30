@@ -226,9 +226,9 @@ impl SearchTactics {
     /// The bits of [`bits`](Self::bits) that only choose how a node branches: `conflict_branching` (bit 9) and
     /// `conflict_look` (bit 10).  A checkpoint records them, as the search began with them, but they do not bind its
     /// resumption: the children of any true conflict cover every completion of their node, so a search whose branching
-    /// changes from one unit to the next is as exact as one that keeps it (solver/docs/design/lab.md has the list of
-    /// the tactics, and why the others are fixed).  So a checkpoint resumes under either setting, and a run may change
-    /// them while it goes ([`Branching`](super::Branching)).
+    /// changes from one unit to the next is as exact as one that keeps it (solver/docs/design/search.md, "The invariant
+    /// of a running search").  So a checkpoint resumes under either setting, and a run may change the gate while it goes
+    /// ([`Branching`](super::Branching)).
     pub const BRANCHING_BITS: u16 = 1 << 9 | 1 << 10;
 
     /// The bit of [`bits`](Self::bits) of `near_repeat` (bit 11).  A checkpoint records it, as the search began with

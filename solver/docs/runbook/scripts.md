@@ -11,6 +11,7 @@ each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `swee
 | file | what it does |
 |---|---|
 | `env.sh` | settings and helpers the scripts share (paths, defaults, `env_report`); sourced, not run |
+| `layout.sh` | the folders of a machine that runs the chain beside other work ([chain.md](chain.md#the-machines-folders)), which `wall.sh status --host` reads; sourced, not run |
 | `run.sh` | what the long runs share (one at a time, log, pid, deadline, S3 saves, clean stop, power-off); sourced |
 | `setup.sh` | packages, Rust, the checkout, the binaries (from the build cache, or built with `target-cpu=native`: `BUILD` says what; [build-cache.md](build-cache.md)), smoke checks and the tests; `RELEASE_TESTS=1` runs the release suite and stores the binaries; idempotent |
 | `build_cache.py`, `run_tests.py` | what `setup.sh` calls ([build-cache.md](build-cache.md)): the cache of tested binaries in S3, keyed by commit, architecture and CPU; the release suite with every test a process of its own on every CPU |

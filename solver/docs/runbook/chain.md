@@ -47,16 +47,14 @@ four games in flight at once (`WINDOW`), a checkpoint every 300 s and a progress
 documents its variables, all optional: `THREADS`, `WINDOW`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
 `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`, and the [cost guardrails](launch.md#cost-guardrails) (`GAME_HOURS`,
 `DEADLINE_HOURS`, `BUDGET_HOURS`, `RUN_UNTIL`, `POWEROFF`; the budget and the date outlive the machine,
-[wall.md](wall.md)), and `LAB_DIR` and `LAB_HOOK`, for a lab beside the chain ([the lab
-channel](../design/lab.md)).
+[wall.md](wall.md)).
 
-On a machine shared with other work, such as a lab, leave `THREADS` unset (one worker per hardware thread) and give
+On a machine shared with other work, leave `THREADS` unset (one worker per hardware thread) and give
 `EXTRA_ARGS="--background"`.  The workers then run under the idle scheduling policy, so that any other process, even
 one at `nice -n 19`, runs before them and the search takes the threads the rest leaves ([the
 flag](../REFERENCE.md#1-the-flags-of-solve)).  A fixed `THREADS` below the machine's leaves threads idle whenever the
-rest is quiet.  Such a machine keeps the chain's checkout and data in [the machine's
-folders](lab.md#the-machines-folders), and `chain.sh` runs there with `TAXMAN_WORK` set to the chain's data folder
-instead of `~/taxman-work`.
+rest is quiet.  Such a machine keeps the chain's checkout and data in [the machine's folders](#the-machines-folders),
+and `chain.sh` runs there with `TAXMAN_WORK` set to the chain's data folder instead of `~/taxman-work`.
 
 `WINDOW` is the number of consecutive games kept in flight at once (`taxman solve --window`).  While the solver still
 proves game n, it sets up and searches game n + 1 from n's best game so far, and the threads move to the searches that
@@ -101,6 +99,26 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
 * **Past 4095.**  The solver supports games up to n = 8191 (`taxman::solver::MAX_N`), those from 4096 with sets of 128
   words ([the entry on boards past 4095](../../notebook/boards-past-4095-2026-10/README.md)).  The solver refuses a game
   past 8191 ("beyond the largest supported board"), which ends the script with an error.
+
+## The machine's folders
+
+A machine that runs the chain beside other work keeps all of it in one folder of the home directory, `taxman_work`.  Its
+name is `TAXMAN_HOME`, relative to the home; [`layout.sh`](../../tools/cloud/layout.sh) derives the first four folders
+from it for `wall.sh status --host`, and no script names them anywhere else.  The last two rows are local conventions
+that no script names.
+
+| folder | what it is |
+|---|---|
+| `~/taxman_work/chain` | the chain's checkout, which it builds and runs from |
+| `~/taxman_work/chain-data` | the chain's results, checkpoints (`ckpt/`), logs and profiles |
+| `~/taxman_work/archive` | archived data, read only |
+| `~/taxman_work/research` | a second checkout, for work on the repository beside the chain |
+| `~/taxman_work/lab` | work beside the chain: builds, measurements and scratch runs, in `work/` |
+| `~/taxman_work/run.sh` | the script that starts the chain: a local file, not in the repository |
+
+`run.sh` starts `chain/solver/tools/cloud/chain.sh` with `TAXMAN_WORK` set to the chain's data folder,
+`$HOME/taxman_work/chain-data`.  `chain.sh` takes its results file, checkpoints and logs from `TAXMAN_WORK`, and needs
+no other variable for the layout; a profile directory in `EXTRA_ARGS` (`--profile`) goes in `chain-data` too.
 
 ## Monitoring
 

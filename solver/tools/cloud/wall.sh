@@ -57,7 +57,7 @@
 # options go before the command or after it, as --verbose does:
 #   --recorded N          the games recorded that the table shows: the last N (0: none)               default 6
 #   --host USER@HOST      read the state of a chain that runs on that machine (chain.sh in the tmux session tx, its
-#                         state in its data folder, solver/tools/lab/layout.sh) in one ssh call, instead of S3 and the
+#                         state in its data folder, solver/tools/cloud/layout.sh) in one ssh call, instead of S3 and the
 #                         group: no AWS profile, no aws
 #                         call.  It shows the machine's uptime, whether the chain runs, how it ended (chain.outcome),
 #                         the window and the wall (chain.log), when logs/chain.err last changed, the game the results
@@ -78,8 +78,8 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 . "$here/env.sh"
 # The folders of a machine that is not a cloud machine, which status --host reads.
-# shellcheck source=../lab/layout.sh
-. "$here/../lab/layout.sh"
+# shellcheck source=layout.sh
+. "$here/layout.sh"
 
 AWS_CLI="${AWS_CLI:-aws}"
 SSH_CLI="${SSH_CLI:-ssh}"

@@ -10,12 +10,11 @@ policy), and the tactics that tune the GF(2) search, `force_window` to `more_for
 tactics that act inside the search are the fields of `search::SearchTactics`.  A checkpoint records the search tactics
 in its header ([trust.md](trust.md), and "Adding a tactic" below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
 tactics of `tactics::Tactics`, in order, with their defaults.  Two of them, `conflict_branching` and `conflict_look`,
-only choose how a node branches: a checkpoint records them but does not bind them, and a lab may switch them while a
-search runs ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs) lists which tactics may change, and why the
-others may not).  A checkpoint does not bind `near_repeat` either, since each run of a search sets its cut up again, nor
-`price_reuse`, which only changes how the prices that rank the conflicts are made, nor `carried_nogoods`, whose store
-holds only facts of the root, nor `warm_start`, which only changes which of several heaviest sets of the same weight a
-node finds.
+only choose how a node branches: a checkpoint records them but does not bind them, and a search may change its gate
+while it runs ([search.md, "The invariant of a running search"](search.md#the-invariant-of-a-running-search)).  A
+checkpoint does not bind `near_repeat` either, since each run of a search sets its cut up again, nor `price_reuse`,
+which only changes how the prices that rank the conflicts are made, nor `carried_nogoods`, whose store holds only facts
+of the root, nor `warm_start`, which only changes which of several heaviest sets of the same weight a node finds.
 
 | tactic | default | status | effect |
 |---|---|---|---|

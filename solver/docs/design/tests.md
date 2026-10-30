@@ -190,9 +190,10 @@ every second line of the Java fixtures), and the comment on each says what the w
     it then resumes;
   * the control: a ceiling given before a run, or while it runs at the incumbent it has, ends it as optimal (with no
     search work if the start reaches it); offers from outside raise the incumbent; a stop through it checkpoints a run
-    that resumes exactly; workers added, retired and down to none (suspended, then resumed, checkpointed, stopped, or
-    ended by a ceiling) give the exact answer; and the conservation test runs with a controller that sets 0 to 4
-    workers every millisecond or so while the run checkpoints, spills and resumes;
+    that resumes exactly; a checkpoint asked through it is written at once, whatever the interval, and with no run
+    attached the request does nothing; workers added, retired and down to none (suspended, then resumed,
+    checkpointed, stopped, or ended by a ceiling) give the exact answer; and the conservation test runs with a
+    controller that sets 0 to 4 workers every millisecond or so while the run checkpoints, spills and resumes;
   * the counters: capacity is wall × threads when the workers do not change, and a searcher that sleeps before its
     first and second polls shows in the rebuild and first-step times.
 * **The profile of a search** (`src/search/profile.rs`, games 800 and 1020): the same steps, counters and answer with
@@ -220,22 +221,13 @@ every second line of the Java fixtures), and the comment on each says what the w
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.
-* **The lab channel** (`tests/lab.rs`; the commands, the folder and a game's record in the unit tests of
-  `src/solver/lab.rs`, the live branching settings in `src/search/branching.rs`, a checkpoint asked through the control
-  in `tests/engine.rs`): a range fed a hostile lab (sets off the board, twice, not promotable or claimed above their
-  worth; commands that are not commands; restarts with tactics a restart does not take; threads it cannot have;
-  `conflict_branching`, `conflict_look` and the gate switched at every tick; a game held, checkpointed and restarted in
-  the middle of its search; a redeploy at a commit off master) refuses every bad command with its reason, ends every
-  game with the score of the table, keeps the abandoned checkpoint aside, records the restart in the game's line,
-  resumes it after the redeploy with its tactics, tells the hook `long` and `done` once each, and passes the verifier.
-  The policy for the games to come has four tests of its own: one gives policies to games in flight and games set up
-  later (a `branching` of a game's own holds over them, whichever comes first; a setting left out keeps the one before;
-  the lines and `run.lab` record them, the gate among them), one redeploys a run and starts it again, one stops a search
-  of game 1000 again and again and resumes it under a policy that flips both switches and changes the gate each time,
-  and one solves game 780 with and without a policy whose gate is 0, which changes the tree and not the answer.  The
-  gate also has a test of the small games (`tests/soundness.rs`: three gates, one answer, other trees).
+* **The gate** (`tests/solver.rs`, `tests/soundness.rs` and the unit tests of `src/search/branching.rs`): the run's
+  `--gate` reaches the searchers of game 780, which takes the steps of conflict branching off under a gate wider than
+  every gap and other steps under a gate of 0, and ends with the score of the table either way; three gates (0, 100 and
+  4,000) give each of the small games one answer and some of them other trees; a gate set after the generation it was
+  decided from is refused.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
-  (`solver/tools/cloud/test/run.sh`: the wall, the ledger and a lab's redeploy through `chain.sh`, `wall-node.sh` through each way a run
+  (`solver/tools/cloud/test/run.sh`: the wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run
   ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What
   was tested, and what can go wrong"](../runbook/wall.md#what-was-tested-and-what-can-go-wrong)), and the build cache
   and the release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`,

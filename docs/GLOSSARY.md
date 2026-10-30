@@ -403,10 +403,6 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   [solver/docs/design/performance.md](../solver/docs/design/performance.md).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
-* **a lab**, **the lab channel**: a lab is a program beside a live chain that studies its dearest searches and steers
-  them; the lab channel is how `taxman solve` lets it, a hook started when a game runs long (`--hook`) and a folder of
-  commands (`--lab-dir`).  A lab changes how and when the games are searched, never their results
-  ([solver/docs/design/lab.md](../solver/docs/design/lab.md)).  Not the lab notebook, below.
 * **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): its rules, the
   register of everything tried (a file a subject, in `register/`), and the entries, one folder
   each.  Older text calls it "EXPERIMENTS".

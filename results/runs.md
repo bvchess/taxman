@@ -187,7 +187,7 @@ searched 5049 and wrote only an incomplete line):
    and did 4876–4878 too.
 3. 03:10 to 05:20: build a88dc7f on 72 threads: 4879.
 4. 05:20 to 12:35: build bcfde26 on 72 threads, with the lab's command folder and hook (`--lab-dir`, `--hook`; [the
-   lab's design](../solver/docs/design/lab.md)): 4880–4894.
+   lab's design](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md)): 4880–4894.
 5. 12:35 to 14:10: build bcfde26 on 72 threads, with `--hook-after 600`: 4895–4898.
 6. From 14:13 on 2026-10-22 to 01:57 on 2026-10-23: build 551f883, on every thread, with `--background` and
    `--finder-seconds 900`: 4899 to 4913.

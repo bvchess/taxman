@@ -83,10 +83,7 @@
 //! nodes, the times): `window` has the driver and the argument.
 
 mod clock;
-mod lab;
 mod window;
-
-pub use lab::{LabOptions, HOOK_AFTER};
 
 use crate::accelerate::{prime_shortcut, solution_for_promotions};
 use crate::bits::{words_for, Bits};
@@ -106,14 +103,12 @@ use crate::search::{
     SearchTactics,
 };
 use crate::tactics::Tactics;
-use lab::{GameLab, Policies};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -197,9 +192,6 @@ pub struct SolveOptions {
     pub finder_after: u64,
     /// The finder thread's budget, from the moment it starts (it ends sooner if the game's search does).
     pub finder_budget: Duration,
-    /// The lab channel (`--lab-dir`, `--hook`, `--hook-after`): a lab that watches and steers the games in flight,
-    /// never their results (`lab`, and solver/docs/design/lab.md).  None by default, and then nothing of it runs.
-    pub lab: LabOptions,
     /// The directory of the searches' profiles (`--profile`): each game's search keeps one, `nNNNN.profile.jsonl`, at
     /// the depth `profile_depth` (`--profile-depth`; [`search::SearchProfile`]).  A profile observes a search and
     /// changes nothing of it: it is no tactic, no part of a checkpoint and no part of a result.  None by default.
@@ -211,14 +203,14 @@ pub struct SolveOptions {
     /// with any stores or none.  None by default.
     pub carried_dir: Option<PathBuf>,
     /// The gate each game's search starts with (`--gate`), in place of [`search::CONFLICT_BRANCHING_GAP`], from 0 to
-    /// [`search::MAX_GATE`]: the gap from which conflict branching chooses the conflict.  The lab's gate for a game,
-    /// its own or its policy's, holds over it, and the gate trial starts from it ([`search::gate_trial`]).  It changes
-    /// no answer and is no tactic and no part of a checkpoint, which resumes with any gate.  None by default.
+    /// [`search::MAX_GATE`]: the gap from which conflict branching chooses the conflict.  The gate trial starts from it
+    /// ([`search::gate_trial`]).  It changes no answer and is no tactic and no part of a checkpoint, which resumes with
+    /// any gate.  None by default.
     pub gate: Option<u64>,
     /// The gate trial (`--gate-trial`): each game's search with conflict branching on tries these gates on a sample
     /// of its own units once it has taken the plan's steps, and branches with the one that took the least CPU
-    /// ([`search::gate_trial`]); a game whose own lab record has a gate keeps that.  It changes only the gate, which
-    /// changes no answer, and is no tactic and no part of a checkpoint.  None by default.
+    /// ([`search::gate_trial`]).  It changes only the gate, which changes no answer, and is no tactic and no part of a
+    /// checkpoint.  None by default.
     pub gate_trial: Option<search::gate_trial::Plan>,
 }
 
@@ -247,7 +239,6 @@ impl Default for SolveOptions {
             window: 4,
             finder_after: 0,
             finder_budget: Duration::from_secs(60),
-            lab: LabOptions::default(),
             profile: None,
             profile_depth: search::PROFILE_DEPTH,
             carried_dir: None,
@@ -651,9 +642,6 @@ pub struct GameResult {
     /// For a game taken from a known source (method [`Method::Known`]), or found by a search that an upper bound of the
     /// bounds store stopped (method [`Method::Search`] or [`Method::Start`]; both proof `known`), the source it cites.
     pub known: Option<Cited>,
-    /// What the lab did to the game's search (`--lab-dir`): its restarts, and its settings of `conflict_branching` and
-    /// `conflict_look`; only for a game whose search the lab changed.
-    pub lab: Option<Json>,
 }
 
 impl GameResult {
@@ -697,7 +685,6 @@ impl GameResult {
             prev: prev.map(|p| p.info(n)),
             same_search: None,
             known: None,
-            lab: None,
         }
     }
 
@@ -837,10 +824,9 @@ impl GameResult {
                 ("tactic_switches", self.tactics.to_json()),
                 ("limits", limits),
                 ("options", options),
-            ])
-            // What the lab did is there only on a line whose search it changed: the other lines are what they were.
-            .chain(self.lab.clone().map(|lab| ("lab", lab)))
-            .chain([("optimal_match", self.optimal_match.map_or(Json::Null, Json::Bool)), ("build", build_json())]);
+                ("optimal_match", self.optimal_match.map_or(Json::Null, Json::Bool)),
+                ("build", build_json()),
+            ]);
         Json::object(fields)
     }
 
@@ -1020,8 +1006,6 @@ struct SearchSetUp {
     /// The setup's phases: forming the frames and the search model, and the greedy set.
     frames: Duration,
     greedy: Duration,
-    /// What the lab did to the game's search, as its setup found it and as the driver keeps it since.
-    lab: Box<GameLab>,
 }
 
 impl SearchSetUp {
@@ -1030,12 +1014,6 @@ impl SearchSetUp {
         result.in_the_bag = Some(self.in_the_bag);
         result.phases.frames = self.frames;
         result.phases.greedy = self.greedy;
-    }
-
-    /// Whether the game is searched whatever an earlier game settled: it resumes a checkpoint, or the lab restarted it
-    /// (a search is resumed, or started again, never replaced by a repeat).
-    fn searched_anyway(&self) -> bool {
-        self.job.resuming() || !self.lab.restarts.is_empty()
     }
 }
 
@@ -1100,10 +1078,6 @@ trait Job: Send + Sync {
     fn survivors(&self, moves: &[u32]) -> u64;
     /// The control through which the driver steers the search ([`engine::Control`]).
     fn control(&self) -> &Control;
-    /// The search's branching settings, which the lab may change while it runs ([`Branching`]).
-    fn branching(&self) -> &Branching;
-    /// The search tactics, with the branching settings as they are now.
-    fn tactics(&self) -> SearchTactics;
     /// Arms the search's near-repeat cut by `prev`, the game of `n − 1` once it is concluded ([`near_repeat`]): with
     /// the tactic `near_repeat`, where `prev` is proven and assumes nothing.  The cut is set up here, on the caller's
     /// thread, and the searchers pick it up as each starts a unit, so the search may run or not have started.  It is
@@ -1113,12 +1087,6 @@ trait Job: Send + Sync {
     ///
     /// Those of [`near_repeat`], and then the cut is not armed.
     fn arm(&self, prev: &Prev) -> Result<Option<u64>, String>;
-    /// Offers the search the promotions `set`, claimed to be worth `value` (their sum if not given), through
-    /// [`search::offer_found`]: whether it became the incumbent, or why it was refused.
-    fn offer(&self, set: &[u32], value: Option<u64>) -> Result<bool, String>;
-    /// A finder beside the running search for `budget` ([`finder::rounds`]), its odd rounds from what survives of the
-    /// game `seed` of `n − 1` if there is one, its random choices from `random`, until `ended` says the search is over.
-    fn find(&self, budget: Duration, seed: Option<&[u32]>, random: u64, ended: &Receiver<()>) -> finder::Report;
     /// The search, from the go (the game's third phase), and the game its promotions make.  The game's checkpoint is
     /// left in place, for the caller to delete once the result is safe ([`discard_checkpoint`]).
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String>;
@@ -1135,10 +1103,8 @@ struct SearchJob<const W: usize> {
     /// the search takes a seed: a seed beside the game of `n − 1`, each with a start of its own and the better start
     /// used ([`search::start_incumbent`]).
     store_game: Option<Vec<u32>>,
-    /// The branching settings the search starts with and the lab may change ([`search::search_steered`]).
+    /// The branching settings the search starts with, which its gate trial may change ([`search::search_steered`]).
     branching: Arc<Branching>,
-    /// Whether the game's own lab record sets its gate, which the gate trial then leaves alone.
-    lab_gate: bool,
     /// The near-repeat cut, once it is armed ([`Job::arm`]): the search reads it from here.
     near: OnceLock<NearRepeat<W>>,
 }
@@ -1182,19 +1148,6 @@ impl<const W: usize> Job for SearchJob<W> {
         &self.control
     }
 
-    fn branching(&self) -> &Branching {
-        &self.branching
-    }
-
-    fn tactics(&self) -> SearchTactics {
-        let settings = self.branching.settings();
-        SearchTactics {
-            conflict_branching: settings.conflict_branching,
-            conflict_look: settings.conflict_look,
-            ..self.prepared.tactics
-        }
-    }
-
     fn arm(&self, prev: &Prev) -> Result<Option<u64>, String> {
         if !self.prepared.tactics.near_repeat || self.near.get().is_some() {
             return Ok(None);
@@ -1202,32 +1155,6 @@ impl<const W: usize> Job for SearchJob<W> {
         let Some(near) = near_repeat(&self.prepared, prev)? else { return Ok(None) };
         let bound = near.bound();
         Ok(self.near.set(near).is_ok().then_some(bound))
-    }
-
-    fn offer(&self, set: &[u32], value: Option<u64>) -> Result<bool, String> {
-        let n = self.board.n();
-        if let Some(bad) = set.iter().find(|&&x| x == 0 || x > n) {
-            return Err(format!("{bad} is not a number of the board 1..={n}"));
-        }
-        let promotions: Bits<W> = set.iter().copied().collect();
-        if promotions.len() as usize != set.len() {
-            return Err("a number is in the set twice".into());
-        }
-        search::offer_found(&self.prepared, &self.control, &promotions, value.unwrap_or_else(|| promotions.sum()))
-    }
-
-    fn find(&self, budget: Duration, seed: Option<&[u32]>, random: u64, ended: &Receiver<()>) -> finder::Report {
-        let seeds = seed.map(|moves| self.board.seed(moves)).into_iter().collect();
-        let plan = finder::Plan { after: 0, budget, seeds, random };
-        let at_nodes = self.control.status().map_or(0, |status| status.nodes);
-        finder::rounds(
-            &self.prepared,
-            &self.control,
-            &plan,
-            at_nodes,
-            ended,
-            Some(&format!("n={} lab", self.board.n())),
-        )
     }
 
     fn search(&self, go: Go, opts: &SolveOptions) -> Result<Outcome, String> {
@@ -1265,9 +1192,18 @@ impl<const W: usize> Job for SearchJob<W> {
         let profile = opts.profile.as_deref().map(|dir| ProfilePlan::in_dir(dir, n, opts.profile_depth));
         let near = &self.near;
         let (profile, carried) = (profile.as_ref(), opts.carried_dir.as_deref());
-        let trial = opts.gate_trial.as_ref().filter(|_| !self.lab_gate);
         let found = search::search_steered(
-            prepared, &cfg, &seeds, go.cap, resuming, plan, branching, near, profile, carried, trial,
+            prepared,
+            &cfg,
+            &seeds,
+            go.cap,
+            resuming,
+            plan,
+            branching,
+            near,
+            profile,
+            carried,
+            opts.gate_trial.as_ref(),
         );
         if own {
             // Only removes the directory if the engine left nothing in it.
@@ -1308,25 +1244,16 @@ fn near_repeat<const W: usize>(prepared: &Prepared<W>, prev: &Prev) -> Result<Op
     crate::board::near_repeat(prepared, prev.score)
 }
 
-type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known, Option<GameLab>, &Policies) -> Result<SetUp, Failure>;
+type SetUpWithWidth = fn(u32, &Before, &SolveOptions, &Known) -> Result<SetUp, Failure>;
 
 /// The setup of game `n` (its first phase, on the game's thread): the checks of a previous game not made by this run,
 /// the tables, and then the game a known source holds, the prime shortcut, the trivial game, or the search problem
-/// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the game.  `lab` is what the lab
-/// did to the game, as the driver knows it; without it, the setup reads it from beside the game's checkpoint.
-/// `policies` are those the lab has given for the games to come.
-fn set_up(
-    n: u32,
-    before: &Before,
-    opts: &SolveOptions,
-    known: &Known,
-    lab: Option<GameLab>,
-    policies: &Policies,
-) -> Result<SetUp, Failure> {
+/// (steps 1 to 4 of the module documentation, up to the repeat), at the set width of the game.
+fn set_up(n: u32, before: &Before, opts: &SolveOptions, known: &Known) -> Result<SetUp, Failure> {
     let words = words_for(n);
     let beyond = || Failure::Error(format!("n={n} is beyond the largest supported board, n={MAX_N}"));
     let set_up: SetUpWithWidth = crate::with_words!(words, W => set_up_with_width::<W>, else return Err(beyond()));
-    set_up(n, before, opts, known, lab, policies).map_err(|failure| at(n, failure))
+    set_up(n, before, opts, known).map_err(|failure| at(n, failure))
 }
 
 fn set_up_with_width<const W: usize>(
@@ -1334,20 +1261,7 @@ fn set_up_with_width<const W: usize>(
     before: &Before,
     opts: &SolveOptions,
     known: &Known,
-    lab: Option<GameLab>,
-    policies: &Policies,
 ) -> Result<SetUp, Failure> {
-    // The game's search tactics are, in this order: the run's, changed by the policy the lab gave for the games to
-    // come, changed by what the lab did to the game itself.  What it did to the game: a restart searches it with the
-    // lab's tactics, which a policy does not change, and a resume of that search too; a setting of `conflict_branching`
-    // or `conflict_look` holds over them and over the policy.  Read from beside its checkpoint, also by a run without a
-    // lab, since the search it resumes was made so; nothing, for a game no lab touched.
-    let mut lab = match lab {
-        Some(lab) => lab,
-        None => GameLab::load(opts, n)?,
-    };
-    lab.apply_policy(policies, n);
-    let tactics = Tactics { search: lab.search_tactics(&opts.tactics.search), ..opts.tactics };
     if let Before::Given(prev) = before {
         // The prime shortcut and the ceiling trust the previous game, so make sure it is what it says it is.  Not for
         // a game this run made: `conclude` has refereed those moves already, with the same `replay_finished` and to
@@ -1357,10 +1271,9 @@ fn set_up_with_width<const W: usize>(
         }
     }
     let tables = Tables::new(n);
-    // A search that was interrupted is resumed, and one that the lab restarted is searched, whatever else could have
-    // produced the game.
+    // A search that was interrupted is resumed, whatever else could have produced the game.
     let checkpoint = opts.checkpoint_file(n).filter(|path| path.exists());
-    let derive = !opts.force_search && checkpoint.is_none() && lab.restarts.is_empty();
+    let derive = !opts.force_search && checkpoint.is_none();
 
     // A board a known source holds a proven game of (`--use-prev`): the game, with no search.
     if derive && opts.use_prev && opts.known.boards {
@@ -1370,7 +1283,7 @@ fn set_up_with_width<const W: usize>(
         }
     }
 
-    if derive && tactics.prime_shortcut && tables.is_prime(n) && before.proven() {
+    if derive && opts.tactics.prime_shortcut && tables.is_prime(n) && before.proven() {
         let candidates = BoardFrames::<W>::new(&tables, Bits::EMPTY).promotion_candidates();
         return Ok(SetUp::Derived(Derived::Prime { candidates: candidates.to_vec() }));
     }
@@ -1387,13 +1300,13 @@ fn set_up_with_width<const W: usize>(
                 format!("cannot resume from {}: {e} (delete the file to start the game over)", path.display())
             })?;
             // A checkpoint does not bind how the searchers keep their nogoods, nor how they branch: this run says.
-            p.tactics = p.tactics.with_unbound_of(&tactics.search);
-            if p.tactics != tactics.search {
-                return Err(Failure::Error(different_tactics(path, p.tactics, tactics)));
+            p.tactics = p.tactics.with_unbound_of(&opts.tactics.search);
+            if p.tactics != opts.tactics.search {
+                return Err(Failure::Error(different_tactics(path, p.tactics, opts.tactics)));
             }
             p
         }
-        None => board.prepare(tactics.search)?,
+        None => board.prepare(opts.tactics.search)?,
     };
     let problem = prepared.problem();
     let setup = SearchSetup {
@@ -1407,21 +1320,18 @@ fn set_up_with_width<const W: usize>(
     let (in_the_bag, frames, greedy) =
         (board.in_the_bag, board.frames_time + prepared.timings.build, prepared.timings.greedy);
     let resuming = checkpoint.is_some();
-    let seeds = tactics.seed_incumbent && !resuming;
+    let seeds = opts.tactics.seed_incumbent && !resuming;
     // What the bounds store has of the board, if it is not to be searched on its own: its lower bound's game seeds the
     // search, and its upper bound is a ceiling.  (`force_search` is a search with nothing but the chain's own help.)
     let help = if opts.use_prev && !opts.force_search { known.open(n)? } else { Open::default() };
     let store_cap = help.upper.map(|bound| StoreCap { sum: bound.value.saturating_sub(in_the_bag), bound });
     let store_game = help.game.filter(|_| seeds);
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
-    // is no tactic, from the lab's record or the policy, else the run's.
-    let branching =
-        Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.starting_gate(opts.gate))));
+    // is no tactic, the run's (`--gate`) if it has one, else the default.
+    let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(opts.gate)));
     let (control, near) = (Control::new(), OnceLock::new());
-    let lab_gate = lab.gate.is_some();
-    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, lab_gate, near });
-    let lab = Box::new(lab);
-    Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy, lab }, problem))
+    let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, near });
+    Ok(SetUp::Search(SearchSetUp { job, setup, in_the_bag, store_cap, frames, greedy }, problem))
 }
 
 /// The ceiling on the promotion sum of game `n`, whose `in_the_bag` is given, from the score of its previous game, if
@@ -1506,11 +1416,6 @@ fn conclude_game(
         }
         Found::Searched(set, searched) => {
             set.fill(&mut result);
-            if set.lab.steered() {
-                // The tactics the search ran with, the branching as it was at the end, and what the lab did.
-                result.tactics.search = set.job.tactics();
-                result.lab = set.lab.record();
-            }
             let cap = ceiling(n, set.in_the_bag, context.prev.and_then(Prev::cap_score), opts);
             let setup = SearchSetup { cap, ..set.setup };
             result.setup = Some(setup);
@@ -1697,7 +1602,6 @@ pub fn discard_checkpoint(opts: &SolveOptions, n: u32) {
         }
     }
     clock::forget(opts, n);
-    GameLab::forget(opts, n);
 }
 
 /// Where the engine spills to, and whether the directory is the game's own, which its search removes when it is done.
@@ -1884,9 +1788,6 @@ pub struct RangeSummary {
     pub stopped_at: Option<u32>,
     /// The game that passed the wall ([`SolveOptions::game_limit`]); the range ends there, with nothing recorded for it.
     pub walled: Option<Wall>,
-    /// The commit a lab asked the run to be redeployed at (`--lab-dir`, the command `redeploy`): every search was
-    /// stopped with a final checkpoint, and the range ends there.
-    pub redeploy: Option<String>,
 }
 
 /// The game that passed the wall.

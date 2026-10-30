@@ -12,6 +12,7 @@ use taxman::game::{largest_prime_at_most, replay_finished, Optimal};
 use taxman::json::Json;
 use taxman::numtheory::Tables;
 use taxman::results::{verify_files, Proof};
+use taxman::search::MAX_GATE;
 use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn solve_all(lo: u32, hi: u32, opts: &SolveOptions) -> Vec<GameResult> {
@@ -377,6 +378,40 @@ fn a_checkpoint_resumes_with_any_finder_settings() {
     assert_eq!((result.score, result.optimal_match), (optimal.score(600).unwrap(), Some(true)));
 }
 
+/// A checkpoint resumes under either setting of `conflict_branching` and of `conflict_look` (bits 9 and 10 of its
+/// tactics bind nothing) and under any gate (no part of it), as a game does that resumes at the run's `--gate` after a
+/// gate trial chose another.  Game 1000, whose default search takes more than the 1,024 steps after which a node limit
+/// stops it, is stopped again and again and resumed, each piece under settings and a gate that differ from those of the
+/// piece before.  It finishes with its score in the table.
+#[test]
+fn a_checkpoint_resumes_under_other_branching_settings_and_gates() {
+    let optimal = Optimal::built_in();
+    let dir = TempDir::new("branching-resume");
+    let base =
+        SolveOptions { checkpoint_dir: Some(dir.0.clone()), node_limit: Some(1), force_search: true, ..options(1) };
+    let settings = [(true, false), (false, true), (true, true), (false, false)];
+    let gates = [300, 150, MAX_GATE, 600];
+    let mut pieces = 0;
+    let result = loop {
+        let (conflict_branching, conflict_look) = settings[pieces % settings.len()];
+        let mut opts = SolveOptions { gate: Some(gates[pieces % gates.len()]), ..base.clone() };
+        opts.tactics.search.conflict_branching = conflict_branching;
+        opts.tactics.search.conflict_look = conflict_look;
+        let r = solver::solve_game_with(1000, None, &opts, optimal).unwrap_or_else(|e| panic!("piece {pieces}: {e}"));
+        let ran = &r.tactics.search;
+        assert_eq!((ran.conflict_branching, ran.conflict_look), (conflict_branching, conflict_look), "piece {pieces}");
+        assert_eq!(r.gate, opts.gate, "piece {pieces}");
+        pieces += 1;
+        if r.completed {
+            break r;
+        }
+        assert!(base.checkpoint_file(1000).unwrap().exists(), "an unfinished game keeps its checkpoint");
+        assert!(pieces < 50, "no progress");
+    };
+    assert!(pieces >= 2, "no piece resumed a search");
+    assert_eq!((result.score, result.optimal_match), (optimal.score(1000).unwrap(), Some(true)));
+}
+
 #[test]
 fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     let optimal = Optimal::built_in();
@@ -464,6 +499,31 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     };
     assert!((598..=602).all(|n| completed(n) == 1));
     assert_eq!(lines.len(), 5 + 1);
+}
+
+/// The gate of the run (`--gate`) reaches the searchers of a game and changes its tree, not its answer.  Game 780,
+/// searched from nothing on one thread, is solved with conflict branching off; under a run gate of `MAX_GATE`, wider
+/// than any gap of the game, which gives the tree of conflict branching off; and under a run gate of 0, so that
+/// conflict branching chooses at every check, which gives another.  Each ends with its score in the table, and its line
+/// records the run's gate.
+#[test]
+fn the_runs_gate_reaches_the_searchers() {
+    const N: u32 = 780;
+    let optimal = Optimal::built_in();
+    let solved = |tag: &str, branching: bool, gate: Option<u64>| {
+        let mut opts = SolveOptions { force_search: true, gate, ..options(1) };
+        opts.tactics.search.conflict_branching = branching;
+        let r = solver::solve_game_with(N, None, &opts, optimal).unwrap_or_else(|e| panic!("{tag}: {e}"));
+        let answer = (r.score, r.completed, r.optimal_match);
+        assert_eq!(answer, (optimal.score(N).unwrap(), true, Some(true)), "{tag}");
+        let recorded = r.to_json().get("options").and_then(|options| options.get("gate")).and_then(Json::as_u64);
+        assert_eq!(recorded, gate, "{tag}: the line's record of the run's gate");
+        r.nodes
+    };
+    let off = solved("run-gate-off", false, None);
+    assert_eq!(solved("run-gate-wide", true, Some(MAX_GATE)), off, "a gate wider than every gap is no gate");
+    let at_every_check = solved("run-gate-0", true, Some(0));
+    assert_ne!(at_every_check, off, "a run gate of 0 took the steps of conflict branching off");
 }
 
 /// 1500 gets `W = 24`, 2050 `W = 36` (the first board with a number above 2047 in its frames), 3600 `W = 64` (the

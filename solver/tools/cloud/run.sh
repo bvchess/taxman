@@ -244,7 +244,7 @@ run_begin() {
     done
 
     # One run of this name at a time.  The lock, on fd 9, is this script's alone: every process it starts has fd 9
-    # closed (9>&-), so that a program that outlives its parent (the lab's hook of a solver, say) cannot hold the lock
+    # closed (9>&-), so that a program that outlives its parent (one that a solver started, say) cannot hold the lock
     # after the script has ended and keep the next run out.  What still guards against two solvers on one checkpoint
     # directory is the solver's own lock on it (taxman.lock): a run that takes this lock while an orphaned solver goes
     # on has its solver refused, and ends.

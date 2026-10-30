@@ -54,11 +54,15 @@ entries that used them keep the paths and commands of their time.  The sacrifice
 `solver/frame/src/sacrifice.rs`, with `sacrifice::hunt`) and the punctured boards it used (`Tables::punctured`,
 `game::replay_punctured`, the maximal-factor rule of `brute::solve` and the hole cases of `frames/`) were removed the
 same day, and the test of `tests/wide.rs` that took its upper bound for game 1133 from the sacrifice bound reads the
-prover's proof instead; they build at commit 3ca11bf too.
+prover's proof instead; they build at commit 3ca11bf too.  The lab was removed the same day: the command folder and the
+hook of `taxman solve` (`--lab-dir`, `--hook`, `--hook-after`, the exit status 5), `solver/tools/lab/`, and the design
+and runbook of the lab (`solver/docs/design/lab.md`, `solver/docs/runbook/lab.md`).  It builds at commit 3ca11bf, the
+entries that used it keep the paths and commands of their time, and their links to its files are links to that commit.
+The result key `lab` stays in the lines that carry it.
 
 The speed tools were removed on 2026-10-30: the command `taxman bench` (its history file,
 `solver/frame/bench/history.jsonl`, stays as the record of the benchmarks of 2026-10), the example `ladder`
 (`solver/frame/examples/ladder.rs`), the scaling sweep `solver/tools/cloud/scaling.sh` and the profile tools
 `solver/tools/profile/` (`profile.sh` and `attribute.py`), and the profile-guided build `solver/tools/pgo.sh` (it gained
-0 to 2% on the M1 and no chain ran on it).  They build at commit 3ca11bf, and the entries that used them
-keep the paths and commands of their time.
+0 to 2% on the M1 and no chain ran on it).  They build at commit 3ca11bf, and the entries that used them keep the paths
+and commands of their time.

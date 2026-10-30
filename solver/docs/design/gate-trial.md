@@ -21,23 +21,20 @@ reach the largest.  It solves each, under each gate, as a unit of the engine of 
 checkpoint's incumbent, to at most 150,000 steps, unit by unit with every gate in turn so that the gates see the machine
 alike, on four threads.  Each solve has its own searchers, nogood tables and incumbent, the search's carried nogoods,
 and a copy of its near-repeat cut.  A gate that took at least 3% less CPU than the search's own becomes the search's
-gate, for the units its searchers start from then on, as the lab's `branching` command sets it.  `--gate-trial-plan`
-changes these numbers (`after`, `units`, `steps`, `threads`, `least_gap`), for tests and for small games.  A search
-that resumes starts again from the gate its flags give (`--gate`, else the default), not from the gate a trial chose
-before the stop, and runs its trial again at its first checkpoint: the steps it waits for count over every run.
+gate, for the units its searchers start from then on.  `--gate-trial-plan` changes these numbers (`after`, `units`,
+`steps`, `threads`, `least_gap`), for tests and for small games.  A search that resumes starts again from the gate its
+flags give (`--gate`, else the default), not from the gate a trial chose before the stop, and runs its trial again at
+its first checkpoint: the steps it waits for count over every run.
 
 *Why it cannot make an answer wrong.*  The trial changes only the gate, and any gate keeps the search exhaustive: the
-children of any true conflict cover every completion of their node, whatever the other nodes chose ([lab.md,
-(b)](lab.md#the-invariant)).  Its solves are searches of their own: what they find, learn or cut stays in them, and they
-neither prune the search nor offer it anything.  The trial keeps nothing in the checkpoint, which resumes with any
-gate.
+children of any true conflict cover every completion of their node, whatever the other nodes chose ([search.md, "The
+invariant of a running search"](search.md#the-invariant-of-a-running-search)).  Its solves are searches of their own:
+what they find, learn or cut stays in them, and they neither prune the search nor offer it anything.  The trial keeps
+nothing in the checkpoint, which resumes with any gate.
 
-*Who decides.*  The lab's word holds.  A game whose lab record has a gate of its own (the lab's `branching` command)
-runs no trial.  If the lab changes the branching settings once the search has started, by a `branching` command or a
-policy given while it runs, the trial does not run, or does not set its gate, and says so.  A policy's gate given
-before the search started is the gate the trial starts from, and is tried against the others.  So is the run's
-`--gate`, for a game whose lab record and policy give no gate: the lab's word holds over the flag as it does over the
-default.
+*Where it starts.*  The gate the trial starts from is the run's `--gate`, else the default, and is tried against the
+others.  If the branching settings have changed since the search started, the trial does not run, or does not set its
+gate, and says so.
 
 The trial needs the tactic `gf2` for the gaps and a checkpoint directory for the units; without either it does not run,
 and with conflict branching off the gate means nothing, so it does not run either.

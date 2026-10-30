@@ -269,7 +269,7 @@ pub(super) fn beside<const W: usize>(
 /// The rounds of LNS that [`beside`] runs from the moment the search has taken `at_nodes` steps (see the module
 /// documentation).  They end when the budget is spent, `ended` says the search is over, or a set is refused.  Also the
 /// finder alone: a `control` that holds the incumbent, and a channel whose sender the caller keeps.
-pub fn rounds<const W: usize>(
+fn rounds<const W: usize>(
     prepared: &Prepared<W>,
     control: &Control,
     plan: &Plan<W>,

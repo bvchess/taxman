@@ -4,13 +4,13 @@
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
 //! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; a `solve` that a game
-//! passing the wall (`--game-hours`) ended exits with status 4, and one that a lab's `redeploy` ended (`--lab-dir`)
-//! with status 5; `certify` exits with status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
+//! passing the wall (`--game-hours`) ended exits with status 4; `certify` exits with status 2 when it finds a game that
+//! beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
 
 mod cli;
 mod commands;
 
-use cli::{errln, outln, CliError, CliResult, REDEPLOY_STATUS, WALL_STATUS};
+use cli::{errln, outln, CliError, CliResult, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, SearchTactics, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
@@ -65,16 +65,6 @@ commands:
                                first of the window, summed over runs and kept in DIR/nNNNN.clock) passes H hours:
                                every search stops with a final checkpoint, nothing is recorded for that game, the
                                line `wall at N after H hours` is printed and the exit status is 4
-      --lab-dir DIR            the lab's command folder: at each progress tick the run takes the files of DIR/in
-                               (one JSON command each: checkpoint, offer, branching, restart, threads, finder,
-                               redeploy), applies or refuses each, writes the outcome to DIR/out and moves the
-                               command to DIR/done.  A lab changes how the games are searched, never their
-                               results.  A redeploy ends the run with every search checkpointed, the line
-                               `redeploy to COMMIT` and the exit status 5
-      --hook PROGRAM           run PROGRAM, detached, with one JSON argument: the event long when a game's own
-                               search passes --hook-after (once a game), and done, with its line, when such a game
-                               has its line
-      --hook-after S           seconds of a game's own search before the hook is told it runs long (default 3600)
       --profile DIR            keep a profile of each game's search in DIR/nNNNN.profile.jsonl: where its steps
                                go, by node near the root, by number of promotions and by checkpoint interval, and
                                its open units at each checkpoint (solver/tools/read_profile.py reads it).  It
@@ -86,8 +76,8 @@ commands:
                                latest first, checked at its root; each search writes its own there.  They only
                                prune, and change no result
       --gate GAP               the gap, from 0 to {max_gate}, from which conflict branching chooses its conflict, in
-                               every game's search (default {gate}).  The lab's gate for a game holds over it.  It
-                               changes no answer and is no part of a checkpoint; refused with conflict_branching off
+                               every game's search (default {gate}).  It changes no answer and is no part of a
+                               checkpoint; refused with conflict_branching off
       --gate-trial GATES       once a game's search has taken {trial_after} steps, try each of the gates GATES (comma
                                separated, each from 0 to {max_gate}) and the search's own on a sample of its units,
                                and branch with the one that took the least CPU.  It needs --checkpoint-dir
@@ -180,7 +170,6 @@ fn main() -> ExitCode {
         }
         // `solve` has said where on stdout.
         Err(CliError::Wall) => ExitCode::from(WALL_STATUS),
-        Err(CliError::Redeploy) => ExitCode::from(REDEPLOY_STATUS),
     }
 }
 

@@ -7,10 +7,10 @@ and explores the sets that could beat it, pruning every part of the tree that a 
 it up: the state and the order of the search, two bounds on a node (the matching bound and the Lagrangian bound over the
 nogoods), and the conflicts and nogoods that the branching rests on; the GF(2) bound, the default, and the rule of
 symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
-changes which conflict a node branches on, and the last two parts are the search's start and the cut that the game
-before gives it.  The finder, a thread beside a long search, is in [finder.md](finder.md), and the search of a problem
-with one-sided candidates in [extended-mode.md](extended-mode.md).  The
-[glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
+changes which conflict a node branches on, "The invariant of a running search" says what may change while it runs, and
+the last two parts are the search's start and the cut that the game before gives it.  The finder, a thread beside a
+long search, is in [finder.md](finder.md), and the search of a problem with one-sided candidates in
+[extended-mode.md](extended-mode.md).  The [glossary](../../../docs/GLOSSARY.md#the-search) defines the search's words.
 
 ## Search state and order
 
@@ -55,9 +55,7 @@ completions.
 
 The bound is an upper bound on `sum(promoted)` plus a completion's sum, so the search cuts a node whose matching value
 is below its need.  At the roots of the 94 golden games that need a search, its mean gap above P\* is 31, against 76 for
-the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.  The Java's
-bound, which the matching bound replaced, never pruned where the matching bound did not: the diagnostics counted none at
-every check.
+the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.
 
 *Incremental.*  The search keeps the bound along its path instead of solving it at each node.  `matchbound::MatchGraph`
 is the root's graph, whose edges never change, and a node's problem is that graph with each vertex in one of three
@@ -92,8 +90,7 @@ kept only help a frame.  So **every promotable completion leaves out some member
   the child promotes the member, and the node goes on without it, so that neither can reproduce the heaviest matching.
   The member is the one whose removal lowers the matching bound most.  That takes one bound without each member, each
   solved exactly (`MatchBound::value_excluding`).  A node with no conflict among its candidates
-  branches on its largest.  The smallest member, the largest, and the Java's largest candidate were once tactics; at the
-  hardest games they took 6 to more than 17 times as long, and were removed.
+  branches on its largest.
 * **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: the search offers it as
   the incumbent, and the node is done.
 * **Propagation into children.**  A conflict known at a node, of which a child promotes all but one member, rules that
@@ -132,17 +129,16 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher
   keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.
   Three research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose
-  defaults are the behavior above, with the same trees.  The table counts what it does (nogoods learned, lookups and
-  the share they answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and
-  the progress lines print the counts.  A checkpoint does not record the policies, since the answer does
-  not depend on them and a resumed search starts with empty tables; the run that resumes says which it uses.
+  defaults are the behavior above, with the same trees.  The table counts what it does (nogoods learned, lookups,
+  candidates ruled out, evictions), and the progress lines print the counts.  A checkpoint does not record the policies,
+  since the answer does not depend on them and a resumed search starts with empty tables; the run that resumes says
+  which it uses.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
-  cannot be promoted from the root at all and could be filtered out once.  It cannot: on every game from 2 to 1230 the
-  frame builder's candidates all pass that test at the root (a test checks every game to 511 and every sixth
-  past it).  A single-member conflict is a
-  candidate that cannot be promoted *once the node's promotions are made*: its frame may have used it to pay for a move
-  left with one live factor, say.  In another branch it is part of a nogood of two or more members.  The promotions that
-  fail are under 4% of the steps, so little would be saved ([single-member
+  cannot be promoted from the root at all and could be filtered out once.  It cannot: every candidate of every game
+  from 2 to 1230 passes that test at the root (a test checks every game to 511 and every sixth past it).  A
+  single-member conflict is a candidate that cannot be promoted *once the node's promotions are made*: its frame may
+  have used it to pay for a move left with one live factor, say.  The promotions that fail are under 4% of the steps,
+  so little would be saved ([single-member
   conflicts](../../notebook/search/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
 
 ## The Lagrangian bound over the nogoods
@@ -162,12 +158,12 @@ The search computes it in integers (weights in 64ths), with nothing rounded; the
   promoted is promoted, the candidates it no longer has are dropped, and the live nogoods they were in die.  So the
   weights of those nogoods' other members only *rise*, which needs a repair only where a member's potential must rise
   past a tight edge.  Weights fall only when the multipliers change, and then the searcher drops the levels and solves
-  them afresh.  A level costs about what a matching level does.
+  them afresh.
 * **Where, and what for.**  The search asks for the bound at every check of a node or a child that the matching bound
   and refinement leave open.  Below the need it cuts the node (cut reason `lagrange`).  Otherwise it yields forced
   members: the members of its heaviest matching without which the bound, read off its potentials as `bound_excluding`
   reads the matching's, would be below the need.  Every completion that beats the incumbent promotes them, and with
-  `fix_forced` the node's child promotes them with the matching's.  The forced members are most of the gain.
+  `fix_forced` the node's child promotes them with the matching's.
 * **The multipliers.**  Each searcher fits its own, at the root, to the nogoods it has learned: after 2,000 of its
   steps, and then just before each forgetting of its table (every 50,000), it takes 50 subgradient steps (Polyak's rule,
   towards what the root needs) over the table's nogoods and those of its present multipliers, and keeps the nogoods
@@ -175,9 +171,7 @@ The search computes it in integers (weights in 64ths), with nothing rounded; the
   speed.  Like the nogoods, the multipliers are a cache that units and checkpoints do not record, and the tree depends
   on the searcher's history.  A search of fewer than 2,000 steps is unchanged.
 * **What it is worth** (on the matching path).  Proofs of the hardest games, 1184 to 1300, take 2 to 6 times fewer
-  cycles on one thread, about 3 times on average, with no trend in n; the chain 1201–1231 on four threads takes 2.4
-  times less game time.  Each step costs about half as much again, so a search whose time goes into finding its best set
-  late, as 992's does, is slower ([a Lagrangian bound over the
+  cycles on one thread, though each step costs half as much again ([a Lagrangian bound over the
   nogoods](../../notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it
   changes no tree measured ([tactics.md](tactics.md), the row of `lagrange`).
 
@@ -256,7 +250,7 @@ gap, so the subtree hardly shrinks.  A conflict whose members all have high pric
 often a set of forced members, which closes the node at step 3.
 
 *The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300; the *gate*,
-which a lab or the run's `--gate` may set from 0 to `MAX_GATE`, 4,000), the check weighs:
+which the run's `--gate` may set from 0 to `MAX_GATE`, 4,000), the check weighs:
 
 * `K`, the conflict the search found;
 * every conflict the nogood table knows within `I*` (`Nogoods::all_within`);
@@ -279,12 +273,12 @@ applied, its frame keeps a stuck set of moves, so it is not winnable ([the peel 
 ([P5](../../../docs/theory/playability.md#the-residual-theorem)), so no completion holding the whole conflict is
 promotable ([the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)).  `conflicts_ordered`
 checks each with the whole peel.  Since it only chooses among true conflicts, the tactic may change between a search's
-units: a checkpoint resumes with it on or off, and a lab may switch it while the search runs ([lab.md](lab.md)).
+units ([the invariant](#the-invariant-of-a-running-search)), and a checkpoint resumes with it on or off.
 
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
-default's steps and 0.26 and 0.27 of its CPU; a step costs more than a default one, the excess mostly in the pricing.
-The share of steps saved grows with the gap.  The measurements, and the gap and slope chosen, are in [where the search
-of 4875 spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
+default's steps and 0.26 and 0.27 of its CPU, the share of steps saved growing with the gap (a step costs more, mostly
+in the pricing).  The measurements, and the gap and slope chosen, are in [where the search of 4875
+spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 
 *The look.*  With the tactic `conflict_look`, on by default, a check that would branch on a conflict other than `K`
 looks at one child of `K` first.  At some deep nodes the choice above avoids `K` although one child of `K` dies at
@@ -314,18 +308,34 @@ own level again, which then resolves its level as it does after any child.  Wher
 nothing is pushed and the workspace keeps the node's tableau; the split's bound is never below the child's own (weak
 duality), so it cuts only children that the solve would cut, and the look chooses as it would with the solve.  The
 conflict that cuts the child is learned as a nogood of the root, which holds at every node, as the search learns its
-own.  No node's list of known conflicts gains anything from it.  So the look may change between a search's units, as the
-choice may (lab.md).
+own.  So the look may change between a search's units, as the choice may.
 
-*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it; on the whole
-games 3000, 3200, 3500 and 4050 it takes 0.975 of them together.  Games of the chain decided it: a game of 4918 to 4948 with the look took 0.79 to 0.97 of its
-neighbor's steps without it, 0.85 in geometric mean ([the live
-lab](../../notebook/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).  The measurements
-on units are in [when a node should use conflict
-branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md).  With the split's bound,
-units of games 4875 and 4950 take 0.79 to 0.95 of the CPU that they took with a look that solves every child, with the
-same trees ([cheaper steps of conflict
-branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
+*What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it ([when a node
+should use conflict
+branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md)); games of the chain
+decided it, 4918 to 4948 taking 0.85 of their neighbors' steps without it, in geometric mean ([the live
+lab](../../notebook/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).  With the split's
+bound, units take 0.79 to 0.95 of the CPU of a look that solves every child, with the same trees ([cheaper steps of
+conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
+
+## The invariant of a running search
+
+Five things change while a search runs, and none changes its answer: the order and share of its work (which worker
+explores which unit, and when, is free: [engine.md](engine.md#engine), the item "Control", and
+[trust.md](trust.md#what-a-window-changes-in-the-results)), its incumbent, through offers that are checked
+([finder.md](finder.md)), its branching, and, if the game before it concludes meanwhile, its ceiling and near-repeat
+cut.  Both end work only where the incumbent reaches a proven bound ([the
+ceiling](#the-starting-incumbent-the-ceiling-and-the-seed), [the cut](#the-near-repeat-cut)).  Nothing acting on a
+running search adds a nogood.
+
+A searcher reads the branching settings, the two switches and the gate, when it starts a unit, and explores the unit's
+subtree to the end.  So a search whose units branch differently is exhaustive unit by unit: every conflict that
+`conflict_branching` chooses among is a true conflict, and the children of any true conflict cover every completion of
+their node ("Conflict branching", the paragraphs "Why it is exact" and "Why the look is exact").  The gate is the gap
+from which a node chooses a conflict at all, and below it the node branches on the search's own conflict, so every
+gate from 0 to `MAX_GATE` keeps the search exact, and the gate trial may change it between units
+([gate-trial.md](gate-trial.md)).  The nogoods learned on the way are conflicts whichever conflict a node chose, and
+they hold at every node (fact 4 of [the default step's](#the-default-step) exactness).
 
 ## The starting incumbent, the ceiling and the seed
 
@@ -359,10 +369,10 @@ cannot beat a set already held. A start at the ceiling proves the game by it, as
 *Details.* The local search runs on the search's threads, the refills of a pass in parallel, and keeps the first
 improvement in the order of the sequential pass, so neither it nor the start depends on the thread count. It reads the
 ceiling before each pass, so a ceiling given while it runs (through the control, [Engine](engine.md#engine)) ends it as
-soon as its set reaches it. The start is offered to the run's control as it is made, so whoever steers the search sees
-the best so far before the engine starts, and the engine's start is unchanged. With one seed, or seeds that give the
-same start, the start and the tree are that seed's alone. `board::Board` sets a board and its search up: it is the one
-place that knows the path from the tables to the frames, the prepared search, the ceiling and the seeds.
+soon as its set reaches it. The start is offered to the run's control as it is made, so a caller sees the best so far
+before the engine starts, and the engine's start is unchanged. With one seed, or seeds that give the same start, the
+start and tree are that seed's alone. `board::Board` is the one place that knows the path from the tables to the
+frames, the prepared search, the ceiling and the seeds.
 
 *A floor.*  A search can start instead from a *floor* (`search::search_above`): an incumbent worth a given promotion
 sum, with no set and no start made.  The search prunes nodes against the floor as against a set of that weight, and a
@@ -402,8 +412,7 @@ checks (tactic `near_repeat`, on by default; `search::NearRepeat`).
   candidate of home j + 1 that y pays for, and no other candidate.  The factor graphs need no check: on a state's frame
   both list the maximal factors among its factors.
 * **The record.**  A search armed with the cut counts the nodes it cuts, as `stats.near_repeat_cut` in its results line
-  ([the reference](../REFERENCE.md#a-results-line---out-schema-5)): above 0 for a search that the cut shortened, 0 for
-  one it was armed for and never cut.  The proof stays `exhausted`.  The count is of the last invocation.
+  ([the reference](../REFERENCE.md#a-results-line---out-schema-5)).  The proof stays `exhausted`.
 * **Cost.**  Below Z the cut costs one comparison, and where the first check fails a few set operations.  A node's
   state in Π_m is found only where it passes, once, from its parent's (one promotion) or from Π_m's root, and kept
   beside the node's own.

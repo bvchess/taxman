@@ -44,10 +44,10 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
     `Stepper::step`, whose phases are `check_node`, `choose_branch`, `make_child` and `check_child`), `refine.rs`
     (`Refiner`: conflicts, refinement; `strongest`), `lagrange.rs` (the Lagrangian bound in the search: where it
     applies, its forced members, its refits), `symmetry.rs` (the rule of symmetric pairs), `dual.rs` (the dual bound of
-    a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, which a lab may
-    change while a search runs), `price_memo.rs` (the prices of conflict branching kept from one check to the next,
-    [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), and `profile.rs` (the profile of
-    a search, [engine.md](engine.md#the-profile-of-a-search)).  The `if let Some(p) = &mut self.probe` lines in
+    a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, whose gate the
+    gate trial may change while a search runs), `price_memo.rs` (the prices of conflict branching kept from one check to
+    the next, [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), and `profile.rs`
+    (the profile of a search, [engine.md](engine.md#the-profile-of-a-search)).  The `if let Some(p) = &mut self.probe` lines in
     `searcher.rs` are instrumentation (`diagnostics.rs`), and so are those of `tags`, the profile's; a first read can
     skip them.
 11. `src/bounds.rs`: two small functions, the limit on a node's further promotions (`max_additional`) and the greedy
@@ -65,8 +65,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
     provenance and verification, the bounds store's line and the relations between games, the known games that
     `--use-prev` draws on, the certificates of `taxman certify`, and the default files.  The range driver is
     `src/solver/window.rs`, the window of games in flight, and its child `window/allot.rs` shares the threads among
-    them; `src/solver/lab.rs` has what the lab channel is made of, its commands, its folder and its hook
-    ([lab.md](lab.md)).
+    them.
 
 **The front end.**
 

@@ -345,8 +345,8 @@ fn the_look_changes_the_trees_of_the_small_games_and_not_their_answers() {
     assert!(changed > 0, "the look changed no tree");
 }
 
-/// The gate, the gap from which conflict branching chooses (what the lab's `branching` and `policy` commands set), acts
-/// and changes no answer: with the gates 0, 100 and 4,000 (the most a command may set), each search of the games 301 to
+/// The gate, the gap from which conflict branching chooses (what `solve --gate` and the gate trial set), acts and
+/// changes no answer: with the gates 0, 100 and 4,000 (the most `--gate` may set), each search of the games 301 to
 /// 500 (every tenth) comes back with exactly the sum of the table, from an incumbent worth 1 less, and the gates
 /// change the tree of some of them.
 #[test]

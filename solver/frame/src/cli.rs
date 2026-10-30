@@ -54,20 +54,12 @@ pub enum CliError {
     Counterexample(String),
     /// `taxman solve` stopped at the wall (`--game-hours`): the command has said so on stdout; exit [`WALL_STATUS`].
     Wall,
-    /// `taxman solve` stopped for a lab's `redeploy` (`--lab-dir`): the command has said so on stdout; exit
-    /// [`REDEPLOY_STATUS`].
-    Redeploy,
 }
 
 /// The exit status of a `solve` that a game passing the wall (`--game-hours`) ended: a status of its own, so that a
 /// script (`solver/tools/cloud/chain.sh`) tells it from an error (1, 2), a signal (130, 143) and the deadline of its
 /// own (124).
 pub const WALL_STATUS: u8 = 4;
-
-/// The exit status of a `solve` that a lab's `redeploy` ended (`--lab-dir`): every search stopped with a final
-/// checkpoint, and the line `redeploy to COMMIT` printed, so that the chain's script builds that commit and runs the
-/// same command again.
-pub const REDEPLOY_STATUS: u8 = 5;
 
 pub type CliResult = Result<(), CliError>;
 
@@ -275,7 +267,7 @@ mod tests {
             CliError::Failed(message) | CliError::Counterexample(message) => {
                 panic!("expected a usage error, got {message:?}")
             }
-            CliError::Wall | CliError::Redeploy => panic!("expected a usage error, got a stop"),
+            CliError::Wall => panic!("expected a usage error, got a stop"),
         }
     }
 

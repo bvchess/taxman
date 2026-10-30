@@ -42,6 +42,7 @@ are appended to it ([the runbook](runbook/chain.md)), and a rebuild takes them i
   a subtree grows about 2.6 times per 100 of gap, so the levers left were a tighter bound everywhere and a cheaper bound,
   which takes most of a step.  The last track, a gate chosen for each game by a trial, is in [a gate for each
   game](../notebook/search/a-gate-for-each-game-2026-10/README.md).
-* **The lab.**  The studies that ran beside the chain have been off since 2026-10-23; what they found is logged in [the
-  live lab](../notebook/search/the-live-lab-2026-10/README.md).  From game 4995 to the chain's stop one branching policy
-  held for every game.
+* **The lab.**  The studies that ran beside the chain were off from 2026-10-23, and the lab itself (the hook, the
+  command folder and the studies' tools) was removed from the solver on 2026-10-29; it builds at commit 3ca11bf.  What
+  the studies found is logged in [the live lab](../notebook/search/the-live-lab-2026-10/README.md).  From game 4995 to
+  the chain's stop one branching policy held for every game.

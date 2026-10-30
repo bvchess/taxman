@@ -164,7 +164,7 @@ no whole game there has been checked.
 ## 2026-10-22: what a lab that steers the chain's searches would need
 
 The aim: a lab agent watches a search in flight, uses the record of recent searches, runs a few quick experiments, and
-sets the search's strategy for this game and the ones after it.  The [lab channel](../../../docs/design/lab.md) has one
+sets the search's strategy for this game and the ones after it.  The [lab channel](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md) has one
 command for it, `branching`, which sets `conflict_branching` and, since a0954bc, `conflict_look` (the look of the
 study of when a node should use conflict branching), on or off, for one game in flight, from its next units on.  The
 setting is kept in the game's record `nNNNN.lab` beside its checkpoint, and `set_up_with_width` in `src/solver.rs`

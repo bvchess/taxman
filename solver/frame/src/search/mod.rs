@@ -72,7 +72,7 @@
 //! # What is where
 //!
 //! * `tactics`: [`SearchTactics`], and how a checkpoint records them.
-//! * `branching`: [`Branching`], the branching settings a caller may change while a search runs.
+//! * `branching`: [`Branching`], the branching settings of a search, whose gate its gate trial may change while it runs.
 //! * `setup`: [`prepare`]: the root, the greedy incumbent, `max_total`; the [`Problem`] a setup poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
@@ -94,7 +94,7 @@
 //!   floor (an incumbent worth a given sum and no set) instead of a start incumbent; [`start_incumbent`], the incumbent
 //!   [`search`] starts from; [`offer_seed`], [`best_so_far`] and [`seed_survivors_sum`], for a caller that steers
 //!   searches through their [`Control`] (`EngineConfig::control`), and [`search_steered`], whose branching settings the
-//!   caller may change as it runs.
+//!   gate trial may change as it runs.
 
 mod branching;
 mod diagnostics;
@@ -159,9 +159,9 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 /// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 
-/// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: the lab's `branching`
-/// and `policy` commands and `solve --gate` take whole numbers from 0 to this.  Any gate keeps the search exact: below
-/// it a check branches on the search's own conflict, from it on the conflict chosen, and both are true conflicts.
+/// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: `solve --gate` and the
+/// gates of `solve --gate-trial` take whole numbers from 0 to this.  Any gate keeps the search exact: below it a check
+/// branches on the search's own conflict, from it on the conflict chosen, and both are true conflicts.
 pub const MAX_GATE: u64 = 4000;
 
 /// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/slope), with this
@@ -342,11 +342,12 @@ pub fn search_beside<const W: usize>(
     search_forgetting(prepared, cfg, seeds, cap, resume, None, forgetting, None, plan, None, None, None, None, None)
 }
 
-/// [`search_beside`] with the branching settings `branching`, which the caller may change while the search runs: each
-/// searcher reads them when it starts a unit ([`Branching`]).  They start as the caller left them, whatever
-/// `prepared.tactics` says of them, and a fresh search's checkpoints record them as they were when it started.  A
-/// setting there chooses only which conflict a node branches on, so the search's answer is the same whatever they say
-/// and however often they change (solver/docs/design/lab.md).
+/// [`search_beside`] with the branching settings `branching`, whose gate the search's gate trial may change while the
+/// search runs: each searcher reads them when it starts a unit ([`Branching`]).  They start as the caller left them,
+/// whatever `prepared.tactics` says of them, and a fresh search's checkpoints record them as they were when it
+/// started.  A setting there chooses only which conflict a node branches on, so the search's answer is the same
+/// whatever they say and however often they change (solver/docs/design/search.md, "The invariant of a running
+/// search").
 ///
 /// With the tactic `near_repeat` on, the search cuts by the game proven before ([`NearRepeat`]) that `near_repeat` holds,
 /// once it holds one: the caller may set it before the search or while it runs, once, and each searcher picks it up
@@ -594,7 +595,7 @@ fn search_forgetting<const W: usize>(
     };
     let engine_start = Instant::now();
     let label = cfg.progress.map(|_| cfg.label.as_str());
-    // The branching settings as the search starts: a change of them since then is the lab's, which the trial leaves.
+    // The generation of the branching settings as the search starts: the trial sets its gate only if they are unchanged.
     let armed = space.branching.generation();
     let run = || {
         let trial = trial.map(|(plan, (checkpoints, receiver))| {
@@ -783,7 +784,7 @@ pub fn offer_seed<const W: usize>(prepared: &Prepared<W>, control: &Control, see
 /// # Errors
 ///
 /// Why the set was refused, with the incumbent left as it was.
-pub fn offer_found<const W: usize>(
+fn offer_found<const W: usize>(
     prepared: &Prepared<W>,
     control: &Control,
     set: &Bits<W>,

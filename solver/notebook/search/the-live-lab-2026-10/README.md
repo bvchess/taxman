@@ -11,7 +11,8 @@ section, and the first studies are here.
 **The setup.**  The chain runs on a machine of 88 threads, 72 of them the chain's and 16 the lab's.  When the search of
 a game has run an hour, the solver runs `solver/tools/lab/on-event.sh`, which starts a study in a sandbox, and when the
 search ends it runs the script again, so that a study can compare the outcome with its prediction ([the runbook,
-Studies](../../../docs/runbook/lab.md#studies), and [the design, the hook](../../../docs/design/lab.md#the-hook)).  A
+Studies](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/lab.md#studies), and [the design, the
+hook](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md#the-hook)).  A
 study copies the search's checkpoint, solves the *units* of the copy (each the root of a subtree that can be solved by
 itself) on one thread each with `tune`, fits the [steps](../../../../docs/GLOSSARY.md#the-search) of the finished units
 to their [gap](../../../../docs/GLOSSARY.md#bounds), and sums the fit over all the units to estimate the steps left.
@@ -268,7 +269,7 @@ root gap and the size of a game](../the-root-gap-and-the-size-of-a-game-2026-10/
 
 The studies stopped at 09:34 UTC on 2026-10-23, and stay off until a better approach.  They were not paying off, and
 adapting them cost the chain.  The `done` hook still appends a line per finished game to the lab's games history ([the
-runbook](../../../docs/runbook/lab.md)).
+runbook](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/lab.md)).
 
 ## Files
 

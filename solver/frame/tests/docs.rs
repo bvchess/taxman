@@ -653,9 +653,12 @@ fn top_level_keys(text: &str) -> BTreeSet<String> {
     keys
 }
 
+/// The keys that only older result lines carry: the code no longer writes them, and REFERENCE.md still documents them,
+/// since the committed files hold such lines.  `lab` is the record of what a lab changed in a game's search.
+const OLDER_KEYS: [&str; 1] = ["lab"];
+
 /// The keys of the result lines the code writes: those of a game that is searched and one that is not, of one
-/// that a limit stopped (which has `best_so_far`), of one taken from a known source (`known`), and of one whose search a
-/// lab changed (`lab`).
+/// that a limit stopped (which has `best_so_far`), and of one taken from a known source (`known`).
 fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
     let keys = |n: u32, opts: &SolveOptions| -> BTreeSet<String> {
         let line = solve_game(n, None, opts).expect("a game").to_json().to_string();
@@ -673,15 +676,7 @@ fn keys_written() -> (BTreeSet<String>, BTreeSet<String>) {
         SolveOptions { use_prev: true, known: KnownSources { boards: true, ..Default::default() }, ..opts.clone() };
     let cited = keys(85, &known);
     assert_eq!(cited.difference(&complete).cloned().collect::<Vec<_>>(), ["known"], "a known game has `known`");
-    // A game whose search a lab changed (`--lab-dir`) records what it did, in a key that only such a line has: here the
-    // lab's setting of `conflict_branching`, kept beside the game's checkpoint.
-    let dir = std::env::temp_dir().join(format!("taxman-test-docs-lab-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("a temporary directory");
-    std::fs::write(dir.join("n0085.lab"), r#"{"conflict_branching":false,"branching_changes":1}"#).expect("a record");
-    let steered = keys(85, &SolveOptions { checkpoint_dir: Some(dir.clone()), ..opts.clone() });
-    let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(steered.difference(&complete).cloned().collect::<Vec<_>>(), ["lab"], "a steered game has `lab`");
-    (complete, stopped.union(&cited).chain(&steered).cloned().collect())
+    (complete, stopped.union(&cited).cloned().collect())
 }
 
 #[test]
@@ -691,10 +686,12 @@ fn the_reference_documents_exactly_the_keys_of_a_result_line() {
     let (complete, stopped) = keys_written();
 
     let documented = first_column_words(part);
-    let written: BTreeSet<String> = complete.union(&stopped).cloned().collect();
+    let mut written: BTreeSet<String> = complete.union(&stopped).cloned().collect();
+    assert!(OLDER_KEYS.iter().all(|key| !written.contains(*key)), "a key the code writes is not an older key");
+    written.extend(OLDER_KEYS.iter().map(|key| (*key).to_owned()));
     assert_eq!(
         documented, written,
-        "REFERENCE.md's table of the fields of a result line, and the keys the code writes"
+        "REFERENCE.md's table of the fields of a result line, and the keys the code writes with the older keys"
     );
 
     let example = part.split("```").nth(1).expect("the example line is the first code block");

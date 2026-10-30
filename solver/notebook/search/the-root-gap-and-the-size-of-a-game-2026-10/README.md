@@ -434,7 +434,7 @@ chain turns it on with `--tactic price_reuse=on` in its run script, at the defau
 worth the change.  A checkpoint written with the tactic on has its bit 12 set, which a build before the tactic refuses
 as unknown tactics; the tactic binds nothing, so a build with it resumes a checkpoint with the tactic on or off.  The
 gate is no flag of `taxman solve`: it is set by the lab's `policy` or `branching` command ([the
-lab channel](../../../docs/design/lab.md#a-policy-for-the-games-to-come), `{"command": "policy", "from": N, "gate": 150}`
+lab channel](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md#a-policy-for-the-games-to-come), `{"command": "policy", "from": N, "gate": 150}`
 in the channel folder), and kept in `run.lab`.
 
 ## 2026-10-27: the GF(2) bound at a node, and a cheaper search for augmenting paths
@@ -595,7 +595,7 @@ hardware threads each.  **Answer.**  No: 44 workers took 0.80 of the steps a sec
 blocks, and the chain stays at 88.
 
 **Method.**  On the live chain, in game 4984 with conflict branching still on, the lab channel's `threads` command
-([the commands](../../../docs/design/lab.md#the-command-folder)) set the run's budget of threads to 88, 44, 88, 44 and
+([the commands](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md#the-command-folder)) set the run's budget of threads to 88, 44, 88, 44 and
 88 again, in blocks of about 12 minutes from 05:38 to 06:29 PDT.  The rate of a block is the growth of the search's
 steps over its steady window, 9 minutes that start about 3 minutes into the block (the switch took effect within 12
 seconds), from the one-minute `nodes` counters of the chain's `chain.err`.  Every engine thread was at idle priority

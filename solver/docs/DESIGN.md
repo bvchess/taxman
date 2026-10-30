@@ -46,7 +46,7 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 |---|---|---|
 | the game and the frame model | [frame-model.md](design/frame-model.md) | see how the solver models a game, and what "optimal" means for each kind of proof |
 | the architecture | [architecture.md](design/architecture.md) | find your way in the code: the modules in their reading order |
-| the search | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, conflict branching, the start, the near-repeat cut |
+| the search | [search.md](design/search.md) | change the search: its state and order, the matching bound and its conflicts, forced members and nogoods, the Lagrangian bound, the default step, conflict branching, what may change while it runs, the start, the near-repeat cut |
 | price reuse | [price-reuse.md](design/price-reuse.md) | change how conflict branching keeps its prices from one check to the next, and see why that keeps the search exact |
 | carried nogoods | [carried-nogoods.md](design/carried-nogoods.md) | carry the nogoods of another search into a search, to prune with, and see why that keeps the search exact |
 | the finder | [finder.md](design/finder.md) | see how a thread beside a long search looks for a better incumbent, and why it cannot make an answer wrong |
@@ -61,4 +61,3 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
 | performance | [performance.md](design/performance.md) | make the solver faster: what it costs and the probe |
-| the lab channel | [lab.md](design/lab.md) | let a lab watch and steer a live chain (the hook, the command folder), and see why nothing it does can make a result wrong |

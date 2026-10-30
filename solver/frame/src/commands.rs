@@ -157,16 +157,13 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 15] = [
+const SOLVE_FLAGS: [&str; 12] = [
     "--out",
     WINDOW_FLAG,
     "--game-hours",
     "--pass",
     "--finder-after",
     "--finder-seconds",
-    "--lab-dir",
-    "--hook",
-    "--hook-after",
     "--profile",
     "--profile-depth",
     "--carried-dir",
@@ -239,11 +236,6 @@ pub fn solve(args: &[String]) -> CliResult {
     if let Some(budget) = args.positive_seconds("--finder-seconds")? {
         opts.finder_budget = budget;
     }
-    opts.lab.dir = args.value("--lab-dir").map(PathBuf::from);
-    opts.lab.hook = args.value("--hook").map(PathBuf::from);
-    if let Some(after) = args.seconds("--hook-after")? {
-        opts.lab.hook_after = after;
-    }
     opts.profile = args.value("--profile").map(PathBuf::from);
     if let Some(depth) = args.parsed("--profile-depth")? {
         if opts.profile.is_none() {
@@ -303,11 +295,6 @@ pub fn solve(args: &[String]) -> CliResult {
     if let Some(wall) = summary.walled {
         outln!("{}", wall_line(wall, &opts));
         return Err(CliError::Wall);
-    }
-    if let Some(commit) = summary.redeploy {
-        // A script reads the words up to the colon (`chain.sh`).
-        outln!("redeploy to {commit}: the lab asked for it; every search stopped with a final checkpoint");
-        return Err(CliError::Redeploy);
     }
     Ok(())
 }

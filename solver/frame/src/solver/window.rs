@@ -153,20 +153,6 @@
 //! the next the ceiling.  The passing over happens before a game enters the window (it costs no setup).  A signal still
 //! ends the range, but its game gets no line, so that a rerun resumes it instead of passing it over.
 //!
-//! # The lab
-//!
-//! With a lab (`SolveOptions::lab`: `--lab-dir`, `--hook`; solver/docs/design/lab.md), the driver also tells the hook
-//! when the head's own search, the clock of the wall, passes `--hook-after` ([`tell_long`](Window::tell_long)) and when
-//! such a game has its line, and at each progress tick takes the lab's commands from its folder and applies or refuses
-//! each ([`lab_tick`](Window::lab_tick)).  A command changes only how and when the games are searched: the threads (a
-//! budget, and games whose workers the lab set, which the policy leaves alone), the branching settings of a search and,
-//! by a policy, of the games to come ([`lab_policy`](Window::lab_policy)), an incumbent offered through
-//! `search::offer_found`, a search started again from nothing (its checkpoint renamed aside) and the build, by ending
-//! the range as a stop signal does ([`RangeSummary::redeploy`]).  A restart of a running search stops it first, and the
-//! game goes back to its setup once it has stopped, unless it completed.  Without a lab, none of this runs: no clock is
-//! kept but the wall's, and the policy has every thread; only the games' records and the policies for the games to come,
-//! kept beside the checkpoints, are read whether or not the run has a lab.
-//!
 //! # Tracing
 //!
 //! With the environment variable `TAXMAN_WINDOW_TRACE` set, the driver prints a line on stderr for each of its events,
@@ -183,10 +169,6 @@
 
 mod allot;
 
-use super::lab::{
-    self, Command, Event as Told, Folder, GameLab, Policies, PolicyEntry, Progress, Restarted, Status as Answer,
-    LAB_TICK,
-};
 use super::{
     ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev,
     stored_unfinished, Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev,
@@ -195,21 +177,18 @@ use super::{
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
-use crate::json::Json;
 use crate::known::Known as KnownGames;
 use crate::results::{BuiltOn, ResultsFile};
-use crate::search::{Problem, SearchTactics};
-use crate::tactics::Tactics;
+use crate::search::Problem;
 use allot::{allot, Grant, Load, Need, TICK};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write as _;
 use std::mem;
-use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, Scope};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 /// A range of games for [`solve`].
 pub(super) struct Range<'a> {
@@ -231,12 +210,10 @@ pub(super) fn solve(
     earlier: &mut Earlier,
     on_game: &mut dyn FnMut(&GameResult),
 ) -> Result<RangeSummary, String> {
-    let folder = opts.lab.dir.as_deref().map(Folder::open).transpose()?;
-    let policies = Policies::load(opts)?;
     let summary = thread::scope(|scope| {
         let (events, received) = mpsc::channel();
         // Dropped when the closure returns or unwinds, before the threads are joined: that ends the range (`Drop`).
-        let mut window = Window::new(range, opts, earlier, events, folder, policies);
+        let mut window = Window::new(range, opts, earlier, events);
         window.run(scope, &received, on_game).map(|()| window.summary.clone())
     });
     // Only removes the directory if the engines left nothing in it; not before, since the games' engines may spill
@@ -259,20 +236,10 @@ enum Event {
 
 /// A game's thread: its setup, then, for a search, its search once the driver says go, unless the game is canceled
 /// first (the driver drops the sender of the go).
-#[allow(clippy::too_many_arguments)]
-fn play(
-    n: u32,
-    before: &Before,
-    opts: &SolveOptions,
-    known: &KnownGames,
-    lab: Option<GameLab>,
-    policies: &Policies,
-    events: &Sender<Event>,
-    go: &Receiver<Go>,
-) {
+fn play(n: u32, before: &Before, opts: &SolveOptions, known: &KnownGames, events: &Sender<Event>, go: &Receiver<Go>) {
     let _unwinding = Unwinding { n, events };
     let start = Instant::now();
-    let set_up = set_up(n, before, opts, known, lab, policies).map_err(Failure::message);
+    let set_up = set_up(n, before, opts, known).map_err(Failure::message);
     let job = match &set_up {
         Ok(SetUp::Search(set, _)) => Some(Arc::clone(&set.job)),
         _ => None,
@@ -312,8 +279,7 @@ struct Game {
     /// Its own time so far: its setup, its repeat lookup and its search.
     own: Duration,
     /// Its wall clock, its own search time: the time it has been the head with its search running, over every
-    /// invocation (see "The wall").  The wall (`--game-hours`), the lab (the hook's `long`, the record of a restart) and
-    /// the game's line (`seconds.own`) read it.
+    /// invocation (see "The wall").  The wall (`--game-hours`) and the game's line (`seconds.own`) read it.
     headed: Duration,
     /// What was last written to its clock file.
     headed_kept: Duration,
@@ -322,18 +288,6 @@ struct Game {
     stopped_at_wall: bool,
     /// The sender of its go while its thread may wait for one; dropping it cancels the game's search.
     go: Option<Sender<Go>>,
-    /// What the lab did to the game, for a setup of it started again after a restart (without it, a setup reads it
-    /// from beside the game's checkpoint).
-    relab: Option<GameLab>,
-    /// A restart the lab asked for, waiting for the game's search to stop (see `lab_restart`).
-    restart: Option<Restart>,
-}
-
-/// A restart of a game's search that the lab asked for: the command, to answer once it is done, and the tactics.
-struct Restart {
-    name: String,
-    json: Option<Json>,
-    tactics: SearchTactics,
 }
 
 /// Where a game of the window is.
@@ -410,14 +364,12 @@ struct Run {
     /// What it was given of the provisional game of `n − 1`, if it was seeded with one; not if it started with the
     /// final game, or without a seed.
     given: Option<Given>,
-    /// The finders the lab started beside it: each ends when its sender is dropped, with the search's end.
-    finders: Vec<Sender<()>>,
 }
 
 impl Run {
     fn new(target: usize, now: Instant, given: Option<Given>) -> Run {
         // Just given its threads: nothing to act on until the next sample.
-        Run { target, granted: now, last: None, load: Load::Starting { fresh: false }, given, finders: Vec::new() }
+        Run { target, granted: now, last: None, load: Load::Starting { fresh: false }, given }
     }
 
     /// Takes a sample of the engine's status (`None` before the engine starts and after it ends).
@@ -550,29 +502,10 @@ struct Window<'a> {
     trace: bool,
     /// When the head's clock was last brought up to date.
     clock_at: Instant,
-    /// The run's budget of threads: `--threads`, or what the lab last said (`threads {total}`).
-    threads: usize,
-    /// The lab's command folder, if the run has one, and when it is next read (at each progress tick).
-    folder: Option<Folder>,
-    lab_at: Instant,
-    /// The workers the lab gave games, by n (`threads {n, workers}`): those games' searches keep them, outside the
-    /// policy that shares the rest.
-    pins: BTreeMap<u32, usize>,
-    /// The finders the lab has started, for their random choices.
-    finders: u64,
-    /// The policies the lab gave for the games to come (`policy`), which the file `run.lab` keeps.
-    policies: Policies,
 }
 
 impl<'a> Window<'a> {
-    fn new(
-        range: Range<'a>,
-        opts: &'a SolveOptions,
-        earlier: &'a mut Earlier,
-        events: Sender<Event>,
-        folder: Option<Folder>,
-        policies: Policies,
-    ) -> Self {
+    fn new(range: Range<'a>, opts: &'a SolveOptions, earlier: &'a mut Earlier, events: Sender<Event>) -> Self {
         // With one thread there is none to run a second game on, and a range that keeps going past limits solves its
         // games one after another: a game cannot go on from a game in flight until it knows whether that game is
         // proven (see "Past limits").
@@ -600,12 +533,6 @@ impl<'a> Window<'a> {
             began: Instant::now(),
             trace: std::env::var_os("TAXMAN_WINDOW_TRACE").is_some(),
             clock_at: Instant::now(),
-            threads: opts.threads,
-            folder,
-            lab_at: Instant::now(),
-            pins: BTreeMap::new(),
-            finders: 0,
-            policies,
         }
     }
 
@@ -643,7 +570,6 @@ impl<'a> Window<'a> {
             let now = Instant::now();
             self.advance_clock(now);
             self.stop_at_wall();
-            self.tell_long();
             if let Some(event) = event {
                 self.handle(event);
             }
@@ -655,17 +581,6 @@ impl<'a> Window<'a> {
                 self.sample();
                 self.hint();
                 tick = now + TICK;
-            }
-            // The lab's commands, at each progress tick (see `lab_tick`).
-            if self.folder.is_some() && now >= self.lab_at {
-                self.lab_tick(scope);
-                self.lab_at = now + self.opts.progress.unwrap_or(LAB_TICK);
-                if self.summary.redeploy.is_some() {
-                    // Every search stops with its final checkpoint as the range ends (`Drop`), and the head keeps its
-                    // clock.
-                    self.keep_clock(self.next);
-                    return Ok(());
-                }
             }
         }
         Ok(())
@@ -743,8 +658,6 @@ impl<'a> Window<'a> {
                     headed_kept: Duration::ZERO,
                     stopped_at_wall: false,
                     go: None,
-                    relab: None,
-                    restart: None,
                 };
                 self.games.insert(n, game);
             }
@@ -765,9 +678,8 @@ impl<'a> Window<'a> {
             };
             let Some(problem) = plan.take_problem() else { continue };
             let start = Instant::now();
-            // Not for a search that a checkpoint resumes or the lab restarted (searched, never replaced), nor with
-            // `force_search`.
-            let repeated = if repeats && !set.searched_anyway() { self.earlier.find(n, &problem) } else { None };
+            // Not for a search that a checkpoint resumes (searched, never replaced), nor with `force_search`.
+            let repeated = if repeats && !set.job.resuming() { self.earlier.find(n, &problem) } else { None };
             // The games that follow compare their problems with this one, whether this game repeats or searches.
             self.earlier.remember(n, problem);
             if let Some(m) = repeated {
@@ -802,13 +714,7 @@ impl<'a> Window<'a> {
                 return Ok(true);
             }
             let n = self.next;
-            // Whether the hook was told that the game runs long, and the game's own search: it is told of its line too.
-            let long = match self.games.get(&n) {
-                Some(Game { stage: Stage::Search(set, _), headed, .. }) if set.lab.long => Some(*headed),
-                _ => None,
-            };
             let Some(result) = self.conclude_head(n)? else { return Ok(false) };
-            self.pins.remove(&n);
             if !result.completed && self.opts.keep_going && engine::stop_signal().is_some() {
                 // A signal stopped the search, not its limit: the game gets no line (as at the wall), so that a rerun
                 // resumes it from its checkpoint rather than passing it over as one that spent its limit.
@@ -821,11 +727,6 @@ impl<'a> Window<'a> {
             }
             on_game(&result);
             self.trace(format_args!("concluded n={n}"));
-            if let (Some(own), Some(hook)) = (long, &self.opts.lab.hook) {
-                let best = result.promotions.iter().map(|&p| u64::from(p)).sum();
-                let progress = Progress { nodes: Some(result.nodes), best: Some(best), own };
-                lab::spawn_hook(hook, &lab::hook_event(Told::Done, n, progress, self.opts, Some(result.to_json())));
-            }
             self.summary.solved += 1;
             if !result.completed {
                 if !self.opts.keep_going {
@@ -1025,8 +926,7 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// What the games hold and claim, oldest first, for [`allot()`]: each game's n and its need, but for the searches
-    /// whose workers the lab set, which are not the policy's ([`pinned`](Self::pinned)).
+    /// What the games hold and claim, oldest first, for [`allot()`]: each game's n and its need.
     fn needs(&self, now: Instant) -> Vec<(u32, Need)> {
         let need = |(&n, game): (&u32, &Game)| match &game.stage {
             Stage::Waiting => Need::SetUp,
@@ -1040,15 +940,7 @@ impl<'a> Window<'a> {
             | Stage::Derived(_)
             | Stage::Failed(_) => Need::Nothing,
         };
-        let policy = |(n, game): &(&u32, &Game)| !self.pinned(**n, game);
-        self.games.iter().filter(policy).map(|entry| (*entry.0, need(entry))).collect()
-    }
-
-    /// Whether game `n` is a search, set up or running, whose workers the lab set (`threads {n, workers}`): it keeps
-    /// them, outside the policy.
-    fn pinned(&self, n: u32, game: &Game) -> bool {
-        self.pins.contains_key(&n)
-            && matches!(game.stage, Stage::Search(_, Plan::Search(Search::NotStarted(_) | Search::Running(_))))
+        self.games.iter().map(|entry| (*entry.0, need(entry))).collect()
     }
 
     /// Whether the driver must wake every tick: a search runs (to sample it and give it hints), or a game waits for a
@@ -1064,26 +956,16 @@ impl<'a> Window<'a> {
         })
     }
 
-    /// Weighs the searches not started for deferring, then shares the threads ([`allot()`]) and carries out the grants.
-    /// The searches whose workers the lab set have them first, and the policy shares what they leave of the run's
-    /// threads.
+    /// Weighs the searches not started for deferring, then shares the run's threads ([`allot()`]) and carries out the
+    /// grants.
     fn share<'s>(&mut self, scope: &'s Scope<'s, '_>)
     where
         'a: 's,
     {
         self.weigh();
         let now = Instant::now();
-        let (held, pinned) = self.pinned_grants();
-        for (n, grant) in pinned {
-            match grant {
-                Grant::Start(threads) => self.start_search(n, threads, now),
-                Grant::Workers(workers) => self.set_workers(n, workers, now),
-                Grant::SetUp => unreachable!("a pin is of a search"),
-            }
-        }
-        let budget = self.threads.saturating_sub(held);
         let needs = self.needs(now);
-        let grants = allot(budget, &needs.iter().map(|&(_, need)| need).collect::<Vec<_>>());
+        let grants = allot(self.opts.threads, &needs.iter().map(|&(_, need)| need).collect::<Vec<_>>());
         for (i, grant) in grants {
             let n = needs[i].0;
             match grant {
@@ -1092,72 +974,9 @@ impl<'a> Window<'a> {
                 Grant::Workers(workers) => self.set_workers(n, workers, now),
             }
         }
-        if self.folder.is_some() {
-            self.fit(budget, now);
-        }
         for game in self.games.values_mut() {
             if let Stage::Search(_, Plan::Search(Search::Running(run))) = &mut game.stage {
                 run.used();
-            }
-        }
-    }
-
-    /// The threads the searches whose workers the lab set hold, and what they are to be told: a running one its
-    /// workers, if they are not what it was last told, and one ready to start its start, on its workers (one set to
-    /// none waits, not started).
-    fn pinned_grants(&self) -> (usize, Vec<(u32, Grant)>) {
-        let (mut held, mut grants) = (0, Vec::new());
-        for (&n, game) in &self.games {
-            let Some(&pin) = self.pins.get(&n) else { continue };
-            match &game.stage {
-                Stage::Search(_, Plan::Search(Search::Running(run))) => {
-                    held += pin.max(run.last.map_or(0, |status| status.live));
-                    if run.target != pin {
-                        grants.push((n, Grant::Workers(pin)));
-                    }
-                }
-                Stage::Search(set, Plan::Search(Search::NotStarted(weighed)))
-                    if pin > 0 && self.ready(n, set, *weighed) =>
-                {
-                    held += pin;
-                    grants.push((n, Grant::Start(pin)));
-                }
-                _ => {}
-            }
-        }
-        (held, grants)
-    }
-
-    /// Brings the threads the policy's games are told to hold within `budget`, when they hold more: the lab lowered
-    /// the run's threads, or set a game's workers.  The youngest searches give workers back first (their engines retire
-    /// them as they come idle); the oldest keeps one, and so does one in its start, which runs on its own thread.
-    fn fit(&mut self, budget: usize, now: Instant) {
-        let mut told = 0;
-        let mut running = Vec::new();
-        for (&n, game) in &self.games {
-            if self.pinned(n, game) {
-                continue;
-            }
-            match &game.stage {
-                Stage::SettingUp => told += 1,
-                Stage::Search(_, Plan::Search(Search::Running(run))) => {
-                    told += run.target;
-                    running.push((n, run.target, matches!(run.load, Load::Starting { .. })));
-                }
-                _ => {}
-            }
-        }
-        let mut excess = told.saturating_sub(budget);
-        let oldest = running.first().map(|&(n, ..)| n);
-        for (n, target, starting) in running.into_iter().rev() {
-            if excess == 0 {
-                break;
-            }
-            let keep = usize::from(starting || Some(n) == oldest);
-            let gives = target.saturating_sub(keep).min(excess);
-            if gives > 0 {
-                self.set_workers(n, target - gives, now);
-                excess -= gives;
             }
         }
     }
@@ -1170,15 +989,12 @@ impl<'a> Window<'a> {
         let Some(game) = self.games.get_mut(&n) else { return };
         let (go, waits) = mpsc::channel();
         let (before, opts, known, events) = (game.before.clone(), self.opts, self.known, self.events.clone());
-        let lab = game.relab.take();
-        // The policies as they are now: one given after this reaches the game when its setup is done (`sync_policy`).
-        let policies = self.policies.clone();
         // The setup and the search's start ran on the main thread when games were solved one at a time; the stack is
         // reserved address space, committed only as touched.
         let spawned = thread::Builder::new()
             .name(format!("game-{n}"))
             .stack_size(WORKER_STACK_SIZE)
-            .spawn_scoped(scope, move || play(n, &before, opts, known, lab, &policies, &events, &waits));
+            .spawn_scoped(scope, move || play(n, &before, opts, known, &events, &waits));
         match spawned {
             Ok(_) => {
                 game.stage = Stage::SettingUp;
@@ -1276,37 +1092,9 @@ impl<'a> Window<'a> {
                     Stage::Derived(_) => "derived",
                     _ => "failed",
                 };
-                // A policy given while the game was set up reaches it now.
-                self.sync_policy(n);
                 self.trace(format_args!("setup-done n={n} took={took:?} kind={kind}"));
             }
             Event::Searched { n, outcome, took } => {
-                // A search the lab stopped to restart it is started again, unless it completed first.
-                if let Some(restart) = self.games.get_mut(&n).and_then(|game| game.restart.take()) {
-                    match &outcome {
-                        Ok(found) if found.completed => {
-                            let why = "the search completed before it stopped: there is nothing to restart";
-                            self.answer(&restart.name, restart.json.as_ref(), Err(why.into()));
-                        }
-                        Ok(_) if engine::stop_signal().is_some() => {
-                            let why = "a stop signal ends the run: the search goes on from its checkpoint next time";
-                            self.answer(&restart.name, restart.json.as_ref(), Err(why.into()));
-                        }
-                        Ok(stopped) => {
-                            if let Some(game) = self.games.get_mut(&n) {
-                                game.own += took;
-                            }
-                            let restarted = self.restart_now(n, restart.tactics, Some(stopped.stats.nodes));
-                            self.answer(&restart.name, restart.json.as_ref(), restarted);
-                            self.trace(format_args!("restarted n={n}"));
-                            return;
-                        }
-                        Err(_) => {
-                            let why = "the search failed before it stopped, and the game fails";
-                            self.answer(&restart.name, restart.json.as_ref(), Err(why.into()));
-                        }
-                    }
-                }
                 // A search that stops (a signal, a limit) is resumed with its clock; a finished one's goes with its
                 // checkpoint.
                 if !matches!(&outcome, Ok(outcome) if outcome.completed) {
@@ -1388,418 +1176,6 @@ impl<'a> Window<'a> {
     }
 }
 
-/// The lab channel (solver/docs/design/lab.md): the hook's events, and the commands of the folder, each checked against
-/// the window and applied or refused.  A command changes how and when the games are searched, never what proves them:
-/// the order and share of the threads, how nodes branch, the incumbent through `offer_found`, a search started again
-/// from nothing, and which build runs.
-impl<'a> Window<'a> {
-    /// Tells the hook that the head runs long, once its own search has passed `--hook-after` and its engine runs (so that
-    /// its steps are known): once a game, over every invocation (its record beside the checkpoint keeps that it was
-    /// told).
-    fn tell_long(&mut self) {
-        let Some(hook) = &self.opts.lab.hook else { return };
-        let (n, opts) = (self.next, self.opts);
-        let Some(game) = self.games.get_mut(&n) else { return };
-        let Stage::Search(set, Plan::Search(Search::Running(_))) = &mut game.stage else { return };
-        if set.lab.long || game.headed < opts.lab.hook_after {
-            return;
-        }
-        // Not in the search's start, before its engine runs: then at the next look.
-        let Some(status) = set.job.control().status() else { return };
-        set.lab.long = true;
-        set.lab.keep(opts, n);
-        let progress = Progress { nodes: Some(status.all_nodes), best: Some(status.best), own: game.headed };
-        lab::spawn_hook(hook, &lab::hook_event(Told::Long, n, progress, opts, None));
-        self.trace(format_args!("long n={n}"));
-    }
-
-    /// Takes the commands in the folder and applies or refuses each, writing its outcome: at each progress tick, on the
-    /// driver's thread, never by a worker.
-    fn lab_tick<'s>(&mut self, scope: &'s Scope<'s, '_>)
-    where
-        'a: 's,
-    {
-        let Some(folder) = self.folder.clone() else { return };
-        for taken in folder.take() {
-            let outcome = match taken.command {
-                Err(why) => Some(Err(why)),
-                Ok(command) => self.apply(scope, &folder, &taken.name, taken.json.as_ref(), command),
-            };
-            // A restart is answered once the search has stopped.
-            if let Some(outcome) = outcome {
-                self.answer(&taken.name, taken.json.as_ref(), outcome);
-            }
-        }
-    }
-
-    /// Writes the outcome of the command `name`, if the run has a folder.
-    fn answer(&self, name: &str, json: Option<&Json>, outcome: Result<String, String>) {
-        if let Some(folder) = &self.folder {
-            match outcome {
-                Ok(reason) => folder.answer(name, json, Answer::Applied, &reason),
-                Err(reason) => folder.answer(name, json, Answer::Refused, &reason),
-            }
-        }
-    }
-
-    /// Applies `command`, or says why it is refused; `None` for a restart that waits for its search to stop.
-    fn apply<'s>(
-        &mut self,
-        scope: &'s Scope<'s, '_>,
-        folder: &Folder,
-        name: &str,
-        json: Option<&Json>,
-        command: Command,
-    ) -> Option<Result<String, String>>
-    where
-        'a: 's,
-    {
-        if self.summary.redeploy.is_some() {
-            return Some(Err("the run is stopping to be redeployed".into()));
-        }
-        Some(match command {
-            Command::Checkpoint => self.lab_checkpoint(),
-            Command::Offer { n, set, value } => self.lab_offer(n, &set, value),
-            Command::Branching { n, conflict_branching, conflict_look, gate } => {
-                self.lab_branching(n, conflict_branching, conflict_look, gate)
-            }
-            Command::Policy { from, conflict_branching, conflict_look, gate } => {
-                self.lab_policy(from, conflict_branching, conflict_look, gate, name)
-            }
-            Command::Restart { n, tactics } => return self.lab_restart(n, &tactics, name, json),
-            Command::Threads { total } => self.lab_threads(total),
-            Command::Workers { n, workers } => self.lab_workers(n, workers),
-            Command::Finder { n, budget } => self.lab_finder(scope, folder, name, n, budget),
-            Command::Redeploy { commit } => self.lab_redeploy(commit),
-        })
-    }
-
-    /// Game `n`'s search, set up and not ended (running or not), or why there is none to act on.
-    fn searching(&self, n: u32) -> Result<&SearchSetUp, String> {
-        self.in_range(n)?;
-        let Some(game) = self.games.get(&n) else {
-            let flight: Vec<u32> = self.games.keys().copied().collect();
-            return Err(format!("game {n} is not in flight (the window holds {flight:?})"));
-        };
-        match &game.stage {
-            Stage::Search(set, Plan::Unlooked(_) | Plan::Search(Search::NotStarted(_) | Search::Running(_))) => Ok(set),
-            Stage::Search(_, Plan::Search(Search::Done(_))) => Err(format!("game {n}'s search has ended")),
-            Stage::Search(_, Plan::Repeat(m)) => {
-                Err(format!("game {n} repeats the search of {m}, and has none of its own"))
-            }
-            Stage::Derived(_) => Err(format!("game {n} needs no search")),
-            Stage::Waiting | Stage::SettingUp => Err(format!("game {n} is being set up: send it again once it is")),
-            Stage::Failed(_) => Err(format!("game {n} has failed")),
-        }
-    }
-
-    /// Whether `n` is a game of the range not concluded yet, or why not.
-    fn in_range(&self, n: u32) -> Result<(), String> {
-        if !(self.lo..=self.hi).contains(&n) {
-            Err(format!("game {n} is not in the range {}..={}", self.lo, self.hi))
-        } else if n < self.next {
-            Err(format!("game {n} is concluded"))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// `checkpoint`: every running search writes its checkpoint now.
-    fn lab_checkpoint(&self) -> Result<String, String> {
-        if self.opts.checkpoint_dir.is_none() {
-            return Err("the run keeps no checkpoints (no --checkpoint-dir)".into());
-        }
-        let asked: Vec<u32> = (self.games.iter())
-            .filter_map(|(&n, game)| match &game.stage {
-                Stage::Search(set, Plan::Search(Search::Running(_))) => set.job.control().checkpoint().then_some(n),
-                _ => None,
-            })
-            .collect();
-        Ok(match asked.is_empty() {
-            true => "no search is running".into(),
-            false => format!("the searches of {asked:?} write their checkpoints"),
-        })
-    }
-
-    /// `offer`: the set goes to game `n`'s search through `offer_found`, which refuses a set that cannot be promoted
-    /// or is not worth what is claimed.
-    fn lab_offer(&self, n: u32, set: &[u32], value: Option<u64>) -> Result<String, String> {
-        let job = &self.searching(n)?.job;
-        match job.offer(set, value) {
-            Ok(true) => Ok(format!("it is game {n}'s incumbent")),
-            Ok(false) => {
-                let best = job.control().best().map_or(0, |(best, _)| best);
-                Ok(format!("it is not better than game {n}'s incumbent, worth {best}: nothing changes"))
-            }
-            Err(why) => Err(format!("offer_found refused it: {why}")),
-        }
-    }
-
-    /// `branching`: game `n`'s searchers branch with `conflict_branching` and `conflict_look`, those given, on or off,
-    /// and from the `gate` given, from the next unit each starts.
-    fn lab_branching(
-        &mut self,
-        n: u32,
-        conflict_branching: Option<bool>,
-        conflict_look: Option<bool>,
-        gate: Option<u64>,
-    ) -> Result<String, String> {
-        self.searching(n)?;
-        let opts = self.opts;
-        let Some(Game { stage: Stage::Search(set, _), .. }) = self.games.get_mut(&n) else { unreachable!("searching") };
-        if let Some(on) = conflict_branching {
-            set.job.branching().set_conflict_branching(on);
-            set.lab.conflict_branching = Some(on);
-        }
-        if let Some(on) = conflict_look {
-            set.job.branching().set_conflict_look(on);
-            set.lab.conflict_look = Some(on);
-        }
-        if let Some(gate) = gate {
-            set.job.branching().set_gate(gate);
-            set.lab.gate = Some(gate);
-        }
-        set.lab.branching_changes += 1;
-        set.lab.keep(opts, n);
-        let tactics = set.job.tactics();
-        let unused = if !tactics.gf2 {
-            " (it acts only with gf2, which this search has off)"
-        } else if !tactics.conflict_branching && (tactics.conflict_look || gate.is_some()) {
-            " (conflict_look and the gate act only where conflict_branching is on, which this search has off)"
-        } else {
-            ""
-        };
-        let changed = switches_given(conflict_branching, conflict_look, gate);
-        Ok(format!("game {n}'s searchers branch with {changed} from the next unit each starts{unused}"))
-    }
-
-    /// `policy`: every game from `from` on branches with `conflict_branching` and `conflict_look`, those given, on or
-    /// off, and from the `gate` given, over what the policies given before say.  It is kept in `run.lab`, for the games
-    /// set up from now on (and by a run that starts again), and reaches the games in flight at once, as `branching`
-    /// does ([`sync_policy`]).
-    ///
-    /// [`sync_policy`]: Window::sync_policy
-    fn lab_policy(
-        &mut self,
-        from: u32,
-        conflict_branching: Option<bool>,
-        conflict_look: Option<bool>,
-        gate: Option<u64>,
-        name: &str,
-    ) -> Result<String, String> {
-        self.in_range(from)?;
-        self.policies.give(PolicyEntry {
-            from,
-            at: lab::utc(SystemTime::now()),
-            file: name.to_owned(),
-            conflict_branching,
-            conflict_look,
-            gate,
-        });
-        self.policies.keep(self.opts);
-        let flight: Vec<u32> = self.games.range(from..).map(|(&n, _)| n).collect();
-        let reached: Vec<u32> = flight.into_iter().filter(|&n| self.sync_policy(n)).collect();
-        let changed = switches_given(conflict_branching, conflict_look, gate);
-        Ok(format!(
-            "from game {from} on, branch with {changed}, over the policies given before; it reaches the searches of \
-             {reached:?} at once, and any other game when it is set up"
-        ))
-    }
-
-    /// Makes game `n`'s searchers branch as the run's flags, the policy for `n` and the game's own record say, from the
-    /// next unit each starts; whether the game has a search to steer.  A policy given since the game's setup read the
-    /// policies reaches it so; so does one given to a game in flight, as a `branching` command would.  The game's own
-    /// settings (`branching`) and the tactics of a restart hold over the policy, here as in its setup.
-    fn sync_policy(&mut self, n: u32) -> bool {
-        let Some(Game { stage: Stage::Search(set, plan), .. }) = self.games.get_mut(&n) else { return false };
-        if matches!(plan, Plan::Repeat(_) | Plan::Search(Search::Done(_))) {
-            return false;
-        }
-        set.lab.apply_policy(&self.policies, n);
-        let wanted = set.lab.branch_settings(&self.opts.tactics.search, self.opts.gate);
-        let live = set.job.branching();
-        if live.settings() != wanted {
-            live.set(wanted);
-        }
-        true
-    }
-
-    /// `restart`: game `n`'s search is abandoned and started again from nothing, with the run's search tactics changed
-    /// by `assignments`.  A running search is stopped first, with a final checkpoint, and restarted when it has
-    /// stopped (`None`: answered then); one not started is restarted at once.
-    fn lab_restart(
-        &mut self,
-        n: u32,
-        assignments: &[String],
-        name: &str,
-        json: Option<&Json>,
-    ) -> Option<Result<String, String>> {
-        if engine::stop_signal().is_some() {
-            return Some(Err("a stop signal ends the run: nothing new starts".into()));
-        }
-        let tactics = match lab::restart_tactics(&self.opts.tactics, assignments) {
-            Ok(tactics) => tactics,
-            Err(why) => return Some(Err(why)),
-        };
-        if let Err(why) = self.searching(n) {
-            return Some(Err(why));
-        }
-        let game = self.games.get_mut(&n)?;
-        if game.restart.is_some() {
-            return Some(Err(format!("game {n} is being restarted already")));
-        }
-        if game.stopped_at_wall {
-            return Some(Err(format!("game {n} has passed the wall")));
-        }
-        let Stage::Search(set, Plan::Search(Search::Running(_))) = &game.stage else {
-            return Some(self.restart_now(n, tactics, None));
-        };
-        set.job.control().stop();
-        game.restart = Some(Restart { name: name.to_owned(), json: json.cloned(), tactics });
-        self.trace(format_args!("restart n={n} stopping"));
-        None
-    }
-
-    /// Starts game `n` again from nothing with the search tactics `tactics`: its checkpoint and clock are put aside in
-    /// the checkpoint directory (never deleted), the restart is recorded beside it, and the game goes back to its setup,
-    /// which searches it whatever an earlier game settled.  `nodes`: the steps of the search abandoned, if known.  If
-    /// the checkpoint cannot be put aside, the game goes on from it, not restarted.
-    fn restart_now(&mut self, n: u32, tactics: SearchTactics, nodes: Option<u64>) -> Result<String, String> {
-        let opts = self.opts;
-        let game = self.games.get_mut(&n).expect("a game in flight");
-        let Stage::Search(set, _) = &game.stage else { unreachable!("a restart is of a search") };
-        let mut record = GameLab::clone(&set.lab);
-        let k = record.restarts.len() + 1;
-        let aside = |path: Option<PathBuf>, ext: &str| -> Result<Option<String>, String> {
-            let Some(path) = path.filter(|path| path.exists()) else { return Ok(None) };
-            let name = format!("n{n:04}.{ext}.restart{k}");
-            fs::rename(&path, path.with_file_name(&name)).map_err(|e| format!("{}: {e}", path.display()))?;
-            Ok(Some(name))
-        };
-        let back = |game: &mut Game, record: GameLab| {
-            game.stage = Stage::Waiting;
-            game.go = None;
-            game.relab = Some(record);
-        };
-        let put = match aside(opts.checkpoint_file(n), "ckpt") {
-            Ok(put) => put,
-            Err(why) => {
-                // Set up again as it was: a search the lab stopped resumes from its checkpoint.
-                back(game, record);
-                return Err(format!("cannot put game {n}'s checkpoint aside ({why}): it goes on from its checkpoint"));
-            }
-        };
-        if let Err(why) = aside(opts.clock_file(n), "clock") {
-            lab::say(format_args!("the clock of n={n} stays where it was: {why}"));
-        }
-        let described = Tactics { search: tactics, ..opts.tactics }.description();
-        record.restarts.push(Restarted {
-            at: lab::utc(SystemTime::now()),
-            own_seconds: game.headed.as_secs_f64(),
-            nodes,
-            tactics: described.clone(),
-            aside: put.clone(),
-        });
-        record.tactics = Some(tactics);
-        // The restart's tactics say how it branches, until the lab says otherwise.
-        record.conflict_branching = None;
-        record.conflict_look = None;
-        record.gate = None;
-        record.keep(opts, n);
-        // A search started again starts its clock again ("The wall").
-        (game.headed, game.headed_kept, game.stopped_at_wall) = (Duration::ZERO, Duration::ZERO, false);
-        back(game, record);
-        let kept = put.map_or_else(|| "it had no checkpoint".to_owned(), |name| format!("its checkpoint is {name}"));
-        Ok(format!("game {n} starts again from nothing with the tactics {described}; {kept}"))
-    }
-
-    /// `threads {total}`: the run's budget of threads.
-    fn lab_threads(&mut self, total: usize) -> Result<String, String> {
-        let pinned: usize = self.pins.values().sum();
-        if total < pinned {
-            return Err(format!("the games whose workers the lab set hold {pinned} of them"));
-        }
-        let old = mem::replace(&mut self.threads, total);
-        Ok(format!("the run's threads go from {old} to {total}"))
-    }
-
-    /// `threads {n, workers}`: game `n`'s search keeps `workers` workers, outside the policy, until it is concluded or
-    /// the lab gives it back to the policy (`None`).  0 suspends a running search, and keeps one not started waiting.
-    fn lab_workers(&mut self, n: u32, workers: Option<usize>) -> Result<String, String> {
-        self.in_range(n)?;
-        let Some(workers) = workers else {
-            return Ok(match self.pins.remove(&n) {
-                Some(_) => format!("game {n}'s workers are the policy's again"),
-                None => format!("game {n}'s workers were the policy's"),
-            });
-        };
-        let others: usize = self.pins.iter().filter(|&(&m, _)| m != n).map(|(_, &w)| w).sum();
-        if others + workers > self.threads {
-            return Err(format!("the run has {} threads, and the other games the lab set hold {others}", self.threads));
-        }
-        self.pins.insert(n, workers);
-        Ok(format!("game {n}'s search keeps {workers} of the run's threads, outside the policy"))
-    }
-
-    /// `finder`: a finder beside game `n`'s running search for `budget`, which offers what it finds through
-    /// `offer_found` and ends with the search; its report goes to `out/` as `report-NAME`.
-    fn lab_finder<'s>(
-        &mut self,
-        scope: &'s Scope<'s, '_>,
-        folder: &Folder,
-        name: &str,
-        n: u32,
-        budget: Duration,
-    ) -> Result<String, String>
-    where
-        'a: 's,
-    {
-        self.searching(n)?;
-        let seed = match self.known_before(n) {
-            Known::Final(prev) => Some(prev.moves.clone()),
-            Known::Provisional(before) => Some(before.moves()),
-            Known::NotYet | Known::None => None,
-        };
-        self.finders += 1;
-        let random = self.finders;
-        let Some(Game { stage: Stage::Search(set, Plan::Search(Search::Running(run))), .. }) = self.games.get_mut(&n)
-        else {
-            return Err(format!("game {n}'s search is not running"));
-        };
-        let (job, (stop, ended)) = (Arc::clone(&set.job), mpsc::channel::<()>());
-        let (folder, report) = (folder.clone(), format!("report-{name}"));
-        let out = report.clone();
-        let spawned = thread::Builder::new().name(format!("finder-{n}")).spawn_scoped(scope, move || {
-            let found = job.find(budget, seed.as_deref(), random, &ended);
-            let json = Json::object([
-                ("n", Json::from(n)),
-                ("from", Json::from(found.from)),
-                ("best", Json::from(found.best)),
-                ("improved", Json::from(found.improved)),
-                ("refused", Json::from(found.refused)),
-                ("seconds", Json::Num(found.seconds)),
-                ("found_seconds", Json::Num(found.found)),
-            ]);
-            folder.write(&out, &json);
-        });
-        spawned.map_err(|e| format!("cannot start a thread for the finder: {e}"))?;
-        run.finders.push(stop);
-        let seconds = budget.as_secs_f64();
-        Ok(format!("a finder runs beside game {n}'s search for {seconds:.1} s; its report will be out/{report}"))
-    }
-
-    /// `redeploy`: the range ends here, every search stopped with a final checkpoint, and `solve` exits with the status
-    /// that tells the chain's script to build `commit` and run it.
-    fn lab_redeploy(&mut self, commit: String) -> Result<String, String> {
-        if self.opts.checkpoint_dir.is_none() {
-            return Err("the run keeps no checkpoints (no --checkpoint-dir): its searches would be lost".into());
-        }
-        let said = format!("every search stops with a final checkpoint, and the run ends to be redeployed at {commit}");
-        self.summary.redeploy = Some(commit);
-        Ok(said)
-    }
-}
-
 /// What the conclusion of game `n − 1`, as `prev`, gives the search of game `n`, set up as `set`, whether it runs or
 /// waits for its go (step 5 of the module docs): its ceiling ([`search_cap`]), the seed of the final game as a hint
 /// ([`Job::hint`]), and the near-repeat cut by `prev`, where the search has the tactic and `prev` is proven and assumes
@@ -1814,21 +1190,6 @@ fn told(set: &SearchSetUp, n: u32, prev: &Prev, opts: &SolveOptions) -> (Option<
     (cap, set.job.arm(prev))
 }
 
-/// The settings a `branching` or `policy` command gave, for its outcome: `conflict_branching on, gate 150`.
-fn switches_given(conflict_branching: Option<bool>, conflict_look: Option<bool>, gate: Option<u64>) -> String {
-    let setting = |on: bool| if on { "on" } else { "off" };
-    let given = |name: &str, on: Option<bool>| on.map(|on| format!("{name} {}", setting(on)));
-    let given: Vec<String> = [
-        given("conflict_branching", conflict_branching),
-        given("conflict_look", conflict_look),
-        gate.map(|gate| format!("gate {gate}")),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-    given.join(", ")
-}
-
 /// Ends the range, however it ends (with a panic of the driver unwinding too): stops every search in flight and
 /// cancels the games that wait for their go (see "Stopping"), so that every game's thread ends and can be joined.
 impl Drop for Window<'_> {
@@ -1836,11 +1197,6 @@ impl Drop for Window<'_> {
         for game in self.games.values() {
             if let Stage::Search(set, Plan::Search(Search::Running(_))) = &game.stage {
                 set.job.control().stop();
-            }
-            // A restart that waits for its search to stop is not made: the search resumes from its checkpoint.
-            if let Some(restart) = &game.restart {
-                let why = "the run ended before the search stopped: it goes on from its checkpoint, not restarted";
-                self.answer(&restart.name, restart.json.as_ref(), Err(why.into()));
             }
         }
         self.games.clear();
@@ -1908,7 +1264,7 @@ mod tests {
     /// Game `n` set up for its search as the window sets it up, with the game before it `prev`, under `opts`.
     fn search_set_up(n: u32, prev: &Prev, opts: &SolveOptions) -> SearchSetUp {
         let known = KnownGames::table(Optimal::built_in());
-        match set_up(n, &Before::Given(prev.clone()), opts, &known, None, &Policies::default()) {
+        match set_up(n, &Before::Given(prev.clone()), opts, &known) {
             Ok(SetUp::Search(set, _)) => set,
             Ok(SetUp::Derived(_)) => panic!("n={n} needs no search"),
             Err(failure) => panic!("n={n}: {}", failure.message()),

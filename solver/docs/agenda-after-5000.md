@@ -101,5 +101,6 @@ puts an answer at risk.
    permissions, and a check when an agent finishes that stops it while its waiting loops or background jobs still run.
    A guard hook already refuses `pgrep -f`, `pkill -f` and the full release suite, but it sees only the command line,
    not a script an agent writes for itself.
-10. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  They come back
-   only with a cheaper way to steer ([lab.md](design/lab.md)).
+10. **The lab's studies**, off since 2026-10-23: they steered the chain too slowly and cost it threads.  The lab was
+   removed on 2026-10-29 ([its design at 3ca11bf](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md)),
+   and a way to steer a live search would have to be cheaper.

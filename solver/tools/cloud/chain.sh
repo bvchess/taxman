@@ -5,7 +5,7 @@
 #
 # It runs
 #
-#   taxman solve 1-N [--threads $THREADS] --window $WINDOW [--lab-dir $LAB_DIR] [--hook $LAB_HOOK] \
+#   taxman solve 1-N [--threads $THREADS] --window $WINDOW \
 #       --out $RESULTS --checkpoint-dir $CKPT --checkpoint-interval 300 --progress 60
 #
 # in a loop.  From n = 1, so that no proof rests on anything beyond the frame model.  Safe to run again at any time, after
@@ -24,12 +24,6 @@
 #   4        THE WALL: a game's own search passed GAME_HOURS (`taxman solve --game-hours`).  Every search was stopped
 #            with a final checkpoint and nothing was recorded for the game: the script logs "wall at N after H
 #            hours" and ends
-#   5        a lab asked for a REDEPLOY at a commit (`taxman solve --lab-dir`, the command redeploy; every search was
-#            stopped with a final checkpoint).  The script fetches origin and checks that the commit is origin/master
-#            or an ancestor of it; if it is, it makes a worktree of the commit in $TAXMAN_WORK/builds/COMMIT, builds
-#            the solver there with that commit's setup.sh, and runs the same command with the new build (the log
-#            of the build is $LOGS/redeploy.log).  Otherwise, or if the build fails, it says why and runs the build
-#            it has again.  A lab's own builds never run here
 #   1, 2     the solver reported an error (a refused checkpoint, a game that failed a check, ...): the script ends,
 #            nothing is retried, because the error would repeat; read chain.err
 #   other    a crash (abort, SIGKILL by the OOM killer): run again after 10 s.  MAX_FAILS passes in a row that add
@@ -58,9 +52,6 @@
 #   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,
 #                        over every run (`taxman solve --game-hours`; its clock is kept in the checkpoint directory,
 #                        so a run that resumes the game goes on from it).  Default: none
-#   LAB_DIR, LAB_HOOK    a lab beside the chain (solver/docs/design/lab.md): its command folder (`--lab-dir`), read at
-#                        each progress tick, and the program told when a game runs long (`--hook`; `--hook-after` goes
-#                        in EXTRA_ARGS).  Default: none
 #   DEADLINE_HOURS, BUDGET_HOURS, RUN_UNTIL, LEDGER_*, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script
 #                        and prover.sh share
 
@@ -85,9 +76,6 @@ thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
 wall_args=()
 [ -n "${GAME_HOURS:-}" ] && wall_args=(--game-hours "$GAME_HOURS")
-lab_args=()
-[ -n "${LAB_DIR:-}" ] && lab_args+=(--lab-dir "$LAB_DIR")
-[ -n "${LAB_HOOK:-}" ] && lab_args+=(--hook "$LAB_HOOK")
 WINDOW="${WINDOW:-4}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
@@ -100,41 +88,6 @@ rm -f "$TAXMAN_WORK/chain.outcome"
 set_outcome() {
     outcome_text="$*"
     printf '%s\n' "$outcome_text" >"$TAXMAN_WORK/chain.outcome"
-}
-
-# Makes the build of the commit $1 the solver of the next pass (a lab's redeploy, status 5), if it is origin/master or
-# an ancestor of it: a worktree of the commit in $TAXMAN_WORK/builds/, built by that commit's setup.sh as a machine's
-# build is made.  Otherwise, or if the build fails, it says why and leaves the build that runs.
-redeploy() {
-    local commit="$1" tree
-    if [ -z "$commit" ]; then
-        log "redeploy: chain.out names no commit; going on with $TAXMAN_BIN"
-        return
-    fi
-    if ! git -C "$TAXMAN_ROOT" fetch --quiet origin; then
-        log "redeploy to $commit refused: cannot fetch origin; going on with $TAXMAN_BIN"
-        return
-    fi
-    if ! git -C "$TAXMAN_ROOT" merge-base --is-ancestor "$commit" origin/master 2>/dev/null; then
-        log "redeploy to $commit refused: it is not origin/master or an ancestor of it; going on with $TAXMAN_BIN"
-        return
-    fi
-    tree="$TAXMAN_WORK/builds/$commit"
-    if [ ! -d "$tree" ] &&
-        ! git -C "$TAXMAN_ROOT" worktree add --detach "$tree" "$commit" >>"$LOGS/redeploy.log" 2>&1; then
-        log "redeploy to $commit: cannot make a worktree in $tree (see redeploy.log); going on with $TAXMAN_BIN"
-        return
-    fi
-    log "redeploy to $commit: building the solver in $tree"
-    # The commit's own setup.sh, on its own checkout, as a machine's build is made: no update, packages or checks.
-    if env -u TAXMAN_ROOT -u TAXMAN_BIN TAXMAN_WORK="$TAXMAN_WORK" NO_PULL=1 SKIP_PACKAGES=1 SKIP_TESTS=1 SKIP_SMOKE=1 \
-        BUILD="--bin taxman" BUILD_PROVER=none "$tree/solver/tools/cloud/setup.sh" >>"$LOGS/redeploy.log" 2>&1 &&
-        [ -x "$tree/solver/frame/target/release/taxman" ]; then
-        TAXMAN_BIN="$tree/solver/frame/target/release/taxman"
-        log "redeploy to $commit: the solver is $TAXMAN_BIN"
-    else
-        log "redeploy to $commit: the build failed (see redeploy.log); going on with $TAXMAN_BIN"
-    fi
 }
 
 # The lines of the results file (0 if there is none yet).
@@ -160,7 +113,7 @@ while :; do
     # EXTRA_ARGS is a list of words on purpose.
     # shellcheck disable=SC2086
     run_child "$LOGS/chain.out" "$LOGS/chain.err" "$TAXMAN_BIN" solve "1-$to" ${thread_args[@]+"${thread_args[@]}"} \
-        ${wall_args[@]+"${wall_args[@]}"} ${lab_args[@]+"${lab_args[@]}"} --window "$WINDOW" --out "$RESULTS" \
+        ${wall_args[@]+"${wall_args[@]}"} --window "$WINDOW" --out "$RESULTS" \
         --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" --progress "$PROGRESS" ${EXTRA_ARGS:-}
     elapsed=$(($(date +%s) - started))
     log "the solver exited with status $status after ${elapsed}s"
@@ -190,10 +143,6 @@ while :; do
             outcome="wall"
             set_outcome "${wall:-wall}"
             break
-            ;;
-        5)
-            # The solver's line, `redeploy to COMMIT: ...`, is the last of its kind in chain.out.
-            redeploy "$(sed -n 's/^redeploy to \([0-9a-f]*\):.*/\1/p' "$LOGS/chain.out" | tail -n 1)"
             ;;
         130 | 143)
             log "the solver was stopped by a signal (a final checkpoint was written)"

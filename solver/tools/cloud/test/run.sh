@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall, the ledger and the lock (run.sh) and a
-# lab's redeploy, wall-node.sh and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the
+# Tests of the unattended-run scripts that need no cloud: chain.sh with the wall, the ledger and the lock (run.sh),
+# wall-node.sh and wall.sh, against a stand-in for the aws CLI (test/bin/aws: S3 as a directory, the
 # group as a file), for ssh (test/bin/ssh: the machine is this one) and for sudo and shutdown.  The scenarios that run
-# the chain (chain, ledger, lab, node, sweep) need the release build of the solver
+# the chain (chain, ledger, node, sweep) need the release build of the solver
 # (cd solver/frame && cargo build --release; or TAXMAN_BIN names another build of the same sources, say the debug build
 # that `cargo build` makes) and rsync; lock, launch and status need neither.  sweep.sh's scenario also runs the real
 # verify.sh on the sweep's files, which replays the committed games three times.
 #
-#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, lock, lab, node,
-#                                                  launch, status, sweep)
+#   solver/tools/cloud/test/run.sh [SCENARIO...]   all of them, or the named (chain, ledger, lock, node, launch,
+#                                                  status, sweep)
 #
 # Prints `ok` or `FAIL` for each check and exits with the number of failures.  A few minutes: the chains are small.
 
@@ -19,10 +19,10 @@ real_cloud="$(cd "$here/.." && pwd)"
 crate="$(cd "$real_cloud/../../frame" && pwd)"
 export TAXMAN_BIN="${TAXMAN_BIN:-$crate/target/release/taxman}"
 selected=("$@")
-[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger lock lab node launch status sweep)
+[ "${#selected[@]}" -gt 0 ] || selected=(chain ledger lock node launch status sweep)
 for s in "${selected[@]}"; do
     case "$s" in
-        chain | ledger | lab | node | sweep)
+        chain | ledger | node | sweep)
             [ -x "$TAXMAN_BIN" ] || {
                 echo "build the solver first: cd $crate && cargo build --release" >&2
                 exit 2
@@ -42,9 +42,6 @@ trap 'rm -rf "$tmp"; kill $(jobs -p) 2>/dev/null' EXIT
 cloud="$tmp/cloud"
 mkdir -p "$cloud"
 cp "$real_cloud"/*.sh "$real_cloud/wall-policy.json" "$cloud/"
-# ... with the layout that wall.sh status --host reads, which sits beside the directory (lab/layout.sh).
-mkdir -p "$tmp/lab"
-cp "$real_cloud/../lab/layout.sh" "$tmp/lab/"
 printf '#!/usr/bin/env bash\necho "verify.sh (a stand-in): $*"\n' >"$cloud/verify.sh"
 cp "$cloud/verify.sh" "$tmp/verify.sh.stub"
 # ... and setup.sh, which installs and builds: the stand-in records how it was called and may sleep a while.
@@ -138,51 +135,6 @@ scenario_chain() {
     check "and the outcome names the date" matches "$tmp/chain-date/chain.outcome" '^deadline: the date 20'
 }
 
-# --- chain.sh: a lab's redeploy ---------------------------------------------------------------------------------
-
-scenario_lab() {
-    echo "== chain.sh: a lab's redeploy"
-    local w="$tmp/lab" origin="$tmp/lab-origin" root="$tmp/lab-root" master side
-    # A checkout whose origin has a master and a branch beside it.  Its setup.sh, a stand-in, "builds" the solver of its
-    # checkout by copying the one under test there.
-    mkdir -p "$origin/solver/tools/cloud"
-    printf '%s\n' '#!/usr/bin/env bash' 'here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' \
-        'mkdir -p "$here/../../frame/target/release" && cp "$LAB_TEST_SOLVER" "$here/../../frame/target/release/taxman"' \
-        >"$origin/solver/tools/cloud/setup.sh"
-    chmod +x "$origin/solver/tools/cloud/setup.sh"
-    local git_as=(git -c user.name=test -c user.email=test@example.com)
-    git init -q "$origin" && git -C "$origin" checkout -q -b master
-    git -C "$origin" add . && "${git_as[@]}" -C "$origin" commit -q -m one
-    master="$(git -C "$origin" rev-parse HEAD)"
-    git -C "$origin" checkout -q -b side && "${git_as[@]}" -C "$origin" commit -q --allow-empty -m side
-    side="$(git -C "$origin" rev-parse HEAD)"
-    git -C "$origin" checkout -q master
-    git clone -q "$origin" "$root"
-    # A commit beside master: the script refuses it and runs the build it has, which completes the chain.
-    mkdir -p "$w/lab/in"
-    printf '{"command":"redeploy","commit":"%s"}\n' "$side" >"$w/lab/in/1-side"
-    (
-        export TAXMAN_WORK="$w" TAXMAN_ROOT="$root" LAB_DIR="$w/lab" LAB_TEST_SOLVER="$TAXMAN_BIN" THREADS=2 PROGRESS=1
-        "$cloud/chain.sh" 40 >"$tmp/lab.out" 2>&1
-        echo $? >"$tmp/lab.status"
-    )
-    check "the solver stops for a redeploy" matches "$w/logs/chain.out" "^redeploy to $side:"
-    check "a commit beside master is refused" matches "$w/logs/chain.log" "redeploy to $side refused: it is not"
-    check "and the build it has completes the chain" has_line "$tmp/lab.status" 0
-    check "with no build made" absent "$w/builds/$side"
-    # master: built in a worktree of its own, and run.
-    printf '{"command":"redeploy","commit":"%s"}\n' "$master" >"$w/lab/in/2-master"
-    (
-        export TAXMAN_WORK="$w" TAXMAN_ROOT="$root" LAB_DIR="$w/lab" LAB_TEST_SOLVER="$TAXMAN_BIN" THREADS=2 PROGRESS=1
-        "$cloud/chain.sh" 60 >"$tmp/lab2.out" 2>&1
-        echo $? >"$tmp/lab2.status"
-    )
-    check "master is built and run" matches "$w/logs/chain.log" \
-        "redeploy to $master: the solver is $w/builds/$master/solver/frame/target/release/taxman"
-    check "and it completes the chain" has_line "$tmp/lab2.status" 0
-    check "the lab has both outcomes" exists "$w/lab/out/2-master"
-}
-
 # --- the ledger: the budget across machines ----------------------------------------------------------------------
 
 scenario_ledger() {
@@ -259,9 +211,9 @@ scenario_ledger() {
 # --- the lock of run.sh ------------------------------------------------------------------------------------------
 
 # run_begin keeps its lock on file descriptor 9 for as long as the script runs, and the lock is the script's alone: a
-# solver that held it, or a program the solver starts and that outlives it (the lab's hook), would keep a new chain.sh
-# out.  A stand-in solver records whether fd 9 is open in it.  Where there is no flock (macOS), a stand-in that takes no
-# lock is put in its place: run_begin opens fd 9 all the same.
+# solver that held it, or a program the solver starts and that outlives it, would keep a new chain.sh out.  A stand-in
+# solver records whether fd 9 is open in it.  Where there is no flock (macOS), a stand-in that takes no lock is put in
+# its place: run_begin opens fd 9 all the same.
 scenario_lock() {
     echo "== run.sh: the lock is the script's alone"
     local w="$tmp/lock" bin="$tmp/lock-bin"
@@ -1124,7 +1076,6 @@ for s in "${selected[@]}"; do
         chain) scenario_chain ;;
         ledger) scenario_ledger ;;
         lock) scenario_lock ;;
-        lab) scenario_lab ;;
         node) scenario_node ;;
         launch) scenario_launch ;;
         status) scenario_status ;;
