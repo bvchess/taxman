@@ -14,9 +14,8 @@
 //! The trial changes nothing but the gate.  Its solves are searches of their own, with their own searchers, nogood
 //! tables and incumbent, and what they find or learn is dropped: they prune nothing of the game's search and offer it
 //! nothing.  The gate only chooses which true conflict a node branches on, so the search stays exhaustive under any gate
-//! and any change of it between units (solver/docs/design/search.md, "The invariant of a running search").  If the
-//! branching settings have changed since the search started, the trial does not run, or leaves them as they are
-//! (solver/docs/design/gate-trial.md).
+//! and any change of it between units (solver/docs/design/search.md, "The invariant of a running search";
+//! solver/docs/design/gate-trial.md).
 
 use super::near_repeat::NearRepeat;
 use super::{BranchSettings, Branching, NodeBound, Prepared, SearchSpace, TaxSearcher, TaxUnit};
@@ -136,9 +135,6 @@ pub struct Report {
     pub scores: Vec<Score>,
     /// The gate the trial chose: `from` unless another took [`MARGIN`] less CPU.
     pub chosen: u64,
-    /// Whether the search branches with `chosen` since the trial: false if the branching settings changed while the
-    /// trial ran.
-    pub applied: bool,
     /// How long the trial took.
     pub seconds: f64,
 }
@@ -150,9 +146,6 @@ pub(super) struct Trial<'a, const W: usize> {
     pub prepared: &'a Prepared<W>,
     pub gf2: &'a Gf2Graph,
     pub branching: &'a Branching,
-    /// The generation of the branching settings when the search started: a change since stands, and the trial then
-    /// does not run, or does not set its gate.
-    pub armed: u64,
     pub near_repeat: Option<&'a OnceLock<NearRepeat<W>>>,
     pub carried: Option<&'a CarriedNogoods<W>>,
     pub forget_period: Option<u64>,
@@ -244,10 +237,6 @@ fn run<const W: usize>(
     }
     let began = Instant::now();
     let settings = t.branching.settings();
-    if t.branching.generation() != t.armed {
-        eprintln!("{}: no gate trial: the branching settings have changed since the search started", t.label);
-        return None;
-    }
     if !settings.conflict_branching {
         return None;
     }
@@ -333,14 +322,15 @@ fn run<const W: usize>(
         scores[g].stopped += usize::from(!completed);
     }
     let chosen = choose(&scores, settings.gate);
-    let applied = chosen == settings.gate || t.branching.set_gate_unchanged(t.armed, chosen);
+    if chosen != settings.gate {
+        t.branching.set_gate(chosen);
+    }
     let report = Report {
         at_nodes,
         units: picked.len(),
         from: settings.gate,
         scores,
         chosen,
-        applied,
         seconds: began.elapsed().as_secs_f64(),
     };
     eprintln!("{}: {}", t.label, describe(&report));
@@ -354,10 +344,10 @@ fn describe(r: &Report) -> String {
         .iter()
         .map(|s| format!("{} {:.1} s ({} steps, {} stopped)", s.gate, s.cpu, s.steps, s.stopped))
         .collect();
-    let outcome = match (r.chosen == r.from, r.applied) {
-        (true, _) => format!("the gate stays {}", r.from),
-        (false, true) => format!("the gate is {} from now on, was {}", r.chosen, r.from),
-        (false, false) => format!("chose {}, but the branching settings changed meanwhile and stay", r.chosen),
+    let outcome = if r.chosen == r.from {
+        format!("the gate stays {}", r.from)
+    } else {
+        format!("the gate is {} from now on, was {}", r.chosen, r.from)
     };
     format!(
         "gate trial at {} steps, {} units: CPU by gate {}; {} ({:.0} s)",
@@ -515,7 +505,6 @@ mod tests {
             prepared: &p,
             gf2: &graph,
             branching: &branching,
-            armed: branching.generation(),
             near_repeat: None,
             carried: None,
             forget_period: p.tactics.forget_period(),
@@ -533,7 +522,6 @@ mod tests {
         assert_eq!(report.scores.iter().map(|s| s.gate).collect::<Vec<_>>(), vec![from, 0]);
         assert_eq!((report.at_nodes, report.units, report.from), (stopped.stats.nodes, 2, from));
         assert!(report.scores.iter().all(|s| s.steps > 0 && s.cpu > 0.0), "{report:?}");
-        assert!(report.applied);
         assert_eq!(branching.settings().gate, report.chosen);
         assert_eq!(report.chosen, choose(&report.scores, from));
     }

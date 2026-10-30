@@ -122,17 +122,32 @@ fn games_with_a_directory_of_stores_find_their_scores() {
     }
 }
 
-/// A folder of carried nogoods that does not exist yet is made when the run starts, and the game that searches writes
-/// its store there.
+/// The folders of `--profile` and `--carried-dir` that do not exist yet are made when the run starts, and the games
+/// write there; one that cannot be made fails the run before its first game.
 #[test]
-fn a_missing_folder_of_stores_is_made_and_written_to() {
-    let dir = TempDir::new("carried-made");
-    let folder = dir.join("stores");
-    let mut opts = SolveOptions { force_search: true, carried_dir: Some(folder.clone()), ..options(1) };
+fn the_folders_of_the_profiles_and_the_stores_are_made_when_the_run_starts() {
+    let dir = TempDir::new("search-folders");
+    let (profiles, stores) = (dir.join("profiles"), dir.join("stores"));
+    let mut opts = SolveOptions {
+        force_search: true,
+        profile: Some(profiles.clone()),
+        carried_dir: Some(stores.clone()),
+        ..options(1)
+    };
     opts.tactics.search.carried_nogoods = true;
     solve_all(500, 500, &opts);
-    assert!(folder.is_dir(), "the run made its folder");
-    assert!(taxman::model::store_file(&folder, 500).exists(), "game 500 wrote its store there");
+    assert!(profiles.join("n0500.profile.jsonl").exists(), "game 500 wrote its profile in the folder the run made");
+    assert!(taxman::model::store_file(&stores, 500).exists(), "game 500 wrote its store in the folder the run made");
+    // A folder under a file cannot be made.
+    let file = dir.join("file");
+    fs::write(&file, "").unwrap();
+    for (name, bad) in [
+        ("profile", SolveOptions { profile: Some(file.join("x")), ..opts.clone() }),
+        ("carried-nogoods", SolveOptions { carried_dir: Some(file.join("x")), ..opts.clone() }),
+    ] {
+        let e = solver::solve_range(500, 500, &bad, None).expect_err("the folder cannot be made");
+        assert!(e.contains(&format!("cannot make the {name} folder")), "{e}");
+    }
 }
 
 /// Every tactic, alone and in the combinations that matter, finds the scores of the table at the games 1..=300.

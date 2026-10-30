@@ -76,8 +76,7 @@ pub(super) enum Phase {
     Other,
 }
 
-/// The names of the phases in a `steps` line, in the order of [`Phase`].  (The files of the builds before this one also
-/// have a phase `lagrange`, the Lagrangian bound's, which `solver/tools/read_profile.py` reads as any other.)
+/// The names of the phases in a `steps` line, in the order of [`Phase`].
 const PHASE_NAMES: [&str; 7] = ["bound", "conflict", "pricing", "branching", "promotion", "children", "other"];
 
 /// A searcher's clock of the phases of its steps: it times one step in [`PHASE_EVERY`], reading the clock as each
@@ -356,9 +355,6 @@ impl SearchProfile {
         incumbent: u64,
     ) -> Result<SearchProfile, String> {
         let at = |e: io::Error| format!("{}: {e}", plan.file.display());
-        if let Some(dir) = plan.file.parent().filter(|dir| !dir.as_os_str().is_empty()) {
-            fs::create_dir_all(dir).map_err(at)?;
-        }
         let (resumed, prior) = match begin {
             Begin::Fresh { .. } => (None, Duration::ZERO),
             Begin::Resumed { nodes, elapsed } => (read_resumed(&plan.file, prepared.n, W, *nodes), *elapsed),

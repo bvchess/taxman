@@ -185,8 +185,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     it then resumes;
   * the control: a ceiling given before a run, or while it runs at the incumbent it has, ends it as optimal (with no
     search work if the start reaches it); offers from outside raise the incumbent; a stop through it checkpoints a run
-    that resumes exactly; a checkpoint asked through it is written at once, whatever the interval, and with no run
-    attached the request does nothing; workers added, retired and down to none (suspended, then resumed,
+    that resumes exactly; workers added, retired and down to none (suspended, then resumed,
     checkpointed, stopped, or ended by a ceiling) give the exact answer; and the conservation test runs with a
     controller that sets 0 to 4 workers every millisecond or so while the run checkpoints, spills and resumes;
   * the counters: capacity is wall × threads when the workers do not change, and a searcher that sleeps before its
@@ -194,7 +193,8 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **The profile of a search** (`src/search/profile.rs`, games 800 and 1020): the same steps, counters and answer with
   it and without; every step counted once, on four threads with a checkpoint every millisecond and all the ids made,
   and through a resume past a block a crash left, behind a lost block, or with no profile.  Debug builds place every
-  unit a searcher hands over.
+  unit a searcher hands over.  The folder of `--profile`, like that of `--carried-dir`, is made when the run starts, and
+  a folder that cannot be made fails the run before its first game (`tests/solver.rs`).
 * **The window** (`tests/window.rs`; the policy's unit tests in `src/solver/window/allot.rs`):
   * chains 1..600 with windows of 1, 2, 4 and 8 on 4 threads have the scores, methods, proofs, ceilings, assumptions,
     repeats and previous games of the committed chain (a game at its ceiling is `start` or `search` in a window, by
@@ -218,7 +218,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   `src/search/branching.rs`): the run's `--gate` reaches the searchers of game 780, which takes the steps of conflict
   branching off under a gate wider than every gap and other steps under a gate of 0, and ends with the score of the
   table either way; three gates (0, 100 and 4,000) give each of the small games one answer and some of them other
-  trees; a gate set after the generation it was decided from is refused.  The gate trial is on by default, and a test
+  trees; a new gate raises the generation and is read back.  The gate trial is on by default, and a test
   that needs the gate to stay says `--gate-trial none`; `tests/cli.rs` checks that a line records the default trial's
   gates (1000, 800 and 600) and none with `none`, and refuses a plan with `none`.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended

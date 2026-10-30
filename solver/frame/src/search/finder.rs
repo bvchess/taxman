@@ -19,12 +19,12 @@
 //! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
 //! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget, [`BUDGET`] when
 //! `solve` is not told; both are `SolveOptions`, no tactics); [`Plan`] carries the two, and the seeds of the search, if
-//! it has any.  The thread ([`beside`]) runs *rounds* of LNS, each with a random seed of its own ([`Plan::random`]
-//! plus the round's number) for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after
-//! another, if there are any, the others from the search's incumbent as it is when the round starts, and adopt a better
-//! incumbent that the search finds meanwhile.  A game better than the search's incumbent is offered to the search at
-//! once ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends
-//! when its budget is spent or the search ends, whichever comes first.
+//! it has any.  The thread ([`beside`]) runs *rounds* of LNS, each with a random seed of its own (the round's number)
+//! for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after another, if there are
+//! any, the others from the search's incumbent as it is when the round starts, and adopt a better incumbent that the
+//! search finds meanwhile.  A game better than the search's incumbent is offered to the search at once
+//! ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends when
+//! its budget is spent or the search ends, whichever comes first.
 //!
 //! The finder only offers sets.  A set it offers becomes the incumbent after the check that a checkpoint's incumbent
 //! passes on resuming (a set of candidates that can be promoted from the root, worth what it claims), and the search
@@ -198,8 +198,6 @@ pub struct Plan<const W: usize> {
     /// still be promoted, from the largest down, as a search seeded with it starts), a set that survives of
     /// several seeds once.
     pub seeds: Vec<Bits<W>>,
-    /// The base of the random seeds of the rounds: round `r` draws with `random + r`.
-    pub random: u64,
 }
 
 /// What a finder did: the record that goes in the result line (`engine.finder`).
@@ -325,7 +323,7 @@ fn rounds<const W: usize>(
         if from_seed && !offer(&best, round, true) {
             break;
         }
-        let mut rng = Options { seed: plan.random.wrapping_add(round), ..lns.options }.rng(prepared.n);
+        let mut rng = Options { seed: round, ..lns.options }.rng(prepared.n);
         let until = (Instant::now() + ROUND).min(deadline);
         while !over(until) {
             // A round from the incumbent goes on from a better one that the search finds meanwhile; a round from the
@@ -468,7 +466,7 @@ mod tests {
         let control = Control::new();
         control.offer(p.greedy.sum(), &payload_of(&p.greedy));
         let (_alive, ended) = mpsc::channel::<()>();
-        let plan = Plan { after: 1, budget, seeds, random: 0 };
+        let plan = Plan { after: 1, budget, seeds };
         let report = rounds(&p, &control, &plan, 4096, &ended, None);
         (report, control, p)
     }
@@ -513,7 +511,7 @@ mod tests {
         let control = Control::new();
         control.offer(p.greedy.sum(), &payload_of(&p.greedy));
         let (alive, ended) = mpsc::channel::<()>();
-        let plan = Plan { after: 1, budget: Duration::from_secs(600), seeds: Vec::new(), random: 0 };
+        let plan = Plan { after: 1, budget: Duration::from_secs(600), seeds: Vec::new() };
         let began = Instant::now();
         let (prepared, steered, planned) = (&p, &control, &plan);
         let report = thread::scope(|scope| {
@@ -544,7 +542,7 @@ mod tests {
         assert!(plain.completed && plain.finder.is_none());
         assert_eq!(plain.sum, known(&board));
         let seed = board.seed(Optimal::built_in().moves(999).unwrap());
-        let plan = Plan { after: 1, budget: Duration::from_secs(30), seeds: vec![seed], random: 0 };
+        let plan = Plan { after: 1, budget: Duration::from_secs(30), seeds: vec![seed] };
         let beside = search_beside(&p, &two_threads(), &[], None, false, Some(&plan)).unwrap();
         assert!(beside.completed);
         assert_eq!(beside.sum, plain.sum);

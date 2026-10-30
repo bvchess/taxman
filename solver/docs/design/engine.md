@@ -48,7 +48,7 @@ the design in outline.
   closed pipe cannot kill a run.  A panic in a release build aborts (`panic = "abort"`), and the previous checkpoint
   stays valid, which is the property that matters.
 * **Control** (`engine::Control`).  Another thread steers a run through this handle while it goes: a ceiling (a proven
-  upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, a checkpoint now, and the
+  upper bound, which ends the run once the incumbent reaches it), outside incumbents, a stop, and the
   number of workers.  The number grows by starting workers and shrinks by retiring workers that hold no unit (a running one hands
   all its units to the deque first); 0 suspends the search, its units waiting in the deque until the number rises
   again.  Requests made before the run apply when it starts (engine docs, "The control").
@@ -301,9 +301,7 @@ as each phase of it ends, and a `steps` line has the nanoseconds of each phase i
 nogood table's lookup, and a peel where it has none), `pricing` (conflict branching's choice), `branching` (strong
 branching's solves), `promotion` (the child's), `children` (the child's candidates: narrowed, and ruled out by the
 known conflicts, the nogoods and the rule of symmetry) and `other` (the cheap checks, the rule of symmetry and the
-near-repeat cut at a node, the offers).  The files of the builds before have one more, `lagrange` (the Lagrangian
-bound's check and refits), which `solver/tools/read_profile.py` reads as any other.  The time is the thread's on the
-wall, which is its CPU time while it runs.
+near-repeat cut at a node, the offers).  The time is the thread's on the wall, which is its CPU time while it runs.
 
 **Cost.**  A step costs the profile a comparison and an increment; a tagged node, a lock and a line; a checkpoint, a
 block written and synced while the workers are parked; and the thread beside the search, one GF(2) solve for each open

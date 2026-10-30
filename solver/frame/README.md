@@ -225,6 +225,7 @@ first.jsonl: 22 completed games, n = 1..=22 (0 missing), 0 incomplete lines
   proof: trivial 10, prime_formula 8, cap 1, exhausted 2, same_search 1
   assumptions: none in 22 of 22 games
   scores at a proven ceiling, given the game of n-1: n + score(n-1) 9, prime formula 7
+  searches shortened by the near-repeat cut, by proof: none
 0 games are in more than one file, with equal scores in all
 checked in 185.3 ms
 $ python3 solver/tools/check_results.py first.jsonl
@@ -326,14 +327,16 @@ range past the known games does, `--force-search` leaves them to their searches:
 ```
 $ taxman solve 1301-1302 --use-prev --force-search --threads 2 \
       --out mine.jsonl --checkpoint-dir ckpt --node-limit 4000 --progress 4
-n=1301 0.1s nodes 3251 (done) best 40800 queue 0 spilled 0 | eff 96.0% idle 3.8% lock 0.0% ...
-n=1301  score=532272    search  nodes=3251            0.151 s  optimal ok  proof=exhausted  own=0.144 s  best=40800
-n=1302 0.1s nodes 3867 (done) best 41436 queue 0 spilled 0 | eff 97.0% idle 2.8% lock 0.0% ...
-n=1302  score=533559    search  nodes=3867            0.125 s  optimal ok  proof=exhausted  own=0.118 s  best=41436
+n=1301 0.0s nodes 1 (done) best 40800 queue 0 spilled 0 | eff 6.4% idle 0.0% lock 0.0% ...
+n=1301  score=532272    search  nodes=1               0.151 s  optimal ok  proof=exhausted  own=0.144 s  best=40800
+n=1302 0.1s nodes 3868 (done) best 41436 queue 0 spilled 0 | eff 96.2% idle 2.8% lock 0.0% ...
+n=1302  score=533559    search  nodes=3868            0.125 s  optimal ok  proof=exhausted  own=0.118 s  best=41436
 ```
 
-Game 1301 is a prime, but `--force-search` also skips the prime formula.  Game 1302 started from 1301.  A node limit
-would have stopped either with its checkpoint; the engine checks the limit every 1,024 steps of a thread.
+Game 1301 is a prime, but `--force-search` also skips the prime formula.  Its search takes one node, since [the
+near-repeat cut](../docs/design/search.md#the-near-repeat-cut) ends it at the root with the proven game of 1300.  Game
+1302 started from 1301.  A node limit would have stopped 1302 with its checkpoint; the engine checks the limit every
+1,024 steps of a thread.
 
 A game whose predecessor is in neither the run nor the results file, and not taken with `--use-prev`, runs *standalone*,
 with no seed and no ceiling: for example `taxman solve 1400`, or `taxman solve 480` without the flag.  `solve` says so
@@ -426,12 +429,12 @@ With `--checkpoint-dir DIR`, a game's search writes `DIR/nNNNN.ckpt` every `--ch
 
 ```
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --progress 1 --out r992.jsonl --checkpoint-dir c992
-n=992 0.1s nodes 4095 (stopped) best 24158 queue 21 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 367 ...
-n=992   score=310658    search  nodes=4095            0.184 s  incomplete  own=0.180 s  best=24158
+n=992 0.1s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 92.3% ... pauses 1 (7.6%) max 10.8ms park 0.0ms | nogoods learned 356 ...
+n=992   score=310675    search  nodes=4095            0.184 s  incomplete  own=0.180 s  best=24175
 stopped: the search for n=992 hit a limit before it finished; run the same command to resume it
 $ taxman solve 992 --use-prev --force-search --threads 1 --node-limit 4000 --out r992.jsonl --checkpoint-dir c992   # resumes, stops again
 $ taxman solve 992 --use-prev --force-search --threads 1 --out r992.jsonl --checkpoint-dir c992   # resumes and finishes
-n=992   score=310690    search  nodes=15783           0.316 s  optimal ok  proof=exhausted  own=0.681 s  best=24190
+n=992   score=310690    search  nodes=14789           0.316 s  optimal ok  proof=exhausted  own=0.681 s  best=24190
 ```
 
 The last line is the third invocation of the game: its `nodes` and its `own` cover all three, its seconds only the last.  The results

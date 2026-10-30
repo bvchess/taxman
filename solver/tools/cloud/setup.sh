@@ -349,9 +349,6 @@ env_report
 echo
 echo "work directory: $TAXMAN_WORK (results, ckpt, logs)"
 echo "solver:         $TAXMAN_BIN"
-if [ -x "$TOOLS/pgo.sh" ]; then
-    echo "note: $TOOLS/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
-fi
 echo "prover:         $EXACT_BIN"
 echo "next:           $CLOUD_DIR/chain.sh N (the solver) or $CLOUD_DIR/prover.sh A B (the prover's proofs);" \
     "see RUNBOOK.md"

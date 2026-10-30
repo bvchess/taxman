@@ -1075,7 +1075,7 @@ mod tests {
     /// which they waited `idle_time` ms.
     fn status(live: usize, idle: usize, capacity: u64, idle_time: u64) -> Status {
         let (capacity, idle_time) = (ms(capacity), ms(idle_time));
-        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0, all_nodes: 0 }
+        Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0 }
     }
 
     /// A near repeat: game 1083 poses nearly the problem of 1082, and the near-repeat cut by 1082 shortens its search

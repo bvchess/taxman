@@ -533,8 +533,6 @@ fn search_forgetting<const W: usize>(
     };
     let engine_start = Instant::now();
     let label = cfg.progress.map(|_| cfg.label.as_str());
-    // The generation of the branching settings as the search starts: the trial sets its gate only if they are unchanged.
-    let armed = space.branching.generation();
     let run = || {
         let trial = trial.map(|(plan, (checkpoints, receiver))| {
             let trial = gate_trial::Trial {
@@ -542,7 +540,6 @@ fn search_forgetting<const W: usize>(
                 prepared,
                 gf2: &space.gf2,
                 branching: &space.branching,
-                armed,
                 near_repeat,
                 carried: carried.as_ref(),
                 forget_period,

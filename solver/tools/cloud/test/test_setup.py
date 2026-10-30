@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Tests of setup.sh's build logic, with a stand-in for cargo (it records how it was called and makes the files a build
-would) and a directory for the build cache: what is built for BUILD and BUILD_PROVER, the cache's hit and miss, the
-release suite and what it does on a pass and on a failure, the dirty checkout, REQUIRE_CACHED.  No packages are
-installed, nothing is built and nothing leaves the machine.
+"""Tests of setup.sh's build logic, with stand-ins for cargo (it records how it was called and makes the files a build
+would) and for rustc (its version and native CPU), and a directory for the build cache: what is built for BUILD and
+BUILD_PROVER, the cache's hit and miss, the release suite and what it does on a pass and on a failure, the dirty
+checkout, REQUIRE_CACHED.  No packages are installed, nothing is built, no toolchain is needed and nothing leaves the
+machine.
 
 usage: python3 -I test_setup.py      (a few seconds each; runs setup.sh with the bash on the PATH, or $TEST_BASH:
        TEST_BASH=/bin/bash is macOS's 3.2)
@@ -67,6 +68,16 @@ case "$1" in
 esac
 """
 
+RUSTC = r"""#!/usr/bin/env bash
+# a stand-in for rustc: the version and the native CPU that setup.sh, env.sh and build_cache.py ask for
+case "$*" in
+    "--version") echo "rustc 1.99.0 (stand-in)" ;;
+    "--print target-cpus")
+        printf 'Available CPUs for this target:\n    native - Select the CPU of the host (currently cortex-a76).\n'
+        ;;
+esac
+"""
+
 TESTBIN = r"""#!/usr/bin/env bash
 # a stand-in for a test executable with three tests, one of them ignored
 case "$*" in
@@ -118,6 +129,7 @@ class Setup(unittest.TestCase):
 
         self.bin = self.base / "bin"
         executable(self.bin / "cargo", CARGO)
+        executable(self.bin / "rustc", RUSTC)
         executable(self.bin / "testbin", TESTBIN)
         self.cache = self.base / "cache"
         self.log = self.base / "cargo.log"
@@ -168,8 +180,9 @@ class Setup(unittest.TestCase):
         machine = self.machine()
         status, logged, _ = self.setup(machine)
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples",
-                                              "cargo noframe build --release --bins --examples"])
+        # The two builds may run at once, so their order in the log is not the test's to say.
+        self.assertCountEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples",
+                                                   "cargo noframe build --release --bins --examples"])
         self.assertTrue((machine / "solver/frame/target/release/examples/perf").exists())
         self.assertTrue((machine / "solver/noframe/target/release/exact").exists())
         self.assertEqual(self.entries(), [], "an untested build never goes to the cache")
@@ -188,8 +201,8 @@ class Setup(unittest.TestCase):
     def test_build_prover_asks_for_the_prover_and_none_leaves_it_out(self):
         status, logged, _ = self.setup(self.machine(), BUILD="--bin taxman", BUILD_PROVER="--bin exact")
         self.assertEqual(status, 0, logged)
-        self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman",
-                                              "cargo noframe build --release --bin exact"])
+        self.assertCountEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman",
+                                                   "cargo noframe build --release --bin exact"])
         status, logged, _ = self.setup(self.machine(), BUILD_PROVER="none")
         self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples"])
 
@@ -197,8 +210,8 @@ class Setup(unittest.TestCase):
         executable(self.bin / "nproc", "#!/bin/sh\necho 64\n")
         status, logged, _ = self.setup(self.machine())
         self.assertEqual(status, 0, logged)
-        self.assertEqual(sorted(self.cargo_calls()), ["cargo frame build --release --bins --examples",
-                                                      "cargo noframe build --release --bins --examples"])
+        self.assertCountEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples",
+                                                   "cargo noframe build --release --bins --examples"])
         self.assertIn("[solver] ", logged)  # each build's lines say whose they are
         self.assertIn("building the prover", logged)
         self.cargo_calls()

@@ -32,7 +32,7 @@
 //!
 //! # The weight split
 //!
-//! For the heaviest set `I*` of all sizes (if no size limit stopped the augmentations), [`Meet::split_bounds`] finds
+//! For the heaviest set `I*` of all sizes (if no size limit stopped the augmentations), [`Meet::split_from`] finds
 //! `w1`, `w2` with `w1 + w2 = w` such that `I*` is a heaviest independent set of `A` for `w1` and of `B` for `w2`
 //! (Frank's weight-splitting theorem; any sizes).  For any common independent `J`, `w(J) = w1(J) + w2(J)`, so the
 //! heaviest independent set of `A` for `w1` plus that of `B` for `w2` bounds every common independent set (weak
@@ -44,7 +44,7 @@
 //! `B` are difference constraints on `w1`, solved by Bellman–Ford.  The split is the shortest distances from a
 //! virtual source, which Bellman–Ford reaches from any potentials that are lengths of paths, so a split may start from
 //! an earlier one's potentials wherever the path of predecessors that gave each is still a path
-//! ([`Meet::split_bounds_from`]): a child's problem is its parent's with a few vertices gone, a node's after it goes
+//! ([`Meet::split_from`]): a child's problem is its parent's with a few vertices gone, a node's after it goes
 //! on without a member its own with a few circuits changed.
 //!
 //! # The heaviest set without a member
@@ -385,11 +385,10 @@ pub struct Meet<const R: usize> {
     /// The weight splits' Bellman–Ford rounds.
     pub split_rounds: u64,
     /// The split's scratch: its potentials (one per element and one more), the predecessor that gave each its
-    /// potential (`NONE` for 0, the virtual source's), the replacements' weights, a walk's vertices, and in debug
+    /// potential (`NONE` for 0, the virtual source's), a walk's vertices, and in debug
     /// builds the potentials found from all zero to check those found from a start.
     pot: Vec<i64>,
     split_pred: Vec<u32>,
-    repl: [Vec<i64>; 2],
     walk: Vec<u32>,
     /// [`split_bound_among`](Self::split_bound_among)'s elements of positive weight, with their weights.
     order: Vec<(i64, u32)>,
@@ -610,7 +609,7 @@ impl RadixHeap {
 /// A weight split's potentials as its Bellman–Ford found them, the predecessor that gave each its potential, and the
 /// live elements and members of the problem it was for ([`Meet::save_split`]): a later split of a related problem
 /// starts from the potentials whose paths of predecessors are still paths of its constraint graph
-/// ([`Meet::split_bounds_from`]).
+/// ([`Meet::split_from`]).
 #[derive(Clone, Default)]
 pub struct SplitStart {
     pot: Vec<i64>,
@@ -811,7 +810,6 @@ impl<const R: usize> Meet<R> {
             split_rounds: 0,
             pot: vec![0; n + 1],
             split_pred: vec![NONE; n + 1],
-            repl: [vec![0; n], vec![0; n]],
             walk: Vec::with_capacity(n + 1),
             order: Vec::with_capacity(n),
             #[cfg(debug_assertions)]
@@ -2229,15 +2227,7 @@ impl<const R: usize> Meet<R> {
         (sink.1 != NONE).then_some(sink.1)
     }
 
-    /// After a [`solve`](Self::solve) that settled (see [`settled`](Self::settled)): the bound on the heaviest
-    /// common independent set without each member `x` of the heaviest set, from a weight split (see the module
-    /// docs), passed to `f(x, bound)`.  False (and `f` never called) if the split's constraints have no solution,
-    /// which Frank's theorem rules out for a settled solve (a test checks it).
-    pub fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], f: impl FnMut(u32, i64)) -> bool {
-        self.split_bounds_from(p, live, None, None, f)
-    }
-
-    /// The split's arc `q → u` in the current tableau (`zero` the zero node), as [`split_bounds`](Self::split_bounds)
+    /// The split's arc `q → u` in the current tableau (`zero` the zero node), as [`split_from`](Self::split_from)
     /// lists them.  The answer for a vertex no longer live reads stale fields and means nothing: the walks that ask
     /// also find such a vertex's path broken.
     fn split_arc(&self, p: &Problem<'_, R>, q: usize, u: usize, zero: usize) -> bool {
@@ -2700,62 +2690,10 @@ impl<const R: usize> Meet<R> {
         true
     }
 
-    /// [`split_bounds`](Self::split_bounds), its Bellman–Ford started from the potentials of an earlier split `start`
-    /// where they still hold ([`split_from`](Self::split_from)), with the bound without each member in one pass over
-    /// the circuits.
-    pub fn split_bounds_from(
-        &mut self,
-        p: &Problem<'_, R>,
-        live: &[u32],
-        start: Option<&SplitStart>,
-        contracted: Option<&[u32]>,
-        mut f: impl FnMut(u32, i64),
-    ) -> bool {
-        if !self.split_from(p, live, start, contracted) {
-            return false;
-        }
-        let w = p.weight;
-        // In each matroid the members of positive weight there, B_m, are a heaviest basis of the elements of
-        // positive weight; without a member x of B_m the heaviest independent set is B_m − x plus the heaviest
-        // positive element whose circuit with respect to B_m holds x (one exchange), if any.  That circuit is the
-        // element's circuit with respect to I*, its mask: an element's circuit holds only members at least as heavy
-        // as it in the matroid (the split's arcs, `w1(y) ≤ w1(x)` in A and `w2(y) ≤ w2(x)` in B for a member x of
-        // y's circuit), so a positive element's circuit holds members of B_m alone.
-        for m in 0..2 {
-            let (pot, repl) = (&self.pot, &mut self.repl[m]);
-            let weight_in = |i: usize| if m == 0 { pot[i] } else { w[i] - pot[i] };
-            for &e in live {
-                repl[e as usize] = 0;
-            }
-            for &e in live {
-                let i = e as usize;
-                let wy = weight_in(i);
-                if wy <= 0 || self.inside[i] {
-                    continue;
-                }
-                debug_assert!(!free!(self, m, i), "an element of positive weight is free of I*");
-                let elems = &self.slot_elem[m][usize::from(p.block[m][i])];
-                each_bit(&self.mask[m][i], |s| {
-                    let x = elems[s] as usize;
-                    debug_assert!(weight_in(x) >= wy, "a member of a circuit lighter than its element");
-                    repl[x] = repl[x].max(wy);
-                });
-            }
-        }
-        for &e in live {
-            let i = e as usize;
-            if self.inside[i] {
-                let split = (self.pot[i], w[i] - self.pot[i]);
-                f(e, bound_without(self.value, split, [self.repl[0][i], self.repl[1][i]]));
-            }
-        }
-        true
-    }
-
     /// After [`split_from`](Self::split_from) on the tableau the workspace holds, with `pot` its split (`w1` by
     /// element, as [`potentials`](Self::potentials) has it): the split's bound without the member `x` alone, as
-    /// [`split_bounds_from`](Self::split_bounds_from) finds it for every member.  The positive elements whose
-    /// circuits hold `x` are those of its column in A, and in B those of its block whose masks hold its slot.
+    /// one pass over the circuits finds it for every member.  The positive elements whose circuits hold `x` are those
+    /// of its column in A, and in B those of its block whose masks hold its slot.
     pub fn split_bound_without(&mut self, p: &Problem<'_, R>, pot: &[i64], x: u32) -> i64 {
         if self.columns_for != self.tableau {
             self.build_columns();
@@ -2827,7 +2765,7 @@ impl<const R: usize> Meet<R> {
     /// independent set without `x`.  It is the heaviest without `x` if the sets of other sizes than the heaviest
     /// set's lose at least as much (see the module docs, "The heaviest set without a member"), which the caller
     /// judges.  `pot` is the weight split of the solve's heaviest set (its `w1` by element, as
-    /// [`potentials`](Self::potentials) has it after [`split_bounds`](Self::split_bounds)).
+    /// [`potentials`](Self::potentials) has it after [`split_from`](Self::split_from)).
     /// The cycle avoids the elements of `banned` (and the value is then the heaviest set's without `x` among the sets
     /// that hold every member of `banned` and no other element of it: the decomposition of the module docs keeps
     /// such sets' parts within the elements not banned).  The tableau is left as it was.
@@ -3773,7 +3711,7 @@ impl<const R: usize> Meet<R> {
         }
     }
 
-    /// For [`split_bounds`](Self::split_bounds) and [`without`](Self::without) on the current tableau: the elements
+    /// For [`split_from`](Self::split_from) and [`without`](Self::without) on the current tableau: the elements
     /// outside the set in the span of A by the slots of their circuits (each has an arc from those members), and
     /// those free in A.
     fn build_columns(&mut self) {
@@ -3813,14 +3751,14 @@ impl<const R: usize> Meet<R> {
         &self.flip
     }
 
-    /// The weight split's `w1` by element after a successful [`split_bounds`](Self::split_bounds) (meaningful for
+    /// The weight split's `w1` by element after a successful [`split_from`](Self::split_from) (meaningful for
     /// the live elements).
     pub fn potentials(&self) -> &[i64] {
         &self.pot[..self.pot.len() - 1]
     }
 
     /// Keeps the last split's potentials and predecessors in `start`, for a later split to start from
-    /// ([`split_bounds_from`](Self::split_bounds_from)).
+    /// ([`split_from`](Self::split_from)).
     pub fn save_split(&self, start: &mut SplitStart) {
         start.pot.clone_from(&self.pot);
         start.pred.clone_from(&self.split_pred);
@@ -3936,6 +3874,69 @@ impl<const R: usize> Meet<R> {
 mod tests {
     use super::*;
     use crate::test_support::Rng;
+
+    /// The bounds of every member at once, which the search does not ask for: it takes the split
+    /// ([`Meet::split_from`]) and the bound of one member at a time ([`Meet::split_bound_without`]).
+    impl<const R: usize> Meet<R> {
+        /// After a [`solve`](Self::solve) that settled (see [`settled`](Self::settled)): the bound on the heaviest
+        /// common independent set without each member `x` of the heaviest set, from a weight split (see the module
+        /// docs), passed to `f(x, bound)`.  False (and `f` never called) if the split's constraints have no solution,
+        /// which Frank's theorem rules out for a settled solve (a test checks it).
+        fn split_bounds(&mut self, p: &Problem<'_, R>, live: &[u32], f: impl FnMut(u32, i64)) -> bool {
+            self.split_bounds_from(p, live, None, None, f)
+        }
+
+        /// [`split_bounds`](Self::split_bounds), its Bellman–Ford started from the potentials of an earlier split
+        /// `start` where they still hold ([`split_from`](Self::split_from)), with the bound without each member in one
+        /// pass over the circuits.
+        fn split_bounds_from(
+            &mut self,
+            p: &Problem<'_, R>,
+            live: &[u32],
+            start: Option<&SplitStart>,
+            contracted: Option<&[u32]>,
+            mut f: impl FnMut(u32, i64),
+        ) -> bool {
+            if !self.split_from(p, live, start, contracted) {
+                return false;
+            }
+            let w = p.weight;
+            // The weight of the heaviest replacement of each member in each matroid, 0 for none.
+            let mut replacement = [vec![0; self.pot.len() - 1], vec![0; self.pot.len() - 1]];
+            // In each matroid the members of positive weight there, B_m, are a heaviest basis of the elements of
+            // positive weight; without a member x of B_m the heaviest independent set is B_m − x plus the heaviest
+            // positive element whose circuit with respect to B_m holds x (one exchange), if any.  That circuit is the
+            // element's circuit with respect to I*, its mask: an element's circuit holds only members at least as
+            // heavy as it in the matroid (the split's arcs, `w1(y) ≤ w1(x)` in A and `w2(y) ≤ w2(x)` in B for a
+            // member x of y's circuit), so a positive element's circuit holds members of B_m alone.
+            for (m, repl) in replacement.iter_mut().enumerate() {
+                let pot = &self.pot;
+                let weight_in = |i: usize| if m == 0 { pot[i] } else { w[i] - pot[i] };
+                for &e in live {
+                    let i = e as usize;
+                    let wy = weight_in(i);
+                    if wy <= 0 || self.inside[i] {
+                        continue;
+                    }
+                    debug_assert!(!free!(self, m, i), "an element of positive weight is free of I*");
+                    let elems = &self.slot_elem[m][usize::from(p.block[m][i])];
+                    each_bit(&self.mask[m][i], |s| {
+                        let x = elems[s] as usize;
+                        debug_assert!(weight_in(x) >= wy, "a member of a circuit lighter than its element");
+                        repl[x] = repl[x].max(wy);
+                    });
+                }
+            }
+            for &e in live {
+                let i = e as usize;
+                if self.inside[i] {
+                    let split = (self.pot[i], w[i] - self.pot[i]);
+                    f(e, bound_without(self.value, split, [replacement[0][i], replacement[1][i]]));
+                }
+            }
+            true
+        }
+    }
 
     /// What a [`Problem`] of `R` words borrows: the blocks and vectors of both matroids, and the weights.
     struct Owned<const R: usize> {

@@ -669,7 +669,6 @@ impl GameResult {
                 ("from", Json::from(t.from)),
                 ("scores", Json::array(scores)),
                 ("chosen", Json::from(t.chosen)),
-                ("applied", Json::Bool(t.applied)),
                 ("seconds", Json::Num(t.seconds)),
             ]);
             ("gate_trial", report)
@@ -1071,7 +1070,7 @@ impl<const W: usize> Job for SearchJob<W> {
         // The finder starts from the same seeds, or from the game of `n − 1` alone when the search takes none.
         let finder = (opts.finder_after > 0).then(|| {
             let seeds = self.seeds_of(go.finder_seed.as_deref());
-            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seeds, random: 0 }
+            finder::Plan { after: opts.finder_after, budget: opts.finder_budget, seeds }
         });
         let (spill_dir, own) = spill_dir(opts, n);
         let cfg = EngineConfig {
@@ -1778,11 +1777,12 @@ pub fn solve_range_each_with(
     if lo < 1 || lo > hi {
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
     }
-    // The games write their stores here as they finish, so the folder is made now: one that cannot be made fails the
-    // run before its first game, as the results file that is opened next does.
-    if let Some(dir) = &opts.carried_dir {
-        fs::create_dir_all(dir)
-            .map_err(|e| format!("cannot make the carried-nogoods folder {}: {e}", dir.display()))?;
+    // The searches write their profiles and stores into these folders as they go, so they are made now: one that
+    // cannot be made fails the run before its first game, as the results file that is opened next does.
+    for (what, dir) in [("profile", &opts.profile), ("carried-nogoods", &opts.carried_dir)] {
+        if let Some(dir) = dir {
+            fs::create_dir_all(dir).map_err(|e| format!("cannot make the {what} folder {}: {e}", dir.display()))?;
+        }
     }
     let known = Known::load(optimal, &opts.known)?;
     let open = |path: &Path| {

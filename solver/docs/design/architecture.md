@@ -45,8 +45,10 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
     (`Seek`: where a node's conflicts come from), `symmetry.rs` (the rule of symmetric pairs), `dual.rs` (the dual bound of
     a stopped search), `setup.rs` (`prepare`), `tactics.rs`, `branching.rs` (the branching settings, whose gate the
     gate trial may change while a search runs), `price_memo.rs` (the prices of conflict branching kept from one check to
-    the next, [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), and `profile.rs`
-    (the profile of a search, [engine.md](engine.md#the-profile-of-a-search)).  The lines of `searcher.rs` that read
+    the next, [price-reuse.md](price-reuse.md)), `incumbent.rs`, `header.rs` (the checkpoint header), `near_repeat.rs`
+    (the near-repeat cut), `finder.rs` (the thread beside a long search, [finder.md](finder.md)), `gate_trial.rs` (the
+    trial of gates, [gate-trial.md](gate-trial.md)) and `profile.rs` (the profile of a search,
+    [engine.md](engine.md#the-profile-of-a-search)).  The lines of `searcher.rs` that read
     `tags` or `phases` are the profile's instrumentation; a first read can skip them.
 11. `src/bounds.rs`: two small functions, the limit on a node's further promotions (`max_additional`) and the greedy
     incumbent.
@@ -82,7 +84,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
   between games; [The ledger](trust.md#the-ledger)).
 
 `tests/` holds the integration tests ([testing.md](testing.md)), and `solver/tools/` the scripts around the programs:
-the second verifiers in Python, the quick check, the profile-guided build and the cloud scripts ([solver/README.md, "The
+the second verifiers in Python, the quick check and the cloud scripts ([solver/README.md, "The
 tools"](../../README.md#the-tools)).  The programs of finished studies (`fields`, `matroid`, `dominance`, `slope`,
 `repeats`, `promotions`, `diff`, `hunt`, `sacrifice`, `tune`, `structure`, `extended`, `finder` and `wall`) are gone
 from master; [the notebook's list of retired terms](../../notebook/terms-changed.md#removed-programs) says where they

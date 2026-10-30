@@ -48,6 +48,12 @@ instance that must outlast a script, take a smaller one in a non-release run (`Q
 shared with the unit tests: the engine's instances, the random configurations of `robustness`).  Tests with a plain
 `#[ignore]` are ignored in both runs.
 
+**A test that stops a search with a node limit** needs a tree that stops it however its workers share it.  A worker looks
+at the limit only after 1,024 steps of its own, so a search of fewer than 2,047 steps may never be stopped on two
+threads, whatever the limit.  A game of more than twice that stops, as game 1000 does from an incumbent
+`QUICK_HANDICAP` below P* (`tests/soundness.rs`); a threshold on the number of stops does not make a
+test deterministic.
+
 The *full suite* is `cargo test --release`: every test, the long ones too, about 3 minutes of tests after a build of 6
 minutes.  It runs before a cloud run, after any change that changes search trees or results, and in the gates (the
 one-thread re-solve of 1301-2175).  A default build, and so every run above and the cloud setup, covers the library, the

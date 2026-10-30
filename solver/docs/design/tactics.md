@@ -26,7 +26,7 @@ of the root, nor `warm_start`, which only changes which of several heaviest sets
 | `conflict_look` | on | proven (as `conflict_branching`: it only chooses between two true conflicts of a node, and leaves the node's state as it found it) | with `conflict_branching`, where a check would branch on a conflict other than the search's own, look first at the last child of the search's own conflict, and branch on the search's own conflict if that child is cut on sight ([search.md, "Conflict branching"](search.md#conflict-branching), the paragraphs on the look); on the units of the games near 4900, 0.61 to 0.87 of the steps; `off` branches on the conflict chosen with no look |
 | `near_repeat` | on | proven ([the near-repeat lemma (R7)](../../../docs/theory/search-rules.md#the-near-repeat-lemma), given a proven bound of the earlier game's best promotion sum; the solver takes it only from a game that assumes nothing) | cut a node whose completions are all promotion sets of the game of n − 1, once that game is concluded and proven (with the search's go, or while it runs) and the incumbent reaches its best promotion sum ([search.md, "The near-repeat cut"](search.md#the-near-repeat-cut)); it ends many searches of the games that pose nearly the problem of the game before at their first step |
 | `price_reuse` | on | proven (as `conflict_branching`: the prices only rank true conflicts of a node, so any ranking keeps the search exact) | with `conflict_branching`, keep the prices of a node's members that the choice of the conflict makes, take them again at the node's later checks and at its descendants' first checks, and make only the prices a check lacks; on the 315 units of games 4920-4949 it takes 0.82 (hard games) and 0.86 (easy games) of the CPU, and 0.91 of the steps ([price-reuse.md](price-reuse.md)) |
-| `carried_nogoods` | off | proven (each carried nogood is checked at the root, so it holds at every node as the search's own do; the cut rests on the forced members, as `fix_forced`) | use the nogoods carried from another search, each kept only if a peel at the root finds a conflict within it, only to prune: rule candidates out of a unit's node and of children, and end a node whose forced members complete one; never to choose the conflict a node branches on; it acts only where the search is given a store (`taxman solve --carried-dir DIR`, which turns it on, or `tune solve --carried FILE`; [carried-nogoods.md](carried-nogoods.md)); on 71 units of 4984 with conflict branching off, a store from 144 units of 4983 takes 0.62 of the steps and 0.85 of the CPU, with it on 0.87 and 0.97 |
+| `carried_nogoods` | off | proven (each carried nogood is checked at the root, so it holds at every node as the search's own do; the cut rests on the forced members, as `fix_forced`) | use the nogoods carried from another search, each kept only if a peel at the root finds a conflict within it, only to prune: rule candidates out of a unit's node and of children, and end a node whose forced members complete one; never to choose the conflict a node branches on; it acts only where the search is given a store (`taxman solve --carried-dir DIR`, which turns it on; [carried-nogoods.md](carried-nogoods.md)); on 71 units of 4984 with conflict branching off, a store from 144 units of 4983 takes 0.62 of the steps and 0.85 of the CPU, with it on 0.87 and 0.97 |
 | `warm_start` | on | proven (the bound is the heaviest weight, found exactly; only which of several heaviest sets is found can differ, and with it the true conflict branched on) | a child that drops members of its parent's heaviest set, and a node that goes on without a member of its own, find the new heaviest set from the old one, deleting the members one at a time along the shortest cycle through each in an exchange graph that takes in the sets of every size, instead of augmenting from a set a few members large ([gf2-bound.md](gf2-bound.md#the-gf2-bound), "Warm starts across deletions") |
 | `prev_cap` | on | proven, given an optimal game of n − 1 | stop as soon as the incumbent reaches the ceiling, n + score(n − 1) − in_the_bag as a promotion sum |
 | `seed_incumbent` | on | sound (any promotion set is a valid incumbent) | start from the best of the greedy set and the promotions of each seed (the game of n − 1, the bounds store's game of n) that are still promotable |
@@ -34,8 +34,7 @@ of the root, nor `warm_start`, which only changes which of several heaviest sets
 **The defaults are the production policy.**  A plain `taxman solve` searches as the chain does: `price_reuse` and
 `warm_start` on, a gate of 1,200, a gate trial of the gates 1000, 800 and 600 ([gate-trial.md](gate-trial.md)), and a
 finder of 900 seconds ([finder.md](finder.md)).  The gate and the trial are no tactics and no part of a checkpoint.
-`--tactic price_reuse=off`, `--tactic warm_start=off`, `--gate 300` and `--gate-trial none` give the search of the
-builds before the policy.  `carried_nogoods` stays off: it needs a store (`--carried-dir`), which turns it on.
+`carried_nogoods` is off: it needs a store (`--carried-dir`), which turns it on.
 
 **The finder is not a tactic.**  `--finder-after` and `--finder-seconds` start a thread beside a long search that looks
 for a better incumbent ([finder.md](finder.md)); they are flags of `solve`, in no checkpoint's
@@ -50,27 +49,19 @@ U](../../../docs/theory/exactness.md#statement-u).
 
 **Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from the
 defaults (such as `nogoods=off,symmetry=off`), and `tactic_switches`, every tactic's value, those of the build that
-wrote it: a committed line may name tactics that this build no longer has (the matching path's `gf2`, `match_refine`
-and `lagrange`, and the knobs below), which the readers ignore.  A checkpoint records the search tactics, and is
-refused when they differ, but for `conflict_branching`, `conflict_look`, `near_repeat`, `price_reuse`,
-`carried_nogoods` and `warm_start`: the error names each tactic that differs, and the `--tactic` flags that resume it
+wrote it: a committed line may name tactics that this build no longer has, which the readers ignore.  A checkpoint
+records the search tactics, and is refused when they differ, but for `conflict_branching`, `conflict_look`,
+`near_repeat`, `price_reuse`, `carried_nogoods` and `warm_start`: the error names each tactic that differs, and the
+`--tactic` flags that resume it
 (the paragraph "What identifies a checkpoint" of [trust.md](trust.md)).
 
-*The tactics removed.*  The [notebook](../../notebook/README.md) has what each tactic was worth and the order they were
-found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's
-promotions with no search) and `revise_freedoms` (lower frame 0's freedoms by solving the two-frame game, assuming that
-the heaviest promotion set also has the most members, which is false at n = 833); the tactics that lost, the
-Java's bound with its runner-up, its preclusion table, and the branchings other than strong branching
-([which tactics earn their keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)); and the
-matching path, which the GF(2) bound replaced ([gf2-bound.md](gf2-bound.md#the-gf2-bound), the item "What it
-replaced"): the switch `gf2`, the matching bound's refinement `match_refine`, and the Lagrangian bound over the nogoods
-`lagrange`; and the knobs of the GF(2) search and of the nogood table, fixed at the values the chain ran with: the
-window of the forced members `force_window` (`all`), the choice of the member to branch on `branching` (`exact`) with
-`strong_limit` (`all`), `strong_depth` (`all`) and `deep_branching` (`split`), `more_forced` (on), the period of
-forgetting `nogood_period` (50,000 steps, the constant `search::NOGOOD_PERIOD`), `nogood_keep` (nothing) and
-`nogood_limit` (no limit).  [The tuning campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
-and [keeping and forgetting nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)
-have what they were worth.
+*The tactics removed.*  The notebook has what the removed tactics were worth: [which tactics earn their
+keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md) for the Java's conjectures and bounds and
+the branchings that lost, [the tuning campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
+for the knobs of the GF(2) search, and [keeping and forgetting
+nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md) for those of the
+nogood table.  Commit 3ca11bf, the build of the re-run, still has the matching path as the node bound (`gf2`,
+`match_refine`, `lagrange`) and those knobs.
 
 ## Adding a tactic
 

@@ -68,17 +68,11 @@ impl Branching {
         *self.settings.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Sets the gate, the gap from which `conflict_branching` chooses, only if no change has come since the generation
-    /// `seen` (read before the settings it was decided from): whether it did.  The gate is kept while the tactic is off.
-    pub(super) fn set_gate_unchanged(&self, seen: u64, gate: u64) -> bool {
+    /// Sets the gate, the gap from which `conflict_branching` chooses.  The gate is kept while the tactic is off.
+    pub(super) fn set_gate(&self, gate: u64) {
         let mut settings = self.settings.lock().unwrap_or_else(PoisonError::into_inner);
-        // Every change raises the generation while it holds the lock, so under the lock it is current.
-        if self.generation.load(Ordering::Acquire) != seen {
-            return false;
-        }
         settings.gate = gate;
         self.generation.fetch_add(1, Ordering::Release);
-        true
     }
 
     /// The generation of the settings: it changes with every change of the gate.  A searcher reads it at the start of
@@ -117,7 +111,7 @@ mod tests {
     fn a_new_gate_raises_the_generation_and_is_read_back() {
         let live = Branching::new(BranchSettings::of(&SearchTactics::default()));
         let seen = live.generation();
-        assert!(live.set_gate_unchanged(seen, 150));
+        live.set_gate(150);
         assert_ne!(live.generation(), seen);
         assert_eq!((live.settings().gate, live.settings().conflict_gap()), (150, Some(150)));
         assert!(live.settings().conflict_branching && live.settings().conflict_look);
@@ -127,18 +121,7 @@ mod tests {
     fn the_gate_is_kept_while_conflict_branching_is_off() {
         let off = SearchTactics { conflict_branching: false, ..SearchTactics::default() };
         let live = Branching::new(BranchSettings::of(&off));
-        assert!(live.set_gate_unchanged(live.generation(), 0));
+        live.set_gate(0);
         assert_eq!((live.settings().gate, live.settings().conflict_gap()), (0, None));
-    }
-
-    #[test]
-    fn a_gate_set_unless_changed_yields_to_a_change_made_since() {
-        let live = Branching::new(BranchSettings::of(&SearchTactics::default()));
-        let seen = live.generation();
-        assert!(live.set_gate_unchanged(seen, 600));
-        assert_eq!(live.settings().gate, 600);
-        // Decided from the generation before that change, a second gate is not set.
-        assert!(!live.set_gate_unchanged(seen, 1200));
-        assert_eq!(live.settings().gate, 600);
     }
 }

@@ -1059,41 +1059,6 @@ fn a_stop_from_the_control_stops_the_run_with_a_checkpoint() {
     assert_eq!(rest.stats.nodes, raw.nodes, "one thread, stopped and resumed, explores the tree of the plain search");
 }
 
-/// A checkpoint asked for through the control is written at once, whatever the interval, and the run goes on to the
-/// exact answer: one thread explores the tree of the plain search.  With no run attached, before it or after it, the
-/// request does nothing, since a checkpoint is of a run.
-#[test]
-fn a_checkpoint_asked_through_the_control_is_written_at_once() {
-    let inst = big_instance();
-    let raw = big_raw();
-    let dir = TempDir::new("control-checkpoint");
-    let ckpt = dir.join("ckpt.bin");
-    let control = Control::new();
-    assert!(!control.checkpoint(), "no run is attached yet");
-    let checkpoint = Some((ckpt.clone(), Duration::from_secs(3600)));
-    let cfg = EngineConfig { checkpoint, keep_completed_checkpoint: true, ..controlled(config(1), &control) };
-    let (out, written) = alongside(
-        || {
-            wait_for(&control, |status| status.nodes > 0).expect("the run going");
-            assert!(control.checkpoint(), "the run is attached");
-            let asked = Instant::now();
-            while !ckpt.exists() && asked.elapsed() < Duration::from_secs(60) {
-                thread::sleep(Duration::from_micros(200));
-            }
-            ckpt.exists()
-        },
-        || solve(&cfg, fresh(), &inst),
-    );
-    assert!(written, "the checkpoint is written before its interval");
-    assert!(out.completed && out.counters.checkpoints >= 1, "{:?}", out.counters);
-    assert_optimal(&out, &inst, raw.best);
-    assert_eq!(
-        out.stats.nodes, raw.nodes,
-        "one thread, checkpointed when asked, explores the tree of the plain search"
-    );
-    assert!(!control.checkpoint(), "the run has ended");
-}
-
 /// A stop given before the run makes it start stopped ("Starting stopped" in the engine's docs): no unit is handed
 /// out, and the final checkpoint holds them all, however many times it is resumed under that stop.
 #[test]

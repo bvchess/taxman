@@ -191,8 +191,9 @@ misses are the *odd* cores of movers with three or more factors.
 * **Other weights.**  `meet::Problem` takes weights that are positive and do not decrease with an element's index, as
   the root's candidates, in increasing order, have them; two of its starts rely on that: the start from the heaviest
   uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian over the
-  nogoods, or a cover LP with this intersection as its inner problem, as the nogoods study suggests) relabels them by
-  increasing weight first, with `Gf2Graph::reweighted`.  The levels, the contraction and the split do not depend on the
+  nogoods, which the search no longer has, or a cover LP with this intersection as its inner problem, as the nogoods
+  study suggests) relabels them by increasing weight first, as `Gf2Graph::reweighted` does in the tests of
+  `src/gf2/tests.rs`.  The levels, the contraction and the split do not depend on the
   order.
 
 ## The decomposition bound

@@ -660,16 +660,24 @@ fn resumed_over_and_over<const W: usize>(
     resumes
 }
 
+/// How far below P* of game 1000 the quick tests of resuming start their searches: the search then has
+/// about four thousand nodes, more than the 2,046 that two workers can make without either of them reaching the
+/// 1,024 polls at which the engine checks its node limit.
+const QUICK_HANDICAP: u64 = 1200;
+
 /// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default, from an
-/// incumbent 300 below its P*.  (The search needs thousands of nodes to be stopped on two threads, and from an
-/// incumbent 30 below the default search of 1000 takes fewer than two thousand; another quick check of resuming is
+/// incumbent [`QUICK_HANDICAP`] below its P*.  (A worker checks the node limit once it has made 1,024 polls of its
+/// own, so a search is stopped only if one of its two workers makes that many; one of them makes at least half the
+/// search's nodes whatever the split, so a search of more than 2,046 nodes is always stopped.  From an incumbent 300
+/// below, the default search of 1000 takes about two thousand and is stopped by chance; from [`QUICK_HANDICAP`]
+/// below it takes about four thousand.  Another quick check of resuming is
 /// `checkpoint_and_resume_with_the_gf2_bound_of_a_small_game`, on one thread, in the unit tests, and
 /// `a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`.)
 #[test]
 fn a_small_search_resumed_over_and_over_finds_the_optimum() {
     let dir = TempDir::new("churn-small");
     let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
-    let resumes = resumed_over_and_over::<16>(1000, truth, 300, 1000, &dir, &[0]);
+    let resumes = resumed_over_and_over::<16>(1000, truth, QUICK_HANDICAP, 1000, &dir, &[0]);
     assert!(resumes >= 1, "only {resumes} resumes");
 }
 
@@ -692,17 +700,22 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
 }
 
 /// [`a_wide_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default, at
-/// W = 20 and 64, from an incumbent 300 below its P*: some four thousand nodes on two threads, so that one of the two
-/// workers passes the 1,024 steps at which it checks the limit, and each width resumes at least once.
+/// W = 20 and (in the next test) 64, from an incumbent [`QUICK_HANDICAP`] below its P*: about four thousand nodes on
+/// two threads, so that one of the two workers passes the 1,024 polls at which it checks the limit, and the search
+/// resumes at least once.
 #[test]
-fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
+fn a_quick_wide_search_resumed_over_and_over_at_w_20() {
     let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
-    let dir = TempDir::new("churn-wide-quick");
-    let resumes = [
-        resumed_over_and_over::<20>(1000, truth, 300, 60, &dir, &[0]),
-        resumed_over_and_over::<64>(1000, truth, 300, 60, &dir, &[0]),
-    ];
-    assert!(resumes.iter().all(|&r| r >= 1), "resumes at W = 20 and 64: {resumes:?}");
+    let resumes = resumed_over_and_over::<20>(1000, truth, QUICK_HANDICAP, 60, &TempDir::new("churn-w20"), &[0]);
+    assert!(resumes >= 1, "only {resumes} resumes");
+}
+
+/// [`a_quick_wide_search_resumed_over_and_over_at_w_20`] at W = 64.
+#[test]
+fn a_quick_wide_search_resumed_over_and_over_at_w_64() {
+    let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
+    let resumes = resumed_over_and_over::<64>(1000, truth, QUICK_HANDICAP, 60, &TempDir::new("churn-w64"), &[0]);
+    assert!(resumes >= 1, "only {resumes} resumes");
 }
 
 /// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: game 992 (some ten thousand nodes), whose
@@ -712,7 +725,7 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run"
+    ignore = "long: the quick check is a_quick_wide_search_resumed_over_and_over_at_w_20 and at_w_64"
 )]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let truth = optimal_sum::<16>(Optimal::built_in(), 992).unwrap();

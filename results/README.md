@@ -30,18 +30,11 @@ How far each kind of proof reaches:
 
 "What supports the scores", below, gives the evidence for each.
 
-**A file with holes is not a chain, and never goes into `optimal.jsonl.gz`.**  An older `solve` could go on past a
-limit, and so could merge the games of many blocks of consecutive games, each given a limited search; the verifiers
-still read the files it wrote ([verifiers.md](../solver/docs/verifiers.md)).  Such a file has:
-
-* games with only an unfinished search, which is a lower bound and no proof;
-* games that no block reached;
-* games built on the best game of an unfinished search, with no ceiling and no prime formula;
-* several lines of one game.
-
-Each completed game in it is proven by its own proof, given what it assumes, in the frame model.  The file is evidence
-for those games alone, and a game that follows a hole may rest on nothing the chain would have given it.  None is
-committed here.
+**A file with holes is not a chain, and never goes into `optimal.jsonl.gz`.**  Such a file has games with only an
+unfinished search (a lower bound, no proof), games that no run reached, games built on the best game of an unfinished
+search, with no ceiling and no prime formula, or several lines of one game.  Each completed game in it is proven by
+its own proof, given what it assumes, but one that follows a hole may rest on nothing the chain would have given it.  The
+verifiers read such files ([verifiers.md](../solver/docs/verifiers.md)); none is committed here.
 
 ## optimal.jsonl.gz
 

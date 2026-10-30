@@ -35,8 +35,7 @@ what they find, learn or cut stays in them, and they neither prune the search no
 nothing in the checkpoint, which resumes with any gate.
 
 *Where it starts.*  The gate the trial starts from is the run's `--gate`, else the default, and is tried against the
-others.  If the branching settings have changed since the search started, the trial does not run, or does not set its
-gate, and says so.
+others.
 
 The trial needs a checkpoint directory for the units; without one it does not run, and with conflict branching off the
 gate means nothing, so it does not run either.
@@ -45,6 +44,6 @@ gate means nothing, so it does not run either.
 core, a few minutes of four, at the scheduling priority of the workers, beside a search of hundreds of thread-hours.
 The trial writes a line to stderr with each gate's CPU and what it chose.  The result line records it where it ran to
 its end (`engine.gate_trial`: the search's steps at its checkpoint, the units, the gate it started from, each gate's
-steps, CPU seconds and solves stopped by the limit, the gate chosen, whether the search took it, and its seconds), and
+steps, CPU seconds and solves stopped by the limit, the gate chosen, and its seconds), and
 `options.gate_trial` records the gates of the trial (absent with `--gate-trial none`), and `options.gate` the starting
 gate where `--gate` was given.

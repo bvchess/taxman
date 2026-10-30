@@ -10,9 +10,9 @@ load on the machine moves wall times by up to 3×.  The probe measures it:
   (`proc_pid_rusage`).  Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
   * Fixture F1: 300 search nodes from each of the proofs of 936 and 1215, every kernel over all of them (the rebuild of
     a node, the promotion of every candidate, the conflicts of the heaviest matching, the matching from scratch, nogood
-    lookups and rule-outs).  Builds that had the matching path made them, when those proofs took 81,119 and 4,652,709
-    nodes; this build's proofs take 449 and 3,704, in one unit each, so `perf make-nodes` would make a fixture of one
-    node, and these stay: a node is a node of the game whatever search found it;
+    lookups and rule-outs).  The current search proves those games in 449 and 3,704 nodes, in one unit each, so `perf
+    make-nodes` would make a fixture of one node.  These were made when the proofs took 81,119 and 4,652,709 nodes
+    (commit 3ca11bf), and stay: a node is a node of the game whatever search found it;
   * Fixture F2: the frame checks of those promotions;
   * Fixture F4: the GF(2) bound's kernels at the nodes of F1 (the bound from scratch; with its weight split and forced
     members; without each member of its heaviest set's conflict, solved, and as strong branching reads them, certified
@@ -32,13 +32,19 @@ load on the machine moves wall times by up to 3×.  The probe measures it:
   searches, `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples
   in its own configuration, with about 2% more instructions: run `cargo build --release --examples` again before
   measuring.
+
+  **The probe's windows are small.**  The current search proves the games of its windows in a few thousand nodes, so
+  the windows fingerprint the code, which an exact optimization must leave alone, and say little about the speed of the
+  search on a hard game.  Measuring speed there takes a window of a hard game, made with `perf make-window`.
+
 The engine's own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, its sizes and thread
 counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
 
 The cloud scripts (`solver/tools/cloud`) run the chain on a machine of many CPUs
 ([runbook/before-a-big-run.md](../runbook/before-a-big-run.md) and [runbook/chain.md](../runbook/chain.md)).  The
-command `taxman bench`, the example `ladder` and `scaling.sh` were removed on 2026-10-30; they build at commit 3ca11bf.
-The file `solver/frame/bench/history.jsonl` is the record of the benchmarks of 2026-10.
+command `taxman bench`, the example `ladder`, `scaling.sh`, the profile tools and the profile-guided build `pgo.sh` were
+removed on 2026-10-30; they build at commit 3ca11bf.  The file `solver/frame/bench/history.jsonl` is the record of the
+benchmarks of 2026-10.
 
 **Where it stands.**  At the end of the chain a step of the search cost 888k cycles on one thread of the M1 Max, 92% of
 it in the GF(2) bound, and [cheaper GF(2) nodes](../../notebook/search/cheaper-gf2-nodes-same-trees-2026-10/README.md)
