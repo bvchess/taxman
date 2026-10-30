@@ -1128,7 +1128,7 @@ fn workers_added_and_retired_while_the_run_goes() {
     assert_eq!((c.threads, c.spawned, c.retired), (2, 0, 0), "{c:?}");
 
     let inst = big_instance();
-    let raw = big_raw();
+    let opt = inst.dp();
     // From one worker to four.
     let control = Control::new();
     let cfg = controlled(config(1), &control);
@@ -1142,7 +1142,7 @@ fn workers_added_and_retired_while_the_run_goes() {
     );
     assert!(grown.is_some(), "four workers running before the end: {:?}", out.counters);
     assert!(out.completed);
-    assert_optimal(&out, &inst, raw.best);
+    assert_optimal(&out, &inst, opt);
     let c = &out.counters;
     assert_eq!((c.threads, c.spawned, c.retired), (4, 3, 0), "{c:?}");
     assert!(c.capacity < c.wall * 4, "three workers came later: {c:?}");
@@ -1163,7 +1163,7 @@ fn workers_added_and_retired_while_the_run_goes() {
     );
     assert!(script.is_some(), "the changes made before the end: {:?}", out.counters);
     assert!(out.completed);
-    assert_optimal(&out, &inst, raw.best);
+    assert_optimal(&out, &inst, opt);
     let c = &out.counters;
     assert_eq!((c.threads, c.spawned, c.retired), (4, 2, 3), "{c:?}");
     assert_accounting(c);
