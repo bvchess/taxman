@@ -21,13 +21,15 @@
 //!
 //! The sources are read as they are given: the committed chain and the store are checked by their own referees
 //! (`taxman verify-results`, `solver/tools/check_results.py`; `ledger verify-bounds`, `solver/tools/check_bounds.py`),
-//! not again here.  What the solver does check of a game it takes is what it checks of every game: the referee's replay
+//! not again here.  The committed chain is a gzip file that decodes to tens of megabytes, so it is decoded and parsed only
+//! as far as the games asked for ([`Known::load`]): a run or a check that takes few games from it reads a member or two.
+//! What the solver does check of a game it takes is what it checks of every game: the referee's replay
 //! (legal, over, opening with the largest prime) at the score the source gives, and the chain bounds against the game
 //! before it.
 
-use crate::game::Optimal;
+use crate::game::{is_gzip, Optimal, Text};
 use crate::json::Json;
-use crate::results::{assumed_optimal, assumed_u, committed_games, Assumptions, CommittedGame, Proof};
+use crate::results::{assumed_optimal, assumed_u, committed_games, parse_committed, Assumptions, CommittedGame, Proof};
 use crate::store::{carried, play, Line, Rule, Side, Store};
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -273,17 +275,53 @@ impl Held {
     }
 }
 
+/// The committed chain, as the sources give it.
+enum Committed {
+    /// There is none.
+    None,
+    /// A plain file, read whole: its completed games by n.
+    Games(BTreeMap<u32, CommittedGame>),
+    /// A gzip file, `results/optimal.jsonl.gz`, which is one game a line, the line of the game of n the nth, read as its
+    /// games are asked for: a check of results that cites nothing of it, or a run that takes a few games from it,
+    /// decodes a few members of tens of megabytes.
+    Chain(Text<CommittedGame>),
+}
+
+impl Committed {
+    /// The committed game of `n`, if the chain has one.
+    ///
+    /// # Errors
+    ///
+    /// If a gzip chain is damaged where the game is read from, or is not one game a line; the message names the file.
+    fn game(&self, n: u32) -> Result<Option<&CommittedGame>, String> {
+        match self {
+            Committed::None => Ok(None),
+            Committed::Games(games) => Ok(games.get(&n)),
+            Committed::Chain(text) => text.get(n),
+        }
+    }
+
+    /// Whether a committed chain with a game in it was given to the check.
+    fn is_given(&self) -> bool {
+        match self {
+            Committed::None => false,
+            Committed::Games(games) => !games.is_empty(),
+            Committed::Chain(_) => true,
+        }
+    }
+}
+
 /// The known sources, loaded.
 pub struct Known<'a> {
     optimal: &'a Optimal,
-    committed: BTreeMap<u32, CommittedGame>,
+    committed: Committed,
     held: Option<Held>,
 }
 
 impl<'a> Known<'a> {
     /// The table `optimal` alone.
     pub fn table(optimal: &'a Optimal) -> Known<'a> {
-        Known { optimal, committed: BTreeMap::new(), held: None }
+        Known { optimal, committed: Committed::None, held: None }
     }
 
     /// The table of optimal games the sources include.
@@ -293,11 +331,21 @@ impl<'a> Known<'a> {
 
     /// The table `optimal` and the files of `sources`.
     ///
+    /// The committed chain is read whole if it is a plain file.  A gzip file (its name ends in `.gz`, as the committed
+    /// results' does) is read into memory and decoded as far as the games asked for (its first member now, so that a
+    /// file that is no gzip file is refused), and parsed when asked; it must be one game a line, as the committed
+    /// results are, and a fault in a member decoded later is an error of the call that asks for the game, so that a
+    /// member that nothing asks for is not read.
+    ///
     /// # Errors
     ///
     /// If a file cannot be read or is not what it should be.
     pub fn load(optimal: &'a Optimal, sources: &KnownSources) -> Result<Known<'a>, String> {
-        let committed = sources.committed.as_deref().map(committed_games).transpose()?.unwrap_or_default();
+        let committed = match sources.committed.as_deref() {
+            None => Committed::None,
+            Some(path) if is_gzip(path) => Committed::Chain(Text::of_file(path, parse_committed)?),
+            Some(path) => Committed::Games(committed_games(path)?),
+        };
         let held = sources.bounds.as_deref().map(Store::read).transpose()?.map(Held::new);
         Ok(Known { optimal, committed, held })
     }
@@ -316,7 +364,7 @@ impl<'a> Known<'a> {
             Origin::Optimal => self.optimal.score(n).zip(self.optimal.moves(n)).and_then(|(score, moves)| {
                 known(score, moves.to_vec(), None, Assumptions::from([assumed_optimal(n)]), Cite::Optimal)
             }),
-            Origin::Strict => self.committed.get(&n).and_then(|game| {
+            Origin::Strict => self.committed.game(n)?.and_then(|game| {
                 known(game.score, game.moves.clone(), Some(game.proof), game.assumes.clone(), Cite::Strict)
             }),
             Origin::Bounds => {
@@ -386,12 +434,12 @@ impl<'a> Known<'a> {
                 }
                 None => Err(format!("it cites the built-in table, which has no game of {n}")),
             },
-            Cite::Strict => match self.committed.get(&n) {
+            Cite::Strict => match self.committed.game(n)? {
                 Some(game) if game.score == score => Ok(game.assumes.clone()),
                 Some(game) => {
                     Err(format!("it cites the committed chain, whose game of {n} scores {}, not {score}", game.score))
                 }
-                None if self.committed.is_empty() => {
+                None if !self.committed.is_given() => {
                     Err("it cites the committed chain, which was not given to the check".into())
                 }
                 None => Err(format!("it cites the committed chain, which has no game of {n}")),

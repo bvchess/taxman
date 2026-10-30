@@ -222,6 +222,17 @@ through [the gzip crate](../../gzip/README.md) in order, only as far as the game
 game the first time it is asked for.  A process that asks for no game decodes nothing, one that asks for a few decodes
 as far as the last of them, and one that goes over every game decodes the whole file.
 
+A results file given by a path that ends in `.gz` is read the same way where it is used as a source of games: the
+committed chain that `--use-prev` and `verify-results` draw on (`known::Known::load`), and the `--results` of `certify` and
+`verify-certificates` and the `--known` of `bench` (`Optimal::with_results`).  Such a file must be one game a line, line n
+for game n, as the committed results are.  It is read into memory when it is opened, with its first member decoded (so
+that a file that is no gzip file is refused at once), and its other members are decoded as games are asked for, so a
+check that cites few of its games reads a member or two of it.  A fault in a member that is decoded later stops the
+call that needs the game and names the file.  A plain file is read whole when it is opened.  The measurement tools take
+their `--known` files through `Optimal::with_results_files`, which checks that a game of a file scores what the games
+before it say: for a plain file when it is opened, for a gzip file when a game of it is looked up, where a difference
+stops the lookup and names the file, n and both scores.
+
 ## The profile of a search
 
 The profile of a search records where the search's steps go, while it runs, so that the shape of a tree is measured

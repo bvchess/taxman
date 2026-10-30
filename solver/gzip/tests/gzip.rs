@@ -639,6 +639,23 @@ fn members_one_at_a_time_give_the_bytes_that_decode_gives() {
 }
 
 #[test]
+fn members_that_keep_their_bytes_give_the_bytes_of_members_that_borrow_them() {
+    let files = files();
+    let file: Vec<u8> = files.iter().flat_map(|(_, gzip, _)| gzip.iter().copied()).collect();
+    let borrowed: Vec<_> = Members::new(&file).collect();
+    // The decoder holds the file, so it can outlive the variable the file was read into.
+    let mut owned = Members::owned(file.clone());
+    drop(file);
+    assert_eq!(owned.by_ref().collect::<Vec<_>>(), borrowed);
+    assert!(owned.next().is_none());
+    // An error ends it as it ends the borrowing one.
+    let mut owned = Members::owned([FIXED, b"garbage", FIXED].concat());
+    assert_eq!(owned.next().unwrap().unwrap(), FIXED_PLAIN);
+    assert_eq!(owned.next().unwrap().unwrap_err().member, 1);
+    assert!(owned.next().is_none());
+}
+
+#[test]
 fn members_can_be_left_before_the_end_of_the_file() {
     // The third member is damaged and the fourth is not a member, but a reader that stops after the second never knows.
     let mut damaged = DYNAMIC.to_vec();

@@ -158,29 +158,31 @@ const BOARDS: [u32; 6] = [906, 907, 910, 920, 930, 944];
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_911_and_both_verifiers_accept_them"
 )]
 fn proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_accept_them() {
-    proven_boards_of_the_store_are_recorded_to(960, &BOARDS);
+    proven_boards_of_the_store_are_recorded_in(900, 960, &BOARDS);
 }
 
-/// [`proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_accept_them`] for the games to 913,
-/// the store's boards among them 906, 907 and 910.
+/// [`proven_boards_of_the_store_are_recorded_without_a_search_and_both_verifiers_accept_them`] for the games 906 to 911,
+/// with all three of the store's boards in them (906 is the first game, 907 follows it, and 910 is followed by the prime
+/// 911).  The games of the long test before 906 and after 911 are games the chain searches, like 908 and 909, so the
+/// cases are the same.
 #[test]
-fn proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them() {
-    proven_boards_of_the_store_are_recorded_to(913, &BOARDS[..3]);
+fn proven_boards_of_the_store_are_recorded_to_911_and_both_verifiers_accept_them() {
+    proven_boards_of_the_store_are_recorded_in(906, 911, &BOARDS[..3]);
 }
 
-/// The test of the games 900..=`hi`, with the games of `boards` in the store.
-fn proven_boards_of_the_store_are_recorded_to(hi: u32, boards: &[u32]) {
+/// The test of the games `lo..=hi`, with the games of `boards` in the store.
+fn proven_boards_of_the_store_are_recorded_in(lo: u32, hi: u32, boards: &[u32]) {
     let dir = TempDir::new("known-store");
     let store = store_of(&dir, boards);
     let sources = sources(None, Some(&store));
     let out = dir.join("out.jsonl");
-    let games = run(900, hi, &options(sources.clone()), &out);
+    let games = run(lo, hi, &options(sources.clone()), &out);
 
     // The control: the same range from the same game before it, with nothing but the search to find the games.
-    let control = run(900, hi, &options(KnownSources::default()), &dir.join("control.jsonl"));
+    let control = run(lo, hi, &options(KnownSources::default()), &dir.join("control.jsonl"));
     assert_eq!(games.len(), control.len());
 
     let proven: BTreeSet<u32> = boards.iter().copied().collect();
@@ -203,7 +205,7 @@ fn proven_boards_of_the_store_are_recorded_to(hi: u32, boards: &[u32]) {
     }
     // The first game's game before it is the table's, assumed optimal; what rests on a game inherits its assumptions.
     let first = games[0].prev.as_ref().unwrap();
-    assert_eq!((first.source, first.n), (PrevSource::Optimal, 899));
+    assert_eq!((first.source, first.n), (PrevSource::Optimal, lo - 1));
     for pair in games.windows(2).filter(|pair| pair[1].proof.is_some_and(Proof::rests_on_prev)) {
         assert_eq!(pair[1].assumes, pair[0].assumes, "n={}", pair[1].n);
     }
@@ -223,7 +225,7 @@ fn proven_boards_of_the_store_are_recorded_to(hi: u32, boards: &[u32]) {
     // A run that starts after a board the store has proven takes that game as the game before it: from the store, which
     // is the better source than the table that has it too (the proven game assumes U where its bound rests).
     let later = dir.join("later.jsonl");
-    let games = run(907, 912, &options(sources.clone()), &later);
+    let games = run(907, hi, &options(sources.clone()), &later);
     let prev = games[0].prev.as_ref().unwrap();
     assert_eq!((prev.source, prev.n, prev.proof), (PrevSource::Bounds, 906, Some(Proof::Known)));
     assert_eq!(prev.assumes, Assumptions::from([assumed_u(906)]));
@@ -395,7 +397,7 @@ fn both_verifiers_refuse_the_cases(sampled: impl Fn(usize) -> bool) {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_911_and_both_verifiers_accept_them"
 )]
 fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it() {
     an_open_board_of_the_store_seeds_its_search_to(960);
@@ -406,7 +408,7 @@ fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it() {
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_913_and_both_verifiers_accept_them"
+    ignore = "long: the quick check is proven_boards_of_the_store_are_recorded_to_911_and_both_verifiers_accept_them"
 )]
 fn an_open_board_of_the_store_seeds_its_search_and_its_upper_bound_stops_it_to_913() {
     an_open_board_of_the_store_seeds_its_search_to(913);
@@ -510,6 +512,70 @@ fn the_committed_chain_and_the_table_are_known_games_too() {
         assert_eq!(game.assumes, Assumptions::from([assumed_optimal(game.n)]), "n={}", game.n);
     }
     both_accept(&out, &KnownSources::default());
+}
+
+/// A committed chain in a gzip file, as the committed results are, gives the games of the same chain in a plain file, is
+/// decoded as its games are asked for (a member that nothing asks for is not read), and a fault in the member a game is
+/// read from is an error of asking for the game, naming the file.
+#[test]
+fn a_gzip_committed_chain_gives_the_games_of_a_plain_one_and_is_read_as_they_are_asked_for() {
+    let dir = TempDir::new("known-committed-gz");
+    let plain = dir.join("committed.jsonl");
+    let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
+    solver::solve_range(1, 60, &opts, Some(&plain)).unwrap();
+    // Two members, as the committed file is several: the games 1..=30 and 31..=60.
+    let text = fs::read_to_string(&plain).unwrap();
+    let cut = text.match_indices('\n').nth(29).unwrap().0 + 1;
+    let zipped = dir.join("committed.jsonl.gz");
+    fs::write(&zipped, common::gzip_stored(&[&text[..cut], &text[cut..]])).unwrap();
+    let load = |file: &Path| Known::load(Optimal::built_in(), &sources(Some(file), None));
+    let (from_plain, from_zipped) = (load(&plain).unwrap(), load(&zipped).unwrap());
+    // Every game, and one past the end, is the same game with the same proof and assumptions; so is every citation.
+    for n in 0..=61 {
+        let game = |known: &Known| format!("{:?}", known.game_from(Origin::Strict, n).unwrap());
+        assert_eq!(game(&from_zipped), game(&from_plain), "n={n}");
+        let (score, _) = truth(n.max(1));
+        let cite = |known: &Known| format!("{:?}", known.check_cite(n, score, &Cite::Strict));
+        assert_eq!(cite(&from_zipped), cite(&from_plain), "n={n}");
+    }
+    assert!(from_zipped.game_from(Origin::Strict, 60).unwrap().is_some());
+    assert!(from_zipped.game_from(Origin::Strict, 61).unwrap().is_none());
+    let err = from_zipped.check_cite(61, 1, &Cite::Strict).unwrap_err();
+    assert!(err.contains("which has no game of 61"), "{err}");
+
+    // The last member damaged: the games of the first are read, and asking for a game of the last is an error.
+    let mut bytes = fs::read(&zipped).unwrap();
+    let crc = bytes.len() - 8;
+    bytes[crc] ^= 1;
+    let damaged = dir.join("damaged.jsonl.gz");
+    fs::write(&damaged, bytes).unwrap();
+    let known = load(&damaged).unwrap();
+    assert!(known.game_from(Origin::Strict, 30).unwrap().is_some());
+    let err = known.game_from(Origin::Strict, 31).unwrap_err();
+    assert!(err.contains("damaged.jsonl.gz") && err.contains("CRC-32"), "{err}");
+    // The first member damaged, a file that is not there and one that is no gzip file are refused at once.
+    let mut bytes = fs::read(&zipped).unwrap();
+    bytes[20] ^= 1;
+    fs::write(&damaged, bytes).unwrap();
+    let err = load(&damaged).err().expect("a refusal");
+    assert!(err.contains("damaged.jsonl.gz") && err.contains("CRC-32"), "{err}");
+    let err = load(&dir.join("missing.jsonl.gz")).err().expect("a refusal");
+    assert!(err.contains("missing.jsonl.gz"), "{err}");
+    let not_gzip = dir.join("plain.jsonl.gz");
+    fs::copy(&plain, &not_gzip).unwrap();
+    let err = load(&not_gzip).err().expect("a refusal");
+    assert!(err.contains("plain.jsonl.gz") && err.contains("not a gzip file"), "{err}");
+
+    // A run takes its games from the gzip chain as it does from the plain one, and the verifier accepts the lines.
+    let table = Optimal::from_json(&Json::Arr(Vec::new())).unwrap();
+    let sources = sources(Some(&zipped), None);
+    let out = dir.join("out.jsonl");
+    let games = run_with(&options(sources.clone()), 50, 52, &out, &table);
+    for game in &games {
+        assert_eq!(game.known.as_ref().map(|cited| &cited.cite), Some(&Cite::Strict), "n={}", game.n);
+        assert_eq!(game.moves, from_plain.game_from(Origin::Strict, game.n).unwrap().unwrap().moves, "n={}", game.n);
+    }
+    rust_verdict(&out, &sources).unwrap_or_else(|e| panic!("the Rust verifier: {e}"));
 }
 
 /// [`run`] with the options and the table given.

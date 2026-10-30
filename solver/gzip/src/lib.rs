@@ -14,6 +14,7 @@ mod inflate;
 mod reader;
 
 use reader::Reader;
+use std::borrow::Cow;
 use std::fmt;
 
 // The flag bits of a gzip header (RFC 1952, 2.3.1): a header CRC-16, an extra field, a file name, a comment.  The bits
@@ -57,7 +58,7 @@ pub fn decode(bytes: &[u8]) -> Result<Vec<u8>, Error> {
 /// The members of a gzip file, decoded one at a time: the bytes of each, in order.  After an error it gives nothing
 /// more, and neither does it after the last member.
 pub struct Members<'a> {
-    bytes: &'a [u8],
+    bytes: Cow<'a, [u8]>,
     /// Where the next member starts.
     offset: usize,
     /// The index of the next member.
@@ -68,7 +69,13 @@ pub struct Members<'a> {
 impl<'a> Members<'a> {
     /// The members of `bytes`, before the first is decoded.
     pub fn new(bytes: &'a [u8]) -> Self {
-        Members { bytes, offset: 0, index: 0, done: false }
+        Members { bytes: Cow::Borrowed(bytes), offset: 0, index: 0, done: false }
+    }
+
+    /// The members of `bytes`, which the decoder keeps, so that it can be held for as long as the reader needs the file
+    /// (a file read into memory, decoded as far as it is wanted).
+    pub fn owned(bytes: Vec<u8>) -> Members<'static> {
+        Members { bytes: Cow::Owned(bytes), offset: 0, index: 0, done: false }
     }
 
     /// Decodes the next member and appends its bytes to `out`, or says there is none (`None`).  What it appends before
@@ -78,7 +85,7 @@ impl<'a> Members<'a> {
             self.done = true;
             return None;
         }
-        let mut reader = Reader::new(self.bytes, self.offset, self.index);
+        let mut reader = Reader::new(&self.bytes, self.offset, self.index);
         let result = read_member(&mut reader, out);
         match result {
             Ok(()) => (self.offset, self.index) = (reader.offset(), self.index + 1),

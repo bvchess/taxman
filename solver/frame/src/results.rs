@@ -663,8 +663,9 @@ pub struct CommittedGame {
     pub assumes: Assumptions,
 }
 
-/// The completed games of the results file at `path` (a gzip file if its name ends in `.gz`), by n.  The lines of
-/// unfinished searches are passed over.
+/// The completed games of the results file at `path` (a gzip file if its name ends in `.gz`), by n, all of them read
+/// now ([`Known::load`] reads a gzip file as its games are asked for instead).  The lines of unfinished searches are
+/// passed over.
 ///
 /// # Errors
 ///
@@ -677,13 +678,30 @@ pub fn committed_games(path: &Path) -> Result<BTreeMap<u32, CommittedGame>, Stri
         let at = |e: String| format!("{}: line {}: {e}", path.display(), i + 1);
         let json = Json::parse(raw).map_err(|e| at(e.to_string()))?;
         if let Line::Completed(entry) = parse_line(&json, i + 1).map_err(at)? {
-            let Entry { n, score, moves, recorded: (proof, assumes), .. } = *entry;
-            if games.insert(n, CommittedGame { score, moves, proof, assumes }).is_some() {
+            let (n, game) = committed_game(*entry);
+            if games.insert(n, game).is_some() {
                 return Err(at(format!("a second completed game of n={n}")));
             }
         }
     }
     Ok(games)
+}
+
+/// The n and the committed game of a completed line.
+fn committed_game(entry: Entry) -> (u32, CommittedGame) {
+    let Entry { n, score, moves, recorded: (proof, assumes), .. } = entry;
+    (n, CommittedGame { score, moves, proof, assumes })
+}
+
+/// Reads line number `number` of a gzip file of the committed chain, as [`crate::game::Text`] does: the n and the game of
+/// a completed line, none for an unfinished search's, or the reason the line is no line of schema [`SCHEMA`] (it starts
+/// with ": ", as `Text`'s errors do).
+pub(crate) fn parse_committed(number: usize, raw: &str) -> Result<Option<(u32, CommittedGame)>, String> {
+    let json = Json::parse(raw).map_err(|e| format!(": {e}"))?;
+    match parse_line(&json, number).map_err(|e| format!(": {e}"))? {
+        Line::Completed(entry) => Ok(Some(committed_game(*entry))),
+        Line::Incomplete { .. } => Ok(None),
+    }
 }
 
 /// Reads and checks the text of a results file (see the module documentation).  Errors name the line.

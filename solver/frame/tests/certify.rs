@@ -503,9 +503,9 @@ fn a_game_that_a_certificate_cannot_be_made_for_is_refused() {
 /// (the engine looks at a limit every 1,024 steps of a searcher) cuts into several pieces.
 const RESUMED: u32 = 1302;
 
-/// The game the quick stop-and-resume tests use: its search takes 1,593 nodes, which a limit of 1,000 nodes cuts in
-/// two.
-const RESUMED_QUICK: u32 = 1041;
+/// The game the quick stop-and-resume tests use: its search takes 1,255 nodes, which a limit of 1,000 nodes cuts in
+/// two.  (Of the games to 1300 whose searches are over 1,200 nodes, it is one of the cheapest to search, 0.35 s.)
+const RESUMED_QUICK: u32 = 803;
 
 /// Checks the nodes of a search that was stopped and resumed against those of the same search uninterrupted.  The
 /// tree is the same, but a stop loses the unit of work in flight, which the resumed search does again (for 1302,
@@ -530,7 +530,7 @@ fn a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one() {
     a_stopped_search_resumes(RESUMED, 3_000, 2);
 }
 
-/// [`a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one`] for a game of 1,593 nodes, stopped once.
+/// [`a_stopped_search_resumes_to_the_certificate_of_an_uninterrupted_one`] for a game of 1,255 nodes, stopped once.
 #[test]
 fn a_stopped_search_of_a_small_game_resumes_to_the_certificate_of_an_uninterrupted_one() {
     a_stopped_search_resumes(RESUMED_QUICK, 1_200, 1);
@@ -592,7 +592,7 @@ fn the_command_stops_resumes_and_then_skips_a_game() {
     the_command_stops_resumes_and_then_skips(RESUMED, 3);
 }
 
-/// [`the_command_stops_resumes_and_then_skips_a_game`] for a game of 1,593 nodes, stopped once.
+/// [`the_command_stops_resumes_and_then_skips_a_game`] for a game of 1,255 nodes, stopped once.
 #[test]
 #[cfg_attr(
     debug_assertions,

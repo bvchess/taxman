@@ -30,8 +30,9 @@ for member in Members::new(&bytes) {          // or a member at a time, in order
 }
 ```
 
-`decode` and `Members` take the whole file as a byte slice.  `Members` gives nothing after its first error.  `crc32` is
-the checksum the trailers use.
+`decode` and `Members` take the whole file as a byte slice.  `Members::owned` takes the file as a `Vec<u8>` instead and
+keeps it, for a reader that holds the decoder after the variable the file was read into is gone.  `Members` gives nothing
+after its first error.  `crc32` is the checksum the trailers use.
 
 ## What it checks
 

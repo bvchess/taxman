@@ -73,6 +73,8 @@ $ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 .
 * **A results file named by path**, in `verify-results`, in the `--results` flags of `certify` and
   `verify-certificates`, and in `bench --known`, is read through the gzip decoder if the path ends in `.gz`, as
   `results/optimal.jsonl.gz` does, and as plain JSONL if it does not.  The files that `--out` writes are plain JSONL.
+  Except in `verify-results`, which reads a file whole, a gzip file is decoded only as far as the games asked for, and
+  must be one game a line ([design/engine.md](design/engine.md)).
 * **`certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE`** proves, game by game, that [statement
   U](../../docs/theory/exactness.md#statement-u) holds: that the recorded scores of A..B that rest on the frame model
   are opt(n) on the whole board ([design/frame-model.md, “What "optimal"

@@ -403,9 +403,10 @@ fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
     assert_usage_error(&["certify", "12", "--background"], "certify needs --results FILE and --upper FILE");
 
     let dir = TempDir::new("solve-background");
+    // A game of 125 nodes, searched by three workers.
     let line = |name: &str, extra: &[&str]| {
         let file = dir.join(name);
-        let args = ["solve", "1000", "--force-search", "--threads", "3", "--progress", "0", "--out", path(&file)];
+        let args = ["solve", "900", "--force-search", "--threads", "3", "--progress", "0", "--out", path(&file)];
         let run = taxman(&[&args[..], extra].concat());
         assert_eq!(run.code, Some(0), "{}", run.stderr);
         let text = fs::read_to_string(&file).unwrap();
