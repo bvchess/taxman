@@ -56,7 +56,7 @@
 //! | | [`playable`] | whether a set of numbers can all be played on the whole board, with nothing of the frame model |
 //! | | [`bits`] | fixed-width bitsets `Bits<W>` for sets of game numbers; the set widths, dispatched |
 //! | | [`json`] | a small JSON reader and writer (the table of optimal games, golden data, results lines) |
-//! | | [`rng`] | a seeded generator, for the finder's random neighborhoods and the tuning benchmark's samples |
+//! | | [`rng`] | a seeded generator, for the finder's random neighborhoods |
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
@@ -80,8 +80,7 @@
 //! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
 //! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy incumbent),
 //! and `brute`, `root_problem` and `sacrifice` are studies that a first read can skip.  `examples/` holds the ladder
-//! (searches of hard games with time limits and thread counts), the probe of the hot paths, the tuning benchmark, the
-//! census of the frames' structure, the extended problem's chain and the measurements of the wall regime; `tests/` the
+//! (searches of hard games with time limits and thread counts), the probe of the hot paths and the ledger; `tests/` the
 //! integration tests.
 
 pub mod accelerate;

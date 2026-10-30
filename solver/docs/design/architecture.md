@@ -83,20 +83,14 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 * built by `cargo build --examples`: the ladder `ladder` (standalone searches of hard games with time limits, thread
   scaling and diagnostics), the probe `perf` (the hot paths, replayed from fixtures and measured in cycles and
   instructions), and `ledger` (bounds on opt(n) for many games at once, tightened by limited searches and the relations
-  between games; [The ledger](trust.md#the-ledger));
-* behind the Cargo feature `studies` (`--features studies`), the study tools: `tune` (the tuning benchmark: units of a
-  search at the end of the chain, each solved on one thread), `structure` (the census of the frames' structure, game by
-  game), `extended` (chains and problems of the extended problem), `finder` (the finder alone on a game: how soon it
-  reaches the game's best from the start a search begins at) and `wall` (what grows with n and with a tree: a
-  game's fixed costs piece by piece, a node's cost at any set width, large trees with their memory and checkpoints, the
-  frames of any game, and the `landscape` of a range of games, each solved standalone: the root's GF(2) bound over the
-  incumbent a search starts from).
+  between games; [The ledger](trust.md#the-ledger)).
 
 `tests/` holds the integration tests ([testing.md](testing.md)), and `solver/tools/` the scripts around the programs:
 the second verifiers in Python, the quick check, the profile-guided build and the cloud scripts ([solver/README.md, "The
 tools"](../../README.md#the-tools)).  The programs of finished studies (`fields`, `matroid`, `dominance`, `slope`,
-`repeats`, `promotions`, `diff`, `hunt` and `sacrifice`) are gone from master; [the notebook's list of retired
-terms](../../notebook/terms-changed.md#removed-programs) says where they build.
+`repeats`, `promotions`, `diff`, `hunt`, `sacrifice`, `tune`, `structure`, `extended`, `finder` and `wall`) are gone
+from master; [the notebook's list of retired terms](../../notebook/terms-changed.md#removed-programs) says where they
+build.
 
 **Width dispatch.**  A set of game numbers is a bitset of W words of 64 bits, and everything that holds one is generic
 over `const W: usize`.  The macro `with_width!` (in `bits`; the solver, the examples and the tests use it) picks the

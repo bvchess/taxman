@@ -89,9 +89,9 @@ and of the run, whatever order they
 were made in.  The tally line reads `list FILE (K boards): ...` where a range gives `A..=B: ...`.
 
 *The campaign's lists.*  `solver/tools/certify_plan.py` (standard library only) makes the lists of the campaign on
-2176-3440, and its estimate, from the results, the barred bounds, the extended problems of
-`examples/extended.rs problems` (which games the rule will settle) and the root gaps.  A game that the rule settles goes
-into the list of the game it rests on, after it, since the rule reads only its own `--out`
+2176-3440, and its estimate, from the results, the barred bounds, the extended problems (which games the rule will
+settle; `problems_600_3440.jsonl`, made by the example `extended`, removed since) and the root gaps.  A game that the
+rule settles goes into the list of the game it rests on, after it, since the rule reads only its own `--out`
 ([solver/tools/certify/](../../tools/certify/README.md)).  `solver/tools/certify_campaign.py` cuts the campaign's phases
 from that work list into `solver/tools/certify/lists/stage4/` (a pilot of seven dear games with a stop rule, the dear
 games, four balanced lists, and the repeats the rule cannot settle), `solver/tools/certify_pilot.py` rates the pilot,

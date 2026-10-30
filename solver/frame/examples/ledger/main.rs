@@ -21,12 +21,12 @@
 //! * **The bounds and where they come from** (`book.rs`; the rules are the names the files use).  The *map*
 //!   (`start`, `root`): each board searched is first set up as `taxman solve N` sets it up standalone (no game of
 //!   n − 1), and its search stopped before its first node: L is the game it starts from (the greedy set or the
-//!   matching dive, improved by the local search) and U the dual bound of that search, the root's GF(2) bound, as
-//!   `wall landscape` has them.  *Searches* (`search`, `dual`, `exhausted`): L is a search's best game; U is the dual
-//!   bound of a search a limit stopped (`taxman::search::dual_bound`: the largest of its incumbent and the bounds of
+//!   matching dive, improved by the local search) and U the dual bound of that search, the root's GF(2) bound.
+//!   *Searches* (`search`, `dual`, `exhausted`): L is a search's best game; U is the dual bound of a search a limit
+//!   stopped (`taxman::search::dual_bound`: the largest of its incumbent and the bounds of
 //!   its open units), or the game of a search that completed.  *Floor steps* (`floor`): U is the floor of a search
 //!   under that floor that completed having found nothing (below).  `nogoods`: U only, the Lagrangian bound over
-//!   checked nogoods that the removed `wall nogoods` made; the store accepts it, and nothing produces it now.
+//!   checked nogoods that the removed example `wall` made; the store accepts it, and nothing produces it now.
 //!   *Relations* (`monotone`, `ceiling`, `prime`,
 //!   `repeat`): the bounds of one board give bounds of its neighbors, of the board past or before a prime, and of
 //!   the boards with the same search problem, applied to a fixpoint after every change (docs/theory/search-rules.md,
@@ -164,7 +164,6 @@
 #[allow(dead_code, unused_imports)] // the ledger reads only the process's CPU time
 #[path = "../common/counters.rs"]
 mod counters;
-#[allow(dead_code)] // the ledger reads only `survivors`
 #[path = "../common/known.rs"]
 mod known;
 /// The helpers of the tests (temporary directories), shared with the other tests.

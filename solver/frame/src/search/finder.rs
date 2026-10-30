@@ -5,8 +5,7 @@
 //! [`Lns`] keeps a random share of an incumbent's promotions fixed, searches the rest exactly as a unit of the engine
 //! ([`run_unit`]), takes any better game, and repeats.  It is not sound: it may miss an optimal game, and nothing it
 //! finds proves anything.  A lower bound needs only a legal game, so a caller offers what it finds as an incumbent,
-//! after the checks of [`offer_found`] (the ledger does, and `wall choice-prepare` harvests nogoods with it).  The
-//! measurements that chose its defaults are in
+//! after the checks of [`offer_found`] (the ledger does).  The measurements that chose its defaults are in
 //! solver/notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md.
 //!
 //! # Beside a long search
@@ -36,7 +35,7 @@
 use super::incumbent::{distinct, surviving};
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::bits::Bits;
-use crate::engine::{self, Control, EngineConfig, Searcher, Start};
+use crate::engine::{self, Control, EngineConfig, Start};
 use crate::matchbound::MatchGraph;
 use crate::rng::Rng;
 use std::fmt;
@@ -64,21 +63,9 @@ pub fn run_unit<const W: usize>(
     start: &Bits<W>,
     node_limit: Option<u64>,
 ) -> Ran<W> {
-    run_unit_with(control, unit, start, node_limit, |_| TaxSearcher::new(space))
-}
-
-/// [`run_unit`] with the searcher `make` makes (for a caller that wants what the searcher learned, as `wall
-/// choice-prepare` does).
-pub fn run_unit_with<const W: usize, S: Searcher<TaxUnit<W>>>(
-    control: &Arc<Control>,
-    unit: TaxUnit<W>,
-    start: &Bits<W>,
-    node_limit: Option<u64>,
-    make: impl Fn(usize) -> S + Sync,
-) -> Ran<W> {
     let cfg = EngineConfig { threads: 1, node_limit, control: Some(Arc::clone(control)), ..EngineConfig::default() };
     let begin = Start::Fresh { units: vec![unit], best: start.sum(), payload: payload_of(start) };
-    let out = engine::run(&cfg, begin, b"finders", make).expect("the engine");
+    let out = engine::run(&cfg, begin, b"finders", |_| TaxSearcher::new(space)).expect("the engine");
     Ran { set: set_of_payload(&out.payload), nodes: out.stats.nodes, completed: out.completed }
 }
 
@@ -281,8 +268,7 @@ pub(super) fn beside<const W: usize>(
 
 /// The rounds of LNS that [`beside`] runs from the moment the search has taken `at_nodes` steps (see the module
 /// documentation).  They end when the budget is spent, `ended` says the search is over, or a set is refused.  Also the
-/// finder alone, for a study (`examples/finder.rs`): a `control` that holds the incumbent, and a channel whose sender
-/// the caller keeps.
+/// finder alone: a `control` that holds the incumbent, and a channel whose sender the caller keeps.
 pub fn rounds<const W: usize>(
     prepared: &Prepared<W>,
     control: &Control,

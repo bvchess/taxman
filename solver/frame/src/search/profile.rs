@@ -809,7 +809,7 @@ impl<'a> Tags<'a> {
 /// Summarizes the open units of each checkpoint that `profile` hands over (the search of `prepared`, whose root's GF(2)
 /// graph is `graph` with the tactic `gf2`), until the search ends: an `open` line with their number by id, and the
 /// spread of the gaps of at most [`OPEN_BOUNDED`] of them, a uniform sample of them if there are more.  A unit's gap is
-/// its bound ([`NodeBound`]) less its need at the checkpoint's incumbent, as in the units file of `examples/tune.rs`.
+/// its bound ([`NodeBound`]) less its need at the checkpoint's incumbent.
 /// With `background` the thread takes the idle scheduling policy, as the workers do.  The end of the search drops the
 /// summary under way.
 pub(super) fn open_work<const W: usize>(

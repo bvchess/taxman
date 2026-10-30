@@ -33,9 +33,8 @@ depends on:
 * **An entry serves a request it covers**, and a request that none covers is a miss: `--bin X` by `--bin X` or `--bins`,
   `--example X` by `--example X` or `--examples`.  The release holds everything (the default of `setup.sh`), so it
   serves any `BUILD`.  An entry is never completed: a request that no entry covers builds what it needs and stores
-  nothing.  The study tools (cargo's feature `studies`: `tune`, `extended`, `structure`, `finder` and `wall`) are a part of their
-  own, so a default build never claims to hold `wall`, and an entry with them also serves a request without them (the
-  smaller entry first, when both exist).
+  nothing.  The Cargo feature `studies` is a part of its own, so a default build never claims to hold it, and an entry
+  with it also serves a request without it (the smaller entry first, when both exist).
 * **Only a tested entry is used.**  The manifest, uploaded last, records the build and the release suite's result
   (`tests=passed`, the counts in lines such as `tests_solver=P passed, 0 failed, I ignored`, its seconds and the
   tests at once); an entry without one does not exist.  The tarball holds the executables only
@@ -62,13 +61,12 @@ the machine at once and costs minutes, not a run of untested binaries.
 `--bin NAME`, `--example NAME`; default `--bins --examples`).  A `BUILD` leaves the prover out, unless `BUILD_PROVER`
 asks for it (the same for `solver/noframe/`; `none` for none; `PROVER_ONLY=1` is the prover alone).  The smoke checks of
 a part that is not built are left out.  `STUDIES=1` adds `--features studies` to the solver's build and to its tests
-(the release suite, `cargo test`), for the study tools, which a build without it skips.  What the jobs need:
+(the release suite, `cargo test`), which a build without it skips.  What the jobs need:
 
 | job | `BUILD` |
 |---|---|
 | the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
 | the ledger ([ledger.md](ledger.md)) | `--bin taxman --example ledger` |
-| the node-choice measurement | `STUDIES=1`, `--bin taxman --example wall --example perf` |
 | the scaling sweep (`scaling.sh`) | `--bin taxman --example ladder` |
 | the prover's proofs ([prover.md](prover.md)) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
@@ -82,9 +80,9 @@ The release is `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` on **one machine, o
 default `BUILD`: everything, so that every smaller request hits it.  It is a launch under the [rules for every
 launch](launch.md#rules-for-every-launch): a `c8g.16xlarge` at spot for about 10 to 20 minutes, **about $0.15 to
 $0.25**, after the account owner's yes.  Any size serves, since the key is the CPU, which every `c8g` shares; the suite
-gains nothing past about 64 vCPUs.  The study tools are the one thing that "everything" leaves out: `STUDIES=1` makes a
-release that also serves the node-choice measurement.  Its entry holds `wall`, its suite runs the study tools' tests
-too, and it serves every smaller request as well.
+gains nothing past about 64 vCPUs.  The feature `studies` is the one thing that "everything" leaves out: `STUDIES=1`
+makes a release with it.  Its suite runs the tests of the feature too, and its entry serves every smaller request as
+well.
 
 ```
 export S3_DEST=s3://taxman-013764204840-us-east-1/release-COMMIT       # where a failure is reported

@@ -346,7 +346,7 @@ The rules of an upper bound:
   set weighs more than F ([the floor lemma (R5)](../docs/theory/search-rules.md#the-floor-lemma)), so the bound is
   `in_the_bag` and F;
 * `nogoods`, the Lagrangian bound over nogoods that were each checked to fail to promote, with the GF(2) bound inside,
-  as the removed `wall nogoods` made it; nothing makes it any more;
+  as the removed example `wall` made it; nothing makes it any more;
 * `given`;
 * and the relations: `ceiling`, U(n) ≤ U(n − 1) + n; `monotone`, U(n − 1) ≤ U(n); `prime`, U(p) = U(p − 1) + p − q
   with q the largest prime below p, both ways; and `repeat`, U(n) − bag(n) ≤ U(m) − bag(m).

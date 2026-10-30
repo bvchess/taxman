@@ -15,39 +15,12 @@ name = "taxman"
 path = "src/main.rs"
 
 [features]
-# The study tools: the examples `tune`, `extended`, `structure`, `finder` and `wall`, which the occasional studies use.
-# A default build, `cargo test`, `cargo clippy --all-targets` and the cloud setup skip them; `--features studies` builds
-# them (and `cargo test --features studies` runs their tests).  The examples `ledger`, `perf` and `ladder` are in every
-# build.
+# The hook of the searcher for studies (`search/hooks.rs`) and the sites of it.  No example uses it now, and a default
+# build, `cargo test` and `cargo clippy --all-targets` skip it; `--features studies` builds the sites.
 studies = []
 
-# The tuning benchmark's solver has tests of its own (units are solved the same every time; a root unit is the
-# whole search), and so have the wall study (the landscape's ends are what `solve` starts from and finds and its output
-# file resumes, the root bound is the first node's, the node-choice measurement's bounds are valid and it resumes),
-# which `cargo test --features studies` runs, and the ledger (its relations bracket the optimum, its runs prove at the
-# optimum), which `cargo test` runs; no other example has any.
-[[example]]
-name = "tune"
-test = true
-required-features = ["studies"]
-
-[[example]]
-name = "wall"
-test = true
-required-features = ["studies"]
-
-[[example]]
-name = "extended"
-required-features = ["studies"]
-
-[[example]]
-name = "structure"
-required-features = ["studies"]
-
-[[example]]
-name = "finder"
-required-features = ["studies"]
-
+# The ledger has tests of its own (its relations bracket the optimum, its runs prove at the optimum), which `cargo test`
+# runs; no other example has any.
 [[example]]
 name = "ledger"
 test = true

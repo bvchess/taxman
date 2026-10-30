@@ -42,7 +42,7 @@ with the hook and without it finds the same tree.  For this study the hook is to
 (`StepHook::excluding`), and may narrow a node's candidates by a rule of its own (`StepHook::narrow`), which the
 searcher applies as it applies the rule of symmetric pairs: the candidates dropped leave the node's bounds, and a node
 with no completion left is cut.  The study is the command `wall exchanges`
-([examples/wall/exchanges.rs](../../../frame/examples/wall/exchanges.rs)).
+([examples/wall/exchanges.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/exchanges.rs)).
 
 ### 1. When an exchange is a symmetry of a node
 
@@ -244,7 +244,7 @@ stays for studies; the production search is unchanged.
 ## Files
 
 * `runs.jsonl`: the lines of `wall exchanges` for the three units, in check mode, with `--prune`, and with `--sample
-  16`.  The fields are in the module comment of [examples/wall/exchanges.rs](../../../frame/examples/wall/exchanges.rs).
+  16`.  The fields are in the module comment of [examples/wall/exchanges.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/exchanges.rs).
   From `solver/frame`, after `cargo build --profile test --example wall --features studies`: `nice -n 10
   target/debug/examples/wall exchanges --suite
   ../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl --known ../../results/strict.jsonl

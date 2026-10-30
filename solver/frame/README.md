@@ -145,8 +145,6 @@ the engine uses `File::try_lock`), and it uses no third-party libraries.  The in
 cd solver/frame
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
 cargo build --release --examples   # also the ladder (scaling and progress harness), the probe and the ledger
-cargo build --release --examples --features studies   # and the study tools: the tuning benchmark, the census of
-                                   # the frames, the extended problem's chain and the wall regime's measurements
 ./target/release/taxman help
 ```
 
@@ -160,10 +158,9 @@ rebuild, which cargo does by itself.  A run decodes the table, through [the gzip
 far as the last game it asks for, and a run that asks for none decodes nothing, so the size of the table costs a run
 nothing.
 
-*Details.*  The study tools, the examples `tune`, `extended`, `structure`, `finder` and `wall`, are behind the feature `studies`,
-which is off by default.  So a build, `cargo test` and `cargo clippy --all-targets` do not compile them, and a command
-that names one (`cargo build --release --example wall`) needs `--features studies` too.  The build is long for a program
-of this size because the search is compiled once for every set width
+*Details.*  The feature `studies`, which adds the searcher's hook and its sites, is off by default.  So a build,
+`cargo test` and `cargo clippy --all-targets` do not compile them.  The build is long for a program of this size
+because the search is compiled once for every set width
 ([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width dispatch").  `taxman
 bench` finds its two
 files in the repository: above the working directory and, if they are not there, above the binary.
@@ -251,9 +248,9 @@ cargo test                           # the same tests, a binary at a time
 cargo test --release                 # the full suite
 ```
 
-`cargo test` runs as many tests at once as the machine has CPUs.  None of these builds the study tools;
-`--features studies` adds them and their tests.  [solver/docs/design/tests.md](../docs/design/tests.md) says what the
-suite checks, and [testing.md](../docs/design/testing.md) what each test takes and when each runs.  `tests/tripwires.rs`
+`cargo test` runs as many tests at once as the machine has CPUs.  None of these builds the hook of the searcher;
+`--features studies` adds it and its tests.  [solver/docs/design/tests.md](../docs/design/tests.md) says what the suite
+checks, and [testing.md](../docs/design/testing.md) what each test takes and when each runs.  `tests/tripwires.rs`
 asserts exact node counts, so a change that alters the search tree on purpose fails it; the module comment of
 `tests/tripwires.rs` says how to update the counts.
 

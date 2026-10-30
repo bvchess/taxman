@@ -446,9 +446,9 @@ fn sightings<const W: usize>(n: u32) -> Vec<Sighting> {
 }
 
 /// Every board from 2 to 2000, for the back claims that a number up to n/2 could hide a use of the factor behind.  No
-/// such number is a candidate (check D of `examples/structure.rs`), and none makes U\* ∪ {c} playable (X7,
-/// docs/theory/exactness.md); where the model alone would accept it, only the candidate filter keeps it out.  Prints
-/// what it finds; the first of them is [`NEAR_MISS`].
+/// such number is a candidate (check D of `examples/structure.rs` at commit 3ca11bf), and none makes U\* ∪ {c}
+/// playable (X7, docs/theory/exactness.md); where the model alone would accept it, only the candidate filter keeps it
+/// out.  Prints what it finds; the first of them is [`NEAR_MISS`].
 #[test]
 #[ignore = "takes ten seconds; it found the board of the near-miss test"]
 fn the_scan_for_near_misses() {

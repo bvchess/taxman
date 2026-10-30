@@ -48,5 +48,6 @@ The commands `chain`, `sound`, `finders`, `nogoods`, `target` and `relaxed` of t
 2026-10-18, with the code only they used (`choice-prepare` and `choice` stay); their entries end the same way, and name
 the commit 9d9dae3.  The large neighborhood search (`examples/common/lns.rs`) and the seeded generator
 (`examples/common/rng.rs`) moved into the library on 2026-10-21 as `src/search/finder.rs` and `src/rng.rs`; the
-entries before that date name the old paths.  The study tools that stay (`tune`, `extended`, `structure`, `finder` and
-`wall`) are built with `--features studies`, not by default.
+entries before that date name the old paths.  The study tools (`tune`, `extended`, `structure`, `finder` and
+`wall`) and the fixtures `solver/frame/testdata/fits/` were removed on 2026-10-29; they build at commit 3ca11bf, and the
+entries that used them keep the paths and commands of their time.

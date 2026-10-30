@@ -51,10 +51,9 @@
 //! claimed, and no claimed factor is one (a back claim's by the check, a front claim's because its source has nothing
 //! else left).  E4: the claims kept are front and back moves of every instance of Π⁺(O), so the extended exactness
 //! theorem (E1) holds with them taken out, and with O = ∅ every claim is kept and Π⁺(∅) is Π_n
-//! (`examples/structure.rs` checks the problems equal on every board; the formulation corollary, E5).  Without the
-//! check a back claim could hide a use of f by a promoted number, as at n = 98 in Π_n (the example in the claims
-//! lemma (X5, docs/theory/exactness.md)): a component of f's layer that holds an open source has more freedoms
-//! and can take on composites of f that were no candidates in Π_n.
+//! (the formulation corollary, E5).  Without the check a back claim could hide a use of f by a promoted number, as at
+//! n = 98 in Π_n (the example in the claims lemma (X5, docs/theory/exactness.md)): a component of f's layer that holds
+//! an open source has more freedoms and can take on composites of f that were no candidates in Π_n.
 
 use super::{columns_of, layer_of, BoardFrames, ClaimKind};
 use crate::bits::Bits;
@@ -97,7 +96,7 @@ pub struct ExtendedFrames<const W: usize> {
 
 /// The check of the kept-claims lemma (E4, docs/theory/extended-problem.md) on a factor claimed by a back claim: the
 /// factor is not a two-sided candidate, and no two-sided candidate has it among its maximal factors.  The one place it
-/// is written, which [`build_extended`] applies and the census of the frames (`examples/structure.rs`) counts.
+/// is written, which [`build_extended`] applies.
 #[derive(Clone, Debug)]
 pub struct ClaimCheck<const W: usize> {
     candidates: Bits<W>,
@@ -192,9 +191,9 @@ impl Shape {
 }
 
 /// How many frames the extended problem Π⁺(O) of the board `1..=t.n` with the open sources `open` has, whether or not
-/// a frame set holds them ([`build_extended`] refuses more than [`MAX_FRAMES`]), and the layers they span: for the
-/// census of the frames (`examples/structure.rs`), which counts them with every source of three or more prime factors
-/// open, the most any `open` gives (an open source only adds to its component's freedoms⁺).
+/// a frame set holds them ([`build_extended`] refuses more than [`MAX_FRAMES`]), and the layers they span.  With every
+/// source of three or more prime factors open it gives the most any `open` gives (an open source only adds to its
+/// component's freedoms⁺).
 ///
 /// # Errors
 ///

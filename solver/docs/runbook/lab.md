@@ -5,7 +5,7 @@ Part of the [runbook](../RUNBOOK.md).
 The lab studies the most expensive subtrees of a running search on the spare threads of its machine, to find rules that
 make the search faster.  A search keeps its unexplored work as *units*, each the root of a subtree that can be solved
 by itself; the [gap](../../../docs/GLOSSARY.md#bounds) of a unit's node predicts its size.  The example
-[`tune`](../../frame/examples/tune.rs) solves units one thread to a unit, so two settings compare in steps with no
+[`tune`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/tune.rs) solves units one thread to a unit, so two settings compare in steps with no
 noise.  A rule that shrinks the largest units is a candidate for the search; whole games decide it.  A person drives
 the lab with the commands below, or the chain starts a *study*, an agent session in a sandbox that does the same work
 and reports ([Studies](#studies)).
@@ -56,7 +56,7 @@ git, a rustup toolchain and jq.
 * `reports [N]`, `proof`, `studies [on|off]`, `ask STUDY "QUESTION"` and `request ["TEXT"]` are for the studies.
 
 Arguments after `units` or `run` go to `tune` as they are: `--known FILE`, `--tactic NAME=VALUE`, `--gate GAP`,
-`--node-limit L` and `--cpu-limit SECONDS` ([the top of `tune.rs`](../../frame/examples/tune.rs) lists them).  The gate
+`--node-limit L` and `--cpu-limit SECONDS` ([the top of `tune.rs`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/tune.rs) lists them).  The gate
 is the gap from which conflict branching chooses ([the lab channel](../design/lab.md#the-command-folder) sets it for a
 search in flight), so a unit can be solved under another gate than the default.  A leading `~/` in one is the
 machine's home.

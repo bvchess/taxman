@@ -39,7 +39,7 @@ pub struct Frame<const W: usize> {
     claimed: Bits<W>,
     /// The pairs `unzip` settled in this frame, as (source, factor, kind), in the order made, across all its calls on
     /// the frame.  The sources are exactly `mandatory` and the factors exactly `claimed`, each once.  Nothing in the
-    /// solver reads them; they are for the census of the frames' structure (`examples/structure.rs`).
+    /// search reads them; they are for the extended problem and the tests of the frames.
     claims: Vec<(u32, u32, ClaimKind)>,
     /// Sources that cannot be played together with the others.
     impossible: Bits<W>,
@@ -113,8 +113,8 @@ impl<const W: usize> Frame<W> {
     }
 
     /// The pairs `unzip` settled in the frame, as (source, factor, kind), in the order made.  The sources are exactly
-    /// the `mandatory` ones and the factors exactly the `claimed` ones, each once.  For the census of the frames'
-    /// structure (`examples/structure.rs`); nothing in the solver reads them.
+    /// the `mandatory` ones and the factors exactly the `claimed` ones, each once.  For the extended problem and the
+    /// tests of the frames; nothing in the search reads them.
     pub fn claims(&self) -> &[(u32, u32, ClaimKind)] {
         &self.claims
     }
@@ -569,7 +569,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// claim.  The sources are visited in descending order and the pass restarts after the first claim, since
     /// a claim can make a larger source eligible.  These are the orders of the claims of frame h in
     /// docs/theory/frame-model.md, so that the frames setup builds are the root problem Π_n of the theory
-    /// (`tests/canonical_root.rs`, and check I of the census `examples/structure.rs`).
+    /// (`tests/canonical_root.rs`, and check I of the census `examples/structure.rs` at commit 3ca11bf).
     ///
     /// The questions about a factor's use (`factor_can_go_forward` and `has_outside_move_using`) are about
     /// other frames and about this frame's sources and factors as they were when `unzip` began, none of which a

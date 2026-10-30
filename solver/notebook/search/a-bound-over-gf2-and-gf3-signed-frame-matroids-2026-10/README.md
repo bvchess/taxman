@@ -207,7 +207,7 @@ above the 600 s run's by 0.038 of the gap on average (median 0.025), within 5% a
 the gap where the gap is under 800 and up to 0.15 at the frontier's gaps.  The runs of the 54 roots with the new code
 reproduce E1's lines exactly where both converged within 60 s (48 of 48 roots).
 
-**Fits and cost.**  The 17 fits are in [solver/frame/testdata/fits](../../../frame/testdata/fits/README.md) (14 MB),
+**Fits and cost.**  The 17 fits are in [solver/frame/testdata/fits](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/testdata/fits/README.md) (14 MB),
 where a test reads each back and checks its bound at its root.  The main arm took 81 minutes of one thread for the 17
 roots, 27 to 600 s a root; the 12 roots of the limit of 16, 96 minutes.  Over the 17 roots the intersections are 1% of
 the time, the master's simplex 24% and the exact checks and the separation 75%.  The cores come from more frames than
@@ -289,7 +289,7 @@ cores, column-sum signings and their merging; `dw.rs` the bound and its multipli
   the same with `--arms f1cores16` at 2200-3200/200, 3300, 3333, 3335, 3336, 3176 and 3400, the code of 32cccb3, run in
   pieces of a few roots, each resuming where the last ended; E2, the main arm certified (600 s a root) at 17
   roots past 2175, the limit of 16 core-derived signings a frame at 12 of them, and the fit of each main-arm run.  The
-  fits are in [solver/frame/testdata/fits](../../../frame/testdata/fits/README.md), where the tests read them.
+  fits are in [solver/frame/testdata/fits](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/testdata/fits/README.md), where the tests read them.
 * `search_e1roots.jsonl`: `fields roots K --arms f1cores --seconds 60 --fit-mode search --out search_e1roots.jsonl 900
   925 936 ... 2175` (the 54 games of `roots.jsonl` whose `f1cores` line has `converged` true), the code of 32cccb3; E2,
   search mode against E1's certified bounds.

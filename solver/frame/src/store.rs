@@ -48,7 +48,7 @@ pub enum Rule {
     /// docs/theory/search-rules.md), so U is in_the_bag + F.
     Floor,
     /// The Lagrangian bound over the nogoods of searches, each checked to fail to promote, with the GF(2) bound inside
-    /// (U): the removed `wall nogoods` made it; the store takes it on record.
+    /// (U): the removed example `wall` made it; the store takes it on record.
     Nogoods,
     /// The game the finder found (L): large neighborhood search, which is not sound and proves nothing; its game is a
     /// lower bound because the referee replays it.

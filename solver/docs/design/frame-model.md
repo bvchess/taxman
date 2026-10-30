@@ -85,13 +85,13 @@ model](../../../docs/theory/frame-model.md#the-frame-model)), and setup makes it
 merging, counting every frame's freedoms as they are.  The two meet at the root: setup's U\*, candidates and root frames
 are those of Π_n.  The front claims that setup's outside test blocks are dropped by its final reduction, which leaves
 the root frames as Π_n's.  `src/root_problem.rs` builds Π_n from the theory's definitions, apart from the frames code,
-and `tests/canonical_root.rs` compares setup with it on every board to 1000, check I of the census on every board to
-8191.
+and `tests/canonical_root.rs` compares setup with it on every board to 1000, check I of the census (below) on every
+board to 8191.
 
 **The Java's numbering.**  The Java numbered the frames breadth first from the front: 0 for those with no frame with
 freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
 numbering by layer when it is clean and its frames numbered 0 lie in one layer.  The census of every board to 8191, the
-largest the solver supports (`examples/structure.rs`; the data in
+largest the solver supports (the census below; the data in
 `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`), found the two the same on every one, with
 frame h in layer 3 + h on 8,100 boards and in layer 2 + h on the 80 where the frames of layer 2 have freedoms.  The
 tests of `src/frames/` compare the two numberings on every board to 400 and on a sample to 8191.  On boards with holes
@@ -99,14 +99,16 @@ they can differ: without 39, the board of 56 gets a frame and a frame with freed
 alike by the breadth-first rule, and without 4 the board of 32 has a layer with only closed frames between two with
 freedoms.
 
-**The census** (`examples/structure.rs`) checks the theory's facts against what setup builds, on every board to 8191:
-check A [the frame lemma (F1)](../../../docs/theory/frame-model.md#the-frame-lemma), C [clean numbering
+**The census** was a program, the example `structure`, run once and removed since ([`examples/structure.rs` at commit
+3ca11bf](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/structure.rs)).  It checked the theory's
+facts against what setup builds, on every board to 8191: check A [the frame
+lemma (F1)](../../../docs/theory/frame-model.md#the-frame-lemma), C [clean numbering
 (F6)](../../../docs/theory/frame-model.md#clean-numbering), D that no candidate lists a back claim's factor (X5), E that
 no candidate is a factor of frame 0, F that every candidate has a home of at least 1 (the reduction-step lemma (X6)), G
 that the game with no promotions plays the U\* of `src/root_problem.rs` (X1), H that the extended problem with nothing
 open and the claims poses the frame model's problem ([the formulation corollary,
 E5](../../../docs/theory/extended-problem.md#the-kept-claims-lemma)), and I that setup builds Π_n.  The theory proves
-all of these, so the census checks the code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an
+all of these, so the census checked the code.  `tests/model_exact.rs` finds the boards where test (b) alone keeps an
 unplayable set out of the promotion sets: 27 boards to 2000, all in 98–120 and 182–186, the first the theory's example
 at 98.
 
@@ -173,9 +175,9 @@ one-sided candidates ([extended-mode.md](extended-mode.md); `Board::prepare_exte
 
 Details of the extended problem: it keeps the claims of `unzip` that [the kept-claims lemma
 (E4)](../../../docs/theory/extended-problem.md#the-kept-claims-lemma) allows.  With nothing open that is all of them, so
-Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (`examples/extended.rs
---no-claims`).  A hunt for a counterexample on the boards without each open member, the example `hunt`, was prepared and
-never run.  It is removed from master, and [its
+Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (the example `extended
+--no-claims`, removed since).  A hunt for a counterexample on the boards without each open member, the example `hunt`,
+was prepared and never run.  It is removed from master, and [its
 entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) says where it builds
 ("the program removed from master").
 

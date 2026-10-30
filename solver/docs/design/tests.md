@@ -45,9 +45,10 @@ every second line of the Java fixtures), and the comment on each says what the w
   * `tests/canonical_root.rs` checks that setup builds Π_n: its U\*, its candidates and its root frames are those of
     `src/root_problem.rs`, which builds Π_n from the definitions with no code of `frames` or `model`, on every game to
     200 (to 1000 ignored).
-  * The census of every game (`examples/structure.rs`; its data are in
-    `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`) checks what X7's proof says of setup
-    one game at a time, that Π⁺(∅) with the claims of `unzip` is Π_n (check H), and that setup builds Π_n (check I).
+  * The census of every game to 8191 was run once, by the example `structure` (removed since; it builds at commit
+    3ca11bf, and its data are in `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`).  It checked
+    what X7's proof says of setup one game at a time, that Π⁺(∅) with the claims of `unzip` is Π_n (check H), and that
+    setup builds Π_n (check I).
 * **Regression**: `taxman regress --to N` solves 1..N as one range and checks every score against the built-in table.
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
   checkpoint is refused when any of the search tactics differs.
@@ -232,8 +233,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   the lines and `run.lab` record them, the gate among them), one redeploys a run and starts it again, one stops a search
   of game 1000 again and again and resumes it under a policy that flips both switches and changes the gate each time,
   and one solves game 780 with and without a policy whose gate is 0, which changes the tree and not the answer.  The
-  gate also has a test of the small games (`tests/soundness.rs`: three gates, one answer, other trees) and one of a
-  unit solved by `tune --gate` (`examples/tune.rs`).
+  gate also has a test of the small games (`tests/soundness.rs`: three gates, one answer, other trees).
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the wall, the ledger and a lab's redeploy through `chain.sh`, `wall-node.sh` through each way a run
   ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What
@@ -329,7 +329,7 @@ the computations behind the statements that are not proved are in [evidence.md](
 | Q1 | A search over the states of the pot that uses no theory (`heuristics/evaluation/certify.py`) finds the heaviest set of sources unique in every game to 62. |
 | Q3 | The prover's `src/moves.rs`: ℓ(n) and the heaviest longest game against brute force to 22, and ν(n) against the matching solver on every board to 400. |
 | W1 | The heuristics' check above, to 22.  The prover's parity bound is at least opt(n) on every game to 1300 (`solver/noframe/data/exact_parity_2_1300.jsonl`), and the recorded game is independent at both parities on every game to 1300 that is not prime; the intersection agrees with brute force on 3,000 random pairs of matroids ([matroid intersection bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)). |
-| F1, F3, F6 | The census of every board 2..8191 (`examples/structure.rs`): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
+| F1, F3, F6 | The census of every board 2..8191 (above): its check A, that each frame lies in one layer and the frames in front of it one layer down, and its check C, clean numbering; the unit tests of `frames` (above). |
 | F4 | `tests/bottom_layers.rs` (above). |
 | X1 to X7 | `tests/model_exact.rs` (above), and the census's checks D to G: no candidate has a back claim's factor among its maximal factors (X5), none is a factor of a frame numbered 0 and every one has a home (X3, X6), and the sources played are the U\* of `src/root_problem.rs` (X1); check I and `tests/canonical_root.rs` (above), that setup builds Π_n. |
 | E1 to E6 | `tests/model_extended.rs`, extended mode and the certificates (above), and the census's check H: Π⁺(∅) with the claims is Π_n (E5). |

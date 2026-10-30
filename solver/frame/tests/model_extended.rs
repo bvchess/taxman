@@ -440,7 +440,7 @@ fn theorem_m_plus_with_every_source_open_61_to_69_with_claims() {
 /// at least one board.
 /// The boards 343 to 349 are too large for every set (a board has 62 million at 70, and the number goes on growing),
 /// and are left to the unit test of `build_extended` (`a_back_claim_that_fails_the_check_is_refused`) and the census
-/// of the frames (`examples/structure.rs`).
+/// of the frames (`examples/structure.rs` at commit 3ca11bf).
 #[test]
 fn skipping_the_check_of_lemma_m5_plus_is_caught() {
     let (start, mut refusing, mut caught) = (Instant::now(), 0, 0);

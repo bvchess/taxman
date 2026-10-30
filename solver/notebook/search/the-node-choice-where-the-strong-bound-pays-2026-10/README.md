@@ -20,7 +20,7 @@ makes the gap a forecast of the subtree.
 ## Method
 
 **The instrument** is two commands of the `wall` example, defined in
-[`examples/wall/choice.rs`](../../../frame/examples/wall/choice.rs), whose module comment defines every field of every
+[`examples/wall/choice.rs`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/choice.rs), whose module comment defines every field of every
 line: `choice-prepare` makes a game's file (the nogood pool harvested
 at the root as [the nogoods entry](../nogoods-from-the-finders-work-2026-10/README.md) did, the multipliers fitted
 there, and the nodes), and `choice` measures every node of such files.  For each node it records:
@@ -69,7 +69,7 @@ The question: does [the A1 bound](../a-bound-over-gf2-and-gf3-signed-frame-matro
 frame matroids and signed GF(3) ones, coupled by multipliers fitted by column generation), fitted fully at a node, cut
 the nodes that head big subtrees?  Its [E3 pilot](../the-a1-bound-in-a-branch-and-bound-the-e3-pilot-2026-10/README.md)
 cut trees fivefold in a branch and bound; this asks it at the nodes that matter, as the nogood bound was asked.  The
-code is [`examples/wall/fields.rs`](../../../frame/examples/wall/fields.rs) (the study's, from commit 8753189,
+code is [`examples/wall/fields.rs`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/fields.rs) (the study's, from commit 8753189,
 adapted), and at each node `choice --a1` measures two bounds beside the nogood bound:
 
 * **r2**, the study's warm refit: the multipliers of the game's root fit (one evaluation of the bound), then at most

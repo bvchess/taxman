@@ -17,7 +17,7 @@ Common options (setup.sh passes them):
                   $BUILD_CACHE, else s3://taxman-013764204840-us-east-1/builds
   --solver ARGS   what was (or is to be) built in solver/frame/: cargo arguments, "--bins --examples" or
                   "--bin taxman";
-                  `--features studies` builds the study examples too, and is a part of the set (see below)
+                  `--features studies` builds the feature of that name too, and is a part of the set (see below)
   --prover ARGS   what was built in solver/noframe/ (default none): the same
   --tmp DIR       where files are staged and downloaded (default: the system's temporary directory)
 
@@ -36,8 +36,8 @@ An entry is never changed by a later run except by a release run of the same set
 covered by an entry that holds each of its parts: `--bin X` by `--bin X` or `--bins`, `--example X` by `--example X` or
 `--examples`, `--features F` by `--features F`.  The entry of a larger set serves a smaller request; there is no
 half-built entry to complete.  A feature is a part like the others: the entry of `--bins --examples --features studies`
-(which holds the study examples that `--examples` alone does not build) serves a request for `--bins --examples`, and
-an entry without the feature never serves a request with it, so a default build is not taken for one with the studies.
+serves a request for `--bins --examples`, and an entry without the feature never serves a request with it, so a
+default build is not taken for one with the feature.
 
 Exit status: 0 done; 1 a miss, or a transfer that failed; 2 a wrong request; 3 the cache is not used (the reason is
 printed): a dirty checkout, no commit, other RUSTFLAGS, the cache off or out of reach.

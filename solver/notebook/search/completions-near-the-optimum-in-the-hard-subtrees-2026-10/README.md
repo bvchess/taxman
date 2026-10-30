@@ -31,7 +31,7 @@ completions within 91 of the optimum, a few thousand leaves against the tree's 1
 ### What was run
 
 **The count is the solver's own search, made to count** (`wall near`,
-[examples/wall/near.rs](../../../frame/examples/wall/near.rs); `StepHook::counting`, in
+[examples/wall/near.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/near.rs); `StepHook::counting`, in
 [src/search/hooks.rs](../../../frame/src/search/hooks.rs), in the studies build only).  A counting search makes every
 completion that reaches its floor as a child exactly once, and a hook counts the children. It offers nothing, so the
 incumbent stays one below the floor; a node whose heaviest set can be promoted branches on that set's members as on a
@@ -181,7 +181,7 @@ Two ideas with cheap tests would reopen the question.
 ## Files
 
 * `runs.jsonl`: the lines of `wall near` (`run` `count` or `estimate`; fields in the module comment of
-  [examples/wall/near.rs](../../../frame/examples/wall/near.rs)) and the fields n, nodes, completed, seconds,
+  [examples/wall/near.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/near.rs)) and the fields n, nodes, completed, seconds,
   root_bound, opt and gap_opt of `wall nodes --mode opt` (`run` `proof`).  From `solver/frame`, after `cargo build -j 2
   --profile test --example wall --features studies`: `target/debug/examples/wall near --suite
   ../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/suite.jsonl --known ../../results/strict.jsonl

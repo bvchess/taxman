@@ -109,7 +109,7 @@ pub struct SearchTactics {
     /// loaded ([`CarriedNogoods`](crate::model::CarriedNogoods)), only to prune: to rule candidates out of a unit's node
     /// and of children, and to end a node whose forced members complete one, never to choose the conflict a node
     /// branches on (sound: a validated nogood holds at every node, as the searcher's own do).  It acts only where the
-    /// search is given a store ([`SearchSpace::carried`](super::SearchSpace::carried); `tune solve --carried FILE`).
+    /// search is given a store ([`SearchSpace::carried`](super::SearchSpace::carried); `solve --carried-dir DIR`).
     /// Off by default.
     pub carried_nogoods: bool,
     /// With `gf2`: a child whose parent's heaviest set holds the members it promotes but also members it dropped finds

@@ -4,8 +4,7 @@
 //! to its maximal factors), U\* (descending greedy on each frame), the numbering by layer, the candidates (tests (a)
 //! and (b)), the claims of frame h in their canonical order, and the root frames.  [`build`] follows those definitions
 //! with the tables of [`crate::numtheory`] and the peel of [`crate::playable`] alone, and shares nothing with `frames`
-//! or `model`, so that a test (`tests/canonical_root.rs`) and the census of the frames (`examples/structure.rs`, checks
-//! G and I) can check setup against a builder that is not setup.
+//! or `model`, so that a test (`tests/canonical_root.rs`) can check setup against a builder that is not setup.
 //!
 //! It is written to be read beside the theory, not for speed.  It builds the full board `1..=n` only: on a board with
 //! holes the frames are formed differently (docs/theory/exactness.md, "Boards with holes").

@@ -2592,7 +2592,7 @@ const MAX_BLOB: u64 = 1 << 32;
 /// Read and verify a whole checkpoint, passing each unit's bytes (decoded by [`Unit::decode`]) to `unit` in the order
 /// the checkpoint holds them, the shared deque from its front (the shallowest, largest subtrees) to its back and then
 /// the units the workers held, and return everything but the units ([`read_checkpoint`] is this with no use for them).
-/// For a caller that studies a checkpoint's work (`examples/tune.rs`); the engine itself resumes from it this way.
+/// For a caller that reads a checkpoint's work without resuming it; the engine itself resumes from it this way.
 ///
 /// # Errors
 ///

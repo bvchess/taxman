@@ -197,13 +197,15 @@ misses are the *odd* cores of movers with three or more factors.
 [The decomposition bound](../../../docs/theory/frame-bounds.md#the-decomposition-bound) joins the GF(2) bound and the
 independence of the frames under signed GF(3) signings through Lagrange multipliers.  It is no tactic of the search: the
 study of the multi-field bound computed it ([a bound over GF(2) and GF(3) signed frame
-matroids](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and `wall choice`
-evaluates it at nodes with that study's code, `examples/wall/fields/`.  The code evaluates the bound exactly in
-integers, so that its floor bounds every promotion sum whatever produced the multipliers: the weights are `x·2^16` and
-the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3) frame's term is
-the greedy algorithm over its vectors, all in 64-bit integers, and a sum that would leave them saturates, which keeps
-the bound valid.  A floating-point linear program proposes the multipliers by column generation and is no part of the
-proof.  The module comment of `examples/wall/fields/dw.rs` has the details.
+matroids](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and the example
+`wall`, removed since, evaluated it at nodes with that study's code, [`examples/wall/fields/` at commit
+3ca11bf](https://github.com/bvchess/taxman/tree/3ca11bf/solver/frame/examples/wall/fields).  The code evaluated the
+bound exactly in integers, so that its floor bounds every promotion sum whatever produced the multipliers: the weights
+are `x·2^16` and the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3)
+frame's term is the greedy algorithm over its vectors, all in 64-bit integers, and a sum that would leave them
+saturates, which keeps the bound valid.  A floating-point linear program proposed the multipliers by column generation
+and was no part of the proof.  The module comment of
+[`dw.rs`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/fields/dw.rs) has the details.
 
 ## Prime exchanges
 

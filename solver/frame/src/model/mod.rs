@@ -200,7 +200,8 @@ impl FrameGraph {
     /// set holding it is dependent.  So such a set can be promoted one member after another, in any order, exactly when
     /// it can be at once.  A search of this model with the GF(2) bound, which promotes only members of its heaviest
     /// sets, therefore finds the heaviest set that is independent in every frame and leaves the checked frames
-    /// winnable: the bound exact in the checked frames and GF(2) in the relaxed ones (`examples/wall/local.rs`).
+    /// winnable: the bound exact in the checked frames and GF(2) in the relaxed ones (`examples/wall/local.rs` at
+    /// commit 3ca11bf).
     #[cfg(feature = "studies")]
     pub fn relaxing(&self, frames: u16) -> FrameGraph {
         FrameGraph { relaxed: frames, ..self.clone() }

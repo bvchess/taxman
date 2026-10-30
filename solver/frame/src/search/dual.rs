@@ -145,7 +145,7 @@ mod tests {
         (result, bound)
     }
 
-    /// The root's GF(2) bound with no incumbent, as `wall landscape` computes it.
+    /// The root's GF(2) bound with no incumbent, as the ledger's map computes it.
     fn root_bound<const W: usize>(p: &Prepared<W>) -> u64 {
         let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         let mut bound = Gf2Bound::<W>::new(&graph);

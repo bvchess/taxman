@@ -1,7 +1,7 @@
 //! Setup builds the root problem Π_n of the theory (docs/theory/frame-model.md): U\* (the sources of the frames as
 //! setup forms them), the candidates, and the moves and factors of each frame of the model at the root are those of
 //! [`taxman::root_problem::build`], which builds Π_n from the definitions with no code of `frames` or `model`.  The
-//! census `examples/structure.rs` (check I) does the same on every board the solver supports.
+//! census `examples/structure.rs` at commit 3ca11bf (check I) did the same on every board the solver supports.
 
 use taxman::frames::numbering;
 use taxman::model::FrameGraph;

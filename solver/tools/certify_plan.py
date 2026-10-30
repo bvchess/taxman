@@ -18,10 +18,10 @@ take several files read them in order):
               n + score(n-1); none), needs (1 if the game needs a certificate), open (where it needs one: a list of
               [u, omega, margin], so |O| is its length).  A board in two files must have equal lines, but for the
               timing `secs`.  The score of a board must be the results' score.  Every board of the range needs a line.
-  --problems  (optional) one line per game that needs a certificate, made by `examples/extended.rs problems`: n, score,
-              open (|O|, a count), rejected (|R|), frames, two_sided, one_sided, in_the_bag, worth, words, width,
-              digest, same_as (a board m in n-8..n-1 whose extended problem equals n's, or null).  Without it the
-              shares are unknown and |R| is null.
+  --problems  (optional) one line per game that needs a certificate, made by the example `extended problems` (removed;
+              it builds at commit 3ca11bf): n, score, open (|O|, a count), rejected (|R|), frames, two_sided, one_sided,
+              in_the_bag, worth, words, width, digest, same_as (a board m in n-8..n-1 whose extended problem equals
+              n's, or null).  Without it the shares are unknown and |R| is null.
   --gaps      (optional) lines of solver/notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root
               gap of the game's search problem.
 

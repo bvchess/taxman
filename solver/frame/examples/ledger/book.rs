@@ -13,11 +13,11 @@
 //! * `repeat` (the repeat lemma, R6, in docs/theory/search-rules.md): boards with the same search problem have the same
 //!   best promotion sum, so U(n) − bag(n) ≤ U(m) − bag(m); L(n) from the promotions of m's game played on n's board.
 //!
-//! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map, as `wall
-//! landscape` computes it), searches (`search`, `dual`, `exhausted`, the dual-bound lemma (R4) for the dual bound;
+//! The sources (a board's own bounds) are the standalone start and root bound (`start`, `root`: the map), searches
+//! (`search`, `dual`, `exhausted`, the dual-bound lemma (R4) for the dual bound;
 //! `floor`, the floor lemma (R5), a search under a floor that completed having found nothing: U is the floor), the
 //! finder's games (`lns`: L only), proven games given (`given`), boards with nothing to promote (`trivial`), and the
-//! Lagrangian bound over checked nogoods (`nogoods`: U only, which nothing makes now: the removed `wall nogoods` did).
+//! Lagrangian bound over checked nogoods (`nogoods`: U only, which nothing makes now: the removed example `wall` did).
 //! Every bound only improves: L only rises and U only falls, and a board is proven when they meet.  L > U anywhere is a
 //! violation, which [`Book::propagate`] reports as an error: a bug, or, since the U of the frame model rests on
 //! statement U, a counterexample to it.

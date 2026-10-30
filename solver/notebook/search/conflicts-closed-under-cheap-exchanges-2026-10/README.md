@@ -33,7 +33,7 @@ of [the anatomy](../the-anatomy-of-a-hard-subtree-2026-10/README.md).
 
 ## Method
 
-**The instrument** is `wall images` ([examples/wall/images.rs](../../../frame/examples/wall/images.rs), with tests), on
+**The instrument** is `wall images` ([examples/wall/images.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/images.rs), with tests), on
 three hooks of the studies build ([src/search/hooks.rs](../../../frame/src/search/hooks.rs)): `StepHook::excluding` is
 told the conflict the node branches on as well, `StepHook::propose` is asked, whenever a bound check computes and
 learns a conflict, for more sets to learn, and `StepHook::learned` is told what the searcher learned from them.  The
@@ -257,7 +257,7 @@ is tested on them first.
 ## Files
 
 * `runs.jsonl`: the lines of `wall images` of the first trial, whose fields the module comment of
-  [examples/wall/images.rs](../../../frame/examples/wall/images.rs) gives: for each unit the test (`mode` `check`), the
+  [examples/wall/images.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/images.rs) gives: for each unit the test (`mode` `check`), the
   search alone (`bare`), the first images (`learn`) and the closure (`closure`), and the closure again with `--trace`
   for the classes, marked `"run":"classes"` (the same trees, about 7% more CPU).
 * `classes/ID.classes.tsv`: the classes of the closure, as `--trace` writes them, for 3300-14, 3441-1262 and 3441-5459.

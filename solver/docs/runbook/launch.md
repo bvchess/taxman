@@ -174,9 +174,8 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
 * installs packages, and installs Rust with rustup if there is none (stable, at least 1.89);
 * looks first, in a clean checkout at a commit, for that commit's tested binaries in the build cache, and builds nothing
   when it finds them ([build-cache.md](build-cache.md)); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the
-  solver, its examples `ledger`, `perf` and `ladder`, and the prover (`solver/noframe`) (`STUDIES=1` adds the study
-  tools `tune`, `extended`,
-  `structure`, `finder` and `wall`, which a default build skips);
+  solver, its examples `ledger`, `perf` and `ladder`, and the prover (`solver/noframe`) (`STUDIES=1` adds the Cargo
+  feature `studies`, which a default build skips);
 * runs both result verifiers on the committed file, and runs `taxman regress --to 400`;
 * runs `cargo test -- --test-threads=4`, and the prover's `cargo test --release`.
 

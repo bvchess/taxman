@@ -387,11 +387,12 @@ and A2's premise needs a rerun (below).  Most of what follows needs only the run
 one thread; what needs the machine is marked.
 
 * **The true root gap of every searched game** past 2175, from the chain's own scores
-  (`examples/wall.rs nodes --nodes 1` over the results file, as in measurements 7.1): the gap's trend (conjecture C5,
-  the two regimes of [The diagnosis of the wall](#2-the-diagnosis-of-the-wall)) and the residuals of the cost model,
-  with the thread count in the fit.  *Done* for a snapshot of the EC2 chain at game 3314 (509 searched games:
-  measurements 7.4, [the gap past 2175](../notebook/search/the-gap-past-2175-2026-10/README.md)).  It can be repeated on
-  the committed chain with `solver/notebook/search/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep
+  (`nodes --nodes 1` of [the example
+  `wall`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall.rs), removed since, over the results
+  file, as in measurements 7.1): the gap's trend (conjecture C5, the two regimes of [The diagnosis of the
+  wall](#2-the-diagnosis-of-the-wall)) and the residuals of the cost model, with the thread count in the fit.  *Done*
+  for a snapshot of the EC2 chain at game 3314 (509 searched games: measurements 7.4, [the gap past
+  2175](../notebook/search/the-gap-past-2175-2026-10/README.md)).  It can be repeated on the committed chain with `solver/notebook/search/the-gap-past-2175-2026-10/gap.py`, to see whether the waves keep
   their level.
 * **The tree's growth with threads** (on the machine): the same three dear games at 1, 16, 64 and 192 threads, to
   convert 192-thread trees to one-thread equivalents in that fit.  *Measured* for 2170 and 2172 (1 to 192 threads) and

@@ -26,10 +26,9 @@
 #                   unless BUILD_PROVER asks for it; the checks of a part that is not built are left out.
 #   BUILD_PROVER    the same for solver/noframe/ (default "--bins --examples" when BUILD is not set, none when it is; the
 #                   word `none` for none)
-#   STUDIES=1       also build the study tools of solver/frame/ (tune, extended, structure, finder, wall: cargo's
-#                   feature `studies`) and test them; the default build, with the ladder, the probe and the ledger,
-#                   skips them.  A build with the studies is another entry of the cache than one without (and serves
-#                   a request without them).
+#   STUDIES=1       also build and test solver/frame/ with cargo's feature `studies` (the searcher's hook); the
+#                   default build skips it.  A build with the feature is another entry of the cache than one without
+#                   (and serves a request without it).
 #   BUILD_CACHE     where the cache is: s3://taxman-013764204840-us-east-1/builds (default), file:///DIR (for tests) or
 #                   off.  build_cache.py has the key and the layout.  A dirty checkout, no commit, RUSTFLAGS other than
 #                   a single -C target-cpu, or a cache out of reach (no aws, no credentials) is a miss: the build

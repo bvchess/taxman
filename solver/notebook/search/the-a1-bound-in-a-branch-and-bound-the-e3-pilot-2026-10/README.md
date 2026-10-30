@@ -143,7 +143,7 @@ not built.
 
 The data were made with the commands and the build of [the fields study's
 files](../a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md#files-and-the-commands-that-made-them).  The
-root fits of 1215 and 1472 are in [`solver/frame/testdata/fits/`](../../../frame/testdata/fits/README.md).
+root fits of 1215 and 1472 are in [`solver/frame/testdata/fits/`](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/testdata/fits/README.md).
 
 | file | command | what it is |
 |---|---|---|

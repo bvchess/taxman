@@ -25,11 +25,12 @@ The problem comes in the theory's two formulations, which have the same promotio
 E5): without any claim, and, the default, with the claims of the frame model (`SearchFrames::claims`) that the lemma
 keeps.  `build_extended` gives each claim the frame, as setup forms it, of its source, and applies the theory's check
 (`frames::ClaimCheck`).  `ExtendedFrames` records the claims kept and those refused (`refused`).  With nothing open
-every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; the census's check
-H).  `Board::extended(open, claims)` is the one place the board's claims are passed.
+every claim is kept, and Π⁺(∅) is Π_n: the same problem, so the same trees (`tests/tripwires.rs`; check H of
+[the census](frame-model.md), run once).  `Board::extended(open, claims)` is the one place the board's claims are
+passed.
 
 The check matters: the kept-claims lemma shows, at
-24, the promotion set that a refused claim would lose, and the oracle catches that loss.  The census counts, game by
+24, the promotion set that a refused claim would lose, and the oracle catches that loss.  The census counted, game by
 game, the claims that some O refuses (`m5_refused`).
 
 * **The model** (`model`, "One-sided candidates").  `FrameGraph::build_extended` gives each one-sided candidate its own
@@ -60,7 +61,7 @@ game, the claims that some O refuses (`m5_refused`).
   own).
 * **Its frames.**  Π⁺(O) has a frame for each layer from the lowest with freedoms to the highest: nine at most up to
   4095 (layers 3 to 11), whatever O is.  From 4096 it has ten with every source open, which `build_extended` refuses
-  (`MAX_FRAMES`), naming the game and the layers.  The census of the frames records the count with every such source
+  (`MAX_FRAMES`), naming the game and the layers.  The census of the frames recorded the count with every such source
   open for every game to 8191 ([the claims of `unzip` in the extended
   problem](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).  Opening a source also adds
   one to its frame's rank, so a problem with many open sources can need more words of the GF(2) bound than the narrow

@@ -19,7 +19,7 @@
 //!   moves and factors as a [`crate::model::Frame`], and the numbers that could be promoted.
 //! * [`Numbering`] is the board's frames as [`BoardFrames::new`] forms them, before any is merged, each as a
 //!   [`NumberedFrame`] with its number, the frames in front of it and the pairs `unzip` settled in it; it is for the
-//!   census of the structure of the frames (`examples/structure.rs`), and the solver does not use it.
+//!   tests of this module, and the solver does not use it.
 //! * [`ExtendedFrames`] is the frames of the extended problem, in which some of the sources of three or more prime
 //!   factors are optional and only the claims of `unzip` that the kept-claims lemma (E4,
 //!   docs/theory/extended-problem.md) allows are kept ([`build_extended`]); research code, which the solver does not
@@ -73,9 +73,9 @@
 //!   its *claimed* factor leaves the frame's *remaining* sources and factors, which are what the frame shows the
 //!   search.  Every such pair is a move that any game playing the frame's sources must make, as the frame takes
 //!   them with whatever is promoted into it (X5); a pair of the second kind needs that no promotion
-//!   candidate has the factor among its maximal factors, which the candidate filter makes so (`examples/structure.rs`
-//!   checks it on every board).  (Earlier notes call these moves "forced"; this code keeps that word out of the
-//!   frames, since the search has forced members of its own that are unrelated.)
+//!   candidate has the factor among its maximal factors, which the candidate filter makes so (the census
+//!   `examples/structure.rs` at commit 3ca11bf checked it on every board).  (Earlier notes call these moves "forced";
+//!   this code keeps that word out of the frames, since the search has forced members of its own that are unrelated.)
 //! * **remove_impossible** drops, greedily from the largest source down, every source that cannot be played
 //!   together with the sources already kept.  They are the frame's *impossible* moves, which no game of the model
 //!   plays.  What the greedy keeps is U\* (X1), the heaviest playable set of sources wherever the
@@ -113,10 +113,10 @@
 //! docs/theory/frame-model.md.  The Java numbered the frames breadth first from the front instead (number 0 to every
 //! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
 //! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
-//! numberings are the same (the census `examples/structure.rs`,
+//! numberings are the same (the census `examples/structure.rs` at commit 3ca11bf,
 //! `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, and this module's tests), so the frames,
 //! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
-//! for the census of the structure of the frames.
+//! for this module's tests.
 //!
 //! A layer between `ℓ₀` and the highest layer with freedoms that has no frame with freedoms leaves its number without
 //! frames: the search then has an *empty* frame there (no moves, no factors, no freedoms), through which nothing is
@@ -163,7 +163,8 @@
 //! model makes of its frames are Π_n's.  The order of every loop is part of that, since which source is declared
 //! impossible, or which pair is claimed first, can depend on the order.  [`crate::root_problem`] builds Π_n from the
 //! theory's definitions with no code of this module, and setup is compared with it on every board to 1000
-//! (`tests/canonical_root.rs`) and on every board to 8191 (check I of the census `examples/structure.rs`).
+//! (`tests/canonical_root.rs`) and on every board to 8191 (check I of the census `examples/structure.rs` at commit
+//! 3ca11bf).
 //!
 //! The golden tests (`tests/golden_frames.rs`) compare every field of every frame as setup forms it of the 318 boards
 //! in `testdata/golden` (up to n = 760), and the frames before and after numbering and merging of the eleven wide
@@ -218,9 +219,8 @@ pub struct SearchFrames<const W: usize> {
     pub names: Vec<String>,
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
     /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
-    /// none for an empty frame.  For the census of the structure of the frames (`examples/structure.rs`) and the
-    /// extended problem, which keeps those the kept-claims lemma (E4, docs/theory/extended-problem.md) allows
-    /// ([`build_extended`]); the solver's search does not read them.
+    /// none for an empty frame.  For the extended problem, which keeps those the kept-claims lemma (E4,
+    /// docs/theory/extended-problem.md) allows ([`build_extended`]); the solver's search does not read them.
     pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
     /// that a frame in front of it could take on as a source ([`BoardFrames::promotion_candidates_of`]), collected
@@ -274,8 +274,8 @@ pub fn build_frames<const W: usize>(t: &Tables) -> SearchFrames<W> {
 }
 
 /// [`build_frames`], and with it the board's frames as they were before any was merged, with their numbers: what the
-/// census of the structure of the frames (`examples/structure.rs`) looks at.  The frames the search takes are built
-/// by the same function as the solver's, so the census sees exactly what the solver builds.
+/// tests of this module look at.  The frames the search takes are built by the same function as the solver's, so the
+/// tests see exactly what the solver builds.
 pub fn numbering<const W: usize>(t: &Tables) -> (Numbering<W>, SearchFrames<W>) {
     let (frames, listed) = build(t, true);
     (listed.expect("a numbering was asked for"), frames)
@@ -544,9 +544,9 @@ mod tests {
         }
     }
 
-    /// The numbering that the census looks at is the one `build_frames` uses, on every board up to 400: `numbering`
-    /// builds the same search frames; the board's frames, grouped by number, are the groups that `build_frames`
-    /// merges; only the closed frames have no number; and the frames in front are those of `frames_in_front`.
+    /// The numbering is the one `build_frames` uses, on every board up to 400: `numbering` builds the same search
+    /// frames; the board's frames, grouped by number, are the groups that `build_frames` merges; only the closed
+    /// frames have no number; and the frames in front are those of `frames_in_front`.
     #[test]
     fn the_numbering_is_what_build_frames_uses() {
         for n in 2..=400u32 {

@@ -99,7 +99,7 @@ to choose the rows (home 3) and columns (home 2) that make it so.
 
 ## Method
 
-`wall local --out FILE` (new; [local.rs](../../../frame/examples/wall/local.rs), studies build) writes each node it
+`wall local --out FILE` (new; [local.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/local.rs), studies build) writes each node it
 measures whole: its promotions, its frames, its candidates with their homes, the GF(2) bound's heaviest set, and for
 each candidate the GF(2) bound with its membership flipped (without it if in the heaviest set, with it if not; a study
 accessor, `Gf2Bound::live`, gives the loops).  Run with `--checked none`, it takes the same nodes as the bound study

@@ -38,7 +38,7 @@ trace of every step: the biggest, another big one, and a small subtree of the sa
   ([src/search/hooks.rs](../../../frame/src/search/hooks.rs)) is told after every step what the step saw and did, and
   may choose which member of a conflict to branch on, which keeps the search exact.  The trees are unchanged: the three
   units take exactly the suite's steps, and the test of `wall anatomy` runs a whole search with and without the hook.
-* **`wall anatomy`** ([examples/wall/anatomy.rs](../../../frame/examples/wall/anatomy.rs), with a test) solves units as
+* **`wall anatomy`** ([examples/wall/anatomy.rs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/wall/anatomy.rs), with a test) solves units as
   `tune solve` does: one thread, fresh tables, from the known optimum.  `--trace` writes a line a step; `--prefer FILE`
   branches in an order of its own; `--best-cpu S` looks for the unit's best completion by large neighborhood search
   below the node (not sound) and lists the heaviest set's minimal conflicts.

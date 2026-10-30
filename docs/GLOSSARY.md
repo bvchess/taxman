@@ -272,9 +272,9 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
   2175](../solver/notebook/search/the-gap-past-2175-2026-10/README.md)).  The tools also measure three related gaps,
   each named where it is used:
-  * a node's gap (`examples/tune.rs`, `wall choice`): the node's bound less its need, how far the bound must fall to
-    cut the node;
-  * the standalone root gap (`wall landscape`): the root's bound less the search's start incumbent, for a game solved
+  * a node's gap (the profile, `--profile`): the node's bound less its need, how far the bound must fall to cut the
+    node;
+  * the standalone root gap (the ledger's map): the root's bound less the search's start incumbent, for a game solved
     with no game of n − 1;
   * a game's gap in the ledger: its best upper bound less its best lower bound.
 
@@ -291,8 +291,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   inner bound when it matters.  It comes in three forms:
   * the tactic `lagrange`: the matching bound inside, with multipliers that each searcher fits at the root to the
     nogoods it has learned ([design/search.md](../solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods));
-  * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (`wall choice`).  The
-    notebook's entries call this form the "strong bound";
+  * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (a form that a study
+    measured, whose example is removed).  The notebook's entries call it the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
 
   The prover has a Lagrangian bound over its own nogoods, with the Franklín–Moniot matching inside.

@@ -267,12 +267,12 @@ ends (`search::profile`, `Tags`).
 | `open` | after each checkpoint | its units by id, the spread of the gaps of a sample of them (at most `OPEN_BOUNDED` of `src/search/profile.rs`), and the seconds the summary took |
 | `end` | the end of a run | `nodes`, `completed`, `best`, `elapsed`, `made`, `full` |
 
-A node's `bound`, `need` and `gap` are those of the units file of `examples/tune.rs`: the GF(2) bound of what the node's
-completions add (the matching bound on the matching path), the incumbent's sum less the node's plus one, and the
-difference.  The bound is the one the node's own check found when it was made, whose limit on the number of promotions
-counts the candidates before the child's were narrowed, so it can exceed the units file's.  The need is at the
-incumbent of that moment; the reader also gives the gap at the final best.  The open units' gaps are computed after
-each checkpoint by a thread beside the search, at the checkpoint's incumbent, as the units file computes them.
+A node's `bound`, `need` and `gap` are the GF(2) bound of what the node's completions add (the matching bound on the
+matching path), the incumbent's sum less the node's plus one, and the difference.  The bound is the one the node's own
+check found when it was made, whose limit on the number of promotions counts the candidates before the child's were
+narrowed, so it can exceed the bound computed from the node as a checkpoint stores it.  The need is at the incumbent of
+that moment; the reader also gives the gap at the final best.  The open units' gaps are computed after each checkpoint
+by a thread beside the search, at the checkpoint's incumbent.
 
 **Placing a unit by its promotions.**  A unit carries only its node's promotions and candidates (`search::TaxUnit`),
 and the checkpoints keep that format, so a searcher that starts a unit finds the unit's id from its promotions
