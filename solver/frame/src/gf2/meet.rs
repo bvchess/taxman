@@ -79,7 +79,7 @@
 //! other sizes losing more, shows a member forced ([`Meet::has_cycle_within`]).  In the proof of 1215, every bound
 //! without a member that strong branching asked for (10,183) was such a cycle's, as the solves found; where the
 //! certificate does not hold the caller solves (see
-//! `solver/notebook/search/the-inner-loop-of-the-gf2-search-2026-10/README.md`).
+//! https://github.com/bvchess/taxman-notebook/blob/main/search/the-inner-loop-of-the-gf2-search-2026-10/README.md).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;

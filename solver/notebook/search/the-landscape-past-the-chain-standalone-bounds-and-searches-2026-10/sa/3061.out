@@ -1,2 +1,0 @@
-note: no previous game for n=3061 (the game of 3060 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games (optimal.json does not have it either)
-n=3061  score=2950904   search  nodes=1204475       203.972 s  optimal unknown  proof=exhausted

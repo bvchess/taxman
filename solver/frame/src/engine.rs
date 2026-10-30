@@ -61,7 +61,7 @@
 //! **Why one deque.**  A searcher's work is on its own depth-first stack, not in the deque: units exist only
 //! after a yield, and running one costs the searcher a rebuild of its state (for Taxman a promotion pass and a
 //! matching solved from scratch, tens to hundreds of microseconds, against about a microsecond in the critical
-//! section; solver/notebook/the-engine/README.md has the numbers).  The lock is taken about twice per unit, and units
+//! section; solver/docs/design/architecture.md has the numbers).  The lock is taken about twice per unit, and units
 //! are only made when workers are idle (splits) or paused (checkpoints): with every worker busy nobody takes it.
 //! Per-worker deques with stealing would remove contention that is not there in steady state, at the price of an
 //! ordering argument for one-thread determinism, spill and checkpoints over `threads` deques, and a distributed
@@ -95,7 +95,7 @@
 //! a stop signal, an I/O error) is a pause whose final checkpoint is followed by `exit` instead of a release.
 //! A pause costs every worker the time until the last one parks, which is bounded by the longest stretch a
 //! searcher runs without polling (one Taxman step takes microseconds, with a tail of milliseconds:
-//! solver/notebook/the-engine/README.md) plus, for a periodic checkpoint, up to `MIN_POLLS` polls of a unit just begun;
+//! solver/docs/design/architecture.md) plus, for a periodic checkpoint, up to `MIN_POLLS` polls of a unit just begun;
 //! then the write and its fsync; then each unit pushed in it costs a rebuild when it runs.  [`Counters`] records the
 //! longest wait for the workers to park and the longest pause.
 //!

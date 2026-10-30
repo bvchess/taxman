@@ -12,8 +12,9 @@ The other documents:
 * The [README](../frame/README.md) is the user guide: how to build and run the solver.  The [reference](REFERENCE.md)
   has every flag and command, the output, and what a result records.  The [glossary](../../docs/GLOSSARY.md) defines the
   project's words.
-* The [lab notebook](../notebook/README.md) says what each part was worth and what was tried instead.  Its register, a
-  file a subject, holds everything tried, kept or not; each entry is a folder in [solver/notebook/](../notebook/).
+* The [lab notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md) says what each part was worth and
+  what was tried instead.  Its register, a file a subject, holds everything tried, kept or not; each entry is a folder
+  in [taxman-notebook](https://github.com/bvchess/taxman-notebook).
 * In the code, each module starts with a comment that says what it is for, and [`src/lib.rs`](../frame/src/lib.rs) has
   the module map.
 

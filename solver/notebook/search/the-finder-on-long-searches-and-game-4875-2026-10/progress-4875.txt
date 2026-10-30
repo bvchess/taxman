@@ -1,6 +1,0 @@
-n=4875 1m00s nodes 63 (1/s) best 537927 queue 63 spilled 0
-n=4875 2h21m00s nodes 1024314552 (258.2k/s) best 537962 queue 5562 spilled 0
-n=4875 2h51m00s nodes 1478490936 (241.7k/s) best 537971 queue 6743 spilled 0
-n=4875 5h50m01s nodes 4053982171 (232.0k/s) best 538068 queue 5172 spilled 0
-n=4875 6h07m01s nodes 4302771107 (258.8k/s) best 538080 queue 3640 spilled 0
-n=4875 6h26m01s nodes 4589053646 (221.8k/s) best 538080 queue 4028 spilled 0

@@ -1,6 +1,0 @@
-wrote /home/ec2-user/node_choice/fixtures/n3213.nodes (215 runs, 439812 nodes, 3911 distinct units)
-wrote /home/ec2-user/node_choice/fixtures/n3260.nodes (163 runs, 331761 nodes, 3052 distinct units)
-wrote /home/ec2-user/node_choice/fixtures/n3129.nodes (151 runs, 308708 nodes, 2822 distinct units)
-wrote /home/ec2-user/node_choice/fixtures/n2976.nodes (77 runs, 157075 nodes, 1426 distinct units)
-wrote /home/ec2-user/node_choice/fixtures/n3267.nodes (64 runs, 129513 nodes, 1291 distinct units)
-wrote /home/ec2-user/node_choice/fixtures/n2700.nodes (54 runs, 109331 nodes, 854 distinct units)

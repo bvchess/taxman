@@ -114,7 +114,7 @@
 //! frame with freedoms with no frame with freedoms directly in front of it, `k + 1` to every one directly behind a
 //! frame numbered `k` and not yet numbered); on every board up to 8191, the largest the solver supports, the two
 //! numberings are the same (the census `examples/structure.rs` at commit 3ca11bf,
-//! `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`, and this module's tests), so the frames,
+//! `solver/docs/design/extended-mode.md`, and this module's tests), so the frames,
 //! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
 //! for this module's tests.
 //!

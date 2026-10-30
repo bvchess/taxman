@@ -1,6 +1,0 @@
-# 4875-10
-engine thread samples 16806
-certified_excluding            under    7211  42.9%  elsewhere     488   2.9%
-evaluate                       under    6563  39.1%  elsewhere       0   0.0%
-stuck                          under     829   4.9%  elsewhere       0   0.0%
-winnable                       under     100   0.6%  elsewhere     306   1.8%

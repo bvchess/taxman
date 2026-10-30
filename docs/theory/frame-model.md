@@ -404,5 +404,6 @@ alone as edges, and d the number of frames of layer 2 with no square.
 5. A computation covers 187 ≤ n ≤ 2499.  Part 1 closes the frame, F4 gives the optimal sets, and k₀ ≥ 3, since the
    frame of layer 1 has one factor and one move, q(n).  ∎
 
-The script of [its notebook entry](../../solver/notebook/the-closed-frames-of-layer-2-2026-10/README.md) makes both
+The script of [its notebook
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-closed-frames-of-layer-2-2026-10/README.md) makes both
 computations in under a second, and the entry shows why 6/5 is needed; one trusts the script and Dusart's proposition.

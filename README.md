@@ -67,7 +67,7 @@ command.
   README](solver/noframe/README.md).
 * For how the frame solver works and why: [DESIGN.md](solver/docs/DESIGN.md).
 * For the state of the work and what was tried: [STATUS.md](solver/docs/STATUS.md) and the [lab
-  notebook](solver/notebook/README.md).
+  notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md).
 
 ## References and links
 

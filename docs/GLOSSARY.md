@@ -18,7 +18,8 @@ Some words are used inside one part of the code only, and are defined there:
 
 The wiki's words map onto these in [solver/docs/design/frame-model.md, "The Java solver and the
 frame solver"](../solver/docs/design/frame-model.md#the-java-solver-and-the-frame-solver).  The old words of the
-notebook's dated entries map onto these in the notebook's ["Terms changed"](../solver/notebook/terms-changed.md).
+notebook's dated entries map onto these in the notebook's ["Terms
+changed"](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md).
 
 ## The game
 
@@ -267,8 +268,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
 * **the gap**: how far an upper bound lies above the best completion, in promotion units (equal to score units, since
   `in_the_bag` is fixed).  Unqualified, *the gap* is the root's: the root's GF(2) bound minus P\*.  The searched games
   of 2176 to 3312 have root gaps from 341 to 1,443, and a search's cost grows with its root gap ([the gap past
-  2175](../solver/notebook/search/the-gap-past-2175-2026-10/README.md)).  The tools also measure three related gaps,
-  each named where it is used:
+  2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md)).  The tools
+  also measure three related gaps, each named where it is used:
   * a node's gap (the profile, `--profile`): the node's bound less its need, how far the bound must fall to cut the
     node;
   * the standalone root gap (the ledger's map): the root's bound less the search's start incumbent, for a game solved
@@ -290,7 +291,7 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   inner bound when it matters.  It comes in three forms:
   * the tactic `lagrange`, which is gone: the matching bound inside, with multipliers that each searcher fitted at the
     root to the nogoods it had learned ([a Lagrangian bound over the
-    nogoods](../solver/notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
+    nogoods](https://github.com/bvchess/taxman-notebook/blob/main/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (a form that a study
     measured, whose example is removed).  The notebook's entries call it the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).
@@ -304,9 +305,10 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   keeps ([the GF(3) proposition (B5)](theory/frame-bounds.md#the-gf3-proposition)).  The bound is the linear program
   over all of them, computed by Lagrangian decomposition ([the decomposition bound
   (B4)](theory/frame-bounds.md#the-decomposition-bound); [the fields
-  study](../solver/notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).  The agenda's A1
-  measured it and is closed ([solver/docs/AGENDA.md, "Ranked avenues"](../solver/docs/AGENDA.md#3-ranked-avenues)).  The
-  notebook's entries call it the "fields bound" or the "A1 bound".
+  study](https://github.com/bvchess/taxman-notebook/blob/main/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)).
+  The agenda's A1 measured it and is closed ([taxman-notebook/agenda/AGENDA.md, "Ranked
+  avenues"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#3-ranked-avenues)).  The notebook's
+  entries call it the "fields bound" or the "A1 bound".
 * **dual bound**: what a search that a limit stopped proves from above.  It is the largest of the incumbent and, over
   the open units of the final checkpoint, each node's promotions plus its GF(2) bound (`search::dual_bound`;
   [the dual-bound lemma (R4)](theory/search-rules.md#the-dual-bound-lemma)).  A search stopped before its first node has
@@ -403,20 +405,21 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   [solver/docs/design/performance.md](../solver/docs/design/performance.md).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
-* **the notebook**: the lab notebook, [solver/notebook/README.md](../solver/notebook/README.md): its rules, the
-  register of everything tried (a file a subject, in `register/`), and the entries, one folder
-  each.  Older text calls it "EXPERIMENTS".
+* **the notebook**: the lab notebook,
+  [taxman-notebook/README.md](https://github.com/bvchess/taxman-notebook/blob/main/README.md): its rules, the register
+  of everything tried (a file a subject, in `register/`), and the entries, one folder each.  Older text calls it
+  "EXPERIMENTS".
 
 ## Labels
 
 Plans and theorems carry short labels.  A reference document gives the descriptive name first and the label once after
 it.  The index of the theory ([THEORY.md](THEORY.md)) lists its results.
 
-* **A1 to A7**: the research avenues of [solver/docs/AGENDA.md, "Ranked
-  avenues"](../solver/docs/AGENDA.md#3-ranked-avenues), such as A1, the multi-field bound, and A3, splitting the search
-  by the number of promotions.
-* **Conjectures C1 to C7**: the conjectures of [solver/docs/AGENDA.md,
-  "Conjectures"](../solver/docs/AGENDA.md#4-conjectures).
+* **A1 to A7**: the research avenues of [taxman-notebook/agenda/AGENDA.md, "Ranked
+  avenues"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#3-ranked-avenues), such as A1, the
+  multi-field bound, and A3, splitting the search by the number of promotions.
+* **Conjectures C1 to C7**: the conjectures of [taxman-notebook/agenda/AGENDA.md,
+  "Conjectures"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#4-conjectures).
 * **Study numbers** (study E1, study E6, study E9(a), ...): the experiments of one plan, numbered within it.  The
   same number means different experiments in different plans; the entry or document that uses one defines it.  Refits
   R1 to R3 likewise name the multi-field bound's refit procedures, and U4 a step of its plan; its entries define them.

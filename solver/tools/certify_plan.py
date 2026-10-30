@@ -22,7 +22,7 @@ take several files read them in order):
               it builds at commit 3ca11bf): n, score, open (|O|, a count), rejected (|R|), frames, two_sided, one_sided,
               in_the_bag, worth, words, width, digest, same_as (a board m in n-8..n-1 whose extended problem equals
               n's, or null).  Without it the shares are unknown and |R| is null.
-  --gaps      (optional) lines of solver/notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root
+  --gaps      (optional) lines of https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/gaps_chain.jsonl: n and gap, the root
               gap of the game's search problem.
 
 The cost of a plain search.  The chain ran several searches at once (a window), so a game's recorded seconds.search is
@@ -104,8 +104,8 @@ DEAREST_SHOWN = 20  # games in the report's table of the dearest
 BAND = 100  # boards in a band of the report's table
 PART_END = 3314  # the first part of the table ends here, the second starts after it
 SPOTLIGHT = (3424, 3425, 3440)  # boards the report names
-# The cost model of the research agenda (solver/docs/AGENDA.md, "The diagnosis of the wall"): log10 nodes = a + b G /
-# n^p, plus the window.
+# The cost model of the research agenda (https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md, "The
+# diagnosis of the wall"): log10 nodes = a + b G / n^p, plus the window.
 GAP_INTERCEPT, GAP_SLOPE, GAP_POWER, WINDOW_DECADES = 2.30, 0.0479, 0.3, 0.06
 PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search", "known"}
 RELATIONS = {"prime": "prime", "chain": "ceiling", "none": "none"}  # upper's word -> the plan's

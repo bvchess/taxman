@@ -1,6 +1,0 @@
-2026-10-21T01:51:23Z wall-node on ip-172-31-12-166.ec2.internal: s3://taxman-013764204840-us-east-1/wall-past-5000, group taxman-wall
-2026-10-21T01:51:24Z setup.sh
-2026-10-21T02:04:13Z chain.sh 8191 (commit 4974a7173e270edcba35ac75b449f088beaf9b11; wall 24 h; budget 47 h; until 2026-10-25T00:00:00Z)
-2026-10-21T20:42:30Z stop requested (s3://taxman-013764204840-us-east-1/wall-past-5000/run/stop): asking chain.sh to stop
-2026-10-21T20:42:32Z chain.sh exited with status 143: stopped by a signal
-2026-10-21T20:42:33Z the run is over: stopped on request (wall.sh stop)

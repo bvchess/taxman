@@ -1,8 +1,0 @@
-4875 steps 183500449 own 3321s rate 55.3k/s start 538051 best 538080 (done) eff_min 98.9 tail_max 0.0 first 55.8k/s rest 55.0k/s
-4879 steps 178132934 own 3383s rate 52.7k/s start 540552 best 540552 (done) eff_min 99.8 tail_max 0.0 first 50.2k/s rest 53.8k/s
-4880 steps 289485544 own 6166s rate 46.9k/s start 542420 best 542420 (done) eff_min 2.5 tail_max 0.1 first 44.1k/s rest 47.6k/s
-4884 steps 172697276 own 3578s rate 48.3k/s start 543308 best 543308 (done) eff_min 98.9 tail_max 0.0 first 46.4k/s rest 49.1k/s
-4888 steps 157095254 own 3319s rate 47.3k/s start 543860 best 543860 (done) eff_min 99.9 tail_max 0.0 first 43.1k/s rest 49.6k/s
-4890 steps 283314868 own 5725s rate 49.5k/s start 544107 best 544107 (done) eff_min 3.1 tail_max 0.0 first 48.6k/s rest 49.7k/s
-4893 steps 614467192 own 11924s rate 51.5k/s start 543739 best 543874 (done) eff_min 99.1 tail_max 0.0 first 44.9k/s rest 52.2k/s
-4895 steps 192116143 own 4078s rate 47.1k/s start 542404 best 542539 (47.7k/s) eff_min 99.7 tail_max 0.0 first 46.4k/s rest 47.4k/s

@@ -3,7 +3,8 @@
 What a certificate is and what it proves: [solver/docs/design/certificates.md](../../docs/design/certificates.md),
 ["Certificates of U"](../../docs/design/certificates.md), and [the certificate theorem
 (E2)](../../../docs/theory/extended-problem.md#the-certificate-theorem).  What the files below showed: ["Certificates
-past 2175"](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).
+past
+2175"](https://github.com/bvchess/taxman-notebook/blob/main/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md).
 Everything ran on the M1 Max, one thread, `nice -n 10`, on the code of commit 35c614b, from the top of the repository,
 against the committed chain (`results/optimal.jsonl.gz`, its games 1..3440) and the prover's barred bounds
 (`solver/noframe/data/upper_*.jsonl`).  `U` stands for the four `--upper` files (2..1300, 1301..2175, 2176..3314,
@@ -18,7 +19,7 @@ The certificates of 600..1300, `certificates_600_1300.jsonl`, are in
 [results/certificates/](../../../results/README.md#certificates) (a certificate file is a result, not a tool); the same
 games certified claim by claim, `certificates_claims_600_1300.jsonl`, and `problems_claims_600_3440.jsonl` are in the
 folder of [the entry on the claims of
-`unzip`](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md#files).
+`unzip`](https://github.com/bvchess/taxman-notebook/blob/main/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md#files).
 
 The campaign itself (its approval, the phases, the stop rule of the pilot) has its own files, made on the same
 data after the plan:
@@ -37,7 +38,7 @@ the plan and says GO, STOP or COUNTEREXAMPLE.  The procedure, the commands and t
 **The two eras.**  `certify_plan.py` prices a search by its nodes, at the thread-seconds per node that the chain's own
 run paid in each stretch of it, since the chain ran several searches at once and a game's recorded seconds are the
 time it shared the machine.  The wall times are the run's ([the cloud run to
-3440](../../notebook/the-frontier-chain-to-3440-2026-10/README.md)): games
+3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)): games
 2176..3310 in 23,025 s on the first instance (window 16), and 3311..3440 on the second (window 4) in its 62,701 s less
 the 3,054 s that the unfinished 3441's 625.8 million nodes took at its measured 205 thousand nodes a second, 59,647 s.
 The recorded seconds over-count the first era 3.27 times and the second 1.55 times; `plan.md` gives the total from

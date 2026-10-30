@@ -41,5 +41,5 @@ tactic takes 0.82 of the CPU of one without it in the hard games and 0.86 in the
 the choice falls from 23 to 25% of the CPU to 17 to 18%.  Every one of the 14 games falls.  The steps change with the
 ranking in either direction, so the gain in CPU is surer than the gain in steps.  A lower gate with the tactic, 150, takes
 0.81 and 0.92 of gate 300's CPU without it, behind gate 300 with the tactic.  [The
-measurements](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-price-reuse-in-the-choice-q6)
+measurements](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-23-price-reuse-in-the-choice-q6)
 have the settings tried.

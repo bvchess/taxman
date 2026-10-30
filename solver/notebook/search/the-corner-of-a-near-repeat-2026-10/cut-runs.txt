@@ -1,6 +1,0 @@
-n=741 near_repeat=on nodes=58 cuts=0 score=173266
-n=741 near_repeat=off nodes=58 cuts=0 score=173266
-n=1209 near_repeat=on nodes=1662 cuts=36 score=461004
-n=1209 near_repeat=off nodes=1740 cuts=0 score=461004
-n=1833 near_repeat=on nodes=95681 cuts=1553 score=1056574
-n=1833 near_repeat=off nodes=112176 cuts=0 score=1056574

@@ -1,8 +1,0 @@
-./unit.sh tune-carry2 e1-carry2 /home/brian/taxman-lab/work/research-stepcost/src/solver/notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/units-fresh.jsonl 4875-10 --node-limit 60000
-STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e1-all /home/brian/taxman-lab/work/research-stepcost/src/solver/notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/units-fresh.jsonl 4875-10 --node-limit 60000
-./unit.sh tune-carry2 e1-carry2 /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-2825 --node-limit 60000
-STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e1-all /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-2825 --node-limit 60000
-./unit.sh tune-carry2 e1-carry2 /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-10 --node-limit 60000
-STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e1-all /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-10 --node-limit 60000
-./unit.sh tune-carry2 e1-carry2 /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-1240 --node-limit 60000
-STEPCOST_CARRY_ALL=1 ./unit.sh tune-all e1-all /home/brian/taxman-lab/snap/4914-20261023T010919Z/units.jsonl 4914-1240 --node-limit 60000

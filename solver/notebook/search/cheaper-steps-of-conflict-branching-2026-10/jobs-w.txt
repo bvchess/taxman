@@ -1,4 +1,0 @@
-./unit.sh tune-base w-tune-base 4050 root
-./unit.sh tune-carry2 w-tune-carry2 4050 root
-./unit.sh tune-base w-tune-base 3000 root
-./unit.sh tune-carry2 w-tune-carry2 3000 root

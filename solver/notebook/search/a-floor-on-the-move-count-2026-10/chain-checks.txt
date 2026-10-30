@@ -1,5 +1,0 @@
-each step n - 1 to n, n = 2..4547 (4546 steps): {'shrinks': 0, 'same': 2583, 'grows by one': 1963, 'grows by more': 0}
-at the ceiling (score = n + score(n - 1)): {'same': 0, 'grows by one': 1462, 'other': 0}
-below the ceiling: {'same': 2583, 'grows by one': 501, 'other': 0}
-games 2..4547: moves - promotions is the length of the game with no promotions in 4546 of 4546
-games 3..4547: promotions below the floor F in 0 of 4545; equal to F in 2583; one above F in 1962

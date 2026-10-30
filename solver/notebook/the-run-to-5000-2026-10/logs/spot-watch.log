@@ -1,8 +1,0 @@
-2026-10-18T19:40:49Z watching for a spot interruption notice
-2026-10-19T02:08:24Z SPOT INTERRUPTION NOTICE: {"action":"terminate","time":"2026-10-19T02:10:22Z"}
-2026-10-19T02:08:24Z stopping chain (pid 169794) with SIGTERM
-2026-10-19T02:11:35Z watching for a spot interruption notice
-2026-10-19T21:18:46Z SPOT INTERRUPTION NOTICE: {"action":"terminate","time":"2026-10-19T21:20:43Z"}
-2026-10-19T21:18:46Z stopping chain (pid 32955) with SIGTERM
-2026-10-19T21:22:40Z watching for a spot interruption notice
-2026-10-20T08:01:51Z watching for a spot interruption notice

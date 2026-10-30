@@ -19,6 +19,11 @@ How-to lives in the docs listed at the end.
 * **Other people's code** stays as they sent it: Robert Moniot's moniot/playtaxman.cpp is worked around in
   moniot/Makefile, not edited.
 * **Branch.**  Work on master; commit and push there.
+* **Notebook.**  The lab notebook and the research agenda are a repository of their own,
+  [bvchess/taxman-notebook](https://github.com/bvchess/taxman-notebook).  Its checkout goes at `solver/notebook/` of
+  this one, which `.gitignore` ignores; in a worktree, set `TAXMAN_NOTEBOOK` to it.  The docs test checks the checkout
+  and says which one it checked.  Its commit hashes name commits of this repository: an experiment that changes code is
+  committed in both, the code here and its entry there.
 * **Writing.**  Docs follow [docs/WRITING.md](docs/WRITING.md).
 
 ## Where things are
@@ -26,7 +31,7 @@ How-to lives in the docs listed at the end.
 * **solver/frame/**: the frame solver, an exact solver in Rust.  **solver/noframe/**: the prover, a separate program
   that shares no proof code with the frame solver and proves its results independently, without the frame model.  Both
   read the committed results through **solver/gzip/**, a gzip decoder whose CRC-32 check makes a decoding error fail
-  loudly.  Their docs, tools and lab notebook are in **solver/**; its rules, and the map of its documents, are in
+  loudly.  Their docs and tools are in **solver/**; its rules, and the map of its documents, are in
   [solver/CLAUDE.md](solver/CLAUDE.md).
 * **results/**: the committed chain of proven games (optimal.jsonl.gz, built into the Rust frame solver), the bounds
   store and the certificates.

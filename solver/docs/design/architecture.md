@@ -87,8 +87,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 the second verifiers in Python, the quick check and the cloud scripts ([solver/README.md, "The
 tools"](../../README.md#the-tools)).  The programs of finished studies (`fields`, `matroid`, `dominance`, `slope`,
 `repeats`, `promotions`, `diff`, `hunt`, `sacrifice`, `tune`, `structure`, `extended`, `finder` and `wall`) are gone
-from master; [the notebook's list of retired terms](../../notebook/terms-changed.md#removed-programs) says where they
-build.
+from master; [the notebook's list of retired
+terms](https://github.com/bvchess/taxman-notebook/blob/main/terms-changed.md#removed-programs) says where they build.
 
 **Width dispatch.**  A set of game numbers is a bitset of W words of 64 bits, and everything that holds one is generic
 over `const W: usize`.  The macro `with_width!` (in `bits`; the solver, the examples and the tests use it) picks the
@@ -101,12 +101,12 @@ narrowest width of `bits::WIDTHS` that holds n:
 Every set operation loops over all W words, so a narrower set makes every step cheaper, and the steps of 4 to 8 words
 between 1023 and 4095 pay.  Past 4095 they would not: a node at 4100 costs 1% more at 128 words than at 72, with the
 board layer the same, so 128 is the only width there ([boards past
-4095](../../notebook/boards-past-4095-2026-10/README.md)).  The price is build time, since each width is a copy of the
-search's code: a release build takes about 100 seconds on an M1 Max, about 12 more for each width ([the
-engine](../../notebook/the-engine/README.md) has the times as widths were added).  The largest game, 8191
-(`solver::MAX_N`, from the widest width), also sets the other fixed sizes, each checked on every game to 8191: at most
-nine frames (`model::MAX_FRAMES`), a peel's worklist of two summary words, and GF(2) vectors of at most five words ([The
-GF(2) bound](gf2-bound.md#the-gf2-bound)).
+4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md)).  The price is build
+time, since each width is a copy of the search's code: a release build takes about 100 seconds on an M1 Max, about 12
+more for each width ([the engine](https://github.com/bvchess/taxman-notebook/blob/main/the-engine/README.md) has the
+times as widths were added).  The largest game, 8191 (`solver::MAX_N`, from the widest width), also sets the other fixed
+sizes, each checked on every game to 8191: at most nine frames (`model::MAX_FRAMES`), a peel's worklist of two summary
+words, and GF(2) vectors of at most five words ([The GF(2) bound](gf2-bound.md#the-gf2-bound)).
 
 *Details.*  A checkpoint records its width, and a build refuses a checkpoint made at another width than it gives the
 game.  So a checkpoint of a game of 2048 to 3583 made at 64 words, by a build before the widths of 36, 40, 48 and 56

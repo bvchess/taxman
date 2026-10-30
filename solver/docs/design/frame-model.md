@@ -92,9 +92,10 @@ board to 8191.
 freedoms in front of them, h + 1 for those directly behind a frame numbered h and not yet numbered.  That is the
 numbering by layer when it is clean and its frames numbered 0 lie in one layer.  The census of every board to 8191, the
 largest the solver supports (the census below; the data in
-`solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`), found the two the same on every one, with
-frame h in layer 3 + h on 8,100 boards and in layer 2 + h on the 80 where the frames of layer 2 have freedoms.  The
-tests of `src/frames/` compare the two numberings on every board to 400 and on a sample to 8191.
+[taxman-notebook/the-claims-of-unzip-in-the-extended-problem-2026-10](https://github.com/bvchess/taxman-notebook/tree/main/the-claims-of-unzip-in-the-extended-problem-2026-10)),
+found the two the same on every one, with frame h in layer 3 + h on 8,100 boards and in layer 2 + h on the 80 where the
+frames of layer 2 have freedoms.  The tests of `src/frames/` compare the two numberings on every board to 400 and on a
+sample to 8191.
 
 **The census** was a program, the example `structure`, run once and removed since ([`examples/structure.rs` at commit
 3ca11bf](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/structure.rs)).  It checked the theory's
@@ -161,7 +162,8 @@ barred bound certifies is played by every set of moves that beats the recorded s
 theorem, and the members it does not certify are *open*.  It certifies most members in each game, within the prover's
 proofs and past them, but closes no game alone
 ([solver/noframe/docs/proofs.md](../../noframe/docs/proofs.md#the-upper-part-game-by-game) has the method, and [the
-entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) the shares).
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)
+the shares).
 
 Second, a search settles the open members.  It is the search of the [extended
 problem](../../../docs/GLOSSARY.md#the-frame-model) Π⁺(O), with the set O of open members optional ([the extended
@@ -175,8 +177,8 @@ Details of the extended problem: it keeps the claims of `unzip` that [the kept-c
 Π⁺(∅) is Π_n itself.  Without the claims, Π⁺(∅) is the frame model with them put back (the example `extended
 --no-claims`, removed since).  A hunt for a counterexample on the boards without each open member, the example `hunt`,
 was prepared and never run.  It is removed from master, and [its
-entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md) says where it builds
-("the program removed from master").
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md)
+says where it builds ("the program removed from master").
 
 What each kind of proof needs of the frame model, beyond the code's correctness and the games before it:
 
@@ -201,7 +203,8 @@ The tests tie the theorems to the code:
 **Given the pruning is exact.**  Every [tactic](../../../docs/GLOSSARY.md#the-search) is proven or sound;
 [tactics.md](tactics.md) grades each.  The Java used two shortcuts that rest on conjectures, `reuse_prev` and
 `revise_freedoms`.  The frame solver had them as tactics for a while, measured that they no longer paid, and removed
-them ([which tactics earn their keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)).
+them ([which tactics earn their
+keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md)).
 
 **Given the previous game is optimal.**  The game of n is built from the game of n − 1, using the
 [ceiling](../../../docs/GLOSSARY.md#the-game) and the [prime formula](../../../docs/GLOSSARY.md#the-game).  So a chain
@@ -229,8 +232,8 @@ the built-in table's.
 The search is the frame solver's own.  It started as the Java's loop: its bound, its depth-2 preclusion table, the
 promotability checks of its candidate lists, and branching on the largest candidate.  Each of those was replaced by
 something measured to be faster, then removed.  The notebook has the rounds, and [which tactics earn their
-keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md) has the last measurements of what was
-removed.
+keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md) has
+the last measurements of what was removed.
 
 The wiki's words map onto this document's:
 
@@ -243,4 +246,4 @@ The wiki's words map onto this document's:
 The port found one defect in the Java's bound: it can be too low.  Its runner-up replaces the
 failing number with the next candidate below the smallest bid member, but a skipped candidate from the failing number's
 frame can be larger.  At the root of n = 114, the Java's bound is 358 against the best completion's 360 ([the
-story](../../notebook/search/the-port-and-its-first-improvements/README.md)).
+story](https://github.com/bvchess/taxman-notebook/blob/main/search/the-port-and-its-first-improvements/README.md)).

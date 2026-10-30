@@ -1,3 +1,0 @@
-ledger: 61 s, 361 CPU s of 7200: 168 of 200 proven, 5 searching; climbs up 42 ended (42 proved their board, 0 parked), down 8 ended (8 proved their board, 0 parked); finder 0 runs, 0 improved; main thread busy 0.5 s, results waited 0.0 s
-ledger: 123 s, 535 CPU s of 7200: 196 of 200 proven, 1 searching; climbs up 48 ended (48 proved their board, 0 parked), down 8 ended (8 proved their board, 0 parked); finder 0 runs, 0 improved; main thread busy 0.6 s, results waited 0.0 s
-ledger: 145 s, 557 CPU s of 7200: 200 of 200 proven, 0 searching; climbs up 50 ended (50 proved their board, 0 parked), down 8 ended (8 proved their board, 0 parked); finder 0 runs, 0 improved; main thread busy 0.6 s, results waited 0.0 s

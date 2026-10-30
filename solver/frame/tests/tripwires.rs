@@ -17,7 +17,7 @@
 //! which prints, on failure, the rows of the failing boards as observed, in the layout of [`EXPECTED`].  (Release,
 //! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick tests.)
 //! Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows
-//! in, and change the node counts quoted in solver/docs/design/ and solver/notebook/ if they are affected.  The same
+//! in, and change the node counts quoted in solver/docs/design/ and in the notebook if they are affected.  The same
 //! goes for [`GATED`], the trees under the gates that make conflict branching act, for [`FORGETTING`] and for
 //! [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its
 //! formulation without the claims of `unzip` (the frame model with the claims put back and no source open;

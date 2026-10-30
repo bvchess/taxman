@@ -8,9 +8,9 @@ is the frame solver.
 This page is its guide: what it computes, how to build and run it, and the common tasks.  [The
 reference](../docs/REFERENCE.md) has every flag and command, how to read the output, and why the answers can be
 trusted.  [DESIGN.md](../docs/DESIGN.md) explains how the solver works and why, the [lab
-notebook](../notebook/README.md) holds the measurements behind it, and the [glossary](../../docs/GLOSSARY.md) defines
-the project's words.  A second program, [the prover](../noframe/README.md), checks the solver's answers on the whole
-board, without the frame model.
+notebook](https://github.com/bvchess/taxman-notebook/blob/main/README.md) holds the measurements behind it, and the
+[glossary](../../docs/GLOSSARY.md) defines the project's words.  A second program, [the prover](../noframe/README.md),
+checks the solver's answers on the whole board, without the frame model.
 
 * [1. What it solves](#1-what-it-solves)
 * [2. Build, test, run](#2-build-test-run)
@@ -40,10 +40,11 @@ smaller n also on the whole board, by the prover.
 of cheap and dear games.  How fast it grows with n depends on the range.  The first 2175 games of the committed chain
 took 27 minutes on eight threads of a laptop; the chain goes on past them ([how far it
 reaches](../../results/README.md#the-files)).  Over the games 1301 to 2175 the waves show no growth that a fit resolves
-(the notebook's study of [the GF(2) bound](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), which lets
-the search cut branches).  Past 2175 a fit does find growth: the search times of the games 2176 to 3440 rise tenfold for
-about every 1,040 in n, with about a decade of scatter ([the chain to
-3440](../notebook/the-frontier-chain-to-3440-2026-10/README.md)).
+(the notebook's study of [the GF(2)
+bound](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/README.md), which
+lets the search cut branches).  Past 2175 a fit does find growth: the search times of the games 2176 to 3440 rise
+tenfold for about every 1,040 in n, with about a decade of scatter ([the chain to
+3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)).
 
 ### How the solver sees the game (the frame model)
 
@@ -342,7 +343,8 @@ A game whose predecessor is in neither the run nor the results file, and not tak
 with no seed and no ceiling: for example `taxman solve 1400`, or `taxman solve 480` without the flag.  `solve` says so
 on stderr (`note: no previous game for n=...`), and the result line has `"prev": null`.  The answer is still correct,
 but costs about twice as much on the hard games, and many times more on the games that a chain settles at once by
-reaching the ceiling ([the cost curve](../notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
+reaching the ceiling ([the cost
+curve](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
 
 ### Known games
 
@@ -418,9 +420,9 @@ searches started, threads moved, deferrals, hints and conclusions.
 
 *Details.*  On 4 threads of the laptop, a window of 16 makes 1..1300 about 16% faster, and the games past 2225, whose
 searches already keep 4 threads busy, no slower ([round
-B](../notebook/round-b-the-chain-on-many-threads-2026-10/README.md)).  On 64 threads, a window of 16 makes the games
-past 2225 20 to 32% slower than one game after another ([scaling to 192
-threads](../notebook/scaling-to-192-threads-2026-10/README.md)).
+B](https://github.com/bvchess/taxman-notebook/blob/main/round-b-the-chain-on-many-threads-2026-10/README.md)).  On 64
+threads, a window of 16 makes the games past 2225 20 to 32% slower than one game after another ([scaling to 192
+threads](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md)).
 
 ### Checkpoints, resuming, signals
 
@@ -495,4 +497,4 @@ bounds store, `results/bounds.jsonl` (`ledger export`; `run --bounds` starts fro
 own ([results/README.md](../../results/README.md#boundsjsonl)) and which `taxman solve --use-prev` draws on too ("Known
 games", above).  The ledger's files are its own, not results lines ([solver/docs/design/trust.md, "The
 ledger"](../docs/design/trust.md#the-ledger); the experiment: [the
-ledger](../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md)).
+ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)).

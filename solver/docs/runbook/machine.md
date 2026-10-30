@@ -10,11 +10,11 @@ Each job's file names the instance that suits it; this page says why.
 * **The workload is CPU-bound.**  It is integer and bit-set code, with no floating point and no SIMD requirement, in one
   process with as many threads as CPUs.  Memory is small: the chain needs 400 to 540 MB with the results file loaded,
   about 1 GB at 192 threads and 2.3 GB at n = 4000, and a proof needs 370 MB at most on 64 threads ([the
-  calibration](../../notebook/graviton-calibration-2026-10/README.md), [the scaling
-  run](../../notebook/scaling-to-192-threads-2026-10/README.md)).  Each thread also reserves 64 MiB of address space for
-  its stack, which is not memory.  Disk I/O is one checkpoint every 300 s by default: tens of KB at 2 threads and a few
-  MB at most at 192, since a checkpoint holds the work stacks of all workers.  So buy the cheapest vCPUs, with 1 GiB per
-  vCPU or less.
+  calibration](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md), [the
+  scaling run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md)).  Each
+  thread also reserves 64 MiB of address space for its stack, which is not memory.  Disk I/O is one checkpoint every 300
+  s by default: tens of KB at 2 threads and a few MB at most at 192, since a checkpoint holds the work stacks of all
+  workers.  So buy the cheapest vCPUs, with 1 GiB per vCPU or less.
 * **Use a mid-size instance, 16 to 64 vCPUs,** for hours or days, rather than the largest one for minutes (`c8g.4xlarge`
   to `c8g.16xlarge`, or the same sizes of `c9g` or `c7g`).  Graviton has no SMT, so a vCPU is a core and each worker
   thread gets a whole one; on Intel a vCPU is a hyperthread, and the throughput per thread is lower.  The price of a
@@ -37,10 +37,11 @@ Each job's file names the instance that suits it; this page says why.
 * **Check `lscpu` on a large machine** for the number of NUMA nodes.  The engine does not pin threads: each searcher
   allocates its own state on its own thread, so first touch puts it on that thread's node.  Threads still move between
   nodes: on a two-socket Xeon about a tenth of their time ran against remote memory, which cost a step about 0.3%
-  ([remote memory and huge pages](../../notebook/remote-memory-and-huge-pages-on-a-two-socket-xeon-2026-10/README.md)).
-  If there are several nodes and the speed per thread falls where the thread count crosses a node, that is the
-  cause.  The 64-vCPU instances of the calibration were one socket and one node
-  (`solver/notebook/graviton-calibration-2026-10/machines/`).
+  ([remote memory and huge
+  pages](https://github.com/bvchess/taxman-notebook/blob/main/remote-memory-and-huge-pages-on-a-two-socket-xeon-2026-10/README.md)).
+  If there are several nodes and the speed per thread falls where the thread count crosses a node, that is the cause.
+  The 64-vCPU instances of the calibration were one socket and one node
+  ([taxman-notebook/graviton-calibration-2026-10/machines](https://github.com/bvchess/taxman-notebook/tree/main/graviton-calibration-2026-10/machines)).
 * **Build on the machine type that runs the binary.**  A plain `cargo build` makes generic code; `-C target-cpu=native`
   is opt-in ([README, section 2](../../frame/README.md#2-build-test-run)).  These scripts add it through `RUSTFLAGS`,
   the default of `env.sh`; set `RUSTFLAGS=` to build generic code.  `native` tunes for the CPU that builds, so a binary

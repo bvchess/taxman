@@ -122,21 +122,21 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   cost more than they help.  The table is a cache, so forgetting is sound; it is deterministic on one thread, and a game
   of fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
   checkpoints, does not pay ([carrying nogoods
-  over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher
-  keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them:
-  the period was a tactic of its own once, with a choice of nogoods to keep and a limit to the table, and the notebook
-  has what they were worth ([keeping and forgetting
-  nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)).  The table
-  counts what it does (nogoods learned, lookups, candidates ruled out, forgettings), and the progress lines print the
-  counts.  A checkpoint does not record when the searchers forget, since the answer does not depend on it and a resumed
-  search starts with empty tables.
+  over](https://github.com/bvchess/taxman-notebook/blob/main/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).
+  Which nogoods a searcher keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is
+  as sound as all of them: the period was a tactic of its own once, with a choice of nogoods to keep and a limit to the
+  table, and the notebook has what they were worth ([keeping and forgetting
+  nogoods](https://github.com/bvchess/taxman-notebook/blob/main/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)).
+  The table counts what it does (nogoods learned, lookups, candidates ruled out, forgettings), and the progress lines
+  print the counts.  A checkpoint does not record when the searchers forget, since the answer does not depend on it and
+  a resumed search starts with empty tables.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
   cannot be promoted from the root at all and could be filtered out once.  It cannot: every candidate of every game
   from 2 to 1230 passes that test at the root (a test checks every game to 511 and every sixth past it).  A
   single-member conflict is a candidate that cannot be promoted *once the node's promotions are made*: its frame may
   have used it to pay for a move left with one live factor, say.  The promotions that fail are under 4% of the steps,
   so little would be saved ([single-member
-  conflicts](../../notebook/search/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
+  conflicts](https://github.com/bvchess/taxman-notebook/blob/main/search/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
 
 ## The default step
 
@@ -221,7 +221,7 @@ with no search ([gf2-bound.md](gf2-bound.md)), and the tactic `price_reuse` keep
 ([price-reuse.md](price-reuse.md)).  Below the gate the search's own `K` is kept, since a small subtree does not repay
 the pricing.  On units of the games 4991, 4992 and 4995, a gate of 1,200 took 0.90 to 0.92 of the CPU of conflict
 branching off, and a gate of 300 took 2.03 of it on those of 4991 ([the settings
-checks](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995)).
+checks](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995)).
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone
@@ -235,7 +235,7 @@ units ([the invariant](#the-invariant-of-a-running-search)), and a checkpoint re
 *What it does.*  On one thread from the known optimum, the whole games 4050 and 4176 take 0.19 and 0.16 of the
 default's steps and 0.26 and 0.27 of its CPU, the share of steps saved growing with the gap (a step costs more, mostly
 in the pricing).  The measurements, and the gap and slope chosen, are in [where the search of 4875
-spends](../../notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
+spends](https://github.com/bvchess/taxman-notebook/blob/main/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
 
 *The look.*  With the tactic `conflict_look`, on by default, a check that would branch on a conflict other than `K`
 looks at one child of `K` first.  At some deep nodes the choice above avoids `K` although one child of `K` dies at
@@ -269,11 +269,13 @@ own.  So the look may change between a search's units, as the choice may.
 
 *What the look does.*  On the units of games 4875 to 4901 it takes 0.61 to 0.87 of the steps without it ([when a node
 should use conflict
-branching](../../notebook/search/when-a-node-should-use-conflict-branching-2026-10/README.md)); games of the chain
-decided it, 4918 to 4948 taking 0.85 of their neighbors' steps without it, in geometric mean ([the live
-lab](../../notebook/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).  With the split's
-bound, units take 0.79 to 0.95 of the CPU of a look that solves every child, with the same trees ([cheaper steps of
-conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
+branching](https://github.com/bvchess/taxman-notebook/blob/main/search/when-a-node-should-use-conflict-branching-2026-10/README.md));
+games of the chain decided it, 4918 to 4948 taking 0.85 of their neighbors' steps without it, in geometric mean ([the
+live
+lab](https://github.com/bvchess/taxman-notebook/blob/main/search/the-live-lab-2026-10/README.md#2026-10-23-the-look-tested-on-whole-games)).
+With the split's bound, units take 0.79 to 0.95 of the CPU of a look that solves every child, with the same trees
+([cheaper steps of conflict
+branching](https://github.com/bvchess/taxman-notebook/blob/main/search/cheaper-steps-of-conflict-branching-2026-10/README.md#2026-10-23-a-cheaper-look)).
 
 ## The invariant of a running search
 
@@ -338,7 +340,7 @@ heavier than the floor ([the floor lemma (R5)](../../../docs/theory/search-rules
 `SearchResult::floor_held` says.  Its tree is that of a search from an incumbent of that worth: at P\*
 the proof's tree, node for node, as a search seeded with an optimal set makes it; above P\* a smaller one, by a factor
 of about 27 for each quarter of the gap between the root's bound and P\*, on the games measured ([searches under a
-floor](../../notebook/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
+floor](https://github.com/bvchess/taxman-notebook/blob/main/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md)).
 
 ## The near-repeat cut
 

@@ -1,4 +1,0 @@
-{"kind": "suite", "commit": "d5ec4256fc448fbe9aff3d7b48fd12329745d5b8", "lo": 100000, "hi": 3000000, "units": 0, "wholes": 3}
-{"kind": "whole", "game": 4050, "id": "4050-root", "gap": 1012, "default": {"nodes": 3086223, "cpu_s": 1083.222947, "wall_s": 1089.2, "best": 368462, "completed": true}}
-{"kind": "whole", "game": 4176, "id": "4176-root", "gap": 1010, "default": {"nodes": 5962919, "cpu_s": 1840.066745, "wall_s": 1852.1, "best": 389035, "completed": true}}
-{"kind": "whole", "game": 4005, "id": "4005-root", "gap": 1148, "default": {"nodes": 6186795, "cpu_s": 2084.301138, "wall_s": 2568.9, "best": 356598, "completed": true}}

@@ -22,8 +22,9 @@ interruptions](machine.md#quota-prices-and-spot-interruptions)).
 
 * **Measure the overhead first.**  The multiple is the plan's guess; the certificates of eight games of 1400..2156
   took a median of 1.55 times the plain search ([one-sided candidates in the
-  search](../../notebook/one-sided-candidates-in-the-search-2026-10/README.md)).  A pilot of a few games where the
-  money goes, before the rest, finds out where it matters ([A pilot first](#a-pilot-first)).
+  search](https://github.com/bvchess/taxman-notebook/blob/main/one-sided-candidates-in-the-search-2026-10/README.md)).
+  A pilot of a few games where the money goes, before the rest, finds out where it matters ([A pilot
+  first](#a-pilot-first)).
 * **Bound each phase.**  Run each phase under a `DEADLINE_HOURS` of 1.5 times its expected hours, after which the script
   stops cleanly and the campaign waits for a report; resume only with a new approval.
 * **Risks.**  A spot interruption costs at most a checkpoint interval (5 minutes), and nothing with `spot-watch.sh`.  A
@@ -168,14 +169,15 @@ rerun overwrite them: a rerun writes another file.  Then record the campaign:
 * the new end of the proofs on the whole board in [results/README.md](../../../results/README.md), which holds how far
   each kind of proof reaches; then search the docs for the old end and update what still names it;
 * a notebook entry with the times against the estimate and the overhead by |O| and gap (the report above, `--bands`),
-  and its rows in the register ([the notebook's rules](../../notebook/README.md#how-this-notebook-is-kept));
+  and its rows in the register ([the notebook's
+  rules](https://github.com/bvchess/taxman-notebook/blob/main/README.md#how-this-notebook-is-kept));
 * the spending, as [The spending, and the end](launch.md#the-spending-and-the-end) says, with the thread-hours of the
   search against the plan's, and what they come to on one machine, which `certify_pilot.py` prints.
 
 ## An example
 
 [Certificates past
-2175](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md) prepared a
-campaign for 2176..3440 ("stage 4"), not run; [its section on the
-campaign](../../notebook/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md#the-stage-4-campaign-as-the-runbook-planned-it)
+2175](https://github.com/bvchess/taxman-notebook/blob/main/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md)
+prepared a campaign for 2176..3440 ("stage 4"), not run; [its section on the
+campaign](https://github.com/bvchess/taxman-notebook/blob/main/certificates-past-2175-the-same-problem-the-work-list-the-verifier-2026-10/README.md#the-stage-4-campaign-as-the-runbook-planned-it)
 has its plan: the prices of its seven lists, the stop rule of its pilot, and the commands of its three phases.

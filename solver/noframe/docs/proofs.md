@@ -136,10 +136,11 @@ data/exact_parity_2_1300.jsonl` gives the 557 games that need a search, proven f
 The cost follows the root's parity gap as the frame solver's follows its root gap.  Over 900–1300 a search's nodes grow
 tenfold per 84 points of gap (1.19 ± 0.05 decades per 100 points, R² 0.76).  The gap grows about 14 points per 100 in n,
 with swings of ±50 between bands; that is the measurement of [matroid intersection
-bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md), which these roots reproduce.  Against n,
-log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over 900–1300 (R² 0.06 and 0.11: the gap's
-swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the Franklín–Moniot bound alone had spent 50–70
-million nodes on each of 990–996 without finishing; the parity bound proves them from scratch in 44,000–68,000.
+bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md),
+which these roots reproduce.  Against n, log10 nodes grows 0.16 ± 0.04 and log10 seconds 0.23 ± 0.04 per 100 in n over
+900–1300 (R² 0.06 and 0.11: the gap's swings dominate), and 0.33 and 0.34 from n = 78 on.  The search with the
+Franklín–Moniot bound alone had spent 50–70 million nodes on each of 990–996 without finishing; the parity bound proves
+them from scratch in 44,000–68,000.
 
 The prover's proofs reach 2175, where the committed chain (`../../results/optimal.jsonl.gz`) ended when they were
 made; the next subsection is the run that made them.
@@ -201,8 +202,8 @@ thread-hours and the fifty dearest 59%.
 
 The run took 1.5 times the nodes projected before it, just above the projected range, and 1.6 times the thread-hours,
 inside it.  [The notebook's
-entry](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) has the run's
-account, the projection game by game, and what the run says about the projection's model.
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
+has the run's account, the projection game by game, and what the run says about the projection's model.
 
 ## The upper part, game by game
 
@@ -239,7 +240,7 @@ Four files, each made on one thread of the laptop:
 |---|---|---|---|---|
 | `data/upper_2_1300.jsonl` | the table's games 2..1300, 1,299 | 665 (417 of them with nothing open; 1.0% of the members open) | 65 s | the tests of `taxman certify` |
 | `data/upper_1301_2175.jsonl` | the committed chain's games 1301–2175, 875 | 490 | 300 s | |
-| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](../../notebook/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
+| `data/upper_2176_3314.jsonl` | the copy of the cloud chain's results taken on 2026-10-15, games that the committed chain also holds, which [the gap past 2175](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/README.md) measured; 1,139 | 635 | 1,272 s, 4.1 s for the slowest game | |
 | `data/upper_3315_3440.jsonl` | the rest of the committed chain as it stood then, 126 | 73, 3424, 3425 and 3440 among them | 277 s, 4.3 s for the slowest game | the input of the certificates of 2176-3440 (`../tools/certify/`) |
 
 By band, the open members and the margins of each game (the share is of all members):
@@ -275,8 +276,9 @@ By band, the open members and the margins of each game (the share is of all memb
 * **The open share follows the root's gap, not n.**  It grows 3.1 points per 100 of gap to 2175 and 2.0 past it (R²
   0.73, 0.73 and 0.91 in the three files), and it falls back with the gap (2600-2699).  The root's gap is the one the
   frame solver's search costs by: with layers 1 and 2 fixed, it equals the solver's GF(2) gap at the root on all 400
-  games past 2175 that both measured (`../notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl`).  The margins
-  grow with it, and the largest is close to the gap.
+  games past 2175 that both measured
+  ([taxman-notebook/search/the-gap-past-2175-2026-10/gaps_chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gap-past-2175-2026-10/gaps_chain.jsonl)).
+  The margins grow with it, and the largest is close to the gap.
 * **The root's heaviest set plays all of U\*_{≥3} in every one of the 1,198 games that need it**, as at every root
   measured before; no game is flagged.
 * **The open members are mostly of layer 3** (52% to 2175 and 58% past it), then of layer 5 (21%, 27%) and 4 (19%, 9%),

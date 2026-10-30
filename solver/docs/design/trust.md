@@ -175,11 +175,11 @@ reads nothing of the truth (the built-in table, the results files) unless it is 
   replays every game that a relation makes before it counts, if it could raise a game's L (a game that cannot is not
   shown to the referee, or not made), and an L above a U stops the run as an error;
 * the *finder*, a large neighborhood search (`search/finder.rs`; [finders for good games that are not
-  sound](../../notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).  It is not sound and
-  proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of a worker, after a
-  game's map and before a search whose best seed has changed since it last ran on the game (a climb's always has).  Its
-  game, which the referee replays like every lower bound, is offered as the game's L, and seeds the search if it is
-  better.
+  sound](https://github.com/bvchess/taxman-notebook/blob/main/search/finders-for-good-games-that-are-not-sound-2026-10/README.md)).
+  It is not sound and proves nothing, but a lower bound needs only a legal game.  It runs for `--lns-seconds` seconds of
+  a worker, after a game's map and before a search whose best seed has changed since it last ran on the game (a climb's
+  always has).  Its game, which the referee replays like every lower bound, is offered as the game's L, and seeds the
+  search if it is better.
 
 *Its order.*  The maps of all the games come first, on the workers, and the relations carry their bounds once, when the
 last map is in; the main thread, which applies every result while the workers whose searches ended wait for it, does

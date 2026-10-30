@@ -98,7 +98,8 @@ n − 1 is prime.
 call c the cofactor.  A game whose cofactor is 1, a prime, twice a prime or 9 was settled with no search: a prime by the
 prime formula, nearly all the others as repeats, and the rest at the start.  Over games 1301–4979, the chain's games past
 4949 included, this rule names about 85% of the games settled with no search, and none of the games it names has the
-method `search`.  [The lab notebook's entry](../solver/notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md)
+method `search`.  [The lab notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md)
 has the tables and the cofactors that are always searched.
 
 *The proofs by range, in detail:*
@@ -179,21 +180,21 @@ What that evidence amounts to:
    (`src/results.rs`), and its 382 games of the bounds store.  A game of the store is a game the referee replays at the
    score of an upper bound the store holds ([below](#boundsjsonl)).
 3. **Standalone solves.**  Some games were solved again on their own, with no seed and no ceiling:
-   * `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for
-     every game of 1001–1231 that is not prime (the example `ladder`, which builds at commit 3ca11bf:
-     `ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads,
-     commit e710d16; see
-     [`solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`](../solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
+   * [taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl)
+     holds 197 standalone searches, one for every game of 1001–1231 that is not prime (the example `ladder`, which
+     builds at commit 3ca11bf: `ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads, commit e710d16; see
+     [`taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
      All of them finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other
      game.  So every game of 1001–1231 that is not prime is proven without the chain, and every prime one by the prime
      formula from a game so proven.
    * There is no such solve for 1232–1300.  Of those 69 games, 24 are proven by an exhausted search of their own, and
      the 7 proofs at the ceiling, the 9 prime ones and the 29 repeats rest on the game before them or on the game they
      repeat, so on the chain from n = 1 (see 5).
-   * Past 1300, `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl` has ten games of 1302–1352
-     solved standalone (the matching path, 8 threads), each finishing with the promotion sum recorded here.  The rest of
-     1301–5060 is the chain's: 1196 exhausted searches of their own, 329 proofs at the ceiling, 423 prime ones and 1430
-     repeats that rest on the games before them, and 382 games of the store.
+   * Past 1300,
+     [taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/bands.jsonl)
+     has ten games of 1302–1352 solved standalone (the matching path, 8 threads), each finishing with the promotion sum
+     recorded here.  The rest of 1301–5060 is the chain's: 1196 exhausted searches of their own, 329 proofs at the
+     ceiling, 423 prime ones and 1430 repeats that rest on the games before them, and 382 games of the store.
 4. **Agreement between builds and files.**
    * n ≤ 1000: the chain's scores are the table's, all 1000, where the table was the Java solver's `optimal.json` when
      the run was made (each line's `optimal_match` is true).  797 of the chain's games are that table's move for move,
@@ -221,7 +222,8 @@ What that evidence amounts to:
      on the final file).  Past 2300 the evidence is the run's own: the verifiers on the whole file.
    * n = 3441–3914: no other chain reaches here either.  The evidence is the third run's own: it solved 1–3440 again
      before these games, with this file's scores in all of them (its lines of those games are kept in [its
-     entry](../solver/notebook/the-run-to-the-wall-2026-10/README.md), not here), and the verifiers pass the whole file.
+     entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-the-wall-2026-10/README.md), not here), and
+     the verifiers pass the whole file.
    * n = 3915–4547: no other chain reaches here either.  The evidence is the fourth run's own, which took games 1–3914
      from this file and did not solve them again, and the verifiers pass the whole file.
    * n = 4548–4874: no other chain reaches here either.  The evidence is the fifth run's own ([runs.md](runs.md)),
@@ -243,11 +245,11 @@ What that evidence amounts to:
    (W1)](../docs/theory/parity-bound.md#the-parity-bound)).  So
    the file's scores to 2175 do not rest on the frame model either: those 2175 are opt(n) on the whole board.  The
    games 1301–2175 were proven in the cloud run of 2026-10-14 and 15 ([the
-   notebook](../solver/notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).  The 2885
-   games of 2176–5060 are proven within the frame model, which is exact given U ([the exactness theorem
-   (X7)](../docs/theory/exactness.md#the-exactness-theorem)).  `taxman certify` can check U there game by game, with
-   the prover's barred bounds ([the prover's README](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has
-   them to 3440).
+   notebook](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)).
+   The 2885 games of 2176–5060 are proven within the frame model, which is exact given U ([the exactness theorem
+   (X7)](../docs/theory/exactness.md#the-exactness-theorem)).  `taxman certify` can check U there game by game, with the
+   prover's barred bounds ([the prover's README](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game) has them
+   to 3440).
 
 The checks cannot catch a game that is legal, finished and within the chain bounds but not optimal, when the game of n
 − 1 is not optimal either.  That is what the proof kinds and the assumptions track, and why the chain from n = 1 and
@@ -256,10 +258,10 @@ the standalone solves (3) matter.
 ## bounds.jsonl
 
 The bounds store: the bounds on opt(n) that [the
-ledger](../solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) finds, kept for good, for the
-games from 3915 on.  A game is *proven* when its best lower bound equals its best upper bound, and the file is the
-record of those proofs, which the lines of proof `known` in `optimal.jsonl.gz` cite.  The first `ledger export` made it,
-from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
+ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)
+finds, kept for good, for the games from 3915 on.  A game is *proven* when its best lower bound equals its best upper
+bound, and the file is the record of those proofs, which the lines of proof `known` in `optimal.jsonl.gz` cite.  The
+first `ledger export` made it, from stage 1 of the ledger past 4400 (2026-10-18), and each export since appends to it.
 
 Its lines are bounds that hold.  A lower bound is the score of a finished game that the referee replays.  An upper
 bound is the frame model's, carried between games as [the
@@ -403,12 +405,13 @@ A results line that rests on a proven game assumes that, one statement a game (`
 Both exit with status 1 if any check fails, and name the line (`line K (n=N)`).
 
 **Size.**  The laptop's dry run of 901..960, with the truth hidden, made [the ledger entry's
-`store/`](../solver/notebook/search/the-ledger-bounds-from-both-sides-2026-10/store/): 58 games of the stretch not in
-the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a game.  Its lines took 330 bytes for
-a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and 155 for an upper bound.  At the end of
-the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves about 15, and a cited game and an upper
-bound about 150 and 220 bytes.  On 2026-10-22 the store held 4,277 games in 9.2 megabytes, about 2.1 kilobytes a game,
-against the chain's 7.3 (36.8 megabytes for 5,060 games uncompressed; the file of 5,060 games is 1.10 megabytes).
+`store/`](https://github.com/bvchess/taxman-notebook/tree/main/search/the-ledger-bounds-from-both-sides-2026-10/store):
+58 games of the stretch not in the chain, two exports of one stretch in all, 171 lines of 45 kilobytes, 778 bytes a
+game.  Its lines took 330 bytes for a game of promotions, 135 for a cited game, 1.7 kilobytes for a game of moves and
+155 for an upper bound.  At the end of the chain (4400..8191) a promotion set is about 2 kilobytes, a game of moves
+about 15, and a cited game and an upper bound about 150 and 220 bytes.  On 2026-10-22 the store held 4,277 games in 9.2
+megabytes, about 2.1 kilobytes a game, against the chain's 7.3 (36.8 megabytes for 5,060 games uncompressed; the file of
+5,060 games is 1.10 megabytes).
 
 ## certificates
 

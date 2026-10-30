@@ -9,7 +9,7 @@ searches of neighboring games learn many of the same ones: their frames are near
 chain refutes the same hard core game after game.  Each searcher's own table forgets its nogoods every 50,000 steps
 and starts empty in each game.  A *store* of carried nogoods keeps them, with three rules that carrying the tables
 themselves broke ([carrying nogoods
-over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)):
+over](https://github.com/bvchess/taxman-notebook/blob/main/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)):
 
 * the store is apart from the searcher's table, and never gives the conflict a node branches on, so it does not steer
   the branching;
@@ -61,4 +61,4 @@ before each checkpoint and at its end, to a file beside it that it then renames,
 meanwhile reads a whole store; and a resumed search starts from the store of its earlier runs, so that its own keeps
 them.  Without a store the tactic does nothing.  What it is worth, measured on
 units of game 4984 with the nogoods that units of 4983 learned, is in [the root gap and the size of a
-game](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-carrying-the-hard-cores-nogoods-into-the-next-game-q7).
+game](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-carrying-the-hard-cores-nogoods-into-the-next-game-q7).

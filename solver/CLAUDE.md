@@ -8,9 +8,11 @@ the docs listed at the end.  Paths here are from the top of the repository; Carg
   and the notebook entries their task needs.
 * **Nothing unproven.**  Every rule the frame solver relies on is proven ([docs/THEORY.md](../docs/THEORY.md)) and
   tested.  Committed results are evidence, and runs never overwrite them.
-* **Record every experiment.**  Read the register's file of its subject (solver/notebook/register/) before proposing
-  one, and record each when it ends, failures included, as the notebook's front page says (one folder an entry in
-  solver/notebook/ or solver/notebook/search/, its README.md the entry, with its rows in the register).
+* **Record every experiment.**  The lab notebook is a repository of its own, bvchess/taxman-notebook ([the project's
+  CLAUDE.md](../CLAUDE.md) says where its checkout goes).  Read the register's file of its subject (`register/` there)
+  before proposing one, and record each experiment there when it ends, failures included, as the notebook's front page
+  says (one folder an entry, its README.md the entry, with its rows in the register).  An experiment that changes code
+  commits to both repositories: the code here, and the entry there, which names the code's commit.
 
 * **Writing.**  Docs follow [docs/WRITING.md](../docs/WRITING.md).
 * **Keep the quick check quick.**  Every change passes `solver/tools/quick_check.py`, which fails on a slow test or a
@@ -26,9 +28,11 @@ the docs listed at the end.  Paths here are from the top of the repository; Carg
 * **[solver/docs/DESIGN.md](docs/DESIGN.md)**: the design, the index of solver/docs/design/, a file a part
   ([testing.md](docs/design/testing.md) says how changes are tested).
 * **[solver/docs/STATUS.md](docs/STATUS.md)**: the current state: the priority, and the projects in flight.
-* **[solver/notebook/README.md](notebook/README.md)**: the lab notebook's rules, and the map of its register (register/,
-  a file a subject); its entries are the folders beside it and in search/.
-* **[solver/docs/AGENDA.md](docs/AGENDA.md)**: the research avenues.
+* **[taxman-notebook/README.md](https://github.com/bvchess/taxman-notebook/blob/main/README.md)**: the lab notebook's
+  rules, and the map of its register (register/, a file a subject); its entries are the folders beside it and in
+  search/.
+* **[taxman-notebook/agenda/AGENDA.md](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md)**: the
+  research avenues.
 * **[solver/docs/RUNBOOK.md](docs/RUNBOOK.md)**: the guide to running on EC2, the index of solver/docs/runbook/, a file
   a job ([launch.md](docs/runbook/launch.md) has the rules for every launch).
 * **results/**: the committed chain of proven games.

@@ -61,8 +61,9 @@ gains dated sections, and nothing in it is rewritten.  When the work concludes, 
 posterity: its question in a sentence and its answer in a sentence or two, then the method, the results with the
 numbers that decided them, and the decision.  The record keeps failures as well as successes and links to its files,
 and it leaves out the ups and downs of the journey, which git keeps.  Every entry says when its work started and, once
-it has, when it concluded.  The [notebook's front page](../solver/notebook/README.md#how-this-notebook-is-kept) has the
-rules for filing it.
+it has, when it concluded.  The [notebook's front
+page](https://github.com/bvchess/taxman-notebook/blob/main/README.md#how-this-notebook-is-kept) has the rules for filing
+it.
 
 ## 8. Give each task one file
 
@@ -111,9 +112,14 @@ catalog, optimize.  The committed data keeps the names it was written with, and 
 
 The docs test, `solver/frame/tests/docs.rs`, runs in `solver/tools/quick_check.py`.  It checks that every relative link
 resolves, that every heading cited by name or by number exists (and every paragraph or list item cited by the bold or
-italic words it opens with), and that every document but the notebook's entries keeps rule 8's limits.  It also checks
-that neither the guides nor the comments of the code and the scripts use the words the project has retired, or a
-person's name where a role belongs, and that the prose and the comments are spelled the American way (rule 10).
+italic words it opens with), and that every document keeps rule 8's limits.  It also checks that neither the guides nor
+the comments of the code and the scripts use the words the project has retired, or a person's name where a role
+belongs, and that the prose and the comments are spelled the American way (rule 10).
+
+The notebook is a repository of its own, and [CLAUDE.md](../CLAUDE.md) says where its checkout goes.  With a checkout,
+the test also checks that every URL that names a file or a folder of either repository, and its anchor, resolves, and
+that the notebook's entries, register and front page keep their rules; without one, it checks the form of those URLs.
+Its output says which notebook it checked, or that it checked none.
 
 ## Sources
 

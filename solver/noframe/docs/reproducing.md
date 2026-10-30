@@ -51,7 +51,7 @@ Every campaign appends one JSON line per game and skips the games already in its
 running it again; `exact` also checkpoints the searches in progress (`work/checkpoints`).  The committed data is gzipped
 where large (`gunzip -k` to resume into it).  The commands marked study E6 measure whether leaving the sources of layer
 3 or more free costs the prover's search anything, the theory track's measurement E6 ([its
-entry](../../notebook/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)).
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-upper-part-game-by-game-and-two-cloud-runs-prepared-2026-10/README.md#the-plan-of-e6)).
 
 ## The recorded games
 

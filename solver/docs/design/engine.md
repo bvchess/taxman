@@ -22,7 +22,8 @@ the design in outline.
   open split request per idle worker, and any running worker can claim one with an atomic decrement, so as many workers
   split at once as there are idle workers to feed.  A worker answers only after 64 polls of its unit, so that a fresh
   unit first gets deep enough to have something to give.  One locked deque is enough, because units exist only after
-  yields and a rebuild costs the searcher far more than the lock ([the engine](../../notebook/the-engine/README.md)).
+  yields and a rebuild costs the searcher far more than the lock ([the
+  engine](https://github.com/bvchess/taxman-notebook/blob/main/the-engine/README.md)).
 * **Memory bound.**  The in-memory deque holds at most `queue_mem_cap` units; beyond that the engine spills the oldest
   to segment files in `spill_dir`, and reloads them when memory runs dry.  Searchers keep only their stack and bounded
   caches.
@@ -198,8 +199,8 @@ starts with the final seed and the ceiling, on every thread.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 
-[Round B](../../notebook/round-b-the-chain-on-many-threads-2026-10/README.md) has what the window buys and what was
-tried on the way.
+[Round B](https://github.com/bvchess/taxman-notebook/blob/main/round-b-the-chain-on-many-threads-2026-10/README.md) has
+what the window buys and what was tried on the way.
 
 **The table of optimal games is built into the binary** (`results/optimal.jsonl.gz`, through `include_bytes!` and
 `game::Optimal::built_in`): the games of the file as it was when the crate was compiled, which a rebuild picks up when

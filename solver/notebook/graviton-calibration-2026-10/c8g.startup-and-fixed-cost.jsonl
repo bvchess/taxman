@@ -1,9 +1,0 @@
-{"machine": "c8g", "label": "chain-2126.t1", "kind": "chain", "game": 2126, "threads": 1, "exit": 0, "wall_s": 46.66, "user_s": 46.42, "sys_s": 0.24, "max_rss_kb": 94332}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2126, "score": 1427212, "search_s": 0.0, "total_s": 0.62038585, "nodes": 0, "threads": 1, "completed": true, "proof": "same_search", "invocations": 1}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2127, "score": 1427937, "search_s": 0.0, "total_s": 0.620480012, "nodes": 0, "threads": 1, "completed": true, "proof": "same_search", "invocations": 1}
-{"machine": "c8g", "label": "chain-2126.t8", "kind": "chain", "game": 2126, "threads": 8, "exit": 0, "wall_s": 46.63, "user_s": 46.4, "sys_s": 0.23, "max_rss_kb": 94576}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2126, "score": 1427212, "search_s": 0.0, "total_s": 0.621024142, "nodes": 0, "threads": 8, "completed": true, "proof": "same_search", "invocations": 1}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2127, "score": 1427937, "search_s": 0.0, "total_s": 0.620963806, "nodes": 0, "threads": 8, "completed": true, "proof": "same_search", "invocations": 1}
-{"machine": "c8g", "label": "chain-2126.t64", "kind": "chain", "game": 2126, "threads": 64, "exit": 0, "wall_s": 46.67, "user_s": 46.4, "sys_s": 0.26, "max_rss_kb": 95072}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2126, "score": 1427212, "search_s": 0.0, "total_s": 0.625289445, "nodes": 0, "threads": 64, "completed": true, "proof": "same_search", "invocations": 1}
-{"machine": "c8g", "kind": "chain-game", "chain_from": 2126, "game": 2127, "score": 1427937, "search_s": 0.0, "total_s": 0.625809641, "nodes": 0, "threads": 64, "completed": true, "proof": "same_search", "invocations": 1}

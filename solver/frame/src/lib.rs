@@ -19,7 +19,7 @@
 //! every frame over GF(2) (or by a matching relaxation) and run on many threads, finds that set; a game of `n` is
 //! built from the game of `n − 1`, so a chain of games from `n = 1` proves each from the one before.  `README.md` (in
 //! the crate's directory) is the user guide; `docs/GLOSSARY.md` defines the project's words; `DESIGN.md` explains the
-//! design; `solver/notebook/README.md` is the lab notebook of how it got there.
+//! design; https://github.com/bvchess/taxman-notebook/blob/main/README.md is the lab notebook of how it got there.
 //!
 //! # From n to a game
 //!

@@ -1,9 +1,0 @@
-boards 1265, proven 0, CPU 1299 s, wall 540 s (stopped by a signal)
-setup (the boards' facts and problems): 38.4 CPU s
-maps: 390, 712.5 s
-searches: 0 of 0 boards, 0.0 s; completed 0 (0 at their ceiling), stopped 0
-stopped searches whose dual bound lowered U: 0, by 0 in all (median None)
-changes the relations made: lower ceiling 1249, lower monotone 6614, lower prime 1163, lower repeat 2995, upper ceiling 81861, upper monotone 189, upper prime 12001, upper repeat 55543
-the run's CPU over its wall time: 2.34 of 64 workers (4%)
-from the last map's result to the end: 1.00 of 64 (2%)
-boards by their number of searches: {0: 1265}

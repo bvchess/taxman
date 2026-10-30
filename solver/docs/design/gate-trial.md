@@ -7,12 +7,13 @@ The *gate* is the gap from which a node branches on the conflict that the tactic
 than on the search's own ([search.md, "Conflict branching"](search.md#conflict-branching)).  On units cut from the
 checkpoints of four games near n = 5000, a gate of 600 took 0.68 to 1.55 of the CPU of the gate of 1,200, and the
 spread of a game's open gaps stays the same through most of its search, so the game is what decides, not the phase
-([the notebook's entry](../../notebook/search/a-gate-for-each-game-2026-10/README.md)).  Each game's search with
-conflict branching on runs a *gate trial* once, by default (`--gate-trial GATES` names other gates, and `--gate-trial
-none` runs none): it solves a sample of its own units under each gate of GATES, 1000, 800 and 600 by default, and under
-the gate it has, and keeps the gate that took the least CPU (`search::gate_trial`).  The gate a search has is the one it
-starts with: the default, 1,200, or the `--gate GAP` of the run, which sets the starting gate of every game, so that a
-plain run compares 1000, 800 and 600 against 1200.
+([the notebook's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/a-gate-for-each-game-2026-10/README.md)).  Each
+game's search with conflict branching on runs a *gate trial* once, by default (`--gate-trial GATES` names other gates,
+and `--gate-trial none` runs none): it solves a sample of its own units under each gate of GATES, 1000, 800 and 600 by
+default, and under the gate it has, and keeps the gate that took the least CPU (`search::gate_trial`).  The gate a
+search has is the one it starts with: the default, 1,200, or the `--gate GAP` of the run, which sets the starting gate
+of every game, so that a plain run compares 1000, 800 and 600 against 1200.
 
 *How it runs.*  The trial waits for the first checkpoint written once the search has taken 50 million steps (over every
 run of it).  A thread beside the workers reads that checkpoint's units, a uniform sample of 2,000 if there are more, and

@@ -5,9 +5,9 @@ Part of the [runbook](../RUNBOOK.md).
 `solver/tools/ledger/cloud.sh FIRST-LAST` runs the ledger over a stretch of games for a budget of CPU on one machine.
 The ledger (`examples/ledger/`; [README, "The ledger"](../../frame/README.md#the-ledger)) proves games from both sides, bounds from below
 and above, in the order that its scheduler judges cheapest.  [The ledger's
-entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) records how the scheduler works, the
-laptop's dry run, and every launch and what it found.  A launch needs the approval of whoever owns the AWS account, with
-the cost below ([rules for every launch](launch.md#rules-for-every-launch)).
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)
+records how the scheduler works, the laptop's dry run, and every launch and what it found.  A launch needs the approval
+of whoever owns the AWS account, with the cost below ([rules for every launch](launch.md#rules-for-every-launch)).
 
 `cloud.sh` runs `ledger run`, with no proven game unless `PROVEN` gives some, then `ledger report --known
 results/optimal.jsonl.gz`.  The report exits
@@ -54,19 +54,19 @@ limits (`BASE`, `MAX_LIMIT`), the games the run is given (`PROVEN`), and the sch
 its section of the entry:
 
 * **The climbs** ([wedge and
-  climb](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)):
+  climb](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-wedge-and-climb)):
   from each board it proves, the scheduler searches the board above and the board below at once, seeded with its game.
   `CLIMB` is their ways (`up`, `down`, `both` or `off`; unset, the program's `both`), and `CLIMB_LIMIT` their limit in
   seconds (unset, the program's 60).  `CLIMB=off` or `CLIMB_LIMIT=0` runs without climbs.  The events and the report say
   what each way cost and proved.
 * **The finder**, large neighborhood search ([the finder in the
-  ledger](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
+  ledger](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-17-the-finder-in-the-ledger)),
   runs on a worker after a board's map and before a search whose best seed has changed.  It finds a legal game, not a
   proof, and its game is a lower bound once the referee has replayed it.  `LNS_SECONDS` is the seconds of one thread it
   gets (unset, the program's 1; 0 runs without it).  Its events (`lns_s`, `lns_from`, `lns_found`, `seed_from`,
   `below_proven`, `above_proven`, on the maps and the searches) and the report's `finder:` line say what it did.
 * **The floor steps** ([floor-guided
-  drilling](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)):
+  drilling](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md#later-2026-10-18-floor-guided-drilling)):
   an open board that is not climbed to is stepped down before its proof.  A step is a search under a floor below the
   board's upper bound; if it completes having found nothing, the floor becomes the upper bound (the rule `floor`), and
   each step costs about ten times the one before.  `FLOOR_STEP` is the points a step goes down (unset, the program's
@@ -116,6 +116,7 @@ Then commit the file.  The checkpoints are in S3 only for the searches still goi
 
 ## Examples
 
-[The ledger's entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) records each of its
-runs: the laptop's dry run, the first cloud attempt and its fix, and the stages past 4400 with the climbs, the finder
-and the floor steps, each with its settings and what it proved.
+[The ledger's
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/the-ledger-bounds-from-both-sides-2026-10/README.md)
+records each of its runs: the laptop's dry run, the first cloud attempt and its fix, and the stages past 4400 with the
+climbs, the finder and the floor steps, each with its settings and what it proved.

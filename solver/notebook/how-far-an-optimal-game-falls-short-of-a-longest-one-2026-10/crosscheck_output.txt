@@ -1,6 +1,0 @@
-26 s
-games 2..4949: 4948
-recorded game illegal or at another score: none; also replayed by core.check_sequence: 52 games
-recorded game with more moves than the matching number: none
-recorded game with fewer moves than the matching number (n, by how many): [(51, 1), (182, 1), (183, 1), (833, 1), (834, 1), (835, 1)]
-disagreements with run.jsonl on the matching number or the move count: none

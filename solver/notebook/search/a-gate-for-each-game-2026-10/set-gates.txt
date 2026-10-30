@@ -1,3 +1,0 @@
-g1200 --tactic conflict_branching=on --tactic price_reuse=on --tactic warm_start=on --tactic carried_nogoods=on --carried STORE --gate 1200
-g600 --tactic conflict_branching=on --tactic price_reuse=on --tactic warm_start=on --tactic carried_nogoods=on --carried STORE --gate 600
-g800 --tactic conflict_branching=on --tactic price_reuse=on --tactic warm_start=on --tactic carried_nogoods=on --carried STORE --gate 800

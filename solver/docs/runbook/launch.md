@@ -16,7 +16,8 @@ calibration.  The jobs link here instead of repeating them.
   interruption would ruin a run), on the `c8g` family (Graviton4), in the sizes that the calibration settled on:
   `c8g.xlarge` to try the scripts, `c8g.4xlarge` for the prover's proofs ([Which instance](prover.md#which-instance)),
   `c8g.16xlarge` for the chain.  The entry [Graviton calibration
-  (2026-10)](../../notebook/graviton-calibration-2026-10/README.md) holds the measurements, with their scripts and data.
+  (2026-10)](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md) holds the
+  measurements, with their scripts and data.
 * **Set a timer on every instance.**  Launch with `--instance-initiated-shutdown-behavior terminate`, and put
   `shutdown -h +MINUTES` in the user data, with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, [Cost
   guardrails](#cost-guardrails)).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance,

@@ -62,7 +62,7 @@ game, the claims that some O refuses (`m5_refused`).
   4095 (layers 3 to 11), whatever O is.  From 4096 it has ten with every source open, which `build_extended` refuses
   (`MAX_FRAMES`), naming the game and the layers.  The census of the frames recorded the count with every such source
   open for every game to 8191 ([the claims of `unzip` in the extended
-  problem](../../notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).  Opening a source also adds
-  one to its frame's rank, so a problem with many open sources can need more words of the GF(2) bound than the narrow
-  set widths compile (three, rank 192) or the widest (five, rank 320): `search::prepare_extended` refuses it, saying so,
-  rather than fail in the search.
+  problem](https://github.com/bvchess/taxman-notebook/blob/main/the-claims-of-unzip-in-the-extended-problem-2026-10/README.md)).
+  Opening a source also adds one to its frame's rank, so a problem with many open sources can need more words of the
+  GF(2) bound than the narrow set widths compile (three, rank 192) or the widest (five, rank 320):
+  `search::prepare_extended` refuses it, saying so, rather than fail in the search.

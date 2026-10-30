@@ -14,7 +14,7 @@
 //! a nogood, and [`all_forced`](CarriedNogoods::all_forced) ends a node whose forced members complete one.  It never
 //! gives the conflict a node branches on, which stays the searcher's own table's.  A carried table that also chose
 //! the conflict steered the branching and lost:
-//! solver/notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md, "Results".
+//! solver/docs/design/carried-nogoods.md.
 //!
 //! # Watched members
 //!

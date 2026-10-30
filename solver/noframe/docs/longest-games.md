@@ -42,7 +42,7 @@ payments (`play_order`).
 
 The checks: M(n) and the heaviest longest game against brute force for n <= 22, ν(n) against the matching solver for
 every board to 400, and `play_order` against the recorded games to 400.  For every game to 4949, [an independent
-check](../../notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/crosscheck.py)
+check](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/crosscheck.py)
 in Python replays the recorded game and computes ν(n) from scratch by Hopcroft-Karp.
 
 Each game reads its predecessor's line in the output file, so a run that continues an earlier one starts from a copy of
@@ -52,11 +52,11 @@ games](reproducing.md#the-recorded-games)).
 ## Results
 
 `data/moves_2_1300.jsonl` holds every game 2..1300, and
-[`moves_1301_4949.jsonl`](../../notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/moves_1301_4949.jsonl)
+[`moves_1301_4949.jsonl`](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/moves_1301_4949.jsonl)
 every game 1301..4949, where the committed chain ended on 2026-10-24 (`tools/summarize.py moves` reads both).  The first
 took seven minutes on one thread, nearly all of it the three searches for the heaviest longest game, 2.5 to 2.6 million
 nodes each.  The second took 27 seconds, since the matching settled every game ([the notebook
-entry](../../notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md)).
+entry](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md)).
 
 | | games 2..1300 | games 1301..4949 |
 |---|---|---|
@@ -116,7 +116,7 @@ What the data shows:
   two-frame game of frames 0 and 1 for its heaviest promotion set, and lowers frame 0's freedoms to that set's size,
   which can cut sets with *more* promotions into frame 0, never fewer.  The frame solver ported it as the tactic
   `revise_freedoms`, measured it and removed it ([which tactics earn their
-  keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)).
+  keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md)).
 * **833 refutes that "theorem" for the whole frame game.**  The exchange above is a promotable set: the
   optimal game promotes 48 numbers and the longest 49, which is the frame model's `max_total`
   (`solver/frame/tests/soundness.rs`, `the_heaviest_promotion_set_of_833_is_not_the_largest`).  So at 833 `max_total`

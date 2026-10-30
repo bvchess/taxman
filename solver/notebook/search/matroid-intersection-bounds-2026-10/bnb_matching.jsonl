@@ -1,2 +1,0 @@
-{"n":880,"bound":"Matching","opt":17671,"completed":false,"nodes":200000,"cut_by_count":0,"cut_by_bound":129227,"branches":200002,"better":0,"warm":0,"cold":0,"augmentations":0,"seconds":12.741,"bound_seconds":11.325,"build_seconds":0.000}
-{"n":936,"bound":"Matching","opt":20507,"completed":false,"nodes":200000,"cut_by_count":0,"cut_by_bound":143936,"branches":200016,"better":0,"warm":0,"cold":0,"augmentations":0,"seconds":16.846,"bound_seconds":15.190,"build_seconds":0.000}

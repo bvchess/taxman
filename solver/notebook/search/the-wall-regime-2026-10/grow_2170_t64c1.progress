@@ -1,8 +1,0 @@
-n=2170 11.9s nodes 23250 (1.9k/s) best 112062 queue 775 spilled 0 | eff 92.8% idle 1.7% lock 0.0% splits 5 steals 65 full 344.3ms pauses 1 (5.5%) max 1.94s park 1.93s
-n=2170 23.9s nodes 49486 (2.2k/s) best 112062 queue 1332 spilled 0 | eff 92.8% idle 0.9% lock 0.0% splits 5 steals 65 full 344.3ms pauses 2 (6.3%) max 1.95s park 1.93s
-n=2170 35.2s nodes 75903 (2.3k/s) best 112062 queue 1705 spilled 0 | eff 93.2% idle 0.6% lock 0.0% splits 5 steals 65 full 344.3ms pauses 3 (6.2%) max 1.95s park 1.93s
-n=2170 46.2s nodes 101712 (2.3k/s) best 112062 queue 1688 spilled 0 | eff 93.5% idle 0.4% lock 0.0% splits 5 steals 65 full 344.3ms pauses 4 (6.0%) max 1.95s park 1.93s
-n=2170 57.2s nodes 127422 (2.4k/s) best 112062 queue 1572 spilled 0 | eff 94.1% idle 0.4% lock 0.0% splits 5 steals 65 full 344.3ms pauses 5 (5.5%) max 1.95s park 1.93s
-n=2170 1m08s nodes 153760 (2.4k/s) best 112062 queue 1307 spilled 0 | eff 94.3% idle 0.3% lock 0.0% splits 5 steals 65 full 344.3ms pauses 6 (5.4%) max 1.95s park 1.93s
-n=2170 1m19s nodes 181106 (2.6k/s) best 112062 queue 1230 spilled 0 | eff 94.5% idle 0.3% lock 0.0% splits 5 steals 65 full 344.3ms pauses 7 (5.2%) max 1.95s park 1.93s
-n=2170 1m30s nodes 207356 (stopped) best 112062 queue 1288 spilled 0 | eff 94.6% idle 0.2% lock 0.0% splits 5 steals 65 full 344.3ms pauses 8 (5.2%) max 1.95s park 1.93s

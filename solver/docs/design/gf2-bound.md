@@ -6,16 +6,16 @@ Part of the [design](../DESIGN.md).
 
 The *GF(2) bound*, the bound of every node of the search, relaxes winnability less than matchability does, and so
 prunes more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound's ([matroid intersection
-bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors
-coordinates over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal
-factors in the frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and
-the peel's order makes these vectors linearly independent.  The moves of a frame are fixed, so a set of candidates is
-*independent in the frame* when the classes of its members that touch it, modulo the span of the moves' vectors, are
-independent, and the frame's freedoms bound its size.  A candidate of home `h` touches frames `h` and `h − 1`, one even
-and one odd.  So independence in every frame is two conditions on the candidates, the even frames' blocks (side `A`) and
-the odd frames' blocks (side `B`), and every promotable set meets both.  The heaviest set of at most `max_add` members
-that is independent in every frame (found by weighted matroid intersection, solved in polynomial time), the node's
-*heaviest set* `I*`, bounds its completions.
+bounds](https://github.com/bvchess/taxman-notebook/blob/main/search/matroid-intersection-bounds-2026-10/README.md)).  In
+each frame, give the factors coordinates over GF(2), each *mover* (a move of the frame, or a number promoted into it)
+the vector of its maximal factors in the frame, and each number promoted out of it its own unit vector.  A winnable
+frame peels completely, and the peel's order makes these vectors linearly independent.  The moves of a frame are fixed,
+so a set of candidates is *independent in the frame* when the classes of its members that touch it, modulo the span of
+the moves' vectors, are independent, and the frame's freedoms bound its size.  A candidate of home `h` touches frames
+`h` and `h − 1`, one even and one odd.  So independence in every frame is two conditions on the candidates, the even
+frames' blocks (side `A`) and the odd frames' blocks (side `B`), and every promotable set meets both.  The heaviest set
+of at most `max_add` members that is independent in every frame (found by weighted matroid intersection, solved in
+polynomial time), the node's *heaviest set* `I*`, bounds its completions.
 
 [The frame bound](../../../docs/theory/frame-bounds.md#the-frame-bound) has the proof; it is the frame model's form of
 [the parity bound](../../../docs/theory/parity-bound.md#the-parity-bound), the prover's bound on the whole game.
@@ -76,19 +76,19 @@ misses are the *odd* cores of movers with three or more factors.
   of that level's, so a set smaller than its heaviest set is smaller than that level's too where its heaviest set, with
   the promoted, is no larger, and a larger set is larger where it is no smaller
   ([the root
-  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-28-floors-from-the-level-before-offers-dropped-before-their-bounds-and-copies-swapped-back)
-  has the measurements).  Both searches run over the split's reduced lengths,
-  by A* with the bounds of the searches for forced members below (`Meet::smaller_loss`, `Meet::gap_with`); debug builds
-  check each against Dijkstra's search and Bellman–Ford's.  A child that loses one member of its parent's heaviest set
-  besides those it promotes gets its own the same way, from the parent's exchange graph with the dropped elements banned
-  from the cycle.  Conflict branching prices a hundred members of a node this way
-  ([search.md](search.md#conflict-branching)), and a child that inherits its parent's heaviest set carries its parent's
-  prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's less the elements it promoted or dropped,
-  since contracting a member keeps the circuits of the others, so every cycle of the child's graph is one of the
-  parent's, as long, and a member's shortest cycle at the parent that is still a cycle of the child
-  (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's searches, nearly all
-  of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the same trees ([cheaper
-  steps of conflict branching](../../notebook/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
+  gap](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-28-floors-from-the-level-before-offers-dropped-before-their-bounds-and-copies-swapped-back)
+  has the measurements).  Both searches run over the split's reduced lengths, by A* with the bounds of the searches for
+  forced members below (`Meet::smaller_loss`, `Meet::gap_with`); debug builds check each against Dijkstra's search and
+  Bellman–Ford's.  A child that loses one member of its parent's heaviest set besides those it promotes gets its own the
+  same way, from the parent's exchange graph with the dropped elements banned from the cycle.  Conflict branching prices
+  a hundred members of a node this way ([search.md](search.md#conflict-branching)), and a child that inherits its
+  parent's heaviest set carries its parent's prices (`Gf2Bound::prices_excluding`): its exchange graph is its parent's
+  less the elements it promoted or dropped, since contracting a member keeps the circuits of the others, so every cycle
+  of the child's graph is one of the parent's, as long, and a member's shortest cycle at the parent that is still a
+  cycle of the child (`Meet::cycle_length`) is its shortest there.  Such children hold three quarters of the pricing's
+  searches, nearly all of which carry, and a step of the units of 4875 and 4914 costs 0.66 to 0.81 of the CPU, with the
+  same trees ([cheaper steps of conflict
+  branching](https://github.com/bvchess/taxman-notebook/blob/main/search/cheaper-steps-of-conflict-branching-2026-10/README.md)).
 * **Warm starts across deletions** (tactic `warm_start`, on by default).  A child that drops members of its parent's
   `I*` keeps only the dominant sets from before those members came in, a few members in the hardest games, and solves
   from there; so does a node that goes on without a member of its own `I*` with no level kept for it.  With the tactic,
@@ -107,7 +107,7 @@ misses are the *odd* cores of movers with three or more factors.
   1, an upper bound on it.  The cycle it finds otherwise is the one the search with no need finds, which takes the same
   vertices in the same order up to it.  The bound is the same, but where several sets weigh the same another may be
   found, and with it another conflict branched on, so the trees can change ([the root
-  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-warm-starts-by-deletion)
+  gap](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-warm-starts-by-deletion)
   has the measurements).
 * **Forced members.**  The weight split of `I*` bounds the intersection without each member in one pass, by weak
   duality, and a member without which that bound is below the need is forced, as the matching's are.  The split is
@@ -131,29 +131,29 @@ misses are the *odd* cores of movers with three or more factors.
   least arc out of it (`Meet::opening_length`): a member whose two arcs are longer than the slack is forced with no
   search, and the search for each other offers no vertex a distance from which no cycle within the slack can close
   ([the root
-  gap](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-cheaper-search-for-forced-members)
-  has the measurements).  Each search is A*: it takes the vertices in the order of their distance from the member plus
-  a lower bound on the path back to it, an element's least arc out where a member's column offers it, else 0, and so
-  finds the shortest cycle within the slack, which serves more of the levels after than the first one found would
-  ([an A* search](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-an-a-search-for-forced-members)).
+  gap](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-cheaper-search-for-forced-members)
+  has the measurements).  Each search is A*: it takes the vertices in the order of their distance from the member plus a
+  lower bound on the path back to it, an element's least arc out where a member's column offers it, else 0, and so finds
+  the shortest cycle within the slack, which serves more of the levels after than the first one found would ([an A*
+  search](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-an-a-search-for-forced-members)).
   An element's bound is found only where its offer could be made whatever the bound, below the slack and the shortest
-  cycle found: the columns a search reads offer few of their elements.
-  A member on a cycle that the search for another found within the slack is not searched, since
-  that cycle passes through it.  Nor is a member on a cycle that the last searches at the parent's depth, the node's own
-  or its child's found, if it is still a cycle of this exchange graph within the slack (`Meet::cycle_length`, a bit test
-  an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that inherits its
-  parent's heaviest set finds nearly all its members free on its parent's cycles ([what a GF(2) step carries from the
-  last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  The forced members
-  are the same.  Checking every member exactly costs each node more, and the trees fall by more: at the end of the
-  chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of a window of 80 members within the need, the
-  former tactic `force_window`, so a search checks them all ([the tuning
-  campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
-  the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
-  least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  An element free in `B` that
-  would not lower the hub is not offered, since it reaches no member sooner; the search for the loss of the smaller
-  sets offers none.  Their queue is a radix heap of packed (distance, vertex) keys, bucketed by distance and the keys of
-  one distance sorted once, which come out in the binary heap's order.  A*'s keys are the distance plus the bound,
-  with no count of arcs, so they can tie in distance with the last one taken, which the queue allows.
+  cycle found: the columns a search reads offer few of their elements.  A member on a cycle that the search for another
+  found within the slack is not searched, since that cycle passes through it.  Nor is a member on a cycle that the last
+  searches at the parent's depth, the node's own or its child's found, if it is still a cycle of this exchange graph
+  within the slack (`Meet::cycle_length`, a bit test an arc).  A child's exchange graph is its parent's less what it
+  promoted or dropped, so a child that inherits its parent's heaviest set finds nearly all its members free on its
+  parent's cycles ([what a GF(2) step carries from the
+  last](https://github.com/bvchess/taxman-notebook/blob/main/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).
+  The forced members are the same.  Checking every member exactly costs each node more, and the trees fall by more: at
+  the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of a window of 80 members within
+  the need, the former tactic `force_window`, so a search checks them all ([the tuning
+  campaign](https://github.com/bvchess/taxman-notebook/blob/main/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
+  The searches reach the elements free in `A` from the members, and the members from the elements free in `B`, through
+  one hub each (the least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  An element
+  free in `B` that would not lower the hub is not offered, since it reaches no member sooner; the search for the loss of
+  the smaller sets offers none.  Their queue is a radix heap of packed (distance, vertex) keys, bucketed by distance and
+  the keys of one distance sorted once, which come out in the binary heap's order.  A*'s keys are the distance plus the
+  bound, with no count of arcs, so they can tie in distance with the last one taken, which the queue allows.
 * **A child's bound from its parent's split.**  The same weak duality bounds a child before it is made.  A child that
   promotes members `F` of `I*` asks for sets `J` independent in every frame together with `F`, so each makes `J ∪ F` a
   set of the parent's problem, with no candidate the child lacks.  So `w1(J) + w2(J)` is at most the heaviest set
@@ -169,25 +169,27 @@ misses are the *odd* cores of movers with three or more factors.
   search of the forced members finds (`Meet::shortest_cycle_length`); `Meet::without` then finds the cycle of the member
   whose level the node keeps alone, the shortest with the fewest arcs, whose flip is that level's heaviest set, its
   search bounded by that length.  The cheaper choices (the split's bound alone, the largest member) took more nodes and
-  more time ([the GF(2) bound in the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)),
+  more time ([the GF(2) bound in the
+  search](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/README.md)),
   and so did a limit to the members whose bounds are found, and a cheaper choice deep in the tree: they were tactics
-  once, and are removed ([tactics.md](tactics.md), the paragraph on the tactics removed).  Every member of a conflict
-  is tried, and once a member is found forced the others still are, to find more forced members.
+  once, and are removed ([tactics.md](tactics.md), the paragraph on the tactics removed).  Every member of a conflict is
+  tried, and once a member is found forced the others still are, to find more forced members.
 * **What it replaced.**  The matching bound was the node bound before it, with a refinement by the branches of its
   conflicts and a Lagrangian bound over the nogoods after it, the *matching path*.  With the GF(2) bound the 146
   one-thread proofs of the slope study ran 45 times faster with 426 times fewer nodes ([the GF(2) bound in the
-  search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)), and the matching path was removed.
-  The search does not compute the matching bound as a first check either, which costs more than the cuts it saves.
-  The conflicts, nogoods, forced members and exact sets work as they did with the matching bound.  The Lagrangian bound
-  after the GF(2) bound changed no tree measured and cost 3.6 to 4.3% ([the tuning campaign at the end of the
-  chain](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
+  search](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/README.md)),
+  and the matching path was removed.  The search does not compute the matching bound as a first check either, which
+  costs more than the cuts it saves.  The conflicts, nogoods, forced members and exact sets work as they did with the
+  matching bound.  The Lagrangian bound after the GF(2) bound changed no tree measured and cost 3.6 to 4.3% ([the tuning
+  campaign at the end of the
+  chain](https://github.com/bvchess/taxman-notebook/blob/main/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
 * **Block words.**  A level's vectors are as wide as the root's largest frame rank (its freedoms) needs: one to three
   words of 64 bits on every game to 4095 (ranks up to 169), four from 4740 and five from 6392 (ranks up to 314 at 8191;
-  [boards past 4095](../../notebook/boards-past-4095-2026-10/README.md) has the scan of every game).  Each word count is
-  a copy of the bound's code (`Levels<W, R>`, R from 1 to `gf2::MAX_WORDS` = 5) for every set width that has it.  Only
-  the sets of 128 words have the copies of four and five words, so the narrower widths build as before.  Tests run those
-  copies on small games with the vectors padded with zero words (`Gf2Graph::padded`), where they must search the same
-  tree.
+  [boards past 4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md) has the
+  scan of every game).  Each word count is a copy of the bound's code (`Levels<W, R>`, R from 1 to `gf2::MAX_WORDS` = 5)
+  for every set width that has it.  Only the sets of 128 words have the copies of four and five words, so the narrower
+  widths build as before.  Tests run those copies on small games with the vectors padded with zero words
+  (`Gf2Graph::padded`), where they must search the same tree.
 * **Other weights.**  `meet::Problem` takes weights that are positive and do not decrease with an element's index, as
   the root's candidates, in increasing order, have them; two of its starts rely on that: the start from the heaviest
   uncontended elements, and the greedy lower bound.  A bound that weighs the candidates otherwise (a Lagrangian over the
@@ -201,8 +203,8 @@ misses are the *odd* cores of movers with three or more factors.
 [The decomposition bound](../../../docs/theory/frame-bounds.md#the-decomposition-bound) joins the GF(2) bound and the
 independence of the frames under signed GF(3) signings through Lagrange multipliers.  It is no tactic of the search: the
 study of the multi-field bound computed it ([a bound over GF(2) and GF(3) signed frame
-matroids](../../notebook/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)), and the example
-`wall`, removed since, evaluated it at nodes with that study's code, [`examples/wall/fields/` at commit
+matroids](https://github.com/bvchess/taxman-notebook/blob/main/search/a-bound-over-gf2-and-gf3-signed-frame-matroids-2026-10/README.md)),
+and the example `wall`, removed since, evaluated it at nodes with that study's code, [`examples/wall/fields/` at commit
 3ca11bf](https://github.com/bvchess/taxman/tree/3ca11bf/solver/frame/examples/wall/fields).  The code evaluated the
 bound exactly in integers, so that its floor bounds every promotion sum whatever produced the multipliers: the weights
 are `x·2^16` and the multipliers are rounded to multiples of `2^-16`, the intersection is `gf2::meet`'s and each GF(3)
@@ -228,8 +230,11 @@ The pairs come in classes of primes that the frame builder treats alike.  At 130
 {67, 71}, {73, 79}, {89, …, 107}, {109, …, 139} and {149, 151, 157}, which make 32 pairs; there are 99 at 2175 and 300
 at 4000.  `search::symmetry::root_pairs` finds them when a search is set up, in under a millisecond: it makes the full
 check only for the primes whose multiples have the same places and exponents in the frames, and only over the multiples.
-[Dominance and symmetry](../../notebook/search/dominance-and-symmetry-2026-10/README.md) found the exchanges, and [prime
-exchanges in the search](../../notebook/search/prime-exchanges-in-the-search-2026-10/README.md) put them in.
+[Dominance and
+symmetry](https://github.com/bvchess/taxman-notebook/blob/main/search/dominance-and-symmetry-2026-10/README.md) found
+the exchanges, and [prime exchanges in the
+search](https://github.com/bvchess/taxman-notebook/blob/main/search/prime-exchanges-in-the-search-2026-10/README.md) put
+them in.
 
 The search uses the pairs through the cofactor sums of a node's promotions `P` and candidates `C` ([the
 exchange-pruning lemma (R3)](../../../docs/theory/search-rules.md#pruning-by-prime-exchanges); `Symmetries::exclude`, a

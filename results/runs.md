@@ -25,7 +25,8 @@ strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 60 --progress 0`, run o
 `--time-limit` or `--node-limit`, and the `default` tactics: the GF(2) bound, `gf2`, on, and the Lagrangian bound over
 the nogoods, `lagrange`, off.  No game was resumed (`invocations` is 1 in every line of 1–2175), and none was built from
 a results file or from the table (`prev.source` is `run` from 2 on).  The [entry on the
-run](../solver/notebook/the-committed-chain-to-2175-2026-10/README.md) adds what it showed.
+run](https://github.com/bvchess/taxman-notebook/blob/main/the-committed-chain-to-2175-2026-10/README.md) adds what it
+showed.
 
 *Details.*  The checkpoint interval is not recorded, but the `engine.checkpoints` counts imply about 60 s: 1 each for
 2170 and 2172, the only games that searched for more than 60 s.  The run took 1638.6 s of wall time and 10,890 s of CPU
@@ -44,19 +45,19 @@ took 1022.5 s of search and 332.0 M nodes, on 4 threads of a machine shared with
 pessimistic; the second took 1052 s, and the first 3359 s.  Three tactics account for it:
 
 * `same_search` concludes 545 of those games as repeats of an earlier game's search ([the
-  notebook](../solver/notebook/search/same-search-2026-10/README.md));
+  notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/same-search-2026-10/README.md));
 * the Lagrangian bound over the nogoods makes the searches that remain shorter ([the
-  notebook](../solver/notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
+  notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
 * the GF(2) bound, which this is the first committed chain made with, makes them shorter again ([the
-  notebook](../solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).
+  notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/README.md)).
 
 **The second run, games 2176–3440.**  The command was `solver/tools/cloud/chain.sh 4095`, which runs `taxman solve
 1-4095 --window W --out strict.jsonl --checkpoint-dir ckpt --checkpoint-interval 300 --progress 60` on all the CPUs.  It
 ran on a copy of the first run's 2175 lines, so that the first game it solved was 2176, and its 24-hour deadline
 stopped it after game 3440 (status 124, with a final checkpoint written).  Every line of 2176–3440 records the build of
 commit 55287ff (`dirty` false), 64 threads, no `--time-limit` or `--node-limit`, and the `default` tactics.  The [entry
-on the run](../solver/notebook/the-frontier-chain-to-3440-2026-10/README.md) has its story and cost, and [the
-RUNBOOK](../solver/docs/RUNBOOK.md) the procedure.
+on the run](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md) has its
+story and cost, and [the RUNBOOK](../solver/docs/RUNBOOK.md) the procedure.
 
 *Details.*  The machine was one `c8g.16xlarge` (64 vCPUs of Graviton4, 124 GiB) on spot in us-east-1d, at $0.6752 an
 hour, in two instances.  The first ran from 2026-10-15 04:05:42Z with a window of 16 games in flight (`W`) to game
@@ -87,7 +88,7 @@ again first, with this file's scores in all (checked), and only its lines from 3
 lines before them are the second run's, unchanged, and the game of 3440 that line 3441 names (`prev`, by digest) is this
 file's.  Every kept line records that build (`dirty` false), 64 threads, one invocation, no `--time-limit` or
 `--node-limit`, the `default` tactics, and a `prev.source` of `run`, 3441's too.  The [entry on the
-run](../solver/notebook/the-run-to-the-wall-2026-10/README.md) has its story.
+run](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-the-wall-2026-10/README.md) has its story.
 
 *Details.*  The 474 games are 221 searches (178 exhausted, 43 at the ceiling), 193 repeats and 60 primes.  The searches
 took 21.28 G nodes and 49.0 hours of game time; the games overlap in the window.  107 games of 30 M nodes or more took
@@ -112,7 +113,7 @@ budget of 36 instance-hours ran out, and ended on 2026-10-20 at 05:31 PDT on its
 4548, which has a checkpoint and no completed line.  Four instances ran the solver, for $27.32: spot interruptions
 replaced the first two, and the budget ended the third, which `--continue` took up with a fourth.  A fifth, the first
 try of `--continue`, idled for about 25 minutes (about $0.30) on the old layout of the scripts.  [The notebook
-entry](../solver/notebook/the-run-to-5000-2026-10/README.md) records the run.
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-to-5000-2026-10/README.md) records the run.
 
 * `invocations` is 1 in every kept line but 3940, 3942, 4340, 4431, 4432 and 4433.  Those games were in flight when an
   instance stopped, and the next took them up from their checkpoints (2 each).  `prev.source` is `results` for 3940,
@@ -141,7 +142,7 @@ game of 4547 as `known`, which both verifiers accept, as for 3915.
 *Details.*  The run was launched on 2026-10-20 at 18:50 PDT, and the account's owner stopped it with `wall.sh stop` on
 2026-10-21 at 13:42 PDT, in the middle of game 4875, which has a checkpoint and no completed line.  One instance ran the
 solver, with no interruption, for 18.86 instance-hours and $13.58 at the ledger's price.  [The notebook
-entry](../solver/notebook/the-run-past-5000-2026-10/README.md) records the run.
+entry](https://github.com/bvchess/taxman-notebook/blob/main/the-run-past-5000-2026-10/README.md) records the run.
 
 * `prev.source` is `run` in every kept line.
 * The 327 games are 35 searches (all exhausted), 14 proofs at the ceiling (method `start`), 13 primes, 50 repeats and
@@ -183,7 +184,7 @@ searched 5049 and wrote only an incomplete line):
    line of it is kept.
 2. 01:54 to 03:10: build a88dc7f, in which `conflict_branching` is on by default, on 88 threads.  It started 4875 afresh
    and exhausted it in 186 M nodes and 3,383 s ([the notebook's
-   study](../solver/notebook/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md)),
+   study](https://github.com/bvchess/taxman-notebook/blob/main/search/where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md)),
    and did 4876–4878 too.
 3. 03:10 to 05:20: build a88dc7f on 72 threads: 4879.
 4. 05:20 to 12:35: build bcfde26 on 72 threads, with the lab's command folder and hook (`--lab-dir`, `--hook`; [the
@@ -259,8 +260,8 @@ searched 5049 and wrote only an incomplete line):
   `lab` key, which the lab set at 04:16 on 2026-10-29, and records no trial.  The lines of 5056 and 5060 record the
   trial in `engine.gate_trial`: 24 units at 57.2 M and 58.3 M steps, a CPU for the gate of 600 of 0.855 and 0.874 of
   the gate of 1200's, and the gate 600 chosen and applied in both ([the
-  notebook](../solver/notebook/search/a-gate-for-each-game-2026-10/README.md)).  5055 and 5058 were proofs at the
-  ceiling with no node.
+  notebook](https://github.com/bvchess/taxman-notebook/blob/main/search/a-gate-for-each-game-2026-10/README.md)).  5055
+  and 5058 were proofs at the ceiling with no node.
 * During the fourth to the sixth invocations the lab ran studies in a sandbox beside the chain, on 16 threads at nice
   19.  Its command folder carried no command to the solver, and no line up to 4919 has a `lab` key, so the lab changed
   no search there.  From 4920 on the lab set a policy for the tactic `conflict_look` (the `lab` key of 67 lines, 4920 to
@@ -276,9 +277,9 @@ searched 5049 and wrote only an incomplete line):
 
   Conflict branching only chooses which true conflict a node branches on, so both verifiers accept the lines.  The
   notebook's entry on the root gap records why the lab chose these settings: [the sweep of
-  4984](../solver/notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-sweep-of-the-settings-on-game-4984)
+  4984](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-a-sweep-of-the-settings-on-game-4984)
   and [the settings checks of 4991, 4992 and
-  4995](../solver/notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995).
+  4995](https://github.com/bvchess/taxman-notebook/blob/main/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995).
 * The near-repeat cut was armed from 4914 on.  It cut nodes in the searches of 4929 (20,458,994), 4936 (52,079),
   4952 (2,670), 4953 (165), 4991 (58,300,645), 5037 (254,558), 5043 (12,716,671), 5047 (1,925,714) and 5048 (585,636),
   and no other.
@@ -308,11 +309,13 @@ sets"](README.md#games-with-several-optimal-sets)).
 * `default.jsonl` (1001–1231, schema 1), the first run past 1000, made with the unproven tactics `reuse_prev` and
   `revise_freedoms` on.  It is gone from the tree; `git show f72c332:rust/results/default.jsonl` has it.  It had 34
   prime, 78 exhausted and 119 proofs by `reuse_prev`, and 19 games resting on nothing unproven.
-* The cost-curve study's `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl` (1001–1231, schema 1,
-  commit e710d16), a chain with those tactics off.  It has 34 prime, 127 exhausted and 70 at the ceiling, all 231
-  resting on nothing unproven.
-* The GF(2) study's `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl` (1301–2175, schema 5,
-  commit 716ebd9, 2 threads), a chain from the table's game of 1300.
+* The cost-curve study's
+  [taxman-notebook/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/chain.jsonl)
+  (1001–1231, schema 1, commit e710d16), a chain with those tactics off.  It has 34 prime, 127 exhausted and 70 at the
+  ceiling, all 231 resting on nothing unproven.
+* The GF(2) study's
+  [taxman-notebook/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/search/the-gf2-bound-in-the-search-2026-10/chain.jsonl)
+  (1301–2175, schema 5, commit 716ebd9, 2 threads), a chain from the table's game of 1300.
 
 The two chains stay as their studies' data.  The verifiers read the second beside this file, and no longer read
 the first.

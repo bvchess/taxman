@@ -186,8 +186,8 @@ lemma (Q3) shows it: the recorded game has ν(n) moves and replays by the rules,
 U](exactness.md#statement-u) holds.  That the recorded game is optimal is proved on the whole board for the games the
 prover has proved, and for the rest given U.  Only the recorded game is measured, and a game may have other optimal
 games.  [evidence.md](evidence.md) gives the range and what one must trust, and [a notebook
-entry](../../solver/notebook/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md) the run.  Whether
-the shortfall is bounded in general is open.
+entry](https://github.com/bvchess/taxman-notebook/blob/main/how-far-an-optimal-game-falls-short-of-a-longest-one-2026-10/README.md)
+the run.  Whether the shortfall is bounded in general is open.
 
 The sets of games 21, 425 and 833 above are replayed by the rules with `heuristics/core.py`, which also gives the
 payments at 833.

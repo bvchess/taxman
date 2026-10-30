@@ -178,7 +178,8 @@ Such an exchange is rare at an even n, and each even n where it happens is a pow
 exchanges 4 for 8, and game 12 exchanges 6 for 12.  At a prime n, [the step theorem (N6)](neighbors.md#the-step-theorem)
 proves the law for every optimal set, with x = q(n − 1).  For an odd semiprime pq the law gives up p′q′, the product of
 the primes below p and q, which [an earlier
-study](../../solver/notebook/the-wikis-open-questions-2026-10/README.md#7-which-n) had found.
+study](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md#7-which-n) had
+found.
 
 The law has a form for U\* that reads no recorded game.
 
@@ -196,8 +197,8 @@ The law says which move an exchange gives up, not when the exchange happens.  It
 and a game may have others.  That a recorded game is optimal is proved on the whole board for the games the prover has
 proved, and for the rest given [statement U](exactness.md#statement-u).  [evidence.md](evidence.md#observations) gives
 the range and what one must trust, and [the notebook entry on the corner of a near
-repeat](../../solver/notebook/search/the-corner-of-a-near-repeat-2026-10/README.md#how-often-it-happens) the count.  A
-proof would say why the shadow is the one move of game n − 1 that n displaces.
+repeat](https://github.com/bvchess/taxman-notebook/blob/main/search/the-corner-of-a-near-repeat-2026-10/README.md#how-often-it-happens)
+the count.  A proof would say why the shadow is the one move of game n − 1 that n displaces.
 
 ## The half law
 
@@ -213,7 +214,8 @@ why the other 1,285 repeat is open.  When n/2 is in U\*(n − 1), it leaves its 
 changed in every game measured, among them the exchanges of n/2 for n that the shadow law finds at the powers of 2 and
 three times them.  With [the half lemma (N7)](neighbors.md#the-half-lemma), which puts game n at its ceiling when an
 optimal game of n − 1 leaves n/2 out, an even game whose half U\*(n − 1) leaves out needs no search of its own.  [The
-notebook entry on the arrival of n](../../solver/notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md) has the
+notebook entry on the arrival of
+n](https://github.com/bvchess/taxman-notebook/blob/main/the-arrival-of-n-in-the-frame-model-2026-10/README.md) has the
 run.
 
 ## The cofactor rule
@@ -255,10 +257,12 @@ out, and the half law gives the repeat, though the frames of layer 3 it joins ha
 of layer 3 with freedoms, and its root problem changes; that it reaches its ceiling is measured.  On every board from
 188 to 8191 the root problems built from the definitions agree: the 1,585 odd numbers with two prime factors and the 540
 numbers 2P repeat, as J2 says, and so do the 1,092 numbers 2pP, which the arrival lemma does not cover ([the notebook
-entry on the arrival of n](../../solver/notebook/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).
+entry on the arrival of
+n](https://github.com/bvchess/taxman-notebook/blob/main/the-arrival-of-n-in-the-frame-model-2026-10/README.md)).
 
 The rule's last two cases are measured on the games whose root problem the chain records, and the boards up to 27 record
 none.  Why the numbers 2pP repeat, and why the numbers 9P reach their ceiling, is open.
 [evidence.md](evidence.md#observations) gives the range and what one must trust, and [the notebook entry on the cofactor
-of n](../../solver/notebook/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md) the counts, with the
-cofactors that are always searched.
+of
+n](https://github.com/bvchess/taxman-notebook/blob/main/search/which-games-need-no-search-the-cofactor-of-n-2026-10/README.md)
+the counts, with the cofactors that are always searched.

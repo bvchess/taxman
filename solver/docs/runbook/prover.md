@@ -22,8 +22,8 @@ idles at the end.
 
 * **One game a thread.**  `exact` hands the games of the range to its threads one at a time.  The CPUs stay busy while
   games are left, and the node counts do not depend on the number of threads ([an
-  entry](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md) measured 12 games
-  at 1 to 8 threads).
+  entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
+  measured 12 games at 1 to 8 threads).
 * **Passes.**  A search still running when a pass ends (`--seconds`) pauses: it saves its open subtrees and learned
   conflicts to its checkpoint, and the next pass resumes it on the same tree, so its node count is that of a run with no
   pause.  `exact` writes checkpoints only then, and it has no signal handler, so a kill or a SIGTERM sends the searches
@@ -49,14 +49,16 @@ formula.
 For the estimate that the account's owner approves, price the range from the cost by bands of 100 in n in [the
 prover's proofs](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles where
 the bands are from the plain root, over the vCPUs, with the idle tail, at the spot price of the hour
-([machine.md](machine.md)).  Past the last band, [solver/docs/AGENDA.md, "The diagnosis of the
-wall"](../AGENDA.md#2-the-diagnosis-of-the-wall) carries the trend of the prover's nodes against the solver's, an
-extrapolation.  The cost of a game follows the root's parity gap, not n, so the bands are a guide, not a rule, and the
-first passes of the run check the estimate ([Run](#run), step 4, reads the cost of a node from the log).
+([machine.md](machine.md)).  Past the last band, [taxman-notebook/agenda/AGENDA.md, "The diagnosis of the
+wall"](https://github.com/bvchess/taxman-notebook/blob/main/agenda/AGENDA.md#2-the-diagnosis-of-the-wall) carries the
+trend of the prover's nodes against the solver's, an extrapolation.  The cost of a game follows the root's parity gap,
+not n, so the bands are a guide, not a rule, and the first passes of the run check the estimate ([Run](#run), step 4,
+reads the cost of a node from the log).
 
-*Details.*  The [Graviton calibration](../../notebook/graviton-calibration-2026-10/README.md) measured the prover's
-speed: a Graviton4 core runs it at 0.93 of an M1 Max core, and a Graviton3 core at 0.75.  The cost of a node grows with
-n: from the plain root on Graviton4 it was 2.0 to 2.6 ms through 1899, then 4.1 ms at 2170 to 2173.
+*Details.*  The [Graviton
+calibration](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md) measured the
+prover's speed: a Graviton4 core runs it at 0.93 of an M1 Max core, and a Graviton3 core at 0.75.  The cost of a node
+grows with n: from the plain root on Graviton4 it was 2.0 to 2.6 ms through 1899, then 4.1 ms at 2170 to 2173.
 
 ## Which instance
 
@@ -222,14 +224,15 @@ names another file.  Do not commit the work directory, the checkpoints or the lo
 * the new end of the prover's proofs in [results/README.md](../../../results/README.md), which holds how far each kind
   of proof reaches; then search the docs for the old end and update what still names it;
 * the run itself in a notebook entry, with its rows in the register ([the notebook's
-  rules](../../notebook/README.md#how-this-notebook-is-kept)), and its cost as [The spending, and the
-  end](launch.md#the-spending-and-the-end) says.
+  rules](https://github.com/bvchess/taxman-notebook/blob/main/README.md#how-this-notebook-is-kept)), and its cost as
+  [The spending, and the end](launch.md#the-spending-and-the-end) says.
 
 Then do the end of the [rules for every launch](launch.md#rules-for-every-launch): `POWEROFF=always` has shut the
 instance down, which terminates it; confirm that nothing is left, the launch's security group included.
 
 ## An example
 
-[The run of 1301..2175](../../notebook/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
+[The run of
+1301..2175](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
 searched from the plain root on one `c8g.4xlarge` at spot; its entry has the estimate it was planned by, the launch's
 values, what it cost and what its model got wrong.

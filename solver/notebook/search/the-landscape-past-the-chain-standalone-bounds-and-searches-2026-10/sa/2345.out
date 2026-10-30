@@ -1,3 +1,0 @@
-note: no previous game for n=2345 (the game of 2344 is neither in this run nor in the results file): solving it standalone, with no seed and no ceiling, which costs more; to chain, give --out with the earlier games (optimal.json does not have it either)
-n=2345  score=1734547   search  nodes=10807148     1802.210 s  incomplete
-stopped: the search for n=2345 hit a limit before it finished; it was not checkpointed

@@ -2,8 +2,7 @@
 //! independence over GF(2) that every promotable set has in every frame: the bound of every node of the search.  It is
 //! never above the matching bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2,
 //! `docs/theory/frame-bounds.md`) has the proof, and
-//! `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
-//! `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md`, the measurements.
+//! `solver/docs/design/gf2-bound.md`, the measurements.
 //!
 //! # Independence in a frame
 //!

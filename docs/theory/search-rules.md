@@ -311,7 +311,7 @@ harder than in the game n searched, wherever the node's candidates reach, every 
 set of Π_m.  Game n is a *near repeat* of game m when Π_n has the candidates of Π_m with the same homes and differs
 from it in the moves and factors of a few frames, as when one move is swapped for another; there the lemma can end
 most of the search ([what carries from one game's search to the
-next](../../solver/notebook/search/what-carries-from-one-games-search-to-the-next-2026-10/README.md)).
+next](https://github.com/bvchess/taxman-notebook/blob/main/search/what-carries-from-one-games-search-to-the-next-2026-10/README.md)).
 
 Below, state_m(P) and state_n(P) are the states that P leaves in Π_m and in Π_n, and a set C of candidates *touches*
 frame j when one of its members [touches](frame-bounds.md#signed-frames) it, having the home j or j + 1.

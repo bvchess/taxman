@@ -56,12 +56,13 @@ records the search tactics, and is refused when they differ, but for `conflict_b
 (the paragraph "What identifies a checkpoint" of [trust.md](trust.md)).
 
 *The tactics removed.*  The notebook has what the removed tactics were worth: [which tactics earn their
-keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md) for the Java's conjectures and bounds and
-the branchings that lost, [the tuning campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
+keep](https://github.com/bvchess/taxman-notebook/blob/main/search/which-tactics-earn-their-keep-2026-10/README.md) for
+the Java's conjectures and bounds and the branchings that lost, [the tuning
+campaign](https://github.com/bvchess/taxman-notebook/blob/main/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
 for the knobs of the GF(2) search, and [keeping and forgetting
-nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md) for those of the
-nogood table.  Commit 3ca11bf, the build of the re-run, still has the matching path as the node bound (`gf2`,
-`match_refine`, `lagrange`) and those knobs.
+nogoods](https://github.com/bvchess/taxman-notebook/blob/main/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)
+for those of the nogood table.  Commit 3ca11bf, the build of the re-run, still has the matching path as the node bound
+(`gf2`, `match_refine`, `lagrange`) and those knobs.
 
 ## Adding a tactic
 

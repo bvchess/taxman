@@ -1,5 +1,0 @@
-ledger: 61 s, 387 CPU s of 1800: 41 of 125 proven, 7 searching; 5 climbs ended, 5 proved their board, 0 parked; main thread busy 0.7 s, results waited 0.0 s
-ledger: 125 s, 795 CPU s of 1800: 58 of 125 proven, 7 searching; 13 climbs ended, 12 proved their board, 1 parked; main thread busy 1.1 s, results waited 0.0 s
-ledger: 186 s, 1180 CPU s of 1800: 73 of 125 proven, 7 searching; 16 climbs ended, 15 proved their board, 1 parked; main thread busy 1.3 s, results waited 0.1 s
-ledger: 248 s, 1569 CPU s of 1800: 87 of 125 proven, 8 searching; 19 climbs ended, 18 proved their board, 1 parked; main thread busy 1.4 s, results waited 0.1 s
-ledger: 287 s, 1806 CPU s of 1800: 108 of 125 proven, 0 searching; 24 climbs ended, 21 proved their board, 3 parked; main thread busy 1.4 s, results waited 0.1 s

@@ -131,16 +131,16 @@ use std::time::{Duration, Instant};
 
 /// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval from
 /// 10,000 to 100,000 steps was about as good on one thread (22–26% less time than never forgetting on hard games near
-/// n = 1200, games of fewer steps unchanged); see solver/notebook/search/forgetting-nogoods-2026-10/README.md.
+/// n = 1200, games of fewer steps unchanged); see
+/// https://github.com/bvchess/taxman-notebook/blob/main/search/forgetting-nogoods-2026-10/README.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// With the tactic `conflict_branching`, a check chooses the conflict it branches on only where its gap, the GF(2) bound
 /// less the need, is at least this (below it the search's own conflict is kept), unless a caller sets another gate
 /// (`solve --gate`, and the gate trial).  On units of the games 4991, 4992 and 4995 a gate of 1,200 took 0.90 to 0.92
-/// of the CPU of conflict branching off, and a gate of 300 took 2.03 of it on those of 4991 (solver/notebook/search/
-/// the-root-gap-and-the-size-of-a-game-2026-10/README.md, "settings checks"); 300, the gate before, was the best of 0,
-/// 200, 300 and 400 on the whole game 4050 and two units of 4548 and 4875 (solver/notebook/search/
-/// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
+/// of the CPU of conflict branching off, and a gate of 300 took 2.03 of it on those of 4991
+/// (solver/docs/design/search.md); 300, the gate before, was the best of 0, 200, 300 and 400 on the whole game 4050 and
+/// two units of 4548 and 4875 (solver/docs/design/search.md).
 pub const CONFLICT_BRANCHING_GAP: u64 = 1200;
 
 /// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: `solve --gate` and the
@@ -156,8 +156,7 @@ pub const CONFLICT_BRANCHING_SLOPE: f64 = 291.0;
 
 /// With the tactic `conflict_look`, the look is made only where the cheapest member of the search's own conflict has a
 /// price of at most this (a member that costs the bound almost nothing to leave out is a hub of the heaviest set).  The
-/// setting of the study of when a node should use conflict branching (solver/notebook/search/
-/// when-a-node-should-use-conflict-branching-2026-10/README.md).
+/// setting of the study of when a node should use conflict branching (solver/docs/design/search.md).
 pub const CONFLICT_LOOK_PRICE: f64 = 10.0;
 
 /// With the tactic `conflict_look`, the look is made only where the weight of the search's own conflict less the term

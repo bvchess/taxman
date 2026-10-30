@@ -5,7 +5,7 @@
 //! weighs more than F (the floor lemma (R5, docs/theory/search-rules.md)).  Its cost grows about tenfold for every 147
 //! points the floor is lowered below the root's bound: on 14 games of 2265-3259, log10 of the nodes is linear in that
 //! distance (r² 0.996 a game), a median 0.68 decades per 100 points (0.53 to 0.89 a game;
-//! solver/notebook/search/proving-an-upper-bound-part-of-the-way-searches-under-a-floor-2026-10/README.md).  Each board
+//! solver/docs/design/search.md).  Each board
 //! has its own line, `log10(nodes) = intercept + slope · distance`, fitted from the steps it has had; a board with
 //! fewer than two steps of 100 nodes or more has the median slope (the shortest trees have a floor of their own, at a
 //! couple of steps) and, with none, the median intercept; the fit is pulled to the median slope as a pair of points 141

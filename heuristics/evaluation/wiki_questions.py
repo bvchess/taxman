@@ -4,7 +4,7 @@
 
 """The two open questions of the wiki's Questions page, measured on the committed games and by exhaustive search.
 
-solver/notebook/the-wikis-open-questions-2026-10/README.md has the method, the results and the proofs; this
+https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md has the method, the results and the proofs; this
 module computes every number there.  The games read are the committed games results/optimal.jsonl.gz (its games
 1..2175, TOP, which the study was made on; the file has more now).
 

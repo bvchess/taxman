@@ -4,7 +4,7 @@
 //! The gate is the gap from which a node branches on the conflict that `conflict_branching` chooses.  Which gate is
 //! best differs from game to game far more than within a game: on the units of game 5052 a gate of 600 took 0.68 of
 //! the CPU of the gate of 1,200, on those of 4984 it took 1.55, and the spread of the open units' gaps stays the same
-//! through most of a game (solver/notebook/search/a-gate-for-each-game-2026-10/README.md).  So the trial asks the game
+//! through most of a game (solver/docs/design/gate-trial.md).  So the trial asks the game
 //! itself, once: at the first checkpoint written after the search has taken [`Plan::after`] steps, a thread beside the
 //! search reads the checkpoint's units, picks [`Plan::units`] of them spread over their gaps, and solves each under
 //! each gate of [`Plan::gates`] (and the gate the search has, if the list lacks it), on one thread, from the

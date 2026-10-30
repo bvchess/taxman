@@ -43,16 +43,19 @@ counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with 
 The cloud scripts (`solver/tools/cloud`) run the chain on a machine of many CPUs
 ([runbook/before-a-big-run.md](../runbook/before-a-big-run.md) and [runbook/chain.md](../runbook/chain.md)).  The
 command `taxman bench`, the example `ladder`, `scaling.sh`, the profile tools and the profile-guided build `pgo.sh` were
-removed on 2026-10-30; they build at commit 3ca11bf.  The file `solver/frame/bench/history.jsonl` is the record of the
-benchmarks of 2026-10.
+removed on 2026-10-30; they build at commit 3ca11bf.  The file
+[taxman-notebook/bench/history.jsonl](https://github.com/bvchess/taxman-notebook/blob/main/bench/history.jsonl) is the
+record of the benchmarks of 2026-10.
 
 **Where it stands.**  At the end of the chain a step of the search cost 888k cycles on one thread of the M1 Max, 92% of
-it in the GF(2) bound, and [cheaper GF(2) nodes](../../notebook/search/cheaper-gf2-nodes-same-trees-2026-10/README.md)
-took it to 542k, with the same trees, and [what a GF(2) step carries from the
-last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md) 31 to 39% more.  The
-cost of a game comes in waves that follow the root's GF(2) gap, and past 2175 it grows tenfold for about every 1,040 in
-n ([the chain to 3440](../../notebook/the-frontier-chain-to-3440-2026-10/README.md));
+it in the GF(2) bound, and [cheaper GF(2)
+nodes](https://github.com/bvchess/taxman-notebook/blob/main/search/cheaper-gf2-nodes-same-trees-2026-10/README.md) took
+it to 542k, with the same trees, and [what a GF(2) step carries from the
+last](https://github.com/bvchess/taxman-notebook/blob/main/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)
+31 to 39% more.  The cost of a game comes in waves that follow the root's GF(2) gap, and past 2175 it grows tenfold for
+about every 1,040 in n ([the chain to
+3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md));
 [results/runs.md](../../../results/runs.md) says how long the committed chain took.  The measurements of the earlier
 builds, from the matching path to the GF(2) bound's rounds, are in [the benchmarks
-entry](../../notebook/search/benchmarks-the-probe-pgo-and-scaling/README.md#later-2026-10-the-measurements-that-designmd-held)
+entry](https://github.com/bvchess/taxman-notebook/blob/main/search/benchmarks-the-probe-pgo-and-scaling/README.md#later-2026-10-the-measurements-that-designmd-held)
 and the entries of each round.

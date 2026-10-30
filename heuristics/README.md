@@ -367,7 +367,7 @@ resumes with `--resume`, so an interruption costs at most a few games.
 | `evaluation/bound.py` | the Franklín–Moniot upper bound |
 | `evaluation/bornfree.py` | the Franklín–Moniot born-free matching: their constructive lower bound |
 | `evaluation/certify.py` | theory-free certification of `results/optimal.jsonl.gz` (uses `evaluation/bitpot.py` bitmask primitives) |
-| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in [solver/notebook/the-wikis-open-questions-2026-10/README.md](../solver/notebook/the-wikis-open-questions-2026-10/README.md)) |
+| `evaluation/wiki_questions.py` | the wiki's two open questions, the tax of a move and reusing the game of n − 1 (`tax`, `adapt`; the results are in [taxman-notebook/the-wikis-open-questions-2026-10/README.md](https://github.com/bvchess/taxman-notebook/blob/main/the-wikis-open-questions-2026-10/README.md)) |
 | `evaluation/bench.py` | timings and scaling exponents |
 | `evaluation/test_taxman.py` | the test suite |
 | `results/solvent_1000.json`, `results/strategies_1000.json` | per-game scores vs. optimal, n=1..1000 |

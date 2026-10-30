@@ -6,15 +6,15 @@
 //! ([`run_unit`]), takes any better game, and repeats.  It is not sound: it may miss an optimal game, and nothing it
 //! finds proves anything.  A lower bound needs only a legal game, so a caller offers what it finds as an incumbent,
 //! after the checks of [`offer_found`] (the ledger does).  The measurements that chose its defaults are in
-//! solver/notebook/search/finders-for-good-games-that-are-not-sound-2026-10/README.md.
+//! solver/docs/design/trust.md.
 //!
 //! # Beside a long search
 //!
 //! Almost every search of the chain ends within a minute of its final best.  A few start well below it and take
 //! hours, and what they spend before the start's deficit is made up is most of their cost: game 4875's search began
 //! 153 below its final best and took 4.5 G steps to reach it, which LNS found in 1.2 to 10.6 seconds on one thread
-//! (solver/notebook/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).  So a search that proves long
-//! gets a finder, and one that ends first never pays for one.
+//! (https://github.com/bvchess/taxman-notebook/blob/main/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).
+//! So a search that proves long gets a finder, and one that ends first never pays for one.
 //!
 //! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
 //! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget, [`BUDGET`] when
@@ -171,7 +171,7 @@ impl<const W: usize> Lns<'_, W> {
 
 /// How long a round of LNS lasts at most: [`Plan::seconds`] is spent in rounds, each from a start of its own with a
 /// random seed of its own.  Game 4875's finder reached its final best in 1.2 to 10.6 seconds from the seed's start
-/// (solver/notebook/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).
+/// (https://github.com/bvchess/taxman-notebook/blob/main/search/the-finder-on-long-searches-and-game-4875-2026-10/README.md).
 pub const ROUND: Duration = Duration::from_secs(15);
 
 /// The steps after which `solve` starts a finder beside a search when `--finder-after` does not say: a few seconds of

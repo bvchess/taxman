@@ -15,14 +15,14 @@ the machine only changes how long it takes.
 
 **What it costs.**  The games to 2175 take minutes on a big machine.  Past 2175 the search time of a game grows about
 tenfold for every 1,040 in n, in waves, and one day on 64 CPUs reached n = 3440 ([the chain to
-3440](../../notebook/the-frontier-chain-to-3440-2026-10/README.md)).  A `c8g.48xlarge` ran the chain past 2225 1.9 to
-2.7 times as fast as 64 threads, for 1.1 to 1.9 times the cost a game ([the scaling
-run](../../notebook/scaling-to-192-threads-2026-10/README.md)), and the
-[calibration](../../notebook/graviton-calibration-2026-10/README.md) gives the rate and the price of the games past 2175
-on a `c8g.16xlarge`.  Estimate the cost of a target N from those entries, at the spot price of the hour (a
-`c8g.16xlarge` costs about $0.68 an hour), and let the first hours of the real run decide: the log has each game's
-seconds.  A single hard game can take hours.  Choose N by money and patience; running `chain.sh` again with a larger N
-later continues the same file.
+3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)).  A
+`c8g.48xlarge` ran the chain past 2225 1.9 to 2.7 times as fast as 64 threads, for 1.1 to 1.9 times the cost a game
+([the scaling run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md)), and
+the [calibration](https://github.com/bvchess/taxman-notebook/blob/main/graviton-calibration-2026-10/README.md) gives the
+rate and the price of the games past 2175 on a `c8g.16xlarge`.  Estimate the cost of a target N from those entries, at
+the spot price of the hour (a `c8g.16xlarge` costs about $0.68 an hour), and let the first hours of the real run decide:
+the log has each game's seconds.  A single hard game can take hours.  Choose N by money and patience; running `chain.sh`
+again with a larger N later continues the same file.
 
 ## Run
 
@@ -64,8 +64,8 @@ keep them busy, so one game's search does not leave a machine of many threads id
 order, with the scores, proofs and repeats of a window of 1, which solves them one after the other ([the
 README](../../frame/README.md#games-in-flight); [DESIGN.md](../design/engine.md#the-window-games-in-flight)).  The
 default is 4, in `chain.sh` and in `taxman solve --window`: on 64 and 192 threads the [scaling
-run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best of 1, 4, 16 and 32 on the games past
-2225, and a window of 16 20 to 32 % slower than 1 on 64 threads.
+run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md) found 4 the best of
+1, 4, 16 and 32 on the games past 2225, and a window of 16 20 to 32 % slower than 1 on 64 threads.
 
 * **Where the chain starts.**  From an empty `~/taxman-work`, `chain.sh` solves from n = 1, which reproduces the
   committed `results/optimal.jsonl.gz` (the scores equal; the moves may differ).  The first 2175 games take minutes on
@@ -99,8 +99,9 @@ run](../../notebook/scaling-to-192-threads-2026-10/README.md) found 4 the best o
   checkpoint.  Do not `git pull` in the middle of a long game without a reason.  Changing only code generation (PGO,
   `target-cpu`) is harmless.
 * **Past 4095.**  The solver supports games up to n = 8191 (`taxman::solver::MAX_N`), those from 4096 with sets of 128
-  words ([the entry on boards past 4095](../../notebook/boards-past-4095-2026-10/README.md)).  The solver refuses a game
-  past 8191 ("beyond the largest supported board"), which ends the script with an error.
+  words ([the entry on boards past
+  4095](https://github.com/bvchess/taxman-notebook/blob/main/boards-past-4095-2026-10/README.md)).  The solver refuses a
+  game past 8191 ("beyond the largest supported board"), which ends the script with an error.
 
 ## The machine's folders
 
@@ -137,11 +138,13 @@ A healthy progress line at 192 threads shows `eff` of 95 % or more, `lock` under
 hundred at most, `spilled 0`, `pauses N (x%)` with x under 1, and `best` rising early and then holding still (the
 incumbent is often, not always, found long before the proof ends).  The node rate grows with the thread count: one M1
 Max thread does 9 thousand nodes a second at n = 1472 and 8 thousand at 2172 (the table of [round
-B](../../notebook/round-b-the-chain-on-many-threads-2026-10/README.md)).  On a Graviton4 core the proof of 2172 does 6.5
-thousand a second on one thread, and the chain's searches of 2277..2336 did 3.3 to 6.2 thousand a thread on 192 threads
-(0.6 to 1.2 million a second) and 3.9 to 5.3 thousand on 64 (0.25 to 0.34 million) ([the scaling
-run](../../notebook/scaling-to-192-threads-2026-10/README.md)).  Estimate when a long game will end from the previous
-ones: the log has each game's seconds, and past 1300 they come in waves of a few hundred n, not on a smooth curve.
+B](https://github.com/bvchess/taxman-notebook/blob/main/round-b-the-chain-on-many-threads-2026-10/README.md)).  On a
+Graviton4 core the proof of 2172 does 6.5 thousand a second on one thread, and the chain's searches of 2277..2336 did
+3.3 to 6.2 thousand a thread on 192 threads (0.6 to 1.2 million a second) and 3.9 to 5.3 thousand on 64 (0.25 to 0.34
+million) ([the scaling
+run](https://github.com/bvchess/taxman-notebook/blob/main/scaling-to-192-threads-2026-10/README.md)).  Estimate when a
+long game will end from the previous ones: the log has each game's seconds, and past 1300 they come in waves of a few
+hundred n, not on a smooth curve.
 
 ### From another machine
 
@@ -253,6 +256,6 @@ measurement needs go to its notebook entry.
 
 ## Examples
 
-[The chain to 3440](../../notebook/the-frontier-chain-to-3440-2026-10/README.md) ran `chain.sh 4095` on one
-`c8g.16xlarge` for a day, from a copy of the committed games to 2175; [results/runs.md](../../../results/runs.md)
-records each run that made the committed chain.
+[The chain to 3440](https://github.com/bvchess/taxman-notebook/blob/main/the-frontier-chain-to-3440-2026-10/README.md)
+ran `chain.sh 4095` on one `c8g.16xlarge` for a day, from a copy of the committed games to 2175;
+[results/runs.md](../../../results/runs.md) records each run that made the committed chain.
