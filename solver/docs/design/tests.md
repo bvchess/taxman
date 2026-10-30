@@ -40,8 +40,8 @@ every second line of the Java fixtures), and the comment on each says what the w
     its games 2176–2276 (`testdata/c8g.chain-2176.jsonl`), every optimal set the prover enumerated, and every optimal
     set of the games to 48.
   * The unit tests of `frames` check that `unzip`'s claims are its mandatory pairs, that `numbering` is what
-    `build_frames` uses, that the frames lie in layers (F1, also on punctured boards), and that the numbering by
-    layer is the Java's breadth-first numbering on every game to 400 and a sample to 8191.
+    `build_frames` uses, that the frames lie in layers (F1), and that the numbering by layer is the Java's
+    breadth-first numbering on every game to 400 and a sample to 8191.
   * `tests/canonical_root.rs` checks that setup builds Π_n: its U\*, its candidates and its root frames are those of
     `src/root_problem.rs`, which builds Π_n from the definitions with no code of `frames` or `model`, on every game to
     200 (to 1000 ignored).
@@ -290,8 +290,7 @@ every second line of the Java fixtures), and the comment on each says what the w
   * The same game at every width that holds it (128 included) has the same frames, candidates, greedy set,
     `max_total`, answer and tree.
   * Game 1133 (W = 20, 41 nodes by default and a few thousand at most) under every tactic against the committed chain, and a
-    slice of that chain; the
-    sacrifice bound proves game 1133 by an independent route.
+    slice of that chain; the prover's proof of game 1133 (`solver/noframe/data/exact_*.jsonl`) gives the committed score.
   * A game of 2050 built at W = 64 (it dispatches to 36) and one of 4100 at 128 go through the frames, the matching
     bound, conflicts, the greedy set and a node-limited search; games of 2050, 2400, 2800 and 3100 at the widths they
     dispatch to (36, 40, 48 and 56) and at 64 (2050 also at 128) have the same start and the same node-limited search,

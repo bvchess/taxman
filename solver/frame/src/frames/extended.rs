@@ -258,11 +258,8 @@ pub fn build_extended<const W: usize>(
     // The two-sided candidates: the factors of the frames behind frame 0 that their component can spare and that a
     // component in front of them can take on.
     let can_take_on = |x: u32| {
-        let mut homes: Vec<usize> = t.max_factors[x as usize]
-            .iter()
-            .filter_map(|&m| board.frame_index_of(m))
-            .filter(|&j| has_freedoms[j])
-            .collect();
+        let mut homes: Vec<usize> =
+            t.max_factors[x as usize].iter().map(|&m| board.frame_index_of(m)).filter(|&j| has_freedoms[j]).collect();
         homes.sort_unstable();
         homes.dedup();
         homes.into_iter().any(|j| board.count_freedoms(fixed_in(j).with(x), components[j].factors()).is_some())
@@ -290,8 +287,12 @@ pub fn build_extended<const W: usize>(
     // The claims, each with the component of its source; a component keeps them if it holds no member of O ∪ R and
     // its back claims pass the check of E4, docs/theory/extended-problem.md.
     let component_of = |&(s, f, _): &Claim| {
-        let i = board.frame_index_of(s).filter(|&i| components[i].sources().contains(s) && has_freedoms[i]);
-        let i = i.unwrap_or_else(|| panic!("n={}: the claiming {s} is no source of a component with freedoms", t.n));
+        let i = board.frame_index_of(s);
+        assert!(
+            components[i].sources().contains(s) && has_freedoms[i],
+            "n={}: the claiming {s} is no source of a component with freedoms",
+            t.n
+        );
         assert!(components[i].factors().contains(f), "n={}: {s} claims {f}, which is no factor of its component", t.n);
         i
     };

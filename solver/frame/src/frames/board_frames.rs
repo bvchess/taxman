@@ -133,26 +133,9 @@ impl<const W: usize> Frame<W> {
     }
 }
 
-/// Which frame a number belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Home {
-    /// The frame at this position in [`BoardFrames::frames`].
-    Live(u32),
-    /// None: the number is a hole of a punctured board ([`Tables::punctured`]).
-    OffBoard,
-}
-
 /// All the frames of the board `1..=n`, for a given set of promoted numbers, simplified and in playing order (see the
 /// documentation of [`crate::frames`] for what that means).  The lists `factors_of` and `composites_of` are the view of
 /// the divisibility relation that setup takes, with the promoted numbers and the sinks taken into account.
-///
-/// On a punctured board ([`Tables::punctured`]) the holes belong to no frame and to no factor or composite list,
-/// so they are never moves and never tax; a number whose maximal factor is a hole simply has one factor fewer.
-/// Everything else is as on the full board: in particular the sources are still the numbers above `n/2` (a number
-/// whose only maximal composites are holes is a factor nobody needs, not a source, so the search decides whether
-/// to promote it), and the frames are put in an order in which every number comes after the frames of its
-/// divisors even when the chain of maximal factors between them passes through a hole (playing a number sweeps
-/// all of its divisors, holes or not in between).
 ///
 /// A `BoardFrames` is used on one thread: `count_freedoms` keeps its working storage in it, and its frames keep what
 /// they have been asked (`Frame::can_add`), both behind a `RefCell`.
@@ -160,15 +143,15 @@ pub struct BoardFrames<'t, const W: usize> {
     t: &'t Tables,
     /// In playing order: a frame is listed after every frame in front of it.
     frames: Vec<Frame<W>>,
-    /// The frame of every number, indexed by number (entry 0 is unused).
-    home: Vec<Home>,
-    /// For each number, the factors it can use as tax, ascending: its maximal factors that are not sources (or
-    /// holes); nothing for a *sink* (a number all of whose maximal factors are promoted or holes).  This is the
-    /// table setup uses wherever it asks what a move can be paid with, not `Tables::max_factors`.
+    /// The position in `frames` of the frame of every number, indexed by number (entry 0 is unused).
+    home: Vec<u32>,
+    /// For each number, the factors it can use as tax, ascending: its maximal factors that are not sources; nothing
+    /// for a *sink* (a number all of whose maximal factors are promoted).  This is the table setup uses wherever it
+    /// asks what a move can be paid with, not `Tables::max_factors`.
     factors_of: Lists,
-    /// For each number, the moves that could use it as tax, ascending: its maximal composites other than sinks
-    /// (and holes); nothing for a source.  The mirror image of `factors_of`: `c` is in the list of `f` exactly
-    /// when `f` is in the list of `c`.
+    /// For each number, the moves that could use it as tax, ascending: its maximal composites other than sinks;
+    /// nothing for a source.  The mirror image of `factors_of`: `c` is in the list of `f` exactly when `f` is in the
+    /// list of `c`.
     composites_of: Lists,
     /// The working storage of `count_freedoms`.
     peel: RefCell<Peel>,
@@ -189,23 +172,20 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         let n = t.n;
         assert!(n <= Bits::<W>::MAX_VALUE, "the board 1..={n} does not fit in Bits<{W}>");
         assert!(
-            !treat_as_sources.contains(0)
-                && treat_as_sources.max().is_none_or(|m| m <= n)
-                && t.holes.iter().all(|&h| !treat_as_sources.contains(h)),
-            "promotions {treat_as_sources:?} are not all on the board 1..={n} without {:?}",
-            t.holes
+            !treat_as_sources.contains(0) && treat_as_sources.max().is_none_or(|m| m <= n),
+            "promotions {treat_as_sources:?} are not all on the board 1..={n}"
         );
 
         let (sources, sinks) = Self::sources_and_sinks(t, treat_as_sources);
         let factors_of = Lists::new(n, |x, list| {
-            if !t.is_hole(x) && !sinks.contains(x) {
-                let usable = |f: &u32| !sources.contains(*f) && !t.is_hole(*f);
+            if !sinks.contains(x) {
+                let usable = |f: &u32| !sources.contains(*f);
                 list.extend(t.max_factors[x as usize].iter().copied().filter(usable));
             }
         });
         let composites_of = Lists::new(n, |x, list| {
-            if !t.is_hole(x) && !sources.contains(x) {
-                let usable = |c: &u32| !sinks.contains(*c) && !t.is_hole(*c);
+            if !sources.contains(x) {
+                let usable = |c: &u32| !sinks.contains(*c);
                 list.extend(t.max_composites[x as usize].iter().copied().filter(usable));
             }
         });
@@ -220,37 +200,35 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     }
 
     /// The numbers that are moves (promoted ones, and those with no maximal composite: every number above `n/2`)
-    /// and the sinks (numbers whose maximal factors are all promoted or holes, which therefore have no factor
-    /// to pay tax with).  Holes are neither.  1 is always a sink (it has no maximal factor at all): it can never
-    /// be a move, because a move needs a divisor to pay it.
+    /// and the sinks (numbers whose maximal factors are all promoted, which therefore have no factor to pay tax
+    /// with).  1 is always a sink (it has no maximal factor at all): it can never be a move, because a move needs a
+    /// divisor to pay it.
     ///
     /// Example: on the board `1..=20` with 8 promoted, 8 is a source and 16, whose only maximal factor is 8, is a
     /// sink; since 16 is also above `n/2` it is a source with nothing to pay it, which `remove_impossible` finds.
     fn sources_and_sinks(t: &Tables, promoted: Bits<W>) -> (Bits<W>, Bits<W>) {
         let (mut sources, mut sinks) = (promoted, Bits::EMPTY);
-        for x in (1..=t.n).filter(|&x| !t.is_hole(x)) {
+        for x in 1..=t.n {
             let xi = x as usize;
             if t.max_composites[xi].is_empty() {
                 sources.insert(x);
             }
-            if t.max_factors[xi].iter().all(|&f| promoted.contains(f) || t.is_hole(f)) {
+            if t.max_factors[xi].iter().all(|&f| promoted.contains(f)) {
                 sinks.insert(x);
             }
         }
         (sources, sinks)
     }
 
-    /// Joins every source to its factors and returns the connected components, with the frame of each number;
-    /// holes are in none.  The joining is a union-find over the edges (source, factor); a component becomes a
-    /// frame when its smallest member is first met, so the frames come out ordered by smallest member (which only
-    /// matters for tie-breaking in [`order_frames`](Self::order_frames)).  Each number goes into its frame's sources
-    /// or factors according to whether it is a source.
+    /// Joins every source to its factors and returns the connected components, with the frame of each number.  The
+    /// joining is a union-find over the edges (source, factor); a component becomes a frame when its smallest member
+    /// is first met, so the frames come out ordered by smallest member (which only matters for tie-breaking in
+    /// [`order_frames`](Self::order_frames)).  Each number goes into its frame's sources or factors according to
+    /// whether it is a source.
     ///
-    /// A number that is neither a source nor a factor of one forms a frame of its own, without sources.  On the
-    /// board `1..=n` that never happens, because every `x ≤ n/2` has a prime `p` with `n/2 < x·p ≤ n`, and `x·p`
-    /// is a source of which `x` is a maximal factor.  On a punctured board it can, when every such `x·p` is a hole:
-    /// then `x` is a factor nobody needs, a frame of that one number with a freedom, which the search may promote.
-    fn form_frames(t: &Tables, sources: Bits<W>, factors_of: &Lists) -> (Vec<Frame<W>>, Vec<Home>) {
+    /// Every frame has a source, because every number is a source or a factor of one: every `x ≤ n/2` has a prime `p`
+    /// with `n/2 < x·p ≤ n`, and `x·p` is a source of which `x` is a maximal factor.
+    fn form_frames(t: &Tables, sources: Bits<W>, factors_of: &Lists) -> (Vec<Frame<W>>, Vec<u32>) {
         let n = t.n;
         let size = n as usize + 1;
         let mut parent: Vec<u32> = (0..=n).collect();
@@ -263,8 +241,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
 
         let mut frame_of_root = vec![u32::MAX; size];
         let mut parts: Vec<(Bits<W>, Bits<W>)> = Vec::new();
-        let mut home = vec![Home::OffBoard; size];
-        for x in (1..=n).filter(|&x| !t.is_hole(x)) {
+        let mut home = vec![0; size];
+        for x in 1..=n {
             let root = find(&mut parent, x) as usize;
             if frame_of_root[root] == u32::MAX {
                 frame_of_root[root] = parts.len() as u32;
@@ -277,7 +255,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
             } else {
                 frame_factors.insert(x)
             }
-            home[x as usize] = Home::Live(h);
+            home[x as usize] = h;
         }
         let frames = parts.into_iter().map(|(s, f)| Frame::new(s, f)).collect();
         (frames, home)
@@ -286,17 +264,15 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
     /// The order the frames are kept in: those in front before those behind, so that playing the frames one after
     /// the other is always a legal game.  It is a breadth-first topological sort: start from the frames with
     /// nothing in front of them, smallest source first; after taking a frame, queue the frames directly behind it
-    /// whose every frame in front is already taken, again smallest source first.  (Frames without a source sort
-    /// first; among those the order is that of formation.)  "In front" here passes through holes
-    /// ([`Self::neighbors_through_holes`]).
+    /// whose every frame in front is already taken, again smallest source first.
     ///
     /// The tie-breaking by smallest source is what makes the order, and with it the names and the final game,
     /// the Java's.
     fn order_frames(&self) -> Vec<usize> {
         let count = self.frames.len();
         let t = self.t;
-        let down: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors_through_holes(i, &t.max_factors)).collect();
-        let up: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors_through_holes(i, &t.max_composites)).collect();
+        let down: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors(i, &t.max_factors)).collect();
+        let up: Vec<Vec<usize>> = (0..count).map(|i| self.neighbors(i, &t.max_composites)).collect();
         let min_source = |i: usize| self.frames[i].sources.min();
 
         let mut roots: Vec<usize> = (0..count).filter(|&i| down[i].is_empty()).collect();
@@ -330,10 +306,8 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         for (pos, frame) in self.frames.iter_mut().enumerate() {
             frame.name = column_name(pos);
         }
-        for home in &mut self.home {
-            if let Home::Live(p) = home {
-                *p = new_pos[*p as usize];
-            }
+        for home in self.home.iter_mut().skip(1) {
+            *home = new_pos[*home as usize];
         }
     }
 
@@ -350,12 +324,10 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         self.t
     }
 
-    /// The position in [`frames`](Self::frames) of the frame that holds `x`, unless `x` is a hole.
-    pub(crate) fn frame_index_of(&self, x: u32) -> Option<usize> {
-        match self.home.get(x as usize)? {
-            Home::Live(p) => Some(*p as usize),
-            Home::OffBoard => None,
-        }
+    /// The position in [`frames`](Self::frames) of the frame that holds `x`, a number of the board `1..=n`: every
+    /// number is homed in one of the board's frames, and factors are never removed from a frame.
+    pub(crate) fn frame_index_of(&self, x: u32) -> usize {
+        self.home[x as usize] as usize
     }
 
     /// The frames in front of frame `i` (other than `i`): those that hold a maximal factor of a number in frame
@@ -370,58 +342,21 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         self.neighbors(i, &self.t.max_composites)
     }
 
-    /// The frames (other than frame `i`) that hold a number related to one in frame `i`.  Holes are skipped.
+    /// The frames (other than frame `i`) that hold a number related to one in frame `i`.
     fn neighbors(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
         let frame = &self.frames[i];
         let mut out = Vec::new();
         for x in (frame.sources | frame.factors).iter() {
             for &y in &board_relation[x as usize] {
-                // A hole belongs to no frame.
-                if let Home::Live(j) = self.home[y as usize] {
-                    if j as usize != i {
-                        out.push(j as usize);
-                    }
+                let j = self.frame_index_of(y);
+                if j != i {
+                    out.push(j);
                 }
             }
         }
         out.sort_unstable();
         out.dedup();
         out
-    }
-
-    /// [`neighbors`](Self::neighbors), except that a related hole is passed through: the frames holding the
-    /// numbers related to the hole are reached instead.  This keeps the relation transitive across holes, as
-    /// divisibility is (a number sweeps its divisors whether or not the chain of maximal factors between them
-    /// is on the board).  Without holes it is `neighbors`.
-    fn neighbors_through_holes(&self, i: usize, board_relation: &[Vec<u32>]) -> Vec<usize> {
-        if self.t.holes.is_empty() {
-            return self.neighbors(i, board_relation);
-        }
-        let frame = &self.frames[i];
-        let mut out = Vec::new();
-        let mut pending: Vec<u32> = (frame.sources | frame.factors).iter().collect();
-        let mut passed = Vec::new();
-        while let Some(x) = pending.pop() {
-            for &y in &board_relation[x as usize] {
-                match self.home[y as usize] {
-                    Home::Live(j) if j as usize != i => out.push(j as usize),
-                    Home::OffBoard if !passed.contains(&y) => {
-                        passed.push(y);
-                        pending.push(y);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        out.sort_unstable();
-        out.dedup();
-        out
-    }
-
-    /// The position of the frame holding the factor `f`.  Factors are never removed from a frame, so they are
-    /// always homed in one of the board's frames.
-    fn frame_of_factor(&self, f: u32) -> usize {
-        self.frame_index_of(f).expect("a factor always has a live frame")
     }
 
     /// Whether `pred` holds for any frame that holds one of the factors in `list` (each frame is tried once, which
@@ -432,7 +367,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         let mut tried = [usize::MAX; 8];
         let mut count = 0;
         for &f in list {
-            let h = self.frame_of_factor(f);
+            let h = self.frame_index_of(f);
             if tried[..count].contains(&h) {
                 continue;
             }
@@ -646,12 +581,10 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         if let Some(&known) = answers.outside.get(&f) {
             return known;
         }
-        let f_frame = self.frame_of_factor(f);
+        let f_frame = self.frame_index_of(f);
         let answer = self.composites_of.of(f).iter().any(|&c| {
-            let c_frame_has_freedoms = match self.home[c as usize] {
-                Home::Live(p) => p as usize != f_frame && !self.frames[p as usize].is_closed(),
-                Home::OffBoard => unreachable!("a hole is nobody's composite"),
-            };
+            let c_frame = self.frame_index_of(c);
+            let c_frame_has_freedoms = c_frame != f_frame && !self.frames[c_frame].is_closed();
             c_frame_has_freedoms && self.can_add_source(&self.frames[f_frame], c)
         });
         answers.outside.insert(f, answer);
@@ -732,10 +665,7 @@ impl<'t, const W: usize> BoardFrames<'t, W> {
         self.frames = frames;
 
         for x in 1..=self.t.n {
-            self.home[x as usize] = match self.home[x as usize] {
-                Home::Live(p) => Home::Live(new_pos[p as usize]),
-                Home::OffBoard => Home::OffBoard,
-            };
+            self.home[x as usize] = new_pos[self.home[x as usize] as usize];
         }
         merged_pos
     }
@@ -1290,7 +1220,7 @@ mod tests {
     fn fifteen_must_take_five_on_the_board_of_21() {
         let t = Tables::new(21);
         let a = BoardFrames::<1>::new(&t, Bits::EMPTY);
-        let at = a.frame_index_of(15).expect("15 is on the board");
+        let at = a.frame_index_of(15);
         assert!(a.frames()[at].claims().contains(&(15, 5, ClaimKind::Back)), "{:?}", a.frames()[at].claims());
     }
 
@@ -1421,8 +1351,8 @@ mod tests {
         let names = |a: &BoardFrames<2>| a.frames().iter().map(|h| h.name().to_owned()).collect::<Vec<_>>();
         assert_eq!(names(&a), ["A", "B", "C", "D", "E", "F", "G", "H"]);
         // F and G hold the numbers 8..=42 and 16..=40; merge them, listing G first.
-        let g = a.frame_index_of(16).unwrap();
-        let f = a.frame_index_of(8).unwrap();
+        let g = a.frame_index_of(16);
+        let f = a.frame_index_of(8);
         assert!(g > f);
         let (sources_f, sources_g) = (a.frames()[f].sources(), a.frames()[g].sources());
         let (freedoms_f, freedoms_g) = (a.frames()[f].freedoms(), a.frames()[g].freedoms());
@@ -1432,11 +1362,11 @@ mod tests {
         assert_eq!(a.frames().len(), 7);
         assert_eq!(a.frames()[merged].name(), "G+F");
         assert_eq!(a.frames()[merged].sources(), sources_f | sources_g);
-        assert_eq!(a.frame_index_of(8), Some(merged));
-        assert_eq!(a.frame_index_of(16), Some(merged));
-        assert_eq!(a.frame_index_of(1), Some(0));
-        assert_eq!(a.frame_index_of(4), Some(2));
-        assert_eq!(a.frame_index_of(32), Some(merged + 1)); // H, which followed G
+        assert_eq!(a.frame_index_of(8), merged);
+        assert_eq!(a.frame_index_of(16), merged);
+        assert_eq!(a.frame_index_of(1), 0);
+        assert_eq!(a.frame_index_of(4), 2);
+        assert_eq!(a.frame_index_of(32), merged + 1); // H, which followed G
 
         // The merged frame has the freedoms of its parts together, before it is simplified again.
         assert_eq!(a.frames()[merged].freedoms(), freedoms_f + freedoms_g);
@@ -1454,7 +1384,7 @@ mod tests {
         let numbers = a.frames()[with_impossible].sources() | a.frames()[with_impossible].factors() | impossible;
         let merged = a.merge(&[other, with_impossible]);
         for x in numbers.iter() {
-            assert_eq!(a.frame_index_of(x), Some(merged), "number {x}");
+            assert_eq!(a.frame_index_of(x), merged, "number {x}");
         }
         assert_eq!(a.frames()[merged].impossible(), impossible);
         // The merged frame finds its claims again, its impossible sources stay impossible, and its freedoms are its
@@ -1463,6 +1393,6 @@ mod tests {
         let frame = &a.frames()[merged];
         assert!(impossible.is_subset(&frame.impossible()));
         assert_eq!(frame.freedoms(), frame.factors().len() as i32 - frame.sources().len() as i32);
-        assert_eq!(a.frame_index_of(impossible.min().unwrap()), Some(merged));
+        assert_eq!(a.frame_index_of(impossible.min().unwrap()), merged);
     }
 }

@@ -29,8 +29,6 @@ use crate::numtheory::Tables;
 /// of `n` that scores `opt(n − 1) − P + n`, and `opt(n)` is exactly that (the prime formula (N5, same file)).  The
 /// exchange changes nothing else of the game, since neither prime divides another number of either board.  For
 /// `n = 2` the game of 1 has no moves and the result is the single move `[2]`.
-///
-/// (The sacrifice bound of [`crate::sacrifice`] contains these facts as its case `f = 1`.)
 pub fn prime_shortcut(n: u32, prev_moves: &[u32]) -> Vec<u32> {
     let mut moves = prev_moves.to_vec();
     if moves.is_empty() {

@@ -6,8 +6,7 @@
 //! with the tables of [`crate::numtheory`] and the peel of [`crate::playable`] alone, and shares nothing with `frames`
 //! or `model`, so that a test (`tests/canonical_root.rs`) can check setup against a builder that is not setup.
 //!
-//! It is written to be read beside the theory, not for speed.  It builds the full board `1..=n` only: on a board with
-//! holes the frames are formed differently (docs/theory/exactness.md, "Boards with holes").
+//! It is written to be read beside the theory, not for speed.
 
 use crate::numtheory::Tables;
 use crate::playable::playable_against;
@@ -100,22 +99,13 @@ fn frames_of(t: &Tables) -> Vec<Frame> {
 }
 
 /// Π_n of the board of `t`.
-///
-/// # Panics
-///
-/// If the board has holes.
 pub fn build(t: &Tables) -> RootProblem {
     build_with_frames(t).0
 }
 
 /// Π_n of the board of `t` and the frames of the board it is built from, in no meaningful order: for each frame its
 /// layer, all its sources, the sources it keeps and its factors (`build` is the first part alone).
-///
-/// # Panics
-///
-/// If the board has holes.
 pub fn build_with_frames(t: &Tables) -> (RootProblem, Vec<Frame>) {
-    assert!(t.holes.is_empty(), "the root problem of a board with holes is not built here");
     let frames = frames_of(t);
     (root_problem_of(t, &frames), frames)
 }

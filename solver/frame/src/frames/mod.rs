@@ -118,9 +118,9 @@
 //! candidates and searches are those of the Java's numbering.  [`numbering`] exposes the numbers of the board's frames,
 //! for this module's tests.
 //!
-//! A layer between `ℓ₀` and the highest layer with freedoms that has no frame with freedoms leaves its number without
-//! frames: the search then has an *empty* frame there (no moves, no factors, no freedoms), through which nothing is
-//! promoted.  No board `1..=n` has one; a punctured board can (below).
+//! Every layer between `ℓ₀` and the highest layer with freedoms has a frame with freedoms, so every number from 0 to the
+//! last has a frame: on every board to 8191, the largest the solver supports (the census `examples/structure.rs` at
+//! commit 3ca11bf), and the tests below check the boards to 400 and a sample to 8191.
 //!
 //! # Why frames are merged
 //!
@@ -180,17 +180,6 @@
 //! numbers it can take on as a source, until its sources change (`Frame::can_add`), and which of its sources
 //! `remove_impossible` has been through (`Frame::swept`).  And `unzip` asks each question about a factor once, however
 //! many passes visit it (`Answers`).
-//!
-//! # Punctured boards
-//!
-//! The frames can also be formed on a board with *holes* ([`Tables::punctured`]): numbers that are never in the
-//! pot, so never moves and never tax, and belong to no frame.  Only the sacrifice study ([`crate::sacrifice`])
-//! does this; the cases it needs are marked `Home::OffBoard` and "through holes" in `board_frames`.  The frames of a
-//! punctured board lie in layers too (a number whose maximal composites are all holes is a frame of its own, with no
-//! source, one layer above that number), and they are numbered by layer like any others.  There the Java's
-//! breadth-first numbering can differ and is not always clean (the board of 56 without 39 has a frame numbered 1 with
-//! a frame with freedoms numbered 1 directly in front of it), and a number can be without frames (the board of 32
-//! without 4: taking 4 off splits the frame of layer 3 into two closed frames, while layers 2 and 4 have freedoms).
 
 mod board_frames;
 mod extended;
@@ -210,16 +199,14 @@ pub struct SearchFrames<const W: usize> {
     /// mandatory nor impossible, the moves the search still has to place; its `factors` are those not used up by
     /// mandatory moves; its `freedoms`, `|factors| − |moves|`, are how many factors it can spare, each promotion into
     /// the frame or out of it using one up.  (They are also the [`Frame::freedoms`] of the merged frame: the mandatory
-    /// moves take one factor each.)  A number that no frame with freedoms has (on a punctured board, a layer between
-    /// the lowest and the highest with freedoms that holds only closed frames) is an empty frame: no moves, no
-    /// factors, no freedoms.
+    /// moves take one factor each.)
     pub frames: Vec<model::Frame<W>>,
-    /// The names setup gave the merged frames (A, B, ...), joined with `+`, one for each of `frames`; `-` for an
-    /// empty frame.  For diagnostics only.
+    /// The names setup gave the merged frames (A, B, ...), joined with `+`, one for each of `frames`.  For diagnostics
+    /// only.
     pub names: Vec<String>,
     /// For each of `frames`, the pairs `unzip` settled in the merged frame as the final `finish_setup` left it (the
-    /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made;
-    /// none for an empty frame.  For the extended problem, which keeps those the kept-claims lemma (E4,
+    /// [`Frame::claims`] of the frame that `frames` takes its remaining moves and factors from), in the order made.
+    /// For the extended problem, which keeps those the kept-claims lemma (E4,
     /// docs/theory/extended-problem.md) allows ([`build_extended`]); the solver's search does not read them.
     pub claims: Vec<Vec<Claim>>,
     /// Every number that could be promoted, in any frame: for each frame with freedoms, the factors it could spare
@@ -293,10 +280,8 @@ fn build<const W: usize>(t: &Tables, record: bool) -> (SearchFrames<W>, Option<N
     debug_assert_eq!(lemma_omega_violation(&board_frames, &layers), None, "the frames do not lie in layers");
     let pre_merge = record.then(|| describe_frames(&board_frames, &number));
     let mut candidates = Bits::EMPTY;
-    // A number that no frame has is an empty group: it adds no candidates and merges nothing.
     for same_number in &numbered {
-        let positions: Vec<usize> =
-            same_number.iter().map(|&f| board_frames.frame_index_of(f).expect("not yet merged")).collect();
+        let positions: Vec<usize> = same_number.iter().map(|&f| board_frames.frame_index_of(f)).collect();
         for &p in &positions {
             candidates |= board_frames.promotion_candidates_of(p);
         }
@@ -311,14 +296,8 @@ fn build<const W: usize>(t: &Tables, record: bool) -> (SearchFrames<W>, Option<N
     let (mut frames, mut names) = (Vec::with_capacity(numbered.len()), Vec::with_capacity(numbered.len()));
     let mut claims = Vec::with_capacity(numbered.len());
     for same_number in &numbered {
-        let Some(&first) = same_number.first() else {
-            frames.push(model::Frame::new(Bits::EMPTY, Bits::EMPTY));
-            names.push("-".to_owned());
-            claims.push(Vec::new());
-            continue;
-        };
-        let at = board_frames.frame_index_of(first).expect("a numbered frame is one of the board's frames");
-        let frame = &board_frames.frames()[at];
+        let first = *same_number.first().expect("every number up to the last has a frame");
+        let frame = &board_frames.frames()[board_frames.frame_index_of(first)];
         let search_frame = model::Frame::new(frame.remaining_sources(), frame.remaining_factors());
         debug_assert_eq!(search_frame.freedoms, frame.freedoms(), "frame {}", frame.name());
         frames.push(search_frame);
@@ -355,7 +334,7 @@ fn describe_frames<const W: usize>(board_frames: &BoardFrames<W>, number: &[Opti
 struct Numbers {
     /// One entry per number `h` = 0, 1, ..., up to the largest number given, in order, listing the frames with
     /// freedoms of layer `l0 + h`, each named by its smallest factor, in the order of their smallest source; the
-    /// frames of one entry are the ones to merge.  An entry is empty when no frame with freedoms lies in that layer.
+    /// frames of one entry are the ones to merge.  No entry is empty (see the module documentation).
     groups: Vec<Vec<u32>>,
     /// The number of each of the board's frames, by position: `layer − l0` for a frame with freedoms, `l0` being the
     /// lowest layer of one; `None` for a closed frame.
@@ -366,13 +345,9 @@ struct Numbers {
 
 /// The layer of a frame (the frame lemma (F1), docs/theory/frame-model.md): Ω of its sources, the number of their prime
 /// factors counted with multiplicity.  The frame's sources and impossible sources all have the same Ω, so this is Ω of
-/// the smallest of them.  A frame that has neither (only a punctured board has one: a factor whose maximal composites
-/// are all holes) is a single factor, one layer above that factor's.
+/// the smallest of them; every frame has one of them (`BoardFrames::form_frames`).
 pub(crate) fn layer_of<const W: usize>(frame: &Frame<W>, t: &Tables) -> u32 {
-    match (frame.sources() | frame.impossible()).min() {
-        Some(source) => t.omega(source),
-        None => t.omega(frame.factors().min().expect("a frame holds a number")) + 1,
-    }
+    t.omega((frame.sources() | frame.impossible()).min().expect("a frame holds a source"))
 }
 
 /// Numbers the frames that have freedoms by layer and groups them by number: the number of a frame is its layer minus
@@ -414,7 +389,6 @@ fn numbered_frames<const W: usize>(board_frames: &BoardFrames<W>) -> Numbers {
 /// `k − 1`, and every frame in front of it ([`BoardFrames::frames_in_front`]) is of layer `k − 1`.
 fn lemma_omega_violation<const W: usize>(board_frames: &BoardFrames<W>, layers: &[u32]) -> Option<String> {
     let t = board_frames.tables();
-    let board = if t.holes.is_empty() { format!("n={}", t.n) } else { format!("n={} without {:?}", t.n, t.holes) };
     for (i, frame) in board_frames.frames().iter().enumerate() {
         let layer = layers[i];
         let held = frame.sources() | frame.impossible();
@@ -427,7 +401,7 @@ fn lemma_omega_violation<const W: usize>(board_frames: &BoardFrames<W>, layers: 
         } else {
             continue;
         };
-        return Some(format!("{board}: frame {} is of layer {layer}, and {failed}", frame.name()));
+        return Some(format!("n={}: frame {} is of layer {layer}, and {failed}", t.n, frame.name()));
     }
     None
 }
@@ -507,13 +481,6 @@ fn unclean(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::accelerate::solution_for_promotions;
-    use crate::board::Board;
-    use crate::brute::{self, Rule};
-    use crate::engine::EngineConfig;
-    use crate::game::replay_punctured;
-    use crate::model::FrameGraph;
-    use crate::search::{self, SearchTactics};
 
     #[test]
     fn frames_of_85() {
@@ -688,26 +655,18 @@ mod tests {
         }
     }
 
-    /// The frames lie in layers (the frame lemma (F1), docs/theory/frame-model.md) on every board to 400 and on every
-    /// board of up to 60 numbers with one number taken off it, and on all of them the numbering by layer is clean.
+    /// The frames lie in layers (the frame lemma (F1), docs/theory/frame-model.md) on every board to 400, and on all of
+    /// them the numbering by layer is clean.
     #[test]
     fn lemma_omega_holds_on_every_board() {
-        let check = |t: &Tables| {
-            let board_frames = BoardFrames::<8>::new(t, Bits::EMPTY);
+        for n in 2..=400 {
+            let t = Tables::new(n);
+            let board_frames = BoardFrames::<8>::new(&t, Bits::EMPTY);
             let frames = board_frames.frames();
             let Numbers { number, layers, .. } = numbered_frames(&board_frames);
-            let board = format!("n={} without {:?}", t.n, t.holes);
-            assert_eq!(lemma_omega_violation(&board_frames, &layers), None, "{board}");
+            assert_eq!(lemma_omega_violation(&board_frames, &layers), None, "n={n}");
             let in_front = in_front_of_the_open(&board_frames);
-            assert_eq!(unclean(&number, &in_front, |i| frames[i].is_closed()), None, "{board}");
-        };
-        for n in 2..=400 {
-            check(&Tables::new(n));
-        }
-        for n in 2..=60 {
-            for hole in 1..=n {
-                check(&Tables::punctured(n, &[hole]));
-            }
+            assert_eq!(unclean(&number, &in_front, |i| frames[i].is_closed()), None, "n={n}");
         }
     }
 
@@ -725,75 +684,6 @@ mod tests {
             message.starts_with("n=30: frame ") && message.contains(board_frames.frames()[last].name()),
             "{message}"
         );
-    }
-
-    /// A punctured board is numbered by layer too, which is clean where the breadth-first numbering is not: on the
-    /// board of 56 without 39 the breadth-first numbering gives a frame (F) and a frame with freedoms directly in
-    /// front of it (E) the number 1, and the numbering by layer gives F the number of E plus one (the sacrifice
-    /// study's boards; `Tables::punctured`).
-    #[test]
-    fn a_punctured_board_is_numbered_by_layer() {
-        let t = Tables::punctured(56, &[39]);
-        let board_frames = BoardFrames::<2>::new(&t, Bits::EMPTY);
-        let frames = board_frames.frames();
-        let closed = |i: usize| frames[i].is_closed();
-
-        let (breadth_first, in_front) = breadth_first_numbers(&board_frames);
-        let (y, x) = unclean(&breadth_first, &in_front, closed).expect("an unclean numbering");
-        let x = x.expect("a frame in front");
-        assert_eq!((frames[y].name(), frames[x].name()), ("F", "E"));
-        assert_eq!((breadth_first[y], breadth_first[x]), (Some(1), Some(1)));
-
-        let Numbers { number, layers, .. } = numbered_frames(&board_frames);
-        assert_eq!(number[y], number[x].map(|k| k + 1));
-        assert_eq!(unclean(&number, &in_front_of_the_open(&board_frames), closed), None);
-        let lowest = (0..frames.len()).filter(|&i| !closed(i)).map(|i| layers[i]).min().expect("frames with freedoms");
-        for (i, &number) in number.iter().enumerate() {
-            assert_eq!(number, (!closed(i)).then(|| (layers[i] - lowest) as usize), "frame {}", frames[i].name());
-        }
-        assert!(!build_frames::<2>(&t).frames.is_empty());
-    }
-
-    /// A punctured board can have a number with no frame: the board of 32 without 4 is the smallest, by size and then
-    /// by the hole, of those with one hole (a scan of every board to 127).  Taking 4 off splits the frame of 18, 20,
-    /// 27, 28 and 30 (layer 3) into two closed frames, so layer 3 has no frame with freedoms, while layer 2 (the
-    /// frames of 21 and of 22, 26) and layer 4 (the frame of 24) have; layer 2 is number 0, layer 3 number 1 and
-    /// layer 4 number 2.  The empty frame has no moves, no factors and no freedoms, the model and the search take
-    /// it, and both bounds (the GF(2) bound and the matching bound) meet it: the search finds the best game that the
-    /// maximal-factor rule allows on the board, which the brute force finds too, and the game of its promotions is a
-    /// game of the punctured board.
-    #[test]
-    fn an_empty_frame_where_a_layer_has_no_freedoms() {
-        const W: usize = 8;
-        let (n, holes) = (32, [4]);
-        let board = Board::<W>::new(Tables::punctured(n, &holes));
-        let board_frames = BoardFrames::<W>::new(&board.tables, Bits::EMPTY);
-        let Numbers { groups, number, layers } = numbered_frames(&board_frames);
-        let mut with_freedoms: Vec<u32> =
-            (0..layers.len()).filter(|&i| number[i].is_some()).map(|i| layers[i]).collect();
-        with_freedoms.sort_unstable();
-        with_freedoms.dedup();
-        assert_eq!(with_freedoms, [2, 4]);
-        assert_eq!(groups.iter().map(Vec::len).collect::<Vec<_>>(), [2, 0, 1]);
-
-        let found = &board.frames;
-        assert_eq!((found.frames.len(), found.names.as_slice()), (3, ["B+C", "-", "G"].map(String::from).as_slice()));
-        let empty = &found.frames[1];
-        assert!(empty.moves.is_empty() && empty.factors.is_empty() && empty.freedoms == 0);
-        assert!(found.claims[1].is_empty());
-        FrameGraph::build::<W>(&board.tables, &found.columns()).expect("the model takes an empty frame");
-
-        let exact = brute::solve(n, &holes, Rule::MaximalFactor).score;
-        let cfg = EngineConfig { threads: 1, progress: None, ..EngineConfig::default() };
-        for tactics in [SearchTactics::default(), SearchTactics { gf2: false, ..SearchTactics::default() }] {
-            let prepared = board.prepare(tactics).expect("a prepared search");
-            let result = search::search(&prepared, &cfg, None, None, false).expect("a search");
-            assert!(result.completed, "{tactics:?}");
-            let score = board.in_the_bag + result.sum;
-            assert_eq!(score, exact, "{tactics:?}");
-            let moves = solution_for_promotions::<W>(&board.tables, result.promotions);
-            assert_eq!(replay_punctured(n, &holes, &moves), Ok(score), "{tactics:?}");
-        }
     }
 
     /// The solver takes a prime game's promotions from the candidates of the board's frames before any is merged

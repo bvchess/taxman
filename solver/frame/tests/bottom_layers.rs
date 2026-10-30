@@ -40,7 +40,7 @@ use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use taxman::board::Board;
-use taxman::brute::{self, Rule};
+use taxman::brute;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::numtheory::Tables;
@@ -579,7 +579,7 @@ fn check_small_boards(boards: RangeInclusive<u32>) -> Vec<String> {
             fail(format!("no playable set is worth opt(n) = {target}"));
         }
         if n <= BRUTE_FORCE_TO {
-            let brute_force = brute::solve(n, &[], Rule::Divisor).score;
+            let brute_force = brute::solve(n, &[]).score;
             if brute_force != target {
                 fail(format!("the brute force scores {brute_force}, the table {target}"));
             }

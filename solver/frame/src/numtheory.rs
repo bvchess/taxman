@@ -19,7 +19,7 @@
 //! is a maximal factor of `c`.  So `c` can be played exactly when one of its maximal factors is in the pot, and
 //! the model treats each maximal factor as able to pay for one move.  The lifting lemma (P1,
 //! `docs/theory/playability.md`) has the full argument; it needs every number between `d` and `c` to be on the board,
-//! so it fails on a board with holes (see [`Tables::punctured`]).
+//! which the board `1..=n` is.
 
 /// Precomputed tables for the board `1..=n`.  Every list is ascending; index 0 is unused (and empty).
 ///
@@ -37,9 +37,6 @@ pub struct Tables {
     pub max_composites: Vec<Vec<u32>>,
     /// All divisors of `k`, including 1 and `k`.
     pub divisors: Vec<Vec<u32>>,
-    /// The numbers taken off the board, ascending (see [`Tables::punctured`]); empty for the board `1..=n`.  The
-    /// lists above are arithmetic and include them.
-    pub holes: Vec<u32>,
     primes: Vec<u32>,
 }
 
@@ -102,32 +99,7 @@ impl Tables {
             }
         }
 
-        Tables { n, spf, max_factors, max_composites, divisors, holes: Vec::new(), primes }
-    }
-
-    /// The tables of the board `1..=n` with the numbers in `holes` taken off it.  Only the sacrifice study
-    /// ([`crate::sacrifice`]) builds punctured boards; the solver never does.
-    ///
-    /// A hole is never in the pot, so it is never a move and never pays tax.  The lists stay arithmetic (they
-    /// still mention the holes): the frames ([`crate::frames::BoardFrames`]) leave the holes out, and the search only
-    /// ever looks at the numbers of its frames.  A number whose maximal factor is a hole does *not* pay with the
-    /// hole's own divisors instead (the lifting argument above fails), so on a punctured board the frame model
-    /// plays the *maximal-factor rule*, which is stricter than the rules of the game there
-    /// ([`crate::game::replay_punctured`], [`crate::brute::Rule`]).
-    pub fn punctured(n: u32, holes: &[u32]) -> Self {
-        let mut t = Tables::new(n);
-        let mut holes = holes.to_vec();
-        holes.sort_unstable();
-        holes.dedup();
-        assert!(holes.iter().all(|h| (1..=n).contains(h)), "holes {holes:?} are not all on the board 1..={n}");
-        t.holes = holes;
-        t
-    }
-
-    /// Whether `k` has been taken off the board.
-    #[inline]
-    pub fn is_hole(&self, k: u32) -> bool {
-        !self.holes.is_empty() && self.holes.binary_search(&k).is_ok()
+        Tables { n, spf, max_factors, max_composites, divisors, primes }
     }
 
     /// Whether `k` is prime.  Requires `k <= n`.

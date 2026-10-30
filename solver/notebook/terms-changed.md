@@ -50,4 +50,8 @@ the commit 9d9dae3.  The large neighborhood search (`examples/common/lns.rs`) an
 (`examples/common/rng.rs`) moved into the library on 2026-10-21 as `src/search/finder.rs` and `src/rng.rs`; the
 entries before that date name the old paths.  The study tools (`tune`, `extended`, `structure`, `finder` and
 `wall`) and the fixtures `solver/frame/testdata/fits/` were removed on 2026-10-29; they build at commit 3ca11bf, and the
-entries that used them keep the paths and commands of their time.
+entries that used them keep the paths and commands of their time.  The sacrifice bound (the library module
+`solver/frame/src/sacrifice.rs`, with `sacrifice::hunt`) and the punctured boards it used (`Tables::punctured`,
+`game::replay_punctured`, the maximal-factor rule of `brute::solve` and the hole cases of `frames/`) were removed the
+same day, and the test of `tests/wide.rs` that took its upper bound for game 1133 from the sacrifice bound reads the
+prover's proof instead; they build at commit 3ca11bf too.

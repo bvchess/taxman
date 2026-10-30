@@ -33,7 +33,7 @@ use std::time::Instant;
 use taxman::accelerate::solution_for_promotions;
 use taxman::bits::Bits;
 use taxman::board::Board;
-use taxman::brute::{self, Rule};
+use taxman::brute;
 use taxman::frames::ClaimKind;
 use taxman::game::{self, Optimal};
 use taxman::model::Scratch;
@@ -95,11 +95,7 @@ fn the_oracle_agrees_with_brute_force() {
             assert_eq!(game::replay(n, &order), Ok(sum), "n={n}: the set {set:?} in the order {order:?}");
             best = best.max(sum);
         }
-        assert_eq!(
-            best,
-            brute::solve(n, &[], Rule::Divisor).score,
-            "n={n}: the largest playable sum and the brute force"
-        );
+        assert_eq!(best, brute::solve(n, &[]).score, "n={n}: the largest playable sum and the brute force");
         assert_eq!(Some(best), optimal.score(n), "n={n}: the largest playable sum and the table");
     }
 }

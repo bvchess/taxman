@@ -551,7 +551,7 @@ fn boards_with_pairs<const W: usize>(
         }
         boards += 1;
         if n <= 40 {
-            let exact = taxman::brute::solve(n, &[], taxman::brute::Rule::Divisor).score;
+            let exact = taxman::brute::solve(n, &[]).score;
             assert_eq!(Board::<W>::for_n(n).in_the_bag + truth, exact, "n={n}: the best score against the oracle");
         }
         for cfg in configs {

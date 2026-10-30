@@ -94,10 +94,7 @@ numbering by layer when it is clean and its frames numbered 0 lie in one layer. 
 largest the solver supports (the census below; the data in
 `solver/notebook/the-claims-of-unzip-in-the-extended-problem-2026-10/`), found the two the same on every one, with
 frame h in layer 3 + h on 8,100 boards and in layer 2 + h on the 80 where the frames of layer 2 have freedoms.  The
-tests of `src/frames/` compare the two numberings on every board to 400 and on a sample to 8191.  On boards with holes
-they can differ: without 39, the board of 56 gets a frame and a frame with freedoms directly in front of it numbered
-alike by the breadth-first rule, and without 4 the board of 32 has a layer with only closed frames between two with
-freedoms.
+tests of `src/frames/` compare the two numberings on every board to 400 and on a sample to 8191.
 
 **The census** was a program, the example `structure`, run once and removed since ([`examples/structure.rs` at commit
 3ca11bf](https://github.com/bvchess/taxman/blob/3ca11bf/solver/frame/examples/structure.rs)).  It checked the theory's
@@ -199,14 +196,7 @@ The tests tie the theorems to the code:
 * `tests/model_extended.rs` checks the extended exactness theorem (E1) the same way, with sources open.
 * `tests/bottom_layers.rs` checks the bottom-layers theorem (F4) on every recorded and enumerated optimal set.
 * Two exhaustive searches agree with the frame model's games on small boards: `brute`, the solver's own, to 40 in the
-  test suite, and `heuristics/evaluation/certify.py`, to 62.  The example `sacrifice`, removed from master, once ran
-  `brute` to 52 ([the entry](../../notebook/the-frame-model-by-layer-and-the-extended-problem-2026-10/README.md) has the
-  run).
-
-The sacrifice bound (`sacrifice`) is an upper bound on opt(n) by a different route: games on punctured boards, boards
-with holes, where the exactness theorem holds too ([the holes theorem
-(X9)](../../../docs/theory/exactness.md#boards-with-holes)).  But U and F4 are statements about the board 1..n, so the
-bound rests on the upper part of each punctured board.  It proves game 1133 and disagrees with nothing.
+  test suite, and `heuristics/evaluation/certify.py`, to 62.
 
 **Given the pruning is exact.**  Every [tactic](../../../docs/GLOSSARY.md#the-search) is proven or sound;
 [tactics.md](tactics.md) grades each.  The Java used two shortcuts that rest on conjectures, `reuse_prev` and

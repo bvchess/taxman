@@ -92,9 +92,9 @@
 //!   searchers' counts, its file.
 //! * here: [`search`], which starts or resumes the engine on a prepared game, and [`search_above`], the same from a
 //!   floor (an incumbent worth a given sum and no set) instead of a start incumbent; [`start_incumbent`], the incumbent
-//!   [`search`] starts from, which the hunt (`sacrifice::hunt`) also makes without a search; [`offer_seed`],
-//!   [`best_so_far`] and [`seed_survivors_sum`], for a caller that steers searches through their [`Control`]
-//!   (`EngineConfig::control`), and [`search_steered`], whose branching settings the caller may change as it runs.
+//!   [`search`] starts from; [`offer_seed`], [`best_so_far`] and [`seed_survivors_sum`], for a caller that steers
+//!   searches through their [`Control`] (`EngineConfig::control`), and [`search_steered`], whose branching settings the
+//!   caller may change as it runs.
 
 mod branching;
 mod diagnostics;

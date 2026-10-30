@@ -19,13 +19,13 @@ use common::{
 use std::time::Duration;
 use taxman::bits::Bits;
 use taxman::board::Board;
+use taxman::certify::verify::read_exact;
 use taxman::engine::EngineConfig;
 use taxman::frames::build_frames;
 use taxman::gf2::{Gf2Bound, Gf2Graph, MAX_WORDS};
 use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
 use taxman::model::{FrameGraph, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
-use taxman::sacrifice::{sacrifice_bound, PuncturedOptions};
 use taxman::search::{SearchTactics, TaxUnit};
 use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
 use taxman::{accelerate, game, with_width};
@@ -326,19 +326,17 @@ fn a_board_past_4095_builds_bounds_and_searches_at_w128() {
     builds_bounds_and_searches::<128>(4100, 4095);
 }
 
-/// At W = 20 the sacrifice bound (a search of punctured boards, which is the theorem that opt(n) is at most the
-/// best of them plus a known term) is the only upper bound that does not come from the search being tested (the
-/// Java stops at 1023): it must be at least the recorded score, and where it is tight it proves it, as it does for
-/// game 1133 (not for game 1131, whose bound is larger).
+/// At W = 20 the prover's proof (`solver/noframe/data/exact_*.jsonl`) is the only upper bound that does not come from
+/// the search being tested (the Java stops at 1023, and the prover shares no code with the frame solver): for game 1133
+/// its own search finished, and proved the recorded score optimal.
 #[test]
-fn the_sacrifice_bound_proves_a_w20_result() {
-    let games = stored_games();
+fn the_provers_proof_matches_a_w20_result() {
     let n = 1133;
-    let (prev_score, prev) = &games[&(n - 1)];
-    let bound = sacrifice_bound(n, prev, *prev_score, None, &PuncturedOptions::default()).unwrap();
-    let score = games[&n].0;
-    assert!(bound.exact(), "n={n}: some punctured game is not exact");
-    assert_eq!(bound.value, score, "n={n}: the bound {} should be the recorded optimum", bound.value);
+    let score = stored_games()[&n].0;
+    let proofs = read_exact(&taxman::paths::exact_files_in_repository().unwrap()).unwrap();
+    let proof = &proofs[&n];
+    assert_eq!(proof.search, "proven", "n={n}: the prover's search did not finish");
+    assert_eq!(proof.score, score, "n={n}: the prover proved another optimum than the recorded one");
 }
 
 // ---------------------------------------------------------------------------------------------------------

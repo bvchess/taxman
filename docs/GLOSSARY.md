@@ -327,8 +327,6 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   bottom-layers theorem (F4)](theory/frame-model.md#the-bottom-layers-theorem) gives every optimal set, plays u.  The members
   it does not certify are *open* ([solver/noframe/docs/proofs.md, "The upper part, game by
   game"](../solver/noframe/docs/proofs.md#the-upper-part-game-by-game)).
-* **sacrifice bound** (`src/sacrifice.rs`): an upper bound on opt(n) from games on boards with holes.  The frame solver
-  does not use it.
 
 ## Results and trust
 

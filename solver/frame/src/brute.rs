@@ -1,60 +1,38 @@
-//! Exact Taxman on small boards, with holes, by exhaustive search over pot states: **a test oracle**.  It makes
-//! no model assumption of any kind (no frames, no maximal-factor lifting, no greedy choices), so its
-//! answers are the ground truth that the frame model's can be checked against on boards small enough to search.
+//! Exact Taxman on small boards, by exhaustive search over pot states: **a test oracle**.  It makes no model
+//! assumption of any kind (no frames, no maximal-factor lifting, no greedy choices), so its answers are the ground
+//! truth that the frame model's can be checked against on boards small enough to search.
 //!
-//! *Status:* the solver never calls this module.  It is compiled into the library (the tests and the sacrifice study
-//! use it) but it is test and study support, for boards of up to [`MAX_N`] = 127 numbers; the search is exponential,
-//! and in practice the tests here stop at 40 and the study's `validate N` at about 52 (the example `sacrifice`,
-//! removed from master: it builds at commit 8753189).
+//! *Status:* the solver never calls this module.  It is compiled into the library (the tests use it) but it is test
+//! support, for boards of up to [`MAX_N`] = 127 numbers; the search is exponential, and in practice the tests stop at
+//! 40.
 //!
-//! A state is the pot (a `u128`, bit `i` for the number `i`), a move is any number in the pot that can pay tax,
-//! the tax is every proper divisor still in the pot, and the value of a state is the best sum of moves from it,
-//! memoized.  The search is exact: a move is skipped only when an upper bound on what follows it shows that it
-//! cannot beat the best move found so far, so what is memoized is always a true value.  It is the Rust
-//! counterpart of the Python certifier (`heuristics/evaluation/certify.py`), extended to boards with holes and to
-//! the maximal-factor rule, and it shares no code with the frame model or with [`crate::numtheory`].
+//! A state is the pot (a `u128`, bit `i` for the number `i`), a move is any number in the pot that has a proper divisor
+//! in the pot, the tax is every proper divisor still in the pot, and the value of a state is the best sum of moves
+//! from it, memoized.  The search is exact: a move is skipped only when an upper bound on what follows it shows that
+//! it cannot beat the best move found so far, so what is memoized is always a true value.  It is the Rust counterpart
+//! of the Python certifier (`heuristics/evaluation/certify.py`), extended to boards with holes, and it shares no code
+//! with the frame model or with [`crate::numtheory`].
 //!
 //! # How the tests use it
 //!
-//! * Here: it reproduces the table of optimal games for every board up to 40; it agrees with a naive solver on random sparse
-//!   boards all the way up to 127 (which exercises the high 64 bits of the `u128`); the two rules agree on boards
-//!   without holes; and the hole semantics are pinned on small cases.
-//! * [`crate::sacrifice`]'s tests check the frame model on every board `1..=n` minus one number, `n ≤ 36`
-//!   (`punctured` against `solve` under the maximal-factor rule), and the sacrifice bound itself.
-//! * The example `sacrifice` (`validate`, `brute`; removed from master, built at commit 8753189) did the same on
-//!   larger ranges.
+//! * Here: it reproduces the table of optimal games for every board up to 40; it agrees with a naive solver on random
+//!   sparse boards all the way up to 127 (which exercises the high 64 bits of the `u128`); and the hole semantics are
+//!   pinned on small cases.
 //!
-//! No test compares the solver's own answers with it directly.  On boards without holes the chain is: the solver
-//! reproduces the table of optimal games (to 1000), and this module reproduces it to 40; the Python certifier
+//! No test compares the solver's own answers with it directly.  The chain is: the solver reproduces the table of
+//! optimal games (to 1000), and this module reproduces it to 40; the Python certifier
 //! `heuristics/evaluation/certify.py` is the exhaustive check that goes further (to 62).
 //!
-//! # Boards and rules
+//! # Boards
 //!
-//! A *board* is `1..=n` minus a set of *holes*: numbers that are never in the pot, so they are never moves and
-//! never tax.  [`Rule`] says what a move needs:
-//!
-//! * [`Rule::Divisor`], the rules of the game: some proper divisor of the move is in the pot.
-//! * [`Rule::MaximalFactor`]: some *maximal factor* `m/p` (`p` prime) of the move is in the pot.  On a board
-//!   without holes the two rules are the same game (the lifting argument: a divisor `d` in the pot lies below a
-//!   maximal factor `f`, `d | f | m`, and whatever removed `f` from the pot removed `d` with it).  With holes they
-//!   differ: a move whose maximal factor `f` is a hole may still pay with a divisor of `f` under the rules, but
-//!   not under this rule.  This is the game the frame model plays on a punctured board (see
-//!   [`crate::sacrifice`]).
+//! A *board* is `1..=n` minus a set of *holes*: numbers that are never in the pot, so they are never moves and never
+//! tax.  A move needs some proper divisor of it in the pot, as in the rules of the game.
 
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// The largest board [`solve`] handles: a pot is a `u128`.
 pub const MAX_N: u32 = 127;
-
-/// What a move must find in the pot to be legal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Rule {
-    /// The rules of Taxman: some proper divisor of the move.
-    Divisor,
-    /// Some maximal factor of the move: `m/p` for a prime `p` dividing `m`.
-    MaximalFactor,
-}
 
 /// An optimal game on a board, and how much work it took.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -66,9 +44,9 @@ pub struct Exact {
     pub states: usize,
 }
 
-/// The best game on the board `1..=n` without `holes`, under `rule`.  Panics if `n > MAX_N`.
-pub fn solve(n: u32, holes: &[u32], rule: Rule) -> Exact {
-    let mut solver = Solver::new(n, holes, rule);
+/// The best game on the board `1..=n` without `holes`.  Panics if `n > MAX_N`.
+pub fn solve(n: u32, holes: &[u32]) -> Exact {
+    let mut solver = Solver::new(n, holes);
     let root = solver.normalize(solver.board);
     let score = solver.best(root);
     // Walk down the memo: at each state some move reaches the state's value.
@@ -102,7 +80,7 @@ struct Solver {
 }
 
 impl Solver {
-    fn new(n: u32, holes: &[u32], rule: Rule) -> Self {
+    fn new(n: u32, holes: &[u32]) -> Self {
         assert!(n <= MAX_N, "the brute force handles boards up to {MAX_N}, not {n}");
         let size = n as usize + 1;
         let board = (1..=n).filter(|x| !holes.contains(x)).fold(0u128, |acc, x| acc | bit(x));
@@ -112,16 +90,10 @@ impl Solver {
                 sweep[m as usize] |= bit(d);
             }
         }
-        let is_prime = |p: u32| p >= 2 && (2..p).take_while(|q| q * q <= p).all(|q| !p.is_multiple_of(q));
         let mut pay = vec![0u128; size];
         let mut payers = vec![0u128; size];
         for m in members(board) {
-            let can_pay = match rule {
-                Rule::Divisor => sweep[m as usize],
-                Rule::MaximalFactor => {
-                    (2..=m).filter(|&p| m % p == 0 && is_prime(p)).fold(0u128, |acc, p| acc | bit(m / p))
-                }
-            } & board;
+            let can_pay = sweep[m as usize] & board;
             pay[m as usize] = can_pay;
             for f in members(can_pay) {
                 payers[f as usize] |= bit(m);
@@ -238,24 +210,23 @@ mod tests {
     fn small_boards_match_the_table() {
         let optimal = Optimal::built_in();
         for n in 1..=40 {
-            let exact = solve(n, &[], Rule::Divisor);
+            let exact = solve(n, &[]);
             assert_eq!(Some(exact.score), optimal.score(n), "n={n}");
             assert_eq!(replay(n, &exact.moves), Ok(exact.score), "n={n}");
         }
     }
 
     /// A naive solver for sparse boards, sharing nothing with [`solve`]: the pot as a sorted vector, memoized.
-    fn naive(pot: &[u32], rule: Rule, memo: &mut BTreeMap<Vec<u32>, u32>) -> u32 {
+    fn naive(pot: &[u32], memo: &mut BTreeMap<Vec<u32>, u32>) -> u32 {
         if let Some(&value) = memo.get(pot) {
             return value;
         }
-        let is_prime = |p: u32| p >= 2 && (2..p).all(|q| !p.is_multiple_of(q));
         let mut best = 0;
         for &c in pot {
-            let pays = pot.iter().any(|&d| d < c && c % d == 0 && (rule == Rule::Divisor || is_prime(c / d)));
+            let pays = pot.iter().any(|&d| d < c && c % d == 0);
             if pays {
                 let next: Vec<u32> = pot.iter().copied().filter(|&d| d != c && c % d != 0).collect();
-                best = best.max(c + naive(&next, rule, memo));
+                best = best.max(c + naive(&next, memo));
             }
         }
         memo.insert(pot.to_vec(), best);
@@ -263,7 +234,7 @@ mod tests {
     }
 
     /// The other tests stop below 65, the low half of the pot's `u128`.  Sparse boards that reach 127 (the numbers
-    /// above 64 are in the high 64 bits) are cheap, and checked against a naive solver under both rules.
+    /// above 64 are in the high 64 bits) are cheap, and checked against a naive solver.
     #[test]
     fn sparse_boards_up_to_the_top_of_the_u128_match_a_naive_solver() {
         let mut rng = Rng(0x1234_5678_9ABC_DEF1);
@@ -279,30 +250,19 @@ mod tests {
             }
             let holes: Vec<u32> = (1..=n).filter(|x| !present.contains(x)).collect();
             let pot: Vec<u32> = present.into_iter().collect();
-            for rule in [Rule::Divisor, Rule::MaximalFactor] {
-                let expected = naive(&pot, rule, &mut BTreeMap::new());
-                assert_eq!(solve(n, &holes, rule).score, u64::from(expected), "n={n} {rule:?} {pot:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn the_rules_agree_without_holes() {
-        for n in 1..=36 {
-            assert_eq!(solve(n, &[], Rule::Divisor).score, solve(n, &[], Rule::MaximalFactor).score, "n={n}");
+            let expected = naive(&pot, &mut BTreeMap::new());
+            assert_eq!(solve(n, &holes).score, u64::from(expected), "n={n} {pot:?}");
         }
     }
 
     #[test]
     fn holes_are_never_moves_or_tax() {
         // Without 1 no prime can be played: on 1..=7 the best is 4 (paid by 2) then 6 (paid by 3).
-        assert_eq!(solve(7, &[1], Rule::Divisor).score, 10);
-        // Without 2, 4 can still pay with 1 under the rules (4 alone: 3 would take the 1 it needs), but not
-        // under the maximal-factor rule, which leaves only 3.
-        assert_eq!(solve(4, &[2], Rule::Divisor).moves, [4]);
-        assert_eq!(solve(4, &[2], Rule::MaximalFactor).moves, [3]);
+        assert_eq!(solve(7, &[1]).score, 10);
+        // Without 2, 4 can still pay with 1 (4 alone: 3 would take the 1 it needs).
+        assert_eq!(solve(4, &[2]).moves, [4]);
         // The game found is legal on the full board too, and never plays a hole.
-        let exact = solve(30, &[6], Rule::MaximalFactor);
+        let exact = solve(30, &[6]);
         assert!(!exact.moves.contains(&6));
         assert_eq!(replay(30, &exact.moves), Ok(exact.score));
     }

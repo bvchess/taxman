@@ -75,8 +75,8 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **Studies**, which the solver does not use and a first read skips:
 
-15. `src/brute.rs` (exhaustive search, the test oracle), `src/root_problem.rs` (the theory's root problem, built
-    without the frames code, the oracle of setup) and `src/sacrifice.rs` (the sacrifice bound and punctured games).
+15. `src/brute.rs` (exhaustive search, the test oracle) and `src/root_problem.rs` (the theory's root problem, built
+    without the frames code, the oracle of setup).
 
 **Beside the library.**  `examples/` holds the programs that use the library but are not the solver:
 

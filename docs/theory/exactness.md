@@ -209,8 +209,7 @@ there the argument that settles layer 2 stops.  The same picture appears among t
 
 ## Boards with holes
 
-The model applies to a board with numbers taken off, and a bound on opt(n) computed on such boards rests on it.  Let Z
-⊆ {1, …, n} be the *holes* and Y = {1, …, n} ∖ Z the board.  On Y a move needs one of its maximal factors in the pot, a
+The model applies to a board with numbers taken off.  Let Z ⊆ {1, …, n} be the *holes* and Y = {1, …, n} ∖ Z the board.  On Y a move needs one of its maximal factors in the pot, a
 hole is never in the pot, and a move takes all its divisors in the pot.  On the full board this *maximal-factor rule*
 changes nothing, by [the lifting lemma (P1)](playability.md#the-lifting-lemma), but on Y it can forbid a move: on the
 board 1 to 9 without 3, the move 9 has the divisor 1 in the pot, but its one maximal factor, 3, is a hole.  The frames

@@ -75,11 +75,10 @@
 //! | | [`paths`] | where the default files are, found at run time |
 //! | studies | [`brute`] | exhaustive search without the frame model, to certify small boards |
 //! | | [`root_problem`] | the theory's root problem Π_n, built without the frames code, to check setup against |
-//! | | [`sacrifice`] | the sacrifice bound and punctured games; not used by the solver |
 //!
 //! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
 //! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy incumbent),
-//! and `brute`, `root_problem` and `sacrifice` are studies that a first read can skip.  `examples/` holds the ladder
+//! and `brute` and `root_problem` are studies that a first read can skip.  `examples/` holds the ladder
 //! (searches of hard games with time limits and thread counts), the probe of the hot paths and the ledger; `tests/` the
 //! integration tests.
 
@@ -103,7 +102,6 @@ pub mod playable;
 pub mod results;
 pub mod rng;
 pub mod root_problem;
-pub mod sacrifice;
 pub mod search;
 pub mod solver;
 pub mod store;
