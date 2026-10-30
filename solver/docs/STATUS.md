@@ -19,6 +19,14 @@ are appended to it ([the runbook](runbook/chain.md)), and a rebuild takes them i
 * **The documentation.**  Every long document is a folder of files with an index, and every doc follows
   [docs/WRITING.md](../../docs/WRITING.md), whose docs test checks the links, the citations, the sizes and the words.
   The project's owner reviews the docs one file at a time, and each review's changes land as they are decided.
+* **The re-run.**  The chain runs again from game 1 to 5060 on a friend's machine of 88 threads, with one
+  build (the tag `rerun-2026-10`, commit 3ca11bf) and one policy, so that its timings come from one machine and one
+  build.  It started on 2026-10-29 at 19:55 PDT as `chain.sh 5060` with `--gate 1200 --gate-trial 1000,800,600 --tactic
+  price_reuse=on --tactic warm_start=on --finder-seconds 900 --background --carried-dir DIR --profile DIR` (DIR is a
+  folder of the run) and no `--use-prev`.  When it completes, its file replaces `results/optimal.jsonl.gz`.
+* **The cleanup of the frame solver.**  The project's owner decided on 2026-10-29 to remove the lab, the studies and the
+  idle experiments; to make the production policy the default; to split the notebook into a repository of its own; and
+  to leave the prover alone.
 
 ## Where the hunt left off
 
