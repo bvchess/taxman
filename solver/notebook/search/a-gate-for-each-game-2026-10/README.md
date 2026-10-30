@@ -13,7 +13,9 @@ keyed to it acts on 0 to 2% of a game's steps.  The game is what decides.  On 60
 0.68 of the CPU of 1,200 on 5052 and 0.83 on 5054, against 1.10 to 1.55 on 4984, 4992 and 4995, and units solved to
 500,000 and 1 million steps keep each game's sign (0.57 to 0.86 of the steps on 5052 and 5054, 2.05 on 4984).  So a
 search that tries the gates on 24 of its own units and keeps the cheapest would take a projected 0.86 to 0.89 of the
-chain's CPU, where no fixed gate does better than 0.97.  It is built as an option, `--gate-trial`, off by default.
+chain's CPU, where no fixed gate does better than 0.97.  It is built as an option, `--gate-trial`, off by default.  On
+the chain, the trials of 5056 and 5060 both chose 600, at 0.855 and 0.874 of the CPU of 1,200 on their 24 units; no
+game was searched under two gates, so a whole game's gain is not measured.
 
 ## Method
 
@@ -158,6 +160,23 @@ after=0,units=3,steps=500,least_gap=0,threads=2`), the trial took its units at 5
 **8. The live game.**  On these numbers the lab set game 5054's gate to 600 at 21:16:36 PDT (04:16:36Z), at about 1.86
 billion steps and 8 h 39 min of its search.  Its profile from then on is a live data point with no control.
 
+**9. The chain's trials.**  The chain ran with `--gate-trial 1000,800,600` from 06:30 UTC on 2026-10-29 until it was
+stopped after game 5060 ([the run](../../../../results/runs.md)).  Two games ran a trial, 5056 and 5060, and each line
+records it in `engine.gate_trial`.  The CPU of the 24 units under each gate, in seconds:
+
+| game | steps at the trial | g1200 | g1000 | g800 | g600 | chosen | g600 against g1200 | the trial took |
+|---|---|---|---|---|---|---|---|---|
+| 5056 | 57,201,683 | 425.6 | 391.8 | 383.0 | 363.9 | 600 | 0.855 | 445 s |
+| 5060 | 58,286,895 | 469.2 | 476.1 | 442.5 | 410.0 | 600 | 0.874 | 504 s |
+
+Both trials took their units at about 57 to 58 million steps, ran on four threads, picked 600 and applied it.  Both
+ratios are near the 0.86 to 0.89 that result 6 projected for the chain as a whole, and 600 took the least CPU and 800
+the next least in both.  Then the games exhausted: 5056 at 6.20 billion nodes in 30,980 s of its own time, and 5060 at
+3.18 billion in 16,094 s.  The other lines had no trial to record: 5054 kept the lab's gate of 600 (result 8) and
+exhausted at 7.45 billion nodes in 37,449 s over two invocations, against the 4.09 billion that result 6 took for it,
+and the line of 5061, stopped at 62 million nodes, records none.  No game was searched under both gates, so the gain on
+a whole game is not measured, only on the trial's 24 units.
+
 ## Decision
 
 Built, off by default: the gate trial, `--gate-trial GATES` with `--gate-trial-plan`.  To run it on the chain:
@@ -166,9 +185,11 @@ fixed gates and the policies of the phase, the lineage and the relative gate are
 
 What would reopen it, the likeliest first:
 
-1. **The trial's own record on the chain.**  Each game's line keeps what its trial measured and chose; a game whose
-   trial chose 600 or 800 and whose search then took longer than its twin or its neighbors says the 150,000-step units
-   misled it.  `--gate-trial-plan steps=500000,least_gap=900` sees larger subtrees, at about three times the cost.
+1. **The trial's own record on the chain.**  Each game's line keeps what its trial measured and chose (result 9); a game
+   whose trial chose 600 or 800 and whose search then took longer than its twin or its neighbors says the 150,000-step
+   units misled it.  The two lines that have a trial chose 600, and neither game has a twin searched under another gate,
+   so the question stays open.  `--gate-trial-plan steps=500000,least_gap=900` sees larger subtrees, at about three
+   times the cost.
 2. **5054's search after the switch**, against 5049's and 5052's at the same steps.
 3. **A trial again later in a game**, if the best gate turns out to move within one; nothing here says it does.
 
