@@ -38,7 +38,7 @@ use std::sync::OnceLock;
 use taxman::json::Json;
 use taxman::known::KnownSources;
 use taxman::solver::{solve_game, SolveOptions};
-use taxman::tactics::Tactics;
+use taxman::tactics::{on_off, Tactics};
 
 /// The crate's directory (`solver/frame/`).
 fn crate_dir() -> PathBuf {
@@ -137,7 +137,7 @@ fn design_lists_the_tactics_of_the_code_in_order() {
 #[test]
 fn design_gives_the_defaults_of_the_code() {
     for (row, (name, value)) in tactic_rows().iter().zip(Tactics::default().settings()) {
-        assert_eq!(row.default, value.to_string(), "the default of {name}");
+        assert_eq!(row.default, on_off(value), "the default of {name}");
     }
 }
 

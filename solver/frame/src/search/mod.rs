@@ -108,10 +108,10 @@ pub use near_repeat::NearRepeat;
 pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
-    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, prepare_for_window,
-    problem_of, problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
+    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
+    problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
 };
-pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
+pub use tactics::SearchTactics;
 
 use crate::bits::Bits;
 use crate::engine::{
@@ -129,10 +129,9 @@ use std::sync::{Arc, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps (the default of the
-/// tactic `nogood_period`).  Every interval from 10,000 to 100,000 steps was about as good on one thread (22–26% less
-/// time than never forgetting on hard games near n = 1200, games of fewer steps unchanged); see
-/// solver/notebook/search/forgetting-nogoods-2026-10/README.md.
+/// With the tactic `forget_nogoods`, a searcher forgets its nogoods after each this many steps.  Every interval from
+/// 10,000 to 100,000 steps was about as good on one thread (22–26% less time than never forgetting on hard games near
+/// n = 1200, games of fewer steps unchanged); see solver/notebook/search/forgetting-nogoods-2026-10/README.md.
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// With the tactic `conflict_branching`, a check chooses the conflict it branches on only where its gap, the GF(2) bound
@@ -260,8 +259,8 @@ pub fn search_above<const W: usize>(
     cap: Option<u64>,
     resume: bool,
 ) -> io::Result<SearchResult<W>> {
-    let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, &[], cap, resume, forgetting, Some(floor), None, None, None, None, None, None)
+    let forget_period = prepared.tactics.forget_period();
+    search_forgetting(prepared, cfg, &[], cap, resume, forget_period, Some(floor), None, None, None, None, None, None)
 }
 
 /// [`search`] with any number of `seeds` (the incumbent starts as the best start of any of them,
@@ -277,8 +276,8 @@ pub fn search_beside<const W: usize>(
     resume: bool,
     plan: Option<&finder::Plan<W>>,
 ) -> io::Result<SearchResult<W>> {
-    let forgetting = prepared.tactics.forgetting();
-    search_forgetting(prepared, cfg, seeds, cap, resume, forgetting, None, plan, None, None, None, None, None)
+    let forget_period = prepared.tactics.forget_period();
+    search_forgetting(prepared, cfg, seeds, cap, resume, forget_period, None, plan, None, None, None, None, None)
 }
 
 /// [`search_beside`] with the branching settings `branching`, whose gate the search's gate trial may change while the
@@ -318,14 +317,15 @@ pub fn search_steered<const W: usize>(
     carried: Option<&Path>,
     trial: Option<&gate_trial::Plan>,
 ) -> io::Result<SearchResult<W>> {
-    let (forgetting, near_repeat, branching) = (prepared.tactics.forgetting(), Some(near_repeat), Some(branching));
+    let (forget_period, near_repeat, branching) =
+        (prepared.tactics.forget_period(), Some(near_repeat), Some(branching));
     search_forgetting(
         prepared,
         cfg,
         seeds,
         cap,
         resume,
-        forgetting,
+        forget_period,
         None,
         plan,
         branching,
@@ -336,9 +336,9 @@ pub fn search_steered<const W: usize>(
     )
 }
 
-/// [`search`], the searchers keeping and forgetting their nogoods as `forgetting` says whatever the tactics say,
-/// so that tests can make them forget often, under `floor` if given (then without a seed), with the branching
-/// settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
+/// [`search`], the searchers forgetting their nogoods after each `forget_period` steps (never if `None`) whatever the
+/// tactics say, so that tests can make them forget often, under `floor` if given (then without a seed), with the
+/// branching settings `branching` if given (else those of the tactics), with the near-repeat cut that `near_repeat` holds or
 /// comes to hold, if given, keeping the profile `profile` asks for, if given, carrying the nogoods of the directory
 /// of stores `carried_dir`, if given, with the tactic `carried_nogoods`, and with the gate trial of `trial`, if given
 /// ([`search_steered`]).
@@ -349,7 +349,7 @@ fn search_forgetting<const W: usize>(
     seeds: &[Bits<W>],
     cap: Option<u64>,
     resume: bool,
-    forgetting: Forgetting,
+    forget_period: Option<u64>,
     floor: Option<u64>,
     plan: Option<&finder::Plan<W>>,
     branching: Option<&Arc<Branching>>,
@@ -435,7 +435,7 @@ fn search_forgetting<const W: usize>(
         (Arc::new(Harvest::resumed(&path, &prepared.candidates)), path)
     });
     let space = SearchSpace {
-        forgetting,
+        forget_period,
         began: t0,
         near_repeat,
         carried: carried.as_ref(),
@@ -514,8 +514,9 @@ fn search_forgetting<const W: usize>(
         }
     };
     // A resumed run goes on under the header it was written with, which `resume_point` read and found to be this
-    // search's: the engine checks the stored header byte for byte, and one of an earlier format (version 4) is this
-    // search's without being this build's encoding of it.  So the checkpoints of a run keep its format.
+    // search's: the engine checks the stored header byte for byte, and one whose bits that bind nothing
+    // ([`SearchTactics::same_recorded`]) differ from this run's is this search's without being this run's encoding of
+    // it.  So the checkpoints of a run keep the header it began with.
     let header = match &resumed {
         Some((_, head)) => head.header.clone(),
         None => {
@@ -541,7 +542,7 @@ fn search_forgetting<const W: usize>(
                 armed,
                 near_repeat,
                 carried: carried.as_ref(),
-                forgetting,
+                forget_period,
                 background: cfg.background,
                 label: &cfg.label,
             };

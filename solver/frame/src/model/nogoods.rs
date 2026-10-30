@@ -19,70 +19,17 @@
 //! unwinnable.  The search uses the table for the conflict to branch on (the smallest it knows,
 //! [`Nogoods::lookup`]) and to rule candidates out of children ([`Nogoods::ruled_out`]).
 //!
-//! # Forgetting is sound, and a policy
+//! # Forgetting is sound
 //!
 //! Every nogood in the table holds at every node, so the table is a *cache*: a table that holds any subset of the
 //! nogoods the search has learned (or of those it might learn) is as sound as a full one, and loses only the time it
-//! takes to learn what it forgot.  So which nogoods a searcher keeps, and for how long, is a matter of speed alone, a
-//! policy: [`Nogoods::forget`] drops all of them or keeps some ([`Keep`]), and a table may be limited
-//! ([`Nogoods::set_limit`]) so that the least recently used goes when a new one comes.  (What the tree looks like does
-//! depend on the policy, because which conflict a node branches on depends on what the table knows; P* does not.)  A
-//! nogood is *used* when a lookup answers with it ([`Nogoods::lookup`]) or it rules a candidate out
-//! ([`Nogoods::ruled_out`]).
+//! takes to learn what it forgot.  So when a searcher forgets them ([`Nogoods::forget`] drops all of them) is a matter
+//! of speed alone.  (What the tree looks like does depend on it, because which conflict a node branches on depends on
+//! what the table knows; P* does not.)
 
 use crate::bits::Bits;
-use std::fmt;
 
-/// What [`Nogoods::forget`] keeps of the table (the others are dropped); the used count of every kept nogood starts
-/// again from 0.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Keep {
-    /// Nothing: the table is cleared.
-    Nothing,
-    /// The nogoods used since the table was last forgotten.
-    Used,
-    /// The nogoods of at most this many members.
-    Short(u32),
-    /// At most this many nogoods, the most used since the last forgetting (only those used at all, the most recently
-    /// used first among equals).
-    Top(u32),
-}
-
-impl Keep {
-    /// The policy `text` names: `none`, `hit`, `size3` (the nogoods of at most 3 members), `top64` (the 64 most
-    /// used).
-    pub fn parse(text: &str) -> Option<Keep> {
-        let number = |digits: &str| {
-            Some(digits)
-                .filter(|d| d.bytes().all(|b| b.is_ascii_digit()))
-                .and_then(|d| d.parse::<u32>().ok())
-                .filter(|&n| n >= 1)
-        };
-        match text {
-            "none" => Some(Keep::Nothing),
-            "hit" => Some(Keep::Used),
-            _ => match (text.strip_prefix("size"), text.strip_prefix("top")) {
-                (Some(digits), _) => number(digits).map(Keep::Short),
-                (_, Some(digits)) => number(digits).map(Keep::Top),
-                _ => None,
-            },
-        }
-    }
-}
-
-/// The policy as [`Keep::parse`] reads it.
-impl fmt::Display for Keep {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Keep::Nothing => f.write_str("none"),
-            Keep::Used => f.write_str("hit"),
-            Keep::Short(size) => write!(f, "size{size}"),
-            Keep::Top(count) => write!(f, "top{count}"),
-        }
-    }
-}
-
-/// What a table has done, for measuring policies ([`Nogoods::take_stats`] hands it over and starts again).
+/// What a table has done ([`Nogoods::take_stats`] hands it over and starts again).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct NogoodStats {
     /// Nogoods added.
@@ -93,12 +40,9 @@ pub struct NogoodStats {
     pub hits: u64,
     /// Candidates ruled out of children.
     pub ruled_out: u64,
-    /// [`Nogoods::forget`]s, the sizes of the tables they began with and the numbers of nogoods they kept (summed).
+    /// [`Nogoods::forget`]s, and the sizes of the tables they began with (summed).
     pub forgettings: u64,
     pub size_before: u64,
-    pub size_kept: u64,
-    /// Nogoods dropped to make room under the limit.
-    pub evicted: u64,
     /// The most nogoods a table held (not a sum: [`add`](Self::add) takes the larger).
     pub largest: u64,
 }
@@ -112,25 +56,21 @@ impl NogoodStats {
         self.ruled_out += other.ruled_out;
         self.forgettings += other.forgettings;
         self.size_before += other.size_before;
-        self.size_kept += other.size_kept;
-        self.evicted += other.evicted;
         self.largest = self.largest.max(other.largest);
     }
 
     /// One line: nogoods learned, lookups with the share answered, candidates ruled out, forgettings with the mean
-    /// table before and the mean kept, evictions, the largest table.
+    /// table before, the largest table.
     pub fn summary(&self) -> String {
         let mean = |sum: u64| if self.forgettings == 0 { 0.0 } else { sum as f64 / self.forgettings as f64 };
         format!(
-            "nogoods learned {} lookups {} hit {:.1}% ruled out {} forgot {} (table {:.0} kept {:.0}) evicted {} largest {}",
+            "nogoods learned {} lookups {} hit {:.1}% ruled out {} forgot {} (table {:.0}) largest {}",
             self.learned,
             self.lookups,
             100.0 * self.hits as f64 / self.lookups.max(1) as f64,
             self.ruled_out,
             self.forgettings,
             mean(self.size_before),
-            mean(self.size_kept),
-            self.evicted,
             self.largest,
         )
     }
@@ -159,13 +99,6 @@ pub struct Nogoods<const W: usize> {
     /// Each nogood as a set of compact indices, `stride` words each (as many as the indices need).
     compact: Vec<u64>,
     stride: usize,
-    /// For each nogood, how many times it has been used since the table was last forgotten, and when it was last used
-    /// or learned (by `clock`, which counts the uses and the learnings).
-    uses: Vec<u32>,
-    last_used: Vec<u64>,
-    clock: u64,
-    /// With a limit, the table holds at most this many nogoods, and a new one takes the place of the least recently used.
-    limit: Option<usize>,
     stats: NogoodStats,
 }
 
@@ -182,18 +115,8 @@ impl<const W: usize> Nogoods<W> {
             numbers: Vec::new(),
             compact: Vec::new(),
             stride: 1,
-            uses: Vec::new(),
-            last_used: Vec::new(),
-            clock: 0,
-            limit: None,
             stats: NogoodStats::default(),
         }
-    }
-
-    /// Limits the table to `limit` nogoods (at least 1), or lifts the limit: a nogood added to a full table takes the place
-    /// of the least recently used one (the first learned among equals).
-    pub fn set_limit(&mut self, limit: Option<usize>) {
-        self.limit = limit.map(|limit| limit.max(1));
     }
 
     /// `set` over the compact indices, in its first [`stride`](Self::stride) words (members that are in no
@@ -242,25 +165,11 @@ impl<const W: usize> Nogoods<W> {
     }
 
     /// Adds the nogood `n` (non-empty, members up to the table's `max_number`), forgetting every other one first
-    /// if the table is full, or the least recently used one if it is at its limit ([`set_limit`](Self::set_limit)).
+    /// if the table is full.
     pub fn insert(&mut self, n: Bits<W>) {
         if self.sets.len() >= self.capacity {
             self.clear();
         }
-        while self.limit.is_some_and(|limit| self.sets.len() >= limit) {
-            let oldest = (0..self.sets.len()).min_by_key(|&id| self.last_used[id]).expect("a full table");
-            let mut keep = vec![true; self.sets.len()];
-            keep[oldest] = false;
-            self.retain(&keep);
-            self.stats.evicted += 1;
-        }
-        self.push(n);
-        self.stats.learned += 1;
-        self.stats.largest = self.stats.largest.max(self.sets.len() as u64);
-    }
-
-    /// Adds `n` as the newest nogood, used just now.
-    fn push(&mut self, n: Bits<W>) {
         let id = self.sets.len() as u32;
         self.sets.push(n);
         for x in n.iter() {
@@ -270,52 +179,15 @@ impl<const W: usize> Nogoods<W> {
         self.maxes.push(n.max().expect("a nogood is not empty") as u16);
         let set = self.compact_of(&n);
         self.compact.extend_from_slice(&set[..self.stride]);
-        self.clock += 1;
-        self.uses.push(0);
-        self.last_used.push(self.clock);
+        self.stats.learned += 1;
+        self.stats.largest = self.stats.largest.max(self.sets.len() as u64);
     }
 
-    /// Keeps the nogoods that `keep` flags (one flag for each, in the order of the table), in the order they were
-    /// learned and with their uses.
-    fn retain(&mut self, keep: &[bool]) {
-        let kept: Vec<(Bits<W>, u32, u64)> = (0..self.sets.len())
-            .filter(|&id| keep[id])
-            .map(|id| (self.sets[id], self.uses[id], self.last_used[id]))
-            .collect();
-        self.clear();
-        for (n, uses, last_used) in kept {
-            self.push(n);
-            let id = self.sets.len() - 1;
-            (self.uses[id], self.last_used[id]) = (uses, last_used);
-        }
-    }
-
-    /// Forgets the nogoods that `keep` does not keep, and starts counting the uses of the others from 0.
-    pub fn forget(&mut self, keep: Keep) {
+    /// Forgets every nogood, and counts the forgetting.
+    pub fn forget(&mut self) {
         self.stats.forgettings += 1;
         self.stats.size_before += self.sets.len() as u64;
-        match keep {
-            Keep::Nothing => self.clear(),
-            Keep::Used => {
-                let mask: Vec<bool> = self.uses.iter().map(|&uses| uses > 0).collect();
-                self.retain(&mask);
-            }
-            Keep::Short(size) => {
-                let mask: Vec<bool> = self.sets.iter().map(|n| n.len() <= size).collect();
-                self.retain(&mask);
-            }
-            Keep::Top(count) => {
-                let mut used: Vec<usize> = (0..self.sets.len()).filter(|&id| self.uses[id] > 0).collect();
-                used.sort_by_key(|&id| (std::cmp::Reverse(self.uses[id]), std::cmp::Reverse(self.last_used[id])));
-                let mut mask = vec![false; self.sets.len()];
-                for &id in used.iter().take(count as usize) {
-                    mask[id] = true;
-                }
-                self.retain(&mask);
-            }
-        }
-        self.uses.fill(0);
-        self.stats.size_kept += self.sets.len() as u64;
+        self.clear();
     }
 
     /// What the table has done since the last call (the table's size now counts as the largest it has been since).
@@ -323,13 +195,6 @@ impl<const W: usize> Nogoods<W> {
         let taken = self.stats;
         self.stats = NogoodStats { largest: self.sets.len() as u64, ..NogoodStats::default() };
         taken
-    }
-
-    /// Records that nogood `id` has been used.
-    fn use_nogood(&mut self, id: u32) {
-        self.clock += 1;
-        self.uses[id as usize] += 1;
-        self.last_used[id as usize] = self.clock;
     }
 
     /// Forgets every nogood.
@@ -347,8 +212,6 @@ impl<const W: usize> Nogoods<W> {
         self.stride = 1;
         self.sets.clear();
         self.maxes.clear();
-        self.uses.clear();
-        self.last_used.clear();
     }
 
     /// The smallest conflict the table knows of a node with the promotions `promoted` among the candidates
@@ -371,7 +234,7 @@ impl<const W: usize> Nogoods<W> {
     /// [`conflict`](Self::conflict), unless one of the conflicts the table knows is a subset of `forced` (it then
     /// stops there and says [`Lookup::AllForced`]).  The search passes a node's forced members: every completion
     /// that can beat the incumbent promotes all of them, so if they contain a conflict there is no such
-    /// completion.  The nogood that answers is used.
+    /// completion.
     pub fn lookup(&mut self, promoted: &Bits<W>, set: &Bits<W>, forced: &Bits<W>) -> Lookup<W> {
         if self.sets.is_empty() {
             return Lookup::None;
@@ -395,13 +258,12 @@ impl<const W: usize> Nogoods<W> {
             6 => self.scan::<6>(sets),
             _ => self.scan::<0>(sets),
         };
-        let (answer, id) = match best {
-            Err(id) => (Lookup::AllForced, id),
-            Ok(Some(id)) => (Lookup::Conflict(self.sets[id as usize] - *promoted), id),
+        let answer = match best {
+            Err(_) => Lookup::AllForced,
+            Ok(Some(id)) => Lookup::Conflict(self.sets[id as usize] - *promoted),
             Ok(None) => return Lookup::None,
         };
         self.stats.hits += 1;
-        self.use_nogood(id);
         answer
     }
 
@@ -437,7 +299,7 @@ impl<const W: usize> Nogoods<W> {
 
     /// The candidates among `cands` that a node with the promotions `promoted` cannot promote by the nogoods
     /// that have a member in `added` (the node's newest promotions): those `N` with `N − promoted` a single
-    /// candidate.  Each nogood that rules a candidate out is used.
+    /// candidate.
     pub fn ruled_out(&mut self, added: &Bits<W>, promoted: &Bits<W>, cands: &Bits<W>) -> Bits<W> {
         let mut out = Bits::EMPTY;
         let has_member = |a: u32| self.by_member.get(a as usize).is_some_and(|ids| !ids.is_empty());
@@ -462,11 +324,11 @@ impl<const W: usize> Nogoods<W> {
     /// [`ruled_out`](Self::ruled_out) with the promotions `p` over the compact indices, whose stride is `S` (0:
     /// any), adding to `out`.
     #[inline]
-    fn rule_out<const S: usize>(&mut self, added: &Bits<W>, p: &[u64; W], cands: &Bits<W>, out: &mut Bits<W>) {
+    fn rule_out<const S: usize>(&self, added: &Bits<W>, p: &[u64; W], cands: &Bits<W>, out: &mut Bits<W>) {
         let stride = if S == 0 { self.stride } else { S };
         debug_assert_eq!(stride, self.stride);
         let p = &p[..stride];
-        let Nogoods { by_member, compact, numbers, uses, last_used, clock, .. } = self;
+        let Nogoods { by_member, compact, numbers, .. } = self;
         for a in added.iter() {
             let Some(ids) = by_member.get(a as usize) else { continue };
             for &id in ids {
@@ -482,9 +344,6 @@ impl<const W: usize> Nogoods<W> {
                 }
                 if count == 1 && cands.contains(u32::from(numbers[at])) {
                     out.insert(u32::from(numbers[at]));
-                    *clock += 1;
-                    uses[id as usize] += 1;
-                    last_used[id as usize] = *clock;
                 }
             }
         }

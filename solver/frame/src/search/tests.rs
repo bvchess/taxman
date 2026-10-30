@@ -1,13 +1,12 @@
 use super::header::Header;
-use super::tactics::MatchingPath;
 use super::*;
 use crate::board::Board;
 use crate::engine::Unit;
 use crate::frames::build_frames;
-use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph};
+use crate::gf2::{Gf2Bound, Gf2Graph};
 use crate::json::Json;
 use crate::model::test_support::*;
-use crate::model::{FrameGraph, Keep, Scratch};
+use crate::model::{FrameGraph, Scratch};
 use crate::numtheory::Tables;
 use crate::test_support::{TempDir, QUICK};
 use std::thread;
@@ -148,65 +147,13 @@ fn forgetting_nogoods_often_does_not_change_answers() {
     for g in &searched_games(400) {
         let p = prepare_golden::<8>(g, SearchTactics::default());
         for (period, threads) in [(1, 1), (3, 2), (40, 1)] {
-            let every = Forgetting::every(period);
             let cfg = config(threads);
             let r =
-                search_forgetting(&p, &cfg, &[], None, false, every, None, None, None, None, None, None, None).unwrap();
+                search_forgetting(&p, &cfg, &[], None, false, Some(period), None, None, None, None, None, None, None)
+                    .unwrap();
             let what = format!("n={}, forgetting every {period} steps on {threads} threads", g.n);
             assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
             assert_eq!(r.sum, golden_sum(g), "{what}");
-        }
-    }
-}
-
-/// Every policy of keeping and forgetting nogoods is sound: the table is a cache of nogoods that hold at every node,
-/// so whatever the searchers keep, however often they forget and however small the table's limit, P* is the same.
-/// The periods are short, to make the policies act in searches of a few thousand steps.
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample"
-)]
-fn every_policy_of_keeping_nogoods_gives_the_same_optimum() {
-    every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(1);
-}
-
-/// [`every_policy_of_keeping_nogoods_gives_the_same_optimum`] on every fifth of its golden games.
-#[test]
-fn every_policy_of_keeping_nogoods_gives_the_same_optimum_of_a_sample() {
-    every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(5);
-}
-
-/// Every policy of keeping nogoods gives the same optimum on every `every`th of the golden games.
-fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize) {
-    let policies = [
-        Forgetting { period: None, keep: Keep::Nothing, limit: None },
-        Forgetting { period: Some(7), keep: Keep::Used, limit: None },
-        Forgetting { period: Some(7), keep: Keep::Short(2), limit: None },
-        Forgetting { period: Some(7), keep: Keep::Short(3), limit: None },
-        Forgetting { period: Some(7), keep: Keep::Short(4), limit: None },
-        Forgetting { period: Some(7), keep: Keep::Top(1), limit: None },
-        Forgetting { period: Some(7), keep: Keep::Top(64), limit: None },
-        Forgetting { period: Some(300), keep: Keep::Used, limit: None },
-        Forgetting { period: None, keep: Keep::Nothing, limit: Some(1) },
-        Forgetting { period: None, keep: Keep::Nothing, limit: Some(4) },
-        Forgetting { period: Some(50), keep: Keep::Top(3), limit: Some(5) },
-    ];
-    for g in searched_games(400).iter().step_by(every) {
-        let p = prepare_golden::<8>(g, SearchTactics::default());
-        for forgetting in policies {
-            for threads in [1, 2] {
-                let cfg = config(threads);
-                let r =
-                    search_forgetting(&p, &cfg, &[], None, false, forgetting, None, None, None, None, None, None, None)
-                        .unwrap();
-                let what = format!("n={}, {forgetting:?} on {threads} threads", g.n);
-                assert!(r.completed && r.promotions.is_subset(&p.candidates), "{what}");
-                assert_eq!(r.sum, golden_sum(g), "{what}");
-                if let Some(limit) = forgetting.limit {
-                    assert!(r.nogoods.largest <= limit as u64, "{what}: a table of {} nogoods", r.nogoods.largest);
-                }
-            }
         }
     }
 }
@@ -708,12 +655,11 @@ fn units_and_headers_round_trip() {
     assert_eq!(bytes.len(), 48);
     assert_eq!(TaxUnit::<3>::decode(&bytes), unit);
 
-    // The header of version 5 is the one of a search tuned as the builds before the tactics that tune the GF(2) search
-    // were (`force_window` 80), which it implies; the default's `force_window` is `all`.
-    let p = prepare_golden::<8>(&load(300), SearchTactics { nogoods: false, ..SearchTactics::legacy_tuning() });
+    let p = prepare_golden::<8>(&load(300), SearchTactics { nogoods: false, ..SearchTactics::default() });
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
+    assert_eq!((Header::<8>::LEN, Header::<8>::VERSION), (46, 7));
     let back = Header::<8>::decode(&bytes).unwrap();
     assert_eq!(back, header);
     assert_eq!((back.n, back.max_total, back.tactics), (300, p.max_total, p.tactics));
@@ -721,83 +667,32 @@ fn units_and_headers_round_trip() {
     assert!(Header::<16>::decode(&bytes).unwrap_err().contains("Bits<8>"));
     assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
-    // Version 4, the format of the builds before the extended problem's search, is version 5 without the digest of the
-    // one-sided candidates (`max_total` and the tactics follow the digest of the frames): it reads as this header with
-    // the digest of none, which this problem (no one-sided candidates) has, so nothing differs but the version.
-    let v4 = [&bytes[..4], &4u32.to_le_bytes(), &bytes[8..32], &bytes[40..]].concat();
-    assert_eq!(v4.len(), Header::<8>::LEN_4);
-    let read = Header::<8>::decode(&v4).unwrap();
-    assert_eq!(read, Header { version: 4, ..header });
-    assert_eq!(read.one_sided, Header::<8>::digest_one_sided(&[]));
-    assert_eq!(read.mismatch(&header), None);
-    // A version-4 header of a search with one-sided candidates cannot exist, and one is refused for such a search,
-    // saying so before anything else.
-    let extended = Header { one_sided: Header::<8>::digest_one_sided(&[(150, 0)]), ..header };
-    let refused = read.mismatch(&extended).unwrap();
-    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
-    // A version-4 number with a header of version 5's length is refused for its length, as any short or long header.
+    // The layout: the magic, the version, the width and n, the digests (the extended problem's test finds them where
+    // they are), `max_total` and the tactics' bits, which the defaults make 0x7F.
+    assert_eq!(&bytes[..4], b"TXSH");
+    assert_eq!(bytes[4..8], 7u32.to_le_bytes());
+    assert_eq!(bytes[8..12], 8u32.to_le_bytes());
+    assert_eq!(bytes[12..16], 300u32.to_le_bytes());
+    assert_eq!(bytes[40..44], p.max_total.to_le_bytes());
+    assert_eq!(Header::of(&prepare_golden::<8>(&load(300), SearchTactics::default())).encode()[44..], [0x7F, 0]);
+    // Every other format version, the older ones included (`TXS2` was version 2), is refused with one message, naming
+    // its number; a header of the magic of another format is no checkpoint of a search at all.
     let versioned = |version: u32| [&bytes[..4], &version.to_le_bytes(), &bytes[8..]].concat();
-    let err = Header::<8>::decode(&versioned(4)).unwrap_err();
-    assert!(err.contains(&format!("{} bytes, not {}", Header::<8>::LEN, Header::<8>::LEN_4)), "{err}");
-    // Every other format version, the older ones (`TXS2` was version 2; version 3 recorded tactics that are gone) and
-    // any later one, is refused with one message.
-    let mut txs2 = b"TXS2".to_vec();
-    txs2.extend_from_slice(&[0; 4 + 64 + 4 + 1 + 4 + 2]);
-    assert_eq!(Header::<8>::VERSION, 5);
-    assert_eq!(Header::<8>::decode(&versioned(5)), Ok(header));
-    for (version, bytes) in
-        [("2", txs2), ("3", versioned(3))].into_iter().chain([("7", versioned(7)), ("unreadable", b"TXSH".to_vec())])
+    assert_eq!(Header::<8>::decode(&versioned(7)), Ok(header));
+    for (version, bytes) in [3, 4, 5, 6, 8]
+        .map(|v| (v.to_string(), versioned(v)))
+        .into_iter()
+        .chain([("unreadable".to_owned(), b"TXSH".to_vec())])
     {
         let err = Header::<8>::decode(&bytes).unwrap_err();
-        let message = format!("format version {version}, and this build reads versions 4 to 6 only");
+        let message = format!("format version {version}, and this build reads version 7 only");
         assert!(err.contains(&message), "{err}");
     }
-    // A search whose tactics that tune the GF(2) search are not those of the builds before them writes version 6, which
-    // records them after the switches' bits; one whose are writes version 5, which implies them.  Version 6's number
-    // with version 5's length is refused for its length.
-    assert_eq!(header.version, 5);
-    assert_eq!(header.tactics.force_window, ForceWindow::Within(80));
-    let tuned = Header {
-        tactics: SearchTactics {
-            force_window: ForceWindow::Share(40),
-            branching: Gf2Branching::Forced,
-            strong_limit: 4,
-            strong_depth: 30,
-            deep_branching: Gf2Branching::Largest,
-            more_forced: false,
-            ..header.tactics
-        },
-        version: 6,
-        ..header
-    };
-    let bytes6 = tuned.encode();
-    assert_eq!(bytes6.len(), Header::<8>::LEN_6);
-    assert_eq!(bytes6[..bytes.len()], [&bytes[..4], &6u32.to_le_bytes(), &bytes[8..]].concat()[..]);
-    assert_eq!(Header::<8>::decode(&bytes6), Ok(tuned));
-    assert!(tuned.mismatch(&header).unwrap().contains("tactics"));
-    // The default's tuning is not the builds before's (`force_window` is `all`, it was 80), so its header is version 6;
-    // a checkpoint of version 5 is of a search with the window of 80 and is not resumed by one with the default's.
-    let current =
-        Header::of(&prepare_golden::<8>(&load(300), SearchTactics { nogoods: false, ..SearchTactics::default() }));
-    assert_eq!(current.version, 6);
-    assert_eq!(current.tactics.force_window, ForceWindow::All);
-    assert_eq!(Header::<8>::decode(&current.encode()), Ok(current));
-    assert_eq!(current.encode().len(), Header::<8>::LEN_6);
-    assert!(header.mismatch(&current).unwrap().contains("tactics"));
-    assert_eq!(Header::<8>::decode(&bytes).unwrap().tactics.force_window, ForceWindow::Within(80));
-    let err = Header::<8>::decode(&versioned(6)).unwrap_err();
-    assert!(err.contains(&format!("{} bytes, not {}", Header::<8>::LEN, Header::<8>::LEN_6)), "{err}");
-    for window in [ForceWindow::Within(0), ForceWindow::Within(200), ForceWindow::All] {
-        for branching in Gf2Branching::ALL {
-            let t = SearchTactics { force_window: window, branching, ..tuned.tactics };
-            let h = Header { tactics: t, ..tuned };
-            assert_eq!(Header::<8>::decode(&h.encode()), Ok(h));
-        }
-    }
-    // An unknown tuning is refused.
-    let mut bad = bytes6.clone();
-    bad[Header::<8>::LEN + 5] = 9;
-    assert!(Header::<8>::decode(&bad).unwrap_err().contains("unknown branching"));
+    assert!(Header::<8>::decode(&[b"TXS2".as_slice(), &bytes[4..]].concat()).unwrap_err().contains("not a checkpoint"));
+    // A bit that no tactic uses is refused.
+    let mut unknown = bytes.clone();
+    unknown[45] = 0x04;
+    assert!(Header::<8>::decode(&unknown).unwrap_err().contains("unknown tactics"));
     // Every field that differs is named.
     let other = |change: fn(&mut Header<8>)| {
         let mut h = header;
@@ -810,19 +705,13 @@ fn units_and_headers_round_trip() {
     assert!(other(|h| h.one_sided ^= 1).contains("one-sided candidates"));
     assert!(other(|h| h.max_total += 1).contains("max_total"));
     assert!(other(|h| h.tactics.nogoods = !h.tactics.nogoods).contains("tactics"));
-    // The policy of keeping and forgetting nogoods is not recorded, so a header made under another is this search's,
-    // and its bytes are those of the default's.
-    let mut policy = header;
-    policy.tactics = SearchTactics { nogood_period: 7, nogood_keep: Keep::Top(3), nogood_limit: 9, ..policy.tactics };
-    assert_eq!(policy.mismatch(&header), None);
-    assert_eq!(policy.encode(), header.encode());
     // The branching switch is recorded, as the search began with it, but binds nothing: a header with it the other way
     // is this search's too.
     let mut branching = header;
     branching.tactics.conflict_branching = !header.tactics.conflict_branching;
     assert_eq!(branching.mismatch(&header), None);
     assert_ne!(branching.encode(), header.encode());
-    // So is the look, which is on by default: a header with it off, as the builds before it wrote, is this search's.
+    // So is the look, which is on by default: a header with it off is this search's.
     let mut unlooking = header;
     unlooking.tactics.conflict_look = false;
     assert_eq!(unlooking.mismatch(&header), None);
@@ -838,8 +727,7 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&cutting.encode()), Ok(cutting));
     assert!(header.tactics.near_repeat);
 
-    // So is the reuse of prices, which is off by default: a header with it on is this search's, and the builds before
-    // it wrote none.
+    // So is the reuse of prices, which is off by default: a header with it on is this search's.
     let mut reusing = header;
     reusing.tactics.price_reuse = true;
     assert_eq!(reusing.mismatch(&header), None);
@@ -866,138 +754,47 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&warming.encode()), Ok(warming));
     assert!(!header.tactics.warm_start);
 
-    // Every setting of the search tactics reads back as it was written: a bit for each switch that is on (the
-    // defaults: 0xFB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look` bit 10, `near_repeat` bit 11,
-    // and `price_reuse` bit 12, `carried_nogoods` bit 13 and `warm_start` bit 14, off by default), with the bits of the
-    // matching path as a search on the GF(2) path had them (bits 0 to 2, 6 and 7: 0x81), and no higher bit is used.
-    for (on, off) in [(true, false), (false, true)] {
-        let t = SearchTactics {
-            fix_forced: on,
-            nogoods: off,
-            forget_nogoods: on,
-            symmetry: off,
-            conflict_branching: off,
-            near_repeat: off,
-            ..SearchTactics::legacy_tuning()
-        };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() & 0xC7, 0x81);
-        let t = SearchTactics { symmetry: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 8 & 1, u16::from(on));
-        let t = SearchTactics { conflict_branching: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 9 & 1, u16::from(on));
-        let t = SearchTactics { near_repeat: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 11, u16::from(on));
-        let t = SearchTactics { price_reuse: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 12, u16::from(on));
-        let t = SearchTactics { carried_nogoods: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 13, u16::from(on));
-        let t = SearchTactics { warm_start: on, ..t };
-        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-        assert_eq!(t.bits() >> 13, 3 * u16::from(on));
-        assert_eq!(MatchingPath::of_bits(t.bits()), MatchingPath::default());
+    // Every setting of the search tactics reads back as it was written: a bit for each switch that is on, in the order
+    // of `SearchTactics::bits` (`fix_forced` bit 0, `nogoods` 1, `forget_nogoods` 2, `symmetry` 3, `conflict_branching`
+    // 4, `conflict_look` 5, `near_repeat` 6, `price_reuse` 7, `carried_nogoods` 8 and `warm_start` 9: the defaults make
+    // 0x7F), and no higher bit is used.  The switches of bits 4 to 9 bind nothing ([`SearchTactics::same_recorded`]): a
+    // checkpoint records each as the search began with it, and resumes with the tactic on or off, and a run that
+    // resumes a search says it.  The others bind.
+    let flips: [fn(SearchTactics) -> SearchTactics; 10] = [
+        |t| SearchTactics { fix_forced: !t.fix_forced, ..t },
+        |t| SearchTactics { nogoods: !t.nogoods, ..t },
+        |t| SearchTactics { forget_nogoods: !t.forget_nogoods, ..t },
+        |t| SearchTactics { symmetry: !t.symmetry, ..t },
+        |t| SearchTactics { conflict_branching: !t.conflict_branching, ..t },
+        |t| SearchTactics { conflict_look: !t.conflict_look, ..t },
+        |t| SearchTactics { near_repeat: !t.near_repeat, ..t },
+        |t| SearchTactics { price_reuse: !t.price_reuse, ..t },
+        |t| SearchTactics { carried_nogoods: !t.carried_nogoods, ..t },
+        |t| SearchTactics { warm_start: !t.warm_start, ..t },
+    ];
+    let default = SearchTactics::default();
+    assert_eq!(default.bits(), 0x7F);
+    for (bit, flip) in flips.iter().enumerate() {
+        let flipped = flip(default);
+        assert_eq!(flipped.bits() ^ default.bits(), 1 << bit, "the bit of switch {bit}");
+        assert_eq!(SearchTactics::from_bits(flipped.bits()), Ok(flipped));
+        let binds = bit < 4;
+        assert_eq!(flipped.same_recorded(&default), !binds, "{flipped:?}");
+        assert_eq!(default.same_recorded(&flipped), !binds, "{flipped:?}");
+        assert_eq!(default.with_unbound_of(&flipped), if binds { default } else { flipped });
+        assert_eq!(flipped.with_unbound_of(&default), if binds { flipped } else { default });
+        // A switch that binds still binds beside one that does not.
+        assert!(!SearchTactics { symmetry: false, ..flipped }.same_recorded(&default));
     }
-    assert_eq!(SearchTactics::default().bits(), 0xFB9);
-    assert_eq!(SearchTactics::from_bits(0xFB9), Ok(SearchTactics::legacy_tuning()));
-    // The bits of the matching path are read apart from the tactics: `match_refine` (bits 0 to 2) not at all, the
-    // matching bound as the node bound (bit 7 clear, `gf2=off`) and the Lagrangian bound (bit 6) as the matching path.
-    for refine in [0, 1, 7] {
-        assert_eq!(SearchTactics::from_bits(0xFB8 | refine), Ok(SearchTactics::legacy_tuning()));
-        assert_eq!(MatchingPath::of_bits(0xFB8 | refine), MatchingPath::default());
-    }
-    let lagrange = MatchingPath { matching_bound: false, lagrange: true };
-    assert_eq!(MatchingPath::of_bits(0xFB9 | 1 << 6), lagrange);
-    assert_eq!(MatchingPath::of_bits(0xFB9 & !(1 << 7)), MatchingPath { matching_bound: true, lagrange: false });
-    // The bits of the checkpoints of `testdata/` (`n1133_after_1000_nodes.ckpt`, the probe's windows): the default
-    // tactics of the matching path, `symmetry` off and the matching bound and the Lagrangian bound on.
-    let matching = MatchingPath { matching_bound: true, lagrange: true };
-    assert_eq!(MatchingPath::of_bits(0x79), matching);
-    assert_eq!(matching.tactics(), ["gf2=off", "lagrange=on"]);
-    assert_eq!(lagrange.tactics(), ["lagrange=on"]);
-    let fixture = SearchTactics {
-        symmetry: false,
-        conflict_branching: false,
-        conflict_look: false,
-        near_repeat: false,
-        ..SearchTactics::legacy_tuning()
-    };
-    assert_eq!(SearchTactics::from_bits(0x79), Ok(fixture));
-    // A header of a search on the matching path is refused once the rest is found to be the game's, naming it.
-    let old = Header::<8>::decode(&[&bytes[..44], &0x79u16.to_le_bytes()[..]].concat()).unwrap();
-    assert_eq!(old.matching, matching);
-    let refused = old.mismatch(&header).unwrap();
-    assert!(refused.contains("matching path (gf2=off, lagrange=on), which this build no longer has"), "{refused}");
-    assert!(Header { n: 301, ..old }.mismatch(&header).unwrap().contains("n=301"));
-    assert_eq!(Header { matching: MatchingPath::default(), tactics: header.tactics, ..old }.mismatch(&header), None);
-    // A checkpoint written before `near_repeat` has bit 11 clear, so it reads with the tactic off; the bit binds
-    // nothing, and a run that resumes a search says it.
-    let uncut = SearchTactics { near_repeat: false, ..SearchTactics::legacy_tuning() };
-    assert_eq!(SearchTactics::from_bits(0x7B9), Ok(uncut));
-    assert_eq!(SearchTactics::NEAR_REPEAT_BIT, 1 << 11);
-    assert!(uncut.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&uncut));
-    assert_eq!(uncut.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
-    assert!(!uncut.same_recorded(&SearchTactics { symmetry: false, ..uncut }));
-    // A checkpoint written before `conflict_branching` has bit 9 clear, so it reads with the tactic off.  The bit only
-    // chooses how nodes branch, and binds nothing: each search resumes the other's, under its own setting.  The other
-    // switches bind.
-    let before = SearchTactics { conflict_branching: false, ..SearchTactics::legacy_tuning() };
-    assert_eq!(SearchTactics::from_bits(0xDB9), Ok(before));
-    assert_eq!(SearchTactics::from_bits(0xCB9), Ok(SearchTactics { symmetry: false, ..before }));
-    assert!(before.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&before));
-    assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 9 | 1 << 10);
-    assert!(!before.same_recorded(&SearchTactics { symmetry: false, ..before }));
-    let resumed = before.with_unbound_of(&SearchTactics::default());
-    assert_eq!(resumed, SearchTactics { conflict_branching: true, ..before });
-    // `conflict_look` is bit 10, on by default, so a checkpoint whose bit is clear (written before it, or by a search
-    // with it off) reads with it off.  It binds nothing either, and a run that resumes a search says it.
-    let unlooking = SearchTactics { conflict_look: false, ..SearchTactics::legacy_tuning() };
-    assert_eq!(unlooking.bits(), 0xFB9 & !(1 << 10));
-    assert_eq!(SearchTactics::from_bits(0xBB9), Ok(unlooking));
-    assert!(unlooking.tuning_is_legacy());
-    assert!(unlooking.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&unlooking));
-    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&unlooking), unlooking);
-    assert_eq!(unlooking.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
-    assert!(!unlooking.same_recorded(&SearchTactics { symmetry: false, ..unlooking }));
-    // `price_reuse` is bit 12, off by default, so the bit is clear in the defaults' 0xFB9; a checkpoint with it set reads
-    // with the tactic on, binds nothing, and a run that resumes a search says it.
-    let reusing = SearchTactics { price_reuse: true, ..SearchTactics::legacy_tuning() };
-    assert_eq!(reusing.bits(), 0xFB9 | 1 << 12);
-    assert_eq!(SearchTactics::from_bits(0x1FB9), Ok(reusing));
-    assert_eq!(SearchTactics::PRICE_REUSE_BIT, 1 << 12);
-    assert!(reusing.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&reusing));
-    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&reusing), reusing);
-    assert_eq!(reusing.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
-    assert!(!reusing.same_recorded(&SearchTactics { symmetry: false, ..reusing }));
-    // `carried_nogoods` is bit 13, off by default, and binds nothing either.
-    let carrying = SearchTactics { carried_nogoods: true, ..SearchTactics::legacy_tuning() };
-    assert_eq!(carrying.bits(), 0xFB9 | 1 << 13);
-    assert_eq!(SearchTactics::from_bits(0x2FB9), Ok(carrying));
-    assert_eq!(SearchTactics::CARRIED_NOGOODS_BIT, 1 << 13);
-    assert!(carrying.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&carrying));
-    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&carrying), carrying);
-    assert_eq!(carrying.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
-    assert!(!carrying.same_recorded(&SearchTactics { symmetry: false, ..carrying }));
-    // `warm_start` is bit 14, off by default, and binds nothing either.
-    let warming = SearchTactics { warm_start: true, ..SearchTactics::legacy_tuning() };
-    assert_eq!(warming.bits(), 0xFB9 | 1 << 14);
-    assert_eq!(SearchTactics::from_bits(0x4FB9), Ok(warming));
-    assert_eq!(SearchTactics::WARM_START_BIT, 1 << 14);
-    assert!(warming.same_recorded(&SearchTactics::legacy_tuning()));
-    assert!(SearchTactics::legacy_tuning().same_recorded(&warming));
-    assert_eq!(SearchTactics::legacy_tuning().with_unbound_of(&warming), warming);
-    assert_eq!(warming.with_unbound_of(&SearchTactics::default()), SearchTactics::legacy_tuning());
-    assert!(!warming.same_recorded(&SearchTactics { symmetry: false, ..warming }));
-    assert!(SearchTactics::from_bits(1 << 15).unwrap_err().contains("unknown tactics"));
+    let all_flipped = flips.iter().fold(default, |t, flip| flip(t));
+    assert_eq!(all_flipped.bits(), !default.bits() & 0x3FF);
+    assert_eq!(SearchTactics::from_bits(all_flipped.bits()), Ok(all_flipped));
+    assert!(SearchTactics::from_bits(1 << 10).unwrap_err().contains("unknown tactics"));
+    assert_eq!(SearchTactics::BRANCHING_BITS, 1 << 4 | 1 << 5);
+    assert_eq!(SearchTactics::NEAR_REPEAT_BIT, 1 << 6);
+    assert_eq!(SearchTactics::PRICE_REUSE_BIT, 1 << 7);
+    assert_eq!(SearchTactics::CARRIED_NOGOODS_BIT, 1 << 8);
+    assert_eq!(SearchTactics::WARM_START_BIT, 1 << 9);
 }
 
 // ---- the extended problem: one-sided candidates ----
@@ -1034,16 +831,13 @@ fn the_header_of_an_extended_problem_records_its_one_sided_candidates() {
 
     let header = Header::of(&prepared);
     let bytes = header.encode();
-    // The default's tuning of the GF(2) search is recorded after the tactics' bits (version 6): the layout up to them
-    // is version 5's.
-    assert_eq!(bytes.len(), Header::<8>::LEN_6);
+    assert_eq!(bytes.len(), Header::<8>::LEN);
     assert_eq!(Header::<8>::decode(&bytes), Ok(header));
     // Magic, version, width, n, then the digests of the candidates, of the frames and of the one-sided candidates.
     let digest_at = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
     assert_eq!(digest_at(16), header.candidates);
     assert_eq!(digest_at(24), header.frames);
     assert_eq!(digest_at(32), header.one_sided);
-    assert_eq!(Header::<8>::LEN, 46);
 
     // The digest is of the model's one-sided candidates, which are the open sources and those greedy rejected.
     let digest = |one_sided: &[(u32, usize)]| Header::<8>::digest_one_sided(one_sided);

@@ -173,10 +173,11 @@ fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_wh
 }
 
 /// [`a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again`] for the games
-/// 799..=801 on two threads (800 takes more than the 1,024 steps of a worker that the limit is looked at after).
+/// 986..=987 on two threads.  987 takes 2,825 steps, more than twice the 1,024 steps after which a worker looks at the
+/// limit, so one of the two workers always reaches them.
 #[test]
 fn a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
-    a_range_stopped_by_a_limit_completes_when_run_again(799, 801, 2);
+    a_range_stopped_by_a_limit_completes_when_run_again(986, 987, 2);
 }
 
 /// The range `lo..=hi` on `threads` threads under a node limit stops at its first unfinished game, and completes when

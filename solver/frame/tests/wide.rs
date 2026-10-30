@@ -27,7 +27,7 @@ use taxman::matchbound::{match_bound, MatchBound, MatchGraph};
 use taxman::model::{FrameGraph, Scratch, MAX_FRAMES};
 use taxman::numtheory::Tables;
 use taxman::search::{SearchTactics, TaxUnit};
-use taxman::solver::{self, Method, Prev, PrevSource, SolveOptions};
+use taxman::solver::{self, Method, Prev, PrevSource};
 use taxman::{accelerate, game, with_width};
 
 // ---------------------------------------------------------------------------------------------------------
@@ -425,60 +425,6 @@ fn boards_are_set_up_at_128_words(boards: &[(u32, usize)]) {
 
 // ---------------------------------------------------------------------------------------------------------
 // Resuming
-
-/// The refusal of a committed checkpoint of game 1133 at W = 20 that an earlier build wrote, `fixture` (of
-/// `testdata/`), for a run with the default tactics, whose checkpoint directory is in `dir`.  The fixtures are of the
-/// default tactics of a build before the GF(2) bound, the matching path, which this build no longer has.  The checks of
-/// the header come in order, the game's (n, candidates, frames, `max_total`) before the tactics, so a refusal for the
-/// matching path says that the rest of the header was read as this build reads it.  Returns the refusal, and leaves
-/// the file as it was.
-fn committed_checkpoint_refused(fixture: &str, dir: &TempDir) -> String {
-    let games = stored_games();
-    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..options(1) };
-    let checkpoint = opts.checkpoint_file(1133).unwrap();
-    std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
-    std::fs::copy(testdata(fixture), &checkpoint).unwrap();
-    let err = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap_err();
-    for part in ["cannot resume from", "n1133.ckpt", "matching path (gf2=off, lagrange=on), which this build no longer"]
-    {
-        assert!(err.contains(part), "{fixture}: {part}: {err}");
-    }
-    assert_eq!(std::fs::read(&checkpoint).unwrap(), std::fs::read(testdata(fixture)).unwrap(), "{fixture}: left alone");
-    err
-}
-
-/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with the
-/// default tactics of that build, the matching path, stopped after 1,023 nodes on one thread; search header format TXSH
-/// v5) is read, every field of its header as it was written, and refused for its tactics, which this build no longer
-/// has.  Every write/read test of the format uses the code's own constants, so a change of the layout that round-trips
-/// (the version, the byte order of a set, the order of the header's fields, the packing of the tactics) passes them
-/// and refuses this file for another reason ([`committed_checkpoint_refused`]).
-///
-/// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
-#[test]
-fn a_committed_checkpoint_of_the_matching_path_is_read_and_refused() {
-    committed_checkpoint_refused("n1133_after_1000_nodes.ckpt", &TempDir::new("committed-checkpoint"));
-}
-
-/// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
-/// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
-/// of the one-sided candidates) reads as a version-5 header with no one-sided candidates, and is refused as the
-/// fixture above is.  Asked to resume a search of the extended problem with open sources instead, it is refused for
-/// its version first, saying why.
-#[test]
-fn a_committed_checkpoint_of_format_4_is_read_and_refused() {
-    let dir = TempDir::new("committed-checkpoint-v4");
-    committed_checkpoint_refused("n1133_after_1000_nodes_v4.ckpt", &dir);
-    let checkpoint = dir.join("ckpt").join("n1133.ckpt");
-    let version = std::fs::read(&checkpoint).unwrap()[24..28].to_vec();
-    assert_eq!(version, 4u32.to_le_bytes(), "the fixture's header is of version 4");
-
-    // A search of the extended problem with open sources cannot be this checkpoint's, and is refused, saying why.
-    let board = Board::<20>::for_n(1133);
-    let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
-    let refused = board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("refused");
-    assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
-}
 
 /// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics (the
 /// tactics are part of the checkpoint's header and must read back as written): game 1032, whose search takes some

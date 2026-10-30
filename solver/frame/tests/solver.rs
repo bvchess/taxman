@@ -40,61 +40,6 @@ fn a_range_reproduces_the_table() {
     }
 }
 
-/// Settings of the tactics that tune the GF(2) search other than the defaults, each a list of `--tactic` assignments
-/// in the order of the tactics.
-const TUNINGS: [&str; 14] = [
-    "force_window=0",
-    "force_window=20",
-    "force_window=80",
-    "force_window=50%",
-    "branching=largest",
-    "branching=split",
-    "branching=forced",
-    "strong_limit=1",
-    "strong_limit=2",
-    "strong_depth=0",
-    "strong_depth=6",
-    "strong_depth=6,deep_branching=largest",
-    "strong_depth=6,deep_branching=exact",
-    "more_forced=off",
-];
-
-/// The tactics that tune the GF(2) search find the same scores at the games `games`, on one thread, every game
-/// searched.
-fn every_tuning_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
-    let optimal = Optimal::built_in();
-    for assignments in std::iter::once("default").chain(TUNINGS) {
-        let mut opts = SolveOptions { force_search: true, ..options(1) };
-        if assignments != "default" {
-            for assignment in assignments.split(',') {
-                opts.tactics.set(assignment).unwrap();
-            }
-        }
-        for r in solve_all(*games.start(), *games.end(), &opts) {
-            assert!(r.completed, "{assignments}: n={}", r.n);
-            assert_eq!(Some(r.score), optimal.score(r.n), "{assignments}: n={}", r.n);
-            assert_eq!(r.tactics.description(), assignments, "n={}", r.n);
-        }
-    }
-}
-
-/// [`every_tuning_of_the_gf2_search_gives_the_same_scores`] at the games 600..=601.
-#[test]
-fn every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games() {
-    every_tuning_gives_the_same_scores_at(600..=601);
-}
-
-/// The tactics that tune the GF(2) search find the same scores at games that need longer searches than those to 300
-/// (931..=940, around the hard 936, on one thread, every game searched).
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is every_tuning_of_the_gf2_search_gives_the_same_scores_at_a_few_games"
-)]
-fn every_tuning_of_the_gf2_search_gives_the_same_scores() {
-    every_tuning_gives_the_same_scores_at(931..=940);
-}
-
 /// Every tactic, alone and in the combinations that matter, finds the scores of the table at the games `games`.
 fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
     let optimal = Optimal::built_in();
@@ -125,7 +70,6 @@ fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
             "fix_forced=off,nogoods=off,symmetry=off",
         ]
         .into_iter()
-        .chain(TUNINGS)
         .map(with),
     );
     for (name, opts) in variants {

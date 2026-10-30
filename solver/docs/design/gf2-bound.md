@@ -120,12 +120,11 @@ misses are the *odd* cores of movers with three or more factors.
   longer live, down the forest of the start's predecessors, and only the vertices whose paths broke and the changed
   elements are pulled along their arcs in and relaxed in the first round.  Elsewhere every vertex's path is walked, and
   where the set is the start's less the members promoted since, the first round relaxes only the arcs into and out of
-  the vertices whose paths broke.  Its bound is loose, so for the members it leaves free within the
-  tactic `force_window` of the need (all of them, by default), the exchange graph decides.  A member is forced too when
-  no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more than that
-  (`Meet::has_cycle_within`).  With the window `all` the searches find every member forced that the split's bound shows
-  forced, since a cycle through a member leaves it by one arc and comes back by another, which together are at least
-  what the bound takes off without it.  So the bounds are found only where the searches cannot run, and else one member
+  the vertices whose paths broke.  Its bound is loose, so for every member the exchange graph decides.  A member is
+  forced too when no cycle through it is shorter than the slack `value − need` and the sets of other sizes lose more
+  than that (`Meet::has_cycle_within`).  The searches find every member forced that the split's bound shows forced,
+  since a cycle through a member leaves it by one arc and comes back by another, which together are at least what the
+  bound takes off without it.  So the bounds are found only where the searches cannot run, and else one member
   at a time where strong branching orders a conflict's members by them (`Meet::split_bound_without`, from the member's
   column of `A` and its block of `B`), which saves a pass over every circuit.  Where many members are left to search,
   one pass over the circuits of `B` finds the least arc into each (`Meet::closing_lengths`), and a member's column the
@@ -145,9 +144,9 @@ misses are the *odd* cores of movers with three or more factors.
   an arc).  A child's exchange graph is its parent's less what it promoted or dropped, so a child that inherits its
   parent's heaviest set finds nearly all its members free on its parent's cycles ([what a GF(2) step carries from the
   last](../../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md)).  The forced members
-  are the same.  The window `all` costs each node more, since every member is checked exactly, and the trees fall by
-  more: at the end of the chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of the former window, 80
-  (`gf2::LEGACY_FORCE_WINDOW`; [the tuning
+  are the same.  Checking every member exactly costs each node more, and the trees fall by more: at the end of the
+  chain it takes 0.41 to 0.43 of the nodes for 0.60 to 0.63 of the CPU of a window of 80 members within the need, the
+  former tactic `force_window`, so a search checks them all ([the tuning
   campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).  The searches reach
   the elements free in `A` from the members, and the members from the elements free in `B`, through one hub each (the
   least distance plus `w1`, less `w2`), which keeps their distances, order and cycles.  An element free in `B` that
@@ -169,10 +168,11 @@ misses are the *odd* cores of movers with three or more factors.
   or solved, is what the node goes on with.  A certified bound needs only the length of the shortest cycle, which the A*
   search of the forced members finds (`Meet::shortest_cycle_length`); `Meet::without` then finds the cycle of the member
   whose level the node keeps alone, the shortest with the fewest arcs, whose flip is that level's heaviest set, its
-  search bounded by that length.  The cheaper choices (the split's bound alone, the largest member) take more nodes and
-  more time ([the GF(2) bound in the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).  The
-  tactics `branching`, `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how
-  far strong branching goes ([tactics.md](tactics.md)).
+  search bounded by that length.  The cheaper choices (the split's bound alone, the largest member) took more nodes and
+  more time ([the GF(2) bound in the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)),
+  and so did a limit to the members whose bounds are found, and a cheaper choice deep in the tree: they were tactics
+  once, and are removed ([tactics.md](tactics.md), the paragraph on the tactics removed).  Every member of a conflict
+  is tried, and once a member is found forced the others still are, to find more forced members.
 * **What it replaced.**  The matching bound was the node bound before it, with a refinement by the branches of its
   conflicts and a Lagrangian bound over the nogoods after it, the *matching path*.  With the GF(2) bound the 146
   one-thread proofs of the slope study ran 45 times faster with 426 times fewer nodes ([the GF(2) bound in the

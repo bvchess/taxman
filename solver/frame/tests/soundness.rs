@@ -25,30 +25,28 @@ use taxman::engine::EngineConfig;
 use taxman::frames::{build_frames, ExtendedFrames};
 use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
-use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
+use taxman::model::{FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::Tables;
 use taxman::search::symmetry::Symmetries;
 use taxman::search::TaxUnit;
-use taxman::search::{search, Gf2Branching, Reuse, SearchTactics};
+use taxman::search::{search, Reuse, SearchTactics};
 
 /// Every tactic that acts inside the search, alone and in the combinations that matter: first the default, the GF(2)
-/// bound with the rule of the root's symmetric pairs (tactic `symmetry`), with each way of choosing the branch, without
-/// forced members, without nogoods, with the nogoods forgotten at every step and on two threads (0 to 7), then without
-/// the rule, on one thread, on two, and with the nogoods forgotten at every step (8 to 10), then the policies of
-/// keeping nogoods (11 to 15: the table is a cache, so what the searchers keep, however often they forget and however
-/// small the limit, changes no answer), then conflict branching (tactic `conflict_branching`) at every check, whatever
-/// its gap, without the look at the last child of the search's own conflict (tactic `conflict_look`, on by default),
-/// on one thread and on two (16 and 17), the search's own conflict everywhere (18; the default chooses from a gap of
-/// 300), and conflict branching at every check with the look, on one thread and on two (19 and 20), then the search
-/// without the near-repeat cut (21; tactic `near_repeat`, which the others have, and which acts where a game has the
-/// cut of a game before it, [`game_after`], and the incumbent reaches its bound), then conflict branching at every
-/// check with the reuse of its prices (tactic `price_reuse`), under the standard schedule, under one that never makes
-/// the prices again, on two threads, and under one that takes none (22 to 25), then the nogoods carried into the search
-/// (tactic `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three
-/// and four, [`Game::carried`](common::Game::carried)): alone, on two threads, with conflict branching at every check
-/// and the reuse of its prices, and with the search's own conflict everywhere (26 to 29), then the warm start of the
-/// children's bound (tactic `warm_start`), alone, and with the search's own conflict everywhere on two threads (30 and
-/// 31).
+/// bound with the rule of the root's symmetric pairs (tactic `symmetry`), without forced members, without nogoods, with
+/// the nogoods forgotten at every step and on two threads (0 to 4), then without the rule, on one thread, on two, and
+/// with the nogoods forgotten at every step (5 to 7), then conflict branching (tactic `conflict_branching`) at every
+/// check, whatever its gap, without the look at the last child of the search's own conflict (tactic `conflict_look`, on
+/// by default), on one thread and on two (8 and 9), the search's own conflict everywhere (10; the default chooses from
+/// a gap of 300), and conflict branching at every check with the look, on one thread and on two (11 and 12), then the
+/// search without the near-repeat cut (13; tactic `near_repeat`, which the others have, and which acts where a game
+/// has the cut of a game before it, [`game_after`], and the incumbent reaches its bound), then conflict branching at
+/// every check with the reuse of its prices (tactic `price_reuse`), under the standard schedule, under one that never
+/// makes the prices again, on two threads, and under one that takes none (14 to 17), then the nogoods carried into the
+/// search (tactic `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some
+/// of three and four, [`Game::carried`](common::Game::carried)): alone, on two threads, with conflict branching at
+/// every check and the reuse of its prices, and with the search's own conflict everywhere (18 to 21), then the warm
+/// start of the children's bound (tactic `warm_start`), alone, and with the search's own conflict everywhere on two
+/// threads (22 and 23).
 fn configs() -> Vec<Config> {
     let g = Config::standard();
     // The schedules of `price_reuse`, with conflict branching at every check: the standard one; one that takes the
@@ -58,9 +56,6 @@ fn configs() -> Vec<Config> {
     let never_again = Reuse { max_steps: 1, own_drop: 0, max_seeds: 0, seed_drop: 0 };
     vec![
         g,
-        Config { gf2_branching: Gf2Branching::Split, ..g },
-        Config { gf2_branching: Gf2Branching::Largest, ..g },
-        Config { gf2_branching: Gf2Branching::Forced, ..g },
         Config { fix_forced: false, ..g },
         Config { nogoods: false, ..g },
         Config { period: Some(1), ..g },
@@ -68,11 +63,6 @@ fn configs() -> Vec<Config> {
         Config { symmetry: false, ..g },
         Config { symmetry: false, threads: 2, ..g },
         Config { symmetry: false, period: Some(1), ..g },
-        Config { period: Some(3), keep: Keep::Used, ..g },
-        Config { period: Some(3), keep: Keep::Short(2), ..g },
-        Config { period: Some(5), keep: Keep::Top(4), ..g },
-        Config { period: None, limit: Some(2), ..g },
-        Config { period: Some(7), keep: Keep::Used, limit: Some(3), threads: 2, ..g },
         Config { conflict_branching: Some(0), conflict_look: false, ..g },
         Config { conflict_branching: Some(0), conflict_look: false, threads: 2, period: Some(3), ..g },
         Config { conflict_branching: None, ..g },
@@ -694,7 +684,7 @@ fn a_search_resumed_over_and_over_finds_the_optimum() {
     // bounds below only check that the resuming really happened; they leave room for the smallest trees a loaded
     // machine produces.
     let truth = optimal_sum::<16>(optimal, 992).unwrap();
-    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[0, 4, 6]);
+    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[0, 1, 3]);
     assert!(resumes >= 6, "only {resumes} resumes");
 }
 
@@ -724,9 +714,9 @@ fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
     let truth = optimal_sum::<16>(Optimal::built_in(), 992).unwrap();
     let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(992, truth, 30, 60, &dir, &[0, 6])
+    let resumes = resumed_over_and_over::<20>(992, truth, 30, 60, &dir, &[0, 3])
         + resumed_over_and_over::<24>(992, truth, 30, 60, &dir, &[0])
-        + resumed_over_and_over::<64>(992, truth, 30, 60, &dir, &[4]);
+        + resumed_over_and_over::<64>(992, truth, 30, 60, &dir, &[1]);
     assert!(resumes > 6, "only {resumes} resumes");
 }
 
@@ -1005,8 +995,7 @@ fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
 /// The configurations of extended mode, the search of a problem with one-sided candidates: the tactics of
 /// [`SearchTactics::extended`] (the default without the rule of the symmetric pairs, which such a search refuses, and
 /// with the GF(2) bound it needs) on one thread; on two; with the nogoods forgotten at every step; without forced
-/// members; without nogoods; and with each way of choosing the member of a conflict to branch on that the default
-/// does not use (the default is the exact one).
+/// members; and without nogoods.
 fn extended_configs() -> Vec<Config> {
     let e = Config::of(&SearchTactics::extended());
     vec![
@@ -1015,9 +1004,6 @@ fn extended_configs() -> Vec<Config> {
         Config { period: Some(1), ..e },
         Config { fix_forced: false, ..e },
         Config { nogoods: false, ..e },
-        Config { gf2_branching: Gf2Branching::Split, ..e },
-        Config { gf2_branching: Gf2Branching::Largest, ..e },
-        Config { gf2_branching: Gf2Branching::Forced, ..e },
     ]
 }
 
@@ -1041,8 +1027,8 @@ fn extended_optimum<const W: usize>(optimal: &Optimal, n: u32, ext: &ExtendedFra
               and a_search_of_the_extended_problems_of_the_boards_43_to_70_from_a_handicapped_incumbent_finds_the_optimum"
 )]
 fn a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum() {
-    // There were 1,258 problems, 978 of them with one-sided candidates, and 16,128 runs, 12,648 of them on those.
-    extended_searches_from_a_handicapped_incumbent(2..=300, 0xE87E_4DED_5EED_0001, [1100, 850, 14_000, 11_000]);
+    // There were 1,258 problems, 978 of them with one-sided candidates, and 10,180 runs, 7,980 of them on those.
+    extended_searches_from_a_handicapped_incumbent(2..=300, 0xE87E_4DED_5EED_0001, [1100, 850, 8_800, 6_900]);
 }
 
 /// [`a_search_of_the_extended_problem_from_a_handicapped_incumbent_finds_the_optimum`] on the boards 2..=42.  The small

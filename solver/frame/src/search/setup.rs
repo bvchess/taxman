@@ -279,9 +279,8 @@ fn build_extended_root<const W: usize>(
 }
 
 /// [`prepare`] for resuming the search checkpointed in `checkpoint`, with the tactics the checkpoint records.  Fails,
-/// saying what differs, if the checkpoint was made for another n, width, candidates, frames or `max_total`, by a
-/// build whose checkpoint headers had another format, or by a search on the matching path, which this build no longer
-/// has.
+/// saying what differs, if the checkpoint was made for another n, width, candidates, frames or `max_total`, or by a
+/// build whose checkpoint headers had another format.
 pub fn prepare_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -292,8 +291,7 @@ pub fn prepare_for_resume<const W: usize>(
 }
 
 /// [`prepare_for_resume`] for the problem of [`prepare_extended`]; a checkpoint of another problem (other one-sided
-/// candidates, say) is refused as one of another game is, and one of format version 4 (a build before this search)
-/// for a problem with one-sided candidates first of all.
+/// candidates, say) is refused as one of another game is.
 pub fn prepare_extended_for_resume<const W: usize>(
     tables: &Tables,
     columns: &[Vec<u32>],
@@ -303,33 +301,7 @@ pub fn prepare_extended_for_resume<const W: usize>(
 ) -> Result<Prepared<W>, String> {
     let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
     let header = Header::<W>::decode(&bytes)?;
-    // A checkpoint that cannot be of a search with one-sided candidates says so before its tactics are looked at.
-    if let Some(refusal) = header.one_sided_refusal().filter(|_| !one_sided.is_empty()) {
-        return Err(refusal);
-    }
     let prepared = prepare_extended(tables, columns, one_sided, candidates, header.tactics)?;
-    match header.mismatch(&Header::of(&prepared)) {
-        Some(mismatch) => Err(mismatch),
-        None => Ok(prepared),
-    }
-}
-
-/// [`prepare_for_resume`] for searching the units of the checkpoint `checkpoint` with this build's search, not for
-/// resuming the search that made it: a checkpoint of a search on the matching path, which this build no longer has
-/// (`gf2=off`, `lagrange=on`), is set up with the other tactics it records, and every other check is made.  Its units
-/// are nodes of the game whatever made them, but the tree below them is not the one its search would have made.  For
-/// the probe (examples/perf.rs), whose windows were made on the matching path and are searched with the GF(2) bound on
-/// purpose.
-pub fn prepare_for_window<const W: usize>(
-    tables: &Tables,
-    columns: &[Vec<u32>],
-    candidates: &Bits<W>,
-    checkpoint: &Path,
-) -> Result<Prepared<W>, String> {
-    let bytes = engine::read_checkpoint_header(checkpoint).map_err(|e| format!("{}: {e}", checkpoint.display()))?;
-    let header = Header::<W>::decode(&bytes)?;
-    let prepared = prepare(tables, columns, candidates, header.tactics)?;
-    let header = Header { matching: Header::of(&prepared).matching, ..header };
     match header.mismatch(&Header::of(&prepared)) {
         Some(mismatch) => Err(mismatch),
         None => Ok(prepared),

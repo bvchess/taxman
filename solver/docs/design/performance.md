@@ -5,34 +5,33 @@ Part of the [design](../DESIGN.md).
 Performance is worked on in cycles and instructions retired, on one thread and a plain release build, because other
 load on the machine moves wall times by up to 3×.  The probe measures it:
 
-* **The probe** (`cargo run --release --example perf`) replays the hot paths of the hardest games from fixtures in
-  `testdata/perf/` (0.2 MB), and measures them in cycles and instructions retired of the process (`proc_pid_rusage`).
-  Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
+* **The probe** (`cargo run --release --example perf`) replays the hot paths of the games 936, 992 and 1215 from
+  fixtures in `testdata/perf/` (0.2 MB), and measures them in cycles and instructions retired of the process
+  (`proc_pid_rusage`).  Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
   * Fixture F1: 300 search nodes from each of the proofs of 936 and 1215, every kernel over all of them (the rebuild of
     a node, the promotion of every candidate, the conflicts of the heaviest matching, the matching from scratch, nogood
-    lookups and rule-outs);
+    lookups and rule-outs).  Builds that had the matching path made them, when those proofs took 81,119 and 4,652,709
+    nodes; this build's proofs take 449 and 3,704, in one unit each, so `perf make-nodes` would make a fixture of one
+    node, and these stay: a node is a node of the game whatever search found it;
   * Fixture F2: the frame checks of those promotions;
   * Fixture F4: the GF(2) bound's kernels at the nodes of F1 (the bound from scratch; with its weight split and forced
     members; without each member of its heaviest set's conflict, solved, and as strong branching reads them, certified
     or solved);
-  * Fixture F3: a checkpoint of each proof (`perf make-window 936 4500`, `perf make-window 1215 600000`, made on the
-    matching path, each with `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off`, by the builds that had
-    them), resumed on one thread for 50,000 steps, one period of forgetting nogoods: the search itself, with the GF(2)
-    bound and the other tactics its checkpoint records (`symmetry` and conflict branching off; `--tactic` changes them),
-    which finishes both searches, fingerprinted by its counters less the GF(2) bound's counts of solves and
-    augmentations, which measure work (a search that ends inside the window is costed by the steps it took).
+  * Fixture F3: a checkpoint of the proofs of 992 (14,841 nodes) and 1215 (3,704), made by this build's default search
+    (`perf make-window 992 1024`, `perf make-window 1215 1024`: stopped by a node limit of 1,024, which the engine
+    reaches after 2,047 nodes), resumed on one thread for 50,000 steps: the search itself, with the tactics its
+    checkpoint records (the defaults; `--tactic` changes them), which finishes both searches, fingerprinted by its
+    counters less the GF(2) bound's counts of solves and augmentations, which measure work (a search that ends inside
+    the window is costed by the steps it took).  Game 936 has no window: its proof takes 449 nodes, fewer than the
+    1,024 steps after which the engine looks at a node limit, so no point exists to stop it at.
 
-  The kernels and the windows search the forced members as `--tactic force_window` says (the default, `all`).  The
-  probe's fingerprint is c3181decd7f69390, and 2b7ddd68a115466f with `--tactic force_window=80`.  The builds that had
-  the matching path searched the windows on it by default, and searched them as this build does with `--tactic gf2=on`
-  (with the Lagrangian bound of the windows' tactics, which changed neither tree); every kernel line and both windows
-  are the same as theirs then, but for the nogood lookups, whose forced members were read off the matching bound's
-  potentials, which this build no longer computes, and the kernels of the matching bound as the node bound, which went
-  with it.  It takes about 5 s in all; `perf make-nodes` (with the arguments each `.nodes` file's header records) makes
-  the nodes again, deterministically, and `perf make-window` makes a window of this build's search, not of the matching
-  path.  For whole searches,
-  `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples in its
-  own configuration, with about 2% more instructions: run `cargo build --release --examples` again before measuring.
+  The probe's fingerprint is aff672d2dccda0dc: it combines those of every kernel and of both windows, so a change of
+  the tree moves it by the windows' and an exact optimization leaves it alone.  A window records the header of the
+  build that made it, so a change of the header's format makes the windows again (`perf make-window` with the arguments
+  above), and the fingerprint with them.  It takes about 5 s in all (more when the machine is busy).  For whole
+  searches, `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples
+  in its own configuration, with about 2% more instructions: run `cargo build --release --examples` again before
+  measuring.
 The engine's own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, its sizes and thread
 counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
 

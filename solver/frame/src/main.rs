@@ -32,8 +32,7 @@ commands:
                                searched from n's best game so far, while n searches (default 4; 1 is one game after
                                another, and it is always 1 with one thread).  Scores and proofs are those of a
                                window of 1
-      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, nogood_period and nogood_limit are
-                               whole numbers, nogood_keep is none, hit, sizeN or topN.  Names: {tactics}
+      --tactic NAME=VALUE      set a tactic (repeatable): VALUE is on or off.  Names: {tactics}
       --finder-after NODES     once a game's search has taken NODES steps (over all its runs), start a finder beside
                                it: a thread that looks for a better game than the incumbent, from the incumbent and
                                from the game of n-1, and offers it to the search (default {finder_after}; 0: none).

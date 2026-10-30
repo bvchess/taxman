@@ -722,35 +722,6 @@ fn levels_match_fresh_matroids_along_a_few_random_paths_with_warm_starts() {
     walk_real_games(&[60, 120, 200, 330], 3, &mut Rng(0xA5A5_0123_4567_89AD), 5, true);
 }
 
-/// Along 3 random paths of each of the boards 60, 120, 200 and 330, the second and the fourth with the tactic
-/// `warm_start`, a bound that searches every member for being forced (the window `all`: the split's bounds found only
-/// where asked for, one at a time) and one that searches the members by their split bounds (a window that admits them
-/// all: the bounds found with every split) agree on everything (`walk_random_paths`): the bounds and heaviest sets, the
-/// forced members (the searches find every member forced that a split bound shows forced) and the split's bound without
-/// each candidate.
-#[test]
-fn split_bounds_found_where_asked_for_agree_with_those_found_with_every_split() {
-    const W: usize = 16;
-    let mut rng = Rng(0xA5A5_0123_4567_89AE);
-    let mut walked = Walked::default();
-    for (n, warm) in [(60, false), (120, true), (200, false), (330, true)] {
-        let p = Board::<W>::for_n(n).prepare(SearchTactics::default()).unwrap();
-        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
-        let mut engines = [Gf2Bound::<W>::new(&graph), Gf2Bound::<W>::new(&graph)];
-        engines[1].set_force_window(ForceWindow::Within(u32::MAX));
-        for engine in &mut engines {
-            engine.set_warm_start(warm);
-        }
-        walk_random_paths(&p, &mut rng, 3, usize::MAX, true, &mut engines, &mut walked);
-    }
-    let Walked { checks, forced_checked, splits_compared, .. } = walked;
-    println!("{checks} nodes, {forced_checked} forced members checked, {splits_compared} split bounds compared");
-    assert!(
-        checks > 200 && forced_checked > 500 && splits_compared > 1000,
-        "{checks} {forced_checked} {splits_compared}"
-    );
-}
-
 /// Along random paths of the boards from 60 to 1000 at W = 16 (`walk_random_paths`, with the one engine a board
 /// needs), the bound of every node equals the bound of a [`Gf2Graph`] built afresh from its state, and the forced
 /// members, the certified bounds and the solved bounds without a candidate are right.

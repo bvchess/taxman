@@ -37,45 +37,20 @@ a checkpoint of another search.  It holds:
 * a format version, the set width and n;
 * digests of the root's candidates, of the frames (every frame's moves, factors and freedoms, as built) and of the
   one-sided candidates of the extended problem ([extended-mode.md](extended-mode.md));
-* `max_total` and the search tactics, and from format version 6 the tactics that tune the GF(2) search (`force_window`
-  to `more_forced`, [tactics.md](tactics.md)).
+* `max_total` and the search tactics, one bit for each that is on ([tactics.md](tactics.md)).
 
-A search tuned as the builds before those tactics were (`force_window=80` and the other five at their defaults) writes
-version 5, which implies that tuning, so its checkpoint is the one those builds wrote; a search tuned otherwise writes
-version 6.  The default's window is `all`, so the default's search writes version 6, and resumes a checkpoint of version
-5 (or 4) only as `--tactic force_window=80`, as for any tactic that differs; a build from before that change reads a
-checkpoint of version 6 as the search it is.  The tactics that set how the nogoods are kept (`nogood_period`,
-`nogood_keep` and `nogood_limit`) are in no version: they change the trees and never the answer, and a resumed search
-starts with empty tables, so the run that resumes says which it uses.  The finder (`--finder-after`,
-[finder.md](finder.md)) is in none either: it only offers sets, each after the check below, so a checkpoint resumes with
+The header's format is version 7, and this build reads no other: a header of any other version is refused with one
+message, naming the version, and a search is finished by the build that made it.  The finder (`--finder-after`,
+[finder.md](finder.md)) is in no version: it only offers sets, each after the check below, so a checkpoint resumes with
 any finder or none.  The switches `conflict_branching` and `conflict_look` have a bit each among the search tactics,
 which records how the search began and binds nothing, since the switches only choose which true conflict a node branches
 on ([search.md, "The invariant of a running search"](search.md#the-invariant-of-a-running-search)): a checkpoint
-resumes with them on or off, those of the builds before them, whose bits are clear, included.  So does `near_repeat`,
-whose bit binds nothing either: each run of a search sets the cut up again from the game before, as it takes its
-ceiling.  So does `price_reuse` (bit 12), which only changes how the prices that rank the conflicts are made, so does
-`carried_nogoods` (bit 13), whose store holds only nogoods checked at the root
-([carried-nogoods.md](carried-nogoods.md)), and so does `warm_start` (bit 14), which only changes which of several
-heaviest sets of the same weight a node finds.  A build before one of these tactics refuses a checkpoint with it on, as
-unknown tactics: the default of the first three, and what a run that turns `price_reuse`, `carried_nogoods` or
-`warm_start` on writes.
-
-The search tactics also had bits for the matching path, which the GF(2) bound replaced: `match_refine` (bits 0 to 2),
-`lagrange` (bit 6) and `gf2` (bit 7).  This build writes them as a search on the GF(2) path had them by default
-(`match_refine` 1, `lagrange` off, `gf2` on), so its header is byte for byte the one the builds before wrote for the same
-search, and it reads `match_refine` not at all, since it acted only on the matching path.  A checkpoint whose bits say
-the search ran on the matching path (`gf2` off, or `lagrange` on) is of a tree that this build's search does not make,
-and is refused, saying so, once the rest of its header is found to be the game's.  Only the probe searches the units of such a
-checkpoint, with the GF(2) bound, on purpose ([performance.md](performance.md)).
-
-This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
-digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header
-reads as version 5 with the digest of none: every other field is checked as for version 5, the run goes on under the
-header it was written with (the engine compares it byte for byte), and a version-4 checkpoint asked to resume a search
-with one-sided candidates is refused, saying so.  So a chain stopped by a build before the extended problem's search,
-but after the GF(2) bound, resumes; `tests/wide.rs` reads a real version-4 checkpoint, of the matching path, and finds
-it refused for that.  Every other version is refused with one message, so a checkpoint of an older build cannot resume
-with tactics that are gone.
+resumes with them on or off.  So does `near_repeat`, whose bit binds nothing either: each run of a search sets the cut
+up again from the game before, as it takes its ceiling.  So does `price_reuse`, which only changes how the prices that
+rank the conflicts are made, so does `carried_nogoods`, whose store holds only nogoods checked at the root
+([carried-nogoods.md](carried-nogoods.md)), and so does `warm_start`, which only changes which of several heaviest sets
+of the same weight a node finds.  The other switches bind: a checkpoint is resumed only by a search with the same
+`fix_forced`, `nogoods`, `forget_nogoods` and `symmetry`.
 
 Resuming checks all of these and says which differs.  It also checks that the stored incumbent is a set of candidates
 that can be promoted from the root and is worth the stored value.  So a checkpoint of another game, or of an older build

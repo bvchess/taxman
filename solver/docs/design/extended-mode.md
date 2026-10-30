@@ -48,8 +48,8 @@ game, the claims that some O refuses (`m5_refused`).
   `64·words` of them to a block, so that hundreds of them widen no vector.
 * **The search.**  `Board::prepare_extended_with(open)` (`search::prepare_extended`) makes them candidates of the
   search.  The problem's form ends with them, after a tag that no plain problem's form has, and the checkpoint header
-  (format 5) records their digest, so neither a repeat nor a resumed checkpoint can take an extended problem for
-  another.  A checkpoint of version 4 resumes only a search without them ([trust.md](trust.md)).
+  records their digest ([trust.md](trust.md)), so neither a repeat nor a resumed checkpoint can take an extended
+  problem for another.
 * **What it refuses** (`SearchTactics::refusal_with_one_sided`).  The matching bound gives a one-sided candidate no
   vertex, so it is no bound there (the dive, which rounds the root's matching for a starting incumbent, still runs and
   never picks one); the search bounds its nodes by the GF(2) bound alone.  It refuses `symmetry`: [the prime-exchange

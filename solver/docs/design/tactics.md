@@ -5,13 +5,11 @@ Part of the [design](../DESIGN.md).
 A *tactic* is a switchable piece of the search: each row below is one, in `tactics::Tactics`, set from the command line
 with `--tactic name=value`.  Every tactic is *proven* (a theorem, given a premise) or *sound* (it never prunes a
 promotable optimal set), so switching one off changes how fast an answer comes, never the answer.  The values are `on`
-or `off`, but for `nogood_period` and `nogood_limit` (whole numbers), `nogood_keep` (a policy), and the tactics that
-tune the GF(2) search, `force_window` to `more_forced`, which their rows give.  The
-tactics that act inside the search are the fields of `search::SearchTactics`.  A checkpoint records the search tactics
-in its header ([trust.md](trust.md), and "Adding a tactic" below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
-tactics of `tactics::Tactics`, in order, with their defaults.  Two of them, `conflict_branching` and `conflict_look`,
-only choose how a node branches: a checkpoint records them but does not bind them, and a search may change its gate
-while it runs ([search.md, "The invariant of a running search"](search.md#the-invariant-of-a-running-search)).  A
+or `off`.  The tactics that act inside the search are the fields of `search::SearchTactics`.  A checkpoint records
+them in its header ([trust.md](trust.md), and "Adding a tactic" below).  A test (`tests/docs.rs`) checks that this
+table lists the tactics of `tactics::Tactics`, in order, with their defaults.  Two of them, `conflict_branching` and
+`conflict_look`, only choose how a node branches: a checkpoint records them but does not bind them, and a search may
+change its gate while it runs ([search.md, "The invariant of a running search"](search.md#the-invariant-of-a-running-search)).  A
 checkpoint does not bind `near_repeat` either, since each run of a search sets its cut up again, nor `price_reuse`,
 which only changes how the prices that rank the conflicts are made, nor `carried_nogoods`, whose store holds only facts
 of the root, nor `warm_start`, which only changes which of several heaviest sets of the same weight a node finds.
@@ -22,17 +20,8 @@ of the root, nor `warm_start`, which only changes which of several heaviest sets
 | `same_search` | on | proven (given the proof of the earlier game: [same-search.md](same-search.md)) | a game whose search problem an earlier game of the chain posed and settled is that game's promotions on this board, with no search (method `repeat`, proof `same_search`) |
 | `fix_forced` | on | sound (every completion that beats the incumbent promotes them) | a node's child promotes all its forced members, and the node's loop ends after that child |
 | `nogoods` | on | sound (a nogood holds at every node; see `model::Nogoods`) | learn each conflict as a nogood of the root, and use the table at every node: for the conflict to branch on, and to rule candidates out of children |
-| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each `nogood_period` of its steps, or keeps some (`nogood_keep`); off: never |
-| `nogood_period` | 50000 | sound (the table is a cache) | with `nogoods` and `forget_nogoods`, the steps of a searcher between its forgettings (a whole number from 1); a research knob, with the next two ([search.md](search.md#forced-members-and-nogoods), the item "Forgetting nogoods") |
-| `nogood_keep` | none | sound (the table is a cache) | what a forgetting keeps: `none` (nothing), `hit` (the nogoods used since the last forgetting), `sizeN` (those of at most N members), `topN` (the N most used since the last forgetting, of those used at all) |
-| `nogood_limit` | 0 | sound (the table is a cache) | with `nogoods`, a searcher's table holds at most this many nogoods, the least recently used dropped to make room for a new one (0: no limit) |
+| `forget_nogoods` | on | sound (the table is a cache) | with `nogoods`, each searcher forgets every nogood it knows after each 50,000 of its steps (`search::NOGOOD_PERIOD`); off: never ([search.md](search.md#forced-members-and-nogoods), the item "Forgetting nogoods") |
 | `symmetry` | on | proven ([the prime-exchange theorem (R2)](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)) | cut a node whose completions all break a symmetric pair's inequality, and drop from a node's candidates those that no completion keeping the inequalities holds ([Prime exchanges](gf2-bound.md#prime-exchanges)) |
-| `force_window` | all | sound (a member is called forced only where the exchange graph shows every completion without it short) | with `fix_forced`, which members of a node's heaviest set that the weight split leaves free the exchange graph searches for being forced: those whose split bound is less than this far above the need (`80`; `0`: none), less than a percentage of the node's slack above it (`25%`), or `all`; a wider window forces more members, for a smaller tree, at the cost of more searches ([gf2-bound.md, "The GF(2) bound"](gf2-bound.md#the-gf2-bound), has the measurements of `all` against `80`) |
-| `branching` | exact | sound (every completion leaves out some member of the conflict) | how a node chooses the member of its conflict to branch on: `exact` (the bound without each member, certified or solved), `forced` (each solved only as far as the need, the branch by the split's bound), `split` (the split's bound alone), `largest`; the cheaper choices take more nodes |
-| `strong_limit` | all | sound (as `branching`) | with strong branching (`exact` or `forced`), the most members of a conflict whose bounds are found, the most promising by the split's bound first |
-| `strong_depth` | all | sound (as `branching`) | a node with at least this many promotions branches as `deep_branching` says instead of `branching` (`all`: none does), so that the deep nodes, the most numerous, can choose more cheaply |
-| `deep_branching` | split | sound (as `branching`) | the choice of `branching` at the nodes `strong_depth` names |
-| `more_forced` | on | sound (as `fix_forced`) | with strong branching and `fix_forced`: once a member is found forced, the bounds of the other members are still found, to find more forced members |
 | `conflict_branching` | on | proven (every completion leaves out a member of any conflict; the conflicts it makes are conflicts by [the peel theorem (P4)](../../../docs/theory/playability.md#the-peel-theorem), [the residual theorem (P5)](../../../docs/theory/playability.md#the-residual-theorem) and [the exactness theorem (X7)](../../../docs/theory/exactness.md#the-exactness-theorem)) | where a check's gap is at least 300, branch on the conflict of the heaviest set whose members cost the bound most to leave out, instead of the smallest the search knows ([search.md, "Conflict branching"](search.md#conflict-branching)); on the whole games 4050 and 4176, on one thread, a fifth of the steps and a quarter of the CPU |
 | `conflict_look` | on | proven (as `conflict_branching`: it only chooses between two true conflicts of a node, and leaves the node's state as it found it) | with `conflict_branching`, where a check would branch on a conflict other than the search's own, look first at the last child of the search's own conflict, and branch on the search's own conflict if that child is cut on sight ([search.md, "Conflict branching"](search.md#conflict-branching), the paragraphs on the look); on the units of the games near 4900, 0.61 to 0.87 of the steps; `off` branches on the conflict chosen with no look |
 | `near_repeat` | on | proven ([the near-repeat lemma (R7)](../../../docs/theory/search-rules.md#the-near-repeat-lemma), given a proven bound of the earlier game's best promotion sum; the solver takes it only from a game that assumes nothing) | cut a node whose completions are all promotion sets of the game of n − 1, once that game is concluded and proven (with the search's go, or while it runs) and the incumbent reaches its best promotion sum ([search.md, "The near-repeat cut"](search.md#the-near-repeat-cut)); it ends many searches of the games that pose nearly the problem of the game before at their first step |
@@ -55,12 +44,11 @@ U](../../../docs/theory/exactness.md#statement-u).
 
 **Where the tactics are recorded.**  A result line records the tactics it was made with: `tactics`, the changes from the
 defaults (such as `nogoods=off,symmetry=off`), and `tactic_switches`, every tactic's value, those of the build that
-wrote it: a line of a build before `gf2` has no such key, and ran the matching path, and a line that has it says
-whether the search ran on the GF(2) bound (`gf2`), with `match_refine` and `lagrange` of the matching path, which this
-build no longer has.  A checkpoint records the search tactics, and is refused when they differ, but for
-`conflict_branching`, `conflict_look`, `near_repeat`, `price_reuse`, `carried_nogoods` and `warm_start`: the error names
-each tactic that differs, and the `--tactic` flags that resume it.  A checkpoint of a search on the matching path is
-refused, saying so (the paragraph "What identifies a checkpoint" of [trust.md](trust.md)).
+wrote it: a committed line may name tactics that this build no longer has (the matching path's `gf2`, `match_refine`
+and `lagrange`, and the knobs below), which the readers ignore.  A checkpoint records the search tactics, and is
+refused when they differ, but for `conflict_branching`, `conflict_look`, `near_repeat`, `price_reuse`,
+`carried_nogoods` and `warm_start`: the error names each tactic that differs, and the `--tactic` flags that resume it
+(the paragraph "What identifies a checkpoint" of [trust.md](trust.md)).
 
 *The tactics removed.*  The [notebook](../../notebook/README.md) has what each tactic was worth and the order they were
 found in, and the tactics that were removed: the Java's two conjectures, `reuse_prev` (accept the previous game's
@@ -70,7 +58,13 @@ Java's bound with its runner-up, its preclusion table, and the branchings other 
 ([which tactics earn their keep](../../notebook/search/which-tactics-earn-their-keep-2026-10/README.md)); and the
 matching path, which the GF(2) bound replaced ([gf2-bound.md](gf2-bound.md#the-gf2-bound), the item "What it
 replaced"): the switch `gf2`, the matching bound's refinement `match_refine`, and the Lagrangian bound over the nogoods
-`lagrange`.
+`lagrange`; and the knobs of the GF(2) search and of the nogood table, fixed at the values the chain ran with: the
+window of the forced members `force_window` (`all`), the choice of the member to branch on `branching` (`exact`) with
+`strong_limit` (`all`), `strong_depth` (`all`) and `deep_branching` (`split`), `more_forced` (on), the period of
+forgetting `nogood_period` (50,000 steps, the constant `search::NOGOOD_PERIOD`), `nogood_keep` (nothing) and
+`nogood_limit` (no limit).  [The tuning campaign](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)
+and [keeping and forgetting nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)
+have what they were worth.
 
 ## Adding a tactic
 
@@ -81,9 +75,8 @@ A new tactic changes the code, its tests and this table together:
   names from there.
 * **Inside the search**: a field of `search::SearchTactics` (`src/search/tactics.rs`) and of `SearchSpace`
   (`search::searcher`), which the soundness harness builds too (`tests/common/mod.rs`).  A checkpoint's header records
-  a switch through `bits`, `from_bits` and `with_switches_of`, and a setting that tunes the search through `tuning`,
-  `with_tuning` and `legacy_tuning`; the paragraph "What identifies a checkpoint" of [trust.md](trust.md) says which
-  header version a search writes, and `src/search/tests.rs` pins the bits.
+  it through a bit in `bits` and `from_bits`, also in `UNBOUND_BITS` if a checkpoint need not bind it (the paragraph
+  "What identifies a checkpoint" of [trust.md](trust.md) says which do), and `src/search/tests.rs` pins the bits.
 * **The tests**: the tactic among the variants of `every_tactic_gives_the_same_scores_at` (`tests/solver.rs`); a
   tactic that prunes, among the configurations of `tests/soundness.rs` and the rows of `tests/tripwires.rs`; and the
   checklist of [testing.md](testing.md) before the merge.

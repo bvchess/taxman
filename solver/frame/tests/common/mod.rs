@@ -28,15 +28,15 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
-use taxman::gf2::{ForceWindow, Gf2Graph};
+use taxman::gf2::Gf2Graph;
 use taxman::json::Json;
-use taxman::model::{CarriedNogoods, FrameGraph, FrameSet, Keep, Scratch};
+use taxman::model::{CarriedNogoods, FrameGraph, FrameSet, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
-    search, BranchSettings, Branching, Forgetting, Gf2Branching, NearRepeat, Prepared, Reuse, SearchSpace,
-    SearchTactics, TaxSearcher, TaxUnit, CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
+    search, BranchSettings, Branching, NearRepeat, Prepared, Reuse, SearchSpace, SearchTactics, TaxSearcher, TaxUnit,
+    CONFLICT_BRANCHING_GAP, NOGOOD_PERIOD,
 };
 use taxman::solver::{Prev, PrevSource, SolveOptions};
 
@@ -262,12 +262,7 @@ pub struct Config {
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
     pub period: Option<u64>,
-    /// What a forgetting keeps, and how many nogoods a table holds at most (`None`: no limit).
-    pub keep: Keep,
-    pub limit: Option<usize>,
     pub threads: usize,
-    /// How a node chooses the member of its conflict to branch on.
-    pub gf2_branching: Gf2Branching,
     /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
     /// Conflict branching from this gap on (tactic `conflict_branching`, whose gap is [`CONFLICT_BRANCHING_GAP`];
@@ -301,10 +296,7 @@ impl Config {
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
-            keep: Keep::Nothing,
-            limit: None,
             threads: 1,
-            gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
             conflict_branching: t.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
             conflict_look: t.conflict_look,
@@ -494,7 +486,7 @@ impl<const W: usize> Game<W> {
             root: &self.root,
             fix_forced: cfg.fix_forced,
             nogoods: cfg.nogoods,
-            forgetting: Forgetting { period: cfg.period, keep: cfg.keep, limit: cfg.limit },
+            forget_period: cfg.period,
             nogood_totals: Arc::default(),
             root_max: self.root_max(),
             max_total: self.max_total,
@@ -507,12 +499,6 @@ impl<const W: usize> Game<W> {
                     None => graph,
                 }
             },
-            gf2_branching: cfg.gf2_branching,
-            gf2_strong_limit: usize::MAX,
-            gf2_more_forced: true,
-            gf2_strong_depth: u32::MAX,
-            gf2_deep_branching: Gf2Branching::Split,
-            gf2_force_window: ForceWindow::default(),
             gf2_warm_start: cfg.warm_start,
             branching: Arc::new(Branching::new(BranchSettings {
                 conflict_branching: cfg.conflict_branching.is_some(),

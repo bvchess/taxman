@@ -258,20 +258,21 @@ mod tests {
     }
 
     #[test]
-    fn tactics_with_values_other_than_on_and_off() {
+    fn the_last_assignment_of_a_tactic_wins_and_a_bad_one_is_a_usage_error() {
         let options = |tactics: &[&str]| {
             let given: Vec<&str> = tactics.iter().flat_map(|t| ["--tactic", t]).collect();
             let args = Args::parse(&strings(&given), &SOLVER_FLAGS, &[]).unwrap();
             solver_options(&args).map(|opts| opts.tactics).map_err(usage)
         };
-        let t = options(&["nogood_period=2000", "nogoods=off"]).unwrap();
-        assert_eq!(t.description(), "nogoods=off,nogood_period=2000");
-        // The last assignment of a tactic wins, as for the switches.
-        assert_eq!(options(&["nogood_period=3", "nogood_period=50000"]).unwrap().description(), "default");
-        for bad in ["nogood_period=0", "nogood_period=two", "nogood_period=-1"] {
+        // The last assignment of a tactic wins.
+        assert_eq!(options(&["nogoods=off", "nogoods=on"]).unwrap().description(), "default");
+        for bad in ["nogoods=0", "nogoods=two", "symmetry=-1"] {
             let message = options(&[bad]).unwrap_err();
             assert!(message.starts_with(&format!("tactic {}: expected ", bad.split('=').next().unwrap())), "{message}");
         }
+        // A tactic that was removed is unknown.
+        let message = options(&["nogood_period=2000"]).unwrap_err();
+        assert!(message.starts_with("unknown tactic \"nogood_period\""), "{message}");
     }
 
     #[test]

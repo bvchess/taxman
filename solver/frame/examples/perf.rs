@@ -1,7 +1,7 @@
-//! The performance probe: replays of the search's hot paths on the hardest games, measured in CPU cycles and
-//! instructions retired of this process (other load on the machine barely moves them, unlike wall time), each with
-//! a fingerprint of everything it computes.  An optimization that keeps the search exact must leave every
-//! fingerprint unchanged; one that changes the tree on purpose changes the window's.
+//! The performance probe: replays of the search's hot paths on three games that were among the hardest when it was
+//! made, measured in CPU cycles and instructions retired of this process (other load on the machine barely moves
+//! them, unlike wall time), each with a fingerprint of everything it computes.  An optimization that keeps the search
+//! exact must leave every fingerprint unchanged; one that changes the tree on purpose changes the windows'.
 //!
 //! ```text
 //! cargo run --release --example perf -- [--reps R] [--steps K] [--brief] [--fixtures DIR] [--tactic NAME=VALUE]...
@@ -10,11 +10,15 @@
 //! cargo run --release --example perf -- make-window N AT [--known FILE] [--fixtures DIR] [--tactic NAME=VALUE]...
 //! ```
 //!
-//! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936 and 1215 by default: W = 16,
-//! and the hardest games):
+//! The fixtures, in `testdata/perf/` unless `--fixtures` says otherwise (games 936, 992 and 1215 by default, at W = 16,
+//! 16 and 20):
 //!
-//! * `nNNNN.nodes` (fixture F1, search nodes): nodes of the proof of game N (one thread, the default tactics, seeded
-//!   with an optimal set), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a
+//! * `nNNNN.nodes` (fixture F1, search nodes): nodes of the proof of game N (one thread, seeded with an optimal set),
+//!   each its promotions and candidates; 936 and 1215 have them, made when their proofs took 81,119 and 4,652,709 nodes
+//!   (`make-nodes 936 --every 2000 --keep 300` and `make-nodes 1215 --every 100000 --keep 300`, by builds that had
+//!   the matching path).  This build's proofs of them take 449 and 3,704 nodes, in one unit each, so `make-nodes` would
+//!   make fixtures of one node: these stay, since a node is a node of the game whatever search found it.  Each kernel
+//!   replays all of them: the rebuild of a
 //!   node's state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
 //!   `can_promote_using`, the minimal conflict and the one from the residual (the `core` line) of the heaviest
 //!   matching (as the start's dive finds it), the matching from scratch, and lookups (with no member forced) and
@@ -23,19 +27,17 @@
 //!   changes (one gains the move, one loses the factor), each checked by `FrameGraph::winnable_using`.
 //! * Fixture F4, the GF(2) bound's kernels at the nodes of F1 ([`gf2_kernels`]).
 //! * `nNNNN.window.ckpt` (fixture F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof
-//!   after some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
+//!   after some nodes, resumed on one thread for `--steps` steps (default 50,000, which the searches end before).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its fingerprint is
 //!   the search's counters (steps, promotions, children, bound checks, ...), less the GF(2) bound's counts of solves
-//!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The windows were made
-//!   on the matching path, the default when they were first made (`make-window 936 4500` and `make-window 1215
-//!   600000`, with `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off` since, by the builds that had those
-//!   tactics, so the windows record the default window of the forced members, `force_window=all`, as a header of
-//!   version 6).  This build has no matching path: it searches the window's units with the GF(2) bound and the other
-//!   tactics the checkpoint records (`symmetry` and conflict branching off; `Board::prepare_for_window`), which
-//!   `--tactic` changes (the search tactics only): `--tactic force_window=80`, say, searches the same window with the
-//!   forced members searched for within 80 of the need.  `make-window` takes `--tactic` as the probe does, on top of
-//!   the defaults, and makes a window of this build's search.  A game in `--fixtures` with a window and no nodes (a copy
-//!   of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has only the window.
+//!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The windows are of this
+//!   build's default search, `make-window 992 1024` and `make-window 1215 1024`: the proof, seeded with an optimal
+//!   set, stopped by a node limit of 1,024, which the engine reaches after 2,047 nodes, the earliest point it stops
+//!   at; the proofs take 14,841 and 3,704 nodes in all, so the windows are the rest of them.  Game 936, whose proof
+//!   takes 449 nodes, has none (the search ends before the engine looks at a node limit), and 992 has no nodes.
+//!   `--tactic` changes the window's tactics (the search tactics only), and `make-window` takes `--tactic` as the
+//!   probe does, on top of the defaults.  A game in `--fixtures` with a window and no nodes (a copy of a chain's
+//!   checkpoint, renamed `nNNNN.window.ckpt`) has only the window, and one with nodes and no window only the kernels.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
 //! operation and in all; the fingerprints of all runs must agree.  The last line sums the kernels' cycles and
@@ -62,14 +64,14 @@ use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
-use taxman::gf2::{ForceWindow, Gf2Bound, Gf2Graph};
+use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::matchbound::{MatchBound, MatchGraph};
 use taxman::model::{FrameGraph, Lookup, Nogoods, Scratch};
 use taxman::search::{search, stat, Prepared, SearchSpace, SearchTactics, TaxSearcher, TaxUnit};
 use taxman::tactics::Tactics;
 
 /// The games whose fixtures the probe runs by default.
-const GAMES: [u32; 2] = [936, 1215];
+const GAMES: [u32; 3] = [936, 992, 1215];
 
 /// The fixture of game `n` of this kind in `dir`.
 fn fixture(dir: &Path, n: u32, kind: &str) -> PathBuf {
@@ -334,9 +336,8 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 /// The GF(2) bound's kernels at the nodes of the F1 fixture `path` ([`taxman::gf2::Gf2Bound`]), each over all the
 /// nodes: a node's level from the root and its bound from scratch; the same with its forced members (the weight
 /// split); and the bound without each member of the conflict of its heaviest set (strong branching's solves,
-/// warm-started from the level's history, to the end).  Fingerprinted by the values.  The forced members are searched
-/// as `window` says (the tactic `force_window`).
-fn gf2_kernels<const W: usize>(path: &Path, reps: u32, window: ForceWindow, report: &mut Report) -> Result<(), String> {
+/// warm-started from the level's history, to the end).  Fingerprinted by the values.
+fn gf2_kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Result<(), String> {
     let (n, incumbent, units) = read_nodes::<W>(path)?;
     let p = setup::<W>(n);
     let model: &FrameGraph = &p.model;
@@ -364,7 +365,6 @@ fn gf2_kernels<const W: usize>(path: &Path, reps: u32, window: ForceWindow, repo
         members as f64 / count.max(1) as f64
     ));
     let mut b = Gf2Bound::<W>::new(&graph);
-    b.set_force_window(window);
     let (cost, fp) = measure(reps, |fp| {
         for &(promoted, cands, cap, _, _) in &nodes {
             b.reset(&promoted, &cands);
@@ -444,7 +444,7 @@ fn window<const W: usize>(
     report: &mut Report,
 ) -> Result<(), String> {
     let mut p = Board::<W>::for_n(n)
-        .prepare_for_window(path)
+        .prepare_for_resume(path)
         .map_err(|e| format!("{}: {e} (make it again with `perf make-window`)", path.display()))?;
     let mut tactics = Tactics { search: p.tactics, ..Tactics::default() };
     for change in changes {
@@ -647,19 +647,28 @@ fn run() -> Result<(), String> {
             let games: Vec<u32> =
                 if games.is_empty() { GAMES.to_vec() } else { games.iter().map(|&n| n as u32).collect() };
             let mut report = Report { brief, ..Report::default() };
+            // A tactic the probe does not know is refused before anything runs.
             let mut tactics = Tactics::default();
             for change in &changes {
                 tactics.set(change).map_err(|e| format!("--tactic: {e}"))?;
             }
             for n in games {
-                // A game with a window and no nodes (a chain's checkpoint, say) has only the window.
-                let nodes = fixture(&dir, n, "nodes");
+                // A game with a window and no nodes (a chain's checkpoint, say) has only the window, and one with nodes
+                // and no window only the kernels.
+                let (nodes, checkpoint) = (fixture(&dir, n, "nodes"), fixture(&dir, n, "window.ckpt"));
+                if !nodes.exists() && !checkpoint.exists() {
+                    return Err(format!("no fixture of game {n} in {}", dir.display()));
+                }
                 taxman::with_width!(n, W => {
                     if nodes.exists() {
                         kernels::<W>(&nodes, reps, &mut report)?;
-                        gf2_kernels::<W>(&nodes, reps, tactics.search.force_window, &mut report)?;
+                        gf2_kernels::<W>(&nodes, reps, &mut report)?;
+                    } else {
+                        report.header(&format!("n={n} W={W}, a search window"));
                     }
-                    window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;
+                    if checkpoint.exists() {
+                        window::<W>(n, &checkpoint, steps, &changes, reps, &mut report)?;
+                    }
                 });
             }
             let g = |x: u64| x as f64 / 1e9;

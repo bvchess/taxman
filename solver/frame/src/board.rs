@@ -177,17 +177,6 @@ impl<const W: usize> Board<W> {
         search::prepare_for_resume(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint)
     }
 
-    /// Sets the search up to search the units of the checkpoint at `checkpoint` with this build's search, not to resume
-    /// it, see [`search::prepare_for_window`]: a checkpoint of a search on the matching path, which this build no
-    /// longer has, is accepted.
-    ///
-    /// # Errors
-    ///
-    /// If the checkpoint does not belong to this board, or cannot be read.
-    pub fn prepare_for_window(&self, checkpoint: &Path) -> Result<Prepared<W>, String> {
-        search::prepare_for_window(&self.tables, &self.frames.columns(), &self.frames.candidates, checkpoint)
-    }
-
     /// The ceiling on the promotion sum, given that the game of `n − 1` scores `prev_score` and is optimal; see
     /// [`promotion_cap`].
     pub fn promotion_cap(&self, prev_score: u64) -> Option<u64> {

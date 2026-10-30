@@ -19,7 +19,7 @@
 //! (solver/docs/design/gate-trial.md).
 
 use super::near_repeat::NearRepeat;
-use super::{BranchSettings, Branching, Forgetting, NodeBound, Prepared, SearchSpace, TaxSearcher, TaxUnit};
+use super::{BranchSettings, Branching, NodeBound, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::engine::{self, CheckpointEvent, Control, Ctx, EngineConfig, Searcher, Start, Unit};
 use crate::gf2::Gf2Graph;
 use crate::model::CarriedNogoods;
@@ -134,7 +134,7 @@ pub struct Report {
 }
 
 /// What the trial needs of the search: its problem, its root's GF(2) graph, its carried nogoods, near-repeat cut and
-/// forgetting (which the trial's searchers share or copy), and its branching settings (which it reads and sets).
+/// forgetting period (which the trial's searchers share or copy), and its branching settings (which it reads and sets).
 pub(super) struct Trial<'a, const W: usize> {
     pub plan: &'a Plan,
     pub prepared: &'a Prepared<W>,
@@ -145,7 +145,7 @@ pub(super) struct Trial<'a, const W: usize> {
     pub armed: u64,
     pub near_repeat: Option<&'a OnceLock<NearRepeat<W>>>,
     pub carried: Option<&'a CarriedNogoods<W>>,
-    pub forgetting: Forgetting,
+    pub forget_period: Option<u64>,
     /// Whether the trial's threads take the idle scheduling policy, as the search's workers do.
     pub background: bool,
     /// The head of its line on stderr (`n=5054`).
@@ -283,7 +283,7 @@ fn run<const W: usize>(
     let spaces: Vec<SearchSpace<'_, W>> = gates
         .iter()
         .map(|&gate| SearchSpace {
-            forgetting: t.forgetting,
+            forget_period: t.forget_period,
             near_repeat: Some(&near),
             carried: t.carried,
             branching: Arc::new(Branching::new(BranchSettings { gate, ..settings })),
@@ -508,7 +508,7 @@ mod tests {
             armed: branching.generation(),
             near_repeat: None,
             carried: None,
-            forgetting: p.tactics.forgetting(),
+            forget_period: p.tactics.forget_period(),
             background: false,
             label: "n=800",
         };

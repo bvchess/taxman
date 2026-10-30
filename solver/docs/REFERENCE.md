@@ -119,7 +119,7 @@ optional.  The line of an incomplete game ends with them, after `incomplete`.
 ### The progress line (stderr, every `--progress` seconds and at the end)
 
 ```
-n=992 0.3s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.3% pauses 1 (5.6%) max 14.0ms park 0.0ms | nogoods learned 356 lookups 2975 hit 87.9% ruled out 1402 forgot 0 (table 0 kept 0) evicted 0 largest 356
+n=992 0.3s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% idle 0.0% lock 0.0% splits 0 steals 0 full 0.2ms ramp 0.0% tail 0.0% rebuild 0.0% first 0.3% pauses 1 (5.6%) max 14.0ms park 0.0ms | nogoods learned 356 lookups 2975 hit 87.9% ruled out 1402 forgot 0 (table 0) largest 356
 ```
 
 | field | meaning |
@@ -135,7 +135,7 @@ n=992 0.3s nodes 4095 (stopped) best 24175 queue 12 spilled 0 | eff 94.3% idle 0
 | `ramp`, `tail` | the shares of worker time spent waiting for work before every worker first ran at once, and after the last time a worker finished a unit while all were running: the search's start and end, when there is not yet, or no longer, work for all |
 | `rebuild`, `first` | the shares of worker time from the start of a unit to its first step (rebuilding the search's state from the unit), and in that first step (its bounds solved from scratch) |
 | `pauses 1 (5.6%) max 14.0ms park 0.0ms` | the checkpoints, each of which parks all workers: their share of worker time, the longest pause, and the longest wait for the workers to park |
-| `nogoods learned 356 ... largest 356` | the searchers' nogood tables (tactic `nogoods`), summed: nogoods learned, lookups and the share they answered, candidates ruled out, forgettings with the mean table before and the mean kept, nogoods evicted under `nogood_limit`, and the largest table |
+| `nogoods learned 356 ... largest 356` | the searchers' nogood tables (tactic `nogoods`), summed: nogoods learned, lookups and the share they answered, candidates ruled out, forgettings with the mean table before, and the largest table |
 
 ### A results line (`--out`, schema 5)
 
@@ -157,9 +157,7 @@ threads, with the moves cut short, the fields regrouped and comments added, so i
  "invocations":1, "threads":2,
  "tactics":"default",
  "tactic_switches":{"prime_shortcut":true,"same_search":true,"fix_forced":true,"nogoods":true,
-                    "forget_nogoods":true,"nogood_period":50000,"nogood_keep":"none","nogood_limit":0,
-                    "symmetry":true,"force_window":"all","branching":"exact",
-                    "strong_limit":"all","strong_depth":"all","deep_branching":"split","more_forced":true,
+                    "forget_nogoods":true,"symmetry":true,
                     "conflict_branching":true,"conflict_look":true,"near_repeat":true,"price_reuse":false,
                     "carried_nogoods":false,"warm_start":false,"prev_cap":true,"seed_incumbent":true},
  "limits":{"seconds":null,"nodes":null},
@@ -191,7 +189,7 @@ Game 249 of that run repeated the search of 248.  Its line has `"method":"repeat
 | `seconds` | per phase, this invocation (`search_all_runs`: the search over every invocation of a resumed game); and `own`, the game's own search time ([glossary](../../docs/GLOSSARY.md#the-search)) over every invocation ([design/engine.md, "The window: games in flight"](design/engine.md#the-window-games-in-flight), the item "The clock").  It is 0 for a game with no search to run (a `trivial`, `prime`, `repeat` or `known` game), and for a search that ran only before its game was the oldest of the window.  A line written before 2026-10-22 lacks `own`; the readers ignore it, and the schema is 5 still |
 | `invocations` | how many invocations ran the search (a resumed game has more than one) |
 | `lab` | a key that only older lines have, those of a game whose search a lab changed (the lab, a program that steered the games in flight through a command folder, is gone from the solver; [its design](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/lab.md) is as of 3ca11bf): `restarts`, each restart's time `at`, the game's `own_seconds` then, the `nodes` of the search abandoned, its `tactics` and the checkpoint put `aside`; `conflict_branching` and `conflict_look`, the lab's last setting of each (`"on"`, `"off"` or null), and `gate`, its last gap from which conflict branching chooses (a number or null); `branching_changes`, how many `branching` commands the lab gave; and `policy`, the policy for the games to come that reached it (`from` and the three settings), or null.  `tactics` and `tactic_switches` are then those the search ran with, its branching as it ended |
-| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `background` (true), `finder_after` and `finder_seconds` (the numbers of the finder flags), `gate` (the number `--gate` was given) and `gate_trial` (the gates of `--gate-trial`); older lines may also have `keep_going`, `retry` and `retry_improved` (true) and `pass` (a number), which a `solve` that is gone wrote, and in `tactic_switches` the tactics of the matching path, which the GF(2) bound replaced: `gf2` (the GF(2) bound, true from the build that brought it, false on the matching path), `match_refine` and `lagrange` |
+| `threads`, `tactics`, `tactic_switches`, `limits`, `options` | what the last invocation ran with; `tactics` is `default` or the changes from the defaults, `options` the flags `--force-search` and `--use-prev` and, only where given, `background` (true), `finder_after` and `finder_seconds` (the numbers of the finder flags), `gate` (the number `--gate` was given) and `gate_trial` (the gates of `--gate-trial`); older lines may also have `keep_going`, `retry` and `retry_improved` (true) and `pass` (a number), which a `solve` that is gone wrote, and in `tactic_switches` the tactics of the matching path, which the GF(2) bound replaced: `gf2` (the GF(2) bound, true from the build that brought it, false on the matching path), `match_refine` and `lagrange`, and the knobs of the GF(2) search and of the nogood table, now fixed at the values that the chain ran with: `nogood_period` (50000), `nogood_keep` (`"none"`), `nogood_limit` (0), `force_window` (`"all"`), `branching` (`"exact"`), `strong_limit` and `strong_depth` (`"all"`), `deep_branching` (`"split"`) and `more_forced` (true) |
 | `optimal_match` | true: the score equals the built-in table's (a score that differs is a hard error, never written); null if the table has no game of n |
 | `build` | the commit the binary was built from, and whether its sources differed from it |
 

@@ -20,12 +20,11 @@ use super::profile::{Branched, Made, Phase, Phases, SearchProfile, Tags};
 use super::seek::{Learning, Seek};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
-use super::tactics::Gf2Branching;
-use super::{Forgetting, CONFLICT_BRANCHING_SLOPE, CONFLICT_LOOK_PRICE, CONFLICT_LOOK_SLACK};
+use super::{CONFLICT_BRANCHING_SLOPE, CONFLICT_LOOK_PRICE, CONFLICT_LOOK_SLACK};
 use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
-use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
+use crate::gf2::{Eval, Gf2Bound, Gf2Graph, Gf2Stats};
 use crate::model::{
     CarriedNogoods, ConflictCache, FrameGraph, FrameSet, Harvest, Lookup, NogoodStats, Nogoods, Scratch, Watches,
 };
@@ -82,9 +81,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
     pub nogoods: bool,
-    /// When a searcher forgets the nogoods it knows, what it keeps, and how many it holds at most (tactics
-    /// `forget_nogoods`, `nogood_period`, `nogood_keep` and `nogood_limit`; sound whatever they say).
-    pub forgetting: Forgetting,
+    /// After how many of its steps a searcher forgets the nogoods it knows, if ever (tactic `forget_nogoods`: every
+    /// [`NOGOOD_PERIOD`](super::NOGOOD_PERIOD) steps; sound whatever it says).
+    pub forget_period: Option<u64>,
     /// What the searchers' tables have done, as each publishes it (at the end of a unit, and every
     /// [`PUBLISH_EVERY`] steps): the counters of the policy.
     pub nogood_totals: Arc<Mutex<NogoodStats>>,
@@ -98,20 +97,6 @@ pub struct SearchSpace<'a, const W: usize> {
     pub found: Mutex<Option<Found>>,
     /// The root's frames as GF(2) vectors ([`Gf2Graph`]), which bound every node.
     pub gf2: Gf2Graph,
-    /// How a node chooses the member of its conflict to branch on.
-    pub gf2_branching: Gf2Branching,
-    /// With [`Gf2Branching::Exact`]: how many members of a conflict (the most promising by their split bounds) are
-    /// solved exactly; the others are not tried.
-    pub gf2_strong_limit: usize,
-    /// With [`Gf2Branching::Exact`] and `fix_forced`: once a member is found forced, whether the others are still
-    /// solved (as far as the need) to find more forced members.
-    pub gf2_more_forced: bool,
-    /// A node with at least this many promotions chooses its branch as `gf2_deep_branching` says, not as
-    /// `gf2_branching` does (tactics `strong_depth` and `deep_branching`).
-    pub gf2_strong_depth: u32,
-    pub gf2_deep_branching: Gf2Branching,
-    /// Which free members are searched for being forced (tactic `force_window`).
-    pub gf2_force_window: ForceWindow,
     /// A child whose parent's heaviest set lost members it dropped finds its heaviest set from its parent's (tactic
     /// `warm_start`, [`Gf2Bound::set_warm_start`]).
     pub gf2_warm_start: bool,
@@ -155,7 +140,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             root: &prepared.root,
             fix_forced: tactics.fix_forced,
             nogoods: tactics.nogoods,
-            forgetting: tactics.forgetting(),
+            forget_period: tactics.forget_period(),
             nogood_totals: Arc::default(),
             root_max: prepared
                 .root
@@ -169,12 +154,6 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             began: Instant::now(),
             found: Mutex::new(None),
             gf2: Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates),
-            gf2_branching: tactics.branching,
-            gf2_strong_limit: tactics.strong_limit as usize,
-            gf2_more_forced: tactics.more_forced,
-            gf2_strong_depth: tactics.strong_depth,
-            gf2_deep_branching: tactics.deep_branching,
-            gf2_force_window: tactics.force_window,
             gf2_warm_start: tactics.warm_start,
             branching: Arc::new(Branching::new(BranchSettings::of(&tactics))),
             symmetry: tactics
@@ -406,7 +385,6 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 scratch: Scratch::new(),
                 gf2: {
                     let mut bound = Gf2Bound::new(&space.gf2);
-                    bound.set_force_window(space.gf2_force_window);
                     bound.set_warm_start(space.gf2_warm_start);
                     bound
                 },
@@ -416,11 +394,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 known: Vec::new(),
                 conflict_cache: ConflictCache::default(),
                 price_memo: space.price_reuse.map(|reuse| (PriceMemo::default(), reuse)),
-                nogoods: space.nogoods.then(|| {
-                    let mut table = Nogoods::new(space.root_max, NOGOOD_CAPACITY);
-                    table.set_limit(space.forgetting.limit);
-                    table
-                }),
+                nogoods: space.nogoods.then(|| Nogoods::new(space.root_max, NOGOOD_CAPACITY)),
                 steps_since_clear: 0,
                 watches: space.carried.map(CarriedNogoods::watches),
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
@@ -441,8 +415,8 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
     }
 
     /// The nogoods the searcher holds now (tactic `nogoods`; none without it), in the order it learned them, for a
-    /// caller that wants what a search learned (the table is a cache: a searcher forgets as the space's
-    /// [`Forgetting`] says, and a new searcher starts with none).
+    /// caller that wants what a search learned (the table is a cache: a searcher forgets after each
+    /// [`SearchSpace::forget_period`] of its steps, and a new searcher starts with none).
     pub fn nogoods(&self) -> &[Bits<W>] {
         self.stepper.nogoods.as_ref().map_or(&[], Nogoods::sets)
     }
@@ -989,86 +963,60 @@ impl<'a, const W: usize> Stepper<'a, W> {
     ///
     /// With forced members (tactic `fix_forced`), the child promotes all of them and the node's loop ends after it:
     /// every completion of the node that reaches `need` promotes them all, and so is a completion of that child.  Else,
-    /// with a conflict of the GF(2) bound's heaviest set, the branch is one of its members, chosen as
-    /// [`SearchSpace::gf2_branching`] says (at a node of at least [`SearchSpace::gf2_strong_depth`] promotions, as
-    /// [`SearchSpace::gf2_deep_branching`] says): every completion leaves out one of them, so neither the child nor the
-    /// node going on can find the same heaviest set again.  With [`Gf2Branching::Exact`], each member's bound without
-    /// it is found exactly (certified or solved), which also finds forced members among them.  Without a conflict, the
-    /// branch is the largest candidate.
+    /// with a conflict of the GF(2) bound's heaviest set, the branch is one of its members, the one whose removal
+    /// lowers the bound most (strong branching): every completion leaves out one of them, so neither the child nor the
+    /// node going on can find the same heaviest set again.  Each member's bound without it is found exactly (certified
+    /// or solved), which also finds forced members among them.  Without a conflict, the branch is the largest
+    /// candidate.
     #[inline]
     fn choose_branch(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
         let g = &mut self.gf2;
         let conflict = Some(open.conflict & node.cands).filter(|k| !k.is_empty());
         let mut forced = open.forced & node.cands;
-        // Below the depth of strong branching (tactic `strong_depth`), the choice of `deep_branching`.
-        let deep = node.promoted.len() >= space.gf2_strong_depth;
-        let branching = if deep { space.gf2_deep_branching } else { space.gf2_branching };
         let n = match conflict {
             Some(_) if !forced.is_empty() => forced.max(),
-            Some(k) if k.len() > 1 => match branching {
-                Gf2Branching::Largest => k.max(),
-                Gf2Branching::Split => {
-                    let mut best = (i64::MAX, 0);
-                    for x in k.iter() {
-                        let bound = g.split_without(x).unwrap_or(i64::MAX);
-                        if bound <= best.0 {
-                            best = (bound, x);
-                        }
+            Some(k) if k.len() > 1 => {
+                // The members by their split bounds, the likeliest to lower the bound most first.  The bound
+                // without each is read off the exchange graph of the heaviest set where that certifies it (no
+                // solve, before any solve spoils the workspace's tableau), and solved where not: each solve
+                // stops as soon as its value reaches both the best so far and `need` (then the member can be
+                // neither chosen nor forced), or `need` once a member is forced (with `fix_forced` only which
+                // are forced still matters).  The exact value of a certified bound leads to the same choices as
+                // a solve stopped at any `stop` would.
+                let order = &mut self.order;
+                order.clear();
+                order.extend(k.iter().map(|x| (g.split_without(x).unwrap_or(i64::MAX), u32::MAX - x)));
+                order.sort_unstable();
+                self.tried.clear();
+                self.tried.extend(order.iter().map(|&(_, key)| u32::MAX - key));
+                g.certified_excluding(&self.tried, node.max_add, &mut self.certified);
+                let mut best = (u64::MAX, 0);
+                // Whether the level without the best member so far was kept from its solve.
+                let mut kept = false;
+                for (&x, &certified) in self.tried.iter().zip(&self.certified) {
+                    // A solve that stops has a value of at least `stop`, which is never below `need`: only a
+                    // solve that ran to the end can show a member forced.
+                    let stop = if space.fix_forced && !forced.is_empty() { need } else { best.0.max(need) };
+                    let bound = certified.unwrap_or_else(|| g.value_excluding(x, node.max_add, stop));
+                    if bound < need {
+                        forced.insert(x);
                     }
-                    Some(best.1)
+                    if bound < best.0 {
+                        kept = certified.is_none();
+                        if kept {
+                            g.keep_excluded();
+                        }
+                        best = (bound, x);
+                    }
                 }
-                Gf2Branching::Exact | Gf2Branching::Forced => {
-                    // The members by their split bounds, the likeliest to lower the bound most first.  The bound
-                    // without each is read off the exchange graph of the heaviest set where that certifies it (no
-                    // solve, before any solve spoils the workspace's tableau), and solved where not: each solve
-                    // stops as soon as its value reaches both the best so far and `need` (then the member can be
-                    // neither chosen nor forced), or `need` once a member is forced (with `fix_forced` only which
-                    // are forced still matters).  The exact value of a certified bound leads to the same choices as
-                    // a solve stopped at any `stop` would.
-                    let order = &mut self.order;
-                    order.clear();
-                    order.extend(k.iter().map(|x| (g.split_without(x).unwrap_or(i64::MAX), u32::MAX - x)));
-                    order.sort_unstable();
-                    let tried = order.len().min(space.gf2_strong_limit.max(1));
-                    self.tried.clear();
-                    self.tried.extend(order[..tried].iter().map(|&(_, key)| u32::MAX - key));
-                    g.certified_excluding(&self.tried, node.max_add, &mut self.certified);
-                    let mut best = (u64::MAX, 0);
-                    let to_need = branching == Gf2Branching::Forced;
-                    if to_need {
-                        best.1 = self.tried[0];
-                    }
-                    // Whether the level without the best member so far was kept from its solve.
-                    let mut kept = false;
-                    for (&x, &certified) in self.tried.iter().zip(&self.certified) {
-                        if !space.gf2_more_forced && space.fix_forced && !forced.is_empty() {
-                            break;
-                        }
-                        // A solve that stops has a value of at least `stop`, which is never below `need`: only a
-                        // solve that ran to the end can show a member forced.
-                        let stop =
-                            if to_need || (space.fix_forced && !forced.is_empty()) { need } else { best.0.max(need) };
-                        let bound = certified.unwrap_or_else(|| g.value_excluding(x, node.max_add, stop));
-                        if bound < need {
-                            forced.insert(x);
-                        }
-                        if bound < best.0 && !to_need {
-                            kept = certified.is_none();
-                            if kept {
-                                g.keep_excluded();
-                            }
-                            best = (bound, x);
-                        }
-                    }
-                    // Unless forced members end the node's loop, it goes on without the chosen member, from that
-                    // member's level, kept for it: solved, or certified.
-                    if !to_need && !kept && !(space.fix_forced && !forced.is_empty()) {
-                        g.keep_certified(best.1);
-                    }
-                    if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
+                // Unless forced members end the node's loop, it goes on without the chosen member, from that
+                // member's level, kept for it: solved, or certified.
+                if !kept && !(space.fix_forced && !forced.is_empty()) {
+                    g.keep_certified(best.1);
                 }
-            },
+                if space.fix_forced { forced.max() } else { None }.or(Some(best.1))
+            }
             Some(k) => k.max(),
             None => node.cands.max(),
         }
@@ -1126,17 +1074,17 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
     }
 
-    /// With the tactic `forget_nogoods`, forgets the nogoods as the space's [`Forgetting`] says, after each of its
-    /// periods of steps.  A table publishes what it has done now and then ([`PUBLISH_EVERY`]).
+    /// With the tactic `forget_nogoods`, forgets the nogoods after each [`SearchSpace::forget_period`] of its steps.
+    /// A table publishes what it has done now and then ([`PUBLISH_EVERY`]).
     #[inline]
     fn forget_nogoods_when_due(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>) {
-        if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forgetting.period) {
+        if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forget_period) {
             self.steps_since_clear += 1;
             if self.steps_since_clear >= period {
                 if let Some(harvest) = self.space.harvest {
                     harvest.add(table.sets());
                 }
-                table.forget(self.space.forgetting.keep);
+                table.forget();
                 self.steps_since_clear = 0;
             }
         }

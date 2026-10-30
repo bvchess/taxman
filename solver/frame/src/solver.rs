@@ -99,7 +99,7 @@ use crate::search::{
     self, finder, gate_trial, stat, BranchSettings, Branching, NearRepeat, Prepared, Problem, ProblemSize, ProfilePlan,
     SearchTactics,
 };
-use crate::tactics::Tactics;
+use crate::tactics::{on_off, Tactics};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -1486,9 +1486,12 @@ fn conclude(
 fn different_tactics(checkpoint: &Path, made: SearchTactics, now: Tactics) -> String {
     let then = Tactics { search: made, ..now };
     let differ: Vec<_> = then.settings().into_iter().zip(now.settings()).filter(|(a, b)| a != b).collect();
-    let what: Vec<String> =
-        differ.iter().map(|((name, there), (_, here))| format!("{name} is {there}, not {here}")).collect();
-    let flags: Vec<String> = differ.iter().map(|((name, there), _)| format!("--tactic {name}={there}")).collect();
+    let what: Vec<String> = differ
+        .iter()
+        .map(|((name, there), (_, here))| format!("{name} is {}, not {}", on_off(*there), on_off(*here)))
+        .collect();
+    let flags: Vec<String> =
+        differ.iter().map(|((name, there), _)| format!("--tactic {name}={}", on_off(*there))).collect();
     format!(
         "{} was made with different search tactics: {}; resume it with {}, or delete it to start the game over",
         checkpoint.display(),

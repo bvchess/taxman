@@ -123,12 +123,13 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   of fewer steps than the period is unchanged.  Carrying the tables from one game to the next, or storing them in
   checkpoints, does not pay ([carrying nogoods
   over](../../notebook/search/carrying-nogoods-over-2026-10-measured-not-kept/README.md)).  Which nogoods a searcher
-  keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them.
-  Three research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose
-  defaults are the behavior above, with the same trees.  The table counts what it does (nogoods learned, lookups,
-  candidates ruled out, evictions), and the progress lines print the counts.  A checkpoint does not record the policies,
-  since the answer does not depend on them and a resumed search starts with empty tables; the run that resumes says
-  which it uses.
+  keeps, and for how long, is a policy and nothing more, since any subset of valid nogoods is as sound as all of them:
+  the period was a tactic of its own once, with a choice of nogoods to keep and a limit to the table, and the notebook
+  has what they were worth ([keeping and forgetting
+  nogoods](../../notebook/search/keeping-and-forgetting-nogoods-at-the-end-of-the-chain-2026-10/README.md)).  The table
+  counts what it does (nogoods learned, lookups, candidates ruled out, forgettings), and the progress lines print the
+  counts.  A checkpoint does not record when the searchers forget, since the answer does not depend on it and a resumed
+  search starts with empty tables.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
   cannot be promoted from the root at all and could be filtered out once.  It cannot: every candidate of every game
   from 2 to 1230 passes that test at the root (a test checks every game to 511 and every sixth past it).  A
@@ -151,8 +152,7 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 2. look at the node's heaviest common independent set I* (gf2) of at most max_add members:
      value < need                                  -> end the loop (cut)
      F = the forced members of I* (by the weight split: those without which the bound is below need; and those it
-         leaves free within force_window of need, all by default, whose exchange graph has no cycle through them
-         within value − need)
+         leaves free, whose exchange graph has no cycle through them within value − need)
      the nogood table knows a conflict of I* all of whose members are in F or promoted
                                                    -> end the loop (cut)
      I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop

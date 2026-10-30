@@ -80,12 +80,11 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Soundness harness** (`tests/soundness.rs`): the search starts from an incumbent worth 1 or 5 less than P\* with an
   empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place (which tests
   the `<` and `<=` boundaries too).  It runs:
-  * every game 2..=300 under each of 32 configurations: 8 of the default, the GF(2) bound with the rule of symmetric
-    pairs (every way of choosing the branch; without forced members or nogoods; forgetting every step; two threads),
-    the GF(2) bound without the rule on one thread, two, and forgetting every step, 5 policies of keeping nogoods, 5
-    of conflict branching (at every check, whatever its gap, on one thread and two; off; and with the look at the last
-    child of the search's own conflict, on one thread and two), 1 without the near-repeat cut, 4 of the reuse of
-    prices, 4 of carried nogoods, and 2 of the warm start;
+  * every game 2..=300 under each of 24 configurations: 5 of the default, the GF(2) bound with the rule of symmetric
+    pairs (without forced members or nogoods; forgetting every step; two threads), the GF(2) bound without the rule on
+    one thread, two, and forgetting every step, 5 of conflict branching (at every check, whatever its gap, on one
+    thread and two; off; and with the look at the last child of the search's own conflict, on one thread and two), 1
+    without the near-repeat cut, 4 of the reuse of prices, 4 of carried nogoods, and 2 of the warm start;
   * the near-repeat cut in every search of the harness on real games, by one of the four games before (the latest whose
     optimum the handicapped incumbent reaches), and the games 404, 430 and 436, whose trees it changes, under every
     configuration with the cut and without it; on those three, a cut whose bound the incumbent never reaches cuts
@@ -175,7 +174,8 @@ every second line of the Java fixtures), and the comment on each says what the w
   * robustness: an interval of zero finishes; limits too large for the clock are never reached; a deadline that has
     passed, or a stop signal received, before a run starts stops it before any search, with every unit in its
     checkpoint; spill segments of dead processes are removed; a locked checkpoint directory or results file is
-    refused; a checkpoint of another game, with other tactics, or with an incumbent that does not fit is refused; and
+    refused; a checkpoint of another game or format version, with other tactics, or with an incumbent that does not fit
+    is refused; and
     the binary rejects bad times, survives a closed stdout and stderr, and stops on SIGINT and SIGTERM with a checkpoint
     it then resumes;
   * the control: a ceiling given before a run, or while it runs at the incumbent it has, ends it as optimal (with no
@@ -271,10 +271,6 @@ every second line of the Java fixtures), and the comment on each says what the w
     score their sum says, and the root's GF(2) bound between the greedy sum and the matching bound, with three, four and
     five block words.  The GF(2) bound's copies of four and five words (only at 128) search game 1000's tree as the
     copy of one word does.
-  * A committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20), and one of the format
-    before the extended problem's search, must still be read, every field of their headers as this build reads them,
-    and refused for their search, on the matching path, which this build no longer has: a deliberate change of the
-    checkpoint format fails it.
   * The levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the matching bound from
     scratch and with a member removed against the min-cost-flow reference; and promoting one number at a time
     (with its no-peel shortcut) against the peel of every frame, in reached states of games at W = 20, 28 and 64.  The
