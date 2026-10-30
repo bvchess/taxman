@@ -22,7 +22,6 @@ use super::near_repeat::NearRepeat;
 use super::{BranchSettings, Branching, Forgetting, NodeBound, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::engine::{self, CheckpointEvent, Control, Ctx, EngineConfig, Searcher, Start, Unit};
 use crate::gf2::Gf2Graph;
-use crate::matchbound::MatchGraph;
 use crate::model::CarriedNogoods;
 use crate::rng::Rng;
 use std::fs::File;
@@ -134,12 +133,11 @@ pub struct Report {
     pub seconds: f64,
 }
 
-/// What the trial needs of the search: its problem, its root's graphs, its carried nogoods, near-repeat cut and
+/// What the trial needs of the search: its problem, its root's GF(2) graph, its carried nogoods, near-repeat cut and
 /// forgetting (which the trial's searchers share or copy), and its branching settings (which it reads and sets).
 pub(super) struct Trial<'a, const W: usize> {
     pub plan: &'a Plan,
     pub prepared: &'a Prepared<W>,
-    pub match_graph: &'a MatchGraph,
     pub gf2: &'a Gf2Graph,
     pub branching: &'a Branching,
     /// The generation of the branching settings when the search started: a change since stands, and the trial then
@@ -289,7 +287,7 @@ fn run<const W: usize>(
             near_repeat: Some(&near),
             carried: t.carried,
             branching: Arc::new(Branching::new(BranchSettings { gate, ..settings })),
-            ..SearchSpace::new(t.prepared, t.match_graph)
+            ..SearchSpace::new(t.prepared)
         })
         .collect();
     // Unit by unit, each under every gate, so that the solves of the gates see the machine alike.
@@ -496,8 +494,7 @@ mod tests {
         };
         let stopped = search(&p, &cfg, None, None, false).expect("the search");
         assert!(!stopped.completed);
-        let graph = MatchGraph::new(&p.model, &p.root);
-        let space = SearchSpace::new(&p, &graph);
+        let graph = Gf2Graph::new(&p.model, &p.root, &p.candidates);
         // The search starts with the gate of the run (`--gate`), which the trial compares the others with.
         let branching = Branching::new(BranchSettings::of(&p.tactics).with_gate(Some(1200)));
         let from = branching.settings().gate;
@@ -506,8 +503,7 @@ mod tests {
         let trial = Trial {
             plan: &plan,
             prepared: &p,
-            match_graph: &graph,
-            gf2: space.gf2.as_ref().expect("the tactic gf2"),
+            gf2: &graph,
             branching: &branching,
             armed: branching.generation(),
             near_repeat: None,

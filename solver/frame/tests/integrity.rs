@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{matching_options, options, TempDir};
+use common::{options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -259,17 +259,17 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
     let opts = SolveOptions {
         checkpoint_dir: Some(checkpoints.clone()),
         checkpoint_interval: Duration::from_secs(3600),
-        node_limit: Some(1_000),
-        ..matching_options(2)
+        time_limit: Some(Duration::ZERO),
+        ..options(2)
     };
-    // A limit stops the search: a checkpoint and an incomplete line.
+    // A limit stops the search (a time limit of nothing, before it starts): a checkpoint and an incomplete line.
     let summary = solver::solve_range_each_with(600, 600, &opts, Some(&results), &wrong, |_| {}).unwrap();
     assert_eq!(summary.stopped_at, Some(600));
     assert!(checkpoint.exists());
 
     // The search completes, then the comparison fails: the game is recorded as rejected and the checkpoint
     // survives, so the work is not lost.
-    let unlimited = SolveOptions { node_limit: None, ..opts.clone() };
+    let unlimited = SolveOptions { time_limit: None, ..opts.clone() };
     let err = solver::solve_range_each_with(600, 600, &unlimited, Some(&results), &wrong, |_| {}).unwrap_err();
     assert!(err.contains(&format!("says {}", truth + 1)) && err.contains("r.rejected.jsonl"), "{err}");
     assert!(checkpoint.exists(), "the checkpoint is gone after a failure that followed the search");
@@ -300,17 +300,17 @@ fn a_failure_after_the_search_keeps_the_checkpoint_and_records_the_game() {
 fn result_lines_carry_their_provenance() {
     let dir = TempDir::new("provenance");
     let (results, _) = twelve_games(&dir);
-    // Game 600, stopped by a limit, in the same file.
+    // Game 600, stopped by a limit (a time limit of nothing, before its search starts), in the same file.
     let checkpoints = dir.join("ckpt");
     let opts = SolveOptions {
         checkpoint_dir: Some(checkpoints),
-        node_limit: Some(200),
+        time_limit: Some(Duration::ZERO),
         force_search: true,
-        ..matching_options(1)
+        ..options(1)
     };
     let mut seen: Vec<GameResult> = Vec::new();
     solver::solve_range_each(600, 600, &opts, Some(&results), |r| seen.push(r.clone())).unwrap();
-    assert!(!seen[0].completed, "600 needs more than 200 nodes");
+    assert!(!seen[0].completed, "600 is stopped by the time limit");
     let all = lines(&results);
     let (done, unfinished) = (&all[11], &all[12]);
 
@@ -350,7 +350,7 @@ fn result_lines_carry_their_provenance() {
     assert_eq!((unfinished.get("proof"), unfinished.get("assumes")), (Some(&Json::Null), Some(&Json::Null)));
     assert_eq!(unfinished.get("invocations").and_then(Json::as_u32), Some(1));
     let limits = unfinished.get("limits").unwrap();
-    assert_eq!(limits.get("nodes").and_then(Json::as_u64), Some(200));
+    assert_eq!(limits.get("seconds").and_then(Json::as_f64), Some(0.0));
     assert_eq!(unfinished.get("options").unwrap().get("force_search"), Some(&Json::Bool(true)));
     // The file reads back, with the unfinished search's invocation counted.
     assert_eq!(ResultsFile::open(&results, Optimal::built_in(), 1).unwrap().earlier_runs(600), 1);
@@ -385,17 +385,18 @@ fn a_summary_line_ends_with_the_games_own_search_time_and_its_best_promotion_sum
 fn a_resumed_game_counts_its_invocations_and_its_time() {
     let dir = TempDir::new("invocations");
     let results = dir.join("r.jsonl");
+    // Game 1000, whose search takes more than the 1,024 steps of a searcher after which a node limit is looked at.
     let opts = SolveOptions {
         checkpoint_dir: Some(dir.join("ckpt")),
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
         force_search: true,
-        ..matching_options(2)
+        ..options(1)
     };
     let mut runs = 0;
     let last = loop {
         runs += 1;
-        let games = solver::solve_range(600, 600, &opts, Some(&results)).unwrap();
+        let games = solver::solve_range(1000, 1000, &opts, Some(&results)).unwrap();
         if games[0].completed {
             break games[0].clone();
         }

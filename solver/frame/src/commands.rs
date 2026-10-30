@@ -125,25 +125,21 @@ fn trial_gates(list: &str) -> Result<Vec<u64>, CliError> {
 }
 
 /// The gate of `--gate`, a whole number from 0 to [`MAX_GATE`], if it is given: the gap from which conflict branching
-/// chooses its conflict in every game of the run.  A run with conflict branching off, or without the GF(2) bound it
-/// acts with, has no use for one, so the flag is refused there.
+/// chooses its conflict in every game of the run.  A run with conflict branching off has no use for one, so the flag is
+/// refused there.
 fn run_gate(args: &Args, opts: &SolveOptions) -> Result<Option<u64>, CliError> {
     let Some(gate) = args.parsed::<u64>("--gate")? else { return Ok(None) };
     if gate > MAX_GATE {
         return Err(CliError::Usage(format!("--gate takes a gap from 0 to {MAX_GATE}: {gate}")));
     }
-    let tactics = &opts.tactics.search;
-    let off = if !tactics.conflict_branching {
-        "conflict branching is off (--tactic conflict_branching=off)"
-    } else if !tactics.gf2 {
-        "conflict branching acts only with the GF(2) bound, which is off (--tactic gf2=off)"
-    } else {
+    if opts.tactics.search.conflict_branching {
         return Ok(Some(gate));
-    };
-    Err(CliError::Usage(format!(
-        "--gate sets the gap from which conflict branching chooses its conflict, and {off}: a gate without conflict \
-         branching does nothing"
-    )))
+    }
+    Err(CliError::Usage(
+        "--gate sets the gap from which conflict branching chooses its conflict, and conflict branching is off \
+         (--tactic conflict_branching=off): a gate without conflict branching does nothing"
+            .into(),
+    ))
 }
 
 /// The line that says why the search of `n` stopped before it finished, and how to go on.

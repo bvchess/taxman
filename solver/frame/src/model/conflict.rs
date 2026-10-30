@@ -2,9 +2,9 @@
 //!
 //! A *conflict* of a set `S` in a state is a subset of `S` that cannot be promoted from that state.  A subset of a
 //! promotable set is promotable (fewer moves added and fewer factors removed only help a frame), so every set
-//! that can be promoted leaves out at least one member of every conflict.  The search branches and refines its
-//! bound on that ([`crate::search`]): when the heaviest matching's candidates cannot all be promoted, a small
-//! conflict among them says which ones to try leaving out.
+//! that can be promoted leaves out at least one member of every conflict.  The search branches on that
+//! ([`crate::search`]): when the members of its bound's heaviest set cannot all be promoted, a small conflict among
+//! them says which ones to try leaving out.
 //!
 //! A conflict is found in a frame that fails, from its *residual* (the moves a peel cannot drop, see
 //! [`super::peel`]), and made minimal ([`FrameGraph::conflict_using`]).  A conflict of a node is relative to the

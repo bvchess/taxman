@@ -247,15 +247,14 @@ mod tests {
 
     #[test]
     fn flags_and_positionals() {
-        let given =
-            strings(&["480", "--threads", "4", "--tactic=match_refine=0", "--tactic", "prev_cap=off", "--show"]);
+        let given = strings(&["480", "--threads", "4", "--tactic=nogoods=off", "--tactic", "prev_cap=off", "--show"]);
         let args = Args::parse(&given, &SOLVER_FLAGS, &["--show"]).unwrap();
         assert_eq!(args.positional(), ["480"]);
         assert!(args.has("--show") && !args.has("--force-search"));
-        assert_eq!(args.values("--tactic"), ["match_refine=0", "prev_cap=off"]);
+        assert_eq!(args.values("--tactic"), ["nogoods=off", "prev_cap=off"]);
         let opts = solver_options(&args).unwrap();
         assert_eq!(opts.threads, 4);
-        assert_eq!(opts.tactics.description(), "match_refine=0,prev_cap=off");
+        assert_eq!(opts.tactics.description(), "nogoods=off,prev_cap=off");
     }
 
     #[test]
@@ -265,11 +264,11 @@ mod tests {
             let args = Args::parse(&strings(&given), &SOLVER_FLAGS, &[]).unwrap();
             solver_options(&args).map(|opts| opts.tactics).map_err(usage)
         };
-        let t = options(&["match_refine=2", "nogoods=off"]).unwrap();
-        assert_eq!(t.description(), "match_refine=2,nogoods=off");
+        let t = options(&["nogood_period=2000", "nogoods=off"]).unwrap();
+        assert_eq!(t.description(), "nogoods=off,nogood_period=2000");
         // The last assignment of a tactic wins, as for the switches.
-        assert_eq!(options(&["match_refine=3", "match_refine=1"]).unwrap().description(), "default");
-        for bad in ["match_refine=9", "match_refine=two", "match_refine=-1"] {
+        assert_eq!(options(&["nogood_period=3", "nogood_period=50000"]).unwrap().description(), "default");
+        for bad in ["nogood_period=0", "nogood_period=two", "nogood_period=-1"] {
             let message = options(&[bad]).unwrap_err();
             assert!(message.starts_with(&format!("tactic {}: expected ", bad.split('=').next().unwrap())), "{message}");
         }

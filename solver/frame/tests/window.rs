@@ -10,7 +10,7 @@
 
 mod common;
 
-use common::{committed_text, matching_options, options, TempDir};
+use common::{committed_text, options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -169,18 +169,19 @@ fn a_game_repeats_the_search_of_a_game_still_in_flight() {
     ignore = "long: the quick check is a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again"
 )]
 fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
-    a_range_stopped_by_a_limit_completes_when_run_again(598, 612);
+    a_range_stopped_by_a_limit_completes_when_run_again(796, 806, 4);
 }
 
 /// [`a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again`] for the games
-/// 599..=601 (600 takes more than the 1,024 steps that the limit is looked at after).
+/// 799..=801 on two threads (800 takes more than the 1,024 steps of a worker that the limit is looked at after).
 #[test]
 fn a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
-    a_range_stopped_by_a_limit_completes_when_run_again(599, 601);
+    a_range_stopped_by_a_limit_completes_when_run_again(799, 801, 2);
 }
 
-/// The range `lo..=hi` under a node limit stops at its first unfinished game, and completes when run again.
-fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32) {
+/// The range `lo..=hi` on `threads` threads under a node limit stops at its first unfinished game, and completes when
+/// run again.
+fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32, threads: usize) {
     let dir = TempDir::new("window-limit");
     let results = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
@@ -190,7 +191,7 @@ fn a_range_stopped_by_a_limit_completes_when_run_again(lo: u32, hi: u32) {
         force_search: true,
         use_prev: true,
         window: 4,
-        ..matching_options(4)
+        ..options(threads)
     };
     limited.tactics.seed_incumbent = false;
     limited.tactics.prev_cap = false;
@@ -237,24 +238,24 @@ fn clock_of(checkpoints: &Path, n: u32) -> f64 {
 }
 
 /// The clock of a game's own search (`seconds.own`; "The clock" in `src/solver/window.rs`): a node limit stops the head
-/// of the window before its search can complete (no seed, no ceiling and the matching tactics make it longer than the
-/// 1,024 steps that the limit is looked at after), and the head keeps a checkpoint and a clock; a run with the same
-/// limits stops at the same game from the clock it was left with (which is never smaller); and a run with no node limit
-/// completes every game from the checkpoint and the clock, records the head's own search time over its invocations, and
-/// leaves no clock behind.
+/// of the window before its search can complete (no seed and no ceiling make the search of 1000 on two threads take
+/// more than twice the 1,024 steps of a worker that the limit is looked at after), and the head keeps a checkpoint and
+/// a clock; a run with the same limits stops at the same game from the clock it was left with (which is never smaller);
+/// and a run with no node limit completes every game from the checkpoint and the clock, records the head's own search
+/// time over its invocations, and leaves no clock behind.
 #[test]
 #[cfg_attr(
     debug_assertions,
     ignore = "long: the quick check is a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it"
 )]
 fn a_stopped_game_keeps_its_clock_and_goes_on_from_it() {
-    a_stopped_game_goes_on_from_its_clock(800, 801);
+    a_stopped_game_goes_on_from_its_clock(1000, 1001);
 }
 
-/// [`a_stopped_game_keeps_its_clock_and_goes_on_from_it`] for the game 740 alone, whose search is shorter.
+/// [`a_stopped_game_keeps_its_clock_and_goes_on_from_it`] for the game 1000 alone.
 #[test]
 fn a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it() {
-    a_stopped_game_goes_on_from_its_clock(740, 740);
+    a_stopped_game_goes_on_from_its_clock(1000, 1000);
 }
 
 /// The head `lo` of the range `lo..=hi` is stopped by a node limit, and the range goes on from its clock.
@@ -268,7 +269,7 @@ fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32) {
         force_search: true,
         use_prev: true,
         window: 4,
-        ..matching_options(4)
+        ..options(2)
     };
     stopping.tactics.seed_incumbent = false;
     stopping.tactics.prev_cap = false;

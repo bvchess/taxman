@@ -476,26 +476,20 @@ fn a_locked_directory_is_refused() {
 // Checkpoints of Taxman searches
 // ------------------------------------------------------------------------------------------------------------
 
-/// Game `n` from the frame builder (at width 16), prepared with the tactics of the matching path, whose search of
-/// 600 is long enough to stop.
-fn prepared_game(n: u32) -> (Board<16>, search::Prepared<16>) {
-    let board = Board::<16>::for_n(n);
-    let prepared = board.prepare(SearchTactics::matching()).unwrap();
-    (board, prepared)
-}
-
-/// A search of game 600 stopped early, leaving a checkpoint at `ckpt`.
+/// A search of game 600 (from the frame builder, at width 16) stopped before it starts by a time limit of nothing,
+/// leaving a checkpoint at `ckpt`.
 fn stopped_search(ckpt: &Path) -> (Board<16>, EngineConfig) {
-    let (board, prepared) = prepared_game(600);
+    let board = Board::<16>::for_n(600);
+    let prepared = board.prepare(SearchTactics::default()).unwrap();
     let cfg = EngineConfig {
         threads: 1,
         checkpoint: Some((ckpt.to_path_buf(), Duration::from_secs(3600))),
-        node_limit: Some(1500),
+        time_limit: Some(Duration::ZERO),
         ..EngineConfig::default()
     };
     assert!(!search::search(&prepared, &cfg, None, None, false).unwrap().completed);
     assert!(ckpt.exists());
-    (board, EngineConfig { node_limit: None, ..cfg })
+    (board, EngineConfig { time_limit: None, ..cfg })
 }
 
 /// A search resumed with an incumbent that already reaches the ceiling is finished at once.
@@ -555,9 +549,9 @@ fn a_checkpoint_whose_incumbent_does_not_fit_is_refused() {
     }
 }
 
-/// One thread, checkpoints in `dir`, and the tactics of the matching path, whose search of 600 is long enough to stop.
+/// One thread and checkpoints in `dir`.
 fn options(dir: &Path) -> SolveOptions {
-    SolveOptions { checkpoint_dir: Some(dir.to_path_buf()), force_search: true, ..common::matching_options(1) }
+    SolveOptions { checkpoint_dir: Some(dir.to_path_buf()), force_search: true, ..common::options(1) }
 }
 
 /// Games 140 and 141 have the same candidates and the same frame 0, but other frames: before checkpoints recorded the
@@ -595,21 +589,20 @@ fn forge_header(path: &Path, edit: impl FnOnce(&mut [u8])) {
 #[test]
 fn a_checkpoint_made_with_other_tactics_names_them() {
     let dir = TempDir::new("tactics");
-    let opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
+    let opts = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&dir.0) };
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let mut other = opts.clone();
     other.tactics.set("nogoods=off").unwrap();
-    other.tactics.set("match_refine=3").unwrap();
-    other.tactics.set("gf2=on").unwrap();
+    other.tactics.set("symmetry=off").unwrap();
     let err = solver::solve_game(600, None, &other).unwrap_err();
-    for part in ["nogoods is on, not off", "match_refine is 1, not 3", "gf2 is off, not on", "--tactic nogoods=on"] {
+    for part in ["nogoods is on, not off", "symmetry is on, not off", "--tactic nogoods=on --tactic symmetry=on"] {
         assert!(err.contains(part), "{part}: {err}");
     }
 }
 
 /// A checkpoint whose header has a format version this build does not read (3, whose headers recorded tactics that
 /// are gone, and 7, a later one) is refused with one message, naming the file, and left alone.  Version 4, that of the
-/// builds before the extended problem's search, is read (`tests/wide.rs` resumes a real one), and so is version 6, that
+/// builds before the extended problem's search, is read (`tests/wide.rs` reads a real one), and so is version 6, that
 /// of a search whose tactics that tune the GF(2) search are not those of the builds before them, but neither with the
 /// length of version 5, which is what forging the number gives.  The header of a search tuned as those builds were
 /// (`force_window=80`), version 5, is the one that the checkpoint was written with, so the same game resumes from it
@@ -617,7 +610,8 @@ fn a_checkpoint_made_with_other_tactics_names_them() {
 #[test]
 fn a_checkpoint_of_another_format_is_refused() {
     let dir = TempDir::new("format");
-    let mut opts = SolveOptions { node_limit: Some(1500), ..options(&dir.0) };
+    // A time limit of nothing stops each search before it starts, with its checkpoint.
+    let mut opts = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&dir.0) };
     opts.tactics.set("force_window=80").unwrap();
     assert!(!solver::solve_game(600, None, &opts).unwrap().completed);
     let checkpoint = dir.join("n0600.ckpt");
@@ -639,28 +633,28 @@ fn a_checkpoint_of_another_format_is_refused() {
         assert!(checkpoint.exists(), "a refused checkpoint is left alone");
     }
     forge_header(&checkpoint, |header| header[4..8].copy_from_slice(&5u32.to_le_bytes()));
-    let opts = SolveOptions { node_limit: None, ..opts };
+    let opts = SolveOptions { time_limit: None, ..opts };
     assert!(solver::solve_game(600, None, &opts).unwrap().completed, "the checkpoint resumes with its own version");
 
     // The default's tuning (`force_window=all`) is not that of the old builds, so the default writes version 6, and
     // resumes from it; a search tuned otherwise does too.
     for tuning in [None, Some("force_window=40")] {
         let tuned_dir = TempDir::new("format-tuned");
-        let mut tuned = SolveOptions { node_limit: Some(1500), ..options(&tuned_dir.0) };
+        let mut tuned = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&tuned_dir.0) };
         if let Some(assignment) = tuning {
             tuned.tactics.set(assignment).unwrap();
         }
         assert!(!solver::solve_game(600, None, &tuned).unwrap().completed);
         let checkpoint = tuned_dir.join("n0600.ckpt");
         assert_eq!(version(&checkpoint), 6u32.to_le_bytes(), "{tuning:?}: writes the header's version 6");
-        let tuned = SolveOptions { node_limit: None, ..tuned };
+        let tuned = SolveOptions { time_limit: None, ..tuned };
         assert!(solver::solve_game(600, None, &tuned).unwrap().completed, "{tuning:?}: version 6 resumes");
     }
 
     // A checkpoint of version 5 is of a search with the window of 80: the default's search (window `all`) does not
     // resume it, saying which flag does.
     let old_dir = TempDir::new("format-old-window");
-    let mut old = SolveOptions { node_limit: Some(1500), ..options(&old_dir.0) };
+    let mut old = SolveOptions { time_limit: Some(Duration::ZERO), ..options(&old_dir.0) };
     old.tactics.set("force_window=80").unwrap();
     assert!(!solver::solve_game(600, None, &old).unwrap().completed);
     let default = SolveOptions { tactics: options(&old_dir.0).tactics, ..old };
@@ -785,24 +779,18 @@ fn a_checkpoint_directory_in_use_is_refused() {
     assert!(stderr.contains("in use by another process"), "{stderr}");
 }
 
-/// The board of the signal test: 944, whose search on the matching path lasts long enough to be stopped (the GF(2)
-/// search takes under a tenth of a second), and in a quick run 925, which does too, with an eighth of the steps (some
-/// 23,000 against 191,000; 0.7 s on two threads where 944 takes 3.9 s).
-const SIGNALED: u32 = if QUICK { 925 } else { 944 };
+/// The board of the signal test: 990, whose search from nothing (no game before it) lasts long enough to be stopped (some
+/// 10,000 steps), and in a quick run 1000, which does too, with a third of the steps.
+const SIGNALED: u32 = if QUICK { 1000 } else { 990 };
 
-/// Runs `solve` of the board `SIGNALED` (in a full run on the known game of the one before it) with progress lines, and
-/// once the search is under way sends `signal` (if any); returns the exit status and stdout.
+/// Runs `solve` of the board `SIGNALED` (from nothing) with progress lines, and once the search is under way sends
+/// `signal` (if any); returns the exit status and stdout.
 #[cfg(unix)]
 fn solve_signaled(dir: &TempDir, signal: Option<&str>) -> (ExitStatus, String) {
     let out = dir.join("results.jsonl");
     let ckpt = dir.join("ckpt");
-    // The known games cost a process a second of CPU to read, and the quick board's search is the same without the game
-    // before it (some 23,000 steps either way); 944's is not (486,000 without it, 191,000 with it).
-    let known: &[&str] = if QUICK { &[] } else { &["--use-prev"] };
     let mut child = taxman()
         .args(["solve", &SIGNALED.to_string(), "--force-search", "--threads", "2", "--progress", "0.02"])
-        .args(known)
-        .args(["--tactic", "gf2=off", "--tactic", "lagrange=on", "--tactic", "symmetry=off"])
         .args(["--out".as_ref(), out.as_os_str(), "--checkpoint-dir".as_ref(), ckpt.as_os_str()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

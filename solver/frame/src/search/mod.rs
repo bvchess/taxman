@@ -1,9 +1,8 @@
 //! The branch-and-bound search for the promotion set with the largest sum, run on the parallel [`engine`].
 //!
-//! `solver/docs/design/search.md`, explains the algorithm: nodes, steps and units, the GF(2) bound (the
-//! default) and the matching bound, conflicts, forced members and nogoods, the pseudocode of "The default step", and
-//! why the search is exact.  The
-//! docs here say where each piece of it is, and carry the arguments next to the code they justify.
+//! `solver/docs/design/search.md`, explains the algorithm: nodes, steps and units, the GF(2) bound, conflicts, forced
+//! members and nogoods, the pseudocode of "The default step", and why the search is exact.  The docs here say where
+//! each piece of it is, and carry the arguments next to the code they justify.
 //!
 //! The words the code uses: a *node* is a set `P` of promotions, with the state they reach (the root with `P`
 //! promoted, in any order) and the candidates `C` its loop has still to try; a *completion* of the node is a set
@@ -22,21 +21,17 @@
 //!   same.
 //!   With the tactic `symmetry`, the rule of [`symmetry`] comes between them (`Stepper::apply_symmetry`): it cuts
 //!   the node, or drops candidates from its loop, and the sum of the largest is checked again for what is left.
-//! * `choose_branch` (steps 3 to 5): the member of the conflict to branch on (with strong branching,
-//!   `refine::strongest`), or with `fix_forced` the forced members, which the child promotes together.
+//! * `choose_branch` (steps 3 to 5): the member of the conflict to branch on (with strong branching), or with
+//!   `fix_forced` the forced members, which the child promotes together.
 //! * `make_child` (steps 6 and 7): the child's state and candidates, without the last member of a conflict known
 //!   along the path or of a nogood, and with `symmetry` without the candidates the rule drops.
 //! * `check_child` (steps 8 and 9): the child's own check, which with `symmetry` begins with the rule's test of the
 //!   child (cut if no completion keeps the inequalities); then it is offered as the incumbent and pushed.
 //!
-//! The bound check of a node or a child is `Stepper::check`.  With the tactic `gf2`, the default, it is `check_gf2`:
-//! the GF(2) bound ([`crate::gf2`]), the forced members, and the conflict of the heaviest set (the smallest the
-//! nogood table knows, [`crate::model::Nogoods`], else
-//! [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using)).  Without it, on the matching path, it is
-//! `refine::Refiner::top`: the matching bound ([`crate::matchbound`]), the forced members, the conflict of the
-//! heaviest matching, and the refinement.  With the tactic `lagrange`, where they leave it open, the Lagrangian bound
-//! over the nogoods and the forced members it finds follow (`lagrange::Lagrangian::check`).  The tactics that switch
-//! these pieces are the fields of [`SearchTactics`].  Before the bound check of a node or a child, with the tactic
+//! The bound check of a node or a child is `Stepper::check`: the GF(2) bound ([`crate::gf2`]), the forced members,
+//! and the conflict of the heaviest set (the smallest the nogood table knows, [`crate::model::Nogoods`], else
+//! [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using): `seek::Seek`).  The tactics that switch
+//! its pieces are the fields of [`SearchTactics`].  Before the bound check of a node or a child, with the tactic
 //! `near_repeat`, comes the near-repeat cut (`Stepper::near_repeat_cuts`, [`NearRepeat`]), where the search was given a
 //! game proven before, at its setup or while it runs, and the incumbent reaches the cut's bound.
 //!
@@ -45,11 +40,9 @@
 //! * The sum of the `max_add` largest candidates bounds every completion by itself, not as a shortcut for the
 //!   other bounds: no completion has more promotions than the freedoms allow (see [`crate::model::FrameSet`]),
 //!   nor larger ones.
-//! * The bounds: [`crate::gf2`] (default) and [`crate::matchbound`].  Conflicts:
+//! * The bound and its forced members: [`crate::gf2`].  Conflicts:
 //!   [`FrameGraph::conflict_using`](crate::model::FrameGraph::conflict_using); nogoods: [`crate::model::Nogoods`];
-//!   refinement and forced members: `refine::Refiner` and `refine::strongest`; the rule-outs of children:
-//!   `Stepper::make_child`; the Lagrangian bound and its forced members: [`crate::matchbound::lagrange`] and
-//!   [`lagrange`].
+//!   the rule-outs of children: `Stepper::make_child`.
 //! * The rule of the tactic `symmetry` ([`symmetry`]): every heaviest promotion set keeps the inequality
 //!   `c_p ≤ c_q` of each symmetric pair `(p, q)` of the root (the prime-exchange theorem (R2),
 //!   docs/theory/search-rules.md), so a node none of whose completions keeps them all holds no heaviest set, and
@@ -65,7 +58,7 @@
 //!   where the incumbent reaches a proven bound of that sum, it holds none that beats the incumbent.  The cut drops
 //!   only such nodes, as a bound does, and learns nothing.
 //! * What a searcher remembers (the conflicts known along the path, the nogoods, the frames' last conflicts, the
-//!   matching levels kept by strong branching, a child's verdict) are facts that hold where they are used, or
+//!   levels of the bound kept by strong branching, a child's verdict) are facts that hold where they are used, or
 //!   caches of them: they change which tree is searched, never the answer.  So a search's tree depends on its
 //!   threads and interruptions; its answer does not.
 //!
@@ -76,8 +69,7 @@
 //! * `setup`: [`prepare`]: the root, the greedy incumbent, `max_total`; the [`Problem`] a setup poses.
 //! * `incumbent`: the starting incumbent (seed, dive, local search).
 //! * `searcher`: [`TaxSearcher`], its stack and its steps; [`SearchSpace`], [`TaxUnit`], the counters [`stat`].
-//! * `refine`: the matching path's check (`Refiner`) and strong branching on it (`strongest`).
-//! * [`lagrange`]: the Lagrangian bound in the search: where it is tried, its forced members, its refits.
+//! * `seek`: where a node's conflicts come from (`Seek`): the nogood table, else a peel.
 //! * `header`: the checkpoint's header.
 //! * `dual`: [`dual_bound`], the upper bound that a stopped search's checkpoint proves, and [`NodeBound`], the bound
 //!   of a unit's node as the search computes it when it starts the unit.
@@ -99,13 +91,12 @@ pub mod finder;
 pub mod gate_trial;
 mod header;
 mod incumbent;
-pub mod lagrange;
 mod near_repeat;
 mod price_memo;
 pub use price_memo::Reuse;
 mod profile;
-mod refine;
 mod searcher;
+mod seek;
 mod setup;
 pub mod symmetry;
 mod tactics;
@@ -117,8 +108,8 @@ pub use near_repeat::NearRepeat;
 pub use profile::{ProfilePlan, SearchProfile, DEPTH as PROFILE_DEPTH, MOST_IDS as PROFILE_MOST_IDS};
 pub use searcher::{stat, Found, SearchSpace, TaxSearcher, TaxUnit};
 pub use setup::{
-    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, problem_of,
-    problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
+    extended_words, prepare, prepare_extended, prepare_extended_for_resume, prepare_for_resume, prepare_for_window,
+    problem_of, problem_of_extended, PrepareTimings, Prepared, Problem, ProblemSize,
 };
 pub use tactics::{Forgetting, Gf2Branching, SearchTactics};
 
@@ -310,7 +301,7 @@ pub fn search_beside<const W: usize>(
 /// ([`CarriedNogoods::from_dir`]); they only prune (solver/docs/design/carried-nogoods.md).  It writes its own store
 /// there too, of the nogoods its searchers learn ([`Harvest`]), before each checkpoint and at its end.
 ///
-/// With `trial`, and the tactic `gf2`, conflict branching on and a checkpoint, the search tries the gates of the plan on
+/// With `trial`, conflict branching on and a checkpoint, the search tries the gates of the plan on
 /// a sample of its own units once it has taken the plan's steps, and branches from then on with the gate that took the
 /// least CPU ([`gate_trial`]); the trial changes only the gate, so the search's answer is the same.
 #[allow(clippy::too_many_arguments)]
@@ -449,7 +440,7 @@ fn search_forgetting<const W: usize>(
         near_repeat,
         carried: carried.as_ref(),
         harvest: harvest.as_ref().map(|(h, _)| &**h),
-        ..SearchSpace::new(prepared, &match_graph)
+        ..SearchSpace::new(prepared)
     };
     let space = match branching {
         Some(branching) => SearchSpace { branching: Arc::clone(branching), ..space },
@@ -459,10 +450,10 @@ fn search_forgetting<const W: usize>(
         let begin = match &resumed {
             Some((_, head)) => Begin::Resumed { nodes: head.stats.nodes, elapsed: head.elapsed },
             None => Begin::Fresh {
-                bound: space.gf2.as_ref().and_then(|graph| {
+                bound: {
                     let root = TaxUnit { promoted: Bits::EMPTY, cands: prepared.candidates };
-                    NodeBound::new(prepared, graph).completions(&root)
-                }),
+                    NodeBound::new(prepared, &space.gf2).completions(&root)
+                },
                 need: best.1 + 1,
                 candidates: prepared.candidates.len(),
             },
@@ -499,11 +490,9 @@ fn search_forgetting<const W: usize>(
             })))
         }
     };
-    // The gate trial, which needs the GF(2) bound for the units' gaps and a checkpoint for its units, takes the first
-    // checkpoint written at its plan's steps or more.
-    let trial = trial
-        .filter(|_| space.gf2.is_some() && checkpoint.is_some())
-        .map(|plan| (plan, gate_trial::Checkpoints::new(plan.after)));
+    // The gate trial, which needs a checkpoint for its units, takes the first checkpoint written at its plan's steps or
+    // more.
+    let trial = trial.filter(|_| checkpoint.is_some()).map(|plan| (plan, gate_trial::Checkpoints::new(plan.after)));
     let hook = match &trial {
         None => hook,
         Some((_, (checkpoints, _))) => {
@@ -547,8 +536,7 @@ fn search_forgetting<const W: usize>(
             let trial = gate_trial::Trial {
                 plan,
                 prepared,
-                match_graph: &match_graph,
-                gf2: space.gf2.as_ref().expect("a trial needs the GF(2) bound"),
+                gf2: &space.gf2,
                 branching: &space.branching,
                 armed,
                 near_repeat,
@@ -570,7 +558,7 @@ fn search_forgetting<const W: usize>(
         None => run(),
         // Beside the search, a thread summarizes the open units of each checkpoint; the profile ends with the run.
         Some(profile) => thread::scope(|scope| {
-            let (graph, background) = (space.gf2.as_ref(), cfg.background);
+            let (graph, background) = (&space.gf2, cfg.background);
             let jobs = profile.jobs().expect("a profile's checkpoints are taken once");
             let summary = scope.spawn(move || profile::open_work(profile, prepared, graph, jobs, background));
             let ending = profile::Ending(profile);

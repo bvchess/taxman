@@ -2,9 +2,8 @@
 //! first incumbent ([`greedy`]).
 //!
 //! The Java bounds every node with a bound of its own and filters the candidates of a child with a preclusion table and
-//! promotability checks.  Here a bound over the node's candidates bounds every node (the GF(2) bound, [`crate::gf2`],
-//! by default; the matching bound, [`crate::matchbound`], on the matching path), the conflicts it finds take the place
-//! of the checks, and a child's candidates are only narrowed to the frames that still have freedoms
+//! promotability checks.  Here a bound over the node's candidates bounds every node (the GF(2) bound, [`crate::gf2`]),
+//! the conflicts it finds take the place of the checks, and a child's candidates are only narrowed to the frames that still have freedoms
 //! ([`FrameGraph::narrow`]: [`FrameSet::narrow_candidates`], and the one-sided candidates of the extended problem whose
 //! own frame has a freedom).
 

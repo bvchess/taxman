@@ -4,8 +4,8 @@ Part of the [design](../DESIGN.md).
 
 ## The GF(2) bound
 
-The *GF(2) bound*, the default node bound (tactic `gf2`), relaxes winnability less than matchability does, and so prunes
-more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound's ([matroid intersection
+The *GF(2) bound*, the bound of every node of the search, relaxes winnability less than matchability does, and so
+prunes more: at the roots of 880 to 1300 its gap is about a fifth of the matching bound's ([matroid intersection
 bounds](../../notebook/search/matroid-intersection-bounds-2026-10/README.md)).  In each frame, give the factors
 coordinates over GF(2), each *mover* (a move of the frame, or a number promoted into it) the vector of its maximal
 factors in the frame, and each number promoted out of it its own unit vector.  A winnable frame peels completely, and
@@ -173,11 +173,14 @@ misses are the *odd* cores of movers with three or more factors.
   more time ([the GF(2) bound in the search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)).  The
   tactics `branching`, `strong_limit`, `strong_depth`, `deep_branching` and `more_forced` choose among them, and set how
   far strong branching goes ([tactics.md](tactics.md)).
-* **What it replaces.**  With `gf2` the search does not compute the matching bound, which as a first check before the
-  intersection costs more than the cuts it saves; so `match_refine` has no effect.  The conflicts, nogoods, forced
-  members and exact sets work as with the matching bound.  The Lagrangian bound over the nogoods still applies after the
-  GF(2) bound when it is on, but changes no tree of the GF(2) search measured and costs 2 to 4%, so `lagrange` is off by
-  default.
+* **What it replaced.**  The matching bound was the node bound before it, with a refinement by the branches of its
+  conflicts and a Lagrangian bound over the nogoods after it, the *matching path*.  With the GF(2) bound the 146
+  one-thread proofs of the slope study ran 45 times faster with 426 times fewer nodes ([the GF(2) bound in the
+  search](../../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md)), and the matching path was removed.
+  The search does not compute the matching bound as a first check either, which costs more than the cuts it saves.
+  The conflicts, nogoods, forced members and exact sets work as they did with the matching bound.  The Lagrangian bound
+  after the GF(2) bound changed no tree measured and cost 3.6 to 4.3% ([the tuning campaign at the end of the
+  chain](../../notebook/search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md)).
 * **Block words.**  A level's vectors are as wide as the root's largest frame rank (its freedoms) needs: one to three
   words of 64 bits on every game to 4095 (ranks up to 169), four from 4740 and five from 6392 (ranks up to 314 at 8191;
   [boards past 4095](../../notebook/boards-past-4095-2026-10/README.md) has the scan of every game).  Each word count is
@@ -252,5 +255,4 @@ conflicts and nogoods that the search learns are facts about promotability, true
 changes which conflicts a searcher meets, as any change of the tree does, never their truth.  It is a function of a
 node's `P` and `C`, so a unit (a subtree of the root) rebuilt from a checkpoint or on another thread keeps the
 guarantee.  A search of one node's completions for their own best, as the soundness harness runs below the root, finds
-the best of those that keep the inequalities, which can be lighter.  The matching path (`SearchTactics::matching`)
-runs without the rule.
+the best of those that keep the inequalities, which can be lighter.

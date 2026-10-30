@@ -22,7 +22,6 @@ use taxman::board::Board;
 use taxman::engine::{self, Control, EngineConfig};
 use taxman::game::{replay_finished, Optimal};
 use taxman::json::Json;
-use taxman::matchbound::MatchGraph;
 use taxman::search::{self, dual_bound, Prepared, SearchSpace, SearchTactics};
 pub use taxman::store::{play, refereed, Played};
 
@@ -345,8 +344,7 @@ fn find<const W: usize>(
     stop: &Control,
 ) -> Result<(Bits<W>, LnsRun), String> {
     let all = Instant::now();
-    let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(p, &graph);
+    let space = SearchSpace::new(p);
     let finder =
         Lns { p, space: &space, options: lns::Options { seed: u64::from(job.lns.round), ..lns::Options::default() } };
     let began = Instant::now();

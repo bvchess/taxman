@@ -13,21 +13,16 @@ use crate::gf2::LEGACY_FORCE_WINDOW;
 /// The tactics of solver/docs/design/tactics.md, that act inside the search.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SearchTactics {
-    /// Refine the matching bound by the branches of its conflict, this many levels deep, where it does not
-    /// prune (0: off; sound, see `search::refine::Refiner`).  At most [`Self::MAX_MATCH_REFINE`].
-    /// What it prunes can depend on the conflicts already known along the path, which work units do not
-    /// record, so a single-threaded search that is interrupted may explore a slightly different tree (with the
-    /// same answer).
-    pub match_refine: u8,
-    /// A node's child promotes all of the node's *forced members*, the members of the heaviest matching whose
-    /// removal alone brings the matching bound below what the node needs, and the node's loop ends after that
-    /// child (sound: every completion that can beat the incumbent promotes them all; see
-    /// `search::refine::strongest`).
+    /// A node's child promotes all of the node's *forced members*, the members of the GF(2) bound's heaviest set
+    /// without which the bound falls below what the node needs, and the node's loop ends after that child (sound:
+    /// every completion that can beat the incumbent promotes them all, as the frame bound (B2,
+    /// docs/theory/frame-bounds.md) of the node without each says; see [`crate::gf2`] and `search::searcher`'s
+    /// `choose_branch`).
     pub fix_forced: bool,
     /// Learn the conflicts found as nogoods of the root ([`crate::model::Nogoods`]) and use them at every node:
-    /// for the conflict to branch on and to refine with, and to rule candidates out of children (sound: a
-    /// nogood holds everywhere).  What is learned depends on the order the search went, so with it a search's
-    /// tree depends on its history (threads, interruptions), not only on the node.
+    /// for the conflict to branch on, and to rule candidates out of children (sound: a nogood holds everywhere).
+    /// What is learned depends on the order the search went, so with it a search's tree depends on its history
+    /// (threads, interruptions), not only on the node.
     pub nogoods: bool,
     /// With `nogoods`: each searcher forgets the nogoods it knows after each [`nogood_period`](Self::nogood_period) of
     /// its steps (sound: the table is a cache), all of them unless [`nogood_keep`](Self::nogood_keep) keeps some.  Old
@@ -43,43 +38,30 @@ pub struct SearchTactics {
     /// With `nogoods`: the most nogoods a searcher's table holds (tactic `nogood_limit`), the least recently used
     /// dropped for a new one; 0: no limit.
     pub nogood_limit: u64,
-    /// With `nogoods`: where the matching bound and its refinement leave a node or a child open, bound it also by a
-    /// Lagrangian relaxation of the nogoods the searcher has learned, kept incrementally along its path, and (with
-    /// `fix_forced`) add to the forced members the members without which that bound would cut (proven: weak
-    /// duality; see [`crate::matchbound::lagrange`] and `search::lagrange`).  The multipliers are refitted as the
-    /// searcher learns, so the tree depends on its history, as with `nogoods`.
-    pub lagrange: bool,
-    /// Bound every node by the GF(2) bound ([`crate::gf2`]: the heaviest set independent in every frame over GF(2),
-    /// kept along the searcher's path by reducing the frames' vectors modulo those of the promoted members), branch on
-    /// the conflicts of its heaviest set, and (with `fix_forced`) force the members without which it would cut (proven:
-    /// the frame bound (B2, docs/theory/frame-bounds.md), and weak duality for the forced members).  Replaces the
-    /// matching bound and its refinement as the node bound; the Lagrangian bound over nogoods still applies after it.
-    pub gf2: bool,
     /// Cut a node none of whose completions keeps the inequality of every symmetric pair of the root, and drop from a
     /// node's candidates those that no such completion holds ([`crate::search::symmetry`]; proven:
     /// the prime-exchange theorem (R2) and the exchange-pruning lemma (R3) of docs/theory/search-rules.md: every
-    /// heaviest promotion set keeps the inequalities, so a search for one needs only the completions that do).  It acts
-    /// with either node bound.  The rule is a function of the node's promotions and candidates alone, so the tree
-    /// depends on nothing but the node.
+    /// heaviest promotion set keeps the inequalities, so a search for one needs only the completions that do).  The
+    /// rule is a function of the node's promotions and candidates alone, so the tree depends on nothing but the node.
     pub symmetry: bool,
-    /// With `gf2` and `fix_forced`: which members of a node's heaviest set that the weight split leaves free are
-    /// searched for being forced after all, by the exchange graph ([`ForceWindow`]; sound whatever it is: a member is
-    /// forced only where the search shows that every completion without it falls short).
+    /// With `fix_forced`: which members of a node's heaviest set that the weight split leaves free are searched for
+    /// being forced after all, by the exchange graph ([`ForceWindow`]; sound whatever it is: a member is forced only
+    /// where the search shows that every completion without it falls short).
     pub force_window: ForceWindow,
-    /// With `gf2`: how a node chooses the member of its conflict to branch on ([`Gf2Branching`]; sound whatever it
-    /// is: every completion leaves out some member of the conflict, so the branches cover them all).
+    /// How a node chooses the member of its conflict to branch on ([`Gf2Branching`]; sound whatever it is: every
+    /// completion leaves out some member of the conflict, so the branches cover them all).
     pub branching: Gf2Branching,
-    /// With `gf2`'s strong branching (`branching` exact or forced): the most members of a conflict whose bounds are
-    /// found, the most promising by their split bounds first (`u32::MAX`: all; sound, as for `branching`).
+    /// With strong branching (`branching` exact or forced): the most members of a conflict whose bounds are found, the
+    /// most promising by their split bounds first (`u32::MAX`: all; sound, as for `branching`).
     pub strong_limit: u32,
-    /// With `gf2`: a node with at least this many promotions chooses its branch by `deep_branching` instead of
-    /// `branching` (`u32::MAX`: none does; sound, as for `branching`).
+    /// A node with at least this many promotions chooses its branch by `deep_branching` instead of `branching`
+    /// (`u32::MAX`: none does; sound, as for `branching`).
     pub strong_depth: u32,
     pub deep_branching: Gf2Branching,
-    /// With `gf2`'s strong branching and `fix_forced`: once a member is found forced, whether the bounds of the others
-    /// are still found, to find more forced members (sound, as for `fix_forced`).
+    /// With strong branching and `fix_forced`: once a member is found forced, whether the bounds of the others are
+    /// still found, to find more forced members (sound, as for `fix_forced`).
     pub more_forced: bool,
-    /// With `gf2`: at a check whose gap is at least [`CONFLICT_BRANCHING_GAP`](super::CONFLICT_BRANCHING_GAP), branch
+    /// At a check whose gap is at least [`CONFLICT_BRANCHING_GAP`](super::CONFLICT_BRANCHING_GAP), branch
     /// on the conflict of the heaviest set whose members cost the bound most to leave out, of the one the search found,
     /// the nogoods within the set and each failing frame's minimal conflict made by leaving out its cheapest members
     /// first (`search::searcher`'s `conflict_to_branch_on`; sound: every completion leaves out a member of any
@@ -112,7 +94,7 @@ pub struct SearchTactics {
     /// search is given a store ([`SearchSpace::carried`](super::SearchSpace::carried); `solve --carried-dir DIR`).
     /// Off by default.
     pub carried_nogoods: bool,
-    /// With `gf2`: a child whose parent's heaviest set holds the members it promotes but also members it dropped finds
+    /// A child whose parent's heaviest set holds the members it promotes but also members it dropped finds
     /// its heaviest set from its parent's, deleting those members one at a time along the shortest cycle through each
     /// in an exchange graph that takes in every size, instead of solving from a smaller set (`crate::gf2`'s
     /// `warm_child`; sound: the bound is the same heaviest weight, found exactly, and only which heaviest set is found
@@ -124,15 +106,12 @@ pub struct SearchTactics {
 impl Default for SearchTactics {
     fn default() -> Self {
         SearchTactics {
-            match_refine: 1,
             fix_forced: true,
             nogoods: true,
             forget_nogoods: true,
             nogood_period: NOGOOD_PERIOD,
             nogood_keep: Keep::Nothing,
             nogood_limit: 0,
-            lagrange: false,
-            gf2: true,
             symmetry: true,
             force_window: ForceWindow::default(),
             branching: Gf2Branching::Exact,
@@ -150,8 +129,8 @@ impl Default for SearchTactics {
     }
 }
 
-/// How a node chooses the member of its conflict to branch on with the tactic `gf2` (strong branching asks what each
-/// member's removal does to the bound).
+/// How a node chooses the member of its conflict to branch on (strong branching asks what each member's removal does
+/// to the GF(2) bound).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Gf2Branching {
     /// The largest member.
@@ -309,26 +288,6 @@ impl SearchTactics {
         }
     }
 
-    /// The largest `match_refine`: the header of a checkpoint has room for no more, so a deeper setting could not
-    /// be told from this one on resuming.
-    pub const MAX_MATCH_REFINE: u8 = 7;
-
-    /// The tactics of the matching path, the default before `gf2`: the matching bound with its refinement, then the
-    /// Lagrangian bound over the nogoods, and without the rule of `symmetry`, as it was before that tactic (its trees
-    /// stay those of the build before it); `conflict_branching` is off, as before it, since it acts only with `gf2`,
-    /// so the checkpoints of the builds before it resume.  Its trees are several times larger than the default's at a
-    /// fraction of the cost a node, so the tests of interrupted searches use it on the small games: the engine checks a
-    /// node limit only every 1,024 steps of a searcher, which the default's searches of those games do not reach.
-    pub fn matching() -> Self {
-        SearchTactics {
-            gf2: false,
-            lagrange: true,
-            symmetry: false,
-            conflict_branching: false,
-            ..SearchTactics::default()
-        }
-    }
-
     /// The tactics of *extended mode*, a search of a problem with one-sided candidates (the extended problem's,
     /// `crate::frames::build_extended`): the default without the rule of symmetric pairs, which such a search refuses
     /// ([`refusal_with_one_sided`](Self::refusal_with_one_sided)).
@@ -336,49 +295,45 @@ impl SearchTactics {
         SearchTactics { symmetry: false, ..SearchTactics::default() }
     }
 
-    /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search needs the
-    /// GF(2) bound (`gf2`; the matching bound, `gf2=off`, gives a one-sided candidate no vertex, so it is no bound
-    /// there), and refuses the Lagrangian bound (`lagrange`, built on the matching bound) and the rule of symmetric
-    /// pairs (`symmetry`: the prime-exchange theorem (R2, docs/theory/search-rules.md) is proven for the frame model,
-    /// and for the extended problem would need each prime exchange to map the one-sided candidates of each frame onto
-    /// themselves, which nothing checks yet).
+    /// Why these tactics cannot search a problem with one-sided candidates, if they cannot: such a search refuses the
+    /// rule of symmetric pairs (`symmetry`: the prime-exchange theorem (R2, docs/theory/search-rules.md) is proven for
+    /// the frame model, and for the extended problem would need each prime exchange to map the one-sided candidates of
+    /// each frame onto themselves, which nothing checks yet).
     pub fn refusal_with_one_sided(&self) -> Option<String> {
-        let mut why = Vec::new();
-        if !self.gf2 {
-            why.push("gf2=off (the matching bound does not know them)");
-        }
-        if self.lagrange {
-            why.push("lagrange=on (the Lagrangian bound is the matching bound's)");
-        }
-        if self.symmetry {
-            why.push("symmetry=on (the prime-exchange theorem, R2, is not proven for them)");
-        }
-        (!why.is_empty())
-            .then(|| format!("a search with one-sided candidates (extended mode) cannot run with {}", why.join(", ")))
+        self.symmetry.then(|| {
+            "a search with one-sided candidates (extended mode) cannot run with symmetry=on (the prime-exchange \
+             theorem, R2, is not proven for them)"
+                .to_owned()
+        })
     }
 
-    /// The tactics as the header of a checkpoint records them: `match_refine` in bits 0 to 2, then one bit for each
-    /// switch that is on, `fix_forced` (bit 3), `nogoods` (4), `forget_nogoods` (5), `lagrange` (6), `gf2` (7),
-    /// `symmetry` (8), `conflict_branching` (9), `conflict_look` (10), `near_repeat` (11), `price_reuse` (12),
-    /// `carried_nogoods` (13) and `warm_start` (14); the defaults are `0xFB9`.  (Bits 9 to 14 record the settings the
-    /// search began with and bind nothing ([`same_recorded`](Self::same_recorded)): a checkpoint of a build before
-    /// `conflict_branching` has bit 9 clear, and resumes with the tactic on or off, and likewise bit 10 and
-    /// `conflict_look`, bit 11 and `near_repeat`, bit 12 and `price_reuse`, bit 13 and `carried_nogoods`, and bit 14 and
-    /// `warm_start`.  A build before a tactic
-    /// refuses a checkpoint with its bit set, as "unknown tactics".)  The knobs of the nogood table's policy
-    /// (`nogood_period`, `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a
-    /// resumed search starts with an empty table whichever policy made the first run's.  (A checkpoint of a build
-    /// before `gf2` has bit 7 clear: it resumes with `gf2` off.  One of a build before `symmetry` has bit 8 clear: it
-    /// resumes with `symmetry` off, which the default no longer is, so a run resumes it only with
-    /// `--tactic symmetry=off`.  A build before `symmetry` refuses a checkpoint with the tactic on, as "unknown
-    /// tactics": it would resume the search without a rule that shaped the tree it wrote.)
+    /// The bits of [`bits`](Self::bits) that recorded the tactics of the matching path, which this build no longer has
+    /// ([`MatchingPath`]), as every search on the GF(2) path of the builds before had them by default: `match_refine`
+    /// 1 (bits 0 to 2), `lagrange` off (bit 6) and `gf2` on (bit 7).  This build writes them so, and a header it writes
+    /// is byte for byte the header those builds wrote for the same search.
+    const GF2_PATH_BITS: u16 = 1 | 1 << 7;
+
+    /// The tactics as the header of a checkpoint records them: one bit for each switch that is on, `fix_forced` (bit
+    /// 3), `nogoods` (4), `forget_nogoods` (5), `symmetry` (8), `conflict_branching` (9), `conflict_look` (10),
+    /// `near_repeat` (11), `price_reuse` (12), `carried_nogoods` (13) and `warm_start` (14), and the bits of the
+    /// matching path as a search on the GF(2) path had them ([`GF2_PATH_BITS`](Self::GF2_PATH_BITS): bits 0 to 2, 6
+    /// and 7); the defaults are `0xFB9`.  (Bits 9 to 14 record the settings the search began with and bind nothing
+    /// ([`same_recorded`](Self::same_recorded)): a checkpoint of a build before `conflict_branching` has bit 9 clear,
+    /// and resumes with the tactic on or off, and likewise bit 10 and `conflict_look`, bit 11 and `near_repeat`, bit 12
+    /// and `price_reuse`, bit 13 and `carried_nogoods`, and bit 14 and `warm_start`.  A build before a tactic refuses a
+    /// checkpoint with its bit set, as "unknown tactics".)  The knobs of the nogood table's policy (`nogood_period`,
+    /// `nogood_keep`, `nogood_limit`) are not recorded: they change the tree, never the answer, and a resumed search
+    /// starts with an empty table whichever policy made the first run's.  (A checkpoint of a build before `gf2`, or of
+    /// a search with `gf2` off or `lagrange` on, records the matching path ([`MatchingPath::of_bits`]), and is not
+    /// resumed.  One of a build before `symmetry` has bit 8 clear: it resumes with `symmetry` off, which the default no
+    /// longer is, so a run resumes it only with `--tactic symmetry=off`.  A build before `symmetry` refuses a
+    /// checkpoint with the tactic on, as "unknown tactics": it would resume the search without a rule that shaped the
+    /// tree it wrote.)
     pub(super) fn bits(self) -> u16 {
-        u16::from(self.match_refine.min(Self::MAX_MATCH_REFINE))
+        Self::GF2_PATH_BITS
             | u16::from(self.fix_forced) << 3
             | u16::from(self.nogoods) << 4
             | u16::from(self.forget_nogoods) << 5
-            | u16::from(self.lagrange) << 6
-            | u16::from(self.gf2) << 7
             | u16::from(self.symmetry) << 8
             | u16::from(self.conflict_branching) << 9
             | u16::from(self.conflict_look) << 10
@@ -414,15 +369,12 @@ impl SearchTactics {
         Self::legacy_tuning().with_switches_of(self) == *self
     }
 
-    /// `self` with the switches and `match_refine` of `other`, and its policy of keeping and forgetting nogoods.
+    /// `self` with the switches of `other`, and its policy of keeping and forgetting nogoods.
     fn with_switches_of(self, other: &Self) -> Self {
         SearchTactics {
-            match_refine: other.match_refine,
             fix_forced: other.fix_forced,
             nogoods: other.nogoods,
             forget_nogoods: other.forget_nogoods,
-            lagrange: other.lagrange,
-            gf2: other.gf2,
             symmetry: other.symmetry,
             conflict_branching: other.conflict_branching,
             conflict_look: other.conflict_look,
@@ -479,18 +431,16 @@ impl SearchTactics {
     }
 
     /// The tactics [`bits`](Self::bits) recorded, with the tuning a header of version 5 implies
-    /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.
+    /// ([`legacy_tuning`](Self::legacy_tuning)), or an error if a bit that no tactic uses is set.  The bits of the
+    /// matching path are not read here: [`MatchingPath::of_bits`] reads what they say.
     pub(super) fn from_bits(bits: u16) -> Result<Self, String> {
         if bits >> 15 != 0 {
             return Err(format!("unknown tactics {bits:#x}"));
         }
         Ok(SearchTactics {
-            match_refine: (bits & 7) as u8,
             fix_forced: bits & 1 << 3 != 0,
             nogoods: bits & 1 << 4 != 0,
             forget_nogoods: bits & 1 << 5 != 0,
-            lagrange: bits & 1 << 6 != 0,
-            gf2: bits & 1 << 7 != 0,
             symmetry: bits & 1 << 8 != 0,
             conflict_branching: bits & 1 << 9 != 0,
             conflict_look: bits & 1 << 10 != 0,
@@ -500,5 +450,33 @@ impl SearchTactics {
             warm_start: bits & 1 << 14 != 0,
             ..SearchTactics::legacy_tuning()
         })
+    }
+}
+
+/// What a checkpoint's header records of the tactics of the matching path, which this build no longer has: the matching
+/// bound as the node bound (`gf2=off`: bit 7 of [`SearchTactics::bits`] clear, as in every header of the builds
+/// before `gf2`) and the Lagrangian bound over the nogoods, built on the matching bound (`lagrange=on`: bit 6).  A
+/// search that used either made a tree that this build's search does not make, so its checkpoint is not resumed
+/// (`Header::mismatch`).  `match_refine` (bits 0 to 2), the depth of the matching bound's refinement, acted only on
+/// the matching path, so it says nothing of a search on the GF(2) path, and it is not read.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct MatchingPath {
+    pub(super) matching_bound: bool,
+    pub(super) lagrange: bool,
+}
+
+impl MatchingPath {
+    /// What the tactics' bits `bits` record of the matching path.
+    pub(super) fn of_bits(bits: u16) -> Self {
+        MatchingPath { matching_bound: bits & 1 << 7 == 0, lagrange: bits & 1 << 6 != 0 }
+    }
+
+    /// The tactics of the matching path that the search used, as `--tactic` spelled them (`gf2=off`, `lagrange=on`);
+    /// empty if it used none.
+    pub(super) fn tactics(self) -> Vec<&'static str> {
+        [(self.matching_bound, "gf2=off"), (self.lagrange, "lagrange=on")]
+            .into_iter()
+            .filter_map(|(used, tactic)| used.then_some(tactic))
+            .collect()
     }
 }

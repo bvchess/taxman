@@ -3,10 +3,10 @@
 //!
 //! The stack holds the path from the unit's node down to the node being worked on, plus one slot below it where
 //! that node's children are made; slots are reused, so a step allocates nothing.  Next to the stack, and
-//! mirroring it level by level, the searcher keeps the bound of every node on the path (the GF(2) bound with the
-//! tactic `gf2`, the default; the matching bound without it: [`MatchBound`]; level `d` is the node at depth `d`, and
-//! a child is pushed on it while it is checked and for as long as it is on the stack) and the conflicts known along
-//! the path (`known`: `stack[d].known_end` of them hold for the node at depth `d`).
+//! mirroring it level by level, the searcher keeps the bound of every node on the path (the GF(2) bound,
+//! [`Gf2Bound`]; level `d` is the node at depth `d`, and a child is pushed on it while it is checked and for as long as
+//! it is on the stack) and the conflicts known along the path (`known`: `stack[d].known_end` of them hold for the node
+//! at depth `d`).
 //!
 //! A step ([`Stepper::step`]) is solver/docs/design/search.md's "The default step" in four phases (the module docs of
 //! [`crate::search`] map them): [`check_node`](Stepper::check_node), [`choose_branch`](Stepper::choose_branch),
@@ -14,11 +14,10 @@
 //! both checks compare with that value, even after one of them has offered a better incumbent.
 
 use super::branching::{BranchSettings, Branching};
-use super::lagrange::{Lagrangian, Refits};
 use super::near_repeat::NearRepeat;
 use super::price_memo::{PriceMemo, Reuse};
 use super::profile::{Branched, Made, Phase, Phases, SearchProfile, Tags};
-use super::refine::{strongest, Learning, Refiner, Seek, Verdict};
+use super::seek::{Learning, Seek};
 use super::setup::Prepared;
 use super::symmetry::{RuleScratch, Symmetries};
 use super::tactics::Gf2Branching;
@@ -27,7 +26,6 @@ use crate::bits::Bits;
 use crate::bounds::max_additional;
 use crate::engine::{Ctx, Poll, Searcher, Stats, Unit};
 use crate::gf2::{Eval, ForceWindow, Gf2Bound, Gf2Graph, Gf2Stats};
-use crate::matchbound::{MatchBound, MatchGraph};
 use crate::model::{
     CarriedNogoods, ConflictCache, FrameGraph, FrameSet, Harvest, Lookup, NogoodStats, Nogoods, Scratch, Watches,
 };
@@ -81,10 +79,6 @@ pub struct SearchSpace<'a, const W: usize> {
     pub model: &'a FrameGraph,
     /// The starting state: the frames as built.
     pub root: &'a FrameSet<W>,
-    /// The root's matching graph, which bounds every node.
-    pub match_graph: &'a MatchGraph,
-    /// How deep to refine the matching bound by conflicts (tactic `match_refine`).
-    pub match_refine: u32,
     /// Tactics `fix_forced` and `nogoods`.
     pub fix_forced: bool,
     pub nogoods: bool,
@@ -94,11 +88,6 @@ pub struct SearchSpace<'a, const W: usize> {
     /// What the searchers' tables have done, as each publishes it (at the end of a unit, and every
     /// [`PUBLISH_EVERY`] steps): the counters of the policy.
     pub nogood_totals: Arc<Mutex<NogoodStats>>,
-    /// With the Lagrangian bound over the nogoods (tactic `lagrange`, with `nogoods`), when each searcher refits
-    /// its multipliers ([`Refits::SEARCH`]).
-    pub lagrange: Option<Refits>,
-    /// The root's candidates (where the Lagrangian bound's multipliers are fitted).
-    pub candidates: Bits<W>,
     /// The largest number in the root's frames and candidates (the one-sided candidates of the extended problem are
     /// in no frame): what the nogoods hold.
     pub root_max: u32,
@@ -107,11 +96,9 @@ pub struct SearchSpace<'a, const W: usize> {
     /// When the search began, and the best incumbent the searchers found (see [`Found`]).
     pub began: Instant,
     pub found: Mutex<Option<Found>>,
-    /// With the tactic `gf2`: the root's frames as GF(2) vectors ([`Gf2Graph`]), which bound every node.
-    pub gf2: Option<Gf2Graph>,
-    /// With `gf2`: whether the matching bound is kept along the path too, as a cheaper first check.
-    pub gf2_prefilter: bool,
-    /// With `gf2`: how a node chooses the member of its conflict to branch on.
+    /// The root's frames as GF(2) vectors ([`Gf2Graph`]), which bound every node.
+    pub gf2: Gf2Graph,
+    /// How a node chooses the member of its conflict to branch on.
     pub gf2_branching: Gf2Branching,
     /// With [`Gf2Branching::Exact`]: how many members of a conflict (the most promising by their split bounds) are
     /// solved exactly; the others are not tried.
@@ -119,18 +106,18 @@ pub struct SearchSpace<'a, const W: usize> {
     /// With [`Gf2Branching::Exact`] and `fix_forced`: once a member is found forced, whether the others are still
     /// solved (as far as the need) to find more forced members.
     pub gf2_more_forced: bool,
-    /// With `gf2`: a node with at least this many promotions chooses its branch as `gf2_deep_branching` says, not
-    /// as `gf2_branching` does (tactics `strong_depth` and `deep_branching`).
+    /// A node with at least this many promotions chooses its branch as `gf2_deep_branching` says, not as
+    /// `gf2_branching` does (tactics `strong_depth` and `deep_branching`).
     pub gf2_strong_depth: u32,
     pub gf2_deep_branching: Gf2Branching,
-    /// With `gf2`: which free members are searched for being forced (tactic `force_window`).
+    /// Which free members are searched for being forced (tactic `force_window`).
     pub gf2_force_window: ForceWindow,
-    /// With `gf2`: a child whose parent's heaviest set lost members it dropped finds its heaviest set from its parent's
-    /// (tactic `warm_start`, [`Gf2Bound::set_warm_start`]).
+    /// A child whose parent's heaviest set lost members it dropped finds its heaviest set from its parent's (tactic
+    /// `warm_start`, [`Gf2Bound::set_warm_start`]).
     pub gf2_warm_start: bool,
     /// The branching settings, which a caller may change while the search runs; each searcher reads them when it
-    /// starts a unit ([`Branching`]).  With `gf2`, their `conflict_branching` and `gate` give the gap from which a
-    /// check branches on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
+    /// starts a unit ([`Branching`]).  Their `conflict_branching` and `gate` give the gap from which a check branches
+    /// on the conflict of the heaviest set whose members cost the bound most to leave out (tactic
     /// `conflict_branching`; see [`conflict_to_branch_on`]); with the tactic off, the search's own conflict everywhere.
     pub branching: Arc<Branching>,
     /// With the tactic `symmetry`: the root's symmetric pairs, whose inequalities the search keeps (`None` without
@@ -159,22 +146,17 @@ pub struct SearchSpace<'a, const W: usize> {
 }
 
 impl<'a, const W: usize> SearchSpace<'a, W> {
-    /// The space [`search`](super::search) searches `prepared` in: its tactics, with `graph` the root's matching
-    /// graph (`MatchGraph::new(&prepared.model, &prepared.root)`), and the searchers forgetting their nogoods as the
-    /// tactic `forget_nogoods` says.
-    pub fn new(prepared: &'a Prepared<W>, graph: &'a MatchGraph) -> Self {
+    /// The space [`search`](super::search) searches `prepared` in: its tactics, and the searchers forgetting their
+    /// nogoods as the tactic `forget_nogoods` says.
+    pub fn new(prepared: &'a Prepared<W>) -> Self {
         let tactics = prepared.tactics;
         SearchSpace {
             model: &prepared.model,
             root: &prepared.root,
-            match_graph: graph,
-            match_refine: u32::from(tactics.match_refine),
             fix_forced: tactics.fix_forced,
             nogoods: tactics.nogoods,
             forgetting: tactics.forgetting(),
             nogood_totals: Arc::default(),
-            lagrange: (tactics.nogoods && tactics.lagrange).then_some(Refits::SEARCH),
-            candidates: prepared.candidates,
             root_max: prepared
                 .root
                 .frames()
@@ -186,8 +168,7 @@ impl<'a, const W: usize> SearchSpace<'a, W> {
             max_total: prepared.max_total,
             began: Instant::now(),
             found: Mutex::new(None),
-            gf2: tactics.gf2.then(|| Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates)),
-            gf2_prefilter: false,
+            gf2: Gf2Graph::new(&prepared.model, &prepared.root, &prepared.candidates),
             gf2_branching: tactics.branching,
             gf2_strong_limit: tactics.strong_limit as usize,
             gf2_more_forced: tactics.more_forced,
@@ -236,10 +217,11 @@ pub mod stat {
     pub const PROMOTIONS: usize = 1;
     /// Children pushed on the stack (explored).
     pub const CHILDREN: usize = 2;
-    /// Matching bounds computed (checks of nodes and children).
+    /// Bound checks of nodes and children: the GF(2) bound's, though the results lines name them `match_bounds`, after
+    /// the matching bound that was the node bound before it.
     pub const MATCH_BOUNDS: usize = 3;
-    /// With the tactic `gf2`: the GF(2) bound's solves and augmentations, and of those the ones of strong
-    /// branching (the bound without a member; see [`Gf2Stats`]).  Not in the results lines.
+    /// The GF(2) bound's solves and augmentations, and of those the ones of strong branching (the bound without a
+    /// member; see [`Gf2Stats`]).  Not in the results lines.
     pub const GF2_SOLVES: usize = 4;
     pub const GF2_AUGMENTATIONS: usize = 5;
     pub const GF2_STRONG_SOLVES: usize = 6;
@@ -299,24 +281,13 @@ pub(super) struct Checked<const W: usize> {
 /// What the check of a node leaves for choosing the branch when its loop goes on.
 #[derive(Clone, Copy)]
 struct Open<const W: usize> {
-    /// The conflict of the heaviest matching (a subset of the node's candidates), if one was looked for and the
-    /// matching has one.
-    conflict: Option<Bits<W>>,
+    /// The conflict of the heaviest set to branch on (a subset of the node's candidates when it was checked).
+    conflict: Bits<W>,
     /// The node's forced members found so far (tactic `fix_forced`): every completion that reaches `need`
     /// promotes them.
     forced: Bits<W>,
     /// Whether conflict branching chose the conflict (for the profile).
     branched: Branched,
-}
-
-impl<const W: usize> Open<W> {
-    /// No conflict looked for, nothing forced: the verdict of a child's check without refinement.
-    const NONE: Self = Open { conflict: None, forced: Bits::EMPTY, branched: Branched::Default };
-
-    /// The conflict to branch on, chosen as the search does without conflict branching, and the forced members.
-    fn of(conflict: Option<Bits<W>>, forced: Bits<W>) -> Self {
-        Open { conflict, forced, branched: Branched::Default }
-    }
 }
 
 /// The candidate a node branches on, and what its child promotes.
@@ -353,7 +324,7 @@ pub(super) struct Counts {
     pub(super) attempts: u64,
     pub(super) promotions: u64,
     pub(super) children: u64,
-    /// Bound checks of nodes and children (the GF(2) bound, or the matching bound without `gf2`).
+    /// Bound checks of nodes and children ([`stat::MATCH_BOUNDS`]).
     pub(super) match_bounds: u64,
     /// Nodes and children the near-repeat cut cut ([`NearRepeat`]).
     pub(super) near_repeat: u64,
@@ -379,19 +350,15 @@ struct Stepper<'a, const W: usize> {
     space: &'a SearchSpace<'a, W>,
     /// The scratch space of every peel the searcher makes.
     scratch: Scratch<W>,
-    /// The matching bound along the path, level for level with the stack; kept only while `matching_on`.
-    matching: MatchBound<'a, W>,
-    /// Whether the matching bound is used: without the tactic `gf2`, or with it as a first check.
-    matching_on: bool,
-    /// The GF(2) bound along the path, level for level with the stack (tactic `gf2`).
-    gf2: Option<Gf2Bound<'a, W>>,
-    /// Scratch for strong branching with `gf2`: the members of a conflict by their split bounds, those tried in
-    /// that order, and their bounds where the heaviest set's exchange graph certifies them.
+    /// The GF(2) bound along the path, level for level with the stack.
+    gf2: Gf2Bound<'a, W>,
+    /// Scratch for strong branching: the members of a conflict by their split bounds, those tried in that order, and
+    /// their bounds where the heaviest set's exchange graph certifies them.
     order: Vec<(i64, u32)>,
     tried: Vec<u32>,
     certified: Vec<Option<u64>>,
-    /// Conflicts known for the node being worked on (see [`Refiner`]); `stack[d].known_end` of them hold for
-    /// the node at depth `d`.
+    /// Conflicts known for the node being worked on (see [`Seek`]); `stack[d].known_end` of them hold for the node at
+    /// depth `d`.
     known: Vec<Bits<W>>,
     /// The frames' last conflicts (see [`ConflictCache`]).
     conflict_cache: ConflictCache<W>,
@@ -404,8 +371,6 @@ struct Stepper<'a, const W: usize> {
     /// The members that the carried nogoods watch along the path ([`SearchSpace::carried`]), valid for the node being
     /// worked on, and for a child once it is made.
     watches: Option<Watches>,
-    /// The Lagrangian bound over the nogoods along the path (tactic `lagrange`).
-    lagrange: Option<Lagrangian<'a, W>>,
     /// The sums of the rule of the tactic `symmetry` (empty without it).
     symmetry_scratch: RuleScratch,
     counts: Counts,
@@ -421,8 +386,8 @@ struct Stepper<'a, const W: usize> {
     near_repeat: Option<&'a NearRepeat<W>>,
     /// The GF(2) bound's counters as of the last flush.
     gf2_flushed: Gf2Stats,
-    /// The bound of the last check (the GF(2) bound, or the matching bound on the matching path), and what the last
-    /// step that pushed a child knew of the child: for the profile, which records them, and nothing else.
+    /// The bound of the last check (the GF(2) bound), and what the last step that pushed a child knew of the child: for
+    /// the profile, which records them, and nothing else.
     bound: u64,
     made: Made,
     /// With a profile, the clock of the phases of one step in [`PHASE_EVERY`](super::profile::PHASE_EVERY).
@@ -439,14 +404,12 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
             stepper: Stepper {
                 space,
                 scratch: Scratch::new(),
-                matching: MatchBound::new(space.match_graph),
-                matching_on: space.gf2.is_none() || space.gf2_prefilter,
-                gf2: space.gf2.as_ref().map(|graph| {
-                    let mut bound = Gf2Bound::new(graph);
+                gf2: {
+                    let mut bound = Gf2Bound::new(&space.gf2);
                     bound.set_force_window(space.gf2_force_window);
                     bound.set_warm_start(space.gf2_warm_start);
                     bound
-                }),
+                },
                 order: Vec::new(),
                 tried: Vec::new(),
                 certified: Vec::new(),
@@ -460,7 +423,6 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
                 }),
                 steps_since_clear: 0,
                 watches: space.carried.map(CarriedNogoods::watches),
-                lagrange: space.lagrange.map(|refits| Lagrangian::new(space.match_graph, refits)),
                 symmetry_scratch: space.symmetry.as_ref().map(Symmetries::scratch).unwrap_or_default(),
                 counts: Counts::default(),
                 payload: Vec::with_capacity(8 * W),
@@ -518,15 +480,7 @@ impl<'a, const W: usize> TaxSearcher<'a, W> {
         } else {
             self.stack[0] = node;
         }
-        if self.stepper.matching_on {
-            self.stepper.matching.reset(&unit.promoted, &cands);
-        }
-        if let Some(g) = &mut self.stepper.gf2 {
-            g.reset(&unit.promoted, &cands);
-        }
-        if let Some(lagrange) = &mut self.stepper.lagrange {
-            lagrange.start();
-        }
+        self.stepper.gf2.reset(&unit.promoted, &cands);
         // The branching settings, as they are when the unit starts: changed since the searcher last read them, they are
         // read again.
         let generation = space.branching.generation();
@@ -619,8 +573,8 @@ impl<const W: usize> Searcher<TaxUnit<W>> for TaxSearcher<'_, W> {
 impl<'a, const W: usize> Stepper<'a, W> {
     /// One step of `node`'s loop (see the module docs of [`crate::search`]): whether the loop goes on, the
     /// candidate to branch on, the child (made in `child`), and whether the child is worth exploring.  `parent`: the
-    /// node's parent on the stack, if `node` is not the unit's node; then its matching level was pushed for it and is
-    /// popped when its loop ends.
+    /// node's parent on the stack, if `node` is not the unit's node; then its level of the bound was pushed for it and
+    /// is popped when its loop ends.
     #[inline]
     fn step(
         &mut self,
@@ -631,22 +585,18 @@ impl<'a, const W: usize> Stepper<'a, W> {
     ) -> Next {
         let pushed = parent.is_some();
         self.known.truncate(node.known_end); // forget the conflicts of the child last considered
-        if self.matching_on {
-            // The node without the candidate it last branched on, if strong branching kept it.
-            self.matching.take_kept();
-        }
         let best = ctx.best();
         let need = (best + 1).saturating_sub(node.sum); // what a completion must add to beat the incumbent
 
         let open = match self.check_node(node, parent, best, need, ctx) {
             Ok(open) => open,
-            Err(Cut) => return self.end_loop(&node.promoted, pushed),
+            Err(Cut) => return self.end_loop(pushed),
         };
         let branched = open.branched;
         let branch = self.choose_branch(node, open, need);
         self.mark(Phase::Branching);
         let Some(branch) = branch else {
-            return self.end_loop(&node.promoted, pushed);
+            return self.end_loop(pushed);
         };
         let made = self.make_child(node, child, &branch);
         self.mark(Phase::Children);
@@ -678,7 +628,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// `need`, the rule of the tactic `symmetry` (a function of the node's promotions and candidates alone, and
     /// cheaper than the bounds), then the near-repeat cut ([`near_repeat_cuts`](Self::near_repeat_cuts); `parent`: the
     /// node's parent on the stack, if it has one; `best`: the incumbent the step read, of which `need` is made), then
-    /// the bound check (the GF(2) bound; the matching bound without `gf2`).
+    /// the bound check (the GF(2) bound).
     #[inline]
     fn check_node(
         &mut self,
@@ -696,10 +646,10 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Err(Cut);
         }
         if let Some(checked) = checked.filter(|checked| checked.need == need) {
-            // The node was checked when it was made, at the same need and with the same matching (this is its
+            // The node was checked when it was made, at the same need and with the same heaviest set (this is its
             // first step): the verdict is the same, and so are the conflict and the forced members.  So is the
             // rule of `symmetry`, which `make_child` applied to the same promotions and candidates.
-            return Ok(Open { conflict: Some(checked.conflict), forced: checked.forced, branched: checked.branched });
+            return Ok(Open { conflict: checked.conflict, forced: checked.forced, branched: checked.branched });
         }
         let space = self.space;
         if let Some(sym) = &space.symmetry {
@@ -709,7 +659,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Err(Cut);
         }
         self.mark(Phase::Other);
-        let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, true, ctx);
+        let open = self.check(&node.state, &node.promoted, &node.cands, need, node.max_add, ctx);
         node.known_end = self.known.len(); // the conflicts the check found hold for the node and its subtree
         open
     }
@@ -724,13 +674,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// reach.  A node's first step finds the rule's fixed point already (`make_child` reached it), unless the
     /// node is a unit, rebuilt from its promotions and candidates alone.
     ///
-    /// The removal from the bounds is the one the node makes of the member it branches on
-    /// ([`choose_branch`](Self::choose_branch)), and is safe here for the same reasons: the node's levels are on top
-    /// of both stacks (the child of the last step was popped, or never pushed), the matching bound has taken the
-    /// level kept for the node at the start of the step (so it holds none for the node as it was before the
-    /// removal), and the GF(2) bound keeps the level before the removal only for a child that promotes `x`, which
-    /// no child of this node does, `x` being no candidate of it now.  A node cut as hopeless is left as it is: its
-    /// loop ends, and its levels are popped or, for a unit, reset.
+    /// The removal from the bound is the one the node makes of the member it branches on
+    /// ([`choose_branch`](Self::choose_branch)), and is safe here for the same reasons: the node's level is on top of
+    /// the bound's stack (the child of the last step was popped, or never pushed), and the GF(2) bound keeps the level
+    /// before the removal only for a child that promotes `x`, which no child of this node does, `x` being no candidate
+    /// of it now.  A node cut as hopeless is left as it is: its loop ends, and its level is popped or, for a unit,
+    /// reset.
     fn apply_symmetry(&mut self, sym: &Symmetries, node: &mut Node<W>, need: u64) -> Result<(), Cut> {
         let before = node.cands;
         if sym.exclude(&mut self.symmetry_scratch, &node.promoted, &mut node.cands) {
@@ -743,18 +692,13 @@ impl<'a, const W: usize> Stepper<'a, W> {
         self.drop_candidates(node, &dropped, need)
     }
 
-    /// Takes `dropped`, the candidates a rule has taken out of `node`'s loop, out of the bounds' levels too (safe for
+    /// Takes `dropped`, the candidates a rule has taken out of `node`'s loop, out of the bound's level too (safe for
     /// the reasons [`apply_symmetry`](Self::apply_symmetry) gives), and makes the cheap checks of
     /// [`check_node`](Self::check_node) again for what is left.
     #[inline]
     fn drop_candidates(&mut self, node: &Node<W>, dropped: &Bits<W>, need: u64) -> Result<(), Cut> {
         for x in dropped.iter() {
-            if let Some(g) = &mut self.gf2 {
-                g.remove_candidate(x);
-            }
-            if self.matching_on {
-                self.matching.remove_candidate(x);
-            }
+            self.gf2.remove_candidate(x);
         }
         if node.cands.is_empty() {
             return Err(Cut);
@@ -813,52 +757,6 @@ impl<'a, const W: usize> Stepper<'a, W> {
         on
     }
 
-    /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
-    /// every member of the conflict is forced (no completion reaches `need`, and the loop ends).
-    ///
-    /// With a conflict, the branch is one of its members, the one that looks best one step ahead (see
-    /// `refine::strongest`): every completion leaves out one of them, so neither the child nor the node going on
-    /// can find the same heaviest matching again.  With forced members (tactic `fix_forced`), the child promotes
-    /// all of them and the node's loop ends after it: every completion of the node that reaches `need` promotes
-    /// them all, and so is a completion of that child.  Without a conflict, the branch is the largest candidate.
-    #[inline]
-    fn choose_branch(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
-        let space = self.space;
-        if self.gf2.is_some() {
-            return self.choose_branch_gf2(node, open, need);
-        }
-        let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
-        let mut forced = open.forced & node.cands;
-        let mut kept = false; // whether the matching level without n is kept for the node
-        let n = match conflict {
-            // With forced members known, the child promotes them all and the node's loop ends there.
-            Some(_) if !forced.is_empty() => forced.max(),
-            Some(k) if k.len() > 1 => {
-                let strong = strongest(&mut self.matching, &k, need, space.fix_forced);
-                (forced, kept) = (strong.forced, strong.kept);
-                Some(strong.member)
-            }
-            Some(k) => k.max(),
-            None => node.cands.max(),
-        }
-        .expect("not empty");
-        if conflict.is_some_and(|k| k.is_subset(&forced)) {
-            // Every completion that reaches `need` promotes the whole conflict, so there is none.
-            return None;
-        }
-        node.cands.remove(n);
-        let left = node.cands;
-        if space.fix_forced && !forced.is_empty() {
-            // Every completion that reaches `need` promotes the forced members, so all of them are the child's (or
-            // none, if it fails): the node's loop has nothing left after it.
-            node.cands = Bits::EMPTY;
-        } else if !kept {
-            self.matching.remove_candidate(n);
-        }
-        let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
-        Some(Branch { n, added, left, forced: space.fix_forced && !forced.is_empty() })
-    }
-
     /// Phase 3: makes in `child` the child of `node` that promotes `branch.added`: its state, promotions and
     /// candidates.  Returns how many more promotions the child can make among `branch.left` ([`max_additional`],
     /// which the child's check uses), or `None` if the promotion fails.
@@ -866,8 +764,8 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// The child's candidates are the node's others, narrowed to the frames that still have freedoms; then a
     /// candidate is ruled out if promoting it would complete a conflict known for the node (or above it), or a
     /// nogood: the child's state is the node's with more promotions, so promoting the last member would promote
-    /// the whole conflict there.  (The heaviest matching of the node promotes the branch already, so without this
-    /// the child's matching bound would not drop.)  With the tactic `symmetry`, the candidates that no completion
+    /// the whole conflict there.  (The heaviest set of the node holds the branch already, so without this the child's
+    /// bound would often not drop.)  With the tactic `symmetry`, the candidates that no completion
     /// keeping the symmetric pairs' inequalities holds go too ([`Symmetries::exclude`]).
     #[inline]
     fn make_child(&mut self, node: &Node<W>, child: &mut Node<W>, branch: &Branch<W>) -> Option<u32> {
@@ -938,10 +836,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     /// promotions) is worth exploring at the incumbent `best` the step began with.  `Err(Cut)` if no
     /// completion of it can beat the incumbent, or if its best completion is known (then offered).
     ///
-    /// The checks are the node's (see [`check_node`](Self::check_node)), without asking for a conflict to
-    /// branch on.  The child is pushed on the matching stack for its check and stays there if it passes, with
-    /// its verdict kept for its first step.  A child with no candidates passes without a check: it has nothing
-    /// to bound, and is offered but not explored.
+    /// The checks are the node's (see [`check_node`](Self::check_node)).  The child is pushed on the bound's stack for
+    /// its check and stays there if it passes, with its verdict kept for its first step.  A child with no candidates
+    /// passes without a check: it has nothing to bound, and is offered but not explored.
     #[inline]
     fn check_child(
         &mut self,
@@ -972,45 +869,27 @@ impl<'a, const W: usize> Stepper<'a, W> {
             return Err(Cut);
         }
         self.mark(Phase::Other);
-        if self.matching_on {
-            self.matching.push_all(added, &cands);
-        }
-        if let Some(g) = &mut self.gf2 {
-            // The check cuts the child where its bound is below `need`, which a warm start may show early.
-            g.push_all_at(added, &cands, need);
-        }
-        match self.check(&child.state, &child.promoted, &cands, need, max_next, false, ctx) {
+        // The check cuts the child where its bound is below `need`, which a warm start may show early.
+        self.gf2.push_all_at(added, &cands, need);
+        match self.check(&child.state, &child.promoted, &cands, need, max_next, ctx) {
             Ok(open) => {
-                child.checked = open.conflict.map(|conflict| Checked {
-                    need,
-                    conflict,
-                    forced: open.forced,
-                    branched: open.branched,
-                });
+                child.checked =
+                    Some(Checked { need, conflict: open.conflict, forced: open.forced, branched: open.branched });
                 Ok(())
             }
             Err(Cut) => {
-                if self.matching_on {
-                    self.matching.pop();
-                }
-                if let Some(g) = &mut self.gf2 {
-                    g.pop();
-                }
-                if let Some(l) = &mut self.lagrange {
-                    l.leave(&child.promoted);
-                }
+                self.gf2.pop();
                 Err(Cut)
             }
         }
     }
 
-    /// The matching check of the node on top of the matching stack, whose state is `state`, promotions `promoted`
-    /// and candidates `cands`, at `need` (see [`Refiner`]).  `Err(Cut)`: its matching bound is below `need`, or
-    /// brought below it by refining or by forced members, or its heaviest matching can be promoted (the best
-    /// completion, offered), or with the tactic `lagrange` the Lagrangian bound is below `need`.  Else the conflict to
-    /// branch on (when `wants_conflict`, or found by refining) and the forced members (of the matching and of the
-    /// Lagrangian bound).  A promotable completion that refining finds is offered too.
-    #[allow(clippy::too_many_arguments)]
+    /// The bound check of the node on top of the GF(2) stack, whose state is `state`, promotions `promoted` and
+    /// candidates `cands`, at `need`, with at most `cap` promotions.  `Err(Cut)`: the GF(2) bound is below `need`, or
+    /// its heaviest set can be promoted (the best completion, offered), or every member of its conflict is forced, or
+    /// a nogood is.  Else the conflict of the heaviest set (from the nogood table or computed, [`Seek`]) and, with
+    /// `fix_forced`, the forced members: those of the heaviest set without which the weight split's bound is below
+    /// `need`.
     fn check(
         &mut self,
         state: &FrameSet<W>,
@@ -1018,90 +897,11 @@ impl<'a, const W: usize> Stepper<'a, W> {
         cands: &Bits<W>,
         need: u64,
         cap: u32,
-        wants_conflict: bool,
-        ctx: &mut Ctx<'_, TaxUnit<W>>,
-    ) -> Result<Open<W>, Cut> {
-        if self.gf2.is_some() {
-            return self.check_gf2(state, promoted, cands, need, cap, ctx);
-        }
-        let space = self.space;
-        let m = &mut self.matching;
-        self.counts.match_bounds += 1;
-        self.bound = m.value();
-        if m.value() < need {
-            return Err(Cut);
-        }
-        let depth = space.match_refine;
-        if depth == 0 && !wants_conflict {
-            // A child's check without refinement (`match_refine` 0) goes no further, the Lagrangian bound included:
-            // the child's first step checks it again, looking for its conflict.
-            return Ok(Open::NONE);
-        }
-        let promoted = *promoted;
-        let learning = self.nogoods.as_mut().map(|table| Learning { table, root: space.root, promoted });
-        let mut refiner = Refiner {
-            m,
-            model: space.model,
-            scratch: &mut self.scratch,
-            state,
-            need,
-            known: &mut self.known,
-            cache: &mut self.conflict_cache,
-            evaluations: 0,
-            computed: 0,
-            exact: Bits::EMPTY,
-            learning,
-            forcing: space.fix_forced,
-            forced: Bits::EMPTY,
-        };
-        let verdict = refiner.top(depth, wants_conflict);
-        let (forced, exact) = (refiner.forced, refiner.exact);
-        self.mark(Phase::Bound);
-        if !exact.is_empty() {
-            self.offer(ctx, &(promoted | exact));
-        }
-        match verdict {
-            Verdict::Below => Err(Cut),
-            Verdict::Exact(q) => {
-                self.offer(ctx, &(promoted | q));
-                Err(Cut)
-            }
-            Verdict::Open(conflict) => match &mut self.lagrange {
-                None => Ok(Open::of(conflict, forced)),
-                Some(l) => {
-                    let checked = l.check(&promoted, cands, need, space.fix_forced, &forced);
-                    self.mark(Phase::Lagrange);
-                    match checked {
-                        None => Err(Cut),
-                        Some(more) => Ok(Open::of(conflict, forced | more)),
-                    }
-                }
-            },
-        }
-    }
-
-    /// The check of [`check`](Self::check) with the tactic `gf2`, on the node on top of the GF(2) stack (and of
-    /// the matching stack, as a first check, with [`SearchSpace::gf2_prefilter`]), at `need`, with at most `cap`
-    /// promotions.  `Err(Cut)`: the matching bound is below `need`, or the GF(2) bound is, or its heaviest set can be
-    /// promoted (the best completion, offered), or every member of its conflict is forced, or a nogood is, or with the
-    /// tactic `lagrange` the Lagrangian bound is below `need`.  Else the conflict of the heaviest set (from the nogood
-    /// table or computed, as [`Refiner`] finds the matching's) and, with `fix_forced`, the forced members: those of
-    /// the heaviest set without which the weight split's bound is below `need`, and those of the Lagrangian bound.
-    fn check_gf2(
-        &mut self,
-        state: &FrameSet<W>,
-        promoted: &Bits<W>,
-        cands: &Bits<W>,
-        need: u64,
-        cap: u32,
         ctx: &mut Ctx<'_, TaxUnit<W>>,
     ) -> Result<Open<W>, Cut> {
         let space = self.space;
         self.counts.match_bounds += 1;
-        if self.matching_on && self.matching.value() < need {
-            return Err(Cut);
-        }
-        let g = self.gf2.as_mut().expect("the tactic gf2");
+        let g = &mut self.gf2;
         let eval = g.evaluate(cap, space.fix_forced.then_some(need));
         self.bound = eval.value;
         if let Some(phases) = &mut self.phases {
@@ -1130,7 +930,7 @@ impl<'a, const W: usize> Stepper<'a, W> {
             known: &mut self.known,
             learning: &mut learning,
         };
-        let (found, _) = seek.conflict(&eval.chosen, forced);
+        let found = seek.conflict(&eval.chosen, forced);
         if let Some(phases) = &mut self.phases {
             phases.mark(Phase::Conflict);
         }
@@ -1181,29 +981,25 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if conflict.is_subset(&forced) {
             return Err(Cut);
         }
-        let forced = match &mut self.lagrange {
-            None => forced,
-            Some(l) => {
-                let checked = l.check(&promoted, cands, need, space.fix_forced, &forced);
-                self.mark(Phase::Lagrange);
-                match checked {
-                    None => return Err(Cut),
-                    Some(more) => forced | more,
-                }
-            }
-        };
-        Ok(Open { conflict: Some(conflict), forced, branched })
+        Ok(Open { conflict, forced, branched })
     }
 
-    /// [`choose_branch`](Self::choose_branch) with the tactic `gf2`: the forced members if there are any (the child
-    /// promotes them all, with `fix_forced`), else a member of the conflict of the GF(2) bound's heaviest set chosen
-    /// as [`SearchSpace::gf2_branching`] says (at a node of at least [`SearchSpace::gf2_strong_depth`] promotions, as
-    /// [`SearchSpace::gf2_deep_branching`] says).  With [`Gf2Branching::Exact`], each member's bound without it is
-    /// found exactly (certified or solved), which also finds forced members among them.
-    fn choose_branch_gf2(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
+    /// Phase 2: the candidate `node` branches on, taken out of its loop, and what the child promotes; `None` if
+    /// every member of the conflict is forced (no completion reaches `need`, and the loop ends).
+    ///
+    /// With forced members (tactic `fix_forced`), the child promotes all of them and the node's loop ends after it:
+    /// every completion of the node that reaches `need` promotes them all, and so is a completion of that child.  Else,
+    /// with a conflict of the GF(2) bound's heaviest set, the branch is one of its members, chosen as
+    /// [`SearchSpace::gf2_branching`] says (at a node of at least [`SearchSpace::gf2_strong_depth`] promotions, as
+    /// [`SearchSpace::gf2_deep_branching`] says): every completion leaves out one of them, so neither the child nor the
+    /// node going on can find the same heaviest set again.  With [`Gf2Branching::Exact`], each member's bound without
+    /// it is found exactly (certified or solved), which also finds forced members among them.  Without a conflict, the
+    /// branch is the largest candidate.
+    #[inline]
+    fn choose_branch(&mut self, node: &mut Node<W>, open: Open<W>, need: u64) -> Option<Branch<W>> {
         let space = self.space;
-        let g = self.gf2.as_mut().expect("the tactic gf2");
-        let conflict = open.conflict.map(|k| k & node.cands).filter(|k| !k.is_empty());
+        let g = &mut self.gf2;
+        let conflict = Some(open.conflict & node.cands).filter(|k| !k.is_empty());
         let mut forced = open.forced & node.cands;
         // Below the depth of strong branching (tactic `strong_depth`), the choice of `deep_branching`.
         let deep = node.promoted.len() >= space.gf2_strong_depth;
@@ -1288,9 +1084,6 @@ impl<'a, const W: usize> Stepper<'a, W> {
             node.cands = Bits::EMPTY;
         } else {
             g.remove_candidate(n);
-            if self.matching_on {
-                self.matching.remove_candidate(n);
-            }
         }
         let added = if space.fix_forced && forced.len() > 1 { forced } else { Bits::EMPTY.with(n) };
         Some(Branch { n, added, left, forced: space.fix_forced && !forced.is_empty() })
@@ -1304,20 +1097,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
         }
     }
 
-    /// Ends the loop of the node with the promotions `promoted`: the search goes back to the parent, whose matching
-    /// level is then on top again (`pushed`: the node had one of its own).
+    /// Ends the loop of a node: the search goes back to the parent, whose level of the bound is then on top again
+    /// (`pushed`: the node had one of its own).
     #[inline]
-    fn end_loop(&mut self, promoted: &Bits<W>, pushed: bool) -> Next {
+    fn end_loop(&mut self, pushed: bool) -> Next {
         if pushed {
-            if self.matching_on {
-                self.matching.pop();
-            }
-            if let Some(g) = &mut self.gf2 {
-                g.pop();
-            }
-        }
-        if let Some(l) = &mut self.lagrange {
-            l.leave(promoted);
+            self.gf2.pop();
         }
         Next::Parent
     }
@@ -1342,19 +1127,9 @@ impl<'a, const W: usize> Stepper<'a, W> {
     }
 
     /// With the tactic `forget_nogoods`, forgets the nogoods as the space's [`Forgetting`] says, after each of its
-    /// periods of steps; with the tactic `lagrange`, refits the Lagrangian bound's multipliers when due, first.  A
-    /// table publishes what it has done now and then ([`PUBLISH_EVERY`]).
+    /// periods of steps.  A table publishes what it has done now and then ([`PUBLISH_EVERY`]).
     #[inline]
     fn forget_nogoods_when_due(&mut self, ctx: &mut Ctx<'_, TaxUnit<W>>) {
-        if let (Some(l), Some(table)) = (&mut self.lagrange, &self.nogoods) {
-            if let Some(phases) = &mut self.phases {
-                phases.mark(Phase::Other);
-            }
-            l.step(table, &self.space.candidates, ctx.best());
-            if let Some(phases) = &mut self.phases {
-                phases.mark(Phase::Lagrange);
-            }
-        }
         if let (Some(table), Some(period)) = (&mut self.nogoods, self.space.forgetting.period) {
             self.steps_since_clear += 1;
             if self.steps_since_clear >= period {
@@ -1401,14 +1176,12 @@ impl<'a, const W: usize> Stepper<'a, W> {
         if let Some(carried) = self.space.carried {
             carried.add_counts(counts.carried_ruled_out, counts.carried_cuts);
         }
-        if let Some(g) = &self.gf2 {
-            let (now, before) = (g.stats(), self.gf2_flushed);
-            stats.extra[stat::GF2_SOLVES] += now.solves - before.solves;
-            stats.extra[stat::GF2_AUGMENTATIONS] += now.augmentations - before.augmentations;
-            stats.extra[stat::GF2_STRONG_SOLVES] += now.excluded_solves - before.excluded_solves;
-            stats.extra[stat::GF2_STRONG_AUGMENTATIONS] += now.excluded_augmentations - before.excluded_augmentations;
-            self.gf2_flushed = now;
-        }
+        let (now, before) = (self.gf2.stats(), self.gf2_flushed);
+        stats.extra[stat::GF2_SOLVES] += now.solves - before.solves;
+        stats.extra[stat::GF2_AUGMENTATIONS] += now.augmentations - before.augmentations;
+        stats.extra[stat::GF2_STRONG_SOLVES] += now.excluded_solves - before.excluded_solves;
+        stats.extra[stat::GF2_STRONG_AUGMENTATIONS] += now.excluded_augmentations - before.excluded_augmentations;
+        self.gf2_flushed = now;
     }
 }
 
@@ -1558,7 +1331,7 @@ struct Look<'r, const W: usize> {
 /// Whether the child of the node on top of `g` (its state `state`) that promotes `added` and leaves out `m` is cut on
 /// sight: its promotion fails, or its largest candidates, its GF(2) bound, or a conflict of its heaviest set all of
 /// whose members it forces put it below its need (the checks of `check_child`, less the rule of `symmetry`, the
-/// matching bound, the Lagrangian bound and the propagation of the node's known conflicts, so a "no" may be a child the
+/// near-repeat cut, the carried nogoods and the propagation of the node's known conflicts, so a "no" may be a child the
 /// search would cut).  Its GF(2) bound is first bounded from the node's weight split ([`Gf2Bound::child_bound`]),
 /// which is never below it: where that is below the need the child is cut as its solve would cut it, with nothing
 /// pushed.  Otherwise the child is pushed on `g`, solved and popped.  The conflict found is learned as a nogood, as the
@@ -1621,7 +1394,7 @@ fn in_child_cut<const W: usize>(
         let mut known = Vec::new();
         let mut seek =
             Seek { model, scratch, cache: &mut *look.cache, state: &child, known: &mut known, learning: &mut learning };
-        match seek.conflict(&eval.chosen, eval.forced).0 {
+        match seek.conflict(&eval.chosen, eval.forced) {
             Lookup::AllForced => true,
             Lookup::None => false,
             Lookup::Conflict(k) if k.is_subset(&eval.forced) => true,

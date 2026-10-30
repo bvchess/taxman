@@ -11,6 +11,7 @@ use common::TempDir;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::known::{Known, KnownSources};
@@ -506,10 +507,10 @@ fn stopped_at(line: &Json) -> Json {
 #[test]
 fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     let dir = TempDir::new("unfinished-prev");
-    // 598..602 stop at a node limit, each on the best game of the one before; 603 finishes on 602's.  The solver no
-    // longer goes on past a limit, so the lines are those of the games solved alone, each naming the best game of the
-    // one before it as its `prev`, as the older `solve` wrote them.
-    let stopping = SolveOptions { node_limit: Some(200), force_search: true, ..common::matching_options(1) };
+    // 598..602 stop at a time limit (of nothing, which stops a search before it starts), each on the best game of the
+    // one before; 603 finishes on 602's.  The solver no longer goes on past a limit, so the lines are those of the games
+    // solved alone, each naming the best game of the one before it as its `prev`, as the older `solve` wrote them.
+    let stopping = SolveOptions { time_limit: Some(Duration::ZERO), force_search: true, ..common::options(1) };
     let built_on = |line: Json, before: &GameResult| {
         let prev = Json::object([
             ("n", Json::from(before.n)),
@@ -523,7 +524,7 @@ fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     };
     let stopped: Vec<GameResult> = (598..=602).map(|n| solver::solve_game(n, None, &stopping).unwrap()).collect();
     assert!(stopped.iter().all(|game| !game.completed), "every game stops at its limit");
-    let finished = solver::solve_game(603, None, &common::matching_options(1)).unwrap();
+    let finished = solver::solve_game(603, None, &common::options(1)).unwrap();
     let mut kept = vec![stopped[0].to_json()];
     kept.extend(stopped.windows(2).map(|pair| built_on(pair[1].to_json(), &pair[0])));
     kept.push(built_on(finished.to_json(), &stopped[4]));

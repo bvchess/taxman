@@ -1,6 +1,6 @@
 //! The GF(2) bound: an upper bound on the sum of the promotions a search state can still make, from the linear
-//! independence over GF(2) that every promotable set has in every frame (tactic `gf2`).  It is never above the
-//! matching bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2,
+//! independence over GF(2) that every promotable set has in every frame: the bound of every node of the search.  It is
+//! never above the matching bound ([`crate::matchbound`]) and usually far below it; the frame bound (B2,
 //! `docs/theory/frame-bounds.md`) has the proof, and
 //! `solver/notebook/search/matroid-intersection-bounds-2026-10/README.md` and
 //! `solver/notebook/search/the-gf2-bound-in-the-search-2026-10/README.md`, the measurements.
@@ -23,7 +23,7 @@
 //! (found by weighted matroid intersection, [`meet`]) bounds the best completion, with at most `max_add` members.
 //!
 //! [`Gf2Graph`] builds the root's vectors once per search; [`Gf2Bound`] keeps one level per node on the search's
-//! path, like [`MatchBound`](crate::matchbound::MatchBound).
+//! path.
 //!
 //! # One-sided candidates
 //!

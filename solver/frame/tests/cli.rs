@@ -126,7 +126,7 @@ fn certify_command_lines_are_usage_errors() {
     );
 
     // The flags.
-    assert_usage_error(&with_files(&["certify", "1302", "--tactic", "gf2=off"]), "unknown option --tactic");
+    assert_usage_error(&with_files(&["certify", "1302", "--tactic", "nogoods=off"]), "unknown option --tactic");
     assert_usage_error(&with_files(&["certify", "1302", "--show"]), "unknown option --show");
     assert_usage_error(&with_files(&["certify", "1302", "--window", "2"]), "unknown option --window");
     assert_usage_error(&with_files(&["certify", "1302", "--threads", "0"]), "--threads must be at least 1");
@@ -422,8 +422,8 @@ fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
     }
 }
 
-/// `--gate GAP` is a flag of `solve`: a whole number from 0 to `MAX_GATE`, refused with conflict branching off (or
-/// without the GF(2) bound it acts with), where a gate does nothing.  A line records it in `options.gate` where it was
+/// `--gate GAP` is a flag of `solve`: a whole number from 0 to `MAX_GATE`, refused with conflict branching off, where a
+/// gate does nothing.  A line records it in `options.gate` where it was
 /// given, beside the gates of `--gate-trial`, and the game ends with the score of the table.
 #[test]
 fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
@@ -434,7 +434,6 @@ fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     let off = |tactic: &'static str| ["solve", "12", "--gate", "1200", "--tactic", tactic];
     assert_usage_error(&off("conflict_branching=off"), "conflict branching is off");
     assert_usage_error(&off("conflict_branching=off"), "a gate without conflict branching does nothing");
-    assert_usage_error(&off("gf2=off"), "conflict branching acts only with the GF(2) bound, which is off");
     assert_usage_error(&["regress", "--gate", "1200"], "unknown option --gate");
 
     let dir = TempDir::new("solve-gate");
@@ -494,9 +493,9 @@ fn regress_checks_scores_against_the_table() {
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert!(run.stdout.contains("40 games match the table, 0 are not in it"), "{}", run.stdout);
 
-    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--tactic", "match_refine=0"]);
+    let run = taxman(&["regress", "--from", "30", "--to", "34", "--threads", "1", "--tactic", "nogoods=off"]);
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert!(run.stdout.contains("solved 30..=34 (1 threads, tactics match_refine=0)"), "{}", run.stdout);
+    assert!(run.stdout.contains("solved 30..=34 (1 threads, tactics nogoods=off)"), "{}", run.stdout);
     assert!(run.stdout.contains("by method: trivial "), "{}", run.stdout);
 }
 

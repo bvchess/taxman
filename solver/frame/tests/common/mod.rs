@@ -30,11 +30,9 @@ use taxman::engine::{self, Ctx, EngineConfig, Searcher, Start};
 use taxman::game::Optimal;
 use taxman::gf2::{ForceWindow, Gf2Graph};
 use taxman::json::Json;
-use taxman::matchbound::MatchGraph;
 use taxman::model::{CarriedNogoods, FrameGraph, FrameSet, Keep, Scratch};
 use taxman::numtheory::Tables;
 use taxman::results::Assumptions;
-use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::{cofactors, Symmetries};
 use taxman::search::{
     search, BranchSettings, Branching, Forgetting, Gf2Branching, NearRepeat, Prepared, Reuse, SearchSpace,
@@ -104,31 +102,15 @@ pub fn options(threads: usize) -> SolveOptions {
     SolveOptions { threads, ..SolveOptions::default() }
 }
 
-/// [`options`] with the search tactics of the matching path ([`SearchTactics::matching`], which
-/// `results/optimal.jsonl.gz` was made with): for the tests that stop a search of a small game by a node limit.
-pub fn matching_options(threads: usize) -> SolveOptions {
-    let mut opts = options(threads);
-    opts.tactics.search = SearchTactics::matching();
-    opts
-}
-
-/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100,
-/// then the matching path ([`SearchTactics::matching`], which is without the rule of `symmetry`) and its variants.
+/// The search tactics a differential test compares: the default and every sound variant that is cheap at n ~ 1100.
 pub fn variants() -> Vec<(&'static str, SearchTactics)> {
-    let (d, m) = (SearchTactics::default(), SearchTactics::matching());
+    let d = SearchTactics::default();
     vec![
         ("default", d),
         ("nogoods=off", SearchTactics { nogoods: false, ..d }),
         ("fix_forced=off", SearchTactics { fix_forced: false, ..d }),
         ("forget_nogoods=off", SearchTactics { forget_nogoods: false, ..d }),
-        ("lagrange=on", SearchTactics { lagrange: true, ..d }),
         ("symmetry=off", SearchTactics { symmetry: false, ..d }),
-        ("matching", m),
-        ("matching,nogoods=off", SearchTactics { nogoods: false, ..m }),
-        ("matching,fix_forced=off", SearchTactics { fix_forced: false, ..m }),
-        ("matching,match_refine=0", SearchTactics { match_refine: 0, ..m }),
-        ("matching,match_refine=3", SearchTactics { match_refine: 3, ..m }),
-        ("matching,symmetry=on", SearchTactics { symmetry: true, ..m }),
     ]
 }
 
@@ -276,7 +258,6 @@ pub fn fnv1a64(moves: &[u32]) -> u64 {
 /// nogoods, and how many threads there are.
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
-    pub refine: u32,
     pub fix_forced: bool,
     pub nogoods: bool,
     /// After how many of its steps a searcher forgets its nogoods; `None` for never.
@@ -284,12 +265,8 @@ pub struct Config {
     /// What a forgetting keeps, and how many nogoods a table holds at most (`None`: no limit).
     pub keep: Keep,
     pub limit: Option<usize>,
-    /// When a searcher refits the multipliers of its Lagrangian bound; `None` without that bound.
-    pub refits: Option<Refits>,
     pub threads: usize,
-    /// The GF(2) bound (tactic `gf2`), and with it the matching bound as a first check and the branching.
-    pub gf2: bool,
-    pub gf2_prefilter: bool,
+    /// How a node chooses the member of its conflict to branch on.
     pub gf2_branching: Gf2Branching,
     /// The rule of the root's symmetric pairs (tactic `symmetry`).
     pub symmetry: bool,
@@ -319,23 +296,14 @@ impl Config {
         Config::of(&SearchTactics::default())
     }
 
-    /// The tactics of the matching path ([`SearchTactics::matching`]) on one thread.
-    pub fn matching() -> Config {
-        Config::of(&SearchTactics::matching())
-    }
-
     pub fn of(t: &SearchTactics) -> Config {
         Config {
-            refine: u32::from(t.match_refine),
             fix_forced: t.fix_forced,
             nogoods: t.nogoods,
             period: t.forget_nogoods.then_some(NOGOOD_PERIOD),
             keep: Keep::Nothing,
             limit: None,
-            refits: (t.nogoods && t.lagrange).then_some(Refits::SEARCH),
             threads: 1,
-            gf2: t.gf2,
-            gf2_prefilter: false,
             gf2_branching: Gf2Branching::Exact,
             symmetry: t.symmetry,
             conflict_branching: t.conflict_branching.then_some(CONFLICT_BRANCHING_GAP),
@@ -390,7 +358,6 @@ pub struct Game<const W: usize> {
     pub root: FrameSet<W>,
     pub candidates: Bits<W>,
     pub max_total: u32,
-    graph: MatchGraph,
     /// The near-repeat cut of the game's searches, by a game proven before ([`Game::with_near_repeat`]); empty without
     /// one.
     near: OnceLock<NearRepeat<W>>,
@@ -403,8 +370,7 @@ impl<const W: usize> Game<W> {
     /// The game that starts at `root` and may promote `candidates`.
     pub fn new(model: FrameGraph, root: FrameSet<W>, candidates: Bits<W>) -> Self {
         let max_total = model.max_promotions_among(&root, &candidates).max(0) as u32;
-        let graph = MatchGraph::new(&model, &root);
-        Game { model, root, candidates, max_total, graph, near: OnceLock::new(), carried: OnceLock::new() }
+        Game { model, root, candidates, max_total, near: OnceLock::new(), carried: OnceLock::new() }
     }
 
     /// The game whose searches cut by the problem of `m`'s game, whose best promotion sum is at most `bound`
@@ -526,26 +492,21 @@ impl<const W: usize> Game<W> {
         SearchSpace {
             model: &self.model,
             root: &self.root,
-            match_graph: &self.graph,
-            match_refine: cfg.refine,
             fix_forced: cfg.fix_forced,
             nogoods: cfg.nogoods,
             forgetting: Forgetting { period: cfg.period, keep: cfg.keep, limit: cfg.limit },
             nogood_totals: Arc::default(),
-            lagrange: cfg.refits.filter(|_| cfg.nogoods),
-            candidates: self.candidates,
             root_max: self.root_max(),
             max_total: self.max_total,
             began: Instant::now(),
             found: Mutex::new(None),
-            gf2: cfg.gf2.then(|| {
+            gf2: {
                 let graph = Gf2Graph::new(&self.model, &self.root, &self.candidates);
                 match cfg.gf2_words {
                     Some(words) => graph.padded(words),
                     None => graph,
                 }
-            }),
-            gf2_prefilter: cfg.gf2_prefilter,
+            },
             gf2_branching: cfg.gf2_branching,
             gf2_strong_limit: usize::MAX,
             gf2_more_forced: true,

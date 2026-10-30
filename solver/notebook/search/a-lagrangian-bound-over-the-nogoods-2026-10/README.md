@@ -16,7 +16,8 @@ geometric mean), with no trend in n, and the strict chain 1201-1231 takes 2.4 ti
 ## Method
 
 The design is in [DESIGN.md, "The Lagrangian bound over the
-nogoods"](../../../docs/design/search.md#the-lagrangian-bound-over-the-nogoods) and the argument in
+nogoods"](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods)
+and the argument in
 `src/matchbound/lagrange.rs`.  `matchbound`'s levels and Hungarian repairs became generic over how a level weighs its
 candidates, with the matching bound's code and trees unchanged, and `matchbound::lagrange` keeps a second stack of
 levels with weights of their own.  A level is made for a node when the bound is asked for there, by copying the nearest

@@ -4,9 +4,9 @@ Part of the [design](../DESIGN.md).
 
 The search is a branch and bound over promotion sets.  It keeps the best promotion set found so far, the *incumbent*,
 and explores the sets that could beat it, pruning every part of the tree that a bound shows cannot.  This section builds
-it up: the state and the order of the search, two bounds on a node (the matching bound and the Lagrangian bound over the
-nogoods), and the conflicts and nogoods that the branching rests on; the GF(2) bound, the default, and the rule of
-symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
+it up: the state and the order of the search, the matching bound (which the search's start rounds to a first
+incumbent), and the conflicts and nogoods that the branching rests on; the GF(2) bound, which bounds every node, and the
+rule of symmetric pairs are in [gf2-bound.md](gf2-bound.md).  "The default step" then puts them together, "Conflict branching"
 changes which conflict a node branches on, "The invariant of a running search" says what may change while it runs, and
 the last two parts are the search's start and the cut that the game before gives it.  The finder, a thread beside a
 long search, is in [finder.md](finder.md), and the search of a problem with one-sided candidates in
@@ -53,49 +53,44 @@ candidate set that has such an assignment: a maximum-weight bipartite matching (
 bounds the best promotable completion from above, and ignores the freedoms and `max_total`, which only remove
 completions.
 
-The bound is an upper bound on `sum(promoted)` plus a completion's sum, so the search cuts a node whose matching value
-is below its need.  At the roots of the 94 golden games that need a search, its mean gap above P\* is 31, against 76 for
-the Java's bound; on the former benchmark games (n = 480 to 760), 107 to 292 against 363 to 769.
+The matching value plus `sum(promoted)` bounds every completion of a node.  At the roots of the 94 golden games that
+need a search, its mean gap above P\* is 31, against 76 for the Java's bound; on the former benchmark games (n = 480 to
+760), 107 to 292 against 363 to 769.  The GF(2) bound is never above it and usually far below it, and it is the bound
+of every node ([gf2-bound.md](gf2-bound.md)); the matching bound was the node bound before it, and the search now uses
+it only at its start, where the dive rounds the root's heaviest matching to a promotion set ("The starting incumbent,
+the ceiling and the seed", below).
 
-*Incremental.*  The search keeps the bound along its path instead of solving it at each node.  `matchbound::MatchGraph`
-is the root's graph, whose edges never change, and a node's problem is that graph with each vertex in one of three
-roles: required (the root's moves and the promoted numbers), candidate, or factor.  `MatchBound` keeps an optimal
-matching and an optimal dual solution, the *potentials*, for every node on the search's path, and repairs them after
-each change by Hungarian searches on a radix heap.  The changes along a depth-first path are small, so an evaluation
-costs 0.7 to 2.4 µs, where a solve from scratch costs 30 to 170 µs (at n = 480 to 760).  The potentials also bound the
-matching *without* a given candidate at once (`bound_excluding`): lower that candidate's potential and its partner's as
-far as their remaining edges allow.  The module comment of `matchbound.rs` is the best explanation of all this.
+*Incremental.*  `matchbound::MatchGraph` is the root's graph, whose edges never change, and a state's problem is that
+graph with each vertex in one of three roles: required (the root's moves and the promoted numbers), candidate, or
+factor.  `MatchBound` keeps an optimal matching and an optimal dual solution, the *potentials*, for one state, and
+repairs them after candidates are removed by Hungarian searches on a radix heap, as the dive removes them one at a time.
+The module comment of `matchbound.rs` is the best explanation of all this.
 
-## Conflicts of the matching bound
+## Conflicts
 
-When the candidates `Q*` of the heaviest matching cannot all be promoted, the matching bound yields a *conflict*: a few
-candidates that cannot be promoted together from the node.  Some frame is unwinnable with all of `Q*`.  A peel of that
-frame stops at its *residual*, the moves that no order can take, the same set whatever the order of the drops
+When the members of a bound's heaviest set (the GF(2) bound's `I*` at a node, the heaviest matching's `Q*` in the dive)
+cannot all be promoted, the bound yields a *conflict*: a few candidates that cannot be promoted together from the node.
+Some frame is unwinnable with all of the set.  A peel of that frame stops at its *residual*, the moves that no order can
+take, the same set whatever the order of the drops
 ([the residual theorem (P5)](../../../docs/theory/playability.md#the-residual-theorem)).
-The members of `Q*` that the residual needs cannot be promoted together: those promoted into the frame that are residual
-moves, and those promoted out of it that are factors of residual moves.  Peeling only the residual makes the set
-minimal, and the result `K ⊆ Q*` is the conflict (`FrameGraph::conflict_using`).  Conflicts are tiny: a median of two
+The members of the set that the residual needs cannot be promoted together: those promoted into the frame that are
+residual moves, and those promoted out of it that are factors of residual moves.  Peeling only the residual makes the
+set minimal, and the result `K` is the conflict (`FrameGraph::conflict_using`).  Conflicts are tiny: a median of two
 members at n = 760 to 1000, and a quarter of them have one.
 
 Everything that follows rests on one fact.  A subset of a promotable set is promotable, since moves left out and factors
 kept only help a frame.  So **every promotable completion leaves out some member of a conflict**.
 
-* **Refinement** (`match_refine`, default 1).  Where the matching bound does not prune, the search bounds the branches
-  of the conflict too.  With members `k₁ < k₂ < … < k_r`, every promotable completion `F` is in exactly one branch
-  "`k₁ … k_{j−1}` in `F`, `k_j` not".  So the best completion is at most the largest of the branches' matching bounds,
-  each the matching with `k_j` no longer a candidate and `k₁ … k_{j−1}` required.  Each branch is refined the same way,
-  one level less deep, and by induction the refined bound is never below the best completion
-  (`search::refine::Refiner`).
 * **Strong branching on the conflict.**  A node branches on a member of the conflict instead of its largest candidate:
-  the child promotes the member, and the node goes on without it, so that neither can reproduce the heaviest matching.
-  The member is the one whose removal lowers the matching bound most.  That takes one bound without each member, each
-  solved exactly (`MatchBound::value_excluding`).  A node with no conflict among its candidates
-  branches on its largest.
-* **Exact matchings.**  A heaviest matching that can be promoted is the node's best completion: the search offers it as
-  the incumbent, and the node is done.
+  the child promotes the member, and the node goes on without it, so that neither can reproduce the heaviest set.  The
+  member is the one whose removal lowers the bound most, which takes the bound without each member
+  ([gf2-bound.md](gf2-bound.md#the-gf2-bound), the item "Exact strong branching").  A node with no conflict among its
+  candidates branches on its largest.
+* **Exact sets.**  A heaviest set that can be promoted is the node's best completion: the search offers it as the
+  incumbent, and the node is done.
 * **Propagation into children.**  A conflict known at a node, of which a child promotes all but one member, rules that
   member out of the child's candidates: the child's state is the node's with more promotions, so promoting the member
-  would promote the whole conflict.  Without this rule the child's matching bound would equal the node's.
+  would promote the whole conflict.  Without this rule the child's bound would often equal the node's.
 
 "The starting incumbent, the ceiling and the seed", below, says where the incumbent starts.
 
@@ -110,13 +105,14 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   and the node's loop ends after that child, which covers every completion that can beat the incumbent.  If the forced
   members cannot all be promoted, or the child's candidate filter dropped one, the child has no such completion at all.
   The child promotes them together, checking each frame once (`FrameGraph::promote_all_using`).  The search finds the
-  forced members from the potentials, for every member of the heaviest matching, and solves strong branching's bounds
-  only where it finds none.  A conflict whose members are all forced ends the node at once.
+  forced members from the weight split of the heaviest set, for every member of it
+  ([gf2-bound.md](gf2-bound.md#the-gf2-bound), the item "Forced members"), and strong branching finds more.  A conflict
+  whose members are all forced ends the node at once.
 * **Nogoods** (`nogoods`).  A conflict `K` found at a node with promotions `P` holds relative to `P`.  A minimal subset
   of `P ∪ K` that keeps a frame of the *root* unwinnable is a *nogood*: it cannot be promoted from the root, so at every
   node of the tree, on any thread and after any resume, the nogood less the node's promotions is a conflict of the node
   (`model::Nogoods` has the proof).  Each searcher keeps a table of nogoods.  A node's conflict is the smallest one the
-  table knows within `P ∪ Q*` (of those as small, the one with the largest member), and the searcher computes and learns
+  table knows within `P ∪ I*` (of those as small, the one with the largest member), and the searcher computes and learns
   a conflict only when the table knows none.  Nogoods also rule candidates out of children, beyond the conflicts known
   along the path.  The table is scanned exactly, over compact member indices.  What a searcher learns depends on the
   order its search went, so the tree depends on the searcher's history (its threads, its interruptions), not only on the
@@ -140,40 +136,6 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   have used it to pay for a move left with one live factor, say.  The promotions that fail are under 4% of the steps,
   so little would be saved ([single-member
   conflicts](../../notebook/search/single-member-conflicts-belong-to-the-node-2026-10/README.md)).
-
-## The Lagrangian bound over the nogoods
-
-The *Lagrangian bound* (tactic `lagrange`, off by default) puts the nogoods into the matching bound, which knows none:
-its heaviest matching often promotes all of a nogood.  At a node with promotions `P` and candidates `C`, a nogood `N` is
-*live* when its members outside `P` are all still candidates, and then every completion `F` leaves one of them out:
-`|F ∩ N| ≤ |N − P| − 1`.  Lagrangian relaxation, as in integer programming, moves these inequalities into the objective
-with multipliers `λ_N ≥ 0`.  The result bounds the completions for any multipliers (weak duality): the heaviest matching
-with each candidate weighed by its number less the multipliers of the live nogoods it is in, plus `Σ λ_N (|N − P| − 1)`.
-The search computes it in integers (weights in 64ths), with nothing rounded; the module comment of
-`matchbound::lagrange` has the argument.
-
-* **Incremental.**  The bound keeps a second stack of matching levels, with weights of its own (`matchbound::lagrange`;
-  the levels and the Hungarian repairs are the matching bound's, generic over how a level weighs its candidates).  The
-  searcher makes a level for a node when it asks for the bound there, from the nearest level on its path: what the node
-  promoted is promoted, the candidates it no longer has are dropped, and the live nogoods they were in die.  So the
-  weights of those nogoods' other members only *rise*, which needs a repair only where a member's potential must rise
-  past a tight edge.  Weights fall only when the multipliers change, and then the searcher drops the levels and solves
-  them afresh.
-* **Where, and what for.**  The search asks for the bound at every check of a node or a child that the matching bound
-  and refinement leave open.  Below the need it cuts the node (cut reason `lagrange`).  Otherwise it yields forced
-  members: the members of its heaviest matching without which the bound, read off its potentials as `bound_excluding`
-  reads the matching's, would be below the need.  Every completion that beats the incumbent promotes them, and with
-  `fix_forced` the node's child promotes them with the matching's.
-* **The multipliers.**  Each searcher fits its own, at the root, to the nogoods it has learned: after 2,000 of its
-  steps, and then just before each forgetting of its table (every 50,000), it takes 50 subgradient steps (Polyak's rule,
-  towards what the root needs) over the table's nogoods and those of its present multipliers, and keeps the nogoods
-  whose multipliers are positive (`search::lagrange`).  Any multipliers give a bound, so the schedule decides only the
-  speed.  Like the nogoods, the multipliers are a cache that units and checkpoints do not record, and the tree depends
-  on the searcher's history.  A search of fewer than 2,000 steps is unchanged.
-* **What it is worth** (on the matching path).  Proofs of the hardest games, 1184 to 1300, take 2 to 6 times fewer
-  cycles on one thread, though each step costs half as much again ([a Lagrangian bound over the
-  nogoods](../../notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md)).  With the GF(2) bound it
-  changes no tree measured ([tactics.md](tactics.md), the row of `lagrange`).
 
 ## The default step
 
@@ -212,22 +174,14 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
 9. otherwise offer the child's own promotions as incumbent, and push it
 ```
 
-The *matching path* (`SearchTactics::matching`, which is `--tactic gf2=off --tactic lagrange=on --tactic
-symmetry=off --tactic conflict_branching=off`) takes the matching bound in place of the GF(2) bound, and the rule of
-symmetric pairs only if asked.  Its step 2 looks at the heaviest matching `Q*` instead: its forced members from the
-potentials, then, where none is forced, refinement of its conflict `match_refine` levels deep (a cut if every branch is
-below `need`), then the Lagrangian bound over the nogoods (a cut, or more forced members).  Its step 4 chooses the member
-whose removal lowers the matching bound most, and its step 8 checks the child's matching bound, refinement and
-Lagrangian bound.
-
 *Why the step is exact.*  Exactness rests on six facts:
 
-1. the bound is an upper bound: the GF(2) bound by [the frame bound (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound), the
-   matching bound with refinement, and the Lagrangian bound for any multipliers;
+1. the bound is an upper bound: the GF(2) bound by [the frame bound
+   (B2)](../../../docs/theory/frame-bounds.md#the-frame-bound);
 2. every promotable completion leaves out a member of a conflict, so branching on a member and then going on without
    it explores every promotable set;
-3. every completion that can beat the incumbent promotes the forced members (by weak duality, for the weight split, the
-   potentials and the Lagrangian bound alike);
+3. every completion that can beat the incumbent promotes the forced members (by weak duality, for the weight split, and
+   by the bound without the member, for strong branching);
 4. nogoods and known conflicts hold at every node they are applied to, since a subset of a promotable set is
    promotable;
 5. every heaviest promotion set keeps the symmetric pairs' inequalities
@@ -293,7 +247,7 @@ looks only where no member is forced, and where:
 
 If that child is cut on sight, the node branches on `K`.  A child is cut on sight when its promotion fails, or its
 largest candidates, its GF(2) bound, or a conflict of its heaviest set all of whose members it forces put it below its
-need.  The look does not apply the rule of `symmetry`, the matching bound, the Lagrangian bound or the conflicts that
+need.  The look does not apply the rule of `symmetry`, the near-repeat cut, the carried nogoods or the conflicts that
 the node knows, so a child that it lets through may still be cut when the search makes it.  The child leaves out a
 member of the node's heaviest set, so it inherits no heaviest set, and a solve of its bound costs several evaluations of
 a node.  So the look first bounds the child's bound from the node's weight split, with no solve

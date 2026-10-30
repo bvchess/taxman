@@ -1,5 +1,6 @@
 //! The matching bound: an upper bound on the sum of the promotions a search state can still make, from relaxing
-//! winnability to matchability.  It is the bound of every node of the search ([`crate::search`]).
+//! winnability to matchability.  The search's start rounds the root's heaviest matching to a promotion set, the dive
+//! ([`crate::search`]); the search bounds its nodes by the GF(2) bound ([`crate::gf2`]), which is never above this one.
 //!
 //! # The relaxation
 //!
@@ -31,18 +32,11 @@
 //! # Two solvers
 //!
 //! [`match_bound`] is the reference: it builds the graph of a state and solves a min-cost flow from scratch,
-//! simply and slowly.  [`MatchBound`] is the solver for the search: it keeps an optimal matching and an optimal
-//! dual solution for every node on the search's path and repairs them after each change, which is cheap
-//! because the changes along a depth-first path are small.
-//!
-//! Besides the bound, the search asks the solver for the candidates its heaviest matching promotes, `Q*`
-//! ([`MatchBound::chosen`]: if they can all be promoted they are the best completion, else their conflicts are
-//! what the search branches on), and for the bound with one candidate left out, solved exactly
-//! ([`MatchBound::value_excluding`]) or bounded from the potentials alone ([`MatchBound::bound_excluding`]).
-//!
-//! The levels and the Hungarian repairs below are generic over how a level weighs a promoted candidate (`Weighing`):
-//! by its number for the matching bound, by weights of the level's own for the Lagrangian bound over nogoods, the
-//! child module [`lagrange`], which keeps a second stack of levels the same way.
+//! simply and slowly.  [`MatchBound`] is the solver for the dive: it keeps an optimal matching and an optimal
+//! dual solution for one state and repairs them after candidates are removed, which is cheap because each removal
+//! changes little.  Besides the bound, the dive asks it for the candidates its heaviest matching promotes, `Q*`
+//! ([`MatchBound::chosen`]: if they can all be promoted they are the dive's set, else a member of a conflict among them
+//! is removed).
 //!
 //! [`MatchGraph`] is the graph of the search's root, with every move and factor of the root as a vertex; its
 //! edges never change.  Every state of the search is the root with some candidates promoted, and its matching
@@ -64,23 +58,18 @@
 //! Besides a maximum-weight matching, [`MatchBound`] keeps a potential `y` per vertex that proves it optimal
 //! (LP duality for bipartite matching): `y ≥ 0` except on required vertices (whose constraint is an equality),
 //! `y_u + y_w ≥ weight` on every edge, with equality on matched edges, and `y = 0` on every free vertex that is
-//! not required.  A change of roles breaks these conditions at a few vertices at most:
+//! not required.  A state is first given a greedy matching and potentials that break these conditions only at the
+//! movers left unmatched ([`MatchBound::reset`]).  Removing a candidate breaks them at two vertices at most:
 //!
 //! * a candidate that is not promoted in the matching stops being a candidate: nothing breaks;
 //! * a candidate that is promoted stops being one: its matched edge goes, and both ends may now be free with a
-//!   positive potential;
-//! * a candidate that is promoted in the matching becomes required (the search promotes it): its potential
-//!   drops by its number and nothing breaks;
-//! * any other number becomes required: it is free and must be matched, and if it was paying for a mover, that
-//!   mover is free now.
+//!   positive potential.
 //!
 //! Each vertex where the conditions break is repaired by one Hungarian search: a Dijkstra over reduced costs
 //! that grows alternating paths from it until either a free vertex is reached or the potential of a vertex in
 //! the tree that is not required reaches zero (that vertex can then give up its partner, or stay free if it is
 //! the start); then it shifts the potentials of the tree and flips the alternating path.  It stops early when
 //! the change is local, which is the common case.
-
-pub mod lagrange;
 
 use crate::bits::Bits;
 use crate::model::{FrameGraph, FrameSet};
@@ -96,19 +85,6 @@ use std::collections::VecDeque;
 /// This is the reference for [`MatchBound`]: a min-cost flow, solved by successive shortest paths with
 /// Bellman–Ford, clear rather than fast (milliseconds on large games).
 pub fn match_bound<const W: usize>(model: &FrameGraph, state: &FrameSet<W>, cands: &Bits<W>) -> u64 {
-    match_bound_weighted(model, state, cands, i64::from).map_or(0, |(value, _)| value as u64)
-}
-
-/// [`match_bound`] with each candidate `x` weighed by `weight(x)` instead of `x` (a candidate whose weight is not
-/// positive is never promoted): the largest total weight of the candidates a matching promotes, and those
-/// candidates; `None` when the moves of `state` cannot all be matched.  The reference for the Lagrangian bound
-/// ([`lagrange`]), which changes the weights.
-fn match_bound_weighted<const W: usize>(
-    model: &FrameGraph,
-    state: &FrameSet<W>,
-    cands: &Bits<W>,
-    weight: impl Fn(u32) -> i64,
-) -> Option<(i64, Bits<W>)> {
     let frames = state.frames();
     // The movers: (number, frame it pays in, weight), with no weight for the moves, which must be matched.
     let mut movers: Vec<(u32, usize, Option<i64>)> = Vec::new();
@@ -116,7 +92,7 @@ fn match_bound_weighted<const W: usize>(
         movers.extend(frame.moves.iter().map(|m| (m, i, None)));
         if i > 0 {
             let promotable = frame.factors.intersect(cands);
-            movers.extend(promotable.iter().map(|x| (x, i - 1, Some(weight(x)))).filter(|m| m.2 > Some(0)));
+            movers.extend(promotable.iter().map(|x| (x, i - 1, Some(i64::from(x)))));
         }
     }
     // Weighing each move more than all the candidates together makes a heaviest matching match all the moves
@@ -138,25 +114,24 @@ fn match_bound_weighted<const W: usize>(
             net.add(2 + k, SINK, 0);
         }
     }
-    let mut edges = Vec::new(); // (arc, weight, the mover if it is a candidate)
+    let mut edges = Vec::new(); // (arc, weight, whether the mover is a candidate)
     for &(u, i, weight) in &movers {
         for w in model.graph().factors(u).iter().map(|&w| u32::from(w)) {
             if frames[i].factors.contains(w) {
                 let (a, b) = (node[u as usize], node[w as usize]);
                 let (from, to) = if even_omega(u) { (a, b) } else { (b, a) };
                 let weight_or_big = weight.unwrap_or(big);
-                edges.push((net.add(from, to, -weight_or_big), weight_or_big, weight.map(|_| u)));
+                edges.push((net.add(from, to, -weight_or_big), weight_or_big, weight.is_some()));
             }
         }
     }
     net.min_cost_flow();
     let matched: Vec<_> = edges.iter().filter(|&&(arc, _, _)| net.carries(arc)).collect();
     let moves = movers.iter().filter(|m| m.2.is_none()).count();
-    if matched.iter().filter(|e| e.2.is_none()).count() < moves {
-        return None;
+    if matched.iter().filter(|e| !e.2).count() < moves {
+        return 0;
     }
-    let chosen: Bits<W> = matched.iter().filter_map(|e| e.2).collect();
-    Some((matched.iter().map(|e| e.1).sum::<i64>() - big * moves as i64, chosen))
+    (matched.iter().map(|e| e.1).sum::<i64>() - big * moves as i64) as u64
 }
 
 /// Whether `x` has an even number of prime factors, counted with multiplicity (by trial division).
@@ -366,33 +341,9 @@ enum Role {
     Factor,
 }
 
-/// How the levels of a solver weigh a candidate that is promoted (an edge whose mover is that candidate): the
-/// matching bound by its number ([`Numbers`]), a Lagrangian bound by weights of the level's own
-/// ([`lagrange`]).  Every weight that a candidate's role allows is positive.
-trait Weighing: Clone + std::fmt::Debug {
-    /// The weight of the vertex `u` as a promoted candidate.
-    fn of(&self, g: &MatchGraph, u: usize) -> i64;
-    /// Makes `self` equal to `other` without allocating.
-    fn copy_from(&mut self, other: &Self);
-}
-
-/// The matching bound's weighing: a candidate weighs its number.
-#[derive(Clone, Copy, Debug, Default)]
-struct Numbers;
-
-impl Weighing for Numbers {
-    #[inline(always)]
-    fn of(&self, g: &MatchGraph, u: usize) -> i64 {
-        i64::from(g.num[u])
-    }
-
-    #[inline(always)]
-    fn copy_from(&mut self, _: &Self) {}
-}
-
-/// The solver's state at one node of the search path, with its candidates weighed by `K`.
+/// The solver's state: the roles, a heaviest matching and the potentials that prove it.
 #[derive(Clone, Debug)]
-struct Level<const W: usize, K: Weighing = Numbers> {
+struct Level<const W: usize> {
     role: Vec<Role>,
     /// The vertex each vertex is matched to, `NONE` if free.
     mate: Vec<u16>,
@@ -411,12 +362,10 @@ struct Level<const W: usize, K: Weighing = Numbers> {
     feasible: bool,
     /// Whether anything may need repairing (drops or pending vertices) since the last settle.
     dirty: bool,
-    /// How the candidates weigh.
-    weighing: K,
 }
 
-impl<const W: usize, K: Weighing> Level<W, K> {
-    fn new(size: usize, weighing: K) -> Self {
+impl<const W: usize> Level<W> {
+    fn new(size: usize) -> Self {
         Level {
             role: vec![Role::Factor; size],
             mate: vec![NONE; size],
@@ -428,31 +377,15 @@ impl<const W: usize, K: Weighing> Level<W, K> {
             pending: Vec::new(),
             feasible: true,
             dirty: true,
-            weighing,
         }
     }
 
-    /// Makes `self` equal to `other` without allocating.
-    fn copy_from(&mut self, other: &Self) {
-        self.role.copy_from_slice(&other.role);
-        self.mate.copy_from_slice(&other.mate);
-        self.y.copy_from_slice(&other.y);
-        self.cands = other.cands;
-        self.chosen = other.chosen;
-        self.value = other.value;
-        self.dropped = other.dropped;
-        self.pending.clear();
-        self.pending.extend_from_slice(&other.pending);
-        self.feasible = other.feasible;
-        self.dirty = other.dirty;
-        self.weighing.copy_from(&other.weighing);
-    }
-
-    /// The weight of the edges from the mover `u` to its factors.
+    /// The weight of the edges from the mover `u` to its factors: its number if it is a candidate (promoted, if it is
+    /// matched over one), else 0.
     #[inline]
     fn weight(&self, g: &MatchGraph, u: usize) -> i64 {
         if self.role[u] == Role::Candidate {
-            self.weighing.of(g, u)
+            i64::from(g.num[u])
         } else {
             0
         }
@@ -464,12 +397,12 @@ impl<const W: usize, K: Weighing> Level<W, K> {
     fn tally(&mut self, g: &MatchGraph, u: usize, w: usize, add: bool) {
         let mover = u.max(w);
         if self.role[mover] == Role::Candidate {
-            let (x, weight) = (g.num[mover], self.weighing.of(g, mover) as u64);
+            let x = g.num[mover];
             if add {
-                self.value += weight;
+                self.value += u64::from(x);
                 self.chosen.insert(x);
             } else {
-                self.value -= weight;
+                self.value -= u64::from(x);
                 self.chosen.remove(x);
             }
         }
@@ -497,7 +430,7 @@ impl<const W: usize, K: Weighing> Level<W, K> {
             let x = g.num[v];
             self.role[v] = if g.root_move[v] || promoted.contains(x) {
                 Role::Required
-            } else if cands.contains(x) && !g.below(v).is_empty() && self.weighing.of(g, v) > 0 {
+            } else if cands.contains(x) && !g.below(v).is_empty() {
                 self.cands.insert(x);
                 Role::Candidate
             } else {
@@ -527,33 +460,6 @@ impl<const W: usize, K: Weighing> Level<W, K> {
         self.pending.reverse(); // repair the largest first
     }
 
-    /// Makes `n` required (the search promotes it).
-    fn promote(&mut self, g: &MatchGraph, n: u32) {
-        let v = g.vertex_of(n).unwrap_or_else(|| panic!("{n} is not in the root"));
-        self.dirty = true;
-        self.dropped.remove(n);
-        match self.role[v] {
-            Role::Required => return,
-            Role::Candidate if self.mate[v] != NONE && usize::from(self.mate[v]) < v => {
-                // Promoted in the matching: it stays matched, and its edges now weigh 0 instead of its weight.
-                self.tally(g, v, usize::from(self.mate[v]), false);
-                self.y[v] -= self.weighing.of(g, v);
-                self.role[v] = Role::Required;
-                self.cands.remove(n);
-                return;
-            }
-            _ => {}
-        }
-        // Free, or paying for a mover above, which has to find another factor.
-        let m = self.mate[v];
-        if m != NONE {
-            self.unmatch(g, usize::from(m), v);
-        }
-        self.cands.remove(n);
-        self.role[v] = Role::Required; // its potential is not negative, so its new edges (weight 0) are fine
-        self.pending.push(v as u16);
-    }
-
     /// Turns the dropped candidates into factors.
     fn apply_drops(&mut self, g: &MatchGraph) {
         let drops = self.dropped.intersect(&self.cands);
@@ -570,58 +476,6 @@ impl<const W: usize, K: Weighing> Level<W, K> {
             self.role[v] = Role::Factor;
         }
         self.cands -= drops;
-    }
-
-    /// [`MatchBound::bound_excluding`] for this level, settled and feasible: an upper bound on its value with `x`
-    /// no longer a candidate, from its potentials alone (the argument is there; `x`'s weight is the level's).
-    fn bound_excluding(&self, g: &MatchGraph, x: u32) -> u64 {
-        let Some(v) = g.vertex_of(x).filter(|&v| self.role[v] == Role::Candidate) else {
-            return self.value;
-        };
-        let w = self.mate[v];
-        if w == NONE || usize::from(w) > v {
-            return self.value; // not promoted: it pays for a mover above, or is free
-        }
-        let w = usize::from(w);
-        // The least potential a factor `f` needs to pay for the movers above it that still count (not `x`).  It is
-        // never more than `f`'s potential (every such edge `u–f` has slack: `weight(u) − y_u ≤ y_f`, and `f` is
-        // not required), so the scan ends at a tight edge.  The same holds for `w`'s own factors below.
-        let as_factor = |f: usize| -> i64 {
-            let (most, mut least) = (self.y[f], 0);
-            for u in g.above(f).iter().map(|&u| usize::from(u)) {
-                if least == most {
-                    break;
-                }
-                if u != v && self.role[u] != Role::Factor {
-                    least = least.max(self.weight(g, u) - self.y[u]);
-                }
-            }
-            least
-        };
-        let y_x = as_factor(v);
-        let mut y_w = as_factor(w);
-        if self.role[w] == Role::Candidate {
-            // It can still be promoted itself, paying with its own factors.
-            let own = self.weight(g, w);
-            for f in g.below(w).iter().map(|&f| usize::from(f)) {
-                if y_w == self.y[w] {
-                    break;
-                }
-                if self.role[f] != Role::Required {
-                    y_w = y_w.max(own - self.y[f]);
-                }
-            }
-        }
-        let bound = self.value as i64 - self.weighing.of(g, v) + y_x + y_w;
-        bound.clamp(0, self.value as i64) as u64
-    }
-
-    /// The members `x` of the heaviest matching of this level, settled and feasible, whose bound without them
-    /// ([`bound_excluding`](Self::bound_excluding)) plus `constant` is below `target`, leaving out those in
-    /// `known` (forced already).
-    fn forced(&self, g: &MatchGraph, target: i64, constant: i64, known: &Bits<W>) -> Bits<W> {
-        let rest = self.chosen - *known;
-        rest.iter().filter(|&x| self.bound_excluding(g, x) as i64 + constant < target).collect()
     }
 
     /// Restores the optimality conditions.
@@ -847,7 +701,7 @@ impl Search {
     /// * a free outer vertex is reached: the alternating path from the root to it flips.
     ///
     /// Returns false when neither can happen: the root is required and no matching matches it with the others.
-    fn run<const W: usize, K: Weighing>(&mut self, g: &MatchGraph, lv: &mut Level<W, K>, root: usize) -> bool {
+    fn run<const W: usize>(&mut self, g: &MatchGraph, lv: &mut Level<W>, root: usize) -> bool {
         self.begin(g.len());
         self.add_inner(g, lv, root, 0);
         while let Some((t, code)) = self.heap.pop() {
@@ -882,7 +736,7 @@ impl Search {
 
     /// Adds the inner vertex `a` to the tree at distance `d`, and reaches its neighbors over unmatched edges.
     #[inline(always)]
-    fn add_inner<const W: usize, K: Weighing>(&mut self, g: &MatchGraph, lv: &Level<W, K>, a: usize, d: i64) {
+    fn add_inner<const W: usize>(&mut self, g: &MatchGraph, lv: &Level<W>, a: usize, d: i64) {
         // The fields taken apart, so that the compiler knows that pushing an event changes neither the slots'
         // place nor the epoch, and keeps them in registers.
         let Search { epoch, slot, heap, tree } = self;
@@ -913,7 +767,7 @@ impl Search {
     }
 
     /// Shifts the potentials of the tree for a search that ends at time `end`.
-    fn shift<const W: usize, K: Weighing>(&self, lv: &mut Level<W, K>, end: i64) {
+    fn shift<const W: usize>(&self, lv: &mut Level<W>, end: i64) {
         for &v in &self.tree {
             let v = usize::from(v);
             let s = &self.slot[v];
@@ -926,7 +780,7 @@ impl Search {
     }
 
     /// Flips the alternating path from `root` to the outer vertex `b`, which is free.
-    fn flip<const W: usize, K: Weighing>(&self, g: &MatchGraph, lv: &mut Level<W, K>, root: usize, mut b: usize) {
+    fn flip<const W: usize>(&self, g: &MatchGraph, lv: &mut Level<W>, root: usize, mut b: usize) {
         loop {
             let a = usize::from(self.slot[b].pred);
             let next = lv.mate[a];
@@ -976,79 +830,29 @@ pub struct MatchStats {
     pub scanned: u64,
 }
 
-/// The matching bound kept up to date along a depth-first search path (see the module docs).  One per search
-/// thread; it allocates only when the path gets deeper than it has been.
+/// The matching bound of one state of the search, kept up to date as candidates are removed (see the module docs).
 ///
-/// It holds a stack of levels, one per node on the path, each with an optimal matching and its proof.  Level 0
-/// is the node the search starts from ([`reset`](Self::reset)); [`push`](Self::push) makes a child of the top
-/// level, [`pop`](Self::pop) returns to the parent, [`remove_candidate`](Self::remove_candidate) shrinks the top
-/// level's candidates, and [`value`](Self::value) gives the top level's bound.  `push` and `remove_candidate`
-/// only record what changed; `value` does the work.
-///
-/// # Driving it from a depth-first search
-///
-/// As the searcher does ([`crate::search`]; `P` the node's promotions, `need = best + 1 − sum(P)`):
+/// [`reset`](Self::reset) sets the state (the root with some candidates promoted, and the candidates left),
+/// [`remove_candidate`](Self::remove_candidate) shrinks its candidates, and [`value`](Self::value) gives its bound and
+/// [`chosen`](Self::chosen) the candidates its heaviest matching promotes.  `reset` and `remove_candidate` only record
+/// what changed; `value` and `chosen` do the work.  As the dive drives it ([`crate::search`]):
 ///
 /// ```text
-/// let graph = MatchGraph::new(&model, &root);      // once per search, shared by the threads
-/// let mut mb = MatchBound::new(&graph);             // once per thread
-/// mb.reset(&promoted, &cands);                      // level 0: the node a work unit starts from
-///
-/// // A step of the node on top of mb:
-/// mb.take_kept();                                   // its level without its last branch, if one was kept
-/// if mb.value() < need { mb.pop(); return; }        // the node's loop ends (no pop for level 0)
+/// let graph = MatchGraph::new(&model, &root);      // once per search
+/// let mut mb = MatchBound::new(&graph);
+/// mb.reset(&Bits::EMPTY, &cands);                   // the root and its candidates
 /// let q = mb.chosen();                              // the heaviest matching's candidates
-/// mb.bound_excluding(x);                            // the bound without x ∈ q, from the potentials alone
-/// // refinement, for the first branch of a conflict K ⊆ q:
-/// mb.push_excluding(&{k₁});                         // the node without k₁, solved; then
-/// mb.keep_solved(k₁);                               //   kept, in case strong branching asks for it
-/// // strong branching, for each member x of K:
-/// mb.value_excluding(x);                            // pushes a level without x and solves it (or takes the
-///                                                   //   one kept for x); then
-/// mb.pop();                                         //   drops it, or
-/// mb.keep_excluded();                               //   keeps it for the node, which takes it next step
-/// mb.remove_candidate(n);                           // the node goes on without n (unless that was kept)
-/// mb.push_all(&added, &child_cands);                // the child that promotes `added` (n among them)
-/// if mb.value() < need_of_child { mb.pop(); }       // pruned; else the child's steps run on top of it
+/// mb.remove_candidate(x);                           // x, of a conflict among them, left out; then `chosen` again
 /// ```
 ///
-/// The rules: `push_all(added, child_cands)` makes the child obtained by promoting `added` from the top level,
-/// where each member of `added` is one of the top level's candidates (or was removed from them since its last
-/// evaluation) and `child_cands` is a subset of the top level's candidates; `pop` goes back once the child is
-/// done.  Neither touches the parent, so the parent's loop continues where it was.  `remove_candidate(n)`
-/// before pushing `n` is free as long as no evaluation of the parent comes between them; after one, the child
-/// has to repair what the removal did.  A level kept by [`keep_excluded`](Self::keep_excluded) waits for its
-/// parent to be the top level again ([`take_kept`](Self::take_kept)); children may come and go meanwhile, but
-/// nothing may be done to the parent itself.  A level kept by [`keep_solved`](Self::keep_solved) is the same
-/// work kept for later: the parent's level without one candidate, which `value_excluding` of that candidate
-/// takes instead of solving it again, and which becomes the parent's kept level when the parent goes on without
-/// it (`remove_candidate`); anything else done to the parent drops it.  The refinement of the bound by conflicts
-/// pushes levels in the same way ([`push_excluding`](Self::push_excluding), [`push`](Self::push) with
-/// [`candidates`](Self::candidates)) and pops them all, or keeps one solved.  The bound covers the state's own
-/// moves and promotions only: the search adds `sum(P)` itself.
-///
-/// For a single state with no search, [`match_bound_once`] does all of this in one call.
+/// The bound covers the state's own moves and promotions only: a caller adds the sum of the promotions itself.  For a
+/// single state, [`match_bound_once`] does all of this in one call.
 #[derive(Clone, Debug)]
 pub struct MatchBound<'g, const W: usize> {
     graph: &'g MatchGraph,
-    levels: Vec<Level<W>>,
-    /// `spares[d]` is a level solved ahead for level `d`, as `spare[d]` says.
-    spares: Vec<Level<W>>,
-    spare: Vec<Spare>,
-    depth: usize,
+    level: Level<W>,
     search: Search,
     stats: MatchStats,
-}
-
-/// What the spare level of a level of a [`MatchBound`] holds: work done ahead, which saves a repair.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Spare {
-    None,
-    /// The level without the candidate `x`, solved ([`MatchBound::keep_solved`]): `value_excluding(x)` takes it.
-    Solved(u32),
-    /// The level without the candidate its node goes on without ([`MatchBound::keep_excluded`]):
-    /// [`MatchBound::take_kept`] makes it the level.
-    Kept,
 }
 
 impl<'g, const W: usize> MatchBound<'g, W> {
@@ -1056,10 +860,7 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     pub fn new(graph: &'g MatchGraph) -> Self {
         let mut out = MatchBound {
             graph,
-            levels: vec![Level::new(graph.len(), Numbers)],
-            spares: Vec::new(),
-            spare: Vec::new(),
-            depth: 0,
+            level: Level::new(graph.len()),
             search: Search::default(),
             stats: MatchStats::default(),
         };
@@ -1067,190 +868,23 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         out
     }
 
-    /// Starts over with level 0 at the state reached from the root by promoting `promoted` (which must succeed),
-    /// with the candidates `cands`.  The first [`value`](Self::value) then solves it from scratch.
+    /// Starts over at the state reached from the root by promoting `promoted` (which must succeed), with the
+    /// candidates `cands`.  The first [`value`](Self::value) then solves it from scratch.
     pub fn reset(&mut self, promoted: &Bits<W>, cands: &Bits<W>) {
-        self.depth = 0;
-        self.spare.fill(Spare::None);
-        self.levels[0].reset(self.graph, promoted, cands);
+        self.level.reset(self.graph, promoted, cands);
     }
 
-    /// Pushes the child of the top level made by promoting `n` (which must succeed in the search's state), with
-    /// the candidates `child_cands` (a subset of the top level's).  See the type's docs.
-    pub fn push(&mut self, n: u32, child_cands: &Bits<W>) {
-        self.push_all(&Bits::EMPTY.with(n), child_cands);
-    }
-
-    /// [`push`](Self::push) for the child made by promoting every member of `promoted` (each of them a candidate
-    /// of the top level, or removed from them since its last evaluation).
-    pub fn push_all(&mut self, promoted: &Bits<W>, child_cands: &Bits<W>) {
-        let graph = self.graph;
-        let child = self.push_copy();
-        for n in promoted.iter() {
-            child.promote(graph, n);
-        }
-        child.dropped |= child.cands - *child_cands;
-        child.dirty = true;
-    }
-
-    /// Pushes a copy of the top level with the candidates `excluded` removed: the same state, fewer
-    /// candidates.
-    pub fn push_excluding(&mut self, excluded: &Bits<W>) {
-        let child = self.push_copy();
-        child.dropped |= *excluded;
-        child.dirty = true;
-    }
-
-    /// Pushes a copy of the top level and returns it.
-    fn push_copy(&mut self) -> &mut Level<W> {
-        let d = self.depth;
-        if self.levels.len() == d + 1 {
-            let copy = self.levels[d].clone();
-            self.levels.push(copy);
-        } else {
-            let (lower, upper) = self.levels.split_at_mut(d + 1);
-            upper[0].copy_from(&lower[d]);
-        }
-        self.depth = d + 1;
-        self.forget_spare(d + 1);
-        &mut self.levels[d + 1]
-    }
-
-    /// Returns to the parent of the top level.
-    pub fn pop(&mut self) {
-        assert!(self.depth > 0, "pop without push");
-        self.forget_spare(self.depth);
-        self.depth -= 1;
-    }
-
-    /// The matching bound of the top level with `x` no longer a candidate, on a level pushed for it: then
-    /// [`pop`](Self::pop) it, or [`keep_excluded`](Self::keep_excluded) it.  If that level was solved already
-    /// and kept ([`keep_solved`](Self::keep_solved)), it is pushed as it was kept, the same level.
-    pub fn value_excluding(&mut self, x: u32) -> u64 {
-        let d = self.depth;
-        if self.spare.get(d) == Some(&Spare::Solved(x)) {
-            self.spare[d] = Spare::None;
-            std::mem::swap(&mut self.levels[d + 1], &mut self.spares[d]);
-            self.depth = d + 1;
-            self.forget_spare(d + 1);
-        } else {
-            self.push_excluding(&Bits::EMPTY.with(x));
-        }
-        self.value()
-    }
-
-    /// An upper bound on [`value_excluding(x)`](Self::value_excluding) from the top level's potentials, without
-    /// repairing anything: at least the exact value, and found in time proportional to the degrees of `x` and
-    /// of the factor it pays with.
-    ///
-    /// The top level's potentials `y` prove its value: they are a feasible dual solution whose sum is the value.
-    /// Without `x` as a candidate, its edges as a mover go and nothing else changes, so they are still feasible
-    /// and their sum still bounds the new value from above.  If `x` is promoted in the heaviest matching, paying
-    /// with `w`, lower `y_x` and then `y_w` as far as their remaining constraints allow (never below 0, as
-    /// neither is required): they share no remaining edge (the one between them was `x`'s as a mover), so each
-    /// can go as low as its own edges allow.  The matched edge was tight (`y_x + y_w = x`), so the bound becomes
-    /// `value − x + y'_x + y'_w`.  If `x` is not promoted, the bound is the value itself.
-    pub fn bound_excluding(&mut self, x: u32) -> u64 {
-        let graph = self.graph;
-        let level = self.settle();
-        if !level.feasible {
-            return 0;
-        }
-        level.bound_excluding(graph, x)
-    }
-
-    /// The members of the top level's heaviest matching without which the bound, from the potentials alone
-    /// ([`bound_excluding`](Self::bound_excluding)), is below `need`: every completion that adds `need` promotes
-    /// them.
-    pub fn forced(&mut self, need: u64) -> Bits<W> {
-        let graph = self.graph;
-        let level = self.settle();
-        if !level.feasible {
-            // No completion at all: without any member the bound is 0.
-            return if need > 0 { level.chosen } else { Bits::EMPTY };
-        }
-        level.forced(graph, need as i64, 0, &Bits::EMPTY)
-    }
-
-    /// Pops the level pushed by [`value_excluding`](Self::value_excluding), keeping it (settled) for its
-    /// parent: once the parent is the top level again, with children pushed and popped meanwhile but nothing done
-    /// to the parent itself, [`take_kept`](Self::take_kept) makes the kept level the parent, which saves
-    /// repairing the parent for the same removal.  A later keep for the same parent replaces it.
-    pub fn keep_excluded(&mut self) {
-        self.keep(Spare::Kept);
-    }
-
-    /// Pops the level pushed by [`push_excluding`](Self::push_excluding) of `{x}`, solved, and keeps it for its
-    /// parent (with levels pushed and popped above it meanwhile, but nothing done to it itself): as long as
-    /// nothing is done to the parent, [`value_excluding(x)`](Self::value_excluding) takes it instead of solving
-    /// the same level again, and if the parent goes on without `x` ([`remove_candidate`](Self::remove_candidate))
-    /// it is the parent's kept level ([`keep_excluded`](Self::keep_excluded)).  The refinement keeps the first
-    /// branch of a conflict, which strong branching asks for next.  A later keep for the same parent replaces it.
-    pub fn keep_solved(&mut self, x: u32) {
-        self.keep(Spare::Solved(x));
-    }
-
-    /// Pops the top level into its parent's spare, which then holds `what`.  (A spare belongs to the level in
-    /// its place, so the top level's own is forgotten, as is the incoming level's when a spare is taken.)
-    fn keep(&mut self, what: Spare) {
-        let d = self.depth;
-        assert!(d > 0, "nothing pushed to keep");
-        self.forget_spare(d);
-        if self.spares.len() < d {
-            let size = self.graph.len();
-            self.spares.resize_with(d, || Level::new(size, Numbers));
-            self.spare.resize(d, Spare::None);
-        }
-        std::mem::swap(&mut self.levels[d], &mut self.spares[d - 1]);
-        self.spare[d - 1] = what;
-        self.depth = d - 1;
-    }
-
-    /// If a level is kept for the top level, makes it the top level and returns true.
-    pub fn take_kept(&mut self) -> bool {
-        let d = self.depth;
-        if self.spare.get(d) != Some(&Spare::Kept) {
-            return false;
-        }
-        std::mem::swap(&mut self.levels[d], &mut self.spares[d]);
-        self.spare[d] = Spare::None;
-        true
-    }
-
-    /// Forgets the level kept for the top level, if any.
-    pub fn drop_kept(&mut self) {
-        self.forget_spare(self.depth);
-    }
-
-    /// Forgets what the spare of level `d` holds.
-    #[inline]
-    fn forget_spare(&mut self, d: usize) {
-        if let Some(spare) = self.spare.get_mut(d) {
-            *spare = Spare::None;
-        }
-    }
-
-    /// Number of levels above level 0.
-    pub fn depth(&self) -> usize {
-        self.depth
-    }
-
-    /// Removes `x` from the top level's candidates (no effect if it is not one).
+    /// Removes `x` from the state's candidates (no effect if it is not one).
     pub fn remove_candidate(&mut self, x: u32) {
-        let d = self.depth;
         if x <= Bits::<W>::MAX_VALUE {
-            self.levels[d].dropped.insert(x);
-            self.levels[d].dirty = true;
-        }
-        if let Some(spare) = self.spare.get_mut(d) {
-            // A level solved without x is the level now, and one solved without another candidate is not.
-            *spare = if *spare == Spare::Solved(x) { Spare::Kept } else { Spare::None };
+            self.level.dropped.insert(x);
+            self.level.dirty = true;
         }
     }
 
-    /// The matching bound of the top level: an upper bound on the sum of the promotions its state can still make
-    /// among its candidates (not counting those already made).  0 if the state's moves cannot be matched, in
-    /// which case it has no completion at all (a state the search reaches always can be).
+    /// The matching bound of the state: an upper bound on the sum of the promotions it can still make among its
+    /// candidates (not counting those already made).  0 if the state's moves cannot be matched, in which case it has
+    /// no completion at all (a state the search reaches always can be).
     pub fn value(&mut self) -> u64 {
         let level = self.settle();
         if level.feasible {
@@ -1260,15 +894,9 @@ impl<'g, const W: usize> MatchBound<'g, W> {
         }
     }
 
-    /// The candidates that a heaviest matching promotes in the top level (their sum is [`value`](Self::value)).
+    /// The candidates that a heaviest matching of the state promotes (their sum is [`value`](Self::value)).
     pub fn chosen(&mut self) -> Bits<W> {
         self.settle().chosen
-    }
-
-    /// The top level's candidates.
-    pub fn candidates(&self) -> Bits<W> {
-        let level = &self.levels[self.depth];
-        level.cands - level.dropped
     }
 
     pub fn stats(&self) -> MatchStats {
@@ -1276,14 +904,9 @@ impl<'g, const W: usize> MatchBound<'g, W> {
     }
 
     fn settle(&mut self) -> &Level<W> {
-        let MatchBound { graph, levels, spare, depth, search, stats, .. } = self;
-        let level = &mut levels[*depth];
+        let MatchBound { graph, level, search, stats } = self;
         stats.evaluations += 1;
         if level.dirty {
-            // A level solved without one of its candidates is not that level once it changes.
-            if let Some(s @ Spare::Solved(_)) = spare.get_mut(*depth) {
-                *s = Spare::None;
-            }
             level.settle(graph, search, stats);
         }
         level
@@ -1312,7 +935,7 @@ mod tests {
     use std::hint::black_box;
     use std::time::Instant;
 
-    pub(super) fn setup<const W: usize>(g: &Golden) -> (FrameGraph, FrameSet<W>, Bits<W>) {
+    fn setup<const W: usize>(g: &Golden) -> (FrameGraph, FrameSet<W>, Bits<W>) {
         let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
         (model, root, Bits::from_slice(&g.candidates))
     }
@@ -1429,16 +1052,17 @@ mod tests {
         assert_eq!(match_bound_once(&model, &root, &Bits::EMPTY), 0);
     }
 
-    // ---- driving the solver as a search does ----
+    // ---- driving the solver along search paths ----
 
-    /// What a walk shows its visitor at each evaluation: the solver (with the node on top), the node's state,
-    /// its promotions, and its candidates.
-    pub(super) type Visit<'v, const W: usize> =
-        dyn FnMut(&mut MatchBound<'_, W>, &FrameSet<W>, &Bits<W>, &Bits<W>) + 'v;
+    /// What a walk shows its visitor at each evaluation: the solver (set to the node), the node's state, its
+    /// promotions, and its candidates.
+    type Visit<'v, const W: usize> = dyn FnMut(&mut MatchBound<'_, W>, &FrameSet<W>, &Bits<W>, &Bits<W>) + 'v;
 
-    /// Drives a [`MatchBound`] the way a depth-first search does, along random paths: at each node the expansion
-    /// loop takes the largest candidate, sometimes descends into the child it makes, then goes on with the
-    /// candidates shrunk.  Evaluations are random too, so changes pile up between them.
+    /// Drives a [`MatchBound`] at the nodes of random depth-first search paths, as the dive drives it at the root: at
+    /// each node the solver is set to the node, and the expansion loop takes the largest candidate out of it, and
+    /// sometimes another at random, so that removals pile up between evaluations (which are random too); sometimes it
+    /// descends into the child that promoting the largest candidate makes, after which the solver is set to the node
+    /// again.
     struct Walk<'a, const W: usize> {
         model: &'a FrameGraph,
         rng: Rng,
@@ -1455,87 +1079,36 @@ mod tests {
             mut cands: Bits<W>,
             visit: &mut Visit<'_, W>,
         ) {
+            mb.reset(&promoted, &cands);
             while let Some(n) = cands.max() {
                 if self.budget == 0 {
                     return;
                 }
                 self.budget -= 1;
-                // A level kept for the node becomes its level, as at the searcher's steps: the same level as the
-                // node's own, repaired.
-                if self.rng.chance(20) {
-                    let mut twin = mb.clone();
-                    twin.drop_kept();
-                    twin.value();
-                    if mb.take_kept() {
-                        mb.value();
-                        assert_same_level(&mb.levels[mb.depth], &twin.levels[twin.depth], "a kept level");
-                    }
-                } else {
-                    mb.take_kept();
-                }
-                assert!(mb.candidates().is_subset(&cands), "the solver's candidates are out of step");
                 if self.rng.chance(80) {
                     visit(mb, state, &promoted, &cands);
                 }
                 cands.remove(n);
-                // The level without n solved ahead and kept, as the refinement keeps its first branch: taken by
-                // value_excluding(n) below, or the node's kept level once the node goes on without n.
-                if self.rng.chance(30) {
-                    mb.push_excluding(&Bits::EMPTY.with(n));
-                    mb.value();
-                    mb.keep_solved(n);
+                mb.remove_candidate(n);
+                // Sometimes another candidate goes with it, at random.
+                if let Some(x) = cands.nth_largest(self.rng.below(u64::from(cands.len().max(1))) as u32) {
                     if self.rng.chance(30) {
-                        // Evaluating the node meanwhile drops it if the node had changes to repair.
-                        mb.value();
+                        cands.remove(x);
+                        mb.remove_candidate(x);
                     }
-                }
-                let remove_first = self.rng.chance(30);
-                if remove_first {
-                    mb.remove_candidate(n);
-                    if self.rng.chance(30) {
-                        // Applies the removal, so that a push has to bring n back as a required vertex.
-                        mb.value();
-                    }
-                }
-                // Or the level without n is solved beforehand and kept for after the child.
-                let keep = !remove_first && self.rng.chance(40);
-                if keep {
-                    let mut twin = mb.clone();
-                    twin.push_excluding(&Bits::EMPTY.with(n));
-                    twin.value();
-                    mb.value_excluding(n);
-                    assert_same_level(&mb.levels[mb.depth], &twin.levels[twin.depth], "a level solved ahead");
-                    mb.keep_excluded();
                 }
                 if self.rng.chance(40) {
-                    if let Some(mut next) = self.model.promote(state, n) {
-                        let mut next_promoted = promoted.with(n);
-                        let mut child = next.narrow_candidates(&cands);
-                        // Sometimes the child promotes another candidate too, as the search's forced ones.
-                        let mut added = Bits::EMPTY.with(n);
-                        if let Some(m) = child.max().filter(|_| self.rng.chance(30)) {
-                            if self.model.promote_in_place(&mut next, m) {
-                                child.remove(m);
-                                next_promoted.insert(m);
-                                added.insert(m);
-                                child = next.narrow_candidates(&child);
-                            }
-                        }
-                        let depth = mb.depth();
-                        mb.push_all(&added, &child);
+                    if let Some(next) = self.model.promote(state, n) {
+                        let child = next.narrow_candidates(&cands);
                         if self.rng.chance(60) {
-                            self.explore(mb, &next, next_promoted, child, visit);
+                            self.explore(mb, &next, promoted.with(n), child, visit);
                         } else {
-                            visit(mb, &next, &next_promoted, &child);
+                            mb.reset(&promoted.with(n), &child);
+                            visit(mb, &next, &promoted.with(n), &child);
                         }
-                        mb.pop();
-                        assert_eq!(mb.depth(), depth);
+                        // The node again, from scratch, without the candidates it has gone on without.
+                        mb.reset(&promoted, &cands);
                     }
-                }
-                if keep {
-                    assert!(mb.take_kept(), "the kept level is gone");
-                } else if !remove_first {
-                    mb.remove_candidate(n);
                 }
                 if self.rng.chance(5) {
                     break;
@@ -1545,57 +1118,21 @@ mod tests {
     }
 
     /// Runs `paths` walks of `budget` loop iterations each from the root of `g`.
-    pub(super) fn walks<const W: usize>(g: &Golden, seed: u64, paths: usize, budget: usize, visit: &mut Visit<'_, W>) {
+    fn walks<const W: usize>(g: &Golden, seed: u64, paths: usize, budget: usize, visit: &mut Visit<'_, W>) {
         let (model, root, all) = setup::<W>(g);
         let graph = MatchGraph::new(&model, &root);
         let mut mb = MatchBound::new(&graph);
         let mut walk = Walk { model: &model, rng: Rng(seed), budget: 0 };
         for _ in 0..paths {
-            mb.reset(&Bits::EMPTY, &all);
             walk.budget = budget;
             walk.explore(&mut mb, &root, Bits::EMPTY, all, visit);
         }
     }
 
-    /// Checks [`Level::bound_excluding`] for every member of a settled level's heaviest matching against the
-    /// formula it computes, every edge scanned (it stops at a tight one): the same value, or the forced members,
-    /// and so the trees, would change.
-    pub(super) fn check_bounds_excluding<const W: usize, K: Weighing>(g: &MatchGraph, lv: &Level<W, K>) {
-        for x in lv.chosen.iter() {
-            let v = g.vertex_of(x).expect("a vertex");
-            let w = usize::from(lv.mate[v]);
-            let as_factor = |f: usize| {
-                let counted = g.above(f).iter().map(|&u| usize::from(u)).filter(|&u| u != v);
-                let counted = counted.filter(|&u| lv.role[u] != Role::Factor);
-                counted.map(|u| lv.weight(g, u) - lv.y[u]).max().unwrap_or(0).max(0)
-            };
-            let mut y_w = as_factor(w);
-            if lv.role[w] == Role::Candidate {
-                let factors = g.below(w).iter().map(|&f| usize::from(f)).filter(|&f| lv.role[f] != Role::Required);
-                y_w = factors.map(|f| lv.weight(g, w) - lv.y[f]).fold(y_w, i64::max);
-            }
-            let bound = (lv.value as i64 - lv.weighing.of(g, v) + as_factor(v) + y_w).clamp(0, lv.value as i64);
-            assert_eq!(lv.bound_excluding(g, x), bound as u64, "the bound without {x} from the potentials");
-        }
-    }
-
-    /// Asserts that two levels hold the same solution (roles, matching, potentials, and what follows from them):
-    /// work kept for later must be the work it saves, or the search's trees would change.
-    fn assert_same_level<const W: usize>(a: &Level<W>, b: &Level<W>, what: &str) {
-        assert_eq!(a.role, b.role, "{what}: roles");
-        assert_eq!(a.mate, b.mate, "{what}: matching");
-        assert_eq!(a.y, b.y, "{what}: potentials");
-        assert_eq!((a.cands, a.chosen, a.value, a.feasible), (b.cands, b.chosen, b.value, b.feasible), "{what}");
-    }
-
-    /// Checks that the top level of `mb` is settled and optimal: its matching and potentials meet the conditions
-    /// in the module docs, which prove the matching heaviest, and the bookkeeping agrees with them.
+    /// Checks that the state of `mb` is settled and optimal: its matching and potentials meet the conditions in the
+    /// module docs, which prove the matching heaviest, and the bookkeeping agrees with them.
     fn check_certificate<const W: usize>(mb: &MatchBound<'_, W>) {
-        check_level(mb.graph, &mb.levels[mb.depth]);
-    }
-
-    /// [`check_certificate`] for a level weighed in any way.
-    pub(super) fn check_level<const W: usize, K: Weighing>(g: &MatchGraph, lv: &Level<W, K>) {
+        let (g, lv) = (mb.graph, &mb.level);
         assert!(lv.pending.is_empty() && lv.dropped.is_empty(), "not settled");
         assert!(lv.feasible, "the moves of a search state can always be matched");
         let (mut cands, mut chosen, mut matched_weight) = (Bits::<W>::EMPTY, Bits::<W>::EMPTY, 0);
@@ -1635,8 +1172,7 @@ mod tests {
         }
         assert_eq!(cands, lv.cands);
         assert_eq!(chosen, lv.chosen);
-        let weights = chosen.iter().map(|x| lv.weighing.of(g, g.vertex_of(x).expect("a vertex"))).sum::<i64>();
-        assert_eq!(weights, lv.value as i64);
+        assert_eq!(chosen.sum(), lv.value);
         assert_eq!(lv.y.iter().sum::<i64>(), matched_weight, "duality gap");
     }
 
@@ -1716,7 +1252,8 @@ mod tests {
     }
 
     /// Walks the search paths of `g`, checking every evaluation against the reference, the optimality
-    /// certificate, and a solver started afresh at the same node; returns the number of evaluations.
+    /// certificate, and a solver started afresh at the same node, and the bound without one candidate (often one the
+    /// heaviest matching promotes, as the dive removes them) against the reference; returns the number of evaluations.
     fn agreement<const W: usize>(g: &Golden, paths: usize, budget: usize, stats: &mut MatchStats) -> u64 {
         let (model, root, _) = setup::<W>(g);
         let graph = MatchGraph::new(&model, &root);
@@ -1724,7 +1261,7 @@ mod tests {
         let mut rng = Rng(u64::from(g.n) * 7919);
         let mut checks = 0;
         let mut evaluations = MatchStats::default();
-        let (mut quick_checks, mut quick_tight) = (0u64, 0u64);
+        let mut without_one = 0u64;
         walks::<W>(g, g.n.into(), paths, budget, &mut |mb, state, promoted, cands| {
             let fast = mb.value();
             check_certificate(mb);
@@ -1736,17 +1273,15 @@ mod tests {
                 assert_eq!(fresh.value(), fast, "n={}: started afresh at {promoted:?}", g.n);
                 check_certificate(&fresh);
             }
-            // The quick bound without a candidate (often a promoted one) is at least the exact value.
             let pool = if rng.chance(70) { mb.chosen() } else { *cands };
-            check_bounds_excluding(&graph, &mb.levels[mb.depth]);
             if let Some(x) = pool.nth_largest(rng.below(u64::from(pool.len().max(1))) as u32) {
-                let quick = mb.bound_excluding(x);
-                let exact = mb.value_excluding(x);
-                mb.pop();
-                assert!(exact <= quick && quick <= fast, "n={}: without {x}: {exact} > {quick}", g.n);
+                let mut without = mb.clone();
+                without.remove_candidate(x);
+                let exact = without.value();
+                check_certificate(&without);
+                assert!(exact <= fast, "n={}: without {x}: {exact} > {fast}", g.n);
                 assert_eq!(exact, match_bound(&model, state, &cands.without(x)), "n={}: without {x}", g.n);
-                quick_tight += u64::from(quick == exact);
-                quick_checks += 1;
+                without_one += 1;
             }
             evaluations = mb.stats();
             checks += 1;
@@ -1754,8 +1289,7 @@ mod tests {
         stats.evaluations += evaluations.evaluations;
         stats.searches += evaluations.searches;
         stats.scanned += evaluations.scanned;
-        eprintln!("  n={}: quick bounds without a candidate exact at {quick_tight} of {quick_checks}", g.n);
-        assert!(quick_checks > checks / 2);
+        assert!(without_one > checks / 2);
         checks
     }
 
@@ -1806,9 +1340,8 @@ mod tests {
         since.elapsed().as_secs_f64() * 1e3
     }
 
-    /// Times the solver at the root of `g`: from scratch, and on the root's expansion loop, where each step
-    /// removes the largest candidate and evaluates the root, and also pushes, evaluates and pops the child that
-    /// promoting it makes.
+    /// Times the solver at the root of `g`: from scratch, and on the root's expansion loop, where each step removes
+    /// the largest candidate and evaluates the root.
     fn bench<const W: usize>(g: &Golden) {
         let (model, root, cands) = setup::<W>(g);
         let graph = MatchGraph::new(&model, &root);
@@ -1830,61 +1363,33 @@ mod tests {
         });
         eprintln!("  match_bound_once (graph + solve):     {:9.1} µs", ns / 1e3);
 
-        // The root's expansion loop: the children's candidate lists, worked out beforehand.
-        let mut left = cands;
-        let mut steps: Vec<(u32, Option<Bits<W>>)> = Vec::new();
-        for n in cands.iter_desc() {
-            left.remove(n);
-            let child = model.promote(&root, n).map(|next| next.narrow_candidates(&left));
-            steps.push((n, child));
-        }
-        let children = steps.iter().filter(|s| s.1.is_some()).count();
+        // The root's expansion loop, from the root solved.
         mb.reset(&Bits::EMPTY, &cands);
         mb.value();
-        let solved = mb.levels[0].clone();
-        let copy_ns = time_per_call(1, || mb.levels[0].copy_from(black_box(&solved)));
-        let run = |with_children: bool, mb: &mut MatchBound<'_, W>| {
-            mb.levels[0].copy_from(&solved);
-            for &(n, child) in &steps {
+        let solved = mb.clone();
+        let copy_ns = time_per_call(1, || {
+            black_box(solved.clone());
+        });
+        let run = || {
+            let mut mb = solved.clone();
+            for n in cands.iter_desc() {
                 black_box(mb.value());
-                if let (true, Some(child)) = (with_children, child) {
-                    mb.push(n, &child);
-                    black_box(mb.value());
-                    mb.pop();
-                }
                 mb.remove_candidate(n);
             }
+            mb.stats()
         };
-        let before = mb.stats();
-        run(false, &mut mb);
-        let shrink = mb.stats();
-        run(true, &mut mb);
-        let both = mb.stats();
-        let shrink_ns = time_per_call(1, || run(false, &mut mb)) - copy_ns;
-        let both_ns = time_per_call(1, || run(true, &mut mb)) - copy_ns;
-        let per = |searches: u64, scanned: u64, count: usize| {
-            format!(
-                "{:.2} searches, {:.1} vertices scanned",
-                searches as f64 / count as f64,
-                scanned as f64 / count as f64
-            )
-        };
-        eprintln!("  level copy:                           {:9.1} µs", copy_ns / 1e3);
+        let (before, after) = (solved.stats(), run());
+        let steps = cands.len() as f64;
+        let ns = time_per_call(1, || {
+            black_box(run());
+        }) - copy_ns;
+        eprintln!("  solver copy:                          {:9.1} µs", copy_ns / 1e3);
         eprintln!(
-            "  root, largest candidate removed:      {:9.2} µs per step ({} steps; {})",
-            shrink_ns / 1e3 / steps.len() as f64,
-            steps.len(),
-            per(shrink.searches - before.searches, shrink.scanned - before.scanned, steps.len())
-        );
-        eprintln!(
-            "  child (push + value + pop):           {:9.2} µs per child ({children} children; {})",
-            (both_ns - shrink_ns) / 1e3 / children as f64,
-            // Added before subtracting: the difference of the first two alone can be negative.
-            per(
-                both.searches + before.searches - 2 * shrink.searches,
-                both.scanned + before.scanned - 2 * shrink.scanned,
-                children
-            )
+            "  root, largest candidate removed:      {:9.2} µs per step ({steps} steps; {:.2} searches, {:.1} vertices \
+             scanned)",
+            ns / 1e3 / steps,
+            (after.searches - before.searches) as f64 / steps,
+            (after.scanned - before.scanned) as f64 / steps
         );
     }
 

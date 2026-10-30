@@ -16,9 +16,7 @@ mod common;
 #[path = "../examples/common/fixtures.rs"]
 mod fixtures;
 
-use common::{
-    config, random_open_sets, random_subset, stored_games, testdata, upper_from_3, Config, Game, Rng, TempDir,
-};
+use common::{config, random_open_sets, random_subset, testdata, upper_from_3, Config, Game, Rng, TempDir};
 use std::cell::OnceCell;
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -29,92 +27,58 @@ use taxman::game::Optimal;
 use taxman::gf2::{Gf2Bound, Gf2Graph};
 use taxman::model::{FrameGraph, FrameSet, Keep, Scratch};
 use taxman::numtheory::Tables;
-use taxman::search::lagrange::Refits;
 use taxman::search::symmetry::Symmetries;
 use taxman::search::TaxUnit;
 use taxman::search::{search, Gf2Branching, Reuse, SearchTactics};
 
-/// Every tactic that acts inside the search, alone and in the combinations that matter: first the matching path
-/// ([`SearchTactics::matching`], which is without the rule of the root's symmetric pairs, tactic `symmetry`; 0 to 18),
-/// then the default, the GF(2) bound with the rule (19 to 29), then the GF(2) bound without the rule (30 to 32), and
-/// the matching path with it (33), then the policies of keeping nogoods (34 to 40: the table is a cache, so what the
-/// searchers keep, however often they forget and however small the limit, changes no answer), then conflict branching
-/// (tactic `conflict_branching`) at every check, whatever its gap, without the look at the last child of the search's
-/// own conflict (tactic `conflict_look`, on by default), on one thread and on two (41 and 42), the search's own
-/// conflict everywhere (43; the default chooses from a gap of 300), and conflict branching at every check with the
-/// look, on one thread and on two (44 and 45), then the GF(2) bound and the matching path without the near-repeat cut
-/// (46 and 47; tactic `near_repeat`, which the others have, and which acts where a game has the cut of a game before
-/// it, [`game_after`], and the incumbent reaches its bound), then conflict branching at every check with the reuse of
-/// its prices (tactic `price_reuse`), under the standard schedule, under one that never makes the prices again, on two
-/// threads, and under one that takes none (48 to 51), then the nogoods carried into the search (tactic
-/// `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three and
-/// four, [`Game::carried`](common::Game::carried)): on the GF(2) bound, on two threads, with conflict branching at
-/// every check and the reuse of its prices, with the search's own conflict everywhere, and on the matching path, where
-/// it only rules candidates out (52 to 56), then the GF(2) bound with the warm start of its children (tactic
-/// `warm_start`), and with it and the search's own conflict everywhere on two threads (57 and 58).  The matching path
-/// with the forgetting of nogoods at the production period, every step, every third, and never; on one thread and two;
-/// and the GF(2) bound with each way of choosing the branch, with and without the matching bound as a first check,
-/// forced members, nogoods and the Lagrangian bound's early refits.  The Lagrangian bound (tactic `lagrange`) refits
-/// its multipliers only after 2,000 steps, which most of these searches never take, so some configurations refit them
-/// after the first few steps and every few steps after that (with and without forgetting at the same time, refinement,
-/// and a second thread), and one turns it off.  The GF(2) bound without the rule runs on one thread, on two, and with
-/// the nogoods forgotten at every step.
+/// Every tactic that acts inside the search, alone and in the combinations that matter: first the default, the GF(2)
+/// bound with the rule of the root's symmetric pairs (tactic `symmetry`), with each way of choosing the branch, without
+/// forced members, without nogoods, with the nogoods forgotten at every step and on two threads (0 to 7), then without
+/// the rule, on one thread, on two, and with the nogoods forgotten at every step (8 to 10), then the policies of
+/// keeping nogoods (11 to 15: the table is a cache, so what the searchers keep, however often they forget and however
+/// small the limit, changes no answer), then conflict branching (tactic `conflict_branching`) at every check, whatever
+/// its gap, without the look at the last child of the search's own conflict (tactic `conflict_look`, on by default),
+/// on one thread and on two (16 and 17), the search's own conflict everywhere (18; the default chooses from a gap of
+/// 300), and conflict branching at every check with the look, on one thread and on two (19 and 20), then the search
+/// without the near-repeat cut (21; tactic `near_repeat`, which the others have, and which acts where a game has the
+/// cut of a game before it, [`game_after`], and the incumbent reaches its bound), then conflict branching at every
+/// check with the reuse of its prices (tactic `price_reuse`), under the standard schedule, under one that never makes
+/// the prices again, on two threads, and under one that takes none (22 to 25), then the nogoods carried into the search
+/// (tactic `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three
+/// and four, [`Game::carried`](common::Game::carried)): alone, on two threads, with conflict branching at every check
+/// and the reuse of its prices, and with the search's own conflict everywhere (26 to 29), then the warm start of the
+/// children's bound (tactic `warm_start`), alone, and with the search's own conflict everywhere on two threads (30 and
+/// 31).
 fn configs() -> Vec<Config> {
-    let (base, g) = (Config::matching(), Config::standard());
+    let g = Config::standard();
     // The schedules of `price_reuse`, with conflict branching at every check: the standard one; one that takes the
     // prices of an earlier check however old and however far the bound has fallen, and takes the ordered conflicts of
     // the check before; and one whose limits ask for new prices at every check but the first of a node.
     let forever = Reuse { max_steps: u32::MAX, own_drop: u64::MAX, max_seeds: u32::MAX, seed_drop: u64::MAX };
     let never_again = Reuse { max_steps: 1, own_drop: 0, max_seeds: 0, seed_drop: 0 };
     vec![
-        base,
-        Config { period: Some(1), ..base },
-        Config { period: Some(3), ..base },
-        Config { period: None, ..base },
-        Config { refine: 0, ..base },
-        Config { refine: 2, ..base },
-        Config { refine: 4, ..base },
-        Config { fix_forced: false, ..base },
-        Config { fix_forced: false, refine: 0, ..base },
-        Config { nogoods: false, ..base },
-        Config { nogoods: false, refine: 0, ..base },
-        Config { threads: 2, ..base },
-        Config { threads: 2, period: Some(2), ..base },
-        Config { threads: 2, refine: 0, ..base },
-        Config { refits: Some(Refits { first: 1, every: 4 }), ..base },
-        Config { refits: Some(Refits { first: 3, every: 9 }), period: Some(9), ..base },
-        Config { refits: Some(Refits { first: 1, every: 4 }), refine: 0, ..base },
-        Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, ..base },
-        Config { refits: None, ..base },
         g,
         Config { gf2_branching: Gf2Branching::Split, ..g },
         Config { gf2_branching: Gf2Branching::Largest, ..g },
         Config { gf2_branching: Gf2Branching::Forced, ..g },
-        Config { gf2_prefilter: true, ..g },
         Config { fix_forced: false, ..g },
         Config { nogoods: false, ..g },
         Config { period: Some(1), ..g },
         Config { threads: 2, ..g },
-        Config { refits: Some(Refits { first: 1, every: 4 }), ..g },
-        Config { refits: Some(Refits { first: 2, every: 5 }), threads: 2, period: Some(3), ..g },
         Config { symmetry: false, ..g },
         Config { symmetry: false, threads: 2, ..g },
         Config { symmetry: false, period: Some(1), ..g },
-        Config { symmetry: true, ..base },
         Config { period: Some(3), keep: Keep::Used, ..g },
         Config { period: Some(3), keep: Keep::Short(2), ..g },
         Config { period: Some(5), keep: Keep::Top(4), ..g },
         Config { period: None, limit: Some(2), ..g },
         Config { period: Some(7), keep: Keep::Used, limit: Some(3), threads: 2, ..g },
-        Config { period: Some(3), keep: Keep::Used, ..base },
-        Config { period: None, limit: Some(1), ..base },
         Config { conflict_branching: Some(0), conflict_look: false, ..g },
         Config { conflict_branching: Some(0), conflict_look: false, threads: 2, period: Some(3), ..g },
         Config { conflict_branching: None, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
         Config { near_repeat: false, ..g },
-        Config { near_repeat: false, ..base },
         Config { conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
         Config { conflict_branching: Some(0), conflict_look: false, price_reuse: Some(forever), ..g },
         Config { conflict_branching: Some(0), price_reuse: Some(forever), threads: 2, period: Some(3), ..g },
@@ -123,7 +87,6 @@ fn configs() -> Vec<Config> {
         Config { carried: true, threads: 2, period: Some(3), ..g },
         Config { carried: true, conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
         Config { carried: true, conflict_branching: None, ..g },
-        Config { carried: true, ..base },
         Config { warm_start: true, ..g },
         Config { conflict_branching: None, warm_start: true, threads: 2, period: Some(3), ..g },
     ]
@@ -226,15 +189,15 @@ fn a_search_from_a_handicapped_incumbent_finds_the_optimum() {
     assert!(cut > 0, "the near-repeat cut cut no node");
 }
 
-/// The near-repeat cut acts, and changes no answer: the games 232, 344 and 376, whose searches from an incumbent below
-/// their optimum it cuts (by the games 231, 343 and 375, [`game_after`]), under each tactic, from an incumbent worth 1
-/// or 5 less than the table's promotion sum, must come back with exactly that sum and a promotable set, and the
+/// The near-repeat cut acts, and changes no answer: the games 404, 430 and 436, whose searches from an incumbent below
+/// their optimum it cuts (by the games before them that [`game_after`] chooses), under each tactic, from an incumbent
+/// worth 1 or 5 less than the table's promotion sum, must come back with exactly that sum and a promotable set, and the
 /// cut changes some of the trees.
 #[test]
 fn the_near_repeat_cut_acts_and_changes_no_answer() {
     let optimal = Optimal::built_in();
     let (mut cut, mut changed) = (0, 0);
-    for n in [232, 344, 376] {
+    for n in [404, 430, 436] {
         let truth = optimal_sum::<8>(optimal, n).unwrap();
         let game = game_after::<8>(optimal, n, truth - 5).unwrap();
         for cfg in configs() {
@@ -293,17 +256,17 @@ fn the_carried_nogoods_act_and_change_no_answer() {
     );
 }
 
-/// The near-repeat cut waits for the incumbent to reach its bound.  On the games 232, 344 and 376 on the matching path,
-/// whose trees it changes, by the games before them that [`game_after`] chooses: a search whose incumbent never reaches
+/// The near-repeat cut waits for the incumbent to reach its bound.  On the games 404, 430 and 436, whose trees it
+/// changes, by the games before them that [`game_after`] chooses: a search whose incumbent never reaches
 /// the bound (one above the game's P*, which bounds the earlier game's P* as its own does) cuts nothing, and
 /// searches the tree of the search without the cut, node for node, where the same search with the earlier game's own
 /// bound cuts; and searches from an incumbent below the bound, just below and from nothing, armed from the start as a
 /// search armed by a provisional game is, find P*, and cut once their incumbent has reached the bound.
 #[test]
 fn the_near_repeat_cut_cuts_nothing_while_the_incumbent_is_below_its_bound() {
-    let (optimal, cfg) = (Optimal::built_in(), Config::matching());
+    let (optimal, cfg) = (Optimal::built_in(), Config::standard());
     let (mut cut_at_the_bound, mut cut_on_the_way) = (0, 0);
-    for n in [232, 344, 376] {
+    for n in [404, 430, 436] {
         let truth = optimal_sum::<8>(optimal, n).unwrap();
         let (m, bound) = game_before::<8>(optimal, n, truth - 5).unwrap();
         let cut_by = |bound: u64| Game::<8>::of_board(n).unwrap().with_near_repeat(&m, bound);
@@ -364,62 +327,6 @@ fn the_gate_changes_the_trees_of_the_small_games_and_not_their_answers() {
         changed += usize::from(outs.iter().any(|out| out.nodes != outs[0].nodes));
     }
     assert!(changed > 0, "the gate changed no tree");
-}
-
-/// Games 301 to 600 (every tenth), whose searches take a few hundred to a few thousand steps, from an incumbent
-/// worth 1 or 5 less than the table's promotion sum, with the Lagrangian bound refitted early and often (with
-/// the nogoods forgotten at the same time, and on two threads): in the games above, few searches are long enough
-/// for its multipliers to have much to fit.
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum_of_four_games"
-)]
-fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum() {
-    let optimal = Optimal::built_in();
-    let configs = lagrangian_configs();
-    let runs = lagrangian_runs::<8>(optimal, 301..=511, &configs) + lagrangian_runs::<16>(optimal, 512..=600, &configs);
-    assert!(runs > 250, "{runs} runs");
-}
-
-/// [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the games 301, 311, 321
-/// and 331.
-#[test]
-fn a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum_of_four_games() {
-    let runs = lagrangian_runs::<8>(Optimal::built_in(), 301..=340, &lagrangian_configs());
-    assert!(runs >= 40, "{runs} runs");
-}
-
-/// The configurations that refit the Lagrangian bound early and often: over the matching bound, and over the GF(2)
-/// bound.
-fn lagrangian_configs() -> [Config; 5] {
-    let (base, g) = (Config::matching(), Config::standard());
-    [
-        Config { refits: Some(Refits { first: 10, every: 60 }), ..base },
-        Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), ..base },
-        Config { refits: Some(Refits { first: 10, every: 60 }), threads: 2, ..base },
-        Config { refits: Some(Refits { first: 10, every: 60 }), ..g },
-        Config { refits: Some(Refits { first: 25, every: 100 }), period: Some(100), threads: 2, ..g },
-    ]
-}
-
-/// The searches of [`a_search_with_the_lagrangian_bound_from_a_handicapped_incumbent_finds_the_optimum`] of the
-/// games `ns` (every tenth of them) at width `W`.
-fn lagrangian_runs<const W: usize>(optimal: &Optimal, ns: std::ops::RangeInclusive<u32>, configs: &[Config]) -> usize {
-    let mut runs = 0;
-    for n in ns.filter(|n| n % 10 == 1) {
-        let truth = optimal_sum::<W>(optimal, n).unwrap_or(0);
-        let Some(game) = game_after::<W>(optimal, n, truth.saturating_sub(5)) else { continue };
-        for cfg in configs {
-            for k in [1, 5] {
-                let out = game.search(*cfg, vec![game.root_unit()], truth - k, None, None);
-                runs += 1;
-                assert!(out.completed, "n={n} {cfg:?} from {}: not completed", truth - k);
-                assert!(out.best == truth && out.real, "n={n} {cfg:?} from {}: truth {truth}, got {out:?}", truth - k);
-            }
-        }
-    }
-    runs
 }
 
 /// A unit below the root of a game, searched from a handicapped incumbent, with what an exhaustive search found in it.
@@ -506,7 +413,7 @@ impl<'a, const W: usize> Searched<'a, W> {
 }
 
 /// Every board 2..=600 whose root has symmetric pairs, searched from the root with the rule of the pairs' inequalities
-/// (tactic `symmetry`) over the GF(2) bound and over the matching bound, from an incumbent 1 and 5 below
+/// (tactic `symmetry`), from an incumbent 1 and 5 below
 /// the table's promotion sum: the search must complete with exactly that sum and a promotable set (R2,
 /// docs/theory/search-rules.md: the root's heaviest set keeps the inequalities, so a search from the root loses
 /// nothing).  For the boards to 40 opt(n) is also checked against the exhaustive search without the frame model.
@@ -530,9 +437,9 @@ fn the_symmetry_rule_finds_the_optimum_of_the_small_boards_with_pairs() {
     assert!(boards >= 40, "{boards} boards with pairs");
 }
 
-/// The rule of the symmetric pairs over the GF(2) bound and over the matching bound.
+/// The rule of the symmetric pairs, with forced members and without.
 fn symmetry_configs() -> [Config; 2] {
-    [Config::standard(), Config { symmetry: true, ..Config::matching() }]
+    [Config::standard(), Config { fix_forced: false, ..Config::standard() }]
 }
 
 /// The searches of [`the_symmetry_rule_finds_the_optimum_of_the_boards_with_pairs`] of the boards `ns` at width `W`;
@@ -692,7 +599,7 @@ fn optimum_units<const W: usize>(optimal: &Optimal, n: u32, rng: &mut Rng, units
 }
 
 /// The searches of the units on the way to an optimal set ([`optimum_units`]) of the games 600 to 1000 (every 23rd)
-/// under the rule of the symmetric pairs, over the GF(2) bound on one thread and on two, and over the matching path.
+/// under the rule of the symmetric pairs, on one thread and on two.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -717,10 +624,10 @@ fn a_few_units_on_the_way_to_the_optimum_find_it_with_the_symmetry_rule() {
     assert!(runs > 10, "{runs} runs");
 }
 
-/// The rule of the symmetric pairs over the GF(2) bound on one thread and on two, and over the matching path.
-fn on_the_way_configs() -> [Config; 3] {
-    let (base, g) = (Config::matching(), Config::standard());
-    [g, Config { threads: 2, ..g }, Config { symmetry: true, ..base }]
+/// The rule of the symmetric pairs on one thread and on two.
+fn on_the_way_configs() -> [Config; 2] {
+    let g = Config::standard();
+    [g, Config { threads: 2, ..g }]
 }
 
 /// A search interrupted every `node_limit` nodes or so and resumed (two threads, a checkpoint every millisecond, a
@@ -761,15 +668,15 @@ fn resumed_over_and_over<const W: usize>(
     resumes
 }
 
-/// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 600 on the matching path in its first configuration.
-/// (The GF(2) bound's resumes need a search of ten thousand nodes to be stopped on two threads; the quick check of
-/// those is `checkpoint_and_resume_with_the_gf2_bound_of_a_small_game`, on one thread, in the unit tests, and
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default.  (The
+/// search needs thousands of nodes to be stopped on two threads; another quick check of resuming is
+/// `checkpoint_and_resume_with_the_gf2_bound_of_a_small_game`, on one thread, in the unit tests, and
 /// `a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`.)
 #[test]
 fn a_small_search_resumed_over_and_over_finds_the_optimum() {
     let dir = TempDir::new("churn-small");
-    let truth = optimal_sum::<16>(Optimal::built_in(), 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0]);
+    let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
+    let resumes = resumed_over_and_over::<16>(1000, truth, 30, 1000, &dir, &[0]);
     assert!(resumes >= 1, "only {resumes} resumes");
 }
 
@@ -781,89 +688,76 @@ fn a_small_search_resumed_over_and_over_finds_the_optimum() {
 fn a_search_resumed_over_and_over_finds_the_optimum() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("churn");
-    // On the matching path, game 600 takes 7,000 to 17,000 nodes from an incumbent that far below P* (two threads:
-    // the count depends on timing), so a limit of 1,000 stops it at least six times in each of the three
-    // configurations: the matching tactics, the searchers forgetting their nogoods every two steps, and their
-    // Lagrangian bounds refitted every four.  The bounds below only check that the resuming really happened; they
-    // leave room for the smallest trees a loaded machine produces.
-    let truth = optimal_sum::<16>(optimal, 600).unwrap();
-    let resumes = resumed_over_and_over::<16>(600, truth, 30, 1000, &dir, &[0, 12, 14]);
-    assert!(resumes >= 10, "only {resumes} resumes");
-    // The GF(2) bound searches 600 in too few nodes to be stopped (the engine checks the limit every 1,024 steps of
-    // a searcher), and game 992 in some ten thousand: the default, without forced members, forgetting every step,
-    // and refitting the Lagrangian bound.
+    // Game 992 takes some ten thousand nodes from an incumbent that far below P* (two threads: the count depends on
+    // timing), so a limit of 1,000 stops it several times (the engine checks the limit every 1,024 steps of a searcher)
+    // in each of the three configurations: the default, without forced members, and forgetting every step.  The
+    // bounds below only check that the resuming really happened; they leave room for the smallest trees a loaded
+    // machine produces.
     let truth = optimal_sum::<16>(optimal, 992).unwrap();
-    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[19, 24, 26, 29]);
-    assert!(resumes >= 8, "the GF(2) bound: only {resumes} resumes");
+    let resumes = resumed_over_and_over::<16>(992, truth, 30, 1000, &dir, &[0, 4, 6]);
+    assert!(resumes >= 6, "only {resumes} resumes");
 }
 
-/// [`a_wide_search_resumed_over_and_over_finds_the_optimum`] on the matching path in its first configuration at W = 20
-/// and 24 and in its third at W = 64, without the configurations that refit the Lagrangian bound every four steps (a
-/// piece of them takes seconds at these widths) and without the GF(2) bound of game 992 (ten thousand nodes).
+/// [`a_wide_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default, at
+/// W = 20 and 64, from an incumbent 300 below its P*: some four thousand nodes on two threads, so that one of the two
+/// workers passes the 1,024 steps at which it checks the limit, and each width resumes at least once.
 #[test]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run() {
-    let n = 1133;
-    let truth = stored_games()[&n].0 - Board::<20>::for_n(n).in_the_bag;
+    let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
     let dir = TempDir::new("churn-wide-quick");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0])
-        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
-        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
-    assert!(resumes > 2, "only {resumes} resumes");
+    let resumes = [
+        resumed_over_and_over::<20>(1000, truth, 300, 60, &dir, &[0]),
+        resumed_over_and_over::<64>(1000, truth, 300, 60, &dir, &[0]),
+    ];
+    assert!(resumes.iter().all(|&r| r >= 1), "resumes at W = 20 and 64: {resumes:?}");
 }
 
-/// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: on the matching path, game 1133 (its truth from `results/optimal.jsonl.gz`) from an
-/// incumbent 400 below it, stopped every 60 nodes or so (the engine checks every 1,024 steps of a searcher): its
-/// tactics, forgetting the nogoods every two or three steps, and refitting the Lagrangian bound every four; with the
-/// GF(2) bound, whose search of 1133 is too short to stop, game 992 (some ten thousand nodes) at those widths.
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] at W = 20, 24 and 64: game 992 (some ten thousand nodes), whose
+/// boards W = 16 holds, from an incumbent 30 below its P*, stopped every 60 nodes or so (the engine checks every 1,024
+/// steps of a searcher), in the default and forgetting every step at W = 20, the default at W = 24 and without forced
+/// members at W = 64.  (The search of game 1133, whose board needs W = 20, is too short to stop.)
 #[test]
 #[cfg_attr(
     debug_assertions,
     ignore = "long: the quick check is a_wide_search_resumed_over_and_over_finds_the_optimum_in_a_quick_run"
 )]
 fn a_wide_search_resumed_over_and_over_finds_the_optimum() {
-    let n = 1133;
-    let truth = stored_games()[&n].0 - Board::<20>::for_n(n).in_the_bag;
-    let dir = TempDir::new("churn-wide");
-    let resumes = resumed_over_and_over::<20>(n, truth, 400, 60, &dir, &[0, 12, 14])
-        + resumed_over_and_over::<24>(n, truth, 400, 60, &dir, &[0])
-        + resumed_over_and_over::<64>(n, truth, 400, 60, &dir, &[2]);
-    assert!(resumes > 10, "only {resumes} resumes");
     let truth = optimal_sum::<16>(Optimal::built_in(), 992).unwrap();
-    let resumes = resumed_over_and_over::<20>(992, truth, 30, 60, &dir, &[19, 26])
-        + resumed_over_and_over::<24>(992, truth, 30, 60, &dir, &[19])
-        + resumed_over_and_over::<64>(992, truth, 30, 60, &dir, &[29]);
-    assert!(resumes > 6, "the GF(2) bound: only {resumes} resumes");
+    let dir = TempDir::new("churn-wide");
+    let resumes = resumed_over_and_over::<20>(992, truth, 30, 60, &dir, &[0, 6])
+        + resumed_over_and_over::<24>(992, truth, 30, 60, &dir, &[0])
+        + resumed_over_and_over::<64>(992, truth, 30, 60, &dir, &[4]);
+    assert!(resumes > 6, "only {resumes} resumes");
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // The GF(2) bound at nodes of the hardest games
 
 /// At the nodes of the probe's fixtures (`testdata/perf/`: 300 nodes each of the proofs of 936 and 1215, from the root
-/// to 30 promotions deep), with the oracles that do not use the bound: every completion made by promoting the node's
+/// to 30 promotions deep), with an oracle that does not use the bound: every completion made by promoting the node's
 /// candidates in a random order, each if it can be, is independent in every frame of the node (the bound of the
-/// node with only its members as candidates is their sum) and no heavier than the bound; and the search of the
-/// matching path, started from the bound, finds no completion above it (where it ends within its time limit, it
-/// proves the bound is at least the best completion).
+/// node with only its members as candidates is their sum) and no heavier than the bound.  (The search of the matching
+/// path, started from the bound, was a second oracle, which proved the bound at all but a few of these nodes; no
+/// search without the GF(2) bound is left, and an exhaustive one, given a million nodes a node, took minutes for 20 of
+/// them.)
 #[test]
 #[cfg_attr(
     debug_assertions,
     ignore = "long: the quick check is the_gf2_bound_holds_at_a_sample_of_the_nodes_of_the_probe"
 )]
 fn the_gf2_bound_holds_at_the_nodes_of_the_probe() {
-    // All but 3 of the 600 searches end within 200 ms on an idle machine.
-    let proved = gf2_at_probe_nodes::<16>("n0936.nodes", 1) + gf2_at_probe_nodes::<20>("n1215.nodes", 1);
-    assert!(proved >= 550, "only {proved} nodes proved by a search");
+    let nodes = gf2_at_probe_nodes::<16>("n0936.nodes", 1) + gf2_at_probe_nodes::<20>("n1215.nodes", 1);
+    assert!(nodes >= 590, "only {nodes} nodes checked");
 }
 
 /// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at every 30th node of each fixture.
 #[test]
 fn the_gf2_bound_holds_at_a_sample_of_the_nodes_of_the_probe() {
-    let proved = gf2_at_probe_nodes::<16>("n0936.nodes", 30) + gf2_at_probe_nodes::<20>("n1215.nodes", 30);
-    assert!(proved >= 18, "only {proved} nodes proved by a search");
+    let nodes = gf2_at_probe_nodes::<16>("n0936.nodes", 30) + gf2_at_probe_nodes::<20>("n1215.nodes", 30);
+    assert!(nodes >= 20, "only {nodes} nodes checked");
 }
 
-/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at every `every`th node of `fixture`: returns the nodes at
-/// which the search of the matching path ended.
+/// [`the_gf2_bound_holds_at_the_nodes_of_the_probe`] at every `every`th node of `fixture`: returns the nodes checked.
 fn gf2_at_probe_nodes<const W: usize>(fixture: &str, every: usize) -> usize {
     let (n, _, units) = fixtures::read_nodes::<W>(&testdata(&format!("perf/{fixture}"))).unwrap();
     let game = Game::<W>::of_board(n).unwrap();
@@ -871,7 +765,7 @@ fn gf2_at_probe_nodes<const W: usize>(fixture: &str, every: usize) -> usize {
     let mut bound = Gf2Bound::<W>::new(&graph);
     let mut scratch = Scratch::<W>::new();
     let mut rng = Rng(0x6F2B_C0DE_0000_0000 ^ u64::from(n));
-    let mut proved = 0;
+    let mut nodes = 0;
     for unit in units.iter().filter(|u| !u.cands.is_empty()).step_by(every) {
         let state = game.model.promote_all_using(&mut scratch, &game.root, &unit.promoted).expect("a node");
         let max_add = (game.max_total - unit.promoted.len()).min(state.max_promotions_among(&unit.cands).max(0) as u32);
@@ -894,13 +788,9 @@ fn gf2_at_probe_nodes<const W: usize>(fixture: &str, every: usize) -> usize {
             let independent = bound.evaluate(completion.len(), None).value == completion.sum();
             assert!(independent && completion.sum() <= value, "{at}: {completion:?} against the bound {value}");
         }
-        let start = unit.promoted.sum() + value;
-        let engine = EngineConfig { time_limit: Some(Duration::from_millis(200)), ..config(1) };
-        let out = game.search(Config::matching(), vec![*unit], start, Some(engine), None);
-        assert_eq!(out.best, start, "{at}: a completion above the bound {value}: {:?}", out.set);
-        proved += usize::from(out.completed);
+        nodes += 1;
     }
-    proved
+    nodes
 }
 
 // ---------------------------------------------------------------------------------------------------------

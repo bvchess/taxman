@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{matching_options, options, TempDir};
+use common::{options, TempDir};
 use std::fs;
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -114,8 +114,6 @@ fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
             "fix_forced=off",
             "nogoods=off",
             "forget_nogoods=off",
-            "lagrange=on",
-            "gf2=off",
             "symmetry=off",
             "conflict_branching=off",
             "conflict_look=off",
@@ -124,11 +122,7 @@ fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
             "conflict_look=off,price_reuse=on",
             "carried_nogoods=on",
             "conflict_branching=off,warm_start=on",
-            "lagrange=on,gf2=off",
-            "lagrange=on,gf2=off,symmetry=off",
-            "match_refine=0,lagrange=on,gf2=off",
-            "match_refine=3,gf2=off",
-            "fix_forced=off,lagrange=on,gf2=off",
+            "fix_forced=off,nogoods=off,symmetry=off",
         ]
         .into_iter()
         .chain(TUNINGS)
@@ -226,48 +220,50 @@ fn derivations_can_be_switched_off() {
 fn an_interrupted_game_resumes_from_its_checkpoint() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("resume");
-    // Without the n − 1 solution to start from, the search has real work to do.
+    // Without the n − 1 solution to start from, the search of 800 has real work to do: some 1,400 steps, more than the
+    // 1,024 of a searcher after which a node limit is looked at.
+    const N: u32 = 800;
     let opts = SolveOptions {
         checkpoint_dir: Some(dir.0.clone()),
         checkpoint_interval: Duration::from_secs(3600),
         node_limit: Some(1_000),
         queue_mem_cap: 4,
         force_search: true,
-        ..matching_options(2)
+        ..options(1)
     };
-    let checkpoint = dir.0.join("n0600.ckpt");
+    let checkpoint = dir.0.join(format!("n{N:04}.ckpt"));
     let mut pieces = 0;
     let result = loop {
-        let r = solver::solve_game_with(600, None, &opts, optimal).unwrap();
+        let r = solver::solve_game_with(N, None, &opts, optimal).unwrap();
         pieces += 1;
         if r.completed {
             break r;
         }
         assert!(checkpoint.exists(), "an unfinished game keeps its checkpoint");
         assert_eq!((r.optimal_match, r.method), (None, Method::Search));
-        assert!(r.score > 0 && r.score <= optimal.score(600).unwrap(), "the best game so far, not more than the best");
+        assert!(r.score > 0 && r.score <= optimal.score(N).unwrap(), "the best game so far, not more than the best");
         assert!(pieces < 100, "no progress");
     };
-    assert!(pieces >= 3, "only {pieces} pieces");
-    assert_eq!((result.score, result.optimal_match), (optimal.score(600).unwrap(), Some(true)));
+    assert!(pieces >= 2, "only {pieces} pieces");
+    assert_eq!((result.score, result.optimal_match), (optimal.score(N).unwrap(), Some(true)));
     assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
     let left: Vec<_> = fs::read_dir(&dir.0).unwrap().map(|e| e.unwrap().path()).collect();
     assert!(left.is_empty(), "left behind: {left:?}");
 }
 
-/// Solves `n` (600 or 760, games with a search of a few thousand nodes on the matching path) and `n + 1` (the prime
-/// after it, which takes `n` as its predecessor) from `base`, with no previous game to start from: a node limit stops
-/// the search of `n`, and a second run, without the limit, resumes it and goes on.  Returns the games of the second run
-/// and the lines of the results file, which the verifier accepts.
+/// Solves `n` and `n + 1` (the prime after it, which takes `n` as its predecessor) from `base`, with no previous game to
+/// start from: a time limit of nothing stops the search of `n` before it starts, and a second run, without the limit,
+/// resumes it and goes on.  Returns the games of the second run and the lines of the results file, which the verifier
+/// accepts.
 fn run_stopped_and_resumed(name: &str, base: SolveOptions, n: u32) -> (Vec<GameResult>, Vec<Json>) {
     let dir = TempDir::new(name);
     let results = dir.join("results.jsonl");
-    let limited = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), node_limit: Some(300), ..base };
+    let limited = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), time_limit: Some(Duration::ZERO), ..base };
     let summary = solver::solve_range_each(n, n + 1, &limited, Some(&results), |_| {}).unwrap();
-    assert_eq!(summary.stopped_at, Some(n), "the node limit stops the search of {n}");
+    assert_eq!(summary.stopped_at, Some(n), "the time limit stops the search of {n}");
     assert!(limited.checkpoint_file(n).unwrap().exists());
 
-    let unlimited = SolveOptions { node_limit: None, ..limited };
+    let unlimited = SolveOptions { time_limit: None, ..limited };
     let games = solver::solve_range(n, n + 1, &unlimited, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
     assert!(games.iter().all(|g| g.completed));
     // A later invocation finds both games in the file, which agrees with what they say of themselves.
@@ -288,7 +284,7 @@ fn assumptions(line: &Json) -> Vec<&str> {
 /// next game, built on it.
 #[test]
 fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
-    let (games, lines) = run_stopped_and_resumed("resume", matching_options(1), 600);
+    let (games, lines) = run_stopped_and_resumed("resume", options(1), 600);
     let [resumed, next] = &games[..] else { panic!("{} games", games.len()) };
     assert_eq!((resumed.n, resumed.invocations), (600, 2), "600 was resumed, not started over");
     assert!(resumed.assumes.is_empty(), "{:?}", resumed.assumes);
@@ -301,28 +297,41 @@ fn a_game_resumed_from_its_checkpoint_assumes_nothing() {
     assert!(assumptions(finished).is_empty() && assumptions(prime).is_empty());
 }
 
-/// The finder, started as early as it can be, changes no score: games 600..=604, whose searches on the matching path
-/// take a few thousand steps (no ceiling from the game before, `prev_cap` off, so that they are searched to the end),
-/// have the table's scores with it as without it, and the finder's record is in the lines of the games it started
-/// for, which the verifier accepts.
+/// The finder, started as early as it can be, changes no score: games 999..=1001 on two threads, whose searches take
+/// thousands of steps (no ceiling from the game before, `prev_cap` off, so that they are searched to the end), have
+/// the table's scores with it as without it, and the finder's record is in the lines of the games it started for,
+/// which the verifier accepts.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long: the quick check is a_finder_started_early_changes_no_score_of_one_game")]
 fn a_finder_started_early_changes_no_score() {
+    a_finder_started_early_changes_no_score_of(999, 1001, 2);
+}
+
+/// [`a_finder_started_early_changes_no_score`] for game 800 alone on one thread, whose search from nothing takes some
+/// 1,400 steps, more than the 1,024 of a searcher after which the finder can look.
+#[test]
+fn a_finder_started_early_changes_no_score_of_one_game() {
+    a_finder_started_early_changes_no_score_of(800, 800, 1);
+}
+
+/// The games `lo..=hi` on `threads` threads, with the finder as early as it can be and without it.
+fn a_finder_started_early_changes_no_score_of(lo: u32, hi: u32, threads: usize) {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("finder-scores");
-    let mut base = SolveOptions { force_search: true, ..matching_options(2) };
+    let mut base = SolveOptions { force_search: true, ..options(threads) };
     base.tactics.prev_cap = false;
-    let without = solve_all(600, 604, &base);
+    let without = solve_all(lo, hi, &base);
     let finder = SolveOptions { finder_after: 1, finder_budget: Duration::from_secs(1), ..base };
     let results = dir.join("results.jsonl");
-    let with = solve_all(600, 604, &SolveOptions { checkpoint_dir: None, ..finder.clone() });
-    let written = solver::solve_range(600, 604, &finder, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
+    let with = solve_all(lo, hi, &SolveOptions { checkpoint_dir: None, ..finder.clone() });
+    let written = solver::solve_range(lo, hi, &finder, Some(&results)).unwrap_or_else(|e| panic!("{e}"));
     for ((a, b), c) in without.iter().zip(&with).zip(&written) {
         assert!(a.completed && b.completed && c.completed, "n={}", a.n);
         assert_eq!(Some(a.score), optimal.score(a.n), "n={}", a.n);
         assert_eq!((b.score, c.score), (a.score, a.score), "n={}: the finder changed the score", a.n);
         assert!(a.finder.is_none(), "n={}: no finder was asked for", a.n);
     }
-    // A search that ends before the finder looks reports nothing, but of five of a few thousand steps some do start it.
+    // A search that ends before the finder looks reports nothing, but of thousands of steps some do start it.
     let started: Vec<_> = written.iter().filter_map(|r| r.finder.map(|f| (r.n, f))).collect();
     assert!(!started.is_empty(), "no game started its finder");
     for (n, f) in &started {
@@ -348,9 +357,11 @@ fn a_finder_started_early_changes_no_score() {
 }
 
 /// A checkpoint is the same search whatever the finder: a search stopped by a node limit is resumed, piece after piece,
-/// with the finder off, on early, off, and on later and with another budget, and finishes with the right score.
+/// with the finder off, on early, off, and on later and with another budget, and finishes with the right score.  Game
+/// 1000 from nothing takes more than three times the 1,024 steps after which a node limit stops a search on one thread.
 #[test]
 fn a_checkpoint_resumes_with_any_finder_settings() {
+    const N: u32 = 1000;
     let optimal = Optimal::built_in();
     let dir = TempDir::new("finder-resume");
     let base = SolveOptions {
@@ -359,23 +370,23 @@ fn a_checkpoint_resumes_with_any_finder_settings() {
         node_limit: Some(1_000),
         queue_mem_cap: 4,
         force_search: true,
-        ..matching_options(2)
+        ..options(1)
     };
     let settings = [(0, 60), (1, 1), (0, 60), (2_000, 5), (1, 60)];
     let mut pieces = 0;
     let result = loop {
         let (finder_after, seconds) = settings[pieces % settings.len()];
         let opts = SolveOptions { finder_after, finder_budget: Duration::from_secs(seconds), ..base.clone() };
-        let r = solver::solve_game_with(600, None, &opts, optimal).unwrap_or_else(|e| panic!("piece {pieces}: {e}"));
+        let r = solver::solve_game_with(N, None, &opts, optimal).unwrap_or_else(|e| panic!("piece {pieces}: {e}"));
         pieces += 1;
         if r.completed {
             break r;
         }
-        assert!(base.checkpoint_file(600).unwrap().exists(), "an unfinished game keeps its checkpoint");
+        assert!(base.checkpoint_file(N).unwrap().exists(), "an unfinished game keeps its checkpoint");
         assert!(pieces < 100, "no progress");
     };
     assert!(pieces >= 3, "only {pieces} pieces");
-    assert_eq!((result.score, result.optimal_match), (optimal.score(600).unwrap(), Some(true)));
+    assert_eq!((result.score, result.optimal_match), (optimal.score(N).unwrap(), Some(true)));
 }
 
 /// A checkpoint resumes under either setting of `conflict_branching` and of `conflict_look` (bits 9 and 10 of its
@@ -416,27 +427,18 @@ fn a_checkpoint_resumes_under_other_branching_settings_and_gates() {
 fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
     let optimal = Optimal::built_in();
     let dir = TempDir::new("refuse");
+    // A time limit of nothing stops the search before it starts, with its checkpoint.
     let opts = SolveOptions {
         checkpoint_dir: Some(dir.0.clone()),
-        node_limit: Some(2_000),
+        time_limit: Some(Duration::ZERO),
         force_search: true,
-        ..matching_options(1)
+        ..options(1)
     };
     assert!(!solver::solve_game_with(600, None, &opts, optimal).unwrap().completed);
     let checkpoint = dir.0.join("n0600.ckpt");
 
-    // Other tactics: each of the seven search tactics (a checkpoint records them all), the switches turned the other
-    // way and `match_refine` changed.
-    let assignments = [
-        "fix_forced=off",
-        "nogoods=off",
-        "forget_nogoods=off",
-        "lagrange=off",
-        "gf2=on",
-        "symmetry=on",
-        "match_refine=0",
-        "match_refine=2",
-    ];
+    // Other tactics: each of the search switches that a checkpoint records and binds, turned the other way.
+    let assignments = ["fix_forced=off", "nogoods=off", "forget_nogoods=off", "symmetry=off"];
     for assignment in assignments {
         let mut other = opts.clone();
         other.tactics.set(assignment).unwrap();
@@ -456,7 +458,7 @@ fn a_checkpoint_for_another_game_or_other_tactics_is_refused() {
 
     // The refused files are untouched, and the game itself still resumes and finishes.
     assert!(checkpoint.exists() && dir.0.join("n0620.ckpt").exists());
-    let resumed = SolveOptions { node_limit: None, ..opts };
+    let resumed = SolveOptions { time_limit: None, ..opts };
     let r = solver::solve_game_with(600, None, &resumed, optimal).unwrap();
     assert!(r.completed && r.optimal_match == Some(true));
 }
@@ -466,11 +468,12 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     let dir = TempDir::new("range");
     let results = dir.0.join("results.jsonl");
     let ckpt = dir.0.join("ckpt");
+    // A time limit of nothing stops the first search before it starts, with its checkpoint.
     let limited = SolveOptions {
         checkpoint_dir: Some(ckpt.clone()),
-        node_limit: Some(200),
+        time_limit: Some(Duration::ZERO),
         force_search: true,
-        ..matching_options(1)
+        ..options(1)
     };
     let mut seen = Vec::new();
     let summary =
@@ -480,7 +483,7 @@ fn a_range_stops_at_an_unfinished_game_and_picks_up_where_it_left_off() {
     assert!(ckpt.join(format!("n{:04}.ckpt", summary.stopped_at.unwrap())).exists());
 
     // Without the limit the same command finishes the game from its checkpoint and goes on.
-    let unlimited = SolveOptions { node_limit: None, ..limited };
+    let unlimited = SolveOptions { time_limit: None, ..limited };
     let mut more = Vec::new();
     let summary = solver::solve_range_each(598, 602, &unlimited, Some(&results), |r| more.push(r.n)).unwrap();
     assert_eq!(summary.stopped_at, None);

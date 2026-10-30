@@ -13,8 +13,8 @@
 mod common;
 
 use common::{
-    config, matching_options, options, prev_of, profile_at_width, random_subset, stored_games, testdata, variants,
-    Config, Game, Profile, Rng, TempDir,
+    config, options, prev_of, profile_at_width, random_subset, stored_games, testdata, variants, Config, Game, Profile,
+    Rng, TempDir,
 };
 use std::time::Duration;
 use taxman::bits::Bits;
@@ -46,26 +46,22 @@ fn the_search_does_not_depend_on_the_width() {
     let default = SearchTactics::default();
     // Boards that W = 8 holds, at every width.
     small_boards_at_every_width(&[300, 400]);
-    // Boards that W = 16 holds, with trees of more than 1,000 nodes: on the matching path and with the GF(2) bound.
-    let matching = SearchTactics::matching();
-    for (n, tactics) in [(760, matching), (1000, default)] {
-        let at16 = profile_at_width::<16>(n, tactics, None);
-        assert!(at16.completed && at16.nodes > 1000, "n={n}: {} nodes", at16.nodes);
-        assert_eq!(profile_at_width::<32>(n, tactics, None), at16, "n={n} at W=32");
-        assert_eq!(profile_at_width::<64>(n, tactics, None), at16, "n={n} at W=64");
-        assert_eq!(profile_at_width::<128>(n, tactics, None), at16, "n={n} at W=128");
-    }
+    // A board that W = 16 holds, with a tree of more than 1,000 nodes.
+    let n = 1000;
+    let at16 = profile_at_width::<16>(n, default, None);
+    assert!(at16.completed && at16.nodes > 1000, "n={n}: {} nodes", at16.nodes);
+    assert_eq!(profile_at_width::<32>(n, default, None), at16, "n={n} at W=32");
+    assert_eq!(profile_at_width::<64>(n, default, None), at16, "n={n} at W=64");
+    assert_eq!(profile_at_width::<128>(n, default, None), at16, "n={n} at W=128");
 
-    // Boards that need W = 20: 1133 on the matching path, and 1050 with the GF(2) bound (which searches 1133 in a
-    // hundred nodes).
-    for (n, name, tactics) in [(1133, "matching", matching), (1050, "default", default)] {
-        let at20 = profile_at_width::<20>(n, tactics, None);
-        assert!(at20.completed && at20.nodes > 500, "{name}: n={n}: {} nodes", at20.nodes);
-        assert_eq!(profile_at_width::<24>(n, tactics, None), at20, "{name}: n={n} at W=24");
-        assert_eq!(profile_at_width::<32>(n, tactics, None), at20, "{name}: n={n} at W=32");
-        assert_eq!(profile_at_width::<64>(n, tactics, None), at20, "{name}: n={n} at W=64");
-        assert_eq!(profile_at_width::<128>(n, tactics, None), at20, "{name}: n={n} at W=128");
-    }
+    // A board that needs W = 20: 1050 (the search of 1133 takes a hundred nodes).
+    let n = 1050;
+    let at20 = profile_at_width::<20>(n, default, None);
+    assert!(at20.completed && at20.nodes > 500, "n={n}: {} nodes", at20.nodes);
+    assert_eq!(profile_at_width::<24>(n, default, None), at20, "n={n} at W=24");
+    assert_eq!(profile_at_width::<32>(n, default, None), at20, "n={n} at W=32");
+    assert_eq!(profile_at_width::<64>(n, default, None), at20, "n={n} at W=64");
+    assert_eq!(profile_at_width::<128>(n, default, None), at20, "n={n} at W=128");
 }
 
 /// [`the_search_does_not_depend_on_the_width`] for the boards `boards` that W = 8 holds, at every width: each
@@ -354,7 +350,6 @@ fn root_search<const W: usize>(game: &Game<W>, words: Option<usize>) -> (u64, Ve
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is the_first_board_past_4095_is_set_up_at_128_words")]
 fn the_gf2_engines_of_four_and_five_words_search_the_same_tree() {
-    assert!(Config::standard().gf2);
     let expected = root_search(&Game::<16>::of_board(1000).unwrap(), None);
     assert!(expected.2 && expected.3 > 1000, "{} nodes", expected.3);
     let wide = Game::<128>::of_board(1000).unwrap();
@@ -431,59 +426,50 @@ fn boards_are_set_up_at_128_words(boards: &[(u32, usize)]) {
 // ---------------------------------------------------------------------------------------------------------
 // Resuming
 
-/// `opts` with the window of `force_window` that the headers of versions 4 and 5 imply (80; the default is `all`
-/// now), as a run resumes a checkpoint of the builds before the default changed.
-fn old_window(mut opts: SolveOptions) -> SolveOptions {
-    opts.tactics.set("force_window=80").unwrap();
-    opts
-}
-
-/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with
-/// the default tactics of that build, now those of the matching path (`SearchTactics::matching`), stopped after
-/// 1,023 nodes on one thread; search header format TXSH v5) still resumes and
-/// finishes with the committed score.  Every write/read test of the format uses the code's own constants, so a
-/// change of the layout that round-trips (the version, the byte order of a set, the order of the header's fields,
-/// the packing of the tactics) passes them and refuses this file.  Its header implies the window of 80 for the forced
-/// members, which the default (`all`) is not, so the run says `--tactic force_window=80`.
-///
-/// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
-/// To make the file again with the new build: `taxman solve 1133 --use-prev --threads 1 --node-limit 1000 --out R
-/// --checkpoint-dir D --tactic gf2=off --tactic lagrange=on --tactic symmetry=off` with a new file `R`, then copy
-/// `D/n1133.ckpt` over the fixture.
-#[test]
-fn a_committed_checkpoint_resumes() {
+/// The refusal of a committed checkpoint of game 1133 at W = 20 that an earlier build wrote, `fixture` (of
+/// `testdata/`), for a run with the default tactics, whose checkpoint directory is in `dir`.  The fixtures are of the
+/// default tactics of a build before the GF(2) bound, the matching path, which this build no longer has.  The checks of
+/// the header come in order, the game's (n, candidates, frames, `max_total`) before the tactics, so a refusal for the
+/// matching path says that the rest of the header was read as this build reads it.  Returns the refusal, and leaves
+/// the file as it was.
+fn committed_checkpoint_refused(fixture: &str, dir: &TempDir) -> String {
     let games = stored_games();
-    let dir = TempDir::new("committed-checkpoint");
-    let opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
+    let opts = SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..options(1) };
     let checkpoint = opts.checkpoint_file(1133).unwrap();
     std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
-    std::fs::copy(testdata("n1133_after_1000_nodes.ckpt"), &checkpoint).unwrap();
+    std::fs::copy(testdata(fixture), &checkpoint).unwrap();
+    let err = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap_err();
+    for part in ["cannot resume from", "n1133.ckpt", "matching path (gf2=off, lagrange=on), which this build no longer"]
+    {
+        assert!(err.contains(part), "{fixture}: {part}: {err}");
+    }
+    assert_eq!(std::fs::read(&checkpoint).unwrap(), std::fs::read(testdata(fixture)).unwrap(), "{fixture}: left alone");
+    err
+}
 
-    let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
-    assert!(r.completed && r.method == Method::Search);
-    assert_eq!(r.score, games[&1133].0);
-    assert_eq!(r.invocations, 2, "the game was resumed, not started over");
-    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
-    assert!(r.nodes > 1000, "{} nodes in all, 1,000 of them before the checkpoint", r.nodes);
-    assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
+/// A checkpoint that an earlier build wrote (`testdata/n1133_after_1000_nodes.ckpt`: game 1133 at W = 20 with the
+/// default tactics of that build, the matching path, stopped after 1,023 nodes on one thread; search header format TXSH
+/// v5) is read, every field of its header as it was written, and refused for its tactics, which this build no longer
+/// has.  Every write/read test of the format uses the code's own constants, so a change of the layout that round-trips
+/// (the version, the byte order of a set, the order of the header's fields, the packing of the tactics) passes them
+/// and refuses this file for another reason ([`committed_checkpoint_refused`]).
+///
+/// A deliberate change of the format (a new header version, say, which refuses older checkpoints) fails this test.
+#[test]
+fn a_committed_checkpoint_of_the_matching_path_is_read_and_refused() {
+    committed_checkpoint_refused("n1133_after_1000_nodes.ckpt", &TempDir::new("committed-checkpoint"));
 }
 
 /// A checkpoint of the format before the extended problem's search (`testdata/n1133_after_1000_nodes_v4.ckpt`: the
 /// same search as the fixture above, written by the build of commit 2e8b851, whose headers are version 4, with no digest
-/// of the one-sided candidates) resumes with this build and finishes as the build that wrote it finishes it: the same
-/// score, two invocations and 3,058 nodes in all (the count that build's binary gave, finishing the same file).  That
-/// build had no near-repeat cut, which the game of 1132 makes end the search at once, so the run turns it off.  Its
-/// header reads as a version-5 header with no one-sided candidates; asked to resume a search of the extended problem
-/// with open sources instead, it is refused, saying why.
+/// of the one-sided candidates) reads as a version-5 header with no one-sided candidates, and is refused as the
+/// fixture above is.  Asked to resume a search of the extended problem with open sources instead, it is refused for
+/// its version first, saying why.
 #[test]
-fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishes_it() {
-    let games = stored_games();
+fn a_committed_checkpoint_of_format_4_is_read_and_refused() {
     let dir = TempDir::new("committed-checkpoint-v4");
-    let mut opts = old_window(SolveOptions { checkpoint_dir: Some(dir.join("ckpt")), ..matching_options(1) });
-    opts.tactics.set("near_repeat=off").unwrap();
-    let checkpoint = opts.checkpoint_file(1133).unwrap();
-    std::fs::create_dir_all(checkpoint.parent().unwrap()).unwrap();
-    std::fs::copy(testdata("n1133_after_1000_nodes_v4.ckpt"), &checkpoint).unwrap();
+    committed_checkpoint_refused("n1133_after_1000_nodes_v4.ckpt", &dir);
+    let checkpoint = dir.join("ckpt").join("n1133.ckpt");
     let version = std::fs::read(&checkpoint).unwrap()[24..28].to_vec();
     assert_eq!(version, 4u32.to_le_bytes(), "the fixture's header is of version 4");
 
@@ -492,19 +478,12 @@ fn a_committed_checkpoint_of_format_4_resumes_as_the_build_that_wrote_it_finishe
     let open: Bits<20> = board.plain.iter().copied().filter(|&x| 2 * x > 1133 && board.tables.omega(x) >= 3).collect();
     let refused = board.prepare_extended_for_resume(&open, false, &checkpoint).err().expect("refused");
     assert!(refused.contains("format version 4") && refused.contains("one-sided candidates"), "{refused}");
-
-    let r = solver::solve_game(1133, Some(&prev_of(&games, 1133)), &opts).unwrap();
-    assert!(r.completed && r.method == Method::Search);
-    assert_eq!(r.score, games[&1133].0);
-    assert_eq!((r.invocations, r.nodes), (2, 3058), "the build that wrote the checkpoint finishes it so");
-    assert!(r.assumes.is_empty(), "{:?}", r.assumes);
-    assert!(!checkpoint.exists(), "a finished game removes its checkpoint");
 }
 
-/// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics
-/// of the matching path (the tactics are part of the checkpoint's header and must read back as written; the GF(2)
-/// bound's search of 1133 is too short to stop, and `tests/soundness.rs` resumes game 992 under it at W = 20, 24 and
-/// 64).  The unit tests resume only at W = 16.
+/// A W = 20 search interrupted every few hundred nodes and resumed from its checkpoint, under two sets of tactics (the
+/// tactics are part of the checkpoint's header and must read back as written): game 1032, whose search takes some
+/// thousands of nodes, where that of 1133 takes a hundred.  `tests/soundness.rs` resumes game 992 at W = 20, 24 and
+/// 64.  The unit tests resume only at W = 16.
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -520,12 +499,13 @@ fn a_w20_search_interrupted_and_resumed_once_gives_the_same_answer() {
     a_w20_search_interrupted_and_resumed_under(1);
 }
 
-/// The W = 20 search of game 1133 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
-/// the matching path, without the near-repeat cut, by which the game of 1132 ends the search at its first step.
+/// The W = 20 search of game 1032 interrupted and resumed gives the answer, under the first `sets` sets of tactics of
+/// [`variants`], without the near-repeat cut, by which the game before could end the search early.
 fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
+    const N: u32 = 1032;
     let games = stored_games();
-    let prev = prev_of(&games, 1133);
-    for (name, tactics) in variants().into_iter().filter(|(name, _)| name.starts_with("matching")).take(sets) {
+    let prev = prev_of(&games, N);
+    for (name, tactics) in variants().into_iter().take(sets) {
         let dir = TempDir::new(&format!("resume-{}", name.replace(['=', ','], "-")));
         let mut opts = options(1);
         opts.tactics.search = SearchTactics { near_repeat: false, ..tactics };
@@ -534,16 +514,16 @@ fn a_w20_search_interrupted_and_resumed_under(sets: usize) {
         opts.queue_mem_cap = 2;
         let mut pieces = 0;
         let result = loop {
-            let r = solver::solve_game(1133, Some(&prev), &opts).unwrap();
+            let r = solver::solve_game(N, Some(&prev), &opts).unwrap();
             pieces += 1;
             if r.completed {
                 break r;
             }
-            assert!(opts.checkpoint_file(1133).unwrap().exists(), "{name}: an unfinished game keeps its checkpoint");
+            assert!(opts.checkpoint_file(N).unwrap().exists(), "{name}: an unfinished game keeps its checkpoint");
             assert!(pieces < 50, "{name}: no progress");
         };
-        assert_eq!(result.score, games[&1133].0, "{name}");
-        assert!(!opts.checkpoint_file(1133).unwrap().exists(), "{name}");
+        assert_eq!(result.score, games[&N].0, "{name}");
+        assert!(!opts.checkpoint_file(N).unwrap().exists(), "{name}");
         assert!(pieces >= 2, "{name}: {pieces} pieces");
     }
 }
@@ -615,8 +595,8 @@ fn deep_units() -> (u64, Vec<TaxUnit<32>>) {
     (best, units.collect())
 }
 
-/// Along the path of a real search to 34 promotions deep, the incremental matching bound and the quick bounds
-/// without a member equal the min-cost-flow reference (the unit tests walk only ~10 deep, at n <= 760), and the
+/// Along the path of a real search to 34 promotions deep, the matching bound, solved from scratch and repaired with a
+/// member removed, equals the min-cost-flow reference (the unit tests walk only ~10 deep, at n <= 760), and the
 /// subtrees of the deep levels give the same answer under every tactic: states and conflicts that no search of
 /// the unit tests' size reaches.  The last comparison is made among the variants without the rule of the tactic
 /// `symmetry` and among those with it: a search of a unit below the root with the rule finds the best completion
@@ -640,9 +620,8 @@ fn deep_levels_of_a_large_game_below(subtrees: usize) {
     assert!(units.len() >= 20, "{} units", units.len());
     let game = Game::<32>::of_board(1215).unwrap();
     let graph = MatchGraph::new(&game.model, &game.root);
-    let (mut fresh, mut incremental) = (MatchBound::new(&graph), MatchBound::new(&graph));
+    let mut fresh = MatchBound::new(&graph);
     let mut scratch = Scratch::new();
-    let mut previous: Option<TaxUnit<32>> = None;
     let deepest = units.iter().map(|u| u.promoted.len()).max().unwrap();
     assert!(deepest >= 25, "deepest level has {deepest} promotions");
     for (k, unit) in units.iter().enumerate() {
@@ -651,22 +630,12 @@ fn deep_levels_of_a_large_game_below(subtrees: usize) {
         fresh.reset(&unit.promoted, &unit.cands);
         assert_eq!(fresh.value(), reference, "level {k} from scratch");
         for x in fresh.chosen().iter().take(4) {
-            let (quick, exact) = (fresh.bound_excluding(x), fresh.value_excluding(x));
-            fresh.pop();
+            let mut without = fresh.clone();
+            without.remove_candidate(x);
+            let exact = without.value();
             assert_eq!(exact, match_bound(&game.model, &state, &unit.cands.without(x)), "level {k} without {x}");
-            assert!(exact <= quick && quick <= reference, "level {k}: {exact} <= {quick} <= {reference}");
+            assert!(exact <= reference, "level {k}: {exact} <= {reference}");
         }
-        match previous {
-            Some(before) if before.promoted.is_subset(&unit.promoted) => {
-                for x in (incremental.candidates() - before.cands).iter() {
-                    incremental.remove_candidate(x);
-                }
-                incremental.push_all(&(unit.promoted - before.promoted), &unit.cands);
-            }
-            _ => incremental.reset(&unit.promoted, &unit.cands),
-        }
-        assert_eq!(incremental.value(), reference, "level {k} incrementally");
-        previous = Some(*unit);
     }
 
     // The subtrees below the deepest levels (milliseconds each), searched from the checkpoint's incumbent and a

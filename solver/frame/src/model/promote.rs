@@ -23,7 +23,7 @@
 //! The state after promoting `S` is then the same in any order, since reduction is confluent on winnable frames,
 //! and [`FrameGraph::promote_all_using`] makes it by checking and reducing each frame once.  Everything that reasons
 //! about sets of promotions rests on this: conflicts and nogoods ([`super::conflict`], [`super::nogoods`]), the
-//! matching bound's relaxation ([`crate::matchbound`]), and a search node rebuilt from its promotions alone.
+//! bounds' relaxations ([`crate::matchbound`], [`crate::gf2`]), and a search node rebuilt from its promotions alone.
 
 use super::peel::{reduce_from, Scratch, Worklist};
 use super::{Frame, FrameGraph, FrameSet, MAX_FRAMES};

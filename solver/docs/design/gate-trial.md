@@ -36,8 +36,8 @@ nothing in the checkpoint, which resumes with any gate.
 others.  If the branching settings have changed since the search started, the trial does not run, or does not set its
 gate, and says so.
 
-The trial needs the tactic `gf2` for the gaps and a checkpoint directory for the units; without either it does not run,
-and with conflict branching off the gate means nothing, so it does not run either.
+The trial needs a checkpoint directory for the units; without one it does not run, and with conflict branching off the
+gate means nothing, so it does not run either.
 
 *What it costs and what it records.*  Near n = 5000, 24 units under three or four gates take 0.15 to 0.35 hours of one
 core, a few minutes of four, at the scheduling priority of the workers, beside a search of hundreds of thread-hours.

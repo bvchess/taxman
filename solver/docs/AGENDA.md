@@ -294,8 +294,8 @@ and 2100.  *Payoff:* about ten times, a constant, which is what A2's remaining s
   search](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md) was not needed.  Where a step's cycles go
   since: [what a GF(2) step carries from the
   last](../notebook/search/what-a-gf2-step-carries-from-the-last-same-trees-2026-10/README.md).
-* **What only the matching path uses**, open: the GF(2) bound has made it idle, and it can be removed once a production
-  run has been made with the GF(2) search: the Lagrangian bound in the search and refinement ([the same
+* **What only the matching path uses**, done: the matching bound as the node bound, its refinement and the Lagrangian
+  bound in the search were removed on 2026-10-30, after the chain had run on the GF(2) search ([the same
   entry](../notebook/search/the-gf2-bound-in-the-search-2026-10/README.md), the item "To remove").
 * **A unit that carries its GF(2) level**, not built: a rebuilt unit's first node would check the level instead of
   solving it, which wins at most the units' first nodes, 1 to 4% of a thread's time at 64 threads, nothing on long

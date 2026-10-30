@@ -16,8 +16,8 @@
 //!
 //! A conflict `K` found at a node with promotions `P` becomes a nogood by
 //! [`FrameGraph::nogood`](super::FrameGraph::nogood): a minimal subset of `P ∪ K` that keeps one of the root's frames
-//! unwinnable.  The search uses the table for the conflict to branch on and to refine with (the smallest it
-//! knows, [`Nogoods::lookup`]) and to rule candidates out of children ([`Nogoods::ruled_out`]).
+//! unwinnable.  The search uses the table for the conflict to branch on (the smallest it knows,
+//! [`Nogoods::lookup`]) and to rule candidates out of children ([`Nogoods::ruled_out`]).
 //!
 //! # Forgetting is sound, and a policy
 //!

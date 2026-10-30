@@ -17,30 +17,30 @@
 //!   with an optimal set), each its promotions and candidates.  Each kernel replays all of them: the rebuild of a
 //!   node's state (`promote_all_using`), the promotion of every candidate (`promote_in_place_using`, the peel) and
 //!   `can_promote_using`, the minimal conflict and the one from the residual (the `core` line) of the heaviest
-//!   matching, the matching from scratch and warm-started from the root's, the bounds without each member of the
-//!   heaviest matching from the potentials, the exact ones without each member of the conflict (strong branching),
-//!   children pushed and evaluated, and lookups and rule-outs in a nogood table learned from the nodes' conflicts.
+//!   matching (as the start's dive finds it), the matching from scratch, and lookups (with no member forced) and
+//!   rule-outs in a nogood table learned from the nodes' conflicts.
 //! * Fixture F2, frame checks, made from F1 on the fly: the two frames that promoting each candidate of each node
 //!   changes (one gains the move, one loses the factor), each checked by `FrameGraph::winnable_using`.
+//! * Fixture F4, the GF(2) bound's kernels at the nodes of F1 ([`gf2_kernels`]).
 //! * `nNNNN.window.ckpt` (fixture F3, a search window): a checkpoint (TXSH, as `taxman solve` writes) of that proof
 //!   after some nodes, resumed on one thread for `--steps` steps (default 50,000, one period of forgetting nogoods).  A
 //!   resumed search starts with empty nogood tables, so the window is the same tree every time, and its fingerprint is
-//!   the search's counters (steps, promotions, children, matching bounds, ...), less the GF(2) bound's counts of solves
-//!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The window searches
-//!   with the tactics the checkpoint records, the matching path's, the defaults when the windows were first made
-//!   (`make-window 936 4500` and `make-window 1215 600000`, with
-//!   `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe
-//!   does, on top of the defaults, so the windows record the default window of the forced members, `force_window=all`,
-//!   as a header of version 6), which `--tactic` changes (the search tactics only):
-//!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.  A game in `--fixtures` with
-//!   a window and no nodes (a copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has
-//!   only the window.
+//!   the search's counters (steps, promotions, children, bound checks, ...), less the GF(2) bound's counts of solves
+//!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The windows were made
+//!   on the matching path, the default when they were first made (`make-window 936 4500` and `make-window 1215
+//!   600000`, with `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off` since, by the builds that had those
+//!   tactics, so the windows record the default window of the forced members, `force_window=all`, as a header of
+//!   version 6).  This build has no matching path: it searches the window's units with the GF(2) bound and the other
+//!   tactics the checkpoint records (`symmetry` and conflict branching off; `Board::prepare_for_window`), which
+//!   `--tactic` changes (the search tactics only): `--tactic force_window=80`, say, searches the same window with the
+//!   forced members searched for within 80 of the need.  `make-window` takes `--tactic` as the probe does, on top of
+//!   the defaults, and makes a window of this build's search.  A game in `--fixtures` with a window and no nodes (a copy
+//!   of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has only the window.
 //!
 //! Each kernel runs `--reps` times (default 3; the window 2) and the fastest by cycles is reported, per
-//! operation and in all; the fingerprints of all runs must agree.  The incremental matching kernels (marked `+`)
-//! each start from a level solved from scratch, and are reported net of that.  The last line sums the kernels'
-//! cycles and instructions and combines their fingerprints.  On Linux there is no per-process cycle counter
-//! without a crate, so the probe reports wall time only; run it under `perf stat` there.
+//! operation and in all; the fingerprints of all runs must agree.  The last line sums the kernels' cycles and
+//! instructions and combines their fingerprints.  On Linux there is no per-process cycle counter without a crate, so
+//! the probe reports wall time only; run it under `perf stat` there.
 //!
 //! The fixtures are made with the commands `make-nodes` (the nodes handed to the searcher by a chain of runs of
 //! `--every` nodes each, every run resuming the last one's checkpoint, so that each hands it the stack the last
@@ -198,7 +198,6 @@ struct Node<const W: usize> {
     promoted: Bits<W>,
     cands: Bits<W>,
     state: taxman::model::FrameSet<W>,
-    need: u64,
     chosen: Bits<W>,
     conflict: Option<Bits<W>>,
 }
@@ -212,7 +211,6 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
     if !incumbent.is_subset(&p.candidates) || model.promote_all_using(&mut scratch, &p.root, &incumbent).is_none() {
         return Err(format!("{}: the incumbent is not a promotion set of game {n}", path.display()));
     }
-    let best = incumbent.sum();
     let mut mb = MatchBound::new(&graph);
     let mut nodes = Vec::new();
     for u in units.iter().filter(|u| !u.cands.is_empty()) {
@@ -222,8 +220,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
         mb.reset(&u.promoted, &u.cands);
         let chosen = mb.chosen();
         let conflict = model.conflict_using(&mut scratch, &state, &chosen, true);
-        let need = (best + 1).saturating_sub(u.promoted.sum());
-        nodes.push(Node { promoted: u.promoted, cands: u.cands, state, need, chosen, conflict });
+        nodes.push(Node { promoted: u.promoted, cands: u.cands, state, chosen, conflict });
     }
     let count = |f: fn(&Node<W>) -> u32| nodes.iter().map(|x| u64::from(f(x))).sum::<u64>();
     let (cands, chosen, conflicts) =
@@ -271,64 +268,13 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
         });
         report.line(label, nodes_len, cost, fp);
     }
-    let (reset, fp) = measure(reps, |fp| {
+    let (cost, fp) = measure(reps, |fp| {
         for x in &nodes {
             mb.reset(&x.promoted, &x.cands);
             fp.add(mb.value());
         }
     });
-    report.line("matching from scratch: reset(P, C) + value", nodes_len, reset, fp);
-    let mut warm = MatchBound::new(&graph);
-    warm.reset(&Bits::EMPTY, &p.candidates);
-    warm.value();
-    let (cost, fp) = measure(reps, |fp| {
-        for x in &nodes {
-            warm.push_all(&x.promoted, &x.cands);
-            fp.add(warm.value());
-            warm.pop();
-        }
-    });
-    report.line("warm start: root level + push_all(P, C) + value", nodes_len, cost, fp);
-    // The incremental kernels each start from a level solved from scratch: reported net of that.
-    let net = |cost: Cost| Cost {
-        cycles: cost.cycles.zip(reset.cycles).map(|(a, b)| a.saturating_sub(b)),
-        instructions: cost.instructions.zip(reset.instructions).map(|(a, b)| a.saturating_sub(b)),
-        wall: cost.wall.saturating_sub(reset.wall),
-    };
-    let (cost, fp) = measure(reps, |fp| {
-        for x in &nodes {
-            mb.reset(&x.promoted, &x.cands);
-            mb.value();
-            for c in x.chosen.iter() {
-                fp.add(mb.bound_excluding(c));
-            }
-        }
-    });
-    report.line("+ bound_excluding(x), x in Q*", chosen, net(cost), fp);
-    let (cost, fp) = measure(reps, |fp| {
-        for x in &nodes {
-            mb.reset(&x.promoted, &x.cands);
-            mb.value();
-            for c in x.conflict.unwrap_or_default().iter() {
-                fp.add(mb.value_excluding(c));
-                mb.pop();
-            }
-        }
-    });
-    report.line("+ value_excluding(x) + pop, x in the conflict", conflicts, net(cost), fp);
-    let pushes = nodes.iter().map(|x| u64::from(x.chosen.len().min(8))).sum();
-    let (cost, fp) = measure(reps, |fp| {
-        for x in &nodes {
-            mb.reset(&x.promoted, &x.cands);
-            mb.value();
-            for c in x.chosen.iter_desc().take(8) {
-                mb.push(c, &x.cands.without(c));
-                fp.add(mb.value());
-                mb.pop();
-            }
-        }
-    });
-    report.line("+ push(x, C - x) + value + pop, 8 largest of Q*", pushes, net(cost), fp);
+    report.line("matching from scratch: reset(P, C) + value", nodes_len, cost, fp);
 
     let root_max = p.root.frames().iter().filter_map(|f| (f.moves | f.factors).max()).max().unwrap_or(0);
     let mut table = Nogoods::<W>::new(root_max, 1 << 16);
@@ -339,24 +285,17 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
             }
         }
     }
-    let forced: Vec<Bits<W>> = nodes
-        .iter()
-        .map(|x| {
-            mb.reset(&x.promoted, &x.cands);
-            mb.value();
-            x.chosen.iter().filter(|&c| mb.bound_excluding(c) < x.need).collect()
-        })
-        .collect();
     let (cost, fp) = measure(reps, |fp| {
-        for (x, forced) in nodes.iter().zip(&forced) {
-            fp.add(match table.lookup(&x.promoted, &x.chosen, forced) {
+        for x in &nodes {
+            fp.add(match table.lookup(&x.promoted, &x.chosen, &Bits::EMPTY) {
                 Lookup::None => 0,
                 Lookup::AllForced => 1,
                 Lookup::Conflict(k) => k.sum(),
             });
         }
     });
-    report.line(&format!("Nogoods::lookup(P, Q*, forced), {} nogoods", table.len()), nodes_len, cost, fp);
+    report.line(&format!("Nogoods::lookup(P, Q*), {} nogoods", table.len()), nodes_len, cost, fp);
+    let pushes = nodes.iter().map(|x| u64::from(x.chosen.len().min(8))).sum();
     let (cost, fp) = measure(reps, |fp| {
         for x in &nodes {
             for c in x.chosen.iter_desc().take(8) {
@@ -390,7 +329,7 @@ fn kernels<const W: usize>(path: &Path, reps: u32, report: &mut Report) -> Resul
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Fixture F4: the GF(2) bound's kernels (with `--tactic gf2=on`)
+// Fixture F4: the GF(2) bound's kernels
 
 /// The GF(2) bound's kernels at the nodes of the F1 fixture `path` ([`taxman::gf2::Gf2Bound`]), each over all the
 /// nodes: a node's level from the root and its bound from scratch; the same with its forced members (the weight
@@ -505,7 +444,7 @@ fn window<const W: usize>(
     report: &mut Report,
 ) -> Result<(), String> {
     let mut p = Board::<W>::for_n(n)
-        .prepare_for_resume(path)
+        .prepare_for_window(path)
         .map_err(|e| format!("{}: {e} (make it again with `perf make-window`)", path.display()))?;
     let mut tactics = Tactics { search: p.tactics, ..Tactics::default() };
     for change in changes {
@@ -515,8 +454,7 @@ fn window<const W: usize>(
         return Err("--tactic: the window only searches, so only search tactics apply".into());
     }
     p.tactics = tactics.search;
-    let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, &graph);
+    let space = SearchSpace::new(&p);
     let header = engine::read_checkpoint_header(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let before = engine::read_checkpoint(path).map_err(|e| format!("{}: {e}", path.display()))?.stats.nodes;
     let cfg = EngineConfig { threads: 1, node_limit: Some(steps), progress: None, ..EngineConfig::default() };
@@ -528,7 +466,7 @@ fn window<const W: usize>(
             Ok(o) => {
                 (done, completed) = (o.stats.nodes, o.completed);
                 // The GF(2) bound's counters of solves and augmentations measure work, not the tree (a faster
-                // bound makes fewer for the same tree), so they count as zero, as on the matching path.
+                // bound makes fewer for the same tree), so they count as zero.
                 let mut extra = o.stats.extra;
                 for k in
                     [stat::GF2_SOLVES, stat::GF2_AUGMENTATIONS, stat::GF2_STRONG_SOLVES, stat::GF2_STRONG_AUGMENTATIONS]
@@ -575,8 +513,7 @@ impl<const W: usize> Searcher<TaxUnit<W>> for Recorder<'_, W> {
 fn make_nodes<const W: usize>(dir: &Path, n: u32, optimal: &Optimal, every: u64, keep: usize) -> Result<(), String> {
     let p = setup::<W>(n);
     let incumbent = seed(&p, optimal);
-    let graph = MatchGraph::new(&p.model, &p.root);
-    let space = SearchSpace::new(&p, &graph);
+    let space = SearchSpace::new(&p);
     let log = Mutex::new(Vec::new());
     let tmp = std::env::temp_dir().join(format!("taxman-perf-{n}-{}.ckpt", std::process::id()));
     let payload = incumbent.as_words().iter().flat_map(|w| w.to_le_bytes()).collect();
@@ -715,15 +652,12 @@ fn run() -> Result<(), String> {
                 tactics.set(change).map_err(|e| format!("--tactic: {e}"))?;
             }
             for n in games {
-                let gf2 = changes.iter().any(|c| c == "gf2=on");
                 // A game with a window and no nodes (a chain's checkpoint, say) has only the window.
                 let nodes = fixture(&dir, n, "nodes");
                 taxman::with_width!(n, W => {
                     if nodes.exists() {
                         kernels::<W>(&nodes, reps, &mut report)?;
-                        if gf2 {
-                            gf2_kernels::<W>(&nodes, reps, tactics.search.force_window, &mut report)?;
-                        }
+                        gf2_kernels::<W>(&nodes, reps, tactics.search.force_window, &mut report)?;
                     }
                     window::<W>(n, &fixture(&dir, n, "window.ckpt"), steps, &changes, reps, &mut report)?;
                 });

@@ -1,15 +1,13 @@
 use super::header::Header;
-use super::refine::{strongest, Learning, Refiner, Verdict};
+use super::tactics::MatchingPath;
 use super::*;
 use crate::board::Board;
-use crate::bounds::max_additional;
 use crate::engine::Unit;
 use crate::frames::build_frames;
 use crate::gf2::{ForceWindow, Gf2Bound, Gf2Graph};
 use crate::json::Json;
-use crate::matchbound::MatchBound;
 use crate::model::test_support::*;
-use crate::model::{ConflictCache, FrameGraph, Keep, Nogoods, Scratch};
+use crate::model::{FrameGraph, Keep, Scratch};
 use crate::numtheory::Tables;
 use crate::test_support::{TempDir, QUICK};
 use std::thread;
@@ -70,218 +68,6 @@ fn golden_games_up_to_400_match_the_java() {
     }
 }
 
-/// Checks the refined matching bound along random search paths of `g`: it never prunes a node whose best
-/// completion (found exhaustively) reaches `need`, the completions it calls exact or finds can be promoted,
-/// and the conflicts it keeps, carried down the path, stay conflicts.  Returns the numbers of verdicts, of
-/// prunings the plain matching bound would not make, and of exact completions.
-fn refinement_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 3] {
-    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
-    let all = Bits::<W>::from_slice(&g.candidates);
-    let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let graph = MatchGraph::new(&model, &root);
-    let mut m = MatchBound::new(&graph);
-    let mut scratch = Scratch::new();
-    let mut table = Nogoods::new(g.n, 1 << 12);
-    let mut checks = [0; 3];
-    for _path in 0..6 {
-        let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
-        let mut known = Vec::new();
-        let mut cache = ConflictCache::default();
-        loop {
-            let max_add = max_additional(&model, max_total, &state, &promoted, &cands);
-            let truth = best_completion(&model, &state, &cands, max_add);
-            let what = format!("n={} promoted {promoted:?} cands {cands:?} best {truth}", g.n);
-            for depth in [0, 1, 2, 4] {
-                for need in [truth.saturating_sub(7), truth, truth + 1, truth + 9] {
-                    m.reset(&promoted, &cands);
-                    let plain = m.value();
-                    // Half the time with the nogoods learned so far, on this path and others.
-                    let learning = rng.chance(50).then_some(Learning { table: &mut table, root: &root, promoted });
-                    let mut refiner = Refiner {
-                        m: &mut m,
-                        model: &model,
-                        scratch: &mut scratch,
-                        state: &state,
-                        need,
-                        known: &mut known,
-                        cache: &mut cache,
-                        evaluations: 0,
-                        computed: 0,
-                        exact: Bits::EMPTY,
-                        learning,
-                        forcing: rng.chance(50),
-                        forced: Bits::EMPTY,
-                    };
-                    let verdict = refiner.top(depth, rng.chance(50));
-                    let found = refiner.exact;
-                    if need <= truth {
-                        assert_ne!(verdict, Verdict::Below, "{what}: depth {depth} prunes at need {need}");
-                    }
-                    let exact = match verdict {
-                        Verdict::Exact(q) => Some(q),
-                        _ => None,
-                    };
-                    for q in [exact, Some(found).filter(|f| !f.is_empty())].into_iter().flatten() {
-                        assert!(q.is_subset(&cands) && q.sum() >= need, "{what}: exact {q:?} at need {need}");
-                        assert!(model.can_promote_all_using(&mut scratch, &state, &q), "{what}: {q:?} fails");
-                    }
-                    checks[0] += 1;
-                    checks[1] += u64::from(verdict == Verdict::Below && plain >= need);
-                    checks[2] += u64::from(exact.is_some() || !found.is_empty());
-                }
-            }
-            for k in &known {
-                assert!(!model.can_promote_all_using(&mut scratch, &state, k), "{what}: {k:?} is no conflict");
-            }
-            // Descend into a random child, as the search would (in any order).
-            let members = cands.to_vec();
-            if members.is_empty() {
-                break;
-            }
-            let Some((n, next)) = (0..4).find_map(|_| {
-                let n = rng.pick(&members);
-                model.promote(&state, n).map(|s| (n, s))
-            }) else {
-                break;
-            };
-            cands = next.narrow_candidates(&cands.without(n));
-            (state, promoted) = (next, promoted.with(n));
-        }
-    }
-    checks
-}
-
-#[test]
-#[cfg_attr(debug_assertions, ignore = "long: the quick check is refined_matching_bound_is_sound_on_a_sample")]
-fn refined_matching_bound_is_sound() {
-    refined_matching_bound_is_sound_on_every(1);
-}
-
-/// [`refined_matching_bound_is_sound`] on every sixth of its golden games.
-#[test]
-fn refined_matching_bound_is_sound_on_a_sample() {
-    refined_matching_bound_is_sound_on_every(6);
-}
-
-/// The refined matching bound is sound on every `every`th of the golden games.
-fn refined_matching_bound_is_sound_on_every(every: usize) {
-    let mut rng = Rng(0x5EED_C0F1_1C75_0001);
-    let mut checks = [0; 3];
-    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
-        let more = refinement_soundness::<4>(&load(n), &mut rng);
-        for (a, b) in checks.iter_mut().zip(more) {
-            *a += b;
-        }
-    }
-    let [verdicts, refined, exact] = checks;
-    eprintln!("refined matching bound: {verdicts} verdicts, {refined} refined prunings, {exact} exact completions");
-    assert!(verdicts > 5000 / every as u64 && refined > 500 / every as u64 && exact > 500 / every as u64);
-}
-
-/// Checks the forced members of strong branching (tactic `fix_forced`) along random search paths of `g`: at a
-/// node whose heaviest matching has a conflict, every forced member is in every completion that reaches
-/// `need` (found exhaustively), so the child that promotes all of them keeps the best completion whenever it
-/// reaches `need`.  Returns the numbers of nodes checked and of forced members.  Two paths per game (six took
-/// 3.5 s and found 7,400 nodes and 18,000 forced members, 15 to 60 times what the test asks for).
-fn forced_soundness<const W: usize>(g: &Golden, rng: &mut Rng) -> [u64; 2] {
-    let (model, root) = FrameGraph::build::<W>(&Tables::new(g.n), &g.columns).unwrap();
-    let all = Bits::<W>::from_slice(&g.candidates);
-    let max_total = root.max_promotions_among(&all).max(0) as u32;
-    let graph = MatchGraph::new(&model, &root);
-    let mut m = MatchBound::new(&graph);
-    let mut scratch = Scratch::new();
-    let mut checks = [0; 2];
-    for _path in 0..2 {
-        let (mut state, mut promoted, mut cands) = (root, Bits::<W>::EMPTY, all);
-        loop {
-            let max_add = max_additional(&model, max_total, &state, &promoted, &cands);
-            let truth = best_completion(&model, &state, &cands, max_add);
-            for need in [truth.saturating_sub(5), truth, truth + 1] {
-                m.reset(&promoted, &cands);
-                if m.value() < need {
-                    continue;
-                }
-                let chosen = m.chosen();
-                let Some(k) = model.conflict_using(&mut scratch, &state, &chosen, true) else { continue };
-                let k = k & cands;
-                if k.len() < 2 {
-                    continue;
-                }
-                let what = format!("n={} promoted {promoted:?} cands {cands:?} need {need}", g.n);
-                // The members of the heaviest matching forced by the potentials alone, or else those of the
-                // conflict that strong branching finds.
-                let quick: Bits<W> = chosen.iter().filter(|&x| m.bound_excluding(x) < need).collect();
-                let forced = if quick.is_empty() || rng.chance(30) {
-                    let strong = strongest(&mut m, &k, need, rng.chance(50));
-                    let (n, forced) = (strong.member, strong.forced);
-                    assert!(k.contains(n) && forced.is_subset(&k), "{what}: {n} {forced:?} from {k:?}");
-                    assert!(forced.is_empty() || forced.contains(n), "{what}: {n} is not among {forced:?}");
-                    assert!((quick & k).is_subset(&forced), "{what}: {quick:?} not all in {forced:?}");
-                    forced
-                } else {
-                    quick
-                };
-                for x in forced.iter() {
-                    let without = best_completion(&model, &state, &cands.without(x), max_add);
-                    assert!(without < need, "{what}: {x} is forced, but leaving it out reaches {without}");
-                }
-                if truth >= need && !forced.is_empty() {
-                    let next = model.promote_all_using(&mut scratch, &state, &forced);
-                    let next = next.unwrap_or_else(|| panic!("{what}: the forced {forced:?} cannot be promoted"));
-                    let rest = best_completion(&model, &next, &(cands - forced), max_add - forced.len());
-                    assert_eq!(rest + forced.sum(), truth, "{what}: promoting {forced:?} loses the best");
-                }
-                checks[0] += 1;
-                checks[1] += u64::from(forced.len());
-            }
-            // Descend into a random child, as the search would (in any order).
-            let members = cands.to_vec();
-            if members.is_empty() {
-                break;
-            }
-            let Some((n, next)) = (0..4).find_map(|_| {
-                let n = rng.pick(&members);
-                model.promote(&state, n).map(|s| (n, s))
-            }) else {
-                break;
-            };
-            cands = next.narrow_candidates(&cands.without(n));
-            (state, promoted) = (next, promoted.with(n));
-        }
-    }
-    checks
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "long: the quick check is forced_members_are_in_every_good_completion_of_a_sample"
-)]
-fn forced_members_are_in_every_good_completion() {
-    forced_members_are_in_every_good_completion_on_every(1);
-}
-
-/// [`forced_members_are_in_every_good_completion`] on every sixth of its golden games.
-#[test]
-fn forced_members_are_in_every_good_completion_of_a_sample() {
-    forced_members_are_in_every_good_completion_on_every(6);
-}
-
-/// The forced members are in every good completion on every `every`th of the golden games.
-fn forced_members_are_in_every_good_completion_on_every(every: usize) {
-    let mut rng = Rng(0xF0BC_ED00_1234_5678);
-    let mut checks = [0; 2];
-    for n in golden_ns().into_iter().filter(|&n| (40..=220).contains(&n)).step_by(every) {
-        let more = forced_soundness::<4>(&load(n), &mut rng);
-        for (a, b) in checks.iter_mut().zip(more) {
-            *a += b;
-        }
-    }
-    let [nodes, forced] = checks;
-    eprintln!("forced members: {nodes} nodes with a conflict to branch on, {forced} forced members");
-    assert!(nodes > 500 / every as u64 && forced > 300 / every as u64);
-}
-
 #[test]
 fn golden_games_above_400_match_the_java() {
     let games: Vec<Golden> = golden_ns().into_iter().filter(|&n| n > 400).map(load).collect();
@@ -320,18 +106,11 @@ fn sums_by_tactics<const W: usize>(g: &Golden) -> Vec<(SearchTactics, u64)> {
     let default = SearchTactics::default();
     let variants = [
         default,
-        SearchTactics { match_refine: 3, ..default },
         SearchTactics { fix_forced: false, ..default },
-        SearchTactics { fix_forced: false, match_refine: 0, ..default },
-        SearchTactics { fix_forced: false, match_refine: 2, ..default },
         SearchTactics { nogoods: false, ..default },
-        SearchTactics { nogoods: false, match_refine: 0, ..default },
         SearchTactics { forget_nogoods: false, ..default },
-        SearchTactics { lagrange: false, ..default },
-        SearchTactics { match_refine: 0, ..default },
         SearchTactics { symmetry: false, ..default },
-        SearchTactics::matching(),
-        SearchTactics { symmetry: true, ..SearchTactics::matching() },
+        SearchTactics { fix_forced: false, nogoods: false, symmetry: false, ..default },
     ];
     variants.iter().map(|&t| (t, search_checked(&prepare_golden::<W>(g, t), 1, "tactics").sum)).collect()
 }
@@ -432,66 +211,11 @@ fn every_policy_of_keeping_nogoods_gives_the_same_optimum_on_every(every: usize)
     }
 }
 
-/// Searches 760 in pieces of about a sixth of its nodes each, resuming from the checkpoint, and checks the
-/// answer.  The engine checks the node limit every 1024 nodes, so a search of fewer than 6·1024 nodes stops
-/// less often: with one thread it must still take `min_pieces` pieces.
-fn resume_in_pieces(threads: usize, tactics: SearchTactics, min_pieces: usize) {
-    let g = load(760);
-    let tables = Tables::new(g.n);
-    let cands = Bits::<16>::from_slice(&g.candidates);
-    let whole = prepare::<16>(&tables, &g.columns, &cands, tactics).unwrap();
-    let nodes = search_checked(&whole, 1, "uninterrupted").stats.nodes;
-
-    let dir = TempDir::new(&format!("resume{threads}-{}", tactics.bits()));
-    let ckpt = dir.0.join("ckpt.bin");
-    let cfg = EngineConfig {
-        checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))),
-        node_limit: Some(nodes / 6 + 1),
-        queue_mem_cap: 4,
-        spill_dir: Some(dir.0.join("spill")),
-        ..config(threads)
-    };
-    let mut result = search(&whole, &cfg, None, None, false).unwrap();
-    let mut pieces = 1;
-    while !result.completed {
-        assert!(ckpt.exists(), "a stopped run leaves a checkpoint");
-        let resumed = prepare_for_resume::<16>(&tables, &g.columns, &cands, &ckpt).unwrap();
-        assert_eq!(resumed.root, whole.root);
-        result = search(&resumed, &cfg, None, None, true).unwrap();
-        pieces += 1;
-        assert!(pieces < 100, "no progress");
-    }
-    // One thread explores in depth-first order however often it is interrupted, but the conflicts a searcher
-    // learns along its path are not part of a work unit, so a resumed search can prune a little differently
-    // (it does not at the time of writing); several threads explore a varying number of nodes anyway.
-    assert!(pieces >= if threads == 1 { min_pieces } else { 2 }, "only {pieces} pieces");
-    assert!(!ckpt.exists(), "a completed run deletes its checkpoint");
-    assert_eq!(result.sum, golden_sum(&g));
-}
-
-#[test]
-fn checkpoint_and_resume_one_thread() {
-    resume_in_pieces(1, SearchTactics::matching(), 3);
-    resume_in_pieces(1, SearchTactics { fix_forced: false, ..SearchTactics::matching() }, 4);
-    // With the rule of the symmetric pairs, whose units hold the candidates it has dropped from their nodes.
-    resume_in_pieces(1, SearchTactics { symmetry: true, ..SearchTactics::matching() }, 3);
-}
-
-#[test]
-fn checkpoint_and_resume_four_threads() {
-    // The matching search of 760 takes too few nodes (about 2,300) for four threads to reach the node limit
-    // before the end; without refinement, forced members and nogoods it takes about 4,700, which some thread
-    // always meets the limit in.
-    let weak = SearchTactics { match_refine: 0, fix_forced: false, nogoods: false, ..SearchTactics::matching() };
-    resume_in_pieces(4, weak, 2);
-    resume_in_pieces(4, SearchTactics { symmetry: true, ..weak }, 2);
-}
-
-/// The default search (tactic `gf2`, with the rule of the symmetric pairs, tactic `symmetry`), and without the rule
-/// (whose tree is larger, so its limit is), stopped every few hundred nodes and resumed from its checkpoint, on one
-/// thread and on two, until it finishes with game 992's optimum: its searches of 760 are too short to interrupt (the
-/// engine checks the node limit every 1024 nodes of a searcher), and so are those of 1000 on two threads since the
-/// window of the forced members became `all` (2,026 nodes).
+/// The default search (with the rule of the symmetric pairs, tactic `symmetry`, whose units hold the candidates it has
+/// dropped from their nodes), and without the rule (whose tree is larger, so its limit is), stopped every few hundred
+/// nodes and resumed from its checkpoint, on one thread and on two, until it finishes with game 992's optimum: its
+/// searches of 760 are too short to interrupt (the engine checks the node limit every 1024 nodes of a searcher), and so
+/// are those of 1000 on two threads since the window of the forced members became `all` (2,026 nodes).
 #[test]
 #[cfg_attr(
     debug_assertions,
@@ -548,9 +272,10 @@ fn a_checkpoint_of_another_game_is_refused() {
     let (a, b) = (load(760), load(720));
     let dir = TempDir::new("refuse");
     let ckpt = dir.0.join("ckpt.bin");
-    let pa = prepare_golden::<16>(&a, SearchTactics::matching());
-    let cfg =
-        EngineConfig { checkpoint: Some((ckpt.clone(), Duration::from_secs(3600))), node_limit: Some(50), ..config(1) };
+    let pa = prepare_golden::<16>(&a, SearchTactics::default());
+    // A time limit of nothing stops the search before it starts, with its checkpoint.
+    let checkpoint = Some((ckpt.clone(), Duration::from_secs(3600)));
+    let cfg = EngineConfig { checkpoint, time_limit: Some(Duration::ZERO), ..config(1) };
     assert!(!search(&pa, &cfg, None, None, false).unwrap().completed);
     let cands = Bits::<16>::from_slice(&b.candidates);
     assert!(prepare_for_resume::<16>(&Tables::new(b.n), &b.columns, &cands, &ckpt).is_err());
@@ -608,9 +333,8 @@ fn floors_around_the_optimum<const W: usize>(p: &Prepared<W>, opt: u64, threads:
         assert!(r.completed && r.floor_held, "{what}, floor {floor}: nothing is above it");
         assert!(r.promotions.is_empty() && r.found.is_none() && r.start.is_empty(), "{what}, floor {floor}");
         assert_eq!(r.sum, floor, "{what}, floor {floor}: the incumbent is the floor");
-        // The first check of the search is the GF(2) bound, which the floor reaches at the root (the matching path
-        // checks its own bound first, which can be higher).
-        if floor >= root && p.tactics.gf2 {
+        // The first check of the search is the GF(2) bound, which the floor reaches at the root.
+        if floor >= root {
             assert!(r.stats.nodes <= 1, "{what}, floor {floor}: {} steps at the root's bound", r.stats.nodes);
         }
     }
@@ -643,19 +367,16 @@ fn a_floor_below_the_optimum_finds_it_and_one_at_it_proves_nothing_is_heavier() 
 }
 
 /// [`a_floor_below_the_optimum_finds_it_and_one_at_it_proves_nothing_is_heavier`] on four threads, and with each of the
-/// tactics that change the tree (the matching path, the rule off), for a few games.
+/// tactics that change the tree most (the rule off, and forced members and nogoods off too), for a few games.
 #[test]
 fn floors_hold_on_four_threads_and_under_every_search_path() {
-    let tactics = [
-        SearchTactics::default(),
-        SearchTactics { symmetry: false, ..SearchTactics::default() },
-        SearchTactics::matching(),
-        SearchTactics { symmetry: true, ..SearchTactics::matching() },
-    ];
+    let without_rule = SearchTactics { symmetry: false, ..SearchTactics::default() };
+    let tactics =
+        [SearchTactics::default(), without_rule, SearchTactics { fix_forced: false, nogoods: false, ..without_rule }];
     for g in searched_games(400).iter().step_by(9) {
         for tactics in tactics {
             let p = prepare_golden::<8>(g, tactics);
-            let what = format!("n={}, gf2 {}, symmetry {}", g.n, tactics.gf2, tactics.symmetry);
+            let what = format!("n={}, {tactics:?}", g.n);
             floors_around_the_optimum(&p, golden_sum(g), 4, &what);
         }
     }
@@ -989,7 +710,7 @@ fn units_and_headers_round_trip() {
 
     // The header of version 5 is the one of a search tuned as the builds before the tactics that tune the GF(2) search
     // were (`force_window` 80), which it implies; the default's `force_window` is `all`.
-    let p = prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::legacy_tuning() });
+    let p = prepare_golden::<8>(&load(300), SearchTactics { nogoods: false, ..SearchTactics::legacy_tuning() });
     let header = Header::of(&p);
     let bytes = header.encode();
     assert_eq!(bytes.len(), Header::<8>::LEN);
@@ -1057,7 +778,7 @@ fn units_and_headers_round_trip() {
     // The default's tuning is not the builds before's (`force_window` is `all`, it was 80), so its header is version 6;
     // a checkpoint of version 5 is of a search with the window of 80 and is not resumed by one with the default's.
     let current =
-        Header::of(&prepare_golden::<8>(&load(300), SearchTactics { match_refine: 3, ..SearchTactics::default() }));
+        Header::of(&prepare_golden::<8>(&load(300), SearchTactics { nogoods: false, ..SearchTactics::default() }));
     assert_eq!(current.version, 6);
     assert_eq!(current.tactics.force_window, ForceWindow::All);
     assert_eq!(Header::<8>::decode(&current.encode()), Ok(current));
@@ -1145,47 +866,74 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&warming.encode()), Ok(warming));
     assert!(!header.tactics.warm_start);
 
-    // Every setting of the search tactics reads back as it was written: `match_refine` in bits 0 to 2, a bit for
-    // each switch that is on (the defaults: 0xFB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look`
-    // bit 10, `near_repeat` bit 11, and `price_reuse` bit 12, `carried_nogoods` bit 13 and `warm_start` bit 14, off by
-    // default), and no higher bit is used.
-    for refine in [0, 1, 7] {
-        for (on, off) in [(true, false), (false, true)] {
-            let t = SearchTactics {
-                match_refine: refine,
-                fix_forced: on,
-                nogoods: off,
-                forget_nogoods: on,
-                lagrange: off,
-                gf2: on,
-                symmetry: off,
-                conflict_branching: off,
-                near_repeat: off,
-                ..SearchTactics::legacy_tuning()
-            };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            let t = SearchTactics { symmetry: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 8 & 1, u16::from(on));
-            let t = SearchTactics { conflict_branching: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 9 & 1, u16::from(on));
-            let t = SearchTactics { near_repeat: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 11, u16::from(on));
-            let t = SearchTactics { price_reuse: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 12, u16::from(on));
-            let t = SearchTactics { carried_nogoods: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 13, u16::from(on));
-            let t = SearchTactics { warm_start: on, ..t };
-            assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
-            assert_eq!(t.bits() >> 13, 3 * u16::from(on));
-        }
+    // Every setting of the search tactics reads back as it was written: a bit for each switch that is on (the
+    // defaults: 0xFB9, `symmetry` is bit 8, `conflict_branching` bit 9, `conflict_look` bit 10, `near_repeat` bit 11,
+    // and `price_reuse` bit 12, `carried_nogoods` bit 13 and `warm_start` bit 14, off by default), with the bits of the
+    // matching path as a search on the GF(2) path had them (bits 0 to 2, 6 and 7: 0x81), and no higher bit is used.
+    for (on, off) in [(true, false), (false, true)] {
+        let t = SearchTactics {
+            fix_forced: on,
+            nogoods: off,
+            forget_nogoods: on,
+            symmetry: off,
+            conflict_branching: off,
+            near_repeat: off,
+            ..SearchTactics::legacy_tuning()
+        };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() & 0xC7, 0x81);
+        let t = SearchTactics { symmetry: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 8 & 1, u16::from(on));
+        let t = SearchTactics { conflict_branching: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 9 & 1, u16::from(on));
+        let t = SearchTactics { near_repeat: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 11, u16::from(on));
+        let t = SearchTactics { price_reuse: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 12, u16::from(on));
+        let t = SearchTactics { carried_nogoods: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 13, u16::from(on));
+        let t = SearchTactics { warm_start: on, ..t };
+        assert_eq!(SearchTactics::from_bits(t.bits()), Ok(t));
+        assert_eq!(t.bits() >> 13, 3 * u16::from(on));
+        assert_eq!(MatchingPath::of_bits(t.bits()), MatchingPath::default());
     }
     assert_eq!(SearchTactics::default().bits(), 0xFB9);
     assert_eq!(SearchTactics::from_bits(0xFB9), Ok(SearchTactics::legacy_tuning()));
+    // The bits of the matching path are read apart from the tactics: `match_refine` (bits 0 to 2) not at all, the
+    // matching bound as the node bound (bit 7 clear, `gf2=off`) and the Lagrangian bound (bit 6) as the matching path.
+    for refine in [0, 1, 7] {
+        assert_eq!(SearchTactics::from_bits(0xFB8 | refine), Ok(SearchTactics::legacy_tuning()));
+        assert_eq!(MatchingPath::of_bits(0xFB8 | refine), MatchingPath::default());
+    }
+    let lagrange = MatchingPath { matching_bound: false, lagrange: true };
+    assert_eq!(MatchingPath::of_bits(0xFB9 | 1 << 6), lagrange);
+    assert_eq!(MatchingPath::of_bits(0xFB9 & !(1 << 7)), MatchingPath { matching_bound: true, lagrange: false });
+    // The bits of the checkpoints of `testdata/` (`n1133_after_1000_nodes.ckpt`, the probe's windows): the default
+    // tactics of the matching path, `symmetry` off and the matching bound and the Lagrangian bound on.
+    let matching = MatchingPath { matching_bound: true, lagrange: true };
+    assert_eq!(MatchingPath::of_bits(0x79), matching);
+    assert_eq!(matching.tactics(), ["gf2=off", "lagrange=on"]);
+    assert_eq!(lagrange.tactics(), ["lagrange=on"]);
+    let fixture = SearchTactics {
+        symmetry: false,
+        conflict_branching: false,
+        conflict_look: false,
+        near_repeat: false,
+        ..SearchTactics::legacy_tuning()
+    };
+    assert_eq!(SearchTactics::from_bits(0x79), Ok(fixture));
+    // A header of a search on the matching path is refused once the rest is found to be the game's, naming it.
+    let old = Header::<8>::decode(&[&bytes[..44], &0x79u16.to_le_bytes()[..]].concat()).unwrap();
+    assert_eq!(old.matching, matching);
+    let refused = old.mismatch(&header).unwrap();
+    assert!(refused.contains("matching path (gf2=off, lagrange=on), which this build no longer has"), "{refused}");
+    assert!(Header { n: 301, ..old }.mismatch(&header).unwrap().contains("n=301"));
+    assert_eq!(Header { matching: MatchingPath::default(), tactics: header.tactics, ..old }.mismatch(&header), None);
     // A checkpoint written before `near_repeat` has bit 11 clear, so it reads with the tactic off; the bit binds
     // nothing, and a run that resumes a search says it.
     let uncut = SearchTactics { near_repeat: false, ..SearchTactics::legacy_tuning() };
@@ -1367,10 +1115,9 @@ fn a_checkpoint_of_one_extended_problem_is_refused_for_another() {
     assert!(err.contains("one-sided") && err.contains("symmetry=on"), "{err}");
 }
 
-/// A search with one-sided candidates needs the GF(2) bound and refuses the Lagrangian bound and the rule of the
-/// symmetric pairs, and the setup says so, naming each tactic that is wrong; the tactics of extended mode are accepted.
-/// With no open source (and no source greedy rejected) there is no one-sided candidate and every tactics are accepted,
-/// the matching path's included.
+/// A search with one-sided candidates refuses the rule of the symmetric pairs, and the setup says so; the tactics of
+/// extended mode are accepted.  With no open source (and no source greedy rejected) there is no one-sided candidate and
+/// every tactics are accepted.
 #[test]
 fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_them() {
     let board = Board::<8>::for_n(200);
@@ -1385,27 +1132,15 @@ fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_
     assert_eq!(prepared.candidates, ext.one_sided.iter().fold(ext.candidates, |set, &(s, _)| set.with(s)));
     assert_eq!(prepared.model.one_sided(), ext.one_sided.as_slice());
 
-    let (gf2, lagrange, symmetry) = ("gf2=off", "lagrange=on", "symmetry=on");
     let cases = [
-        ("the default", SearchTactics::default(), vec![symmetry]),
-        ("the matching path", SearchTactics::matching(), vec![gf2, lagrange]),
-        ("no GF(2) bound", SearchTactics { gf2: false, ..extended }, vec![gf2]),
-        ("the Lagrangian bound", SearchTactics { lagrange: true, ..extended }, vec![lagrange]),
-        ("the rule, no bound", SearchTactics { gf2: false, symmetry: true, ..extended }, vec![gf2, symmetry]),
-        (
-            "all three",
-            SearchTactics { gf2: false, lagrange: true, symmetry: true, ..extended },
-            vec![gf2, lagrange, symmetry],
-        ),
+        ("the default", SearchTactics::default()),
+        ("the rule, no forced members", SearchTactics { fix_forced: false, symmetry: true, ..extended }),
     ];
-    for &(what, tactics, ref wrong) in &cases {
+    for &(what, tactics) in &cases {
         let err =
             board.prepare_extended_with(&open, false, tactics).err().unwrap_or_else(|| panic!("{what}: accepted"));
-        assert!(err.contains("one-sided candidates (extended mode) cannot run with"), "{what}: {err}");
+        assert!(err.contains("one-sided candidates (extended mode) cannot run with symmetry=on"), "{what}: {err}");
         assert_eq!(Some(err.clone()), tactics.refusal_with_one_sided(), "{what}");
-        for tactic in [gf2, lagrange, symmetry] {
-            assert_eq!(err.contains(tactic), wrong.contains(&tactic), "{what}: {tactic} in {err}");
-        }
         // The setup of a resumed search takes the tactics of the checkpoint through the same check, and the setup that
         // takes no one-sided candidate (the default path's) is not asked.
         let columns = ext.columns();
@@ -1415,7 +1150,7 @@ fn a_problem_with_one_sided_candidates_is_set_up_only_for_the_tactics_that_know_
     }
 
     // With nothing open, any tactics: Π⁺(∅) is the frame model's problem.
-    for &(what, tactics, _) in &cases {
+    for &(what, tactics) in &cases {
         let (empty, prepared) = board.prepare_extended(false, tactics).unwrap_or_else(|e| panic!("{what}: {e}"));
         assert!(!prepared.model.has_one_sided() && empty.one_sided.is_empty(), "{what}");
         let (_, same) = board.prepare_extended_with(&Bits::EMPTY, false, tactics).unwrap();

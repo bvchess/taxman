@@ -31,8 +31,7 @@ store in three places, all of them prunings:
   the searcher's table and the known conflicts rule out.
 * **A check** ends a node, as a cut `refined`, when some nogood lies within its promotions and its forced members with a
   member among the forced ones (`CarriedNogoods::all_forced`, at step 2, before the searcher looks for a conflict): every
-  completion that beats the incumbent promotes the forced members, and so the whole nogood.  This applies on the GF(2)
-  path, which gives the forced members of the check; on the matching path the store only rules candidates out.
+  completion that beats the incumbent promotes the forced members, and so the whole nogood.
 
 *Watched members.*  Each searcher keeps `model::Watches` of the store along its path, as SAT solvers watch two literals
 of each clause.  Each nogood watches two of its members that the node has not promoted.  A nogood that watches two such

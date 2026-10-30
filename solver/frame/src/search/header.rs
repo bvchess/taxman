@@ -3,7 +3,7 @@
 
 use super::searcher::put_bits;
 use super::setup::Prepared;
-use super::tactics::SearchTactics;
+use super::tactics::{MatchingPath, SearchTactics};
 use crate::bits::Bits;
 use crate::engine;
 use crate::model::FrameSet;
@@ -24,7 +24,9 @@ use crate::model::FrameSet;
 /// without one-sided candidates, so a version-4 header reads as version 5 with the digest of none, and a checkpoint of a
 /// plain search resumes with every other check as for version 5; one asked to resume a search with one-sided candidates
 /// is refused, saying why.  Older headers (magic `TXS2`, or `TXSH` with versions 3 and below) recorded tactics that are
-/// gone, and are refused with one message.
+/// gone, and are refused with one message.  A header of any version read records whether the search used the matching
+/// path ([`MatchingPath`]), which this build no longer has, and the checkpoint of such a search is refused, saying so,
+/// once the rest of the header is found to be the game's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Header<const W: usize> {
     pub(super) n: u32,
@@ -37,6 +39,9 @@ pub(super) struct Header<const W: usize> {
     pub(super) one_sided: u64,
     pub(super) max_total: u32,
     pub(super) tactics: SearchTactics,
+    /// What the tactics' bits record of the matching path (none, for a header made by [`Header::of`]); encoded in
+    /// them.
+    pub(super) matching: MatchingPath,
     /// The format the header was read from (for one made by [`Header::of`], the one it is written in); not encoded.
     pub(super) version: u32,
 }
@@ -60,6 +65,7 @@ impl<const W: usize> Header<W> {
             one_sided: Self::digest_one_sided(prepared.model.one_sided()),
             max_total: prepared.max_total,
             tactics: prepared.tactics,
+            matching: MatchingPath::default(),
             version: if prepared.tactics.tuning_is_legacy() { Self::VERSION } else { Self::VERSION_6 },
         }
     }
@@ -139,7 +145,8 @@ impl<const W: usize> Header<W> {
         }
         let u64_at = |i: usize| u64::from_le_bytes(bytes[i..i + 8].try_into().expect("8 bytes"));
         let one_sided = if version == Self::VERSION_4 { Self::digest_one_sided(&[]) } else { u64_at(32) };
-        let tactics = SearchTactics::from_bits(u16::from_le_bytes([bytes[rest + 4], bytes[rest + 5]]))?;
+        let bits = u16::from_le_bytes([bytes[rest + 4], bytes[rest + 5]]);
+        let tactics = SearchTactics::from_bits(bits)?;
         let tactics = if version == Self::VERSION_6 { tactics.with_tuning(&bytes[Self::LEN..])? } else { tactics };
         Ok(Header {
             n: u32_at(12).expect("length checked"),
@@ -148,6 +155,7 @@ impl<const W: usize> Header<W> {
             one_sided,
             max_total: u32_at(rest).expect("length checked"),
             tactics,
+            matching: MatchingPath::of_bits(bits),
             version,
         })
     }
@@ -163,7 +171,8 @@ impl<const W: usize> Header<W> {
     }
 
     /// What differs between a checkpoint's header (`self`) and the one the run expects, if anything; for a run with
-    /// one-sided candidates, [`one_sided_refusal`](Self::one_sided_refusal) first.
+    /// one-sided candidates, [`one_sided_refusal`](Self::one_sided_refusal) first.  A header of the run's game whose
+    /// search used the matching path ([`MatchingPath`]) differs from every header of this build by that.
     pub(super) fn mismatch(&self, expected: &Self) -> Option<String> {
         if expected.one_sided != Self::digest_one_sided(&[]) {
             if let Some(refusal) = self.one_sided_refusal() {
@@ -180,6 +189,11 @@ impl<const W: usize> Header<W> {
             "other one-sided candidates (another extended problem)".into()
         } else if self.max_total != expected.max_total {
             format!("max_total {}, not {}", self.max_total, expected.max_total)
+        } else if self.matching != expected.matching {
+            format!(
+                "a search on the matching path ({}), which this build no longer has",
+                self.matching.tactics().join(", ")
+            )
         } else if !self.tactics.same_recorded(&expected.tactics) {
             format!("the search tactics {:?}, not {:?}", self.tactics, expected.tactics)
         } else {

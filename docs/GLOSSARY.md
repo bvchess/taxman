@@ -276,18 +276,21 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   * a game's gap in the ledger: its best upper bound less its best lower bound.
 
   The prover's *parity gap* is the same idea on the whole board: the root's parity bound less opt(n), in points.
-* **matching bound** (`matchbound`; the tactic `gf2=off`): relaxes winnability to matchability.  It is the largest sum
-  of promotions such that every move and every promoted number gets a distinct maximal factor in its frame.  It is a
-  maximum-weight bipartite matching, kept along the search path.
-* **GF(2) bound** (`gf2`, the default node bound): the heaviest set of candidates, with at most the promotion limit
-  members, that is *independent in every frame* over GF(2): in each frame, the vectors of its moves together with those
-  of the set are linearly independent ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound);
+* **matching bound** (`matchbound`): relaxes winnability to matchability.  It is the largest sum of promotions such
+  that every move and every promoted number gets a distinct maximal factor in its frame.  It is a maximum-weight
+  bipartite matching, which the search's start rounds to a promotion set (the dive).  It was the node bound before the
+  GF(2) bound, with its refinement (`match_refine`) and the Lagrangian bound below (`lagrange`): the *matching path*,
+  `gf2=off` in the lines of the builds that had it.
+* **GF(2) bound** (the node bound; `gf2` in the lines of the builds that had the matching path): the heaviest set of
+  candidates, with at most the promotion limit members, that is *independent in every frame* over GF(2): in each frame,
+  the vectors of its moves together with those of the set are linearly independent ([the frame bound (B2)](theory/frame-bounds.md#the-frame-bound);
   [solver/docs/design/gf2-bound.md, "The GF(2) bound"](../solver/docs/design/gf2-bound.md#the-gf2-bound)).
 * **the Lagrangian bound over the nogoods**: an inner bound, either the matching bound or the GF(2) bound, with each
   candidate's weight lowered by multipliers on the live nogoods it is in.  Any multipliers give a valid bound.  Name the
   inner bound when it matters.  It comes in three forms:
-  * the tactic `lagrange`: the matching bound inside, with multipliers that each searcher fits at the root to the
-    nogoods it has learned ([design/search.md](../solver/docs/design/search.md#the-lagrangian-bound-over-the-nogoods));
+  * the tactic `lagrange`, which is gone: the matching bound inside, with multipliers that each searcher fitted at the
+    root to the nogoods it had learned ([a Lagrangian bound over the
+    nogoods](../solver/notebook/search/a-lagrangian-bound-over-the-nogoods-2026-10/README.md));
   * refitted at a node: the GF(2) bound inside, with multipliers fitted again at the node (a form that a study
     measured, whose example is removed).  The notebook's entries call it the "strong bound";
   * in the bounds store: the GF(2) bound inside, over nogoods each checked to fail to promote (the rule `nogoods`).

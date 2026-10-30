@@ -36,7 +36,6 @@ use super::incumbent::{distinct, surviving};
 use super::{best_so_far, offer_found, payload_of, set_of_payload, Prepared, SearchSpace, TaxSearcher, TaxUnit};
 use crate::bits::Bits;
 use crate::engine::{self, Control, EngineConfig, Start};
-use crate::matchbound::MatchGraph;
 use crate::rng::Rng;
 use std::fmt;
 use std::io::{self, Write};
@@ -285,8 +284,7 @@ fn rounds<const W: usize>(
     say(label, format_args!("started at {at_nodes} nodes, from {from}, for {:.0} s", plan.budget.as_secs_f64()));
 
     // The finder's own space: the searches of its units must not touch the search's counters and records.
-    let graph = MatchGraph::new(&prepared.model, &prepared.root);
-    let space = SearchSpace::new(prepared, &graph);
+    let space = SearchSpace::new(prepared);
     let lns = Lns { p: prepared, space: &space, options: Options::default() };
     let units = Control::new();
     let survivors = distinct(plan.seeds.iter().map(|seed| surviving(prepared, seed)));
@@ -398,8 +396,7 @@ mod tests {
         for n in [200, 300, 400, 600, 700, 900] {
             let board = board(n);
             let p = board.prepare(SearchTactics::default()).unwrap();
-            let graph = MatchGraph::new(&p.model, &p.root);
-            let space = SearchSpace::new(&p, &graph);
+            let space = SearchSpace::new(&p);
             let lns = Lns { p: &p, space: &space, options: Options::default() };
             let units = Cell::new(0u64);
             let over = || {
@@ -416,8 +413,7 @@ mod tests {
     fn lns_is_the_same_every_time() {
         let board = board(800);
         let p = board.prepare(SearchTactics::default()).unwrap();
-        let graph = MatchGraph::new(&p.model, &p.root);
-        let space = SearchSpace::new(&p, &graph);
+        let space = SearchSpace::new(&p);
         let lns = Lns { p: &p, space: &space, options: Options::default() };
         let run = || {
             let units = Cell::new(0u64);
@@ -537,13 +533,13 @@ mod tests {
 
     #[test]
     fn a_search_with_a_finder_has_the_answer_of_a_search_without() {
-        // The matching path's tree is larger than the default's, so the search lasts until the finder looks.
-        let board = board(900);
-        let p = board.prepare(SearchTactics::matching()).unwrap();
+        // A tree of thousands of steps, so the search lasts until the finder looks.
+        let board = board(1000);
+        let p = board.prepare(SearchTactics::default()).unwrap();
         let plain = search(&p, &two_threads(), None, None, false).unwrap();
         assert!(plain.completed && plain.finder.is_none());
         assert_eq!(plain.sum, known(&board));
-        let seed = board.seed(Optimal::built_in().moves(899).unwrap());
+        let seed = board.seed(Optimal::built_in().moves(999).unwrap());
         let plan = Plan { after: 1, budget: Duration::from_secs(30), seeds: vec![seed], random: 0 };
         let beside = search_beside(&p, &two_threads(), &[], None, false, Some(&plan)).unwrap();
         assert!(beside.completed);

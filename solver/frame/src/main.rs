@@ -13,7 +13,7 @@ mod commands;
 use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
-use taxman::search::{finder, gate_trial, SearchTactics, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
+use taxman::search::{finder, gate_trial, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -32,9 +32,8 @@ commands:
                                searched from n's best game so far, while n searches (default 4; 1 is one game after
                                another, and it is always 1 with one thread).  Scores and proofs are those of a
                                window of 1
-      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, match_refine is 0-{max_refine},
-                               nogood_period and nogood_limit are whole numbers, nogood_keep is none, hit, sizeN
-                               or topN.  Names: {tactics}
+      --tactic NAME=VALUE      set a tactic (repeatable).  A switch is on or off, nogood_period and nogood_limit are
+                               whole numbers, nogood_keep is none, hit, sizeN or topN.  Names: {tactics}
       --finder-after NODES     once a game's search has taken NODES steps (over all its runs), start a finder beside
                                it: a thread that looks for a better game than the incumbent, from the incumbent and
                                from the game of n-1, and offers it to the search (default {finder_after}; 0: none).
@@ -123,7 +122,6 @@ fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
-        .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
         .replace("{finder_after}", &finder::AFTER.to_string())
         .replace("{profile_depth}", &PROFILE_DEPTH.to_string())
         .replace("{gate}", &CONFLICT_BRANCHING_GAP.to_string())

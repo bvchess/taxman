@@ -34,7 +34,7 @@
 //!        │
 //!        ▼
 //!       search::search ───────────────► engine::run: threads, shared deque with disk spill, checkpoints
-//!        │                               └ Stepper::step per node: gf2 (or matchbound) → conflicts,
+//!        │                               └ Stepper::step per node: gf2 → conflicts,
 //!        │                                 forced members, nogoods → branch → child
 //!        ▼
 //!       promotions ──► frames::BoardFrames ──► the moves ──► game::replay ──► score, results line
@@ -60,8 +60,8 @@
 //! | frame model | [`frames`] | the frames of a board: formed, simplified, numbered from the front and merged |
 //! | | [`model`] | the search state: frames, winnability, promotion, conflicts, nogoods |
 //! | | [`accelerate`] | the prime shortcut (the game of a prime `n` from the game of `n − 1`); promotions → moves |
-//! | search | [`matchbound`] | the matching bound, an upper bound on a node's completions; the Lagrangian bound |
-//! | | [`gf2`] | the GF(2) node bound (the default): independence in every frame, by weighted matroid intersection |
+//! | search | [`matchbound`] | the matching bound, an upper bound on a state's completions, which the start's dive rounds |
+//! | | [`gf2`] | the GF(2) node bound: independence in every frame, by weighted matroid intersection |
 //! | | [`search`] | the branch-and-bound searcher, its tactics, its setup and checkpoint header, and the finder |
 //! | | [`bounds`] | the greedy incumbent and the limit on a node's further promotions |
 //! | engine | [`engine`] | the problem-independent parallel depth-first driver: threads, spill, checkpoints |

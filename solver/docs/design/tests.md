@@ -53,13 +53,9 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Tactic invariance**: games 1..300, forced to search, give identical scores with each tactic off or changed, and a
   checkpoint is refused when any of the search tactics differs.
 * **Bound soundness**:
-  * on small frame sets, the upper bound is never below the best completion computed exhaustively; the same for the
-    matching bound and its refinement by conflicts (whose exact completions must be promotable, and whose conflicts,
-    carried down a path, must stay conflicts), and for the Lagrangian bound over the root's nogoods with fitted and
-    random multipliers;
-  * the incremental solvers agree with the reference min-cost flow (with the Lagrangian weights, live nogoods and
-    constant worked out afresh, under random relaxations changed mid-walk) and with a solver started afresh, and their
-    levels pass the optimality certificate;
+  * on small frame sets, the matching bound is never below the best completion computed exhaustively;
+  * the incremental matching solver, as the dive drives it (candidates removed a few at a time), agrees with the
+    reference min-cost flow and with a solver started afresh, and its states pass the optimality certificate;
   * the GF(2) bound (`src/gf2/tests.rs`, `src/gf2/meet.rs`): the intersection against brute force under every size
     limit, from every set it reports as a warm start, with members deleted, and its weight split's bounds without each
     member.  On the games up to 400 the bound is never below the exhaustive best completion, and the optimal
@@ -69,8 +65,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     solve builds; along the same kind of paths the copies of every word count (1 to 5, padded) give the same results
     and do the same work.  Blocks of more than 255 members (five words) are checked against the greedy algorithm, one
     side free and the other random.  At the 600 nodes of the probe's fixtures (936 and 1215), completions promoted
-    in random orders are independent in every frame of the node and no heavier than its bound, and the matching path's
-    search started from the bound finds nothing above it (`tests/soundness.rs`);
+    in random orders are independent in every frame of the node and no heavier than its bound (`tests/soundness.rs`);
   * conflicts and residuals are checked against promoting the sets;
   * the checks of the near-repeat cut (`src/search/near_repeat/tests.rs`): on constructed problems, each check failing
     alone where it must, among them a number that Π_M's model promotes but that is no candidate of Π_M (22 at n = 98),
@@ -85,55 +80,50 @@ every second line of the Java fixtures), and the comment on each says what the w
 * **Soundness harness** (`tests/soundness.rs`): the search starts from an incumbent worth 1 or 5 less than P\* with an
   empty payload, so that any pruning that loses every best completion leaves the fake incumbent in place (which tests
   the `<` and `<=` boundaries too).  It runs:
-  * every game 2..=300 under each of 48 configurations: 19 of the matching path (every tactic; forgetting every step,
-    every third, never; the Lagrangian bound refitted every few steps; one thread and two), 11 of the default, the
-    GF(2) bound with the rule of symmetric pairs (every way of choosing the branch; the matching bound as a first check;
-    without forced members or nogoods; forgetting every step; two threads; the Lagrangian bound after it), the GF(2)
-    bound without the rule on one thread, two, and forgetting every step, the matching path with the rule, 7 policies
-    of keeping nogoods, 5 of conflict branching (at every check, whatever its gap, on one thread and two; off;
-    and with the look at the last child of the search's own conflict, on one thread and two), and 2 without the
-    near-repeat cut;
+  * every game 2..=300 under each of 32 configurations: 8 of the default, the GF(2) bound with the rule of symmetric
+    pairs (every way of choosing the branch; without forced members or nogoods; forgetting every step; two threads),
+    the GF(2) bound without the rule on one thread, two, and forgetting every step, 5 policies of keeping nogoods, 5
+    of conflict branching (at every check, whatever its gap, on one thread and two; off; and with the look at the last
+    child of the search's own conflict, on one thread and two), 1 without the near-repeat cut, 4 of the reuse of
+    prices, 4 of carried nogoods, and 2 of the warm start;
   * the near-repeat cut in every search of the harness on real games, by one of the four games before (the latest whose
-    optimum the handicapped incumbent reaches), and the games 232, 344 and 376, whose trees it changes, under every
+    optimum the handicapped incumbent reaches), and the games 404, 430 and 436, whose trees it changes, under every
     configuration with the cut and without it; on those three, a cut whose bound the incumbent never reaches cuts
     nothing and leaves the tree as it is without the cut, and a search that starts below the bound cuts once its
     incumbent has reached it;
   * the games 301..=500 (every tenth) with conflict branching at every check, with and without the look at the last
     child of the search's own conflict: the look changes the tree of some of them, and no answer;
-  * every game 2..=600 with symmetric pairs, with the rule over either bound (and the oracle without the frame model to
-    40); units on the way to an optimal set (an optimal set less 30 to 70% of its members, games 600..1000) with the
-    rule; and games 301..=600 (every tenth: searches of hundreds to thousands of steps) with the Lagrangian bound
-    refitted early and often, over either bound, where it cuts and forces thousands of times;
+  * every game 2..=600 with symmetric pairs, with the rule, with forced members and without (and the oracle without
+    the frame model to 40); and units on the way to an optimal set (an optimal set less 30 to 70% of its members, games
+    600..1000) with the rule;
   * the same for 500 perturbed frame sets (numbers dropped, a role flipped, moved a frame) with the truth found
     exhaustively; promoting a set at once against one by one in random orders; conflicts and nogoods on perturbed
     models;
-  * searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling: game 600 on the matching
-    path, one of them with the Lagrangian bound refitted every four steps, and game 992 with the GF(2) bound, whose
-    search of 600 is too short to stop;
+  * searches interrupted every 1,000 nodes and resumed from a checkpoint with units spilling: game 992 in three
+    configurations (game 1000 in a quick run);
   * units of real games at W = 20 to 64 (thinned so that the truth is found exhaustively) from a handicapped incumbent,
-    and games 1133 (matching) and 992 (GF(2)) resumed every 1,024 steps at W = 20, 24 and 64, which carry the harness
-    past the widths of the Java's table (n ≤ 1000).
+    and game 992 resumed every 1,024 steps at W = 20, 24 and 64 (game 1000 at W = 20 and 64 in a quick run), which
+    carry the harness past the widths of the Java's table (n ≤ 1000).
 
   A search below the root with the rule of symmetric pairs is held to the best completion that keeps their
   inequalities (an exhaustive oracle of its own, which prunes by the same bound but shares no code with the rule), which
   it must reach; at the root that is P\* ([R2](../../../docs/theory/search-rules.md#the-prime-exchange-theorem)).
 * **The floor** (`src/search/tests.rs`): on every game of the Java's that needs a search, to 400, a floor below P\*
   finds an optimal set, a floor at P\* or above completes with nothing found, and a floor at the root's bound or above
-  ends at the first check; with the default tactics and (every ninth game) on four threads, on the matching path, and
-  without the rule of symmetric pairs.  The floor at P\* searches the tree of the search seeded with an optimal set,
+  ends at the first check; with the default tactics and (every ninth game) on four threads, without the rule of
+  symmetric pairs, and without it, forced members and nogoods.  The floor at P\* searches the tree of the search seeded with an optimal set,
   step for step, on games 300 to 1000; a floor at the ceiling ends the search before it starts; a stopped floor search
   resumes under its floor, and is refused under another floor or none.  With no floor nothing moves: the tripwires and
   the probe's fingerprints are the same.
 * **Node-count tripwires** (`tests/tripwires.rs`): a pruning tactic that stops working changes no answer, so no
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` takes 27 to 67% more nodes).
   With one thread the tree is deterministic, so the test asserts the exact node count of a fixed game under fixed
-  tactics: n = 480 to 1133, every tactic off or changed in turn, with the GF(2) bound and on the matching path, and the
-  tree of game 600 on the matching path with the searchers forgetting their nogoods every 500 steps.  The table
+  tactics: n = 480 to 1133, every tactic off or changed in turn, and the tree of game 800 with the searchers
+  forgetting their nogoods every 200 steps.  The table
   `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the committed
   game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes the cut
-  cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The matching path's rows are the
-  default's trees before the GF(2) bound, its rows with `lagrange=off` those of the build before that tactic, and the
-  rows `symmetry=off` the default's before the rule of symmetric pairs.  The table `EXTENDED` does the same for the
+  cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off` are the
+  default's trees before the rule of symmetric pairs.  The table `EXTENDED` does the same for the
   extended problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default
   engine's on the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself and
   reproduce every row of the default table, node for node.
@@ -281,10 +271,12 @@ every second line of the Java fixtures), and the comment on each says what the w
     score their sum says, and the root's GF(2) bound between the greedy sum and the matching bound, with three, four and
     five block words.  The GF(2) bound's copies of four and five words (only at 128) search game 1000's tree as the
     copy of one word does.
-  * A committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20) must still resume: a
-    deliberate change of the checkpoint format fails it, and the test says how to make the file again.
-  * The levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the incremental matching
-    bound and the quick bounds without a member against the min-cost-flow reference; and promoting one number at a time
+  * A committed checkpoint of game 1133 (`testdata/n1133_after_1000_nodes.ckpt`, W = 20), and one of the format
+    before the extended problem's search, must still be read, every field of their headers as this build reads them,
+    and refused for their search, on the matching path, which this build no longer has: a deliberate change of the
+    checkpoint format fails it.
+  * The levels of a real depth-first stack of game 1215 (`testdata/n1215_deep_units.txt`): the matching bound from
+    scratch and with a member removed against the min-cost-flow reference; and promoting one number at a time
     (with its no-peel shortcut) against the peel of every frame, in reached states of games at W = 20, 28 and 64.  The
     unit tests check the nogood table's lookups against their definition at compact strides of 1 to 16 words, and debug
     builds check that every root frame is winnable, which the shortcut needs.

@@ -60,15 +60,12 @@ const VERSION: u64 = 1;
 /// The phases of a step that the profile times, in the order of [`PHASE_NAMES`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Phase {
-    /// The bound of the node or of the child: the GF(2) bound's solve (and the child's level pushed), or the matching
-    /// bound and its refinement on the matching path.
+    /// The bound of the node or of the child: the GF(2) bound's solve (and the child's level pushed).
     Bound,
     /// The conflict of the heaviest set: the nogood table's lookup, and a peel where the table has none.
     Conflict,
     /// Conflict branching's choice of the conflict: the prices, the ordered conflicts and the look.
     Pricing,
-    /// The Lagrangian bound: its check, and its refits after the step.
-    Lagrange,
     /// The member to branch on: strong branching's solves.
     Branching,
     /// The child's promotion.
@@ -79,9 +76,9 @@ pub(super) enum Phase {
     Other,
 }
 
-/// The names of the phases in a `steps` line, in the order of [`Phase`].
-const PHASE_NAMES: [&str; 8] =
-    ["bound", "conflict", "pricing", "lagrange", "branching", "promotion", "children", "other"];
+/// The names of the phases in a `steps` line, in the order of [`Phase`].  (The files of the builds before this one also
+/// have a phase `lagrange`, the Lagrangian bound's, which `solver/tools/read_profile.py` reads as any other.)
+const PHASE_NAMES: [&str; 7] = ["bound", "conflict", "pricing", "branching", "promotion", "children", "other"];
 
 /// A searcher's clock of the phases of its steps: it times one step in [`PHASE_EVERY`], reading the clock as each
 /// phase ends ([`mark`](Phases::mark)), and the others cost it a test.  The times are those of the thread's clock on the
@@ -91,13 +88,13 @@ pub(super) struct Phases {
     timing: bool,
     last: Instant,
     /// Nanoseconds by phase, and the steps timed, since the counts were last handed over.
-    spent: [u64; 8],
+    spent: [u64; PHASE_NAMES.len()],
     steps: u64,
 }
 
 impl Phases {
     pub(super) fn new() -> Self {
-        Phases { countdown: PHASE_EVERY, timing: false, last: Instant::now(), spent: [0; 8], steps: 0 }
+        Phases { countdown: PHASE_EVERY, timing: false, last: Instant::now(), spent: [0; PHASE_NAMES.len()], steps: 0 }
     }
 
     /// A step begins, timed if it is due.
@@ -184,8 +181,8 @@ impl Branched {
 }
 
 /// What a step that made a child knew of it, for its line: how its parent branched, and the child's own check when
-/// it was made (the bound, the GF(2) bound of its completions with its check's limit on promotions, or the matching bound on
-/// the matching path, and its need at the incumbent the step read).
+/// it was made (the bound, the GF(2) bound of its completions with its check's limit on promotions, and its need at the
+/// incumbent the step read).
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Made {
     pub(super) branched: Branched,
@@ -262,7 +259,7 @@ struct Pending {
     /// Steps by the number of promotions of the node that took them.
     promotions: Vec<u64>,
     /// The phases of the steps timed: nanoseconds by phase, and the steps.
-    phases: [u64; 8],
+    phases: [u64; PHASE_NAMES.len()],
     timed: u64,
 }
 
@@ -333,7 +330,7 @@ struct Mark {
 /// How the profile of a search starts: a fresh search, or one resumed from a checkpoint of `nodes` steps.
 pub(super) enum Begin {
     Fresh {
-        /// The root's bound ([`NodeBound`], with the tactic `gf2`), and its need at the starting incumbent.
+        /// The root's bound ([`NodeBound`]), and its need at the starting incumbent.
         bound: Option<u64>,
         need: u64,
         candidates: u32,
@@ -807,7 +804,7 @@ impl<'a> Tags<'a> {
 }
 
 /// Summarizes the open units of each checkpoint that `profile` hands over (the search of `prepared`, whose root's GF(2)
-/// graph is `graph` with the tactic `gf2`), until the search ends: an `open` line with their number by id, and the
+/// graph is `graph`), until the search ends: an `open` line with their number by id, and the
 /// spread of the gaps of at most [`OPEN_BOUNDED`] of them, a uniform sample of them if there are more.  A unit's gap is
 /// its bound ([`NodeBound`]) less its need at the checkpoint's incumbent.
 /// With `background` the thread takes the idle scheduling policy, as the workers do.  The end of the search drops the
@@ -815,14 +812,14 @@ impl<'a> Tags<'a> {
 pub(super) fn open_work<const W: usize>(
     profile: &SearchProfile,
     prepared: &Prepared<W>,
-    graph: Option<&Gf2Graph>,
+    graph: &Gf2Graph,
     jobs: Receiver<OpenJob>,
     background: bool,
 ) {
     if background {
         engine::background_priority();
     }
-    let mut bound = graph.map(|graph| NodeBound::new(prepared, graph));
+    let mut bound = NodeBound::new(prepared, graph);
     for job in jobs {
         if profile.ending.load(Ordering::Relaxed) {
             return;
@@ -846,18 +843,16 @@ pub(super) fn open_work<const W: usize>(
         });
         let Ok(head) = scanned else { continue };
         let mut gaps = Vec::new();
-        if let Some(bound) = &mut bound {
-            for (id, unit) in &sample {
-                if profile.ending.load(Ordering::Relaxed) {
-                    return;
-                }
-                let Some(add) = bound.completions(unit) else { continue };
-                let gap = add as i64 - (head.best + 1) as i64 + unit.promoted.sum() as i64;
-                let entry = by_id.entry(*id).or_default();
-                entry.1 += 1;
-                entry.2 = Some(entry.2.map_or(gap, |max| max.max(gap)));
-                gaps.push(gap);
+        for (id, unit) in &sample {
+            if profile.ending.load(Ordering::Relaxed) {
+                return;
             }
+            let Some(add) = bound.completions(unit) else { continue };
+            let gap = add as i64 - (head.best + 1) as i64 + unit.promoted.sum() as i64;
+            let entry = by_id.entry(*id).or_default();
+            entry.1 += 1;
+            entry.2 = Some(entry.2.map_or(gap, |max| max.max(gap)));
+            gaps.push(gap);
         }
         if profile.ending.load(Ordering::Relaxed) {
             return;

@@ -105,10 +105,8 @@ The steps again, with the functions that take them:
    |                                   matching + local search; ceiling = n + score(n-1) - in_the_bag
    |          engine::run              worker threads; shared deque with disk spill; incumbent; checkpoints; signals
    |            Stepper::step          per node (search/searcher.rs): check_node = the rule of symmetric pairs
-   |                                   (symmetry, search::symmetry) -> GF(2) bound (gf2; with gf2=off
-   |                                   the matching bound, matchbound, and its refinement) -> conflicts, forced
-   |                                   members, nogoods (search::refine, model::Nogoods) -> with lagrange the
-   |                                   Lagrangian bound over the nogoods (search::lagrange);
+   |                                   (symmetry, search::symmetry) -> GF(2) bound (gf2) -> conflicts, forced
+   |                                   members, nogoods (search::seek, model::Nogoods);
    |                                   choose_branch (a candidate) -> make_child -> check_child
    |      promotions -> accelerate::solution_for_promotions   (frames::BoardFrames with the promotions as sources)
    |                                                         -> ordered moves
@@ -261,8 +259,8 @@ ends (`search::profile`, `Tags`).
 | `open` | after each checkpoint | its units by id, the spread of the gaps of a sample of them (at most `OPEN_BOUNDED` of `src/search/profile.rs`), and the seconds the summary took |
 | `end` | the end of a run | `nodes`, `completed`, `best`, `elapsed`, `made`, `full` |
 
-A node's `bound`, `need` and `gap` are the GF(2) bound of what the node's completions add (the matching bound on the
-matching path), the incumbent's sum less the node's plus one, and the difference.  The bound is the one the node's own
+A node's `bound`, `need` and `gap` are the GF(2) bound of what the node's completions add, the incumbent's sum less the
+node's plus one, and the difference.  The bound is the one the node's own
 check found when it was made, whose limit on the number of promotions counts the candidates before the child's were
 narrowed, so it can exceed the bound computed from the node as a checkpoint stores it.  The need is at the incumbent of
 that moment; the reader also gives the gap at the final best.  The open units' gaps are computed after each checkpoint
@@ -299,12 +297,13 @@ file of its game aside, as `nNNNN.profile.jsonl.K`: a restart or a rerun does no
 
 **The phases of a step.**  Each searcher times one step in `PHASE_EVERY` (`src/search/profile.rs`), reading the clock
 as each phase of it ends, and a `steps` line has the nanoseconds of each phase in its interval, with the steps timed:
-`bound` (the GF(2) bound's solve, with the child's level pushed, or the matching bound and its refinement),
-`conflict` (the conflict of the heaviest set: the nogood table's lookup, and a peel where it has none), `pricing`
-(conflict branching's choice), `lagrange` (the Lagrangian bound's check and refits), `branching` (strong branching's
-solves), `promotion` (the child's), `children` (the child's candidates: narrowed, and ruled out by the known
-conflicts, the nogoods and the rule of symmetry) and `other` (the cheap checks, the rule of symmetry and the
-near-repeat cut at a node, the offers).  The time is the thread's on the wall, which is its CPU time while it runs.
+`bound` (the GF(2) bound's solve, with the child's level pushed), `conflict` (the conflict of the heaviest set: the
+nogood table's lookup, and a peel where it has none), `pricing` (conflict branching's choice), `branching` (strong
+branching's solves), `promotion` (the child's), `children` (the child's candidates: narrowed, and ruled out by the
+known conflicts, the nogoods and the rule of symmetry) and `other` (the cheap checks, the rule of symmetry and the
+near-repeat cut at a node, the offers).  The files of the builds before have one more, `lagrange` (the Lagrangian
+bound's check and refits), which `solver/tools/read_profile.py` reads as any other.  The time is the thread's on the
+wall, which is its CPU time while it runs.
 
 **Cost.**  A step costs the profile a comparison and an increment; a tagged node, a lock and a line; a checkpoint, a
 block written and synced while the workers are parked; and the thread beside the search, one GF(2) solve for each open

@@ -60,13 +60,22 @@ heaviest sets of the same weight a node finds.  A build before one of these tact
 unknown tactics: the default of the first three, and what a run that turns `price_reuse`, `carried_nogoods` or
 `warm_start` on writes.
 
+The search tactics also had bits for the matching path, which the GF(2) bound replaced: `match_refine` (bits 0 to 2),
+`lagrange` (bit 6) and `gf2` (bit 7).  This build writes them as a search on the GF(2) path had them by default
+(`match_refine` 1, `lagrange` off, `gf2` on), so its header is byte for byte the one the builds before wrote for the same
+search, and it reads `match_refine` not at all, since it acted only on the matching path.  A checkpoint whose bits say
+the search ran on the matching path (`gf2` off, or `lagrange` on) is of a tree that this build's search does not make,
+and is refused, saying so, once the rest of its header is found to be the game's.  Only the probe searches the units of such a
+checkpoint, with the GF(2) bound, on purpose ([performance.md](performance.md)).
+
 This build also reads version 4, the format of the builds before the extended problem's search, whose headers lack the
 digest of the one-sided candidates.  Those builds searched no problem with one-sided candidates, so a version-4 header
 reads as version 5 with the digest of none: every other field is checked as for version 5, the run goes on under the
 header it was written with (the engine compares it byte for byte), and a version-4 checkpoint asked to resume a search
-with one-sided candidates is refused, saying so.  So a chain stopped by a build before the extended problem's search
-resumes; `tests/wide.rs` resumes a real version-4 checkpoint to the node count of the build that wrote it.  Every other
-version is refused with one message, so a checkpoint of an older build cannot resume with tactics that are gone.
+with one-sided candidates is refused, saying so.  So a chain stopped by a build before the extended problem's search,
+but after the GF(2) bound, resumes; `tests/wide.rs` reads a real version-4 checkpoint, of the matching path, and finds
+it refused for that.  Every other version is refused with one message, so a checkpoint of an older build cannot resume
+with tactics that are gone.
 
 Resuming checks all of these and says which differs.  It also checks that the stored incumbent is a set of candidates
 that can be promoted from the root and is worth the stored value.  So a checkpoint of another game, or of an older build

@@ -24,8 +24,7 @@
 //! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
 //! same frames and candidates, node for node; and with the claims that the kept-claims lemma (E4,
 //! docs/theory/extended-problem.md) allows, which with no source open are all of them, Π⁺(∅) is the frame model's
-//! problem itself, so its search reproduces every tree of [`EXPECTED`], the matching rows too, which no table needs to
-//! say.  [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut shortens, solved as the solver solves
+//! problem itself, so its search reproduces every tree of [`EXPECTED`], which no table needs to say.  [`NEAR_REPEATS`] counts the trees of games that the near-repeat cut shortens, solved as the solver solves
 //! them, with the cut and without it; its test prints its rows as observed.
 
 mod common;
@@ -41,18 +40,13 @@ use taxman::tactics::Tactics;
 use taxman::with_width;
 
 /// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread.  The tactics are
-/// `--tactic` assignments after the default or `matching`, the tactics of the matching path
-/// ([`SearchTactics::matching`], the default before the GF(2) bound, and without the rule of the tactic `symmetry`
-/// as it was).  The Lagrangian bound (tactic `lagrange`) first fits its multipliers after 2,000 steps, so the games
-/// that take fewer (480, 640) do not see it; the matching path's rows `lagrange=off` are the trees of the build
-/// before it.
-const EXPECTED: [(u32, &str, u64, u64); 55] = [
+/// `--tactic` assignments after the default.
+const EXPECTED: [(u32, &str, u64, u64); 21] = [
     // The default, the GF(2) bound with the rule of the root's symmetric pairs: trees of tens to thousands of nodes;
-    // `lagrange=on` (which refits after 2,000 steps) changes none of them, and `symmetry=off` (the default before the
-    // rule) makes them larger with the same answers.  Game 1000's rows count the tree with conflict branching, which
-    // is on by default and acts where a node's gap passes 300; with `conflict_branching=off` its default row is
-    // smaller.  With `conflict_look`, on by default, it looks at the last child of the search's own conflict there;
-    // `conflict_look=off` gives another tree.
+    // `symmetry=off` (the default before the rule) makes them larger with the same answers.  Game 1000's rows count the
+    // tree with conflict branching, which is on by default and acts where a node's gap passes 300; with
+    // `conflict_branching=off` its default row is smaller.  With `conflict_look`, on by default, it looks at the last
+    // child of the search's own conflict there; `conflict_look=off` gives another tree.
     (480, "default", 5350, 37),
     (600, "default", 8507, 365),
     (600, "fix_forced=off", 8507, 530),
@@ -66,53 +60,14 @@ const EXPECTED: [(u32, &str, u64, u64); 55] = [
     (936, "default", 20507, 449),
     (936, "fix_forced=off", 20507, 830),
     (936, "nogoods=off", 20507, 345),
-    (936, "lagrange=on", 20507, 449),
     (936, "symmetry=off", 20507, 652),
     (1000, "default", 24168, 3319),
     (1000, "fix_forced=off", 24168, 4000),
     (1000, "nogoods=off", 24168, 6308),
-    (1000, "lagrange=on", 24168, 3319),
     (1000, "conflict_look=off", 24168, 3360),
     (1000, "symmetry=off", 24168, 4591),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),
-    // The matching path.  W = 8, the small end: every tactic's effect shows in a few hundred nodes.
-    (480, "matching", 5350, 393),
-    (480, "matching,nogoods=off", 5350, 417),
-    (480, "matching,fix_forced=off", 5350, 503),
-    (480, "matching,match_refine=0", 5350, 431),
-    (480, "matching,match_refine=3", 5350, 254),
-    // W = 16: games of a few hundred to ten thousand nodes.
-    (600, "matching", 8507, 4558),
-    (600, "matching,lagrange=off", 8507, 5877),
-    (600, "matching,nogoods=off", 8507, 17740),
-    (600, "matching,fix_forced=off", 8507, 7723),
-    (600, "matching,match_refine=0", 8507, 4711),
-    (600, "matching,match_refine=3", 8507, 3469),
-    (600, "matching,symmetry=on", 8507, 3856),
-    (640, "matching", 9220, 676),
-    (640, "matching,nogoods=off", 9220, 1099),
-    (640, "matching,fix_forced=off", 9220, 1569),
-    (660, "matching", 10242, 8822),
-    (660, "matching,lagrange=off", 10242, 10043),
-    (660, "matching,nogoods=off", 10242, 14817),
-    (660, "matching,fix_forced=off", 10242, 14657),
-    (760, "matching", 14170, 2318),
-    (760, "matching,lagrange=off", 14170, 2567),
-    (760, "matching,nogoods=off", 14170, 3361),
-    (760, "matching,fix_forced=off", 14170, 4317),
-    (760, "matching,match_refine=3", 14170, 1643),
-    (760, "matching,symmetry=on", 14170, 2292),
-    // W = 16, and without the Lagrangian bound a search of more than 50,000 steps, which forgets its nogoods once
-    // (`forget_nogoods=off` as well: 56,990).
-    (936, "matching", 20507, 41653),
-    (936, "matching,lagrange=off", 20507, 59055),
-    // W = 20, the width of the hardest games.
-    (1133, "matching", 28690, 2122),
-    (1133, "matching,lagrange=off", 28690, 2386),
-    (1133, "matching,nogoods=off", 28690, 5269),
-    (1133, "matching,fix_forced=off", 28690, 4848),
-    (1133, "matching,match_refine=0", 28690, 2156),
 ];
 
 /// (board, tactics, promotion sum, nodes): the search of the extended problem Π⁺(∅) of the board in its formulation
@@ -151,7 +106,6 @@ fn tactics(assignments: &str) -> SearchTactics {
     for assignment in assignments.split(',') {
         match assignment {
             "default" => {}
-            "matching" => tactics.search = SearchTactics::matching(),
             "extended" => tactics.search = SearchTactics::extended(),
             _ => tactics.set(assignment).unwrap(),
         }
@@ -309,7 +263,7 @@ fn the_extended_search_trees_of_936_and_1133_have_not_changed() {
 }
 
 // Π⁺(∅) with the claims of `unzip` is the frame model's problem, so its search reproduces the trees of EXPECTED, every
-// row of the boards (the matching ones too), node for node.
+// row of the boards, node for node.
 
 /// What the trees of Π⁺(∅) with the claims of `unzip` are called in the message of a difference.
 const WITH_CLAIMS: &str = "search trees of Π⁺(∅) with the claims of unzip";
@@ -381,15 +335,18 @@ fn the_tactics_of_extended_mode_are_the_default_without_the_symmetry_rule() {
     ignore = "long: the quick check is a_search_of_a_small_game_on_one_thread_is_deterministic"
 )]
 fn a_search_on_one_thread_is_deterministic() {
-    for (n, t) in [(1000, SearchTactics::default()), (760, SearchTactics::matching())] {
+    let without_rule = SearchTactics { symmetry: false, ..SearchTactics::default() };
+    for (n, t) in [(1000, SearchTactics::default()), (936, without_rule)] {
         assert_eq!(search_at_width::<16>(n, t), search_at_width::<16>(n, t), "n={n}");
     }
 }
 
-/// [`a_search_on_one_thread_is_deterministic`] for the games 660 (by the default) and 640 (on the matching path).
+/// [`a_search_on_one_thread_is_deterministic`] for the games 660 (by the default) and 600 (without the rule of the
+/// symmetric pairs).
 #[test]
 fn a_search_of_a_small_game_on_one_thread_is_deterministic() {
-    for (n, t) in [(660, SearchTactics::default()), (640, SearchTactics::matching())] {
+    let without_rule = SearchTactics { symmetry: false, ..SearchTactics::default() };
+    for (n, t) in [(660, SearchTactics::default()), (600, without_rule)] {
         assert_eq!(search_at_width::<16>(n, t), search_at_width::<16>(n, t), "n={n}");
     }
 }
@@ -409,19 +366,19 @@ fn a_search_with_the_symmetry_rule_on_one_thread_is_deterministic() {
     assert_eq!((first.nodes, first.best, first.set), (again.nodes, again.best, again.set));
 }
 
-/// (game, nodes forgetting the nogoods every 500 steps, nodes never forgetting) for [`forgetting_search`].
-const FORGETTING: (u32, u64, u64) = (600, 5500, 4558);
+/// (game, nodes forgetting the nogoods every 200 steps, nodes never forgetting) for [`forgetting_search`].
+const FORGETTING: (u32, u64, u64) = (800, 1640, 1424);
 
-/// The tree below the root of a game, searched on the matching path (the GF(2) bound's trees of the small games
-/// are too small for forgetting to matter) by one searcher that forgets its nogoods every `period` steps
-/// (`None`: never), from the greedy incumbent; returns (best, nodes).  A search forgets for the first time after
-/// 50,000 steps (`NOGOOD_PERIOD`), so the games that finish sooner never meet what a long search meets all the
-/// time: conflicts that the table no longer holds, that only the propagation of the node's known conflicts into its
-/// children (`Stepper::make_child` in src/search/searcher.rs) still rules out.  Measured with a mutant that switched
-/// that propagation off: no count changes below 50,000 steps (600, 760, 936, 1133, 1140, 1150), but forgetting
-/// every 500 steps costs it 0.9 % at n = 600, and n = 992 (4.2M nodes) 22 %.
+/// The tree below the root of a game of more than a thousand nodes (the trees of the smaller games are too small for
+/// forgetting to matter), searched by one searcher that forgets its nogoods every `period` steps (`None`: never), from
+/// the greedy incumbent; returns (best, nodes).  A search forgets for the first time after 50,000 steps
+/// (`NOGOOD_PERIOD`), so the games that finish sooner never meet what a long search meets all the time: conflicts that
+/// the table no longer holds, that only the propagation of the node's known conflicts into its children
+/// (`Stepper::make_child` in src/search/searcher.rs) still rules out.  Measured on the matching path, the node bound
+/// before the GF(2) bound, with a mutant that switched that propagation off: no count changed below 50,000 steps (600,
+/// 760, 936, 1133, 1140, 1150), but forgetting every 500 steps cost it 0.9 % at n = 600, and n = 992 (4.2M nodes) 22 %.
 fn forgetting_search(game: &Game<16>, period: Option<u64>) -> (u64, u64) {
-    let cfg = Config { period, ..Config::matching() };
+    let cfg = Config { period, ..Config::standard() };
     let start = greedy(&game.model, &game.root, &game.candidates).sum();
     let out = game.search(cfg, vec![game.root_unit()], start, None, None);
     assert!(out.completed && out.real);
@@ -432,13 +389,13 @@ fn forgetting_search(game: &Game<16>, period: Option<u64>) -> (u64, u64) {
 fn the_tree_with_frequent_forgetting_has_not_changed() {
     let (n, expected_forgetting, expected_never) = FORGETTING;
     let game = Game::<16>::of_board(n).unwrap();
-    let (best, forgetting) = forgetting_search(&game, Some(500));
+    let (best, forgetting) = forgetting_search(&game, Some(200));
     let (best_never, never) = forgetting_search(&game, None);
     assert_eq!(best, best_never);
     assert_eq!(
         (forgetting, never),
         (expected_forgetting, expected_never),
-        "n={n}: nodes forgetting every 500 steps, nodes never forgetting; update FORGETTING"
+        "n={n}: nodes forgetting every 200 steps, nodes never forgetting; update FORGETTING"
     );
 }
 
