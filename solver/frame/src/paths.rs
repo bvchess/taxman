@@ -1,4 +1,4 @@
-//! Where the files `taxman bench` reads and writes by default are, found when the program runs.
+//! Where the files the commands read by default are, found when the program runs.
 //!
 //! Nothing here is a path fixed at compile time, so a binary works wherever it is as long as it can find the
 //! repository: the nearest directory above the working directory, and failing that above the directory of the
@@ -8,8 +8,6 @@
 //!
 //! | file | default | flag |
 //! |---|---|---|
-//! | the benchmark history (`taxman bench`) | `solver/frame/bench/history.jsonl` | `--history FILE` |
-//! | the results `taxman bench` takes games past the built-in table from | `results/optimal.jsonl.gz` | `--known FILE` |
 //! | the prover's proofs (`verify-certificates`) | `solver/noframe/data/exact_*.jsonl` | `--exact FILE...` |
 //!
 //! A flag wins over the repository.  When the repository cannot be found the error says where it looked and what to
@@ -21,9 +19,6 @@ use std::path::{Path, PathBuf};
 /// The committed results, the chain of games from n = 1 (gzip), relative to the repository; its presence is what makes a
 /// directory the repository.
 pub const RESULTS_IN_REPOSITORY: &str = "results/optimal.jsonl.gz";
-
-/// The benchmark history, relative to the repository.
-pub const BENCH_HISTORY_IN_REPOSITORY: &str = "solver/frame/bench/history.jsonl";
 
 /// The bounds store, the bounds on opt(n) that the ledger finds, relative to the repository.
 pub const BOUNDS_STORE_IN_REPOSITORY: &str = "results/bounds.jsonl";
@@ -61,7 +56,7 @@ pub fn repository_root() -> Result<PathBuf, String> {
     })
 }
 
-/// `relative` in the repository, for the defaults of `taxman bench`; `flag` is what to give instead of finding it.
+/// `relative` in the repository, for a default file; `flag` is what to give instead of finding it.
 ///
 /// # Errors
 ///
@@ -137,6 +132,6 @@ mod tests {
         // `cargo test` runs in the crate's directory, which is in the repository.
         let root = repository_root().expect("tests run in the repository");
         assert!(root.join(RESULTS_IN_REPOSITORY).is_file());
-        assert!(in_repository(BENCH_HISTORY_IN_REPOSITORY, "--history FILE").unwrap().starts_with(&root));
+        assert!(in_repository(PROVER_DATA_IN_REPOSITORY, "--exact FILE").unwrap().starts_with(&root));
     }
 }

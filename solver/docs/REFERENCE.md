@@ -57,22 +57,15 @@ $ taxman verify-results results/optimal.jsonl.gz  # replay every game of the com
 $ taxman tables 85 8 45                         # the maximal factors and composites of 8 and 45 on the board 1..=85
 8: maximal factors [4]; maximal composites [16, 24, 40, 56]
 45: maximal factors [9, 15]; maximal composites []
-$ taxman bench --history /tmp/h.jsonl           # time the benchmark games 936 ... 1184, each on its own, no derivation
 ```
 
-* **`bench`** appends one JSON line per run to its history file: `solver/frame/bench/history.jsonl` of the repository,
-  unless `--history FILE` names another (pass it to keep the checkout clean).  It takes the games past the built-in
-  table's from `results/optimal.jsonl.gz`, unless `--known FILE` names another results file.
-* **The ladder** is the harness for hard games and for scaling over thread counts: `cargo run --release --example
-  ladder -- --scaling --seed-opt --known ../../results/optimal.jsonl.gz --seconds 600 1215`, in `solver/frame`.  Its
-  flags are documented at the top of `examples/ladder.rs`.
 * **`verify-results [--threads K] FILE...`** checks each file as `solve` checks its `--out FILE` when it opens it.  The
   checks run in order, but the search problems they set up again for the repeats, most of the time on a long file,
   are set up first, on K threads (default: all CPUs).  With `--threads 1` it sets them up one at a time, as the checks
   need them.  The result, and the first line to fail, are the same for any K.  `solve` takes the threads for this from
   its own `--threads`.
-* **A results file named by path**, in `verify-results`, in the `--results` flags of `certify` and
-  `verify-certificates`, and in `bench --known`, is read through the gzip decoder if the path ends in `.gz`, as
+* **A results file named by path**, in `verify-results` and in the `--results` flags of `certify` and
+  `verify-certificates`, is read through the gzip decoder if the path ends in `.gz`, as
   `results/optimal.jsonl.gz` does, and as plain JSONL if it does not.  The files that `--out` writes are plain JSONL.
   Except in `verify-results`, which reads a file whole, a gzip file is decoded only as far as the games asked for, and
   must be one game a line ([design/engine.md](design/engine.md)).

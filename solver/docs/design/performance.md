@@ -3,16 +3,8 @@
 Part of the [design](../DESIGN.md).
 
 Performance is worked on in cycles and instructions retired, on one thread and a plain release build, because other
-load on the machine moves wall times by up to 3×.  Five tools measure it:
+load on the machine moves wall times by up to 3×.  The probe measures it:
 
-* **`taxman bench`** runs a fixed set of games that need a search and take about a second each on one thread: n = 936
-  (W = 16), and 1050, 1100, 1133, 1170 and 1184 (W = 20).  It solves them standalone, with acceleration off (the game
-  of n − 1 from the built-in table, past it from `results/optimal.jsonl.gz`), prints the times of each phase and the
-  node counts, and appends them to `solver/frame/bench/history.jsonl`, so that performance can be followed across
-  changes.
-  Each line has the commit the binary was built from, every tactic's value, and for each game the nodes, the seconds
-  of each phase and the search's counters.  `--history FILE` and `--known FILE` name other files; by default the
-  command finds them in the repository.
 * **The probe** (`cargo run --release --example perf`) replays the hot paths of the hardest games from fixtures in
   `testdata/perf/` (0.2 MB), and measures them in cycles and instructions retired of the process (`proc_pid_rusage`).
   Each part has a fingerprint of what it computes, which an exact optimization must leave unchanged:
@@ -37,32 +29,13 @@ load on the machine moves wall times by up to 3×.  Five tools measure it:
   fixtures again, deterministically.  For whole searches,
   `/usr/bin/time -l` reports the same counters for a process.  `cargo test --release` rebuilds the examples in its
   own configuration, with about 2% more instructions: run `cargo build --release --examples` again before measuring.
-* **Profile-guided optimization** (`solver/tools/pgo.sh`) gains 0 to 2%, with the same trees and fingerprints, since
-  the hot loop is inlined by hand.  An instrumented build runs the probe and a short search at every set width (code
-  that a profile never saw is optimized as cold), and `-Cprofile-use` builds `target/pgo/release/taxman` and the
-  examples.  Profile the plain build: with PGO the search is inlined into a few functions, and a profiler sees little.
-  On Linux, rustup's `llvm-tools` has an llvm-profdata that matches rustc's LLVM, and the script adds whatever
-  `RUSTFLAGS` it is given (for instance `-C target-cpu=native`, which a plain build does not use) to the profile flags.
-* **The ladder** (`cargo run --release --example ladder -- [--threads T[,T…] | --scaling] [--seconds S] [--diag]
-  [--seed-opt] [--known FILE] [--tactic …] [--node-limit N] N…`; the top of `examples/ladder.rs` documents its flags)
-  makes standalone searches of hard games from the frame builder, seeded from the known game of n − 1 and capped as
-  the solver does, each with a time limit.  It reports completion, nodes, time, when the final incumbent was found,
-  and the engine's counters.  `--seed-opt` seeds with an optimal game of n itself, to measure the proof alone; `--diag`
-  prints `search::Diagnostics` (nodes by depth, what pruned, bound gaps, conflict sizes, matching work).  Games for
-  fast progress benchmarks (one thread): 880, 936, 1050, 1100, 1170, 1184; harder ones: 992, 996, 1025, 1215, 1216 on
-  several threads.
-* **Scaling** is the ladder with a list of thread counts (`--threads 1,2,4,8`, or `--scaling` for 1, 2, 4, … up to all
-  the CPUs).  It searches each game with each count, and prints a table for each game and one summed over the games:
-  search time, speedup, nodes per second per thread, effective parallelism, idle and lock-wait time, splits and the
-  units they gave, steals, runs, tiny runs, and the time to full occupancy.  With `--seed-opt` the node count barely
-  depends on the threads, so the speedup measures the parallel proof alone.  `--cores C` lets only C of the threads
-  search at once (`EngineConfig::cores`), to measure in counts, not time, what many more workers than CPUs would do.
-  The engine's own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, its sizes and thread
-  counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
+The engine's own benchmark (`cargo test --release --test engine -- --ignored --nocapture bench`, its sizes and thread
+counts set by `TXENGINE_BENCH_*`) measures the engine's overhead per node, with no work per node.
 
-The cloud scripts (`solver/tools/cloud`) run the scaling sweep, the cost of a checkpoint pause and the chain on a
-machine of many CPUs ([runbook/before-a-big-run.md](../runbook/before-a-big-run.md) and
-[runbook/chain.md](../runbook/chain.md)).
+The cloud scripts (`solver/tools/cloud`) run the chain on a machine of many CPUs
+([runbook/before-a-big-run.md](../runbook/before-a-big-run.md) and [runbook/chain.md](../runbook/chain.md)).  The
+command `taxman bench`, the example `ladder` and `scaling.sh` were removed on 2026-10-30; they build at commit 3ca11bf.
+The file `solver/frame/bench/history.jsonl` is the record of the benchmarks of 2026-10.
 
 **Where it stands.**  At the end of the chain a step of the search cost 888k cycles on one thread of the M1 Max, 92% of
 it in the GF(2) bound, and [cheaper GF(2) nodes](../../notebook/search/cheaper-gf2-nodes-same-trees-2026-10/README.md)

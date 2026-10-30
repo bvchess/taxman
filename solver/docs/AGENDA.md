@@ -425,10 +425,10 @@ B, where a thread's time goes at 16, 64, 96 and 192 threads, the window at 64 an
 and the memory at 192, the fixed costs of a game on a Graviton4 core, and the chain's speed and cost a game on 64 and
 192 threads ([scaling to 192 threads](../notebook/scaling-to-192-threads-2026-10/README.md)).  What neither measured:
 
-* **Why a 192-thread search after one-thread work in the same process steps 1.6 to 1.7 times slower.**  The ladder
-  showed it twice, `solve` never; the suspect is the kernel's automatic NUMA balancing.  The check (the threads' CPUs
-  during such a run, and the same under `numactl --interleave=all`) takes minutes on the next 192-thread machine; it
-  matters for a long `chain.sh` run on 192 threads.
+* **Why a 192-thread search after one-thread work in the same process steps 1.6 to 1.7 times slower.**  The scaling
+  run showed it twice, `solve` never; the suspect is the kernel's automatic NUMA balancing.  The check (the threads'
+  CPUs during such a run, and the same under `numactl --interleave=all`) takes minutes on the next 192-thread machine;
+  it matters for a long `chain.sh` run on 192 threads.
 * **Where the second socket's cost goes.**  At 192 threads a step is 7 to 10% dearer than on one socket; remote memory
   and the other chip's caches were not separated.
 * **Large trees on many threads.**  The longest search at 192 threads was 85 s (2288).  Hours of one tree (item 2 of
@@ -440,10 +440,11 @@ and the memory at 192, the fixed costs of a game on a Graviton4 core, and the ch
   threads, in one run each; 2, 3, 6 and 8 were not tried there.
 * **Graviton5.**  A `c9g.16xlarge` was launched for the calibration, and the spot service took it back five minutes in,
   before it ran anything.  The speed of its CPUs against Graviton4's (AWS says up to 25 %) is unmeasured.
-* **PGO and `target-cpu=native` on Graviton.**  `solver/tools/pgo.sh` exists and was run on the M1 only; no gain from
-  profile-guided builds is claimed for Graviton, and the calibration built with `native` without comparing generic code.
+* **PGO and `target-cpu=native` on Graviton.**  `solver/tools/pgo.sh` (removed on 2026-10-30; it builds at commit
+  3ca11bf) was run on the M1 only; no gain from profile-guided builds is claimed for Graviton, and the calibration built
+  with `native` without comparing generic code.
 * **A spot interruption, and the scripts on Ubuntu.**  `spot-watch.sh` has not seen an interruption, so neither has the
   restore after one (the cloud run's restore followed a stop on purpose): no notice came in the cloud runs, and the
-  scaling run's instance had its notice two minutes before the end, with no `spot-watch.sh` running.  `scaling.sh` has
-  not run on EC2, and its first run, on a small instance, is its test; nothing has run on Ubuntu ([runbook/scripts.md,
+  scaling run's instance had its notice two minutes before the end, with no `spot-watch.sh` running.  Nothing has
+  run on Ubuntu ([runbook/scripts.md,
   "What has run where"](runbook/scripts.md#what-has-run-where)).

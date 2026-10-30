@@ -934,8 +934,8 @@ pub fn solve_game(n: u32, prev: Option<&Prev>, opts: &SolveOptions) -> Result<Ga
     solve_game_with(n, prev, opts, Optimal::built_in())
 }
 
-/// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests, and for `taxman bench`,
-/// whose known games extend the table.  The checkpoint of a completed game is deleted once the game has passed its
+/// [`solve_game`] with the score confirmed against the table `optimal` instead: for tests, and for a table whose known
+/// games extend the built-in one.  The checkpoint of a completed game is deleted once the game has passed its
 /// checks.  This is the driver of a range (`window`) over the one game `n`, from `prev`, with no results file and
 /// no earlier games to repeat.
 pub fn solve_game_with(
@@ -2001,6 +2001,12 @@ pub fn solve_range_each_with(
 ) -> Result<RangeSummary, String> {
     if lo < 1 || lo > hi {
         return Err(format!("the range {lo}..={hi} is empty or starts below 1"));
+    }
+    // The games write their stores here as they finish, so the folder is made now: one that cannot be made fails the
+    // run before its first game, as the results file that is opened next does.
+    if let Some(dir) = &opts.carried_dir {
+        fs::create_dir_all(dir)
+            .map_err(|e| format!("cannot make the carried-nogoods folder {}: {e}", dir.display()))?;
     }
     let known = Known::load(optimal, &opts.known)?;
     let open = |path: &Path| {

@@ -9,8 +9,7 @@ the work.
 An entry names the commits that made each step, so `git show COMMIT` finds the code.  It is true of the code at its
 dates, and DESIGN.md is the authority on the code.
 The [glossary](../../docs/GLOSSARY.md) defines the terms, and
-[solver/docs/design/performance.md](../docs/design/performance.md) the measuring tools: the ladder, the probe and
-`taxman bench`.
+[solver/docs/design/performance.md](../docs/design/performance.md) the measuring tool, the probe.
 
 * [Register of everything tried](#register-of-everything-tried): a row per experiment, by subject, with what decided
   it.  Look here first.

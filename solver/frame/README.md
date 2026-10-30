@@ -144,7 +144,7 @@ the engine uses `File::try_lock`), and it uses no third-party libraries.  The in
 ```
 cd solver/frame
 cargo build --release              # about 100 seconds on an M1 Max; the binary is target/release/taxman
-cargo build --release --examples   # also the ladder (scaling and progress harness), the probe and the ledger
+cargo build --release --examples   # also the probe and the ledger
 ./target/release/taxman help
 ```
 
@@ -161,19 +161,15 @@ nothing.
 *Details.*  The feature `studies`, which adds the searcher's hook and its sites, is off by default.  So a build,
 `cargo test` and `cargo clippy --all-targets` do not compile them.  The build is long for a program of this size
 because the search is compiled once for every set width
-([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width dispatch").  `taxman
-bench` finds its two
-files in the repository: above the working directory and, if they are not there, above the binary.
+([solver/docs/design/architecture.md](../docs/design/architecture.md), the paragraph "Width dispatch").
 
 *Build options.*  The release profile uses fat LTO and `panic = "abort"`.  The `test` profile is optimized
 (`opt-level = 2`) because the tests replay real games.  A build is generic for its target architecture, so its binary
 runs on any machine of that architecture.  Tuning for the build machine's CPU is opt-in, for a machine that will run
 only that binary: `RUSTFLAGS="-C target-cpu=native" cargo build --release`, as the cloud scripts do
 ([RUNBOOK](../docs/RUNBOOK.md)).  It gains nothing on the Apple M1, where it was measured, and is unmeasured elsewhere;
-the generic x86-64 target has no hardware popcount, so measure there.  `solver/tools/pgo.sh` makes a profile-guided
-build in `target/pgo/release`, with 0 to 2% fewer cycles on the M1 and the same answers and trees.  Its header says how,
-and [solver/docs/design/performance.md](../docs/design/performance.md) what it gains.  The probe, `examples/perf.rs`,
-measures the hot paths.
+the generic x86-64 target has no hardware popcount, so measure there.  The probe, `examples/perf.rs`, measures the hot
+paths ([solver/docs/design/performance.md](../docs/design/performance.md)).
 
 ### A first run: the games 1 to 22
 

@@ -11,7 +11,6 @@
 #   CKPT          the checkpoint directory        (default $TAXMAN_WORK/ckpt)
 #   LOGS          the log directory               (default $TAXMAN_WORK/logs)
 #   TAXMAN_BIN    the solver binary               (default solver/frame/target/release/taxman)
-#   LADDER_BIN    the ladder example binary       (default solver/frame/target/release/examples/ladder)
 #   EXACT_BIN     the prover's `exact`            (default solver/noframe/target/release/exact; prover.sh)
 #   RUSTFLAGS     default "-C target-cpu=native" in these scripts (a plain `cargo build` builds generic code): build
 #                 for the CPU of the machine that builds.  Build on the machine type that will run the binary.  Set it
@@ -27,7 +26,6 @@ RESULTS="${RESULTS:-$TAXMAN_WORK/results/strict.jsonl}"
 CKPT="${CKPT:-$TAXMAN_WORK/ckpt}"
 LOGS="${LOGS:-$TAXMAN_WORK/logs}"
 TAXMAN_BIN="${TAXMAN_BIN:-$CRATE/target/release/taxman}"
-LADDER_BIN="${LADDER_BIN:-$CRATE/target/release/examples/ladder}"
 PROVER="$TAXMAN_ROOT/solver/noframe"
 EXACT_BIN="${EXACT_BIN:-$PROVER/target/release/exact}"
 CLOUD_DIR="$_cloud_dir"

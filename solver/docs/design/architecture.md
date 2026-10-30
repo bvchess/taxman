@@ -70,7 +70,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **The front end.**
 
-14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line, with the commands `solve`, `regress`, `bench`,
+14. `src/main.rs`, `src/cli.rs`, `src/commands.rs`: the command line, with the commands `solve`, `regress`,
     `verify-results`, `tables`, `certify` and `verify-certificates`.
 
 **Studies**, which the solver does not use and a first read skips:
@@ -80,8 +80,7 @@ with a comment that says what it is for; read it first.  The pipeline of [Per-ga
 
 **Beside the library.**  `examples/` holds the programs that use the library but are not the solver:
 
-* built by `cargo build --examples`: the ladder `ladder` (standalone searches of hard games with time limits, thread
-  scaling and diagnostics), the probe `perf` (the hot paths, replayed from fixtures and measured in cycles and
+* built by `cargo build --examples`: the probe `perf` (the hot paths, replayed from fixtures and measured in cycles and
   instructions), and `ledger` (bounds on opt(n) for many games at once, tightened by limited searches and the relations
   between games; [The ledger](trust.md#the-ledger)).
 

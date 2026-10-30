@@ -78,9 +78,8 @@
 //!
 //! The command-line front end (`main.rs`, `cli.rs`, `commands.rs`) is the binary's, not the library's, and is read
 //! last.  `bounds` is two small functions that the Java solver has too (`max_additional` and the greedy incumbent),
-//! and `brute` and `root_problem` are studies that a first read can skip.  `examples/` holds the ladder
-//! (searches of hard games with time limits and thread counts), the probe of the hot paths and the ledger; `tests/` the
-//! integration tests.
+//! and `brute` and `root_problem` are studies that a first read can skip.  `examples/` holds the probe of the hot paths
+//! and the ledger; `tests/` the integration tests.
 
 pub mod accelerate;
 pub mod bits;

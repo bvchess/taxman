@@ -108,11 +108,6 @@ commands:
       --show                   print each game's promotions and moves
   regress [--from A] [--to N] [--threads K] [--window K] [--tactic ...] [--use-prev]
                           solve A..N (default 1..400) in memory and check every score against the built-in table
-  bench [--threads K] [--tactic ...] [--history FILE] [--known FILE] [N ...]
-                          time the benchmark games (default 936 1050 1100 1133 1170 1184), each on its own
-                          with the previous game from the built-in table or past it from the results file --known
-                          (default results/optimal.jsonl.gz), and no derivation; appends the run to
-                          --history (default solver/frame/bench/history.jsonl; both in the repository)
   verify-results [--threads K] FILE...
                           check results files without changing them: every game replayed and its score checked
                           against the built-in table, the chain from n-1, each line's proof and provenance, and that
@@ -200,7 +195,6 @@ fn run(args: &[String]) -> CliResult {
         }
         "solve" => commands::solve(rest),
         "regress" => commands::regress(rest),
-        "bench" => commands::bench(rest),
         "verify-results" => commands::verify_results(rest),
         "tables" => commands::tables(rest),
         "certify" => commands::certify(rest),

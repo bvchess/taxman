@@ -11,10 +11,9 @@ ARG RUST_IMAGE=rust:1-bookworm
 FROM ${RUST_IMAGE}
 
 # python3: solver/tools/check_results.py and the prover's tools/summarize.py.  procps: the kill command, which tests
-# use to send signals.  time: GNU time, which scaling.sh uses to report peak memory.  tmux: the RUNBOOK's way to keep a
-# run alive over a dropped connection.
+# use to send signals.  tmux: the RUNBOOK's way to keep a run alive over a dropped connection.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 procps time tmux \
+    && apt-get install -y --no-install-recommends python3 procps tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # The solver finds the committed results at run time (src/paths.rs): results/optimal.jsonl.gz above the working

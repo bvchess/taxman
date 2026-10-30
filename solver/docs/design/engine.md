@@ -224,7 +224,7 @@ as far as the last of them, and one that goes over every game decodes the whole 
 
 A results file given by a path that ends in `.gz` is read the same way where it is used as a source of games: the
 committed chain that `--use-prev` and `verify-results` draw on (`known::Known::load`), and the `--results` of `certify` and
-`verify-certificates` and the `--known` of `bench` (`Optimal::with_results`).  Such a file must be one game a line, line n
+`verify-certificates`.  Such a file must be one game a line, line n
 for game n, as the committed results are.  It is read into memory when it is opened, with its first member decoded (so
 that a file that is no gzip file is refused at once), and its other members are decoded as games are asked for, so a
 check that cites few of its games reads a member or two of it.  A fault in a member that is decoded later stops the

@@ -2,8 +2,8 @@
 //! pipeline derives from them before it decides how to solve the game.
 //!
 //! This is the one path from n to a search that is ready to run (tables → frames → [`prepare`] → ceiling and seed →
-//! [`search`]).  The per-game pipeline ([`crate::solver`]), the ladder and the benchmarks, and the tests all take
-//! it, so that the facts that join the pieces are written once:
+//! [`search`]).  The per-game pipeline ([`crate::solver`]), the probe and the tests all take it, so that the facts
+//! that join the pieces are written once:
 //!
 //! * the score of a game of the frame model is `in_the_bag` plus the sum of its promotions, where `in_the_bag`
 //!   is what the game with no promotions scores ([`Board::in_the_bag`]);
@@ -16,7 +16,7 @@
 //!   whose completions are promotion sets of it: the *near-repeat cut* ([`near_repeat`]).
 //!
 //! A board is generic over the set width `W` (see [`crate::bits`]): pick it with `with_width!`, as the solver and
-//! the ladder do.
+//! the probe do.
 //!
 //! [`prepare`]: crate::search::prepare
 //! [`search`]: crate::search::search

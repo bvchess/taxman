@@ -307,8 +307,7 @@ every second line of the Java fixtures), and the comment on each says what the w
     (with its no-peel shortcut) against the peel of every frame, in reached states of games at W = 20, 28 and 64.  The
     unit tests check the nogood table's lookups against their definition at compact strides of 1 to 16 words, and debug
     builds check that every root frame is winnable, which the shortcut needs.
-* **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors, through the real binary;
-  `bench --history FILE` keeps the tracked `solver/frame/bench/history.jsonl` out of the tests.
+* **Command line** (`tests/cli.rs`): every subcommand's happy path and its usage errors, through the real binary.
 * **Documentation** (`tests/docs.rs`): what the docs state that the code can check, from the table of tactics to
   the links, the citations of headings, the sizes of [WRITING.md](../../../docs/WRITING.md)'s rule 8 and the words the
   project has retired.  The comment at the top of the file lists every check.

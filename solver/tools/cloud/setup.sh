@@ -68,11 +68,11 @@ if [ "$(id -u)" -ne 0 ]; then
     command -v sudo >/dev/null 2>&1 && sudo_cmd="sudo"
 fi
 
-# Optional tools (GNU time reports the peak memory of a run; htop shows the CPUs): one at a time, so that a package
-# a distribution does not have cannot fail the rest.
+# Optional tools (htop shows the CPUs): one at a time, so that a package a distribution does not have cannot fail the
+# rest.
 optional_packages() {
     local manager="$1" package
-    for package in time htop; do
+    for package in htop; do
         $sudo_cmd env DEBIAN_FRONTEND=noninteractive "$manager" install -y "$package" ||
             say "note: could not install $package (optional)"
     done
@@ -261,7 +261,6 @@ fi
 if [ -n "$solver_args" ]; then
     # A named binary or example must be there; "--bins" and "--examples" are held to the ones the scripts use.
     ! selects "$solver_args" bin taxman || [ -x "$TAXMAN_BIN" ] || fail "the build did not produce $TAXMAN_BIN"
-    ! selects "$solver_args" example ladder || [ -x "$LADDER_BIN" ] || fail "the build did not produce $LADDER_BIN"
 fi
 if [ -n "$prover_args" ]; then
     ! selects "$prover_args" bin exact || [ -x "$EXACT_BIN" ] || fail "the build did not produce $EXACT_BIN"
@@ -368,5 +367,5 @@ if [ -x "$TOOLS/pgo.sh" ]; then
     echo "note: $TOOLS/pgo.sh exists in this checkout; read its header for an optional profile-guided build"
 fi
 echo "prover:         $EXACT_BIN"
-echo "next:           $CLOUD_DIR/scaling.sh (the solver) or $CLOUD_DIR/prover.sh A B (the prover's proofs);" \
+echo "next:           $CLOUD_DIR/chain.sh N (the solver) or $CLOUD_DIR/prover.sh A B (the prover's proofs);" \
     "see RUNBOOK.md"

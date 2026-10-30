@@ -174,7 +174,7 @@ run `setup.sh` from inside it; it then works on that tree and does not pull, and
 * installs packages, and installs Rust with rustup if there is none (stable, at least 1.89);
 * looks first, in a clean checkout at a commit, for that commit's tested binaries in the build cache, and builds nothing
   when it finds them ([build-cache.md](build-cache.md)); otherwise builds with `RUSTFLAGS="-C target-cpu=native"` the
-  solver, its examples `ledger`, `perf` and `ladder`, and the prover (`solver/noframe`) (`STUDIES=1` adds the Cargo
+  solver, its examples `ledger` and `perf`, and the prover (`solver/noframe`) (`STUDIES=1` adds the Cargo
   feature `studies`, which a default build skips);
 * runs both result verifiers on the committed file, and runs `taxman regress --to 400`;
 * runs `cargo test -- --test-threads=4`, and the prover's `cargo test --release`.
@@ -278,5 +278,4 @@ counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#wa
 | a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root, and `sudo -i` mangles a multi-line `bash -lc '...'` | put the step in a script file and run `sudo -u ec2-user -i bash FILE` ([Steps through SSM, or SSH](#steps-through-ssm-or-ssh)) |
 | the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain and the sweep, `pv` for the prover, `cert` for the certificates); if tmux is gone, the machine rebooted (next row) |
 | the machine rebooted | tmux and the job are gone; the state is in `~/taxman-work`, and the build survives | run the job's command again (`chain.sh N`) |
-| `eff` low and `idle` high on a short game at 192 threads | expected ([Reading the sweep](before-a-big-run.md#reading-the-sweep)) | judge the long games |
 | `lock` of several percent on long games | the shared deque is contended | report it; fewer threads is the remedy at hand (`THREADS=96`) |

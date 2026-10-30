@@ -21,7 +21,7 @@ Each job's file names the instance that suits it; this page says why.
   vCPU-hour changes little with the size (below), the largest spot pools are the thinnest, and the prover's proofs need
   no more than 16 vCPUs.  A new account's quota is 5 vCPUs; the owner's account allows 640 on spot (below).  Every
   script takes the CPU count from the machine, so any size works, up to a 192-vCPU `c8g.48xlarge`, if you have the quota
-  and want the chain in hours.  On x86_64, compare the nodes per second per thread (`k/s/thr` in the sweep) before you
+  and want the chain in hours.  On x86_64, compare the speed per thread of the candidates on a small instance before you
   choose.
 * **Choose the family.**  `c8g` (Graviton4) is the safe default, and what the calibration chose.  `c9g` (Graviton5) is
   up to 25 % faster per vCPU by AWS's
@@ -32,13 +32,13 @@ Each job's file names the instance that suits it; this page says why.
   more per vCPU.
 * **Try a small instance of the same family first** (`c8g.xlarge`, 4 vCPUs, which fits the default quota; or `2xlarge`).
   It has the same CPU, so the same build and the same per-thread speed, for a sixteenth of the price or less.  It is
-  where you find setup problems on Linux, test failures, and the single-thread rate and the 1-to-4-thread part of the
-  sweep ([A small instance first](before-a-big-run.md#a-small-instance-first)).
+  where you find setup problems on Linux and test failures
+  ([A small instance first](before-a-big-run.md#a-small-instance-first)).
 * **Check `lscpu` on a large machine** for the number of NUMA nodes.  The engine does not pin threads: each searcher
   allocates its own state on its own thread, so first touch puts it on that thread's node.  Threads still move between
   nodes: on a two-socket Xeon about a tenth of their time ran against remote memory, which cost a step about 0.3%
   ([remote memory and huge pages](../../notebook/remote-memory-and-huge-pages-on-a-two-socket-xeon-2026-10/README.md)).
-  If there are several nodes and the sweep shows a step in `k/s/thr` where the thread count crosses a node, that is the
+  If there are several nodes and the speed per thread falls where the thread count crosses a node, that is the
   cause.  The 64-vCPU instances of the calibration were one socket and one node
   (`solver/notebook/graviton-calibration-2026-10/machines/`).
 * **Build on the machine type that runs the binary.**  A plain `cargo build` makes generic code; `-C target-cpu=native`
@@ -51,11 +51,6 @@ Each job's file names the instance that suits it; this page says why.
   `env_report` greps `lscpu` for `^Model name`, and on Graviton4 with Amazon Linux 2023 `lscpu` prints only
   `BIOS Model name: AWS Graviton4`.  Nobody has measured the gain of `native` on Graviton; expect 0 to 3 % (on the M1 it
   measured 0 %).
-* **Profile-guided optimization** (PGO) is optional.  `solver/tools/pgo.sh` makes the build (its header says how); on
-  the M1 it adds 0 to 2 % ([design/performance.md](../design/performance.md)).  PGO changes code generation only, so the
-  search
-  and its answers stay the same, and either binary can resume a checkpoint.  `TAXMAN_BIN` and `LADDER_BIN` point the
-  scripts at another binary.  Keep a non-PGO build too if you want to profile.
 
 ## Spot or on demand
 

@@ -14,7 +14,6 @@ each says how to run it, and the long runs' scripts (`run.sh`, `chain.sh`, `swee
 | `run.sh` | what the long runs share (one at a time, log, pid, deadline, S3 saves, clean stop, power-off); sourced |
 | `setup.sh` | packages, Rust, the checkout, the binaries (from the build cache, or built with `target-cpu=native`: `BUILD` says what; [build-cache.md](build-cache.md)), smoke checks and the tests; `RELEASE_TESTS=1` runs the release suite and stores the binaries; idempotent |
 | `build_cache.py`, `run_tests.py` | what `setup.sh` calls ([build-cache.md](build-cache.md)): the cache of tested binaries in S3, keyed by commit, architecture and CPU; the release suite with every test a process of its own on every CPU |
-| `scaling.sh` | the scaling sweep (`--engine`: the engine benchmark; `--pauses`: the cost of checkpoints; `--quick`) |
 | `chain.sh N` | the production run: the chain 1..N in a loop, a window of games in flight (`WINDOW`), resumable, logged, optional deadline and power-off |
 | `verify.sh [FILE...]` | both referees on a results file, and against the committed results |
 | `sweep.sh FIRST LAST` | the sweep ([sweep.md](sweep.md)): FIRST..LAST in blocks of consecutive games, one thread each and a limited search a game, then passes that search again the games whose game before them has gained, into `explore.jsonl`; resumable, with `DEADLINE_HOURS`, `POWEROFF` and `S3_DEST` as the others; `../sweep_plan.py` sizes the blocks and cuts the excerpts of the passes |
@@ -32,8 +31,7 @@ The scripts that source `run.sh` keep their state in one directory, `$TAXMAN_WOR
 it `results/strict.jsonl` (and
 `exact_parity_A_B.jsonl` of `prover.sh`), `ckpt/` (the checkpoints, `taxman.lock`), `logs/`, `chain.pid` (`prover.pid`)
 and `deadline`; `wall.sh` keeps its files in `WALL_DIR`, and the ledger's `cloud.sh` in `OUT`.  Nothing is written
-inside the checkout but `solver/frame/target` and `solver/noframe/target`, and
-`solver/frame/bench/history.jsonl` if you run `taxman bench` without `--history`.
+inside the checkout but `solver/frame/target` and `solver/noframe/target`.
 
 ## What has run where
 
@@ -51,7 +49,6 @@ on macOS cannot.
 | `spot-watch.sh` | the path after a notice (a SIGTERM, the final checkpoint), with a signal, in `test/run.sh node` ([The rehearsal](../../notebook/the-run-to-the-wall-2026-10/README.md#later-2026-10-20-the-rehearsal-as-the-runbook-gave-it)) | the prover's run, the chain's run, and [the run to 5000](../../notebook/the-run-to-5000-2026-10/README.md), whose two spot interruptions it handled |
 | `prover.sh` | over a range, with a SIGTERM stop and a resume, on macOS and in the image | the run of [prover.md](prover.md) (2026-10-14 and 15, to the end) |
 | `certify.sh` | `taxman certify` on two lists at once (bash 3.2) through a complete run and its `verify-certificates`, a SIGTERM stop and its resume; with a stand-in for the binary, a counterexample, an error, a crash and a deadline | not run |
-| `scaling.sh` | all three modes: a sweep, `--engine`, `--pauses` | not run: the calibration and the scaling run did by hand what it does |
 | `wall.sh`, `wall-node.sh`, the instance-hours ledger of `run.sh` | against a stand-in for aws (`test/run.sh`) | [the rehearsal](../../notebook/the-run-to-the-wall-2026-10/README.md#later-2026-10-20-the-rehearsal-as-the-runbook-gave-it) and [the run to the wall](../../notebook/the-run-to-the-wall-2026-10/README.md) and [the run to 5000](../../notebook/the-run-to-5000-2026-10/README.md) |
 | `sweep.sh` | against the stand-in (`test/run.sh sweep`) and on ranges a laptop can do ([its local test](../../notebook/the-sweep-a-local-test-2026-10/README.md)) | not run |
 | `ledger/cloud.sh` | the laptop's dry run of 1301..1500, with the test profile's `ledger` | the ledger's launches of 2026-10-17 and 18 ([its entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md)) |

@@ -35,7 +35,7 @@ The other documents:
   then loses all of its progress.  So every long run checkpoints often and resumes after a restart, losing at most one
   checkpoint interval.  Stopped by SIGINT or SIGTERM, it loses nothing.
 * **Iterate fast.**  Correctness and performance are worked out on small and medium games that finish in seconds: the
-  tests, the benchmark set and the probe ([performance.md](design/performance.md)).  Big runs come last.
+  tests and the probe ([performance.md](design/performance.md)).  Big runs come last.
 * **Standard library only**: no third-party crates.  The solver runs on Linux and macOS.
 
 ## The files
@@ -60,5 +60,5 @@ Each file explains one part of the solver and the reasons for it, and defines ea
 | certificates of U | [certificates.md](design/certificates.md) | make or check a certificate of [statement U](../../docs/theory/exactness.md#statement-u) |
 | testing | [testing.md](design/testing.md) | test a change: why small games, the quick check and its limits, and the checklist before a merge |
 | the tests | [tests.md](design/tests.md) | find the tests that cover a part, and where a new test belongs |
-| performance | [performance.md](design/performance.md) | make the solver faster: what it costs, the benchmark set and the probe |
+| performance | [performance.md](design/performance.md) | make the solver faster: what it costs and the probe |
 | the lab channel | [lab.md](design/lab.md) | let a lab watch and steer a live chain (the hook, the command folder), and see why nothing it does can make a result wrong |

@@ -1,4 +1,4 @@
-//! The subcommands: `solve`, `regress`, `bench`, `verify-results`, `tables`, `certify` and `verify-certificates`.
+//! The subcommands: `solve`, `regress`, `verify-results`, `tables`, `certify` and `verify-certificates`.
 //!
 //! The ones that solve games read their flags with [`Args`], build [`SolveOptions`] from them ([`solver_options`],
 //! or [`range_options`] for those that solve a range) and call the library's pipeline ([`taxman::solver`]); what
@@ -8,10 +8,6 @@
 //!   it, `results::ResultsFile`) its results file, prints one summary line per game as it is concluded, and with
 //!   `--game-hours` ends at the first game whose own search passes the wall (exit status 4);
 //! * `regress` solves in memory and compares every score with the table of optimal games;
-//! * `bench` solves a fixed set of hard games, each on its own (given the game before it from the table or the
-//!   committed chain, and nothing derived), and appends the run to a history file, so that performance can be followed
-//!   from commit to commit.  Its files are found in the repository ([`taxman::paths`]) unless `--history` and `--known`
-//!   name them;
 //! * `certify` searches as `solve` does (the same flags for checkpoints, limits and progress, the same lock and
 //!   signals), appends a certificate a game to its `--out` file (locked while it is open), takes the games of a range
 //!   or of a list file, and exits with status 2 on a game that beats a recorded score.
@@ -29,20 +25,19 @@ use crate::cli::{
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use taxman::certify::verify::{
     compact_ranges, frontier, read_exact, verify_certificates as verify_certificates_in, Frontier, Gap,
 };
 use taxman::certify::{certify_game_with, read_upper, CertificateFile, EarlierCertificates, Upper, Verdict};
 use taxman::engine;
 use taxman::game::Optimal;
-use taxman::json::Json;
 use taxman::known::{Known, KnownSources};
 use taxman::numtheory::Tables;
 use taxman::paths;
-use taxman::results::{build, verify_files_with, Build};
+use taxman::results::verify_files_with;
 use taxman::search::{finder, gate_trial, MAX_GATE};
-use taxman::solver::{self, GameResult, Method, Prev, SolveOptions, Wall};
+use taxman::solver::{self, GameResult, Method, SolveOptions, Wall};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
@@ -552,95 +547,6 @@ pub fn regress(args: &[String]) -> CliResult {
     let unchecked = results.iter().filter(|r| r.optimal_match.is_none()).count();
     outln!("{} games match the table, {unchecked} are not in it", results.len() - unchecked);
     Ok(())
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// bench
-
-/// The benchmark games: the last W = 16 game of the fast set and the W = 20 ones near the end of the chain, each a
-/// search of a second or so on one thread (solver/docs/design/performance.md).
-const BENCH_GAMES: [u32; 6] = [936, 1050, 1100, 1133, 1170, 1184];
-
-/// Times the benchmark games (or the games given), each on its own, given the game before it, and appends the run to
-/// the history.
-pub fn bench(args: &[String]) -> CliResult {
-    let args = Args::parse(args, &flags_with(&["--history", "--known"]), &[])?;
-    // Where the run is recorded, and where the previous games past the table's come from: in the repository
-    // unless a flag names a file.
-    let file = |flag: &str, in_repository: &str| match args.value(flag) {
-        Some(path) => Ok(PathBuf::from(path)),
-        None => paths::in_repository(in_repository, &format!("{flag} FILE")).map_err(failed),
-    };
-    let history = file("--history", paths::BENCH_HISTORY_IN_REPOSITORY)?;
-    let results = file("--known", paths::RESULTS_IN_REPOSITORY)?;
-    let ns: Vec<u32> = if args.positional().is_empty() {
-        BENCH_GAMES.to_vec()
-    } else {
-        let parse = |text: &String| text.parse().map_err(|_| CliError::Usage(format!("not a game n: {text:?}")));
-        args.positional().iter().map(parse).collect::<Result<_, _>>()?
-    };
-    let mut opts = solver_options(&args)?;
-    // Every game on its own: the previous game from the table or, past it, from the committed results, and no
-    // derivation.
-    opts.force_search = true;
-    let known = Optimal::built_in().with_results_files(&[results]).map_err(failed)?;
-
-    outln!("{} threads, tactics {}", opts.threads, opts.tactics.description());
-    let [n, nodes, greedy, search, total] = ["n", "nodes", "greedy s", "search s", "total s"];
-    outln!("{n:>5} {nodes:>13} {greedy:>9} {search:>9} {total:>9}");
-    let mut results = Vec::new();
-    for &n in &ns {
-        let prev = n.checked_sub(1).and_then(|before| Prev::from_optimal(&known, before));
-        let result = solver::solve_game_with(n, prev.as_ref(), &opts, &known).map_err(failed)?;
-        let p = &result.phases;
-        let secs = |d: Duration| d.as_secs_f64();
-        outln!("{:>5} {:>13} {:>9.3} {:>9.3} {:>9.3}", n, result.nodes, secs(p.greedy), secs(p.search), secs(p.total));
-        let _ = std::io::stdout().flush();
-        results.push(result);
-    }
-    let total: f64 = results.iter().map(|r| r.phases.total.as_secs_f64()).sum();
-    let nodes: u64 = results.iter().map(|r| r.nodes).sum();
-    outln!("{:>5} {:>13} {:>29.3}", "all", nodes, total);
-
-    let record = history_record(&opts, &results);
-    append_history(&history, &record).map_err(|e| failed(format!("{}: {e}", history.display())))?;
-    outln!("appended to {}", history.display());
-    Ok(())
-}
-
-/// One line of the benchmark history: when, which code, how it was run, and what each game cost.  The code is the
-/// commit this binary was built from (`results::build`), and whether its sources differed from it.
-fn history_record(opts: &SolveOptions, results: &[GameResult]) -> Json {
-    let games = results.iter().map(|r| {
-        Json::object([
-            ("n", Json::from(r.n)),
-            ("score", Json::from(r.score)),
-            ("nodes", Json::from(r.nodes)),
-            ("optimal_match", r.optimal_match.map_or(Json::Null, Json::Bool)),
-            ("seconds", r.phases.to_json()),
-            ("stats", r.stats_json()),
-        ])
-    });
-    let unix_time = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let Build { commit, dirty } = build();
-    let short = commit.map(|commit| &commit[..commit.len().min(7)]);
-    Json::object([
-        ("unix_time", Json::from(unix_time)),
-        ("git", short.map_or(Json::Null, Json::from)),
-        ("dirty", dirty.map_or(Json::Null, Json::Bool)),
-        ("threads", Json::from(opts.threads)),
-        ("tactics", Json::from(opts.tactics.description())),
-        ("tactic_switches", opts.tactics.to_json()),
-        ("games", Json::array(games)),
-    ])
-}
-
-fn append_history(path: &Path, record: &Json) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
-    writeln!(file, "{record}")
 }
 
 // ---------------------------------------------------------------------------------------------------------

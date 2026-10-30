@@ -182,6 +182,19 @@ fn games_with_a_directory_of_stores_find_their_scores() {
     }
 }
 
+/// A folder of carried nogoods that does not exist yet is made when the run starts, and the game that searches writes
+/// its store there.
+#[test]
+fn a_missing_folder_of_stores_is_made_and_written_to() {
+    let dir = TempDir::new("carried-made");
+    let folder = dir.join("stores");
+    let mut opts = SolveOptions { force_search: true, carried_dir: Some(folder.clone()), ..options(1) };
+    opts.tactics.search.carried_nogoods = true;
+    solve_all(500, 500, &opts);
+    assert!(folder.is_dir(), "the run made its folder");
+    assert!(taxman::model::store_file(&folder, 500).exists(), "game 500 wrote its store there");
+}
+
 /// Every tactic, alone and in the combinations that matter, finds the scores of the table at the games 1..=300.
 #[test]
 #[cfg_attr(debug_assertions, ignore = "long: the quick check is every_tactic_gives_the_same_scores_at_a_few_games")]

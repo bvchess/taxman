@@ -134,7 +134,7 @@ node's need.  Such a member is *forced*: every completion that beats the incumbe
   Three research tactics set it (`nogood_period`, `nogood_keep` and `nogood_limit`; [tactics.md](tactics.md)), whose
   defaults are the behavior above, with the same trees.  The table counts what it does (nogoods learned, lookups and
   the share they answered, candidates ruled out, the table's size at each forgetting and what was kept, evictions), and
-  the ladder and the progress lines print the counts.  A checkpoint does not record the policies, since the answer does
+  the progress lines print the counts.  A checkpoint does not record the policies, since the answer does
   not depend on them and a resumed search starts with empty tables; the run that resumes says which it uses.
 * **Single-member conflicts belong to the node.**  Many conflicts have one member, which looks like a candidate that
   cannot be promoted from the root at all and could be filtered out once.  It cannot: on every game from 2 to 1230 the

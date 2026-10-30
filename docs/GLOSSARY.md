@@ -245,14 +245,12 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
 * **checkpoint**: a periodic pause in which all workers stop and the engine writes the unexplored work, the incumbent
   and statistics to `nNNNN.ckpt`.  Its **header** identifies the search: n, the set width, digests of the candidates
   and frames, `max_total` and the tactics.
-* **profile** **(overloaded)**: (1) the *profile of a search*, which `taxman solve --profile DIR` keeps for research
+* **profile**: the *profile of a search*, which `taxman solve --profile DIR` keeps for research
   in `DIR/nNNNN.profile.jsonl`.  Every node at most D branchings below the root (`--profile-depth`) is a *tagged* node,
   with an id; its *own steps* are those taken at it and, at depth D, in its whole subtree.  The profile records each
   tagged node when it is made, the own steps of each id in each checkpoint interval, the steps by number of
   promotions, and the open units at each checkpoint.  It observes the search and changes nothing of it
   ([solver/docs/design/engine.md, "The profile of a search"](../solver/docs/design/engine.md#the-profile-of-a-search)).
-  (2) A CPU profile: where a process spends its time, which `solver/tools/profile/` samples and the profile-guided
-  build of `solver/tools/pgo.sh` uses.
 * **own search**: the time a game's search has run while the game was the oldest of the window, summed over every run
   of it.  The time it waited behind an older game, suspended while that game held the threads, is not in it, and
   neither is the time a speculative search ran before the game became the oldest.  The driver keeps it as the game's
@@ -401,8 +399,8 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   ([S5](theory/sources.md#the-span-conjecture)).  Statement (♦) implies (★) ([the span theorem
   (S6)](theory/sources.md#the-span-theorem)).
 * **the heuristics** (`heuristics/`): strategies that play good games quickly but don't guarantee optimal results.
-* **the probe** (`examples/perf.rs`), **the ladder** (`examples/ladder.rs`) and **`taxman bench`**: the performance
-  tools of [solver/docs/design/performance.md](../solver/docs/design/performance.md).
+* **the probe** (`examples/perf.rs`): the performance tool of
+  [solver/docs/design/performance.md](../solver/docs/design/performance.md).
 * **the quick check** (`solver/tools/quick_check.py`): formatting, lints and the tests, within time limits.  Every
   change passes it.
 * **a lab**, **the lab channel**: a lab is a program beside a live chain that studies its dearest searches and steers

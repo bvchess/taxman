@@ -439,8 +439,8 @@ impl Optimal {
     }
 
     /// The table with the completed games of the results files `results` added (they replace the table's moves for
-    /// the same values of n; an unfinished search's line is skipped): how a measurement (the ladder, `taxman
-    /// bench`) gets the previous game of a board past the table's end, to seed its search and give it a ceiling.
+    /// the same values of n; an unfinished search's line is skipped): how a measurement (the probe, the ledger) gets the
+    /// previous game of a board past the table's end, to seed its search and give it a ceiling.
     ///
     /// A file whose name ends in `.gz` is taken as [`with_results`](Self::with_results) takes it, decoded as its games are
     /// asked for, so its games are compared with the known games where they are looked up, not all now (that would

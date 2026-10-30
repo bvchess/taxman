@@ -26,7 +26,6 @@ fn help_lists_the_commands_and_every_tactic() {
         for text in [
             "solve N|A-B",
             "regress",
-            "bench",
             "verify-results [--threads K] FILE...",
             "certify (A-B | --list FILE) --results FILE... --upper FILE... --out FILE",
             "verify-certificates CERTS... --results FILE... --upper FILE...",
@@ -37,7 +36,6 @@ fn help_lists_the_commands_and_every_tactic() {
             "--gate-trial GATES",
             "--gate-trial-plan SPEC",
             "tables N K...",
-            "--history FILE",
         ] {
             assert!(run.stdout.contains(text), "{args:?}: no {text:?}");
         }
@@ -65,7 +63,6 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--window", "0"], "--window must be at least 1");
     assert_usage_error(&["solve", "12", "--window", "many"], "--window: cannot read");
     assert_usage_error(&["regress", "--window", "0"], "--window must be at least 1");
-    assert_usage_error(&["bench", "--window", "2"], "unknown option --window");
     assert_usage_error(&["solve", "12", "--nope"], "unknown option --nope");
     assert_usage_error(&["solve", "12", "--time-limit", "-1"], "not a number of seconds");
     assert_usage_error(&["solve", "12", "--node-limit", "many"], "cannot read");
@@ -77,9 +74,7 @@ fn bad_command_lines_are_usage_errors() {
     assert_usage_error(&["solve", "12", "--finder-after", "-1"], "--finder-after: cannot read");
     assert_usage_error(&["solve", "12", "--finder-seconds", "0"], "--finder-seconds must be more than 0 seconds");
     assert_usage_error(&["regress", "--finder-after", "1"], "unknown option --finder-after");
-    assert_usage_error(&["bench", "--finder-seconds", "1"], "unknown option --finder-seconds");
     assert_usage_error(&["regress", "12"], "regress takes no positional arguments");
-    assert_usage_error(&["bench", "many"], "not a game n");
     assert_usage_error(&["tables"], "usage: tables N K...");
     assert_usage_error(&["tables", "30"], "usage: tables N K...");
     assert_usage_error(&["tables", "30", "31"], "not on the board");
@@ -557,29 +552,4 @@ fn a_game_with_no_previous_game_says_it_is_solved_standalone() {
         assert_eq!(run.code, Some(0), "{args:?}: {}", run.stderr);
         assert_eq!(run.stderr, "", "{args:?}");
     }
-}
-
-#[test]
-fn bench_appends_to_the_history_it_is_given_and_not_to_the_tracked_one() {
-    let tracked = Path::new(env!("CARGO_MANIFEST_DIR")).join("bench/history.jsonl");
-    let before = fs::read(&tracked).ok();
-    let dir = TempDir::new("bench");
-    let history = dir.join("nested").join("history.jsonl");
-    for runs in 1..=2 {
-        let run = taxman(&["bench", "480", "--threads", "1", "--history", path(&history)]);
-        assert_eq!(run.code, Some(0), "{}", run.stderr);
-        assert!(run.stdout.contains("1 threads, tactics default"), "{}", run.stdout);
-        assert!(run.stdout.contains("appended to ") && run.stdout.contains("history.jsonl"), "{}", run.stdout);
-        let text = fs::read_to_string(&history).unwrap();
-        assert_eq!(text.lines().count(), runs, "{text}");
-    }
-    let record = Json::parse(fs::read_to_string(&history).unwrap().lines().last().unwrap()).unwrap();
-    let games = record.get("games").and_then(Json::as_arr).unwrap();
-    assert_eq!(games.len(), 1);
-    assert_eq!(games[0].get("n").and_then(Json::as_u32), Some(480));
-    assert_eq!(games[0].get("score").and_then(Json::as_u64), Optimal::built_in().score(480));
-    assert_eq!(games[0].get("optimal_match").and_then(Json::as_bool), Some(true));
-    assert_eq!(record.get("threads").and_then(Json::as_u32), Some(1));
-    assert!(games[0].get("nodes").and_then(Json::as_u64).is_some_and(|nodes| nodes > 0));
-    assert_eq!(fs::read(&tracked).ok(), before, "a test must not touch the tracked benchmark history");
 }

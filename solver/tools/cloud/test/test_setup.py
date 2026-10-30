@@ -47,7 +47,7 @@ case "$1" in
                 --examples)
                     all_examples=1
                     if [ "$crate" = solver ]; then
-                        tool $release/examples/ladder
+                        tool $release/examples/perf
                         tool $release/examples/ledger
                     else
                         tool $release/examples/inspect
@@ -177,7 +177,7 @@ class Setup(unittest.TestCase):
         self.assertEqual(status, 0, logged)
         self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bins --examples",
                                               "cargo noframe build --release --bins --examples"])
-        self.assertTrue((machine / "solver/frame/target/release/examples/ladder").exists())
+        self.assertTrue((machine / "solver/frame/target/release/examples/perf").exists())
         self.assertTrue((machine / "solver/noframe/target/release/exact").exists())
         self.assertEqual(self.entries(), [], "an untested build never goes to the cache")
 
@@ -187,7 +187,7 @@ class Setup(unittest.TestCase):
         self.assertEqual(status, 0, logged)
         self.assertEqual(self.cargo_calls(), ["cargo frame build --release --bin taxman --example ledger"])
         self.assertTrue((machine / "solver/frame/target/release/examples/ledger").exists())
-        self.assertFalse((machine / "solver/frame/target/release/examples/ladder").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/perf").exists())
         self.assertFalse((machine / "solver/noframe/target").exists())
         self.assertIn("smoke: the committed results file", logged)  # the solver has its checks, the prover none
         self.assertIn("smoke: none for the prover", logged)

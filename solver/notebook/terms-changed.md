@@ -55,3 +55,10 @@ entries that used them keep the paths and commands of their time.  The sacrifice
 `game::replay_punctured`, the maximal-factor rule of `brute::solve` and the hole cases of `frames/`) were removed the
 same day, and the test of `tests/wide.rs` that took its upper bound for game 1133 from the sacrifice bound reads the
 prover's proof instead; they build at commit 3ca11bf too.
+
+The speed tools were removed on 2026-10-30: the command `taxman bench` (its history file,
+`solver/frame/bench/history.jsonl`, stays as the record of the benchmarks of 2026-10), the example `ladder`
+(`solver/frame/examples/ladder.rs`), the scaling sweep `solver/tools/cloud/scaling.sh` and the profile tools
+`solver/tools/profile/` (`profile.sh` and `attribute.py`), and the profile-guided build `solver/tools/pgo.sh` (it gained
+0 to 2% on the M1 and no chain ran on it).  They build at commit 3ca11bf, and the entries that used them
+keep the paths and commands of their time.

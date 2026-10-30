@@ -68,7 +68,7 @@ class Cache(unittest.TestCase):
         """What `cargo build --release --bins --examples` leaves in the two crates, and its by-products."""
         release = root / "solver" / "frame" / "target" / "release"
         make_binary(release / "taxman", "taxman")
-        make_binary(release / "examples" / "ladder", "ladder")
+        make_binary(release / "examples" / "perf", "perf")
         make_binary(release / "examples" / "ledger", "ledger")
         make_binary(release / "examples" / "ledger-0123456789abcdef", "ledger copy")
         (release / "examples" / "ledger.d").write_text("deps\n")
@@ -183,15 +183,15 @@ class Cache(unittest.TestCase):
         machine = self.fresh_checkout()
         self.assertEqual(self.fetch("--bin taxman", root=machine).returncode, 0)
         self.assertEqual(self.fetch("--example ledger --bin taxman", root=machine).returncode, 0)
-        self.assertEqual(self.fetch("--example ladder", root=machine).returncode, 1)  # not in it
+        self.assertEqual(self.fetch("--example perf", root=machine).returncode, 1)  # not in it
         self.assertEqual(self.fetch("--bins", root=machine).returncode, 1)  # all of them is more than one
         self.assertEqual(self.fetch("--bin taxman", prover="--bin exact", root=machine).returncode, 1)  # no prover
-        self.assertFalse((machine / "solver/frame/target/release/examples/ladder").exists())
+        self.assertFalse((machine / "solver/frame/target/release/examples/perf").exists())
         self.assertEqual(self.fetch("--bin taxman=oops").returncode, 2)
 
     def test_a_plural_entry_serves_a_named_request(self):
         self.store()
-        done = self.fetch("--bin taxman --example ladder", "--bin exact", root=self.fresh_checkout())
+        done = self.fetch("--bin taxman --example perf", "--bin exact", root=self.fresh_checkout())
         self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_a_build_with_the_studies_is_an_entry_of_its_own_that_serves_a_build_without_them(self):

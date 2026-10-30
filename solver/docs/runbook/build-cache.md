@@ -67,7 +67,6 @@ a part that is not built are left out.  `STUDIES=1` adds `--features studies` to
 |---|---|
 | the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
 | the ledger ([ledger.md](ledger.md)) | `--bin taxman --example ledger` |
-| the scaling sweep (`scaling.sh`) | `--bin taxman --example ladder` |
 | the prover's proofs ([prover.md](prover.md)) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
 `taxman` is there for the smoke checks.  A machine of 32 CPUs or more builds the solver and the prover at the same time

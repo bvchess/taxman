@@ -31,7 +31,7 @@
 //!   (`make-window 936 4500` and `make-window 1215 600000`, with
 //!   `--tactic gf2=off --tactic lagrange=on --tactic symmetry=off` since; `make-window` takes `--tactic` as the probe
 //!   does, on top of the defaults, so the windows record the default window of the forced members, `force_window=all`,
-//!   as a header of version 6), which `--tactic` changes (the search tactics only, as for the ladder):
+//!   as a header of version 6), which `--tactic` changes (the search tactics only):
 //!   `--tactic lagrange=off`, say, searches the same window without the Lagrangian bound.  A game in `--fixtures` with
 //!   a window and no nodes (a copy of a chain's checkpoint at the end of the chain, renamed `nNNNN.window.ckpt`) has
 //!   only the window.

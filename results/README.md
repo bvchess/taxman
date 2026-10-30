@@ -188,7 +188,8 @@ What that evidence amounts to:
    score of an upper bound the store holds ([below](#boundsjsonl)).
 3. **Standalone solves.**  Some games were solved again on their own, with no seed and no ceiling:
    * `solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/calib.jsonl` holds 197 standalone searches, one for
-     every game of 1001–1231 that is not prime (`ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads,
+     every game of 1001–1231 that is not prime (the example `ladder`, which builds at commit 3ca11bf:
+     `ladder --no-seed --no-cap --tactic revise_freedoms=off`, 8 threads,
      commit e710d16; see
      [`solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md`](../solver/notebook/search/benchmarks-the-probe-pgo-and-scaling/cost-curve.md)).
      All of them finished, and each found the promotion sum of the score recorded here.  These proofs rest on no other

@@ -7,9 +7,8 @@ with `--tactic name=value`.  Every tactic is *proven* (a theorem, given a premis
 promotable optimal set), so switching one off changes how fast an answer comes, never the answer.  The values are `on`
 or `off`, but for `match_refine` (`0` to `7`), `nogood_period` and `nogood_limit` (whole numbers), `nogood_keep` (a
 policy), and the tactics that tune the GF(2) search, `force_window` to `more_forced`, which their rows give.  The
-tactics that act inside the search are the fields of `search::SearchTactics`, and `examples/ladder.rs` takes the same
-names for them.  A checkpoint records the search tactics in its header ([trust.md](trust.md), and "Adding a tactic"
-below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
+tactics that act inside the search are the fields of `search::SearchTactics`.  A checkpoint records the search tactics
+in its header ([trust.md](trust.md), and "Adding a tactic" below), but for the three that set how the nogoods are kept.  A test (`tests/docs.rs`) checks that this table lists the
 tactics of `tactics::Tactics`, in order, with their defaults.  Two of them, `conflict_branching` and `conflict_look`,
 only choose how a node branches: a checkpoint records them but does not bind them, and a lab may switch them while a
 search runs ([lab.md](lab.md#which-tactics-may-change-while-a-search-runs) lists which tactics may change, and why the
@@ -76,8 +75,8 @@ Java's bound with its runner-up, its preclusion table, and the branchings other 
 A new tactic changes the code, its tests and this table together:
 
 * **Its name and value**: a slot in `Tactics::slots_mut` (`src/tactics.rs`), in this table's order, with
-  `TACTIC_COUNT` and that module's tests of the names and the values.  The command line, the results line and the
-  ladder take the names from there.
+  `TACTIC_COUNT` and that module's tests of the names and the values.  The command line and the results line take the
+  names from there.
 * **Inside the search**: a field of `search::SearchTactics` (`src/search/tactics.rs`) and of `SearchSpace`
   (`search::searcher`), which the soundness harness builds too (`tests/common/mod.rs`).  A checkpoint's header records
   a switch through `bits`, `from_bits` and `with_switches_of`, and a setting that tunes the search through `tuning`,
