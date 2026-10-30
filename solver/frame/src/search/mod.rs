@@ -160,8 +160,9 @@ pub const NOGOOD_PERIOD: u64 = 50_000;
 pub const CONFLICT_BRANCHING_GAP: u64 = 300;
 
 /// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: the lab's `branching`
-/// and `policy` commands and `tune --gate` take whole numbers from 0 to this.  Any gate keeps the search exact: below
-/// it a check branches on the search's own conflict, from it on the conflict chosen, and both are true conflicts.
+/// and `policy` commands, `solve --gate` and `tune --gate` take whole numbers from 0 to this.  Any gate keeps the
+/// search exact: below it a check branches on the search's own conflict, from it on the conflict chosen, and both are
+/// true conflicts.
 pub const MAX_GATE: u64 = 4000;
 
 /// With the tactic `conflict_branching`, a conflict weighs the sum over its members of 10^(−price/slope), with this

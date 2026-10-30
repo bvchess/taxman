@@ -498,8 +498,10 @@ mod tests {
         assert!(!stopped.completed);
         let graph = MatchGraph::new(&p.model, &p.root);
         let space = SearchSpace::new(&p, &graph);
-        let branching = Branching::new(BranchSettings::of(&p.tactics));
+        // The search starts with the gate of the run (`--gate`), which the trial compares the others with.
+        let branching = Branching::new(BranchSettings::of(&p.tactics).with_gate(Some(1200)));
         let from = branching.settings().gate;
+        assert_eq!(from, 1200);
         let plan = Plan { gates: vec![0, from], after: 0, units: 2, steps: 300, threads: 2, least_gap: 0 };
         let trial = Trial {
             plan: &plan,

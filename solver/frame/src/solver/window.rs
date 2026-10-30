@@ -1616,7 +1616,7 @@ impl<'a> Window<'a> {
             return false;
         }
         set.lab.apply_policy(&self.policies, n);
-        let wanted = set.lab.branch_settings(&self.opts.tactics.search);
+        let wanted = set.lab.branch_settings(&self.opts.tactics.search, self.opts.gate);
         let live = set.job.branching();
         if live.settings() != wanted {
             live.set(wanted);

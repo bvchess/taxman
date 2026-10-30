@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use taxman::game::Optimal;
 use taxman::json::Json;
+use taxman::search::MAX_GATE;
 
 /// A usage error: exit code 2, the message and then the usage on stderr, nothing on stdout.
 fn assert_usage_error(args: &[&str], message: &str) {
@@ -32,6 +33,9 @@ fn help_lists_the_commands_and_every_tactic() {
             "--no-claims",
             "--finder-after NODES",
             "--finder-seconds S",
+            "--gate GAP",
+            "--gate-trial GATES",
+            "--gate-trial-plan SPEC",
             "tables N K...",
             "--history FILE",
         ] {
@@ -422,6 +426,48 @@ fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
     if cfg!(not(target_os = "linux")) {
         assert_eq!(note.matches("--background does nothing on this system").count(), 1, "{note}");
     }
+}
+
+/// `--gate GAP` is a flag of `solve`: a whole number from 0 to `MAX_GATE`, refused with conflict branching off (or
+/// without the GF(2) bound it acts with), where a gate does nothing.  A line records it in `options.gate` where it was
+/// given, beside the gates of `--gate-trial`, and the game ends with the score of the table.
+#[test]
+fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
+    let over = (MAX_GATE + 1).to_string();
+    assert_usage_error(&["solve", "12", "--gate", &over], &format!("--gate takes a gap from 0 to {MAX_GATE}: {over}"));
+    assert_usage_error(&["solve", "12", "--gate", "-1"], "--gate: cannot read");
+    assert_usage_error(&["solve", "12", "--gate", "wide"], "--gate: cannot read");
+    let off = |tactic: &'static str| ["solve", "12", "--gate", "1200", "--tactic", tactic];
+    assert_usage_error(&off("conflict_branching=off"), "conflict branching is off");
+    assert_usage_error(&off("conflict_branching=off"), "a gate without conflict branching does nothing");
+    assert_usage_error(&off("gf2=off"), "conflict branching acts only with the GF(2) bound, which is off");
+    assert_usage_error(&["regress", "--gate", "1200"], "unknown option --gate");
+
+    let dir = TempDir::new("solve-gate");
+    // A game of 125 nodes, searched by three workers.
+    let line = |name: &str, extra: &[&str]| {
+        let file = dir.join(name);
+        let args = ["solve", "900", "--force-search", "--threads", "3", "--progress", "0", "--out", path(&file)];
+        let run = taxman(&[&args[..], extra].concat());
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        let text = fs::read_to_string(&file).unwrap();
+        Json::parse(text.trim()).unwrap()
+    };
+    let plain = line("plain.jsonl", &[]);
+    let options = |line: &Json| line.get("options").unwrap().clone();
+    assert_eq!(options(&plain).get("gate"), None, "a line without the flag has no record of it");
+    assert_eq!(plain.get("score").and_then(Json::as_u64), Optimal::built_in().score(900));
+    // The gate at its least, and at its most with a trial: the trial's gates are recorded beside it.
+    let zero = line("zero.jsonl", &["--gate", "0"]);
+    let widest = line("widest.jsonl", &["--gate", &MAX_GATE.to_string(), "--gate-trial", "0,600"]);
+    for (name, gated) in [("zero", &zero), ("widest", &widest)] {
+        assert_eq!(gated.get("score"), plain.get("score"), "{name}");
+        assert_eq!(gated.get("optimal_match"), Some(&Json::Bool(true)), "{name}");
+    }
+    assert_eq!(options(&zero).get("gate").and_then(Json::as_u64), Some(0));
+    assert_eq!(options(&zero).get("gate_trial"), None);
+    assert_eq!(options(&widest).get("gate").and_then(Json::as_u64), Some(MAX_GATE));
+    assert_eq!(options(&widest).get("gate_trial").map(Json::to_string).as_deref(), Some("[0,600]"));
 }
 
 /// A game that passes the wall (`--game-hours`) ends `solve` with exit status 4 and the line `wall at N after H

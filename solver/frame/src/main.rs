@@ -13,7 +13,7 @@ mod commands;
 use cli::{errln, outln, CliError, CliResult, REDEPLOY_STATUS, WALL_STATUS};
 use std::process::ExitCode;
 use taxman::engine;
-use taxman::search::{finder, SearchTactics, PROFILE_DEPTH};
+use taxman::search::{finder, gate_trial, SearchTactics, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
 use taxman::tactics::Tactics;
 
 /// The usage text with its `{...}` parts to fill in by [`usage`].
@@ -85,6 +85,15 @@ commands:
                                turns on): the stores DIR/nogoods-N.txt of its game and the games before it, the
                                latest first, checked at its root; each search writes its own there.  They only
                                prune, and change no result
+      --gate GAP               the gap, from 0 to {max_gate}, from which conflict branching chooses its conflict, in
+                               every game's search (default {gate}).  The lab's gate for a game holds over it.  It
+                               changes no answer and is no part of a checkpoint; refused with conflict_branching off
+      --gate-trial GATES       once a game's search has taken {trial_after} steps, try each of the gates GATES (comma
+                               separated, each from 0 to {max_gate}) and the search's own on a sample of its units,
+                               and branch with the one that took the least CPU.  It needs --checkpoint-dir
+      --gate-trial-plan SPEC   the trial's numbers, NAME=VALUE separated by commas: after ({trial_after}), units
+                               ({trial_units}), steps ({trial_steps}, the most of each solve), threads
+                               ({trial_threads}) and least_gap ({trial_least_gap})
       --mem-cap UNITS          search units kept in memory before spilling to disk
       --force-search           search even where the previous game or an earlier search gives the answer
       --use-prev               draw on the known games: the built-in table's, the committed chain's
@@ -148,6 +157,13 @@ fn usage() -> String {
         .replace("{max_refine}", &SearchTactics::MAX_MATCH_REFINE.to_string())
         .replace("{finder_after}", &finder::AFTER.to_string())
         .replace("{profile_depth}", &PROFILE_DEPTH.to_string())
+        .replace("{gate}", &CONFLICT_BRANCHING_GAP.to_string())
+        .replace("{max_gate}", &MAX_GATE.to_string())
+        .replace("{trial_after}", &gate_trial::AFTER.to_string())
+        .replace("{trial_units}", &gate_trial::UNITS.to_string())
+        .replace("{trial_steps}", &gate_trial::STEPS.to_string())
+        .replace("{trial_threads}", &gate_trial::THREADS.to_string())
+        .replace("{trial_least_gap}", &gate_trial::LEAST_GAP.to_string())
 }
 
 fn main() -> ExitCode {

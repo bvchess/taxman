@@ -716,11 +716,19 @@ impl GameLab {
         self.gate.or(self.policy.and_then(|policy| policy.gate))
     }
 
-    /// The branching settings the game's searchers start with: those of [`search_tactics`] and the game's gate.
+    /// The gate the game's searchers start with, if anything sets one: the lab's, else `run`, the run's own (`--gate`);
+    /// none: the default gate.
+    pub(super) fn starting_gate(&self, run: Option<u64>) -> Option<u64> {
+        self.gate().or(run)
+    }
+
+    /// The branching settings the game's searchers start with: those of [`search_tactics`] and the game's
+    /// [`starting_gate`], `run_gate` being the run's own.
     ///
     /// [`search_tactics`]: GameLab::search_tactics
-    pub(super) fn branch_settings(&self, run: &SearchTactics) -> BranchSettings {
-        BranchSettings::of(&self.search_tactics(run)).with_gate(self.gate())
+    /// [`starting_gate`]: GameLab::starting_gate
+    pub(super) fn branch_settings(&self, run: &SearchTactics, run_gate: Option<u64>) -> BranchSettings {
+        BranchSettings::of(&self.search_tactics(run)).with_gate(self.starting_gate(run_gate))
     }
 
     /// What a results line records of it (`lab`), if the lab changed how the game was searched.
@@ -984,7 +992,7 @@ mod tests {
         // The gate is in the file, and reaches the branching settings of the game's searchers.
         let file = Json::from_file(dir.join("ckpt/n0077.lab")).unwrap();
         assert_eq!(file.get("gate").and_then(Json::as_u64), Some(150));
-        let settings = lab.branch_settings(&SearchTactics::default());
+        let settings = lab.branch_settings(&SearchTactics::default(), None);
         assert_eq!(settings, BranchSettings { conflict_branching: false, gate: 150, conflict_look: true });
         // A setting of the look alone steers the game, and leaves the branching and the gate to the tactics.
         let looking = GameLab { conflict_look: Some(true), ..GameLab::default() };
@@ -992,16 +1000,19 @@ mod tests {
         assert!(looking.search_tactics(&SearchTactics::default()).conflict_look);
         assert_eq!(looking.record().unwrap().get("conflict_branching"), Some(&Json::Null));
         assert_eq!(looking.record().unwrap().get("gate"), Some(&Json::Null));
-        assert_eq!(looking.branch_settings(&SearchTactics::default()).conflict_gap(), Some(CONFLICT_BRANCHING_GAP));
+        assert_eq!(
+            looking.branch_settings(&SearchTactics::default(), None).conflict_gap(),
+            Some(CONFLICT_BRANCHING_GAP)
+        );
         // A setting of the gate alone steers the game too, and changes the gap of the tactics and nothing else.
         let gated = GameLab { gate: Some(500), ..GameLab::default() };
         assert!(gated.steered());
         let run = SearchTactics::default();
         assert_eq!(gated.search_tactics(&run), run);
-        assert_eq!(gated.branch_settings(&run).conflict_gap(), Some(500));
+        assert_eq!(gated.branch_settings(&run, None).conflict_gap(), Some(500));
         let off = SearchTactics { conflict_branching: false, ..run };
         assert_eq!(
-            gated.branch_settings(&off),
+            gated.branch_settings(&off, None),
             BranchSettings { conflict_branching: false, gate: 500, ..BranchSettings::of(&off) }
         );
         // A record from before the look and the gate has no setting of them.
@@ -1118,7 +1129,7 @@ mod tests {
         // No policy reaches game 9: it is searched as the run is, and its line says nothing of a lab.
         lab.apply_policy(&policies, 9);
         assert_eq!((lab.search_tactics(&run), lab.steered(), lab.record()), (run, false, None));
-        assert_eq!((lab.gate(), lab.branch_settings(&run)), (None, BranchSettings::of(&run)));
+        assert_eq!((lab.gate(), lab.branch_settings(&run, None)), (None, BranchSettings::of(&run)));
         // The policy changes the run's tactics for game 10, and its line records it.
         lab.apply_policy(&policies, 10);
         let policy = Policy { from: 10, conflict_branching: Some(false), conflict_look: Some(true), gate: Some(150) };
@@ -1128,7 +1139,7 @@ mod tests {
         // branching is off.
         assert_eq!(lab.gate(), Some(150));
         let settings = BranchSettings { conflict_branching: false, gate: 150, conflict_look: true };
-        assert_eq!(lab.branch_settings(&run), settings);
+        assert_eq!(lab.branch_settings(&run, None), settings);
         let record = lab.record().unwrap();
         let recorded = record.get("policy").unwrap();
         assert_eq!(recorded.get("from").and_then(Json::as_u32), Some(10));
@@ -1143,8 +1154,21 @@ mod tests {
         // So does its own gate, and the policy's gate stays for a game that sets none.
         let gated = GameLab { gate: Some(500), ..lab.clone() };
         assert_eq!(gated.gate(), Some(500));
-        assert_eq!(gated.branch_settings(&run), BranchSettings { gate: 500, ..settings });
+        assert_eq!(gated.branch_settings(&run, None), BranchSettings { gate: 500, ..settings });
         assert_eq!(own.gate(), Some(150));
+        // The run's own gate (`--gate`) starts a game that nothing else gives one, and the game's own and its policy's
+        // hold over it.
+        let plain = GameLab::default();
+        assert_eq!(plain.starting_gate(Some(1200)), Some(1200));
+        assert_eq!(plain.branch_settings(&run, Some(1200)), BranchSettings { gate: 1200, ..BranchSettings::of(&run) });
+        assert_eq!(plain.starting_gate(None), None);
+        assert_eq!(lab.branch_settings(&run, Some(1200)), settings);
+        assert_eq!(gated.branch_settings(&run, Some(1200)).gate, 500);
+        let mut gateless = Policies::default();
+        gateless.give(entry(10, Some(false), Some(true), None));
+        let mut reached = GameLab::default();
+        reached.apply_policy(&gateless, 10);
+        assert_eq!(reached.branch_settings(&run, Some(1200)), BranchSettings { gate: 1200, ..settings });
         // The tactics of a restart are named outright: the policy does not reach the game, and its line has none.
         let again = Restarted {
             at: utc(UNIX_EPOCH),

@@ -210,6 +210,11 @@ pub struct SolveOptions {
     /// checked at its root ([`crate::model::CarriedNogoods::from_dir`]).  They only prune, so the results are the same
     /// with any stores or none.  None by default.
     pub carried_dir: Option<PathBuf>,
+    /// The gate each game's search starts with (`--gate`), in place of [`search::CONFLICT_BRANCHING_GAP`], from 0 to
+    /// [`search::MAX_GATE`]: the gap from which conflict branching chooses the conflict.  The lab's gate for a game,
+    /// its own or its policy's, holds over it, and the gate trial starts from it ([`search::gate_trial`]).  It changes
+    /// no answer and is no tactic and no part of a checkpoint, which resumes with any gate.  None by default.
+    pub gate: Option<u64>,
     /// The gate trial (`--gate-trial`): each game's search with conflict branching on tries these gates on a sample
     /// of its own units once it has taken the plan's steps, and branches with the one that took the least CPU
     /// ([`search::gate_trial`]); a game whose own lab record has a gate keeps that.  It changes only the gate, which
@@ -246,6 +251,7 @@ impl Default for SolveOptions {
             profile: None,
             profile_depth: search::PROFILE_DEPTH,
             carried_dir: None,
+            gate: None,
             gate_trial: None,
         }
     }
@@ -630,6 +636,8 @@ pub struct GameResult {
     pub finder_budget: Duration,
     /// What the finder did in the last invocation, if it started.
     pub finder: Option<finder::Report>,
+    /// The gate the searches started with (`--gate`).
+    pub gate: Option<u64>,
     /// The gate trial's gates (`--gate-trial`), and what the trial did in the last invocation, if it ran to its end.
     pub gate_trial_gates: Option<Vec<u64>>,
     pub gate_trial: Option<gate_trial::Report>,
@@ -682,6 +690,7 @@ impl GameResult {
             finder_after: opts.finder_after,
             finder_budget: opts.finder_budget,
             finder: None,
+            gate: opts.gate,
             gate_trial_gates: opts.gate_trial.as_ref().map(|plan| plan.gates.clone()),
             gate_trial: None,
             optimal_match: None,
@@ -782,6 +791,7 @@ impl GameResult {
         let finder_after = (self.finder_after > 0).then(|| ("finder_after", Json::from(self.finder_after)));
         let finder_seconds =
             (self.finder_after > 0).then_some(("finder_seconds", Json::Num(self.finder_budget.as_secs_f64())));
+        let gate = self.gate.map(|gate| ("gate", Json::from(gate)));
         let trial_gates =
             self.gate_trial_gates.as_ref().map(|gates| ("gate_trial", Json::array(gates.iter().copied())));
         let options = Json::object(
@@ -794,6 +804,7 @@ impl GameResult {
                 .chain(background)
                 .chain(finder_after)
                 .chain(finder_seconds)
+                .chain(gate)
                 .chain(trial_gates),
         );
         // The citation of a known source is there only on a line that has one: the lines made before it do not.
@@ -1403,8 +1414,9 @@ fn set_up_with_width<const W: usize>(
     let store_cap = help.upper.map(|bound| StoreCap { sum: bound.value.saturating_sub(in_the_bag), bound });
     let store_game = help.game.filter(|_| seeds);
     // The branching settings the searchers start with: the tactics' (checked above to be the game's), and the gate, which
-    // is no tactic, from the lab's record or the policy.
-    let branching = Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.gate())));
+    // is no tactic, from the lab's record or the policy, else the run's.
+    let branching =
+        Arc::new(Branching::new(BranchSettings::of(&prepared.tactics).with_gate(lab.starting_gate(opts.gate))));
     let (control, near) = (Control::new(), OnceLock::new());
     let lab_gate = lab.gate.is_some();
     let job = Arc::new(SearchJob { board, prepared, control, resuming, seeds, store_game, branching, lab_gate, near });

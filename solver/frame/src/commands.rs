@@ -130,6 +130,28 @@ fn trial_gates(list: &str) -> Result<Vec<u64>, CliError> {
     Ok(gates)
 }
 
+/// The gate of `--gate`, a whole number from 0 to [`MAX_GATE`], if it is given: the gap from which conflict branching
+/// chooses its conflict in every game of the run.  A run with conflict branching off, or without the GF(2) bound it
+/// acts with, has no use for one, so the flag is refused there.
+fn run_gate(args: &Args, opts: &SolveOptions) -> Result<Option<u64>, CliError> {
+    let Some(gate) = args.parsed::<u64>("--gate")? else { return Ok(None) };
+    if gate > MAX_GATE {
+        return Err(CliError::Usage(format!("--gate takes a gap from 0 to {MAX_GATE}: {gate}")));
+    }
+    let tactics = &opts.tactics.search;
+    let off = if !tactics.conflict_branching {
+        "conflict branching is off (--tactic conflict_branching=off)"
+    } else if !tactics.gf2 {
+        "conflict branching acts only with the GF(2) bound, which is off (--tactic gf2=off)"
+    } else {
+        return Ok(Some(gate));
+    };
+    Err(CliError::Usage(format!(
+        "--gate sets the gap from which conflict branching chooses its conflict, and {off}: a gate without conflict \
+         branching does nothing"
+    )))
+}
+
 /// The line that says why the search of `n` stopped before it finished, and how to go on.
 fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     let resume =
@@ -140,7 +162,7 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 14] = [
+const SOLVE_FLAGS: [&str; 15] = [
     "--out",
     WINDOW_FLAG,
     "--game-hours",
@@ -153,6 +175,7 @@ const SOLVE_FLAGS: [&str; 14] = [
     "--profile",
     "--profile-depth",
     "--carried-dir",
+    "--gate",
     "--gate-trial",
     "--gate-trial-plan",
 ];
@@ -239,6 +262,7 @@ pub fn solve(args: &[String]) -> CliResult {
     if opts.carried_dir.is_some() {
         opts.tactics.search.carried_nogoods = true;
     }
+    opts.gate = run_gate(&args, &opts)?;
     if let Some(gates) = args.value("--gate-trial") {
         let plan = gate_trial::Plan::of(trial_gates(gates)?);
         let spec = args.value("--gate-trial-plan").unwrap_or_default();

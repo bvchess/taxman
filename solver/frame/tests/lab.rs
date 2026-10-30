@@ -11,7 +11,8 @@
 //! The policy for the games to come (`policy`) has its tests below the hostile lab's: it reaches the games in flight
 //! and those set up later, yields to a game's own `branching`, survives a restart of the run, and reaches a search that
 //! resumes from a checkpoint made under other settings.  The gate, the gap from which conflict branching chooses, is
-//! one of the settings of both commands, and a policy's gate changes the tree of a game and not its answer.
+//! one of the settings of both commands, and a policy's gate changes the tree of a game and not its answer, as does the
+//! run's own (`--gate`), over which a policy's gate holds.
 
 mod common;
 
@@ -22,6 +23,7 @@ use std::time::{Duration, Instant};
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::results::verify_files;
+use taxman::search::MAX_GATE;
 use taxman::solver::{self, LabOptions, SolveOptions};
 
 /// The range, and its game whose search the lab restarts: 950 searches about 1,600 steps from the game before it, a
@@ -638,4 +640,38 @@ fn a_policys_gate_changes_the_tree_of_a_game_and_not_its_answer() {
     let (gated, given) = solved("lab-gate-0", Some(r#""gate":0"#));
     assert_eq!(given, Some(0));
     assert_ne!(gated, default, "a gate of 0 took the steps of the default gate");
+}
+
+/// The gate of the run (`--gate`) reaches the searchers of a game, and a policy's gate holds over it.  Game 780,
+/// searched from nothing on one thread, is solved with conflict branching off; under a run gate of `MAX_GATE`, wider
+/// than any gap of the game, which gives the tree of conflict branching off; under a run gate of 0, so that conflict
+/// branching chooses at every check, which gives another; and under that gate with a policy whose gate is `MAX_GATE`,
+/// which gives the first tree again.  Each ends with its score in the table, and its line records the run's gate.
+#[test]
+fn the_runs_gate_reaches_the_searchers_and_a_policys_gate_holds_over_it() {
+    const N: u32 = 780;
+    let optimal = Optimal::built_in();
+    let solved = |tag: &str, branching: bool, gate: Option<u64>, policy: Option<u64>| {
+        let dir = TempDir::new(tag);
+        let ckpt = dir.join("ckpt");
+        if let Some(policy) = policy {
+            fs::create_dir_all(&ckpt).unwrap();
+            let entry = format!(r#"{{"from":{N},"at":"2026-10-22T00:00:00Z","file":"by-hand","gate":{policy}}}"#);
+            fs::write(ckpt.join("run.lab"), format!(r#"{{"policies":[{entry}]}}"#)).unwrap();
+        }
+        let mut opts = SolveOptions { checkpoint_dir: Some(ckpt), force_search: true, gate, ..options(1) };
+        opts.tactics.search.conflict_branching = branching;
+        let r = solver::solve_game_with(N, None, &opts, optimal).unwrap_or_else(|e| panic!("{tag}: {e}"));
+        let answer = (r.score, r.completed, r.optimal_match);
+        assert_eq!(answer, (optimal.score(N).unwrap(), true, Some(true)), "{tag}");
+        let recorded = r.to_json().get("options").and_then(|options| options.get("gate")).and_then(Json::as_u64);
+        assert_eq!(recorded, gate, "{tag}: the line's record of the run's gate");
+        r.nodes
+    };
+    let off = solved("run-gate-off", false, None, None);
+    assert_eq!(solved("run-gate-wide", true, Some(MAX_GATE), None), off, "a gate wider than every gap is no gate");
+    let at_every_check = solved("run-gate-0", true, Some(0), None);
+    assert_ne!(at_every_check, off, "a run gate of 0 took the steps of conflict branching off");
+    let policy = solved("run-gate-0-policy-wide", true, Some(0), Some(MAX_GATE));
+    assert_eq!(policy, off, "the policy's gate held over the run's");
 }

@@ -191,9 +191,9 @@ restart: when, the game's own seconds then, the steps of the search abandoned, t
 checkpoint put aside.  The game is then set up again, with those tactics, and searched whatever an earlier game settled,
 as a game with a checkpoint is; its clock starts again, as a fresh search's does.  A search that completes before it
 stops is not restarted, and neither is one that a stop signal ends.  The restarted search branches as its tactics say,
-with the default gate, until the lab says otherwise: a `branching` given before the restart is not carried over.  The
-record goes into the game's line as `lab`, with the tactics the search ran with in `tactics` and `tactic_switches`.  A
-run without `--lab-dir` reads the record too, so it resumes a restarted game with its tactics.
+with the run's gate (the default, or `--gate`), until the lab says otherwise: a `branching` given before the restart is
+not carried over.  The record goes into the game's line as `lab`, with the tactics the search ran with in `tactics` and
+`tactic_switches`.  A run without `--lab-dir` reads the record too, so it resumes a restarted game with its tactics.
 
 *A redeploy.*  `chain.sh`, seeing the status 5, reads the commit from the line, fetches `origin` and checks that the
 commit is `origin/master` or an ancestor of it.  If it is, the script makes a worktree of the commit under
@@ -242,8 +242,9 @@ chosen on one game reaches the next without a command each game.
   it, and the settings of the policy for it (null where none gave one).  `tactic_switches` has the switches the search
   ended with, which differ from the policy's where the game's own record held over it.  The gate is in the line as
   `lab.gate`, the game's own, and `lab.policy.gate`, the policy's; the search ran with the first that is not null, and
-  with the default gate if both are ([search.md, "Conflict branching"](search.md#conflict-branching)), until a gate
-  trial chose another, which the line has in `engine.gate_trial` ([gate-trial.md](gate-trial.md)).
+  with the run's gate if both are (`options.gate`, the flag `--gate`; the default gate if the run gave none,
+  [search.md, "Conflict branching"](search.md#conflict-branching)), until a gate trial chose another, which the line has
+  in `engine.gate_trial` ([gate-trial.md](gate-trial.md)).
 
 **Why it is exact.**  A policy sets what `branching` sets, the switches and the gate, the choice between true conflicts
 that (b) shows exact at any unit, and a searcher reads it only when it starts a unit.  It only moves that choice from
