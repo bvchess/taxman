@@ -2,9 +2,17 @@
 //!
 //! * the table of tactics in the design (`solver/docs/design/tactics.md`) lists the tactics of
 //!   `taxman::tactics::Tactics`, in order, with their defaults;
-//! * every relative link and `#anchor` of the repository's markdown files (the README, `docs/`, `results/`, `solver/`
-//!   with the lab notebook, and the READMEs of `heuristics/` and `moniot/`) resolves;
-//! * the lab notebook keeps its rules on its front page, `solver/notebook/README.md`, and its register in the files of
+//! * every link of the repository's markdown files and code resolves, files and anchors both: a relative link, and a
+//!   URL of the main repository (`https://github.com/bvchess/taxman/blob/COMMIT/PATH`, `tree/` for a folder, found with
+//!   `git show COMMIT:PATH`) or of the notebook's (`https://github.com/bvchess/taxman-notebook/blob/main/PATH`);
+//! * the lab notebook is a repository of its own, bvchess/taxman-notebook.  Its checkout goes at `solver/notebook/` of
+//!   this one (`.gitignore` ignores it), or anywhere, with `TAXMAN_NOTEBOOK` naming it, which a worktree needs.  The
+//!   test checks the one `TAXMAN_NOTEBOOK` names or, when it is not set, the one at `solver/notebook/`, and a line of
+//!   its output says which (on stderr, which the harness does not capture).  The checkout's files are checked as if
+//!   they lay in a folder `notebook/` of this repository: every check below that reads the notebook's files runs on
+//!   them, and the URLs of the notebook are looked up in it.  With no checkout, the test checks the form of those URLs
+//!   and says that it did not look them up;
+//! * the lab notebook keeps its rules on its front page, `notebook/README.md`, and its register in the files of
 //!   `register/` (a file a subject); its entries are folders with one README.md each, beside the front page and in
 //!   `search/` (the search's), and the register lists them all: every entry opens with its title, a link back and the
 //!   dates it was started and concluded (the month of its name, if it has one, is the month it started), and a file of
@@ -17,7 +25,7 @@
 //! * the docs call `unzip`'s moves *mandatory*, never *forced* (which is the search's word);
 //! * the guides and comments do not use the words the project has retired (hive, apiary, model-free, upstream, cap
 //!   for the ceiling, ...) or the old names of the prover's directory and script, but for the note that lists them,
-//!   `solver/notebook/terms-changed.md`;
+//!   `notebook/terms-changed.md`;
 //! * the prose of the Markdown files and the comments of the Rust, Python and shell files, the notebook's entries
 //!   included, are spelled the American way (`BRITISH_STEMS`), as docs/WRITING.md, rule 10, says;
 //! * the docs rewritten to docs/WRITING.md (`REWRITTEN`), and the comments of the code (the Rust files of both crates
@@ -33,6 +41,7 @@
 //! All of it reads files and solves a few small games, so the whole file takes a fraction of a second.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use taxman::json::Json;
@@ -51,9 +60,90 @@ fn repo_dir() -> PathBuf {
     crate_dir().join("../..").canonicalize().expect("the repository above the crate")
 }
 
-/// The lab notebook's directory: its front page, `README.md`, and a folder for each entry.
-fn notebook_dir() -> PathBuf {
-    repo_dir().join("solver/notebook")
+/// The environment variable that names a checkout of the lab notebook, the repository bvchess/taxman-notebook: its
+/// front page, `README.md`, at the top, and a folder for each entry.
+const NOTEBOOK_ENV: &str = "TAXMAN_NOTEBOOK";
+
+/// Where a checkout of the notebook goes in a checkout of this repository, and where the test looks for it when
+/// `NOTEBOOK_ENV` is not set (the scripts of the notebook's entries expect it there too).  `.gitignore` ignores it.
+const NOTEBOOK_HOME: &str = "solver/notebook";
+
+/// The folder under which the files of the notebook's checkout are shown, in the paths of the messages and of the lists
+/// of documents (`notebook/README.md`): the notebook is a repository of its own, and this test treats its checkout as
+/// a folder of this one, so that the checks that read the notebook's files read them as they did when it was one.
+const NOTEBOOK_SHOWN: &str = "notebook/";
+
+/// The checkout of the notebook at `NOTEBOOK_HOME`, if there is one: a git checkout, so a folder with a `.git`.
+fn notebook_home() -> Option<PathBuf> {
+    let home = repo_dir().join(NOTEBOOK_HOME);
+    home.join(".git").exists().then(|| home.canonicalize().expect("the notebook's checkout at its home"))
+}
+
+/// Says a line on the process's own stderr, which the test harness does not capture, so that a run of the test says
+/// which notebook it checked (or that it checked none) whether the tests pass or not.
+fn say(line: &str) {
+    writeln!(std::io::stderr(), "docs test: {line}").expect("stderr");
+}
+
+/// The notebook's checkout: the folder that `NOTEBOOK_ENV` names or, if it is not set, the checkout at
+/// `NOTEBOOK_HOME`; `None` if there is neither.  The first call says which one the test checks.  A name that is no
+/// checkout stops the test, since a mistyped name would skip every check of the notebook.
+fn notebook_checkout() -> Option<&'static Path> {
+    static CHECKOUT: OnceLock<Option<PathBuf>> = OnceLock::new();
+    CHECKOUT
+        .get_or_init(|| {
+            let (folder, why) = match std::env::var_os(NOTEBOOK_ENV).filter(|named| !named.is_empty()) {
+                Some(named) => {
+                    let shown = Path::new(&named).display().to_string();
+                    let folder =
+                        Path::new(&named).canonicalize().unwrap_or_else(|e| panic!("{NOTEBOOK_ENV} is {shown}: {e}"));
+                    (folder, format!("{NOTEBOOK_ENV} names it"))
+                }
+                None => match notebook_home() {
+                    Some(home) => (home, format!("{NOTEBOOK_ENV} is not set; it is the checkout at {NOTEBOOK_HOME}/")),
+                    None => {
+                        say(&format!(
+                            "no notebook checked ({NOTEBOOK_ENV} is not set, and {NOTEBOOK_HOME}/ is no git \
+                             checkout): its entries, register and front page are not checked, and its URLs only for \
+                             their form"
+                        ));
+                        return None;
+                    }
+                },
+            };
+            assert!(
+                folder.join("README.md").is_file(),
+                "the notebook's checkout {} has no README.md at its top",
+                folder.display()
+            );
+            say(&format!("the notebook checked is {} ({why})", folder.display()));
+            Some(folder)
+        })
+        .as_deref()
+}
+
+/// The notebook's checkout; `None`, after saying what is `skipped` then, if there is none.
+fn notebook_for(skipped: &str) -> Option<&'static Path> {
+    let checkout = notebook_checkout();
+    if checkout.is_none() {
+        eprintln!("no checkout of the notebook (bvchess/taxman-notebook): {skipped}");
+    }
+    checkout
+}
+
+/// Whether `dir` is a checkout of the notebook, the one the test checks or the one at `NOTEBOOK_HOME`: a walk of this
+/// repository leaves it to the walk of the notebook, since its files are the notebook's, not this repository's.
+fn is_notebook_checkout(dir: &Path) -> bool {
+    let Ok(dir) = dir.canonicalize() else { return false };
+    notebook_checkout().is_some_and(|checkout| dir == checkout) || notebook_home().is_some_and(|home| dir == home)
+}
+
+/// The file at `shown`, a path from the repository's top or, after `NOTEBOOK_SHOWN`, from the notebook's.
+fn path_of(shown: &str) -> PathBuf {
+    match (shown.strip_prefix(NOTEBOOK_SHOWN), notebook_checkout()) {
+        (Some(below), Some(checkout)) => checkout.join(below),
+        _ => repo_dir().join(shown),
+    }
 }
 
 /// The folder of the design's files, by its path from the repository, ending in `/` as the folders of `REWRITTEN` do:
@@ -145,7 +235,7 @@ fn design_gives_the_defaults_of_the_code() {
 // Links
 
 /// The markdown files of the repository's docs: the README, `docs/`, `results/` and `solver/` (not the build
-/// directories), and the READMEs of `heuristics/` and `moniot/`.
+/// directories), and the READMEs of `heuristics/` and `moniot/`; and all of the notebook's checkout, if there is one.
 fn markdown_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
@@ -153,7 +243,7 @@ fn markdown_files() -> Vec<PathBuf> {
         for path in paths {
             let name = path.file_name().unwrap().to_string_lossy().into_owned();
             if path.is_dir() {
-                if name != "target" && !name.starts_with('.') {
+                if name != "target" && !name.starts_with('.') && !is_notebook_checkout(&path) {
                     walk(&path, found);
                 }
             } else if name.ends_with(".md") {
@@ -167,6 +257,9 @@ fn markdown_files() -> Vec<PathBuf> {
         walk(&root.join(dir), &mut found);
     }
     found.extend(["heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
+    if let Some(checkout) = notebook_checkout() {
+        walk(checkout, &mut found);
+    }
     found
 }
 
@@ -255,34 +348,240 @@ fn link_targets(line: &str) -> Vec<&str> {
     link_ranges(line).into_iter().map(|range| &line[range]).collect()
 }
 
+/// The address of the main repository: `https://github.com/bvchess/taxman/blob/COMMIT/PATH` names a file at a commit,
+/// and `tree/` a folder.  A link from the notebook, or from a doc to a file at a commit, is one.
+const MAIN_URL: &str = "https://github.com/bvchess/taxman/";
+
+/// The address of the notebook's repository: `https://github.com/bvchess/taxman-notebook/blob/main/PATH` names a file
+/// on its branch, and `tree/` a folder.  A link from a doc of the main repository to the notebook is one.
+const NOTEBOOK_URL: &str = "https://github.com/bvchess/taxman-notebook/";
+
+/// The branch of the notebook that its URLs name.
+const NOTEBOOK_BRANCH: &str = "main";
+
+/// A URL that names a file or a folder of one of the two repositories.
+#[derive(Debug, PartialEq)]
+struct RepoUrl {
+    /// The URL as it is written, with its anchor.
+    written: String,
+    /// It names the notebook's repository, else the main one.
+    notebook: bool,
+    /// It names a folder (`tree/`), else a file (`blob/`).
+    folder: bool,
+    /// The commit that a URL of the main repository names.  A notebook URL's is the branch.
+    reference: String,
+    /// The path below the top of the repository, without a `/` at either end.
+    path: String,
+    /// The anchor after the `#`, or nothing.
+    anchor: String,
+}
+
+/// Whether `c` can be in the path or the anchor of a URL of the two repositories.
+fn is_url_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '~' | '%' | '+' | '@' | '/' | '-' | '#')
+}
+
+/// Whether `reference` names a commit in a URL: seven to forty hexadecimal digits, so that the URL is a permalink.
+fn is_commit(reference: &str) -> bool {
+    (7..=40).contains(&reference.len()) && reference.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The URLs in `line` that name a file or a folder (`blob/` or `tree/`) of the main repository or of the notebook's,
+/// each as it reads or with what is wrong with its form: a URL of the main repository names a commit (a branch's files
+/// change), and one of the notebook's names its branch, `main`.  The other URLs of the two repositories (the wiki, the
+/// address to clone) name no file and are left alone.
+fn repo_urls(line: &str) -> Vec<Result<RepoUrl, String>> {
+    let mut found = Vec::new();
+    for (prefix, notebook) in [(NOTEBOOK_URL, true), (MAIN_URL, false)] {
+        for (at, _) in line.match_indices(prefix) {
+            let rest = &line[at + prefix.len()..];
+            let rest = &rest[..rest.find(|c: char| !is_url_char(c)).unwrap_or(rest.len())];
+            let (path, anchor) = rest.split_once('#').unwrap_or((rest, ""));
+            let (path, anchor) = (path.trim_end_matches('.'), anchor.trim_end_matches('.'));
+            let mut parts = path.splitn(3, '/');
+            let folder = match parts.next() {
+                Some("blob") => false,
+                Some("tree") => true,
+                _ => continue,
+            };
+            let written =
+                format!("{prefix}{path}{}", if anchor.is_empty() { String::new() } else { format!("#{anchor}") });
+            let reference = parts.next().unwrap_or("");
+            let below = parts.next().unwrap_or("").trim_matches('/');
+            found.push(if notebook && reference != NOTEBOOK_BRANCH {
+                Err(format!("({written}): a URL of the notebook names its branch {NOTEBOOK_BRANCH}, not {reference:?}"))
+            } else if !notebook && !is_commit(reference) {
+                Err(format!(
+                    "({written}): a URL of the main repository names a commit (a permalink), not {reference:?}"
+                ))
+            } else if !folder && below.is_empty() {
+                Err(format!("({written}): a `blob/` URL names a file"))
+            } else {
+                Ok(RepoUrl {
+                    written,
+                    notebook,
+                    folder,
+                    reference: reference.to_owned(),
+                    path: below.to_owned(),
+                    anchor: anchor.to_owned(),
+                })
+            });
+        }
+    }
+    found
+}
+
+/// The output of `git` run in the repository, or why it did not run.
+fn git_output(args: &[&str]) -> Result<Vec<u8>, String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(repo_dir())
+        .args(args)
+        .output()
+        .map_err(|e| format!("git did not run: {e}"))?;
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
+    }
+}
+
+/// Whether the repository has its history here (it is a git checkout, not an unpacked archive), where the URLs of the
+/// main repository are looked up.
+fn has_history() -> bool {
+    static HAS_HISTORY: OnceLock<bool> = OnceLock::new();
+    *HAS_HISTORY.get_or_init(|| git_output(&["rev-parse", "--git-dir"]).is_ok())
+}
+
+/// Looks up the URLs of the two repositories: the notebook's in its checkout, if there is one, and the main
+/// repository's in its history, as `git show COMMIT:PATH` finds them.  A URL that cannot be looked up, since there is
+/// no checkout or no history, has no problem.
+#[derive(Default)]
+struct UrlChecker {
+    /// The files (`false`) and folders (`true`) of each commit that a URL names, or why git has none.
+    trees: HashMap<String, Result<BTreeMap<String, bool>, String>>,
+    /// The anchors of the markdown files that a URL names with one: `notebook:PATH` or `COMMIT:PATH`.
+    anchors: HashMap<String, BTreeSet<String>>,
+}
+
+impl UrlChecker {
+    /// The files and the folders of `commit`, by their paths.
+    fn tree(&mut self, commit: &str) -> &Result<BTreeMap<String, bool>, String> {
+        self.trees.entry(commit.to_owned()).or_insert_with(|| {
+            let listing = git_output(&["ls-tree", "-r", "-t", "-z", commit])
+                .map_err(|why| format!("this repository's history has no commit {commit} ({why})"))?;
+            let listing = String::from_utf8_lossy(&listing);
+            let records = listing.split('\0').filter_map(|record| record.split_once('\t'));
+            Ok(records.map(|(meta, path)| (path.to_owned(), meta.split(' ').nth(1) == Some("tree"))).collect())
+        })
+    }
+
+    /// What is wrong with `url`, if anything: the file or folder is not there, is not of the kind that the URL says, or
+    /// has no heading with the anchor.
+    fn problem(&mut self, url: &RepoUrl) -> Option<String> {
+        let is_folder = if url.notebook {
+            let file = notebook_checkout()?.join(&url.path);
+            file.exists().then(|| file.is_dir())
+        } else {
+            if !has_history() {
+                return None;
+            }
+            match self.tree(&url.reference) {
+                Ok(_) if url.path.is_empty() => Some(true),
+                Ok(tree) => tree.get(&url.path).copied(),
+                Err(why) => return Some(format!("({}): {why}", url.written)),
+            }
+        };
+        let place = if url.notebook { "the notebook".to_owned() } else { format!("commit {}", url.reference) };
+        let Some(is_folder) = is_folder else {
+            return Some(format!("({}): {place} has no {}", url.written, url.path));
+        };
+        if is_folder != url.folder {
+            let (kind, say) = if is_folder { ("folder", "tree") } else { ("file", "blob") };
+            return Some(format!("({}): {} is a {kind} at {place}: write `{say}/`", url.written, url.path));
+        }
+        if url.anchor.is_empty() || is_folder || !url.path.ends_with(".md") {
+            return None;
+        }
+        let key = format!("{}:{}", if url.notebook { "notebook" } else { &url.reference }, url.path);
+        let known = self.anchors.entry(key).or_insert_with(|| {
+            let text = match notebook_checkout().filter(|_| url.notebook) {
+                Some(checkout) => read(checkout.join(&url.path)),
+                None => {
+                    let shown = git_output(&["show", &format!("{}:{}", url.reference, url.path)]);
+                    String::from_utf8_lossy(&shown.expect("a file of the commit, as its URL says")).into_owned()
+                }
+            };
+            anchors(&text)
+        });
+        (!known.contains(&url.anchor))
+            .then(|| format!("({}): no heading of {} at {place} has the anchor #{}", url.written, url.path, url.anchor))
+    }
+}
+
+/// The problems with the relative links of the markdown file `file` and the number of those links: each must reach a
+/// file of its own repository (the repository, or the notebook's checkout), and an anchor a heading of it.
+fn relative_link_problems(file: &Path, anchors_of: &mut BTreeMap<PathBuf, BTreeSet<String>>) -> (usize, Vec<String>) {
+    let home =
+        notebook_checkout().filter(|checkout| file.starts_with(checkout)).map_or_else(repo_dir, Path::to_path_buf);
+    let (mut checked, mut broken) = (0, Vec::new());
+    for (i, line) in without_code(&read(file)).iter().enumerate() {
+        for target in link_targets(line) {
+            if target.contains("://") || target.starts_with("mailto:") {
+                continue;
+            }
+            checked += 1;
+            let (path, fragment) = target.split_once('#').unwrap_or((target, ""));
+            let linked = if path.is_empty() { file.to_path_buf() } else { file.parent().unwrap().join(path) };
+            let at = format!("{}:{}: ({target})", from_repo(file), i + 1);
+            if !linked.exists() {
+                broken.push(format!("{at}: there is no {}", linked.display()));
+            } else if !linked.canonicalize().is_ok_and(|linked| linked.starts_with(&home)) {
+                broken.push(format!(
+                    "{at}: leaves its repository, {}: link a file of the other one by its URL",
+                    home.display()
+                ));
+            } else if !fragment.is_empty() && linked.extension().is_some_and(|ext| ext == "md") {
+                let known = anchors_of.entry(linked.clone()).or_insert_with(|| anchors(&read(&linked)));
+                if !known.contains(fragment) {
+                    broken.push(format!("{at}: no heading of {} has that anchor", linked.display()));
+                }
+            }
+        }
+    }
+    (checked, broken)
+}
+
 #[test]
-fn every_relative_link_and_anchor_in_the_markdown_files_resolves() {
+fn every_link_and_anchor_of_the_markdown_files_and_the_code_resolves() {
     // The links reach across the whole repository, so they can only be checked in a full checkout; the Linux dry-run
     // image (solver/tools/cloud/Dockerfile) copies just the solver's directory and the data it needs.
     if !repo_dir().join("README.md").exists() {
         eprintln!("links not checked: this is not a full checkout of the repository (no README.md at its top)");
         return;
     }
-    let mut anchors_of: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
-    let mut broken = Vec::new();
-    let mut checked = 0;
-    for file in markdown_files() {
-        let text = read(&file);
-        for (i, line) in without_code(&text).iter().enumerate() {
-            for target in link_targets(line) {
-                if target.contains("://") || target.starts_with("mailto:") {
-                    continue;
-                }
-                checked += 1;
-                let (path, fragment) = target.split_once('#').unwrap_or((target, ""));
-                let linked = if path.is_empty() { file.clone() } else { file.parent().unwrap().join(path) };
-                let at = format!("{}:{}: ({target})", file.strip_prefix(repo_dir()).unwrap_or(&file).display(), i + 1);
-                if !linked.exists() {
-                    broken.push(format!("{at}: there is no {}", linked.display()));
-                } else if !fragment.is_empty() && linked.extension().is_some_and(|ext| ext == "md") {
-                    let known = anchors_of.entry(linked.clone()).or_insert_with(|| anchors(&read(&linked)));
-                    if !known.contains(fragment) {
-                        broken.push(format!("{at}: no heading of {} has that anchor", linked.display()));
+    notebook_for("its URLs are checked for their form only, and not looked up");
+    if !has_history() {
+        eprintln!("the URLs of the main repository are checked for their form only: there is no git history here");
+    }
+    let mut anchors_of = BTreeMap::new();
+    let (mut broken, mut checked) = (Vec::new(), 0);
+    let markdown = markdown_files();
+    for file in &markdown {
+        let (count, problems) = relative_link_problems(file, &mut anchors_of);
+        checked += count;
+        broken.extend(problems);
+    }
+    let (mut checker, mut urls) = (UrlChecker::default(), [0, 0]);
+    for file in markdown.iter().chain(&code_files()) {
+        for (i, line) in read(file).lines().enumerate() {
+            for url in repo_urls(line) {
+                let at = format!("{}:{}", from_repo(file), i + 1);
+                match url {
+                    Err(problem) => broken.push(format!("{at}: {problem}")),
+                    Ok(url) => {
+                        urls[usize::from(url.notebook)] += 1;
+                        broken.extend(checker.problem(&url).map(|problem| format!("{at}: {problem}")));
                     }
                 }
             }
@@ -290,6 +589,56 @@ fn every_relative_link_and_anchor_in_the_markdown_files_resolves() {
     }
     assert!(broken.is_empty(), "broken links:\n{}", broken.join("\n"));
     assert!(checked > 50, "the checker found only {checked} relative links: has the link syntax changed?");
+    let [of_main, of_notebook] = urls;
+    assert!(of_notebook > 20, "the checker found only {of_notebook} URLs of the notebook: has their syntax changed?");
+    assert!(
+        notebook_checkout().is_none() || of_main > 100,
+        "the checker found only {of_main} URLs of the main repository: has their syntax changed?"
+    );
+}
+
+#[test]
+fn urls_of_the_two_repositories_are_read_and_their_form_is_checked() {
+    let line =
+        "see [a](https://github.com/bvchess/taxman-notebook/blob/main/search/x-2026-10/README.md#some-heading), \
+                https://github.com/bvchess/taxman/tree/3ca11bf/solver/frame/examples/wall/fields. and\n";
+    let found = repo_urls(line);
+    let notebook = RepoUrl {
+        written: "https://github.com/bvchess/taxman-notebook/blob/main/search/x-2026-10/README.md#some-heading"
+            .to_owned(),
+        notebook: true,
+        folder: false,
+        reference: "main".to_owned(),
+        path: "search/x-2026-10/README.md".to_owned(),
+        anchor: "some-heading".to_owned(),
+    };
+    let main = RepoUrl {
+        written: "https://github.com/bvchess/taxman/tree/3ca11bf/solver/frame/examples/wall/fields".to_owned(),
+        notebook: false,
+        folder: true,
+        reference: "3ca11bf".to_owned(),
+        path: "solver/frame/examples/wall/fields".to_owned(),
+        anchor: String::new(),
+    };
+    assert_eq!(found, [Ok(notebook), Ok(main)]);
+    for left_alone in [
+        "https://github.com/bvchess/taxman/wiki/Taxman-Mini",
+        "git clone https://github.com/bvchess/taxman.git",
+        "https://github.com/bvchess/taxman-notebook",
+        "https://github.com/bvchess/other/blob/main/x.md",
+    ] {
+        assert!(repo_urls(left_alone).is_empty(), "{left_alone} names no file of the two repositories");
+    }
+    for wrong in [
+        "https://github.com/bvchess/taxman/blob/master/README.md",
+        "https://github.com/bvchess/taxman/blob/abc123/README.md",
+        "https://github.com/bvchess/taxman-notebook/blob/3ca11bf/README.md",
+        "https://github.com/bvchess/taxman/blob/3ca11bf",
+    ] {
+        assert!(repo_urls(wrong).iter().all(Result::is_err), "{wrong} has the wrong form");
+        assert_eq!(repo_urls(wrong).len(), 1);
+    }
+    assert!(repo_urls("https://github.com/bvchess/taxman-notebook/tree/main").iter().all(Result::is_ok), "the top");
 }
 
 #[test]
@@ -321,9 +670,15 @@ const REGISTER_FOLDER: &str = "register";
 /// The folder of the lab notebook that holds the search's entries, a folder each: it is not an entry.
 const SEARCH_FOLDER: &str = "search";
 
+/// The folder of the lab notebook that holds the agenda, the time-bound pages on what to try next: it is not an entry.
+const AGENDA_FOLDER: &str = "agenda";
+
+/// The folder of the lab notebook that holds the history of the benchmarks, a file: it is not an entry.
+const BENCH_FOLDER: &str = "bench";
+
 /// The notebook's note that maps the words the project retired to the words that replaced them, by its path from the
-/// repository.  It lists the old words, so the vocabulary check skips it.
-const TERMS_CHANGED: &str = "solver/notebook/terms-changed.md";
+/// repository (below `NOTEBOOK_SHOWN`).  It lists the old words, so the vocabulary check skips it.
+const TERMS_CHANGED: &str = "notebook/terms-changed.md";
 
 /// The visible folders of `dir`, but for those named in `except`; sorted by path.
 fn folders_in(dir: &Path, except: &[&str]) -> Vec<PathBuf> {
@@ -339,12 +694,11 @@ fn folders_in(dir: &Path, except: &[&str]) -> Vec<PathBuf> {
     folders
 }
 
-/// The README.md of every entry of the lab notebook, which is a folder `solver/notebook/NAME/` beside the front page or
-/// `solver/notebook/search/NAME/` (the folders `register/` and `search/` are no entries); sorted by name.
-fn entry_files() -> Vec<PathBuf> {
-    let dir = notebook_dir();
-    let mut folders = folders_in(&dir, &[REGISTER_FOLDER, SEARCH_FOLDER]);
-    folders.extend(folders_in(&dir.join(SEARCH_FOLDER), &[]));
+/// The README.md of every entry of the lab notebook `notebook`, which is a folder `NAME/` beside the front page or
+/// `search/NAME/` (the folders `register/` and `search/` are no entries); sorted by name.
+fn entry_files(notebook: &Path) -> Vec<PathBuf> {
+    let mut folders = folders_in(notebook, &[REGISTER_FOLDER, SEARCH_FOLDER, AGENDA_FOLDER, BENCH_FOLDER]);
+    folders.extend(folders_in(&notebook.join(SEARCH_FOLDER), &[]));
     folders.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
     folders
         .into_iter()
@@ -362,32 +716,29 @@ fn entry_name(file: &Path) -> String {
 }
 
 /// The folder of an entry of the lab notebook and the path below it, for the file at `shown` (a path from the
-/// repository), if it lies in an entry's folder: `("NAME", "README.md")` for `solver/notebook/NAME/README.md` and for
-/// `solver/notebook/search/NAME/README.md`.  The front page, `terms-changed.md` and the files of `register/` lie in no
-/// entry's folder.
+/// repository), if it lies in an entry's folder: `("NAME", "README.md")` for `notebook/NAME/README.md` and for
+/// `notebook/search/NAME/README.md`.  The front page, `terms-changed.md`, the agenda and the benchmark history and the
+/// files of `register/` lie in no entry's folder.
 fn in_entry_folder(shown: &str) -> Option<(&str, &str)> {
-    let (folder, below) = shown.strip_prefix("solver/notebook/")?.split_once('/')?;
+    let (folder, below) = shown.strip_prefix(NOTEBOOK_SHOWN)?.split_once('/')?;
     match folder {
-        REGISTER_FOLDER => None,
+        REGISTER_FOLDER | AGENDA_FOLDER | BENCH_FOLDER => None,
         SEARCH_FOLDER => below.split_once('/'),
         _ => Some((folder, below)),
     }
 }
 
-/// The files of the register, `solver/notebook/register/*.md`, a file a subject; sorted by path.
-fn register_files() -> Vec<PathBuf> {
-    files_with_extensions(&notebook_dir().join(REGISTER_FOLDER), &["md"])
+/// The files of the register of the notebook `notebook`, `register/*.md`, a file a subject; sorted by path.
+fn register_files(notebook: &Path) -> Vec<PathBuf> {
+    files_with_extensions(&notebook.join(REGISTER_FOLDER), &["md"])
 }
 
 /// The files that the links of the register's files reach (without their anchors): each link is resolved from the
 /// folder of the file that holds it, so that `../NAME/README.md` and `../search/NAME/README.md` reach the entries NAME.
 /// A link to a file that does not exist reaches nothing (the link test finds it).
-fn files_linked_by_the_register() -> BTreeSet<PathBuf> {
-    let files = register_files();
-    assert!(
-        !files.is_empty(),
-        "the check found no file in solver/notebook/{REGISTER_FOLDER}/: has the layout changed?"
-    );
+fn files_linked_by_the_register(notebook: &Path) -> BTreeSet<PathBuf> {
+    let files = register_files(notebook);
+    assert!(!files.is_empty(), "the check found no file in the notebook's {REGISTER_FOLDER}/: has the layout changed?");
     let mut linked = BTreeSet::new();
     for file in files {
         for line in without_code(&read(&file)) {
@@ -402,10 +753,11 @@ fn files_linked_by_the_register() -> BTreeSet<PathBuf> {
     linked
 }
 
-/// The third line of the entry whose README.md is `file`: the link back to the front page, from its folder.
-fn back_link_of(file: &Path) -> &'static str {
-    let beside = file.parent().and_then(Path::parent).and_then(Path::file_name);
-    if beside.is_some_and(|folder| folder == SEARCH_FOLDER) {
+/// The third line of the entry whose README.md is `file`, in the notebook `notebook`: the link back to the front page,
+/// from its folder.
+fn back_link_of(notebook: &Path, file: &Path) -> &'static str {
+    let above = file.parent().and_then(Path::parent);
+    if above == Some(&notebook.join(SEARCH_FOLDER)) {
         SEARCH_BACK_LINK
     } else {
         BACK_LINK
@@ -417,8 +769,9 @@ fn back_link_of(file: &Path) -> &'static str {
 /// holds, if it holds one), and a file of the register links to it.
 #[test]
 fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
-    let listed = files_linked_by_the_register();
-    let files = entry_files();
+    let Some(notebook) = notebook_for("its entries are not checked") else { return };
+    let listed = files_linked_by_the_register(notebook);
+    let files = entry_files(notebook);
     assert!(files.len() > 40, "the check found only {} entries: has the layout changed?", files.len());
     let mut problems = Vec::new();
     for file in files {
@@ -434,7 +787,7 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
             }
             _ => problems.push(format!("{name}: the first line is not a title (`# `)")),
         }
-        let back_link = back_link_of(&file);
+        let back_link = back_link_of(notebook, &file);
         if top.get(1) != Some(&"") || top.get(2) != Some(&back_link) {
             problems.push(format!("{name}: the third line is not {back_link:?}, after a blank line"));
         }
@@ -457,12 +810,12 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
             }
         }
         if !listed.contains(&file) {
-            problems.push(format!("{name}: no file of solver/notebook/{REGISTER_FOLDER}/ links to it"));
+            problems.push(format!("{name}: no file of the notebook's {REGISTER_FOLDER}/ links to it"));
         }
     }
     assert!(
         problems.is_empty(),
-        "entries of solver/notebook/ and solver/notebook/{SEARCH_FOLDER}/ that break the notebook's rules:\n{}",
+        "entries of the notebook and of its {SEARCH_FOLDER}/ that break its rules:\n{}",
         problems.join("\n")
     );
 }
@@ -471,58 +824,65 @@ fn every_entry_of_the_notebook_has_a_title_and_a_back_link_and_is_listed() {
 /// table row, since the rows are in the files of `register/`.
 #[test]
 fn the_front_page_of_the_notebook_has_no_entries_and_no_table_rows() {
-    let front = without_code(&read(notebook_dir().join("README.md")));
+    let Some(notebook) = notebook_for("its front page is not checked") else { return };
+    let front = without_code(&read(notebook.join("README.md")));
     let sections: Vec<String> = front.iter().filter_map(|line| line.strip_prefix("## ").map(str::to_owned)).collect();
     assert_eq!(
         sections, FRONT_SECTIONS,
-        "solver/notebook/README.md keeps the rules of the notebook and of the register; an entry is a folder of \
-         solver/notebook/ or of solver/notebook/{SEARCH_FOLDER}/"
+        "the notebook's README.md keeps the rules of the notebook and of the register; an entry is a folder of the \
+         notebook or of its {SEARCH_FOLDER}/"
     );
     let rows: Vec<String> = front
         .iter()
         .enumerate()
         .filter(|(_, line)| line.starts_with("| "))
-        .map(|(i, line)| format!("solver/notebook/README.md:{}: {line}", i + 1))
+        .map(|(i, line)| format!("{NOTEBOOK_SHOWN}README.md:{}: {line}", i + 1))
         .collect();
     assert!(
         rows.is_empty(),
         "the front page of the notebook holds no table: the rows of the register are in the files of \
-         solver/notebook/{REGISTER_FOLDER}/:\n{}",
+         {NOTEBOOK_SHOWN}{REGISTER_FOLDER}/:\n{}",
         rows.join("\n")
     );
 }
 
-/// The register's files and the note on the terms changed lie in no entry's folder, nor does a file of `search/` that
-/// is no entry's; a file in the folder of an entry, beside the front page or in `search/`, at any depth, does.
+/// The register's files, the note on the terms changed, the agenda and the benchmark history lie in no entry's folder,
+/// nor does a file of `search/` that is no entry's; a file in the folder of an entry, beside the front page or in
+/// `search/`, at any depth, does.
 #[test]
 fn the_register_and_the_top_files_are_told_from_the_entries() {
     let beside = [
-        "solver/notebook/README.md",
+        "notebook/README.md",
         TERMS_CHANGED,
-        "solver/notebook/register/node-bound.md",
-        "solver/notebook/register/README.md",
-        "solver/notebook/search/README.md",
+        "notebook/register/node-bound.md",
+        "notebook/register/README.md",
+        "notebook/agenda/AGENDA.md",
+        "notebook/bench/history.jsonl",
+        "notebook/search/README.md",
         "solver/docs/DESIGN.md",
     ];
     for shown in beside {
         assert!(!is_entry(shown) && !is_in_an_entry(shown), "{shown} lies in no entry's folder");
     }
-    assert!(is_entry("solver/notebook/x-2026-10/README.md") && is_in_an_entry("solver/notebook/x-2026-10/README.md"));
-    assert!(!is_entry("solver/notebook/x-2026-10/fields_output.md"));
-    assert!(is_in_an_entry("solver/notebook/x-2026-10/fields_output.md") && is_in_an_entry("solver/notebook/x/y/z.md"));
-    assert!(is_entry("solver/notebook/search/x-2026-10/README.md"));
-    assert!(!is_entry("solver/notebook/search/x-2026-10/fields_output.md"));
-    assert!(is_in_an_entry("solver/notebook/search/x-2026-10/fields_output.md"));
-    assert!(is_in_an_entry("solver/notebook/search/x/y/z.md"));
+    assert!(is_entry("notebook/x-2026-10/README.md") && is_in_an_entry("notebook/x-2026-10/README.md"));
+    assert!(!is_entry("notebook/x-2026-10/fields_output.md"));
+    assert!(is_in_an_entry("notebook/x-2026-10/fields_output.md") && is_in_an_entry("notebook/x/y/z.md"));
+    assert!(is_entry("notebook/search/x-2026-10/README.md"));
+    assert!(!is_entry("notebook/search/x-2026-10/fields_output.md"));
+    assert!(is_in_an_entry("notebook/search/x-2026-10/fields_output.md"));
+    assert!(is_in_an_entry("notebook/search/x/y/z.md"));
 }
 
 /// An entry in `search/` links back with one more `../`.
 #[test]
 fn the_back_link_of_an_entry_goes_up_to_the_front_page() {
-    let beside = notebook_dir().join("x-2026-10/README.md");
-    let below = notebook_dir().join(SEARCH_FOLDER).join("x-2026-10/README.md");
-    assert_eq!(back_link_of(&beside), BACK_LINK);
-    assert_eq!(back_link_of(&below), SEARCH_BACK_LINK);
+    let notebook = Path::new("/a/notebook");
+    let beside = notebook.join("x-2026-10/README.md");
+    let below = notebook.join(SEARCH_FOLDER).join("x-2026-10/README.md");
+    assert_eq!(back_link_of(notebook, &beside), BACK_LINK);
+    assert_eq!(back_link_of(notebook, &below), SEARCH_BACK_LINK);
+    let named_search = Path::new("/a/search");
+    assert_eq!(back_link_of(named_search, &named_search.join("x-2026-10/README.md")), BACK_LINK, "a checkout's name");
 }
 
 /// The number that `text` writes with exactly `count` digits, if it does.
@@ -749,19 +1109,16 @@ fn the_minimum_rust_version_is_the_same_everywhere() {
 // Vocabulary
 
 /// The text files that explain the code: the guides (DESIGN.md with the files of the design), the lab notebook (its
-/// front page, register and note on the terms changed, and its entries), and the comments.
+/// front page, register and note on the terms changed, and its entries) if its checkout is there, and the comments.
 fn prose_files() -> Vec<PathBuf> {
-    let mut files: Vec<PathBuf> = vec![
-        crate_dir().join("README.md"),
-        reference_md(),
-        design_md(),
-        notebook_dir().join("README.md"),
-        repo_dir().join(TERMS_CHANGED),
-        repo_dir().join("solver/docs/STATUS.md"),
-    ];
+    let mut files: Vec<PathBuf> =
+        vec![crate_dir().join("README.md"), reference_md(), design_md(), repo_dir().join("solver/docs/STATUS.md")];
     files.extend(files_with_extensions(&design_dir(), &["md"]));
-    files.extend(register_files());
-    files.extend(entry_files());
+    if let Some(notebook) = notebook_checkout() {
+        files.extend([notebook.join("README.md"), path_of(TERMS_CHANGED)]);
+        files.extend(register_files(notebook));
+        files.extend(entry_files(notebook));
+    }
     files.extend(files_with_extensions(&crate_dir().join("src"), &["rs"]));
     files
 }
@@ -774,7 +1131,7 @@ fn files_where(dir: &Path, keep: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     for path in paths {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
         if path.is_dir() {
-            if name != "target" && !name.starts_with('.') {
+            if name != "target" && !name.starts_with('.') && !is_notebook_checkout(&path) {
                 found.extend(files_where(&path, keep));
             }
         } else if keep(&path) {
@@ -886,7 +1243,6 @@ const REWRITTEN: &[&str] = &[
     "solver/docs/verifiers.md",
     "solver/docs/DESIGN.md",
     DESIGN_DIR,
-    "solver/docs/AGENDA.md",
     "solver/docs/RUNBOOK.md",
     "solver/docs/runbook/",
     "solver/docs/STATUS.md",
@@ -894,11 +1250,10 @@ const REWRITTEN: &[&str] = &[
     "solver/tools/ledger/README.md",
     "solver/noframe/README.md",
     "solver/noframe/docs/",
-    "solver/docs/agenda-ideas.md",
-    "solver/docs/agenda-after-5000.md",
     "results/runs.md",
-    "solver/notebook/README.md",
-    "solver/notebook/register/",
+    "notebook/README.md",
+    "notebook/register/",
+    "notebook/agenda/",
     "results/README.md",
     "heuristics/README.md",
 ];
@@ -927,7 +1282,7 @@ const RETIRED_IN_THE_REWRITTEN_DOCS: &[Retired] = &[
 /// Retired in the rewritten docs and matched in their own case: the notebook's old name, which in lower case is a plain
 /// English word.
 const RETIRED_CASED: &[Retired] = &[
-    retired("EXPERIMENTS", "the notebook (solver/notebook/README.md)"),
+    retired("EXPERIMENTS", "the notebook (bvchess/taxman-notebook)"),
     retired("Brian", "the role: whoever owns the AWS account, or the project's owner (docs/WRITING.md, rule 9)"),
 ];
 
@@ -967,9 +1322,9 @@ const STAYS: &[&str] = &[
 /// The file the check skips, by its path from the repository: this one, which lists the words.
 const SKIPPED: &str = "solver/frame/tests/docs.rs";
 
-/// Whether the file at `shown` (a path from the repository) is an entry of the lab notebook, `solver/notebook/NAME/
-/// README.md` or `solver/notebook/search/NAME/README.md`: the entries are history and keep the words of their time, so
-/// the check skips them.  The register's files, the note on the terms changed and the front page are no entries.
+/// Whether the file at `shown` (a path from the repository) is an entry of the lab notebook, `notebook/NAME/README.md`
+/// or `notebook/search/NAME/README.md`: the entries are history and keep the words of their time, so the check skips
+/// them.  The register's files, the note on the terms changed and the front page are no entries.
 fn is_entry(shown: &str) -> bool {
     in_entry_folder(shown).is_some_and(|(_, below)| below == "README.md")
 }
@@ -1227,21 +1582,28 @@ fn prose_lines(path: &Path, text: &str) -> Vec<String> {
     without_code(&comment_lines(extension, text).join("\n"))
 }
 
-/// `path` as shown in a message and compared with the names above: relative to the repository, with `/`.
+/// `path` as shown in a message and compared with the names above: relative to the repository, with `/`; a file of the
+/// notebook's checkout is shown below `NOTEBOOK_SHOWN`.
 fn from_repo(path: &Path) -> String {
-    path.strip_prefix(repo_dir()).unwrap_or(path).to_string_lossy().replace('\\', "/")
+    let shown = |below: &Path| below.to_string_lossy().replace('\\', "/");
+    match notebook_checkout().and_then(|checkout| path.strip_prefix(checkout).ok()) {
+        Some(below) => format!("{NOTEBOOK_SHOWN}{}", shown(below)),
+        None => shown(path.strip_prefix(repo_dir()).unwrap_or(path)),
+    }
 }
 
 /// Whether the file at `shown` is one where the solver's extra retired words do not apply: the prover's, and the
 /// repository's own (the README, `docs/`, `heuristics/`, `moniot/`).  The solver's are `solver/` but for the prover,
-/// and the README of `results/`.
+/// the README of `results/` and the notebook's.
 fn keeps_own_words(shown: &str) -> bool {
-    shown.starts_with("solver/noframe/") || !(shown.starts_with("solver/") || shown.starts_with("results/"))
+    let solvers = shown.starts_with("solver/") || shown.starts_with("results/") || shown.starts_with(NOTEBOOK_SHOWN);
+    shown.starts_with("solver/noframe/") || !solvers
 }
 
 /// The files to check: the solver's directory and `results/` (which a Linux dry run has), and, in a full checkout, the
 /// repository's README and `docs/`, and the READMEs of `heuristics/` and `moniot/`; but for the files that list the old
-/// words (`SKIPPED`, `TERMS_CHANGED`) and the notebook's entries.
+/// words (`SKIPPED`, `TERMS_CHANGED`) and the notebook's entries.  The notebook's checkout, if there is one, is walked
+/// as the rest of the repository is.
 fn vocabulary_files() -> Vec<PathBuf> {
     fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
         let mut paths: Vec<PathBuf> = std::fs::read_dir(dir).expect("a directory").map(|e| e.unwrap().path()).collect();
@@ -1249,7 +1611,10 @@ fn vocabulary_files() -> Vec<PathBuf> {
         for path in paths {
             let name = path.file_name().unwrap().to_string_lossy().into_owned();
             if path.is_dir() {
-                if !matches!(name.as_str(), "target" | "testdata" | "data") && !name.starts_with('.') {
+                if !matches!(name.as_str(), "target" | "testdata" | "data")
+                    && !name.starts_with('.')
+                    && !is_notebook_checkout(&path)
+                {
                     walk(&path, found);
                 }
             } else if name.ends_with("_output.md") {
@@ -1269,6 +1634,9 @@ fn vocabulary_files() -> Vec<PathBuf> {
     if root.join("README.md").exists() {
         walk(&root.join("docs"), &mut found);
         found.extend(["README.md", "heuristics/README.md", "moniot/README.md"].iter().map(|name| root.join(name)));
+    }
+    if let Some(notebook) = notebook_checkout() {
+        walk(notebook, &mut found);
     }
     let is_checked = |shown: &str| shown != SKIPPED && shown != TERMS_CHANGED && !is_entry(shown);
     found.into_iter().filter(|path| is_checked(&from_repo(path))).collect()
@@ -1463,7 +1831,7 @@ const LONGEST_QUOTED_HEADING: usize = 100;
 const LEAD_IN_KINDS: &[&str] = &["the paragraph ", "the item "];
 
 /// What may stand between `of` or `in` and the name of a document that a citation precedes (`section 2 of the entry
-/// solver/notebook/.../README.md`), longest first.
+/// notebook/.../README.md`), longest first.
 const ARTICLES: &[&str] = &["the entry ", "the "];
 
 /// The fewest citations by name that the check must find in the repository: fewer means that a pattern broke.  It found
@@ -1475,6 +1843,10 @@ const FEWEST_BY_NAME: usize = 40;
 /// found 14 on 2026-10-20.
 const FEWEST_BY_LEAD_IN: usize = 8;
 
+/// How a text names a file of the notebook's repository: `taxman-notebook/agenda/AGENDA.md`.  The citations of its
+/// headings are looked up in the checkout, and are not checked without one.
+const NOTEBOOK_REPO: &str = "taxman-notebook/";
+
 /// How a text writes the name of a document.
 #[derive(Clone, Debug, PartialEq)]
 struct DocName {
@@ -1482,6 +1854,11 @@ struct DocName {
     written: String,
     /// Whether it is the target of a markdown link, which is relative to the citing file.
     link: bool,
+}
+
+/// Whether `doc` is a file of the notebook's repository, which there is no checkout of to look it up in.
+fn is_in_absent_notebook(doc: &DocName) -> bool {
+    doc.written.starts_with(NOTEBOOK_REPO) && notebook_checkout().is_none()
 }
 
 /// What a citation takes from the document.
@@ -1575,7 +1952,9 @@ fn file_mention_at(text: &str, at: usize) -> Option<Mention> {
         return None;
     }
     let start = before.char_indices().rev().take_while(|&(_, c)| is_path_char(c)).last().map_or(at, |(i, _)| i);
-    Some(Mention { start, end, doc: DocName { written: text[start..end].to_owned(), link: false } })
+    // A URL (`https://github.com/.../README.md`) names a file by its address: the link test looks it up.
+    let is_url = text[..start].ends_with(':') && text[start..].starts_with("//");
+    (!is_url).then(|| Mention { start, end, doc: DocName { written: text[start..end].to_owned(), link: false } })
 }
 
 /// The paths and file names of `text` that end in `.md`.
@@ -1926,7 +2305,10 @@ impl DocSet {
         let written = doc.written.as_str();
         let beside = citing.parent().expect("a file has a directory").join(written);
         let from_top = repo_dir().join(written);
-        let found = if doc.link || written.starts_with('.') {
+        let in_notebook = written.strip_prefix(NOTEBOOK_REPO).zip(notebook_checkout());
+        let found = if let Some((below, checkout)) = in_notebook {
+            checkout.join(below)
+        } else if doc.link || written.starts_with('.') {
             beside
         } else if written.contains('/') {
             if from_top.exists() {
@@ -1983,6 +2365,9 @@ impl DocSet {
 
     /// What is wrong with `citation`, written in the file `citing`, if anything.
     fn citation_problem(&mut self, citing: &Path, citation: &Citation) -> Option<String> {
+        if is_in_absent_notebook(&citation.doc) {
+            return None;
+        }
         let doc = match self.resolve(citing, &citation.doc) {
             Ok(doc) => doc,
             Err(problem) => return Some(problem),
@@ -2009,6 +2394,9 @@ impl DocSet {
 
     /// What is wrong with the `anchor` of `doc`, written in the file `citing`, if anything.
     fn anchor_problem(&mut self, citing: &Path, doc: &DocName, anchor: &str) -> Option<String> {
+        if is_in_absent_notebook(doc) {
+            return None;
+        }
         let path = match self.resolve(citing, doc) {
             Ok(path) => path,
             Err(problem) => return Some(problem),
@@ -2348,14 +2736,14 @@ fn headings_are_quoted_with_their_number_or_without_and_sections_are_named_by_nu
 // Sizes
 
 /// The indexes of the documents that are folders of files, by their paths from the repository: each holds a line a
-/// file, and stays under the index limit.
+/// file, and stays under the index limit.  The notebook's front page is one if its checkout is there.
 const INDEXES: &[&str] = &[
     "docs/THEORY.md",
     "docs/theory/primer.md",
     "solver/noframe/README.md",
     "solver/docs/DESIGN.md",
     "solver/docs/RUNBOOK.md",
-    "solver/notebook/README.md",
+    "notebook/README.md",
 ];
 
 /// The words of `text`, as `wc -w` counts them: its runs of characters between white space.
@@ -2404,7 +2792,7 @@ fn guide_sizes() -> Vec<(String, usize)> {
 
 /// The size of the file `shown` (a path from the repository) in words, if it exists.
 fn words_in(shown: &str) -> Option<usize> {
-    std::fs::read_to_string(repo_dir().join(shown)).ok().map(|text| word_count(&text))
+    std::fs::read_to_string(path_of(shown)).ok().map(|text| word_count(&text))
 }
 
 /// What is wrong with the sizes of the documents, as messages, given the limits of a file and of an index.
@@ -2417,7 +2805,8 @@ fn size_problems(file_limit: usize, index_limit: usize) -> Vec<String> {
             ));
         }
     }
-    for shown in INDEXES {
+    let has_notebook = notebook_checkout().is_some();
+    for shown in INDEXES.iter().filter(|shown| has_notebook || !shown.starts_with(NOTEBOOK_SHOWN)) {
         match words_in(shown) {
             None => problems.push(format!("{shown} is in INDEXES but there is no such file: remove it from INDEXES")),
             Some(words) if words >= index_limit => problems.push(format!(
@@ -2610,9 +2999,9 @@ fn british_in(lines: &[String]) -> Vec<(usize, String, String)> {
 }
 
 /// The files whose prose is spelled the American way: the Markdown files, the Rust and Python sources and the shell
-/// scripts of the repository, with the notebook's entries and their scripts, but for `moniot/` (another person's code),
-/// the files that list the old words (`SKIPPED`, `TERMS_CHANGED`) and the files that a study's script wrote
-/// (`*_output.md`).
+/// scripts of the repository, with the notebook's entries and their scripts if its checkout is there, but for `moniot/`
+/// (another person's code), the files that list the old words (`SKIPPED`, `TERMS_CHANGED`) and the files that a study's
+/// script wrote (`*_output.md`).
 fn spelling_files() -> Vec<PathBuf> {
     let keep = |path: &Path| {
         let shown = from_repo(path);
@@ -2621,13 +3010,16 @@ fn spelling_files() -> Vec<PathBuf> {
         let listed = shown == SKIPPED || shown == TERMS_CHANGED;
         spelled && !shown.starts_with("moniot/") && !name.ends_with("_output.md") && !listed
     };
-    files_where(&repo_dir(), &keep)
+    let mut files = files_where(&repo_dir(), &keep);
+    files.extend(notebook_checkout().into_iter().flat_map(|notebook| files_where(notebook, &keep)));
+    files
 }
 
 #[test]
 fn the_guides_and_comments_are_spelled_the_american_way() {
     let files = spelling_files();
-    assert!(files.len() > 400, "the check found only {} files: has the layout changed?", files.len());
+    let fewest = if notebook_checkout().is_some() { 400 } else { 200 };
+    assert!(files.len() > fewest, "the check found only {} files: has the layout changed?", files.len());
     let mut found = Vec::new();
     for path in files {
         for (at, british, american) in british_in(&prose_lines(&path, &read(&path))) {

@@ -5,3 +5,4 @@ target
 .claude/
 .venv/
 __pycache__/
+solver/notebook/
