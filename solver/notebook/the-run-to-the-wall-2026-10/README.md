@@ -4,7 +4,7 @@ Part of the [lab notebook](../README.md).
 
 Started 2026-10-16.  Concluded 2026-10-18.
 
-**Question.**  How far does the unattended run of [the runbook's wall page](../../docs/runbook/wall.md) take the chain
+**Question.**  How far does the unattended run of [the runbook's wall page](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md) take the chain
 from n = 1 on one `c8g.16xlarge` at spot, and where is the wall, the first game whose own search takes more than 24
 hours?  The run used the settings of [the tuning
 campaign](../search/the-tuning-campaign-at-the-end-of-the-chain-2026-10/README.md) (`force_window=all`) and the counter
@@ -25,7 +25,7 @@ instance-hours and 2026-10-22.  One machine ran all of it, and no interruption n
 The run was stopped on request (`wall.sh stop`, a final checkpoint written) in the middle of game 3915, 49 minutes and
 138 million nodes into its search, after 128,236 s of the solver: 35.72 instance-hours, about $24.14 at the $0.676 the
 run recorded.  The reason was to restart with the chain drawing on the known games (`solve --use-prev`, [the wall
-page](../../docs/runbook/wall.md#launch-watch-stop-clean-up)): the committed chain then holds 1..3914, so a run that
+page](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md#launch-watch-stop-clean-up)): the committed chain then holds 1..3914, so a run that
 draws on it records those games with no search and starts at 3915.
 
 ## Results
@@ -188,7 +188,7 @@ instance-hours` at 0.18, with the group at 0.
 **Cost.**  Run 1 takes about 0.25 instance-hours and run 2 0.6, so 0.85 instance-hours of a `c8g.2xlarge`, with a 20 GB
 gp3 volume for as long (under a cent) and a few thousand requests to S3: **about $0.15 in all**, and under $0.40 at the
 spot ceiling of $0.40 an hour.  The account changes are those of [What needs approval, and what it
-costs](../../docs/runbook/wall.md#what-needs-approval-and-what-it-costs), with the spot instance of a `c8g.2xlarge` and
+costs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md#what-needs-approval-and-what-it-costs), with the spot instance of a `c8g.2xlarge` and
 the group's termination by `aws ec2 terminate-instances`.
 
 **What the rehearsal leaves out:** the 64-thread machine, the hours-long searches (the Rust tests check the clock at the

@@ -75,3 +75,15 @@ and `Gf2Bound::live` with their tests, and the setup switch `STUDIES=1`.  The se
 collected them through the searcher, and `search::search_with`, which took it), and so did the counters of the
 searcher that only they read.  They build at commit 3ca11bf, and the entries that used them keep the paths and commands
 of their time.
+
+The keep-going flags and the two scripts of the unattended runs were removed the same day.  Of `taxman solve`: the flags
+`--keep-going`, `--retry`, `--retry-improved`, `--pass` and `--game-hours` (the wall, with its exit status 4 and the
+`GAME_HOURS` of `chain.sh`), and the code only they used; the `options` keys `keep_going`, `retry`, `retry_improved` and
+`pass` stay in the lines that carry them.  Of the scripts: the sweep (`solver/tools/cloud/sweep.sh`,
+`solver/tools/sweep_plan.py` with its test, `solver/docs/runbook/sweep.md`, and the tests `tests/keep_going.rs` and
+`tests/sweep.rs`), and the run to the wall (`launch`, `stop`, `cleanup` and the S3 and Auto Scaling `status` of
+`solver/tools/cloud/wall.sh`, `wall-node.sh`, `wall-policy.json` and `solver/docs/runbook/wall.md`).  The status of a
+chain on another machine, `wall.sh status [--recorded N] --host USER@HOST`, is now `solver/tools/cloud/status.sh
+[--recorded N] --host USER@HOST`.  The verifiers still read the files with holes that `--keep-going` and the sweep wrote.
+They build at commit 3ca11bf, the entries that used them keep the paths and commands of their time, and their links to
+the files removed are links to that commit.

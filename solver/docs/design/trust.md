@@ -100,24 +100,21 @@ records what the range solved in order records, but for what a multi-threaded se
   nodes decide the method of a game at its ceiling: `start` when its search took no step, as in order, `search` when it
   began before the ceiling was known and took some.
 
-## Past limits
+## Files with holes
 
-With `--keep-going`, a game whose search a limit stops is recorded as an unfinished line (its best game so far, no
-proof), and the range goes on (`solver::SolveOptions::keep_going`; the driver is `window`, "Past limits").  The next
-game may take from that game only what does not rest on its being optimal.  A *seed* is any promotable set the board can
-use, offered as an incumbent, so it cannot change what a search proves.  Three things do rest on opt(n − 1): the ceiling
-`n + opt(n − 1)` (a `cap` proof), the prime formula (proved at `accelerate::prime_shortcut`), and the tripwire that a
-score above that ceiling proves the game before it not optimal.  The solver takes each of them from a game only if
-`Prev::proven`, which is true of a completed game and of the built-in table's (assumed), and false of the best game of a
-stopped search.  A repeat rests on the earlier game it repeats, which is a completed game of the file or the range,
-never an unfinished one.  The check that a completed game scores no less than the game before it stays, since a game of
-n − 1 is a game of n, optimal or not.
+A results file may have holes: games with no line, or only incomplete ones.  A `solve` that went on past limits wrote
+such files: a game whose search a limit stopped was recorded as an unfinished line (its best game so far, no proof), and
+the next game was built on it.  The solver no longer does this, and the verifiers still read these files.  A game may
+take from an unfinished game only what does not rest on its being optimal.  A *seed* is any promotable set the board
+can use, offered as an incumbent, so it cannot change what a search proves.  Three things do rest on opt(n − 1): the
+ceiling `n + opt(n − 1)` (a `cap` proof), the prime formula (proved at `accelerate::prime_shortcut`), and the tripwire
+that a score above that ceiling proves the game before it not optimal.  A repeat rests on the earlier game it repeats,
+which is a completed game of the file, never an unfinished one.  The check that a completed game scores no less than the
+game before it stays, since a game of n − 1 is a game of n, optimal or not.
 
 The lines say what a game had: a game built on an unfinished one has `prev` with no proof, `setup.cap` null and no `cap`
-or `prime_formula` proof, and both referees refuse a line that claims one of these on it ([REFERENCE.md, "What a game
-had from n - 1"](../REFERENCE.md#what-a-game-had-from-n---1)).  The format of a line is the same, except that `options`
-also names `keep_going`, `retry`, `retry_improved` and `pass` where they were given.  The games of such a range are
-solved one at a time, because a game that went on from a game in flight would not know whether to take its ceiling.
+or `prime_formula` proof, and both verifiers refuse a line that claims one of these on it ([REFERENCE.md, "What a game
+had from n - 1"](../REFERENCE.md#what-a-game-had-from-n---1)).
 
 ## Known games
 

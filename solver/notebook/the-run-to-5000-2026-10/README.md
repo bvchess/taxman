@@ -15,7 +15,7 @@ games with no search.
 
 The run went from 2026-10-18 at 19:27:41Z to 2026-10-20 at 12:31:00Z, on commit ca357bf with a clean tree.  `wall.sh
 launch` set up an Auto Scaling group of one spot `c8g.16xlarge` (64 threads) that replaces an interrupted machine ([the
-unattended run to the wall](../../docs/runbook/wall.md)).  The machine ran `taxman solve 1-8191 --use-prev` with a
+unattended run to the wall](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md)).  The machine ran `taxman solve 1-8191 --use-prev` with a
 [window](../../../docs/GLOSSARY.md#the-search) of 4 games in flight, the default tactics of that commit and the
 [wall](../../../docs/GLOSSARY.md#the-search) at 24 hours (`--game-hours 24`).  With `--use-prev` it took games 1..3914
 from the committed chain and each game the store had proven from the store, and searched the others from 3915.  The

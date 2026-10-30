@@ -14,7 +14,7 @@ pass 2 completed 1413 at once with the `cap` proof once 1412 was proven; both re
 
 The project owner's plan of 2026-10-17 is as many proven games of 3441..8191 as one cheap machine gives, holes allowed.
 A game that does not finish leaves its best game as a seed for the next, and passes over the merged file give each game
-the game before it, whichever block made it ([the runbook's page on the sweep](../../docs/runbook/sweep.md);
+the game before it, whichever block made it ([the runbook's page on the sweep](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/sweep.md);
 `taxman solve --keep-going`).
 
 The test ran `solver/tools/cloud/sweep.sh` on the laptop (ten CPUs) with the binary of `cargo build --profile test`
@@ -86,12 +86,12 @@ limit of its search.  The setup is 5.1 s at 3441, 22.6 at 5000, 90.7 at 7000 and
 the four measured points (1 s at 2200, 3 at 3000, 9 at 4000, 48 at 6000).  Together that is 76 core-hours of setup and
 at most 238 of search, so at most 314 core-hours, 4.9 hours of 64 CPUs.  A `c8g.16xlarge` at spot cost $0.66 to $0.81 an
 hour on 2026-10-17, counted at $0.676 as in [What needs approval, and what it
-costs](../../docs/runbook/wall.md#what-needs-approval-and-what-it-costs), so pass 1 costs about $3.3.  The later passes
+costs](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md#what-needs-approval-and-what-it-costs), so pass 1 costs about $3.3.  The later passes
 cost a fraction of that, since they search again only the games whose game before has gained.  A deadline of 8 hours
 (`DEADLINE_HOURS`) bounds the run at about $5.4 at $0.676 an hour ($6.5 at $0.81), and the timer of 9 hours bounds the
 machine at $9 at the ceiling of $1.0; the 40 GB volume costs a few cents.  The launch builds nothing: it takes the
 solver from the build cache, which must already hold the commit ([Launch, watch, stop, bring the results
-home](../../docs/runbook/sweep.md#launch-watch-stop-bring-the-results-home)).  Releasing a commit is a launch of its
+home](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/sweep.md#launch-watch-stop-bring-the-results-home)).  Releasing a commit is a launch of its
 own, $0.15 to $0.25 ([The release: the suite, then the
 cache](../../docs/runbook/build-cache.md#the-release-the-suite-then-the-cache)).
 

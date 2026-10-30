@@ -52,14 +52,7 @@ pub enum CliError {
     Failed(String),
     /// `taxman certify` found a game that beats a recorded score: print the message, exit 2.
     Counterexample(String),
-    /// `taxman solve` stopped at the wall (`--game-hours`): the command has said so on stdout; exit [`WALL_STATUS`].
-    Wall,
 }
-
-/// The exit status of a `solve` that a game passing the wall (`--game-hours`) ended: a status of its own, so that a
-/// script (`solver/tools/cloud/chain.sh`) tells it from an error (1, 2), a signal (130, 143) and the deadline of its
-/// own (124).
-pub const WALL_STATUS: u8 = 4;
 
 pub type CliResult = Result<(), CliError>;
 
@@ -147,24 +140,6 @@ impl Args {
             Some(time) if time.is_zero() => Err(CliError::Usage(format!("{name} must be more than 0 seconds"))),
             time => Ok(time),
         }
-    }
-
-    /// The flag's value as a number of hours (fractions allowed), more than 0 (as it comes out in nanoseconds) and at
-    /// most [`MAX_SECONDS`] seconds.
-    pub fn positive_hours(&self, name: &str) -> Result<Option<Duration>, CliError> {
-        let Some(hours) = self.parsed::<f64>(name)? else { return Ok(None) };
-        let seconds = hours * 3600.0;
-        if !(seconds > 0.0 && seconds <= MAX_SECONDS) {
-            return Err(CliError::Usage(format!(
-                "{name}: {hours} is not a number of hours from 0 to {}",
-                MAX_SECONDS / 3600.0
-            )));
-        }
-        let time = Duration::from_secs_f64(seconds);
-        if time.is_zero() {
-            return Err(CliError::Usage(format!("{name} must be more than 0 hours")));
-        }
-        Ok(Some(time))
     }
 }
 
@@ -267,7 +242,6 @@ mod tests {
             CliError::Failed(message) | CliError::Counterexample(message) => {
                 panic!("expected a usage error, got {message:?}")
             }
-            CliError::Wall => panic!("expected a usage error, got a stop"),
         }
     }
 
@@ -355,17 +329,6 @@ mod tests {
         }
         assert_eq!(given("0.001").positive_seconds("--every").unwrap(), Some(Duration::from_millis(1)));
         assert_eq!(given("1").positive_seconds("--other").unwrap(), None);
-    }
-
-    #[test]
-    fn hours_are_bounded_and_positive() {
-        let given = |value: &str| Args::parse(&strings(&["--wall", value]), &["--wall"], &[]).unwrap();
-        for bad in ["0", "-1", "1e9", "inf", "NaN", "soon", "1e-20"] {
-            assert!(usage(given(bad).positive_hours("--wall").unwrap_err()).contains("--wall"), "{bad}");
-        }
-        assert_eq!(given("24").positive_hours("--wall").unwrap(), Some(Duration::from_secs(86_400)));
-        assert_eq!(given("0.5").positive_hours("--wall").unwrap(), Some(Duration::from_secs(1_800)));
-        assert_eq!(given("0.001").positive_hours("--other").unwrap(), None);
     }
 
     #[test]

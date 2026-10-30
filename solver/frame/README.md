@@ -373,7 +373,7 @@ it does with them:
 
 A chain from n = 1 with `--use-prev` takes its games from the committed chain as far as that goes, so it proves nothing
 again there.  That is for a run that goes past the committed chain
-([solver/docs/runbook/wall.md](../docs/runbook/wall.md)), not for one that checks the build.
+([solver/docs/runbook/chain.md, "Run"](../docs/runbook/chain.md#run)), not for one that checks the build.
 
 ### A chain from n = 1
 
@@ -449,13 +449,10 @@ them.
   `--tactic` flags, or delete the file.
 * **Limits.**  `--time-limit S` and `--node-limit N` bound one game's search in one invocation, not the whole range.  A
   game that a limit stops gets an incomplete result line (`completed` false, with `best_so_far`), and the range stops
-  there with the exit status 0.  With `--keep-going` it goes on (next subsection).
-* **The wall.**  `--game-hours H` ends the range at the first game whose own search passes H hours.  The hours are
-  summed over every invocation, and counted only while the game is the oldest of the window with its search running,
-  not while it waits behind another.  Every search in flight stops with a final checkpoint, and nothing is recorded for
-  that game, not even an incomplete line.  A search that completes before the stop reaches it is recorded, and the
-  range goes on.  `solve` prints `wall at N after H hours` and exits with the status 4.  The game's clock is kept
-  beside its checkpoint (`nNNNN.clock`), so the same command with a larger H goes on from both
+  there with the exit status 0.
+* **The clock.**  A game's own search time, which a line records as `seconds.own`, is summed over every invocation and
+  counted only while the game is the oldest of the window with its search running, not while it waits behind another.
+  It is kept beside the game's checkpoint (`nNNNN.clock`), so a resumed game goes on from it
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A finder beside a long search.**  `--finder-after NODES` starts a thread of its own, beside the workers, once a game's
   search has taken NODES steps (over all its invocations; default 1000000, and 0 starts none), which looks for a better
@@ -469,39 +466,7 @@ them.
   units (default 1048576).  The runs of the committed chain never came near it
   ([results/runs.md](../../results/runs.md) gives their largest queues).
 
-### Keeping going past limits, and the sweep
-
-```
-$ taxman solve 3441-3600 --threads 1 --time-limit 180 --keep-going --out part.jsonl
-```
-
-With `--keep-going`, a game whose search a limit stops does not end the range.  Its best game so far is recorded as an
-unfinished line (`completed` false, with `best_so_far` and the moves).  The next game goes on from that game as a seed
-and nothing more, since it is not known to be optimal: it gets no ceiling n + score(n − 1) from it, no prime formula,
-and no proof that rests on it.  Its line says so: its `prev` has no proof ([the reference, "What a game had from n −
-1"](../docs/REFERENCE.md#what-a-game-had-from-n---1)).  What does not rest on the game before is as ever: an exhausted
-search is a proof, and so is a repeat of a completed game of the file.  The games are solved one at a time (`--window`
-is 1).
-
-* **A rerun** on the same `--out` passes over the games that the file holds only unfinished lines of, and solves the
-  others.  It seeds the game after the last of them with its best game, the best of its lines.
-* **`--retry`** searches the unfinished games again instead, each from its checkpoint if `--checkpoint-dir` kept one,
-  as a second pass with a longer limit does.
-* **`--retry-improved`** searches again only the unfinished games whose game before has more to give than it had when
-  they were tried: it is proven now, or has a better best game than their seed, or they had none.  It passes over the
-  rest.  The games it searches again go in increasing n, so that one it has just proven helps the next.
-* **A signal** still ends the range, but with no line for the game it stopped, so that a rerun resumes it.
-* **`--pass N`** records N in `options.pass` of every line the run writes, and changes nothing else.
-
-**The sweep** (`solver/tools/cloud/sweep.sh FIRST LAST`, [solver/docs/runbook/sweep.md](../docs/runbook/sweep.md))
-goes over a long stretch of games for as many proven games as the time allows, holes allowed.  It splits the stretch
-into blocks of consecutive games of about equal expected work.  Each block is one `taxman solve --keep-going` on one
-thread, with a limit on each game's search (`GAME_SECONDS`, 180).  Then passes of `--retry-improved` go over the
-merged file, so that each game sees the game before it whichever block made it, until a pass changes nothing.
-
-Its file, `explore.jsonl`, holds every line of every block and pass.  It is **not a chain**, and never goes into
-`results/optimal.jsonl.gz`: some of its games have only an unfinished search, or none, and each proof in it rests only
-on the games it holds.  Both verifiers accept it ([verifiers.md](../docs/verifiers.md)).
+### The ledger
 
 **The ledger** works on a whole stretch of games at once instead of in order.  For every game it keeps a lower bound
 with a game that reaches it, and an upper bound, each with how it was derived, and a game is proven when its bounds

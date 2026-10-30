@@ -362,7 +362,7 @@ skipped once a set reaches it, and the result is the same.
 
 *Why the start cannot make an answer wrong.* It only chooses the incumbent, a promotable set: the greedy set, the
 survivors, the dive and every move of the local search promote their members one after another ([trust.md](trust.md),
-"Past limits"). The search is exhaustive from any promotable incumbent, because a node is cut only when its bound is
+"Files with holes"). The search is exhaustive from any promotable incumbent, because a node is cut only when its bound is
 below its need, `best + 1 − sum(promoted)` ("Search state and order"): a heavier incumbent prunes only subtrees that
 cannot beat a set already held. A start at the ceiling proves the game by it, as no promotable set is heavier.
 

@@ -33,14 +33,7 @@ fn assumptions_of_line(line: &Json) -> Assumptions {
 }
 
 fn prev(moves: Vec<u32>, score: u64) -> Prev {
-    Prev {
-        moves,
-        score,
-        source: PrevSource::Results,
-        proof: Some(Proof::Exhausted),
-        assumes: Assumptions::new(),
-        proven: true,
-    }
+    Prev { moves, score, source: PrevSource::Results, proof: Some(Proof::Exhausted), assumes: Assumptions::new() }
 }
 
 /// A game of 80 that is legal, over and opens with 79, as an optimal game does, but scores less than

@@ -29,8 +29,8 @@
 //!    conclusion can make the next head concludable at once (a repeat, a prime or trivial game, a search already
 //!    done), so heads are concluded as long as they can be.
 //! 5. After a conclusion, the next game, if its search runs, is given its ceiling ([`Control::set_ceiling`]), the seed
-//!    of the final game ([`Job::hint`]), and, if the game concluded is proven and assumes nothing, the near-repeat cut
-//!    by it ([`Job::arm`]; the three in [`told`]); one not started yet gets all three with its go.  The cut is set up
+//!    of the final game ([`Job::hint`]), and, if the game concluded assumes nothing, the near-repeat cut by it
+//!    ([`Job::arm`]; the three in [`told`]); one not started yet gets all three with its go.  The cut is set up
 //!    on the driver's thread, and each searcher picks it up when it next starts a unit, as it reads the branching
 //!    settings; the nodes searched before are only not cut, which changes no answer.  The cut acts only where the
 //!    incumbent reaches its bound B, the best promotion sum of the game concluded.  A search seeded with a provisional
@@ -106,52 +106,19 @@
 //! checkpoint, the incomplete line a search started after the signal gives in the range solved in order, and the
 //! range ends there.  Time and node limits are each search's own, per game and invocation, as always.
 //!
-//! # The wall
+//! # The clock
 //!
-//! `--game-hours H` ([`SolveOptions::game_limit`]) bounds how long one game's own search may take, to find the first
-//! game that takes more than H hours on the machine (the *wall*) and stop there.  A game's own search is the time it
-//! has been the head of the window with its search running, summed over the invocations that searched it.  The chain
-//! waits for the head and for no other game; a search behind it is suspended, or shares the threads that the head
-//! leaves free, so the time it spends there is not what the game costs, and the search's elapsed time in its
-//! checkpoint (which counts it) would end a run at a game that follows a dear one.  The driver keeps the head's clock
-//! ([`clock`](super::clock)): it adds the time between its looks while the head's search runs, writes it beside the
-//! game's checkpoint every checkpoint interval and when the search ends, and reads it back when a search starts with a
-//! checkpoint to resume, so that a spot interruption, a new machine or a rerun goes on from it.
+//! A game's own search is the time it has been the head of the window with its search running, summed over the
+//! invocations that searched it; its line records it as `seconds.own`.  The chain waits for the head and for no other
+//! game; a search behind it is suspended, or shares the threads that the head leaves free, so the time it spends there
+//! is not what the game costs, and the search's elapsed time in its checkpoint (which counts it) would overstate the
+//! cost of a game that follows a dear one.  The driver keeps the head's clock ([`clock`](super::clock)): it adds the
+//! time between its looks while the head's search runs, writes it beside the game's checkpoint every checkpoint
+//! interval and when the search ends without completing, and reads it back when a search starts with a checkpoint to
+//! resume, so that a spot interruption, a new machine or a rerun goes on from it.
 //!
-//! When the head's clock reaches the limit, the driver stops the head's search, and once the search has ended the
-//! range ends as it does at a stop signal: every search in flight is stopped with its final checkpoint, and nothing is
-//! recorded for the head, not even an incomplete line (the games before it are recorded already).
-//! [`RangeSummary::walled`] names the head and its clock.  Run again with a larger limit, the head resumes from its
-//! checkpoint and its clock.
-//!
-//! The driver looks at the clock only when it wakes, every tick or at an event, so the head's search may end before
-//! the stop reaches it.  A search that completed is concluded like any other and the range goes on, as a search that
-//! ends before the engine looks at its time limit completes.  One that a limit of its own stopped has its final
-//! checkpoint, and is at the wall all the same.  At each look the driver counts the time since the last look as the
-//! head's search before it takes in the event that woke it, so a search whose end arrives once its clock has reached
-//! the limit has passed the wall, however late the driver wakes.
-//!
-//! # Past limits
-//!
-//! With [`SolveOptions::keep_going`] (`--keep-going`) a game whose search a time or node limit stops does not end the
-//! range.  Its best game so far is recorded as an unfinished line, its checkpoint is kept, and the next game goes on
-//! from that game as a seed: the seed is any promotable set, so it cannot make a result wrong.  What the unfinished
-//! game is not is proven, so the next game takes nothing that rests on its being optimal ([`Prev::proven`]): no
-//! ceiling `n + score(n − 1)` (a search needs its own exhaustion to be proven, or a ceiling from a proven game after
-//! it), no prime formula (a prime game is searched), and the tripwire that a score above that ceiling proves the
-//! game before it not optimal is not made.  A repeat of an earlier search rests on that earlier game, which is in the
-//! file as a completed one or is not repeated, so it is as before.  The games are solved one at a time, since a game
-//! that goes on from a game in flight cannot know whether to take its ceiling.
-//!
-//! A rerun passes over the games the file holds only unfinished lines of, seeding the game after the last of them
-//! with its best game (the best of its lines: a search started again can end below an earlier one), unless `retry` is
-//! set, which searches them again (each from its checkpoint, if it has one).  With `retry_improved` an unfinished game
-//! is searched again only if the game before it, as it is now (the file's, or one this run has just searched again),
-//! has more to give than it had when the unfinished line was made: it is proven and the line's was not, or its best game
-//! scores more than the line's seed, or the line had none.  That is how a script goes over games that were made in
-//! blocks apart, so that each sees the one before it: a block's first game saw none, and its first game proven gives
-//! the next the ceiling.  The passing over happens before a game enters the window (it costs no setup).  A signal still
-//! ends the range, but its game gets no line, so that a rerun resumes it instead of passing it over.
+//! At each look the driver counts the time since the last look as the head's search before it takes in the event that
+//! woke it, so a search whose end arrives is counted up to the moment the driver wakes, however late that is.
 //!
 //! # Tracing
 //!
@@ -160,9 +127,8 @@
 //! whether it has a seed, its ceiling), a search's workers changed (`workers n=N a->b`: given, given back, reclaimed,
 //! or suspended at 0), a hint, a deferral, a search done (with the nodes its near-repeat cut cut, if it had one), what
 //! a conclusion told the next game's running search (its ceiling, the bound of the near-repeat cut if it was armed,
-//! and how long that took), a game concluded, the wall reached.  It is
-//! how the policy's decisions were followed on the laptop, and how they are to be followed on a machine of many
-//! threads.
+//! and how long that took), a game concluded.  It is how the policy's decisions were followed on the laptop, and how
+//! they are to be followed on a machine of many threads.
 //!
 //! [`Control::set_ceiling`]: crate::engine::Control::set_ceiling
 //! [`Control::stop`]: crate::engine::Control::stop
@@ -170,15 +136,15 @@
 mod allot;
 
 use super::{
-    ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev,
-    stored_unfinished, Before, Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev,
-    RangeSummary, SearchSetUp, SetUp, SolveOptions, Wall,
+    ceiling, clock, conclude_game, discard_checkpoint, search_cap, set_up, shared_spill_dir, stored_prev, Before,
+    Context, Derived, Earlier, Failure, Found, GameResult, Go, Job, Outcome, Prev, RangeSummary, SearchSetUp, SetUp,
+    SolveOptions,
 };
 use crate::accelerate::prime_shortcut;
 use crate::engine::{self, Status, WORKER_STACK_SIZE};
 use crate::game::Optimal;
 use crate::known::Known as KnownGames;
-use crate::results::{BuiltOn, ResultsFile};
+use crate::results::ResultsFile;
 use crate::search::Problem;
 use allot::{allot, Grant, Load, Need, TICK};
 use std::collections::BTreeMap;
@@ -198,7 +164,7 @@ pub(super) struct Range<'a> {
     pub(super) before: Before,
     /// The known sources: the table the scores are confirmed against, and, with `--use-prev`, what the games draw on.
     pub(super) known: &'a KnownGames<'a>,
-    /// The results file: its completed games are passed over, and the others appended to it.
+    /// The results file: its completed games are skipped, and the others appended to it.
     pub(super) results: Option<&'a mut ResultsFile>,
 }
 
@@ -278,14 +244,11 @@ struct Game {
     stage: Stage,
     /// Its own time so far: its setup, its repeat lookup and its search.
     own: Duration,
-    /// Its wall clock, its own search time: the time it has been the head with its search running, over every
-    /// invocation (see "The wall").  The wall (`--game-hours`) and the game's line (`seconds.own`) read it.
+    /// Its clock, its own search time: the time it has been the head with its search running, over every invocation
+    /// (see "The clock").  The game's line (`seconds.own`) reads it.
     headed: Duration,
     /// What was last written to its clock file.
     headed_kept: Duration,
-    /// Whether its search has been stopped at the wall: the range ends at it once the search has ended, unless the
-    /// search completed first (see "The wall").
-    stopped_at_wall: bool,
     /// The sender of its go while its thread may wait for one; dropping it cancels the game's search.
     go: Option<Sender<Go>>,
 }
@@ -456,19 +419,6 @@ impl Seed<'_> {
     }
 }
 
-/// Whether an unfinished search that had `built_on` from the game of `n − 1` is to be tried again now that the game is
-/// `last` (`retry_improved`, see "Past limits"): it has more to give than it had.  With no game of `n − 1` there is
-/// nothing new; a game of `n − 1` after none is new; a proven game is new after an unproven one, and an unproven game
-/// is new if its score is higher than the seed's was.
-fn improved(last: Option<&Prev>, built_on: Option<BuiltOn>) -> bool {
-    let Some(last) = last else { return false };
-    match built_on {
-        None => true,
-        Some(on) if on.proven => false,
-        Some(on) => last.proven || last.score > on.score,
-    }
-}
-
 /// The sum of `numbers`: a game's score, of its moves, or a promotion sum.
 fn sum(numbers: &[u32]) -> u64 {
     numbers.iter().map(|&k| u64::from(k)).sum()
@@ -506,10 +456,8 @@ struct Window<'a> {
 
 impl<'a> Window<'a> {
     fn new(range: Range<'a>, opts: &'a SolveOptions, earlier: &'a mut Earlier, events: Sender<Event>) -> Self {
-        // With one thread there is none to run a second game on, and a range that keeps going past limits solves its
-        // games one after another: a game cannot go on from a game in flight until it knows whether that game is
-        // proven (see "Past limits").
-        let width = if opts.threads <= 1 || opts.keep_going { 1 } else { opts.window.max(1) };
+        // With one thread there is none to run a second game on.
+        let width = if opts.threads <= 1 { 1 } else { opts.window.max(1) };
         let last = match &range.before {
             Before::Given(prev) => Some(prev.clone()),
             Before::Run | Before::None => None,
@@ -564,18 +512,12 @@ impl<'a> Window<'a> {
             } else {
                 received.recv().ok()
             };
-            // The time since the last look was spent with the head's search as it was before this event, so a clock
-            // that has reached the limit by now reached it while the search ran: the search is stopped at the wall
-            // before the event, which may be its end, is taken in.
+            // The time since the last look was spent with the head's search as it was before this event, which may be
+            // its end: the clock is brought up to date before the event is taken in.
             let now = Instant::now();
             self.advance_clock(now);
-            self.stop_at_wall();
             if let Some(event) = event {
                 self.handle(event);
-            }
-            if let Some(wall) = self.walled() {
-                self.summary.walled = Some(wall);
-                return Ok(());
             }
             if now >= tick {
                 self.sample();
@@ -591,37 +533,11 @@ impl<'a> Window<'a> {
         self.results.as_deref().is_some_and(|file| file.completed(n).is_some())
     }
 
-    /// The game of the results file that the range passes over at the head `n`, as the previous game of the one after
-    /// it: a completed game, or, when the range keeps going past limits, the best game of an unfinished search, which is
-    /// a seed and not a proven game.  Not one that `retry` searches again, nor one that `retry_improved` does because the
-    /// game before it, `last`, has improved.
-    fn passed_over(&self, n: u32) -> Option<Prev> {
-        let file = self.results.as_deref()?;
-        if let Some(done) = stored_prev(file, n) {
-            return Some(done);
-        }
-        if !self.opts.keep_going || self.opts.retry {
-            return None;
-        }
-        let seed = stored_unfinished(file, n)?;
-        // What the game had is what its latest attempt had, not the attempt that scored best: a search started again
-        // can end below an earlier one.
-        let latest = file.last_attempt(n)?;
-        if self.opts.retry_improved && improved(self.last.as_ref(), latest.built_on) {
-            return None;
-        }
-        Some(seed)
-    }
-
-    /// Passes over the games of the results file at the head, each the previous game of the one after it.
+    /// Skips the games of the results file at the head, each the previous game of the one after it.
     fn skip_settled(&mut self) {
         while self.next <= self.hi {
-            let Some(stored) = self.passed_over(self.next) else { break };
-            if stored.proven {
-                self.summary.skipped += 1;
-            } else {
-                self.summary.passed_over += 1;
-            }
+            let Some(stored) = self.results.as_deref().and_then(|file| stored_prev(file, self.next)) else { break };
+            self.summary.skipped += 1;
             self.last = Some(stored);
             self.next += 1;
         }
@@ -631,12 +547,6 @@ impl<'a> Window<'a> {
     fn before(&self, n: u32) -> Before {
         if n == self.lo {
             return self.first.clone();
-        }
-        if self.opts.keep_going {
-            // Solved one at a time, from the head: the game before it is settled, by this run or by the file, proven or
-            // not, and the setup is told which (the prime formula needs a proven game).
-            debug_assert_eq!(n, self.next, "a range that keeps going enters only the head");
-            return self.last.clone().map_or(Before::None, Before::Given);
         }
         match self.results.as_deref().and_then(|file| stored_prev(file, n - 1)) {
             Some(prev) => Before::Given(prev),
@@ -656,7 +566,6 @@ impl<'a> Window<'a> {
                     own: Duration::ZERO,
                     headed: Duration::ZERO,
                     headed_kept: Duration::ZERO,
-                    stopped_at_wall: false,
                     go: None,
                 };
                 self.games.insert(n, game);
@@ -699,29 +608,14 @@ impl<'a> Window<'a> {
     /// free.  Returns whether the range has ended: every game concluded, or one that did not complete.
     fn settle(&mut self, on_game: &mut dyn FnMut(&GameResult)) -> Result<bool, String> {
         loop {
-            // A range that keeps going passes over first: whether a game is passed over depends on the game before it
-            // (`retry_improved`), which is known only once the games before it have been.
-            if self.opts.keep_going {
-                self.skip_settled();
-                self.entering = self.entering.max(self.next);
-            }
             self.enter();
             self.look_up();
-            if !self.opts.keep_going {
-                self.skip_settled();
-            }
+            self.skip_settled();
             if self.next > self.hi {
                 return Ok(true);
             }
             let n = self.next;
             let Some(result) = self.conclude_head(n)? else { return Ok(false) };
-            if !result.completed && self.opts.keep_going && engine::stop_signal().is_some() {
-                // A signal stopped the search, not its limit: the game gets no line (as at the wall), so that a rerun
-                // resumes it from its checkpoint rather than passing it over as one that spent its limit.
-                self.trace(format_args!("stopped n={n} by a signal"));
-                self.summary.stopped_at = Some(n);
-                return Ok(true);
-            }
             if let Some(file) = self.results.as_deref_mut() {
                 file.append(&result)?;
             }
@@ -729,24 +623,13 @@ impl<'a> Window<'a> {
             self.trace(format_args!("concluded n={n}"));
             self.summary.solved += 1;
             if !result.completed {
-                if !self.opts.keep_going {
-                    self.summary.stopped_at = Some(n);
-                    return Ok(true);
-                }
-                // Its checkpoint stays, for a retry.  The next game goes on from its best game, as a seed.
-                self.summary.unfinished += 1;
-            } else {
-                discard_checkpoint(self.opts, n);
+                // Its checkpoint stays, for the next run.
+                self.summary.stopped_at = Some(n);
+                return Ok(true);
             }
+            discard_checkpoint(self.opts, n);
             self.earlier.add_result(&result);
-            let mut prev = Prev::from_result(&result);
-            if !result.completed {
-                // A search started again can end below an earlier one the file records: the better seeds the next game.
-                let file = self.results.as_deref();
-                if let Some(best) = file.and_then(|file| stored_unfinished(file, n)).filter(|b| b.score > prev.score) {
-                    prev = best;
-                }
-            }
+            let prev = Prev::from_result(&result);
             self.tell(n + 1, &prev);
             self.last = Some(prev);
             // The conclusion was the old head's: the next head's clock counts from here.
@@ -1013,7 +896,7 @@ impl<'a> Window<'a> {
         // The ceiling is the one that a concluded game before it gives, or the bounds store's upper bound of the board.
         let (seed, cap, given) = match self.known_before(n) {
             Known::Final(prev) => {
-                (seeds.then(|| prev.moves.clone()), search_cap(set, n, prev.cap_score(), self.opts), None)
+                (seeds.then(|| prev.moves.clone()), search_cap(set, n, Some(prev.score), self.opts), None)
             }
             Known::Provisional(before) if seeds => {
                 let moves = before.moves();
@@ -1038,10 +921,10 @@ impl<'a> Window<'a> {
         if n == self.next {
             self.advance_clock(now);
         }
-        // The game before it, if it is concluded and proven: the game of the near-repeat cut (`near_repeat`).  A search
-        // started before then does not cut by it.
-        let proven = match self.known_before(n) {
-            Known::Final(prev) if prev.proven => Some(prev.clone()),
+        // The game before it, if it is concluded: the game of the near-repeat cut (`near_repeat`).  A search started
+        // before then does not cut by it.
+        let concluded = match self.known_before(n) {
+            Known::Final(prev) => Some(prev.clone()),
             _ => None,
         };
         let Some(game) = self.games.get_mut(&n) else { return };
@@ -1050,7 +933,7 @@ impl<'a> Window<'a> {
         game.headed_kept = game.headed;
         if let Some(go) = game.go.take() {
             // The game's thread waits for it.
-            let _ = go.send(Go { seed, finder_seed, cap, threads, proven });
+            let _ = go.send(Go { seed, finder_seed, cap, threads, concluded });
         }
         if let Stage::Search(_, plan) = &mut game.stage {
             *plan = Plan::Search(Search::Running(Run::new(threads, now, given)));
@@ -1118,8 +1001,8 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Brings the head's wall clock up to `now` if its search runs (the time since the last look is its own search),
-    /// and keeps it in its file once a checkpoint interval has passed since it was last kept.
+    /// Brings the head's clock up to `now` if its search runs (the time since the last look is its own search), and
+    /// keeps it in its file once a checkpoint interval has passed since it was last kept.
     fn advance_clock(&mut self, now: Instant) {
         let since = now.saturating_duration_since(self.clock_at);
         self.clock_at = self.clock_at.max(now);
@@ -1134,36 +1017,13 @@ impl<'a> Window<'a> {
         }
     }
 
-    /// Writes game `n`'s wall clock to its file, if it has run since it was last written.
+    /// Writes game `n`'s clock to its file, if it has run since it was last written.
     fn keep_clock(&mut self, n: u32) {
         let Some(game) = self.games.get_mut(&n) else { return };
         if game.headed > game.headed_kept {
             game.headed_kept = game.headed;
             clock::keep(self.opts, n, game.headed);
         }
-    }
-
-    /// Stops the head's search once its wall clock has reached the limit (see "The wall"): the range ends at the head
-    /// when the search has ended, unless it completed first ([`walled`](Self::walled)).
-    fn stop_at_wall(&mut self) {
-        let Some(limit) = self.opts.game_limit else { return };
-        let n = self.next;
-        let Some(game) = self.games.get_mut(&n) else { return };
-        let Stage::Search(set, Plan::Search(Search::Running(_))) = &game.stage else { return };
-        if game.stopped_at_wall || game.headed < limit {
-            return;
-        }
-        set.job.control().stop();
-        game.stopped_at_wall = true;
-        let held = game.headed;
-        self.trace(format_args!("wall n={n} held={held:?}"));
-    }
-
-    /// The head, if its search was stopped at the wall and has ended without completing.
-    fn walled(&self) -> Option<Wall> {
-        let game = self.games.get(&self.next)?;
-        let ended = matches!(&game.stage, Stage::Search(_, Plan::Search(Search::Done(outcome))) if !outcome.completed);
-        (game.stopped_at_wall && ended).then_some(Wall { n: self.next, held: game.headed })
     }
 
     /// Samples every running search's engine.
@@ -1178,11 +1038,11 @@ impl<'a> Window<'a> {
 
 /// What the conclusion of game `n − 1`, as `prev`, gives the search of game `n`, set up as `set`, whether it runs or
 /// waits for its go (step 5 of the module docs): its ceiling ([`search_cap`]), the seed of the final game as a hint
-/// ([`Job::hint`]), and the near-repeat cut by `prev`, where the search has the tactic and `prev` is proven and assumes
+/// ([`Job::hint`]), and the near-repeat cut by `prev`, where the search has the tactic and `prev` assumes
 /// nothing ([`Job::arm`]).  Returns the ceiling given, if any, and the cut's bound if this armed the cut, or why it could
 /// not be set up.
 fn told(set: &SearchSetUp, n: u32, prev: &Prev, opts: &SolveOptions) -> (Option<u64>, Result<Option<u64>, String>) {
-    let cap = search_cap(set, n, prev.cap_score(), opts);
+    let cap = search_cap(set, n, Some(prev.score), opts);
     if let Some(cap) = cap {
         set.job.control().set_ceiling(cap);
     }
@@ -1218,37 +1078,11 @@ mod tests {
         Status { live, running: live - idle, idle, queued: 0, idle_time, capacity, best: 0, nodes: 0, all_nodes: 0 }
     }
 
-    fn game(score: u64, proven: bool) -> Prev {
-        Prev {
-            moves: Vec::new(),
-            score,
-            source: super::super::PrevSource::Run,
-            proof: None,
-            assumes: Default::default(),
-            proven,
-        }
-    }
-
-    #[test]
-    fn an_unfinished_game_is_tried_again_when_the_game_before_it_has_more_to_give() {
-        let on = |score, proven| Some(BuiltOn { score, proven });
-        // Nothing before it now: nothing new, whatever it had.
-        assert!(!improved(None, None) && !improved(None, on(5, false)));
-        // It had no game before it, and now there is one, proven or not.
-        assert!(improved(Some(&game(5, false)), None) && improved(Some(&game(5, true)), None));
-        // It had a proven game: nothing can be more.
-        assert!(!improved(Some(&game(5, true)), on(5, true)) && !improved(Some(&game(9, true)), on(5, true)));
-        // It had an unproven game: a proven one is new, and an unproven one if it scores more.
-        assert!(improved(Some(&game(5, true)), on(5, false)));
-        assert!(improved(Some(&game(6, false)), on(5, false)));
-        assert!(!improved(Some(&game(5, false)), on(5, false)) && !improved(Some(&game(4, false)), on(5, false)));
-    }
-
     /// A near repeat: game 1083 poses nearly the problem of 1082, and the near-repeat cut by 1082 shortens its search
     /// (`tests/tripwires.rs`, `NEAR_REPEATS`).
     const NEAR: u32 = 1083;
 
-    /// Game `n` as the run concludes a search of it: the table's game, proven, and assuming nothing.
+    /// Game `n` as the run concludes a search of it: the table's game, assuming nothing.
     fn concluded(n: u32) -> Prev {
         let optimal = Optimal::built_in();
         Prev {
@@ -1257,7 +1091,6 @@ mod tests {
             source: super::super::PrevSource::Run,
             proof: Some(crate::results::Proof::Exhausted),
             assumes: Default::default(),
-            proven: true,
         }
     }
 
@@ -1279,7 +1112,7 @@ mod tests {
         let control = set.job.control();
         control.set_workers(0);
         thread::scope(|scope| {
-            let go = Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: None };
+            let go = Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, concluded: None };
             let search = scope.spawn(|| set.job.search(go, opts));
             // Its engine runs, with no worker: nothing of the tree has been searched.
             let since = Instant::now();
@@ -1325,25 +1158,27 @@ mod tests {
         assert!(cut.stats.nodes < uncut.stats.nodes, "{} steps with the cut, {}", cut.stats.nodes, uncut.stats.nodes);
     }
 
-    /// The near-repeat cut is armed only by a game that is proven and assumes nothing, only with the tactic, and only
-    /// once: not by the best game of an unfinished search (a provisional game bounds nothing), nor by a game assumed
-    /// optimal; a search armed with its go is not armed again by a conclusion.
+    /// The near-repeat cut is armed only by a game that assumes nothing, only with the tactic, and only once: not by a
+    /// game assumed optimal; a search armed with its go is not armed again by a conclusion.
     #[test]
-    fn the_near_repeat_cut_is_armed_once_by_a_proven_game_that_assumes_nothing() {
+    fn the_near_repeat_cut_is_armed_once_by_a_game_that_assumes_nothing() {
         let prev = concluded(NEAR - 1);
         let bound = prev.score - crate::board::search_problem(NEAR - 1).unwrap().1;
         let opts = SolveOptions { threads: 1, ..SolveOptions::default() };
         let set = search_set_up(NEAR, &prev, &opts);
-        let unfinished = Prev { proven: false, proof: None, ..prev.clone() };
         let assumed = Prev { assumes: [crate::results::assumed_optimal(NEAR - 1)].into(), ..prev.clone() };
-        assert_eq!(set.job.arm(&unfinished), Ok(None));
         assert_eq!(set.job.arm(&assumed), Ok(None));
         assert_eq!(set.job.arm(&prev), Ok(Some(bound)));
         assert_eq!(set.job.arm(&prev), Ok(None));
         // Armed with its go, as a search that starts once the game before it is concluded is, then told of that game.
         let set = search_set_up(NEAR, &prev, &opts);
-        let go =
-            Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: Some(prev.clone()) };
+        let go = Go {
+            seed: Some(prev.moves.clone()),
+            finder_seed: None,
+            cap: None,
+            threads: 1,
+            concluded: Some(prev.clone()),
+        };
         let outcome = set.job.search(go, &opts).unwrap();
         assert!(
             outcome.completed && outcome.near_repeat_cut.is_some_and(|nodes| nodes > 0),
@@ -1356,8 +1191,13 @@ mod tests {
         off.tactics.search.near_repeat = false;
         let set = search_set_up(NEAR, &prev, &off);
         assert_eq!(set.job.arm(&prev), Ok(None));
-        let go =
-            Go { seed: Some(prev.moves.clone()), finder_seed: None, cap: None, threads: 1, proven: Some(prev.clone()) };
+        let go = Go {
+            seed: Some(prev.moves.clone()),
+            finder_seed: None,
+            cap: None,
+            threads: 1,
+            concluded: Some(prev.clone()),
+        };
         assert_eq!(set.job.search(go, &off).unwrap().near_repeat_cut, None);
     }
 

@@ -30,10 +30,9 @@ How far each kind of proof reaches:
 
 "What supports the scores", below, gives the evidence for each.
 
-**`explore.jsonl` is not a chain, and never goes into `optimal.jsonl.gz`.**  The file of a sweep ([the frame solver's
-README, "Keeping going past limits, and the
-sweep"](../solver/frame/README.md#keeping-going-past-limits-and-the-sweep); `solver/tools/cloud/sweep.sh`) merges the
-games of many blocks of consecutive games, each given a limited search.  So it has:
+**A file with holes is not a chain, and never goes into `optimal.jsonl.gz`.**  An older `solve` could go on past a
+limit, and so could merge the games of many blocks of consecutive games, each given a limited search; the verifiers
+still read the files it wrote ([verifiers.md](../solver/docs/verifiers.md)).  Such a file has:
 
 * games with only an unfinished search, which is a lower bound and no proof;
 * games that no block reached;
@@ -41,8 +40,8 @@ games of many blocks of consecutive games, each given a limited search.  So it h
 * several lines of one game.
 
 Each completed game in it is proven by its own proof, given what it assumes, in the frame model.  The file is evidence
-for those games alone, and a game that follows a hole may rest on nothing the chain would have given it.  It is not
-committed here: a sweep's results go to a file of their own, with a notebook entry saying what they are.
+for those games alone, and a game that follows a hole may rest on nothing the chain would have given it.  None is
+committed here.
 
 ## optimal.jsonl.gz
 
@@ -274,8 +273,7 @@ bound is the frame model's, carried between games as [the
 theory](../docs/theory/search-rules.md#bounds-carried-between-games) says.
 
 A line is a bound, not a game of `taxman solve`.  It is not in the schema of the results lines, and an export adds
-no line of a game that `optimal.jsonl.gz` has.  It is not `explore.jsonl`'s kind of file either: that one holds the
-sweep's games.
+no line of a game that `optimal.jsonl.gz` has.
 
 * `taxman solve --use-prev` draws on it: a game it has proven is recorded with no search, and its other games seed and
   end the searches ([the frame solver's README, "Known games"](../solver/frame/README.md#known-games)).

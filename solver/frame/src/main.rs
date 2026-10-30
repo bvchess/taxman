@@ -3,14 +3,14 @@
 //! The subcommands are in `commands.rs`; the flag parser, the error type and the output macros they share are in
 //! `cli.rs`.  Every subcommand is a plain function of the arguments after its name.  A command
 //! that fails prints `error: ...` and exits with status 1; a bad command line prints the usage and exits with
-//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; a `solve` that a game
-//! passing the wall (`--game-hours`) ended exits with status 4; `certify` exits with status 2 when it finds a game that
-//! beats a recorded score.  `verify-certificates` fails with status 1 on the first line that is not what it says.
+//! status 2; a run that SIGINT or SIGTERM stopped (see `solve`) exits with 128 plus the signal; `certify` exits with
+//! status 2 when it finds a game that beats a recorded score.  `verify-certificates` fails with status 1 on the first
+//! line that is not what it says.
 
 mod cli;
 mod commands;
 
-use cli::{errln, outln, CliError, CliResult, WALL_STATUS};
+use cli::{errln, outln, CliError, CliResult};
 use std::process::ExitCode;
 use taxman::engine;
 use taxman::search::{finder, gate_trial, SearchTactics, CONFLICT_BRANCHING_GAP, MAX_GATE, PROFILE_DEPTH};
@@ -49,23 +49,7 @@ commands:
       --node-limit N           stop a game's search after N nodes (keeps its checkpoint)
                                SIGINT or SIGTERM stops the search the same way (exit status 130 or 143);
                                a second one kills the process.  One process at a time uses a checkpoint DIR.
-      --keep-going             a game that a limit stops does not end the range: its best game so far is recorded
-                               as an unfinished line, and the next game goes on from it as a seed alone (no
-                               ceiling, no prime formula, nothing that rests on its being optimal); the games are
-                               solved one at a time.  A rerun passes over the games --out holds only unfinished
-                               lines of; a signal still ends the range, with nothing recorded for its game
-      --retry                  with --keep-going, search again the games --out holds only unfinished lines of
-                               (each from its checkpoint), as a pass with a longer limit does
-      --retry-improved         with --keep-going, search again only the games --out holds only unfinished lines of
-                               whose game before it now has more to give than when they were tried: it is
-                               proven, or has a better best game, or they had none (the others are passed over)
-      --pass N                 record N as the pass in the options of every line written (for a script that
-                               goes over the games more than once); it changes nothing else
-      --game-hours H           the wall: stop the range at the first game whose own search (the time it is the
-                               first of the window, summed over runs and kept in DIR/nNNNN.clock) passes H hours:
-                               every search stops with a final checkpoint, nothing is recorded for that game, the
-                               line `wall at N after H hours` is printed and the exit status is 4
-      --profile DIR            keep a profile of each game's search in DIR/nNNNN.profile.jsonl: where its steps
+      --profile DIR           keep a profile of each game's search in DIR/nNNNN.profile.jsonl: where its steps
                                go, by node near the root, by number of promotions and by checkpoint interval, and
                                its open units at each checkpoint (solver/tools/read_profile.py reads it).  It
                                changes no search and no result, and is no part of a checkpoint
@@ -168,8 +152,6 @@ fn main() -> ExitCode {
             errln!("counterexample: {message}");
             ExitCode::from(2)
         }
-        // `solve` has said where on stdout.
-        Err(CliError::Wall) => ExitCode::from(WALL_STATUS),
     }
 }
 

@@ -42,7 +42,7 @@ if ! command -v cargo >/dev/null 2>&1 && [ -r "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
-# The awk function commas(x) that the awk programs of wall.sh status include (as "$AWK_COMMAS"): the
+# The awk function commas(x) that the awk programs of status.sh include (as "$AWK_COMMAS"): the
 # whole number x with a comma between each three digits, 6971841261 as 6,971,841,261; any other text (a `-`) as it is.
 # The one definition of it.
 AWK_COMMAS='

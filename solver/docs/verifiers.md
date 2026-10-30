@@ -19,7 +19,7 @@ each line's proof and assumptions again, so that a hand edit cannot change them.
   ([the reference, "Citing a known source"](REFERENCE.md#citing-a-known-source)): the built-in table, the committed
   chain and the bounds store of the repository, read as they are, since their own verifiers check them.  Opening a
   results file for `--out` runs the same checks, with the sources that `--use-prev` draws on.
-* **Both verifiers accept a file with holes**, such as a `--keep-going` run's or the sweep's `explore.jsonl`, whose
+* **Both verifiers accept a file with holes**, such as one an older `solve` wrote when it went on past limits, whose
   games may have no line or only incomplete ones.  They check each line against what it rests on in the same file:
   * a ceiling (`setup.cap`), or a `cap` or `prime_formula` proof, needs the game of n − 1 completed in the file;
   * a repeat needs the game it repeats completed on an earlier line;

@@ -208,16 +208,14 @@ every second line of the Java fixtures), and the comment on each says what the w
   * a repeat of a game still in flight (301 of 300) names it, on a later line;
   * a range stopped by a node limit ends at its first unfinished game, with the lines before it in order, and completes
     when run again;
-  * a game that passes the wall (`game_limit`) ends the range with no line for it, its checkpoint and clock kept, walls
-    again at once under the same limit from the clock it left, and completes under none, leaving no clock, with a line
-    whose `seconds.own` is no less than the clock it went on from (the command through the binary is in `tests/cli.rs`,
-    the clock file's unit tests in `src/solver/clock.rs`);
+  * a game stopped by a node limit keeps its checkpoint and its clock, stops again from the clock it left, and
+    completes under no limit, leaving no clock, with a line whose `seconds.own` is no less than the clock it went on
+    from (the clock file's unit tests are in `src/solver/clock.rs`);
   * a score that is not the table's fails the range at that game, with the lines before it, as a window of one does;
   * the near-repeat cut of a search that runs when the game before it is concluded (unit tests in
     `src/solver/window.rs`): game 1083, held at no worker beside 1082, is armed by the conclusion of 1082, picks the cut
     up at its first unit, cuts, and ends with the table's score, in fewer steps than without the tactic, which arms
-    nothing; the cut is armed once, by a proven game that assumes nothing, never by a provisional game or one assumed
-    optimal;
+    nothing; the cut is armed once, by a game that assumes nothing, never by one assumed optimal;
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.
@@ -227,9 +225,8 @@ every second line of the Java fixtures), and the comment on each says what the w
   4,000) give each of the small games one answer and some of them other trees; a gate set after the generation it was
   decided from is refused.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
-  (`solver/tools/cloud/test/run.sh`: the wall and the ledger through `chain.sh`, `wall-node.sh` through each way a run
-  ends, `wall.sh` through a launch, a stop and a clean-up, against a stand-in for the aws CLI; [solver/docs/runbook/wall.md, "What
-  was tested, and what can go wrong"](../runbook/wall.md#what-was-tested-and-what-can-go-wrong)), and the build cache
+  (`solver/tools/cloud/test/run.sh`: the date and the ledger through `chain.sh`, the lock of `run.sh`, and `status.sh`
+  on a chain on another machine, against stand-ins for the aws CLI and ssh), and the build cache
   and the release suite that runs on EC2 before binaries are stored (`solver/tools/cloud/test/test_build_cache.py`,
   `test_run_tests.py` and `test_setup.py`, run with `python3 -I`; [runbook/build-cache.md](../runbook/build-cache.md)).
 * **Integrity of results** (`tests/integrity.rs`, `tests/results.rs`, `tests/solver.rs`): a previous game that is not
@@ -247,17 +244,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   (`stats.near_repeat_cut`: game 256 after 255 cuts one, game 21 after 20 is armed and cuts none, and the first game of
   a run and a run without the tactic have no such key), both verifiers accept the files and count the shortened search,
   and both refuse the key on a prime game or with a value that is no count.
-* **Keeping going past limits** (`tests/keep_going.rs`, `tests/results.rs`, `tests/sweep.rs`,
-  `solver/tools/test_sweep_plan.py`, `solver/tools/cloud/test/run.sh sweep`):
-  * a range whose games all stop at a limit goes on, each game built on the best game of the one before it, with no
-    ceiling; a prime game after an unfinished one is searched, and after a proven one derived;
-  * a rerun passes over the unfinished games; `--retry` and `--retry-improved` search them again (the latter only where
-    the game before has gained, the rule also in a unit test of `window`), and the lines name the pass;
-  * both verifiers accept a file with holes and unfinished lines, and refuse a ceiling, a `cap` or `prime_formula`
-    proof, a changed score, moves or assumptions, or a later line, for a game built on one;
-  * the sweep's planner tiles a range into blocks of equal work and cuts the excerpts of the passes, and `sweep.sh` over
-    1301..1340 and 1411..1416 completes with both referees accepting the file, is stopped by a SIGTERM and resumed, and
-    settles a block's first game by the ceiling its neighbor gives in pass 2.
+* **Files with holes** (`tests/results.rs`): both verifiers accept a file with holes and unfinished lines, and refuse
+  a ceiling, a `cap` or `prime_formula` proof, a changed score, moves or assumptions, or a later line, for a game built
+  on one.  The solver no longer writes such a file, so the test makes its lines from games solved alone.
 * **Repeats** (`tests/same_search.rs`): the games that repeat an earlier search are found from the setups alone, and a
   chain concludes exactly those, with the scores of a chain that searches them, from n = 1 (1..300) and from a results
   file that a stopped run left; a game with a checkpoint is resumed, not repeated; a repeat assumes what the game it

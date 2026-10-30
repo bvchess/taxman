@@ -21,8 +21,7 @@ calibration.  The jobs link here instead of repeating them.
   `shutdown -h +MINUTES` in the user data, with MINUTES a little past the run's own deadline (`DEADLINE_HOURS`, [Cost
   guardrails](#cost-guardrails)).  Any shutdown (the timer, `POWEROFF`, the spot service) then terminates the instance,
   so a forgotten instance ends by itself.  The timer is the backstop that depends on no script.
-* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `wall`, `ledger`, `sweep`,
-  `certify`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
+* **Tag everything.**  Put `Project=taxman` and `Purpose=...` (`trial`, `prover`, `chain`, `ledger`, `certify`) on everything the launch creates that takes a tag: the instance, its volumes and spot request, a key pair,
   a security group.  The check at the end finds them by `Project`.
 * **Take the binaries from the build cache.**  A machine does not build what a machine has already built and tested.
   `setup.sh` takes the commit's release binaries from S3 ([build-cache.md](build-cache.md)) and, when the cache has
@@ -123,8 +122,7 @@ I=$(aws ec2 run-instances --instance-type $INSTANCE_TYPE --placement Availabilit
 ```
 
 The instance requires IMDSv2 (`HttpTokens=required`), which `spot-watch.sh` uses.  A job that starts itself adds its
-steps to the user data, as [the ledger's experiment](ledger.md) and [the
-sweep](sweep.md#launch-watch-stop-bring-the-results-home) do.  To launch from the console, set the same fields: the
+steps to the user data, as [the ledger's experiment](ledger.md) does.  To launch from the console, set the same fields: the
 image, the volume, no inbound rule, the instance profile, shutdown behavior "terminate", the timer in the user data,
 and the tags with a `Name`.  For SSH access, see [Steps through SSM, or SSH](#steps-through-ssm-or-ssh).
 
@@ -186,21 +184,19 @@ made.  `RELEASE_TESTS=1 solver/tools/cloud/setup.sh` puts the tested binaries in
 
 These variables bound a run.  `DEADLINE_HOURS`, `POWEROFF`, `BUDGET_HOURS` and `RUN_UNTIL` belong to `run.sh`, so
 `chain.sh`,
-`sweep.sh`, `prover.sh` and `certify.sh` read them; `GAME_HOURS` is `chain.sh`'s.  The table says what `chain.sh` does.
+`prover.sh` and `certify.sh` read them.  The table says what `chain.sh` does.
 
 | variable | effect |
 |---|---|
 | `DEADLINE_HOURS` | after that many hours from the first start (on a replacement machine, from its own first start: [Surviving a spot interruption](#surviving-a-spot-interruption)), `chain.sh` stops the solver cleanly with a final checkpoint and ends with status 3 |
 | `POWEROFF` | `done` powers the machine off when the range is complete; `always` powers it off whenever `chain.sh` ends for any reason, which needs passwordless `sudo`, as on both AMIs |
-| `GAME_HOURS` | the wall: the chain stops at the first game whose own search has passed that many hours, over every run of it, keeping every checkpoint and recording nothing for the game; the log says `wall at N after H hours`, and the status is 4 |
 | `BUDGET_HOURS` | instance-hours over every machine of the run, counted in the ledger in S3; the solver stops cleanly five minutes before they are used up, with status 3 like `DEADLINE_HOURS` |
 | `RUN_UNTIL` | a date in seconds since the epoch, treated like `BUDGET_HOURS` |
 
 Use `POWEROFF=always` for an unattended run, since an idle machine after an error or a deadline costs as much as a busy
 one.  `chain.sh` saves to `S3_DEST` before it powers off, which matters because a shutdown terminates the instance.
-[wall.md](wall.md) puts the budget and the date together with a group that restarts the machine.  The timer (a backstop
-that depends on no script), the tags and the cleanup are in the [rules for every launch](#rules-for-every-launch); a
-budget alert on the account, set before the first launch, is the other half.
+The timer (a backstop that depends on no script), the tags and the cleanup are in the [rules for every
+launch](#rules-for-every-launch); a budget alert on the account, set before the first launch, is the other half.
 
 ### Surviving a spot interruption
 
@@ -226,8 +222,8 @@ budget alert on the account, set before the first launch, is the other half.
    * **The deadline.**  `save.sh` does not save the deadline's file (`~/taxman-work/deadline` for `chain.sh`,
      `deadline.NAME` for the others, as `run.sh` names it), so a replacement machine starts a fresh
      deadline at its first start.  Give it `DEADLINE_HOURS` set to the hours that remain, so that the deadline falls
-     where the first one did.  A run that replacements continue by themselves does not count that way: its
-     `BUDGET_HOURS` and `RUN_UNTIL` live in S3 ([wall.md](wall.md)).
+     where the first one did.  `BUDGET_HOURS` and `RUN_UNTIL` do not count that way: they live in S3, in the ledger of
+     `run.sh`, and a replacement machine finds them there.
 
 ### Getting the results off the machine
 
@@ -259,8 +255,7 @@ nothing of the project remains, and delete the launch's security group.
 ## When something goes wrong
 
 Most failures leave a message in the logs of `~/taxman-work/logs/`; the table gives the cause and the remedy of each.  A
-job's own failures are in its section: the prover's error stop in [Watch, stop, resume](prover.md#watch-stop-resume),
-the run to the wall's in [What was tested, and what can go wrong](wall.md#what-was-tested-and-what-can-go-wrong), and a
+job's own failures are in its section: the prover's error stop in [Watch, stop, resume](prover.md#watch-stop-resume), and a
 counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#watch-stop-resume-and-a-counterexample).
 
 | what you see | cause | remedy |
@@ -275,6 +270,6 @@ counterexample to U in [Watch, stop, resume, and a counterexample](certify.md#wa
 | `DIR is on a memory filesystem: it would vanish with the instance (set TAXMAN_WORK)` | `/tmp` or `$TAXMAN_WORK` is tmpfs | set `TAXMAN_WORK` to a directory on EBS ([Storage](machine.md#storage)) |
 | `installing packages needs root or sudo (or SKIP_PACKAGES=1 if git, cc, python3 and curl are there)` | `setup.sh` runs as a user without sudo | run it as a user with sudo, or install those four and set `SKIP_PACKAGES=1` |
 | a step sent with `aws ssm send-command` runs as root, or its quoting is mangled | `send-command` runs as root, and `sudo -i` mangles a multi-line `bash -lc '...'` | put the step in a script file and run `sudo -u ec2-user -i bash FILE` ([Steps through SSM, or SSH](#steps-through-ssm-or-ssh)) |
-| the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain and the sweep, `pv` for the prover, `cert` for the certificates); if tmux is gone, the machine rebooted (next row) |
+| the SSH connection dropped | the run is in tmux | reconnect and `tmux attach -t NAME` (`tx` for the chain, `pv` for the prover, `cert` for the certificates); if tmux is gone, the machine rebooted (next row) |
 | the machine rebooted | tmux and the job are gone; the state is in `~/taxman-work`, and the build survives | run the job's command again (`chain.sh N`) |
 | `lock` of several percent on long games | the shared deque is contended | report it; fewer threads is the remedy at hand (`THREADS=96`) |

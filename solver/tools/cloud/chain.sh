@@ -21,17 +21,14 @@
 #            checkpoint): the script ends
 #   124      the deadline (DEADLINE_HOURS, the budget BUDGET_HOURS or the date RUN_UNTIL, whichever came first) stopped
 #            the solver, with a final checkpoint: the script ends
-#   4        THE WALL: a game's own search passed GAME_HOURS (`taxman solve --game-hours`).  Every search was stopped
-#            with a final checkpoint and nothing was recorded for the game: the script logs "wall at N after H
-#            hours" and ends
-#   1, 2     the solver reported an error (a refused checkpoint, a game that failed a check, ...): the script ends,
+#   1, 2    the solver reported an error (a refused checkpoint, a game that failed a check, ...): the script ends,
 #            nothing is retried, because the error would repeat; read chain.err
 #   other    a crash (abort, SIGKILL by the OOM killer): run again after 10 s.  MAX_FAILS passes in a row that add
 #            no line to the results file and last under five minutes end the script
 #
-# The script exits with 0 when the range is complete, 143 when stopped, 3 for the deadline, 4 for the wall, 1 otherwise.
-# How it ended is also the one line of $TAXMAN_WORK/chain.outcome (complete, stopped, "wall at N after H hours", the
-# deadline's reason, failed), for a script that supervises it (wall-node.sh).
+# The script exits with 0 when the range is complete, 143 when stopped, 3 for the deadline, 1 otherwise.  How it ended
+# is also the one line of $TAXMAN_WORK/chain.outcome (complete, stopped, the deadline's reason, failed), which
+# status.sh shows.
 #
 # Output: $LOGS/chain.out (the solver's result lines), chain.err (its progress lines), chain.log (this script).
 #
@@ -46,12 +43,9 @@
 #                        of the machine at 300 s, 0.7% at 60 s; SIGTERM still writes a final one)
 #   EXTRA_ARGS           more flags for `taxman solve`, e.g. "--mem-cap 100000", or "--use-prev": the chain then
 #                        draws on the known games of the checkout's results/ (the committed chain, the
-#                        proven boards of the bounds store) instead of searching for them (solver/docs/runbook/wall.md, "Launch, watch, stop, clean up")
+#                        proven boards of the bounds store) instead of searching for them
 #   MAX_FAILS            default 5
 #   CHAIN_TO             N, if not given as the argument (the solver goes up to 8191; solver/docs/runbook/chain.md, the item "Past 4095")
-#   GAME_HOURS           the wall: stop at the first game whose own search has taken more than this many hours in all,
-#                        over every run (`taxman solve --game-hours`; its clock is kept in the checkpoint directory,
-#                        so a run that resumes the game goes on from it).  Default: none
 #   DEADLINE_HOURS, BUDGET_HOURS, RUN_UNTIL, LEDGER_*, POWEROFF, S3_DEST, SAVE_EVERY: as in run.sh, which this script
 #                        and prover.sh share
 
@@ -74,8 +68,6 @@ esac
 # Without THREADS the solver uses every CPU it is allowed (in a container, the cgroup quota).
 thread_args=()
 [ -n "${THREADS:-}" ] && thread_args=(--threads "$THREADS")
-wall_args=()
-[ -n "${GAME_HOURS:-}" ] && wall_args=(--game-hours "$GAME_HOURS")
 WINDOW="${WINDOW:-4}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-300}"
 PROGRESS="${PROGRESS:-60}"
@@ -95,8 +87,7 @@ line_count() {
     if [ -r "$RESULTS" ]; then wc -l <"$RESULTS" | tr -d ' '; else echo 0; fi
 }
 
-log "chain 1-$to; threads: ${THREADS:-all available}; window $WINDOW; wall: ${GAME_HOURS:-none} hours;" \
-    "results $RESULTS; checkpoints $CKPT"
+log "chain 1-$to; threads: ${THREADS:-all available}; window $WINDOW; results $RESULTS; checkpoints $CKPT"
 env_report | tee -a "$LOGS/chain.log" >&2
 
 fails=0
@@ -113,8 +104,8 @@ while :; do
     # EXTRA_ARGS is a list of words on purpose.
     # shellcheck disable=SC2086
     run_child "$LOGS/chain.out" "$LOGS/chain.err" "$TAXMAN_BIN" solve "1-$to" ${thread_args[@]+"${thread_args[@]}"} \
-        ${wall_args[@]+"${wall_args[@]}"} --window "$WINDOW" --out "$RESULTS" \
-        --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" --progress "$PROGRESS" ${EXTRA_ARGS:-}
+        --window "$WINDOW" --out "$RESULTS" --checkpoint-dir "$CKPT" --checkpoint-interval "$CHECKPOINT_INTERVAL" \
+        --progress "$PROGRESS" ${EXTRA_ARGS:-}
     elapsed=$(($(date +%s) - started))
     log "the solver exited with status $status after ${elapsed}s"
 
@@ -134,14 +125,6 @@ while :; do
             log "stopped by $deadline_reason (a final checkpoint was written)"
             outcome="deadline"
             set_outcome "deadline: $deadline_reason"
-            break
-            ;;
-        4)
-            # The solver's line, `wall at N after H hours: ...`, is the last of its kind in chain.out.
-            wall="$(sed -n 's/^\(wall at [0-9]* after [0-9.]* hours\):.*/\1/p' "$LOGS/chain.out" | tail -n 1)"
-            log "${wall:-wall} (all searches stopped with a final checkpoint; nothing recorded for the game)"
-            outcome="wall"
-            set_outcome "${wall:-wall}"
             break
             ;;
         130 | 143)
@@ -189,6 +172,5 @@ case "$outcome" in
     complete) exit 0 ;;
     stopped) exit 143 ;;
     deadline) exit 3 ;;
-    wall) exit 4 ;;
     *) exit 1 ;;
 esac

@@ -1,10 +1,10 @@
-//! The wall clock of a game: how long its own search has run, kept between invocations (the wall `--game-hours` counts
-//! it, and a line records it as `seconds.own`; "The wall" in [`window`](super::window)).
+//! The clock of a game: how long its own search has run, kept between invocations (a line records it as `seconds.own`;
+//! "The clock" in [`window`](super::window)).
 //!
 //! The clock is a file beside the game's checkpoint, `n<NNNN>.clock`, holding the seconds the game has been the head of
 //! the window with its search running, summed over every invocation that searched it.  The checkpoint holds the
 //! search's own elapsed time too, but that counts the time a search waited behind an older game, suspended in the
-//! window, and the wall is about the time the chain waited for the game; so the clock is the driver's and the
+//! window, and `seconds.own` is about the time the chain waited for the game; so the clock is the driver's and the
 //! checkpoint's format is left as it is.  A clock is valid only beside the checkpoint it was kept with: a game that
 //! restarts from its beginning (no checkpoint) starts its clock again, so deleting a checkpoint by hand needs no second
 //! deletion.  A finished game's clock goes with its checkpoint ([`forget`], from `discard_checkpoint`).
@@ -19,8 +19,8 @@ use std::time::Duration;
 const MAX_SECONDS: f64 = 3.2e9;
 
 /// Game `n`'s clock as its search starts: what the last invocation kept, if the game has a checkpoint to resume, else
-/// zero (also for a file that does not say a number of seconds: the clock only bounds the run, and a lost reading
-/// makes the wall late, not early).
+/// zero (also for a file that does not say a number of seconds: the clock only reports the time, and a lost reading
+/// makes `seconds.own` too small).
 pub(super) fn resume(opts: &SolveOptions, n: u32) -> Duration {
     let (Some(checkpoint), Some(clock)) = (opts.checkpoint_file(n), opts.clock_file(n)) else { return Duration::ZERO };
     if !checkpoint.exists() {
@@ -42,7 +42,7 @@ fn read(path: &Path) -> Duration {
 
 /// Keeps `held` as game `n`'s clock, replacing the file whole (written aside and renamed, so a crash leaves the old
 /// reading or the new, never half of one).  Nothing happens without a checkpoint directory.  A failure is reported on
-/// stderr and the run goes on: the clock bounds the run and is not its result.
+/// stderr and the run goes on: the clock is a report and not a result.
 pub(super) fn keep(opts: &SolveOptions, n: u32, held: Duration) {
     let Some(path) = opts.clock_file(n) else { return };
     let aside = path.with_extension("clock.tmp");

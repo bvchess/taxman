@@ -84,8 +84,8 @@ quietly() {
 #   base       the instance-hours of the machines before that one; hours: base plus that machine's uptime then
 #   updated    when it was written
 # A machine that starts a run finds the ledger, takes its hours as the base of its own count (unless the boot is its
-# own, which a second script of the same boot is), and counts on.  Only one machine writes at a time: the Auto Scaling
-# group of wall.sh holds one instance at most.
+# own, which a second script of the same boot is), and counts on.  Only one machine writes at a time: a run has one
+# instance at most.
 
 # Whether the run keeps a ledger.
 ledger_active() {

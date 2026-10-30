@@ -52,10 +52,8 @@ depends on:
 `setup.sh` looks for an entry that covers the set it was asked for (`BUILD`).  Finding one, it downloads, checks and
 unpacks it, builds nothing, and goes on to the smoke checks, which show that this machine runs the binaries.  Finding
 none, it builds the set and does not store it.  `REQUIRE_CACHED=1` turns a miss, or a cache it cannot use, into an
-error, for a launch that must run only tested binaries.  The user data of [the ledger's experiment](ledger.md) and [the
-sweep](sweep.md#launch-watch-stop-bring-the-results-home) use it, and the run to the wall takes it from the environment
-of `wall.sh launch` ([wall.md](wall.md#launch-watch-stop-clean-up)), so that a commit that has not been released ends
-the machine at once and costs minutes, not a run of untested binaries.
+error, for a launch that must run only tested binaries.  The user data of [the ledger's experiment](ledger.md) uses it, so that a commit that has not been released ends the
+machine at once and costs minutes, not a run of untested binaries.
 
 **Build only what a run needs**, with `BUILD`, cargo's arguments for `solver/frame/` (`--bins`, `--examples`,
 `--bin NAME`, `--example NAME`; default `--bins --examples`).  A `BUILD` leaves the prover out, unless `BUILD_PROVER`
@@ -64,7 +62,7 @@ a part that is not built are left out.  What the jobs need:
 
 | job | `BUILD` |
 |---|---|
-| the chain, the wall run (`wall-node.sh` sets it), the sweep, `verify.sh` | `--bin taxman` |
+| the chain, `verify.sh` | `--bin taxman` |
 | the ledger ([ledger.md](ledger.md)) | `--bin taxman --example ledger` |
 | the prover's proofs ([prover.md](prover.md)) | `PROVER_ONLY=1` (`BUILD_PROVER="--bin exact"` for `exact` alone) |
 
@@ -127,10 +125,9 @@ suite's times on a laptop are in solver/docs/design/testing.md.
   manifest or its passed suite, a build that lacks a file, a stranger in the tarball, a build with a feature as an
   entry of its own, the same through the stand-in for aws); `python3 -I test/test_run_tests.py` (a toy crate: a failure,
   an ignored test, a doc test, a timeout, the order, a feature, a build that fails); `python3 -I test/test_setup.py`
-  (`setup.sh` with a stand-in for cargo: what `BUILD` builds, a hit and a miss, the release suite on a pass
-  and on a failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once); and `test/run.sh node launch` (the
-  settings reach `wall-node.sh` and `setup.sh`).  The runner ran the whole suite of both crates in the test profile; no
-  release build was made on the laptop.
+  (`setup.sh` with a stand-in for cargo: what `BUILD` builds, a hit and a miss, the release suite on a pass and on a
+  failure, the dirty checkout, `REQUIRE_CACHED`, the two builds at once).  The runner ran the whole suite of both crates
+  in the test profile; no release build was made on the laptop.
 * **On EC2, on 2026-10-18:** the releases of ca357bf, for the run to 5000, and of 260e74f, with the study tools, for the
   A1 measurement, each tested before it was stored ([The release](#the-release-the-suite-then-the-cache)); and the
   node-choice measurement at 9d9dae3, which took its binaries from the cache ([its

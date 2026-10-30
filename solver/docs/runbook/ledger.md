@@ -3,8 +3,7 @@
 Part of the [runbook](../RUNBOOK.md).
 
 `solver/tools/ledger/cloud.sh FIRST-LAST` runs the ledger over a stretch of games for a budget of CPU on one machine.
-The ledger (`examples/ledger/`; [README, "Keeping going past
-limits"](../../frame/README.md#keeping-going-past-limits-and-the-sweep)) proves games from both sides, bounds from below
+The ledger (`examples/ledger/`; [README, "The ledger"](../../frame/README.md#the-ledger)) proves games from both sides, bounds from below
 and above, in the order that its scheduler judges cheapest.  [The ledger's
 entry](../../notebook/search/the-ledger-bounds-from-both-sides-2026-10/README.md) records how the scheduler works, the
 laptop's dry run, and every launch and what it found.  A launch needs the approval of whoever owns the AWS account, with
@@ -22,8 +21,7 @@ is spent, each limited to the budget left over the workers), and the report (a m
 it at about $1.7 at spot, and the 40 GB volume costs a few cents.
 
 **Launch** as [Launch](launch.md#launch) says, with these values for one `c8g.16xlarge` at spot, `ZONE` the zone of the
-lowest price that day ([machine.md](machine.md)) and the ceiling of [Launch, watch, stop, bring the results
-home](sweep.md#launch-watch-stop-bring-the-results-home):
+lowest price that day ([machine.md](machine.md)) and a price ceiling of 1.0 dollars an hour (`MAX_PRICE`):
 
 ```
 INSTANCE_TYPE=c8g.16xlarge ZONE=... VOLUME_GB=40 PURPOSE=ledger MAX_PRICE=1.0

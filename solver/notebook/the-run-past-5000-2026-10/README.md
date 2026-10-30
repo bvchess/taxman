@@ -17,7 +17,7 @@ had proven from 4548 to 4783; the 91 games after it cost 7.45 billion nodes, and
 
 The run went from 2026-10-21 at 02:04:13Z to 20:42:30Z, on commit 4974a71 with a clean tree.  `wall.sh launch` set up an
 Auto Scaling group of one spot `c8g.16xlarge` (64 threads) with the lowest-price strategy, a spot ceiling of $0.72 an
-hour and the zone us-east-1b ([the unattended run to the wall](../../docs/runbook/wall.md)).  The machine ran `taxman
+hour and the zone us-east-1b ([the unattended run to the wall](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md)).  The machine ran `taxman
 solve 1-8191 --use-prev` with a [window](../../../docs/GLOSSARY.md#the-search) of 4 games in flight, the default tactics
 of that commit and the [wall](../../../docs/GLOSSARY.md#the-search) at 24 hours (`--game-hours 24`).  With `--use-prev`
 it took games 1..4547 from the committed chain and each game the store had proven from the store, and searched the

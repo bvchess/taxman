@@ -63,11 +63,11 @@
 //!   same moves (by digest, [`moves_digest`]), same proof and assumptions.  But a record of the proof `known` of
 //!   the file's own game needs no more than the same score, moves and assumptions: it says where the run got its
 //!   copy of the game, and the file's line proves it.  A predecessor of a run or file with no proof is the best
-//!   game of an unfinished search (`solve --keep-going`): an earlier incomplete line of `n − 1` with that score and
-//!   those moves.  Such a game seeds the line and proves nothing, so the line has no ceiling
-//!   (`setup.cap`) and no proof that rests on `n − 1` (`cap`, `prime_formula`), and scores no less than that game;
-//!   the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and `same_search` on a completed game of
-//!   the file) stand;
+//!   game of an unfinished search (older files have such lines, made by a `solve` that went on past limits): an
+//!   earlier incomplete line of `n − 1` with that score and those moves.  Such a game seeds the line and proves
+//!   nothing, so the line has no ceiling (`setup.cap`) and no proof that rests on `n − 1` (`cap`, `prime_formula`),
+//!   and scores no less than that game; the proofs that rest on nothing of `n − 1` (`exhausted`, `trivial`, and
+//!   `same_search` on a completed game of the file) stand;
 //! * a repeat: the game `m` it names is a completed game of the file, on an earlier line, whose proof settles its
 //!   search ([`Proof::settles_search`]) and whose proof and assumptions the record gives; the search problems of
 //!   both games, set up again from their n ([`search_problem`]), are as large as their lines record (frames,
@@ -83,8 +83,8 @@
 //! An incomplete line that records its game (`best_so_far`, with `moves` and `promotions`: the solver always writes
 //! them) is checked as far as it goes: the game is legal, scores the `best_so_far`, has ascending promotions that are
 //! moves, and is no better than the table's score.  A file may have holes, games with no line or only incomplete
-//! ones (the file of a `--keep-going` run, or the sweep's `explore.jsonl`, which merges many); each line is checked
-//! against what it rests on in the same file, and a proof that rests on a game the file lacks is refused.
+//! ones (the file of a `solve` that went on past limits, or a file that merges many); each line is checked against what
+//! it rests on in the same file, and a proof that rests on a game the file lacks is refused.
 //!
 //! The digest a line that is not a repeat records is not checked against its problem: it is how the solver finds
 //! an earlier game to repeat, which it then sets up again and compares problem for problem, as the check of the
@@ -340,7 +340,7 @@ fn replaced_by_prime(n: u32) -> u64 {
 }
 
 /// The best game of a search that a limit stopped, from its incomplete line, checked: legal, and scoring what the line
-/// says.  It seeds the next game (`taxman solve --keep-going`) and proves nothing.
+/// says.  A later line may be built on it as a seed, and it proves nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnfinishedGame {
     pub n: u32,
@@ -1098,7 +1098,7 @@ fn check_entry(
             let record = &named.record;
             let pred = match named.source {
                 // The record of a game of this run or file with no proof is the best game of an unfinished search
-                // (`--keep-going`): any earlier line of n − 1 with its score and moves.
+                // (older files have them): any earlier line of n − 1 with its score and moves.
                 PrevSource::Run | PrevSource::Results if record.proof.is_none() => {
                     let earlier =
                         |g: &&UnfinishedGame| g.line < e.line && g.score == record.score && g.digest == record.digest;
@@ -1311,26 +1311,6 @@ impl ResultsFile {
     /// The completed games of the file, by n.
     pub fn games(&self) -> impl Iterator<Item = &StoredGame> {
         self.contents.games.values()
-    }
-
-    /// The best game of the unfinished searches of `n` the file records (the highest score, the later of equals): none if
-    /// the file has a completed game of `n`.  The file holds only searches that a limit stopped, and their best game
-    /// can seed the game after it.  (A search started again can end below an earlier one, so it is the best of the
-    /// lines, not the last, that seeds.)
-    pub fn unfinished(&self, n: u32) -> Option<&UnfinishedGame> {
-        if self.contents.games.contains_key(&n) {
-            return None;
-        }
-        self.contents.unfinished.get(&n)?.iter().max_by_key(|game| (game.score, game.line))
-    }
-
-    /// The last unfinished search of `n` the file records (the last line), if it has no completed game of `n`: the latest
-    /// attempt, whatever it scored, which says what the game had from the game of `n − 1` when it was last tried.
-    pub fn last_attempt(&self, n: u32) -> Option<&UnfinishedGame> {
-        if self.contents.games.contains_key(&n) {
-            return None;
-        }
-        self.contents.unfinished.get(&n)?.last()
     }
 
     /// The invocations the file records for an unfinished search of `n` (0 if none).

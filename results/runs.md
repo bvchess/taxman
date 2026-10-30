@@ -97,7 +97,7 @@ never held more than 5,815, and none spilled to disk.
 
 **The fourth run, games 3915–4547.**  The command was `taxman solve 1-8191 --use-prev`, with a window of 4 games in
 flight on 64 threads of one `c8g.16xlarge` at spot, with the build of commit ca357bf; `solver/tools/cloud/wall.sh`
-launched it ([solver/docs/runbook/wall.md](../solver/docs/runbook/wall.md)).  With `--use-prev` it took games 1–3914
+launched it ([its runbook](https://github.com/bvchess/taxman/blob/3ca11bf/solver/docs/runbook/wall.md), as of 3ca11bf).  With `--use-prev` it took games 1–3914
 from this file and each game the bounds store had proven from the store, with no search, and searched the others, from
 3915 on.  Its own file started with `known` copies of games 1–3914.  The lines of games 3915–4547 were appended to this
 file, byte for byte; those copies and the run's three incomplete lines (of games 3940, 4340 and 4548) were left out.

@@ -4,10 +4,9 @@
 //! thread the window is one, and the lines are those of a window of one but for the times and the build; a repeat of
 //! a game still in flight names it, on a later line; a range stopped by a limit stops at its first unfinished game with
 //! the lines before it in order, keeps the checkpoints of the games searched ahead of it and completes when run again;
-//! a game that passes the wall (`SolveOptions::game_limit`) ends the range with no line for it, its checkpoint and its
-//! clock kept, and goes on from them when run again; and a score that is not the table's fails the range at that game,
-//! with the lines before it, as a window of one does.  The policy that shares the threads is tested on its own in
-//! `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
+//! a game stopped by a limit keeps its clock beside its checkpoint and goes on from it when run again; and a score that
+//! is not the table's fails the range at that game, with the lines before it, as a window of one does.  The policy
+//! that shares the threads is tested on its own in `src/solver/window/allot.rs`.  Small boards, at most 4 threads.
 
 mod common;
 
@@ -15,7 +14,6 @@ use common::{committed_text, matching_options, options, TempDir};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use std::time::Duration;
 use taxman::game::Optimal;
 use taxman::json::Json;
 use taxman::results::{rejected_path, verify_files};
@@ -238,74 +236,65 @@ fn clock_of(checkpoints: &Path, n: u32) -> f64 {
     text.trim().parse().unwrap_or_else(|e| panic!("n={n}: {text:?}: {e}"))
 }
 
-/// The wall: the head of the window passes a wall of a nanosecond, which any time its search runs passes; a node limit
-/// stops the search before it can complete (no seed, no ceiling and the matching tactics make it longer than the 1,024
-/// steps that the limit is looked at after), so the head is at the wall however the threads are scheduled.  The range
-/// ends there with no line for it, nothing in the results file, a checkpoint and a clock for it; the games searched
-/// ahead of it keep their checkpoints; a run with the same limits walls again at the same game at once, from the clock
-/// it was left with (which is never smaller); and a run with a larger limit and no node limit completes every game and
+/// The clock of a game's own search (`seconds.own`; "The clock" in `src/solver/window.rs`): a node limit stops the head
+/// of the window before its search can complete (no seed, no ceiling and the matching tactics make it longer than the
+/// 1,024 steps that the limit is looked at after), and the head keeps a checkpoint and a clock; a run with the same
+/// limits stops at the same game from the clock it was left with (which is never smaller); and a run with no node limit
+/// completes every game from the checkpoint and the clock, records the head's own search time over its invocations, and
 /// leaves no clock behind.
 #[test]
 #[cfg_attr(
     debug_assertions,
-    ignore = "long: the quick check is a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock"
+    ignore = "long: the quick check is a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it"
 )]
-fn a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
-    a_game_that_passes_the_wall_goes_on_from_its_clock(800, 801);
+fn a_stopped_game_keeps_its_clock_and_goes_on_from_it() {
+    a_stopped_game_goes_on_from_its_clock(800, 801);
 }
 
-/// [`a_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock`] for the game 740 alone, whose
-/// search is shorter.
+/// [`a_stopped_game_keeps_its_clock_and_goes_on_from_it`] for the game 740 alone, whose search is shorter.
 #[test]
-fn a_lone_game_that_passes_the_wall_ends_the_range_with_no_line_and_goes_on_from_its_clock() {
-    a_game_that_passes_the_wall_goes_on_from_its_clock(740, 740);
+fn a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it() {
+    a_stopped_game_goes_on_from_its_clock(740, 740);
 }
 
-/// The head `lo` of the range `lo..=hi` passes the wall, and the range goes on from its clock.
-fn a_game_that_passes_the_wall_goes_on_from_its_clock(lo: u32, hi: u32) {
-    let dir = TempDir::new("window-wall");
+/// The head `lo` of the range `lo..=hi` is stopped by a node limit, and the range goes on from its clock.
+fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32) {
+    let dir = TempDir::new("window-clock");
     let results = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
-    let limit = Duration::from_nanos(1);
-    let mut walled = SolveOptions {
+    let mut stopping = SolveOptions {
         checkpoint_dir: Some(checkpoints.clone()),
-        game_limit: Some(limit),
         node_limit: Some(200),
         force_search: true,
         use_prev: true,
         window: 4,
         ..matching_options(4)
     };
-    walled.tactics.seed_incumbent = false;
-    walled.tactics.prev_cap = false;
-    let mut seen = Vec::new();
-    let summary = solver::solve_range_each(lo, hi, &walled, Some(&results), |game| seen.push(game.n)).unwrap();
-    let wall = summary.walled.expect("the head's search cannot complete, and any time it runs passes the wall");
-    assert_eq!(wall.n, lo, "the first game of the range is the head");
-    assert!(wall.held >= limit, "{wall:?}");
-    assert!(summary.stopped_at.is_none() && summary.solved == 0 && seen.is_empty(), "{summary:?} {seen:?}");
-    assert_eq!(fs::read_to_string(&results).unwrap(), "", "nothing is recorded for the game, or any other");
+    stopping.tactics.seed_incumbent = false;
+    stopping.tactics.prev_cap = false;
+    let summary = solver::solve_range_each(lo, hi, &stopping, Some(&results), |_| {}).unwrap();
+    assert_eq!(summary.stopped_at, Some(lo), "the first game of the range is the head");
     assert!(checkpoints.join(format!("n{lo:04}.ckpt")).exists());
     let kept = clock_of(&checkpoints, lo);
-    // The clock file keeps the clock to the millisecond.
-    assert!((kept - wall.held.as_secs_f64()).abs() < 0.001, "{kept} {wall:?}");
 
-    // The same limit again: the clock is where it was left, so the game walls at once, with a clock no smaller.
-    let again = solver::solve_range_each(lo, hi, &walled, Some(&results), |_| {}).unwrap();
-    let wall_again = again.walled.expect("a clock at the limit walls the game again");
-    assert_eq!(wall_again.n, lo);
-    assert!(wall_again.held >= Duration::from_secs_f64(kept) && clock_of(&checkpoints, lo) >= kept, "{wall_again:?}");
+    // The same limits again: the head goes on from its checkpoint and its clock, which is no smaller.
+    let again = solver::solve_range_each(lo, hi, &stopping, Some(&results), |_| {}).unwrap();
+    assert_eq!(again.stopped_at, Some(lo));
+    assert!(clock_of(&checkpoints, lo) >= kept);
 
-    // A larger limit and no node limit: the game resumes from its checkpoint and its clock, and the range completes
-    // without reaching the wall; no clock is left.
-    let larger = SolveOptions { game_limit: Some(Duration::from_secs(3600)), node_limit: None, ..walled };
-    let done = solver::solve_range_each(lo, hi, &larger, Some(&results), |game| seen.push(game.n)).unwrap();
-    assert!(done.walled.is_none() && done.stopped_at.is_none(), "{done:?}");
+    // No node limit: the game resumes from its checkpoint and its clock, and the range completes; no clock is left.
+    let finishing = SolveOptions { node_limit: None, ..stopping };
+    let mut seen = Vec::new();
+    let done = solver::solve_range_each(lo, hi, &finishing, Some(&results), |game| seen.push(game.n)).unwrap();
+    assert!(done.stopped_at.is_none(), "{done:?}");
     assert_eq!(seen, (lo..=hi).collect::<Vec<_>>());
-    assert_eq!(lines(&results).iter().map(n_of).collect::<Vec<_>>(), (lo..=hi).collect::<Vec<_>>());
+    let chain = lines(&results);
+    let completed: Vec<&Json> =
+        chain.iter().filter(|line| line.get("completed").and_then(Json::as_bool) == Some(true)).collect();
+    assert_eq!(completed.iter().map(|line| n_of(line)).collect::<Vec<_>>(), (lo..=hi).collect::<Vec<_>>());
     verify_files(std::slice::from_ref(&results), Optimal::built_in(), 1).unwrap_or_else(|e| panic!("{e}"));
     // The game's line records its own search time over every invocation, which is no less than the clock it went on from.
-    let head = lines(&results).into_iter().find(|line| n_of(line) == lo).unwrap();
+    let head = completed.iter().find(|line| n_of(line) == lo).unwrap();
     let own = head.get("seconds").and_then(|seconds| seconds.get("own")).and_then(Json::as_f64).expect("seconds.own");
     assert!(own >= kept, "{own} {kept}");
     let left: Vec<String> = fs::read_dir(&checkpoints)

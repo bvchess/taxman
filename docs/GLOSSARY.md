@@ -255,11 +255,10 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   of it.  The time it waited behind an older game, suspended while that game held the threads, is not in it, and
   neither is the time a speculative search ran before the game became the oldest.  The driver keeps it as the game's
   *clock*, in `nNNNN.clock` beside the checkpoint ([solver/docs/design/engine.md, "The window: games in
-  flight"](../solver/docs/design/engine.md#the-window-games-in-flight), the item "The wall").  A result line records it
-  as `seconds.own`, the summary line as `own=`, and `wall.sh status` shows it as the `own search` column.
-* **the wall**: the first game whose own search takes longer than a set number of hours.  `taxman solve --game-hours
-  H` ends a range there.  The project's limit (2026-10-16) is 24 hours of the game's own search on one `c8g.16xlarge`
-  with the run's build and settings: `--game-hours 24`.
+  flight"](../solver/docs/design/engine.md#the-window-games-in-flight), the item "The clock").  A result line records it
+  as `seconds.own`, the summary line as `own=`, and `status.sh` shows it as the `own search` column.
+* **the wall**: the first game whose own search takes longer than the project's limit (2026-10-16): 24 hours of the
+  game's own search on one `c8g.16xlarge` with the run's build and settings.  No program stops at it.
 
 ## Bounds
 
@@ -355,8 +354,6 @@ A bound below is an upper bound on what a set of promotions or moves can score, 
   lower bound equals its best upper bound.
 * **the ledger**: the example program `ledger` (`solver/frame/examples/ledger/`).  It works on a whole stretch of games
   at once, raising lower bounds and lowering upper bounds until they meet.
-* **the sweep** (`solver/tools/cloud/sweep.sh`): a limited search of every game of a long stretch, holes allowed.  Its
-  file, `explore.jsonl`, is not a chain.
 * **certificate of U**: a line of `taxman certify` that proves statement U at one game.  The extended problem with the
   game's open members optional, searched from the recorded game, ends `certified` when nothing beats the recorded
   score ([solver/docs/design/certificates.md](../solver/docs/design/certificates.md)).

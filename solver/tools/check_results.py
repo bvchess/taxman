@@ -52,9 +52,10 @@ For every completed game:
   unfinished  an incomplete line that records its game (best_so_far, moves, promotions) is legal, scores the
               best_so_far, has ascending promotions that are moves, and is no better than the table's score; it need
               not be over.  A line whose prev has source run or results and no proof was built on such a game
-              (`solve --keep-going`): an earlier incomplete line of n-1 has that score and those moves.  That game seeded
-              the line and proves nothing, so the line has no ceiling (setup.cap), no cap or prime_formula proof, and
-              scores no less than it.  A file may have holes (games with no line, or only incomplete lines)
+              (as an older `solve` went on past limits): an earlier incomplete line of n-1 has that score and those
+              moves.  That game seeded the line and proves nothing, so the line has no ceiling (setup.cap), no cap or
+              prime_formula proof, and scores no less than it.  A file may have holes (games with no line, or only
+              incomplete lines)
   repeat      a repeat (method "repeat", proof same_search) names a game m that is a completed game of the same file
               on an earlier line, whose proof is exhausted, cap, known or same_search; the record's proof and
               assumptions are m's; the repeat's setup.digest, its record's digest and m's setup.digest agree, and so do
@@ -529,8 +530,8 @@ def check_file(path, fm, heuristic, divisors, problems, sources):
         prev = None  # (score, moves, proof, assumptions)
         proven = True  # whether the game of n-1 is optimal (given its assumptions); not the best game of a stopped search
         if source in ("run", "results") and record["proof"] is None:
-            # The best game of an unfinished search of n-1 (`solve --keep-going`): an earlier incomplete line of n-1
-            # with that score and those moves.
+            # The best game of an unfinished search of n-1 (an older `solve` went on past limits): an earlier
+            # incomplete line of n-1 with that score and those moves.
             found = [
                 u
                 for u in unfinished.get(n - 1, [])

@@ -5,8 +5,7 @@
 //! they add is output, and the policies of a command-line run:
 //!
 //! * `solve` stops on SIGINT and SIGTERM with a final checkpoint, locks its checkpoint directory and (when it opens
-//!   it, `results::ResultsFile`) its results file, prints one summary line per game as it is concluded, and with
-//!   `--game-hours` ends at the first game whose own search passes the wall (exit status 4);
+//!   it, `results::ResultsFile`) its results file, and prints one summary line per game as it is concluded;
 //! * `regress` solves in memory and compares every score with the table of optimal games;
 //! * `certify` searches as `solve` does (the same flags for checkpoints, limits and progress, the same lock and
 //!   signals), appends a certificate a game to its `--out` file (locked while it is open), takes the games of a range
@@ -37,7 +36,7 @@ use taxman::numtheory::Tables;
 use taxman::paths;
 use taxman::results::verify_files_with;
 use taxman::search::{finder, gate_trial, MAX_GATE};
-use taxman::solver::{self, GameResult, Method, SolveOptions, Wall};
+use taxman::solver::{self, GameResult, Method, SolveOptions};
 
 fn failed(message: String) -> CliError {
     CliError::Failed(message)
@@ -152,16 +151,12 @@ fn stopped_line(n: u32, opts: &SolveOptions) -> String {
     let resume =
         if opts.checkpoint_dir.is_some() { "run the same command to resume it" } else { "it was not checkpointed" };
     let why = if engine::stop_signal().is_some() { "was stopped by a signal" } else { "hit a limit" };
-    // A range that keeps going past limits is ended only by a signal, and records nothing for the game it stops.
-    let recorded = if opts.keep_going { "; nothing is recorded for it" } else { "" };
-    format!("stopped: the search for n={n} {why} before it finished{recorded}; {resume}")
+    format!("stopped: the search for n={n} {why} before it finished; {resume}")
 }
 
-const SOLVE_FLAGS: [&str; 12] = [
+const SOLVE_FLAGS: [&str; 10] = [
     "--out",
     WINDOW_FLAG,
-    "--game-hours",
-    "--pass",
     "--finder-after",
     "--finder-seconds",
     "--profile",
@@ -172,33 +167,11 @@ const SOLVE_FLAGS: [&str; 12] = [
     "--gate-trial-plan",
 ];
 
-/// The line `solve` prints when a game passes the wall, `wall at N after H hours`, then why and what is kept.  A script
-/// reads the words up to the colon (`chain.sh`).
-fn wall_line(wall: Wall, opts: &SolveOptions) -> String {
-    let hours = |time: Duration| time.as_secs_f64() / 3600.0;
-    let limit = opts.game_limit.map_or(0.0, hours);
-    let resume = if opts.checkpoint_dir.is_some() {
-        "its checkpoint and clock are kept, and nothing is recorded for it; run the same command with a larger \
-         --game-hours to go on with it"
-    } else {
-        "it was not checkpointed"
-    };
-    format!(
-        "wall at {} after {:.5} hours: its own search passed the limit of {limit} hours; {resume}",
-        wall.n,
-        hours(wall.held)
-    )
-}
-
 /// `solve N|A-B [options]`: solves game N or a range, each from the one before (`solver::solve_range_each`).
 pub fn solve(args: &[String]) -> CliResult {
     let usage = || CliError::Usage("usage: solve N|A-B [options]".into());
     let flags = [&SOLVE_FLAGS[..], &SEARCH_FLAGS[..]].concat();
-    let switches = [
-        &["--force-search", "--use-prev", "--show", "--keep-going", "--retry", "--retry-improved"][..],
-        &SEARCH_SWITCHES[..],
-    ]
-    .concat();
+    let switches = [&["--force-search", "--use-prev", "--show"][..], &SEARCH_SWITCHES[..]].concat();
     let args = Args::parse(args, &flags_with(&flags), &switches)?;
     let [range] = args.positional() else { return Err(usage()) };
     let (lo, hi) = parse_range(range)?;
@@ -213,25 +186,6 @@ pub fn solve(args: &[String]) -> CliResult {
             KnownSources { boards: true, ..KnownSources::default() }
         });
     }
-    opts.keep_going = args.has("--keep-going");
-    opts.retry = args.has("--retry");
-    opts.retry_improved = args.has("--retry-improved");
-    opts.pass = args.parsed("--pass")?;
-    if (opts.retry || opts.retry_improved) && !opts.keep_going {
-        return Err(CliError::Usage(
-            "--retry and --retry-improved search again the games that --keep-going passed over: give --keep-going \
-             too (without it a rerun resumes the game a limit stopped)"
-                .into(),
-        ));
-    }
-    if opts.retry && opts.retry_improved {
-        return Err(CliError::Usage(
-            "--retry searches again every unfinished game and --retry-improved only those whose game before it has \
-             improved: give one"
-                .into(),
-        ));
-    }
-    opts.game_limit = args.positive_hours("--game-hours")?;
     opts.finder_after = args.parsed("--finder-after")?.unwrap_or(finder::AFTER);
     if let Some(budget) = args.positive_seconds("--finder-seconds")? {
         opts.finder_budget = budget;
@@ -276,25 +230,8 @@ pub fn solve(args: &[String]) -> CliResult {
         let file = out.map_or_else(String::new, |p| format!(" in {}", p.display()));
         outln!("skipped {} games already done{file}", summary.skipped);
     }
-    if summary.passed_over > 0 {
-        outln!(
-            "passed over {} games that the file holds only an unfinished search of (--retry searches them again)",
-            summary.passed_over
-        );
-    }
-    if summary.unfinished > 0 {
-        let kept = if opts.checkpoint_dir.is_some() { "their checkpoints are kept" } else { "not checkpointed" };
-        outln!(
-            "{} games ended at a limit, unfinished ({kept}); the games after each went on from its best game",
-            summary.unfinished
-        );
-    }
     if let Some(n) = summary.stopped_at {
         outln!("{}", stopped_line(n, &opts));
-    }
-    if let Some(wall) = summary.walled {
-        outln!("{}", wall_line(wall, &opts));
-        return Err(CliError::Wall);
     }
     Ok(())
 }

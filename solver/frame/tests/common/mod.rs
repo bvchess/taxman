@@ -96,14 +96,7 @@ pub const FIRST_GAMES: u32 = 1300;
 /// The game `n − 1` of the committed results as the previous game of `n`; the proof only matters to the results lines.
 pub fn prev_of(games: &StoredGames, n: u32) -> Prev {
     let (score, moves) = &games[&(n - 1)];
-    Prev {
-        moves: moves.clone(),
-        score: *score,
-        source: PrevSource::Results,
-        proof: None,
-        assumes: Assumptions::new(),
-        proven: true,
-    }
+    Prev { moves: moves.clone(), score: *score, source: PrevSource::Results, proof: None, assumes: Assumptions::new() }
 }
 
 /// The default options on `threads` threads.

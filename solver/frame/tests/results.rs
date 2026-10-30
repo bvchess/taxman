@@ -500,21 +500,33 @@ fn stopped_at(line: &Json) -> Json {
 }
 
 /// A file with holes, and unfinished searches, passes both verifiers when each line stands against what it rests on in
-/// the file: a game built on the best game of an unfinished search (`solve --keep-going`) has no ceiling and no proof
-/// that rests on it, and names an earlier incomplete line that records that game.  The lines that claim otherwise are
-/// refused by both, naming the line.
+/// the file: a game built on the best game of an unfinished search (as a `solve` that went on past limits wrote it) has
+/// no ceiling and no proof that rests on it, and names an earlier incomplete line that records that game.  The lines
+/// that claim otherwise are refused by both, naming the line.
 #[test]
 fn games_built_on_unfinished_searches_are_checked_by_both_verifiers() {
     let dir = TempDir::new("unfinished-prev");
-    // 598..602 stop at a node limit, each on the best game of the one before; 603 finishes on 602's.
-    let results = dir.join("keep-going.jsonl");
-    let stopping =
-        SolveOptions { node_limit: Some(200), force_search: true, keep_going: true, ..common::matching_options(1) };
-    solver::solve_range(598, 602, &stopping, Some(&results)).unwrap();
-    let finishing = SolveOptions { node_limit: None, force_search: false, ..stopping.clone() };
-    solver::solve_range(598, 603, &finishing, Some(&results)).unwrap();
-    let kept: Vec<Json> =
-        fs::read_to_string(&results).unwrap().lines().map(|line| Json::parse(line).unwrap()).collect();
+    // 598..602 stop at a node limit, each on the best game of the one before; 603 finishes on 602's.  The solver no
+    // longer goes on past a limit, so the lines are those of the games solved alone, each naming the best game of the
+    // one before it as its `prev`, as the older `solve` wrote them.
+    let stopping = SolveOptions { node_limit: Some(200), force_search: true, ..common::matching_options(1) };
+    let built_on = |line: Json, before: &GameResult| {
+        let prev = Json::object([
+            ("n", Json::from(before.n)),
+            ("score", Json::from(before.score)),
+            ("source", Json::from("run")),
+            ("moves_digest", Json::from(moves_digest(&before.moves).as_str())),
+            ("proof", Json::Null),
+            ("assumes", Json::array(Vec::<u32>::new())),
+        ]);
+        with(&line, "prev", &prev)
+    };
+    let stopped: Vec<GameResult> = (598..=602).map(|n| solver::solve_game(n, None, &stopping).unwrap()).collect();
+    assert!(stopped.iter().all(|game| !game.completed), "every game stops at its limit");
+    let finished = solver::solve_game(603, None, &common::matching_options(1)).unwrap();
+    let mut kept = vec![stopped[0].to_json()];
+    kept.extend(stopped.windows(2).map(|pair| built_on(pair[1].to_json(), &pair[0])));
+    kept.push(built_on(finished.to_json(), &stopped[4]));
     assert_eq!(kept.len(), 6);
     let (finished, s) = (&kept[5], |text: &str| Json::from(text));
     assert_eq!(finished.get("prev").and_then(|p| p.get("proof")), Some(&Json::Null));

@@ -135,7 +135,7 @@ with the largest prime (`conclude` has already checked a game that this run made
 assume what it assumes ([trust.md](trust.md)).
 
 *Limits.*  A search that a time or node limit stops gives an incomplete result (`completed` false, `best_so_far` the
-best game so far) and keeps its checkpoint, and a range stops there (but see "Past limits", trust.md).
+best game so far) and keeps its checkpoint, and a range stops there.
 
 *Range runs* pass each game on to the next as its game of n − 1, and resume from the results file.  The solver checks
 the file when it opens it: it replays every game, and checks the chain from n − 1 and each line's arithmetic and
@@ -190,19 +190,13 @@ starts with the final seed and the ceiling, on every thread.
   oldest, so a run fails or stops at the game, and with the lines before it, where a range solved in order would.  It
   then stops the searches still in flight with a final checkpoint (the next run resumes them), and drops what they
   found.
-* *The wall.*  Every game has a clock, its own search ([glossary](../../../docs/GLOSSARY.md#the-search)), which is not
+* *The clock.*  Every game has a clock, its own search ([glossary](../../../docs/GLOSSARY.md#the-search)), which is not
   the time the game waited behind an older one, as its checkpoint's elapsed time counts it: a younger search is
   suspended while the oldest keeps the threads busy, so a game that follows a dear one would arrive at its own search
   with that time already on its clock.  The driver keeps the clock in `nNNNN.clock` beside the checkpoint, every
   checkpoint interval and when the search stops, reads it back when a search starts from a checkpoint, and writes it in
   the game's line as `seconds.own` ([reference](../REFERENCE.md#a-results-line---out-schema-5)).  A game that restarts
-  from its beginning starts its clock again, and a finished game's clock goes with its checkpoint.  `--game-hours H`
-  (`SolveOptions::game_limit`) ends the range at the first game whose clock passes H hours, to find the game at which a
-  machine's day is not enough.  At the limit the driver stops the game's search, and once it has ended the range ends as
-  it does at a stop signal, every search in flight stopped with a final checkpoint, but records nothing for the game,
-  not even an incomplete line; `solve` prints `wall at N after H hours` and exits with the status 4
-  (`RangeSummary::walled`).  A search that completes before the stop reaches it is recorded like any other, and the
-  range goes on.  Run again with a larger limit, the game goes on from its checkpoint and its clock.
+  from its beginning starts its clock again, and a finished game's clock goes with its checkpoint.
 * *Trace.*  With `TAXMAN_WINDOW_TRACE` set, the driver prints its events on stderr: setups, the starts of searches with
   their seeds and ceilings, workers given and taken back, hints, deferrals and conclusions.
 
