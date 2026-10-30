@@ -37,16 +37,18 @@ use taxman::search::{search, Reuse, SearchTactics};
 /// with the nogoods forgotten at every step (5 to 7), then conflict branching (tactic `conflict_branching`) at every
 /// check, whatever its gap, without the look at the last child of the search's own conflict (tactic `conflict_look`, on
 /// by default), on one thread and on two (8 and 9), the search's own conflict everywhere (10; the default chooses from
-/// a gap of 300), and conflict branching at every check with the look, on one thread and on two (11 and 12), then the
+/// a gap of 1,200), and conflict branching at every check with the look, on one thread and on two (11 and 12), then the
 /// search without the near-repeat cut (13; tactic `near_repeat`, which the others have, and which acts where a game
 /// has the cut of a game before it, [`game_after`], and the incumbent reaches its bound), then conflict branching at
-/// every check with the reuse of its prices (tactic `price_reuse`), under the standard schedule, under one that never
-/// makes the prices again, on two threads, and under one that takes none (14 to 17), then the nogoods carried into the
-/// search (tactic `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some
-/// of three and four, [`Game::carried`](common::Game::carried)): alone, on two threads, with conflict branching at
-/// every check and the reuse of its prices, and with the search's own conflict everywhere (18 to 21), then the warm
-/// start of the children's bound (tactic `warm_start`), alone, and with the search's own conflict everywhere on two
-/// threads (22 and 23).
+/// every check without the reuse of its prices (tactic `price_reuse`, which the standard configuration has, with
+/// the standard schedule, like the others that choose at every check), and under a schedule that never makes the prices
+/// again, on two threads, and one that takes none (14 to 17), then the nogoods carried into the search (tactic
+/// `carried_nogoods`, a store of every nogood of two members among neighboring candidates and of some of three and
+/// four, [`Game::carried`](common::Game::carried)): alone, on two threads, with conflict branching at every check and
+/// the reuse of its prices, and with the search's own conflict everywhere (18 to 21), then the search without the
+/// reuse of prices and without the warm start of the children's bound (tactic `warm_start`, which the standard
+/// configuration has too), and with the search's own conflict everywhere on two threads without the warm start (22 and
+/// 23).
 fn configs() -> Vec<Config> {
     let g = Config::standard();
     // The schedules of `price_reuse`, with conflict branching at every check: the standard one; one that takes the
@@ -69,7 +71,7 @@ fn configs() -> Vec<Config> {
         Config { conflict_branching: Some(0), conflict_look: true, ..g },
         Config { conflict_branching: Some(0), conflict_look: true, threads: 2, period: Some(3), ..g },
         Config { near_repeat: false, ..g },
-        Config { conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
+        Config { conflict_branching: Some(0), price_reuse: None, ..g },
         Config { conflict_branching: Some(0), conflict_look: false, price_reuse: Some(forever), ..g },
         Config { conflict_branching: Some(0), price_reuse: Some(forever), threads: 2, period: Some(3), ..g },
         Config { conflict_branching: Some(0), price_reuse: Some(never_again), ..g },
@@ -77,8 +79,8 @@ fn configs() -> Vec<Config> {
         Config { carried: true, threads: 2, period: Some(3), ..g },
         Config { carried: true, conflict_branching: Some(0), price_reuse: Some(Reuse::STANDARD), ..g },
         Config { carried: true, conflict_branching: None, ..g },
-        Config { warm_start: true, ..g },
-        Config { conflict_branching: None, warm_start: true, threads: 2, period: Some(3), ..g },
+        Config { price_reuse: None, warm_start: false, ..g },
+        Config { conflict_branching: None, warm_start: false, threads: 2, period: Some(3), ..g },
     ]
 }
 
@@ -658,15 +660,16 @@ fn resumed_over_and_over<const W: usize>(
     resumes
 }
 
-/// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default.  (The
-/// search needs thousands of nodes to be stopped on two threads; another quick check of resuming is
+/// [`a_search_resumed_over_and_over_finds_the_optimum`] of game 1000 in the first configuration, the default, from an
+/// incumbent 300 below its P*.  (The search needs thousands of nodes to be stopped on two threads, and from an
+/// incumbent 30 below the default search of 1000 takes fewer than two thousand; another quick check of resuming is
 /// `checkpoint_and_resume_with_the_gf2_bound_of_a_small_game`, on one thread, in the unit tests, and
 /// `a_small_search_of_the_extended_problem_resumed_over_and_over_finds_the_optimum`.)
 #[test]
 fn a_small_search_resumed_over_and_over_finds_the_optimum() {
     let dir = TempDir::new("churn-small");
     let truth = optimal_sum::<16>(Optimal::built_in(), 1000).unwrap();
-    let resumes = resumed_over_and_over::<16>(1000, truth, 30, 1000, &dir, &[0]);
+    let resumes = resumed_over_and_over::<16>(1000, truth, 300, 1000, &dir, &[0]);
     assert!(resumes >= 1, "only {resumes} resumes");
 }
 
@@ -994,8 +997,9 @@ fn the_heaviest_promotion_set_of_833_is_not_the_largest() {
 
 /// The configurations of extended mode, the search of a problem with one-sided candidates: the tactics of
 /// [`SearchTactics::extended`] (the default without the rule of the symmetric pairs, which such a search refuses, and
-/// with the GF(2) bound it needs) on one thread; on two; with the nogoods forgotten at every step; without forced
-/// members; and without nogoods.
+/// with the GF(2) bound it needs, the reuse of prices and the warm start) on one thread; on two; with the nogoods
+/// forgotten at every step; without forced members; without nogoods; and with conflict branching at every check,
+/// whatever its gap, which the default gate leaves to the largest games.
 fn extended_configs() -> Vec<Config> {
     let e = Config::of(&SearchTactics::extended());
     vec![
@@ -1004,6 +1008,7 @@ fn extended_configs() -> Vec<Config> {
         Config { period: Some(1), ..e },
         Config { fix_forced: false, ..e },
         Config { nogoods: false, ..e },
+        Config { conflict_branching: Some(0), ..e },
     ]
 }
 

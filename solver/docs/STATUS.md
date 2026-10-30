@@ -23,7 +23,11 @@ are appended to it ([the runbook](runbook/chain.md)), and a rebuild takes them i
   build (the tag `rerun-2026-10`, commit 3ca11bf) and one policy, so that its timings come from one machine and one
   build.  It started on 2026-10-29 at 19:55 PDT as `chain.sh 5060` with `--gate 1200 --gate-trial 1000,800,600 --tactic
   price_reuse=on --tactic warm_start=on --finder-seconds 900 --background --carried-dir DIR --profile DIR` (DIR is a
-  folder of the run) and no `--use-prev`.  When it completes, its file replaces `results/optimal.jsonl.gz`.
+  folder of the run) and no `--use-prev`.  That build needs the policy flags; the solver of the master branch has the
+  policy as its defaults (a gate of 1200, the gate trial of 1000, 800 and 600, `price_reuse` and `warm_start` on, a
+  finder of 900 seconds), so a plain `taxman solve` searches as the re-run does.  Only the flags that depend on the
+  machine and the run (`--background`, `--carried-dir`, `--profile`) are still given.  When it completes, its file
+  replaces `results/optimal.jsonl.gz`.
 * **The cleanup of the frame solver.**  The project's owner decided on 2026-10-29 to remove the lab, the studies and the
   idle experiments; to make the production policy the default; to split the notebook into a repository of its own; and
   to leave the prover alone.

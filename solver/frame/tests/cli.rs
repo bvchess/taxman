@@ -423,8 +423,9 @@ fn background_is_a_switch_that_is_recorded_and_changes_no_score() {
 }
 
 /// `--gate GAP` is a flag of `solve`: a whole number from 0 to `MAX_GATE`, refused with conflict branching off, where a
-/// gate does nothing.  A line records it in `options.gate` where it was
-/// given, beside the gates of `--gate-trial`, and the game ends with the score of the table.
+/// gate does nothing.  A line records it in `options.gate` where it was given, beside the gates of the trial
+/// (`options.gate_trial`: by default 1000, 800 and 600, and none with `--gate-trial none`, which a run that needs its
+/// gate to stay says), and the game ends with the score of the table.
 #[test]
 fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     let over = (MAX_GATE + 1).to_string();
@@ -435,6 +436,11 @@ fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     assert_usage_error(&off("conflict_branching=off"), "conflict branching is off");
     assert_usage_error(&off("conflict_branching=off"), "a gate without conflict branching does nothing");
     assert_usage_error(&["regress", "--gate", "1200"], "unknown option --gate");
+    // `none` is no trial, so it has no plan to change; the plan of a trial takes only its own settings; the gates are
+    // numbers.
+    assert_usage_error(&["solve", "12", "--gate-trial", "none", "--gate-trial-plan", "after=1"], "no trial");
+    assert_usage_error(&["solve", "12", "--gate-trial-plan", "gate=600"], "--gate-trial-plan: gate: not a setting");
+    assert_usage_error(&["solve", "12", "--gate-trial", "600,none"], "--gate-trial takes gates from 0 to");
 
     let dir = TempDir::new("solve-gate");
     // A game of 125 nodes, searched by three workers.
@@ -449,18 +455,20 @@ fn gate_is_a_flag_of_solve_that_is_recorded_and_changes_no_score() {
     let plain = line("plain.jsonl", &[]);
     let options = |line: &Json| line.get("options").unwrap().clone();
     assert_eq!(options(&plain).get("gate"), None, "a line without the flag has no record of it");
+    let trial = |line: &Json| options(line).get("gate_trial").map(Json::to_string);
+    assert_eq!(trial(&plain).as_deref(), Some("[1000,800,600]"), "the default trial");
     assert_eq!(plain.get("score").and_then(Json::as_u64), Optimal::built_in().score(900));
-    // The gate at its least, and at its most with a trial: the trial's gates are recorded beside it.
-    let zero = line("zero.jsonl", &["--gate", "0"]);
+    // The gate at its least with no trial, and at its most with one: the trial's gates are recorded beside it.
+    let zero = line("zero.jsonl", &["--gate", "0", "--gate-trial", "none"]);
     let widest = line("widest.jsonl", &["--gate", &MAX_GATE.to_string(), "--gate-trial", "0,600"]);
     for (name, gated) in [("zero", &zero), ("widest", &widest)] {
         assert_eq!(gated.get("score"), plain.get("score"), "{name}");
         assert_eq!(gated.get("optimal_match"), Some(&Json::Bool(true)), "{name}");
     }
     assert_eq!(options(&zero).get("gate").and_then(Json::as_u64), Some(0));
-    assert_eq!(options(&zero).get("gate_trial"), None);
+    assert_eq!(trial(&zero), None, "--gate-trial none records no trial");
     assert_eq!(options(&widest).get("gate").and_then(Json::as_u64), Some(MAX_GATE));
-    assert_eq!(options(&widest).get("gate_trial").map(Json::to_string).as_deref(), Some("[0,600]"));
+    assert_eq!(trial(&widest).as_deref(), Some("[0,600]"));
 }
 
 /// A results file that another process has open (here this one, appending to it as a run does) is refused by

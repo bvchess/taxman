@@ -32,6 +32,9 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+/// The gates a trial tries, by default, besides the search's own (the default gate, [`super::CONFLICT_BRANCHING_GAP`],
+/// unless a caller sets another): the gates of the chain's re-run.
+pub const GATES: [u64; 3] = [1000, 800, 600];
 /// The steps a search takes before its trial, by default: a few minutes of a search of 88 threads near n = 5000,
 /// enough for a checkpoint of thousands of units.
 pub const AFTER: u64 = 50_000_000;
@@ -65,6 +68,13 @@ pub struct Plan {
     pub threads: usize,
     /// The least gap of a unit it picks.
     pub least_gap: u64,
+}
+
+impl Default for Plan {
+    /// A trial of [`GATES`], with the defaults for the rest.
+    fn default() -> Self {
+        Plan::of(GATES.to_vec())
+    }
 }
 
 impl Plan {

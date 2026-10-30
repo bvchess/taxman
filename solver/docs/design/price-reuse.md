@@ -2,7 +2,7 @@
 
 Part of the [design](../DESIGN.md).
 
-With the tactic `price_reuse`, off by default, the choice of the conflict keeps the prices it makes and takes them
+With the tactic `price_reuse`, on by default, the choice of the conflict keeps the prices it makes and takes them
 again, and a node's later steps and its descendants cost the CPU of a few prices instead of all of them.  [Conflict
 branching](search.md#conflict-branching) prices the members of a node's heaviest set at every check (`Gf2Bound::prices_excluding`):
 the price of a member is what leaving it out costs the bound, read off the heaviest set's exchange graph, and the node

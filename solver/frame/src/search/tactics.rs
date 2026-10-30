@@ -53,7 +53,7 @@ pub struct SearchTactics {
     /// With `conflict_branching`, keep the prices of a node's members that the choice of the conflict makes, from one
     /// check of the node to the next and from a node to its children, and make only the prices a check lacks, all of
     /// them again after a few checks or when the node's bound has fallen (`search::price_memo`; sound: the prices only
-    /// rank the conflicts, each a true conflict of the node, so any ranking keeps the search exact).  Off by default.
+    /// rank the conflicts, each a true conflict of the node, so any ranking keeps the search exact).  On by default.
     pub price_reuse: bool,
     /// Use the nogoods carried into the search from another search, each validated as a nogood of this root when it is
     /// loaded ([`CarriedNogoods`](crate::model::CarriedNogoods)), only to prune: to rule candidates out of a unit's node
@@ -66,7 +66,7 @@ pub struct SearchTactics {
     /// its heaviest set from its parent's, deleting those members one at a time along the shortest cycle through each
     /// in an exchange graph that takes in every size, instead of solving from a smaller set (`crate::gf2`'s
     /// `warm_child`; sound: the bound is the same heaviest weight, found exactly, and only which heaviest set is found
-    /// where several weigh the same can differ, which changes the conflicts branched on, not the answer).  Off by
+    /// where several weigh the same can differ, which changes the conflicts branched on, not the answer).  On by
     /// default.
     pub warm_start: bool,
 }
@@ -81,9 +81,9 @@ impl Default for SearchTactics {
             conflict_branching: true,
             conflict_look: true,
             near_repeat: true,
-            price_reuse: false,
+            price_reuse: true,
             carried_nogoods: false,
-            warm_start: false,
+            warm_start: true,
         }
     }
 }
@@ -185,7 +185,7 @@ impl SearchTactics {
 
     /// The tactics as the header of a checkpoint records them: one bit for each switch that is on, `fix_forced` (bit
     /// 0), `nogoods` (1), `forget_nogoods` (2), `symmetry` (3), `conflict_branching` (4), `conflict_look` (5),
-    /// `near_repeat` (6), `price_reuse` (7), `carried_nogoods` (8) and `warm_start` (9); the defaults are `0x7F`.
+    /// `near_repeat` (6), `price_reuse` (7), `carried_nogoods` (8) and `warm_start` (9); the defaults are `0x2FF`.
     /// Bits 4 to 9 record the settings the search began with and bind nothing ([`same_recorded`](Self::same_recorded)).
     pub(super) fn bits(self) -> u16 {
         u16::from(self.fix_forced)

@@ -668,13 +668,13 @@ fn units_and_headers_round_trip() {
     assert!(Header::<8>::decode(b"nonsense").unwrap_err().contains("not a checkpoint"));
     assert!(Header::<8>::decode(&bytes[..20]).is_err());
     // The layout: the magic, the version, the width and n, the digests (the extended problem's test finds them where
-    // they are), `max_total` and the tactics' bits, which the defaults make 0x7F.
+    // they are), `max_total` and the tactics' bits, which the defaults make 0x2FF.
     assert_eq!(&bytes[..4], b"TXSH");
     assert_eq!(bytes[4..8], 7u32.to_le_bytes());
     assert_eq!(bytes[8..12], 8u32.to_le_bytes());
     assert_eq!(bytes[12..16], 300u32.to_le_bytes());
     assert_eq!(bytes[40..44], p.max_total.to_le_bytes());
-    assert_eq!(Header::of(&prepare_golden::<8>(&load(300), SearchTactics::default())).encode()[44..], [0x7F, 0]);
+    assert_eq!(Header::of(&prepare_golden::<8>(&load(300), SearchTactics::default())).encode()[44..], [0xFF, 0x02]);
     // Every other format version, the older ones included (`TXS2` was version 2), is refused with one message, naming
     // its number; a header of the magic of another format is no checkpoint of a search at all.
     let versioned = |version: u32| [&bytes[..4], &version.to_le_bytes(), &bytes[8..]].concat();
@@ -727,14 +727,14 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&cutting.encode()), Ok(cutting));
     assert!(header.tactics.near_repeat);
 
-    // So is the reuse of prices, which is off by default: a header with it on is this search's.
+    // So is the reuse of prices, which is on by default: a header with it off is this search's.
     let mut reusing = header;
-    reusing.tactics.price_reuse = true;
+    reusing.tactics.price_reuse = false;
     assert_eq!(reusing.mismatch(&header), None);
     assert_eq!(header.mismatch(&reusing), None);
     assert_ne!(reusing.encode(), header.encode());
     assert_eq!(Header::<8>::decode(&reusing.encode()), Ok(reusing));
-    assert!(!header.tactics.price_reuse);
+    assert!(header.tactics.price_reuse);
 
     // So is the carrying of nogoods, which is off by default.
     let mut carrying = header;
@@ -745,21 +745,21 @@ fn units_and_headers_round_trip() {
     assert_eq!(Header::<8>::decode(&carrying.encode()), Ok(carrying));
     assert!(!header.tactics.carried_nogoods);
 
-    // So is the warm start of the GF(2) bound, which is off by default.
+    // So is the warm start of the GF(2) bound, which is on by default.
     let mut warming = header;
-    warming.tactics.warm_start = true;
+    warming.tactics.warm_start = false;
     assert_eq!(warming.mismatch(&header), None);
     assert_eq!(header.mismatch(&warming), None);
     assert_ne!(warming.encode(), header.encode());
     assert_eq!(Header::<8>::decode(&warming.encode()), Ok(warming));
-    assert!(!header.tactics.warm_start);
+    assert!(header.tactics.warm_start);
 
     // Every setting of the search tactics reads back as it was written: a bit for each switch that is on, in the order
     // of `SearchTactics::bits` (`fix_forced` bit 0, `nogoods` 1, `forget_nogoods` 2, `symmetry` 3, `conflict_branching`
     // 4, `conflict_look` 5, `near_repeat` 6, `price_reuse` 7, `carried_nogoods` 8 and `warm_start` 9: the defaults make
-    // 0x7F), and no higher bit is used.  The switches of bits 4 to 9 bind nothing ([`SearchTactics::same_recorded`]): a
-    // checkpoint records each as the search began with it, and resumes with the tactic on or off, and a run that
-    // resumes a search says it.  The others bind.
+    // 0x2FF), and no higher bit is used.  The switches of bits 4 to 9 bind nothing
+    // ([`SearchTactics::same_recorded`]): a checkpoint records each as the search began with it, and resumes with the
+    // tactic on or off, and a run that resumes a search says it.  The others bind.
     let flips: [fn(SearchTactics) -> SearchTactics; 10] = [
         |t| SearchTactics { fix_forced: !t.fix_forced, ..t },
         |t| SearchTactics { nogoods: !t.nogoods, ..t },
@@ -773,7 +773,7 @@ fn units_and_headers_round_trip() {
         |t| SearchTactics { warm_start: !t.warm_start, ..t },
     ];
     let default = SearchTactics::default();
-    assert_eq!(default.bits(), 0x7F);
+    assert_eq!(default.bits(), 0x2FF);
     for (bit, flip) in flips.iter().enumerate() {
         let flipped = flip(default);
         assert_eq!(flipped.bits() ^ default.bits(), 1 << bit, "the bit of switch {bit}");

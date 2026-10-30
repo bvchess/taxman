@@ -18,7 +18,8 @@
 //! because a non-release run checks only the rows of the trees of [`QUICK_NODES`] nodes or fewer, in the quick tests.)
 //! Check that the changes are the intended ones (the promotion sum, which is the answer, never moves), paste the rows
 //! in, and change the node counts quoted in solver/docs/design/ and solver/notebook/ if they are affected.  The same
-//! goes for [`FORGETTING`] and for [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its
+//! goes for [`GATED`], the trees under the gates that make conflict branching act, for [`FORGETTING`] and for
+//! [`EXTENDED`], the table of the search of the extended problem Π⁺(∅) in its
 //! formulation without the claims of `unzip` (the frame model with the claims put back and no source open;
 //! `Board::prepare_extended_with` with `claims` unset), whose rows are checked the same way.  Besides its table, Π⁺(∅)
 //! is held to the default engine: without the claims, with no one-sided candidate its search is that engine's on the
@@ -30,23 +31,24 @@
 mod common;
 
 use common::{options, prev_of, search_at_width, stored_games, Config, Game};
+use std::sync::{Arc, OnceLock};
 use taxman::bits::Bits;
 use taxman::board::Board;
 use taxman::bounds::greedy;
 use taxman::json::Json;
-use taxman::search::{prepare, search, Prepared, SearchTactics};
+use taxman::search::{prepare, search, search_steered, BranchSettings, Branching, Prepared, SearchTactics};
 use taxman::solver::{self, Method};
 use taxman::tactics::Tactics;
 use taxman::with_width;
 
 /// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread.  The tactics are
 /// `--tactic` assignments after the default.
-const EXPECTED: [(u32, &str, u64, u64); 21] = [
-    // The default, the GF(2) bound with the rule of the root's symmetric pairs: trees of tens to thousands of nodes;
-    // `symmetry=off` (the default before the rule) makes them larger with the same answers.  Game 1000's rows count the
-    // tree with conflict branching, which is on by default and acts where a node's gap passes 300; with
-    // `conflict_branching=off` its default row is smaller.  With `conflict_look`, on by default, it looks at the last
-    // child of the search's own conflict there; `conflict_look=off` gives another tree.
+const EXPECTED: [(u32, &str, u64, u64); 20] = [
+    // The default, the GF(2) bound with the rule of the root's symmetric pairs, the reuse of prices and the warm start:
+    // trees of tens to thousands of nodes; `symmetry=off` (the default before the rule) makes them larger with the same
+    // answers.  Conflict branching is on by default and acts where a node's gap passes the gate, 1,200, which no node
+    // of these games' searches reaches, so these trees are those of the search's own conflict at every node: [`GATED`]
+    // has the trees of the games under gates that make conflict branching act.
     (480, "default", 5350, 37),
     (600, "default", 8507, 365),
     (600, "fix_forced=off", 8507, 530),
@@ -61,11 +63,10 @@ const EXPECTED: [(u32, &str, u64, u64); 21] = [
     (936, "fix_forced=off", 20507, 830),
     (936, "nogoods=off", 20507, 345),
     (936, "symmetry=off", 20507, 652),
-    (1000, "default", 24168, 3319),
+    (1000, "default", 24168, 2026),
     (1000, "fix_forced=off", 24168, 4000),
-    (1000, "nogoods=off", 24168, 6308),
-    (1000, "conflict_look=off", 24168, 3360),
-    (1000, "symmetry=off", 24168, 4591),
+    (1000, "nogoods=off", 24168, 2991),
+    (1000, "symmetry=off", 24168, 2432),
     (1133, "default", 28690, 41),
     (1133, "nogoods=off", 28690, 34),
 ];
@@ -79,7 +80,7 @@ const EXPECTED: [(u32, &str, u64, u64); 21] = [
 /// the rule).  The promotion sums are those of [`EXPECTED`]: Π⁺(∅) has the frame model's promotion sets, and the sum is
 /// the answer.  The rows `extended` are the frame model's trees, node for node, where [`EXPECTED`] has the same tactics
 /// (its rows `symmetry=off` for 600, 936 and 1000); the rows `default` differ from those of [`EXPECTED`] (408 against
-/// 365 nodes at 600, 366 against 449 at 936, 3,507 against 3,319 at 1000), so what differs is what the rule of the
+/// 365 nodes at 600, 366 against 449 at 936, 2,107 against 2,026 at 1000), so what differs is what the rule of the
 /// symmetric pairs reads from the two models, not the search.  Both are also held to the default engine's search of the
 /// same frames and candidates ([`extended_searches`]), whatever the table says.
 const EXTENDED: [(u32, &str, u64, u64); 16] = [
@@ -95,18 +96,45 @@ const EXTENDED: [(u32, &str, u64, u64); 16] = [
     (760, "extended", 14170, 184),
     (936, "default", 20507, 366),
     (936, "extended", 20507, 652),
-    (1000, "default", 24168, 3507),
-    (1000, "extended", 24168, 4591),
+    (1000, "default", 24168, 2107),
+    (1000, "extended", 24168, 2432),
     (1133, "default", 28690, 41),
     (1133, "extended", 28690, 41),
 ];
 
+/// (board, tactics, promotion sum, nodes): the game searched from the frame builder on one thread, as [`EXPECTED`]'s,
+/// with a gate named among the assignments, `gate=N`: the gap from which conflict branching chooses.  [`EXPECTED`]'s
+/// rows have the default gate, 1,200, which no node of their games reaches, so these rows hold the trees of the tactics
+/// that act only where conflict branching chooses (`conflict_look`, `price_reuse`, and the conflicts themselves), and
+/// those of a tactic that changes a tree by a node (`warm_start`: the games 775 to 777 take one node fewer without it).
+/// The games 760 and 1133 under the gate 0, which chooses at every check; 775 under the default gate; and 1000 under
+/// 300, the default gate before the policy of the chain became the default, whose row `price_reuse=off,warm_start=off`
+/// is that default's tree (3,319 nodes, the row of [`EXPECTED`] then).
+const GATED: [(u32, &str, u64, u64); 10] = [
+    (760, "gate=0", 14170, 159),
+    (760, "gate=0,conflict_look=off", 14170, 157),
+    (760, "gate=0,price_reuse=off", 14170, 159),
+    (1133, "gate=0", 28690, 29),
+    (1133, "gate=0,price_reuse=off", 28690, 27),
+    (775, "gate=1200", 14548, 210),
+    (775, "gate=1200,warm_start=off", 14548, 209),
+    (1000, "gate=300", 24168, 2841),
+    (1000, "gate=300,price_reuse=off", 24168, 3319),
+    (1000, "gate=300,price_reuse=off,warm_start=off", 24168, 3319),
+];
+
+/// The boards of [`GATED`].
+const GATED_BOARDS: [u32; 4] = [760, 775, 1000, 1133];
+
+/// The tactics a row names: `default` and `extended` as in the tables, the others `--tactic` assignments after the
+/// default, and `gate=N`, a gate of [`GATED`], none.
 fn tactics(assignments: &str) -> SearchTactics {
     let mut tactics = Tactics::default();
     for assignment in assignments.split(',') {
         match assignment {
             "default" => {}
             "extended" => tactics.search = SearchTactics::extended(),
+            _ if assignment.starts_with("gate=") => {}
             _ => tactics.set(assignment).unwrap(),
         }
     }
@@ -155,6 +183,21 @@ fn searched<const W: usize>(p: &Prepared<W>) -> (u64, u64) {
 /// builder under the tactics `assignments`, on one thread.
 fn default_tree(n: u32, assignments: &str) -> (u64, u64) {
     with_width!(n, W => search_at_width::<W>(n, tactics(assignments)))
+}
+
+/// The tree [`GATED`] counts: [`default_tree`] with the gate `assignments` name (`gate=N`).
+fn gated_tree(n: u32, assignments: &str) -> (u64, u64) {
+    let gate = assignments.split(',').find_map(|a| a.strip_prefix("gate=")).expect("a row of GATED names its gate");
+    let gate = gate.parse().expect("a gate is a number");
+    with_width!(n, W => {
+        let p = Board::<W>::for_n(n).prepare(tactics(assignments)).unwrap();
+        let branching = Arc::new(Branching::new(BranchSettings::of(&p.tactics).with_gate(Some(gate))));
+        let near = OnceLock::new();
+        let cfg = common::config(1);
+        let r = search_steered(&p, &cfg, &[], None, false, None, &branching, &near, None, None, None).unwrap();
+        assert!(r.completed);
+        (r.sum, r.stats.nodes)
+    })
 }
 
 /// (promotion sum, nodes) of the search of the extended problem Π⁺(∅) of game `n` at width `W` without the claims of
@@ -214,6 +257,20 @@ const ALL_BOARDS: [u32; 8] = [480, 600, 640, 660, 760, 936, 1000, 1133];
 #[test]
 fn the_small_search_trees_have_not_changed() {
     check_trees(&EXPECTED, &ALL_BOARDS, QUICK_NODES, "search trees", default_tree);
+}
+
+#[test]
+fn the_small_search_trees_under_a_gate_that_chooses_have_not_changed() {
+    check_trees(&GATED, &GATED_BOARDS, QUICK_NODES, "search trees under a gate", gated_tree);
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "long: the quick check is the_small_search_trees_under_a_gate_that_chooses_have_not_changed"
+)]
+fn the_search_trees_under_a_gate_that_chooses_have_not_changed() {
+    check_trees(&GATED, &GATED_BOARDS, u64::MAX, "search trees under a gate", gated_tree);
 }
 
 #[test]
@@ -367,7 +424,7 @@ fn a_search_with_the_symmetry_rule_on_one_thread_is_deterministic() {
 }
 
 /// (game, nodes forgetting the nogoods every 200 steps, nodes never forgetting) for [`forgetting_search`].
-const FORGETTING: (u32, u64, u64) = (800, 1640, 1424);
+const FORGETTING: (u32, u64, u64) = (800, 1550, 1401);
 
 /// The tree below the root of a game of more than a thousand nodes (the trees of the smaller games are too small for
 /// forgetting to matter), searched by one searcher that forgets its nogoods every `period` steps (`None`: never), from

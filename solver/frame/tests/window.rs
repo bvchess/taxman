@@ -169,15 +169,15 @@ fn a_game_repeats_the_search_of_a_game_still_in_flight() {
     ignore = "long: the quick check is a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again"
 )]
 fn a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
-    a_range_stopped_by_a_limit_completes_when_run_again(796, 806, 4);
+    a_range_stopped_by_a_limit_completes_when_run_again(987, 991, 4);
 }
 
-/// [`a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again`] for the games
-/// 986..=987 on two threads.  987 takes 2,825 steps, more than twice the 1,024 steps after which a worker looks at the
-/// limit, so one of the two workers always reaches them.
+/// [`a_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again`] for the game 999 alone
+/// on two threads.  999 takes 2,708 steps, more than twice the 1,024 steps after which a worker looks
+/// at the limit, so one of the two workers always reaches them.
 #[test]
 fn a_short_range_stopped_by_a_limit_ends_at_its_first_unfinished_game_and_completes_when_run_again() {
-    a_range_stopped_by_a_limit_completes_when_run_again(986, 987, 2);
+    a_range_stopped_by_a_limit_completes_when_run_again(999, 999, 2);
 }
 
 /// The range `lo..=hi` on `threads` threads under a node limit stops at its first unfinished game, and completes when
@@ -239,28 +239,31 @@ fn clock_of(checkpoints: &Path, n: u32) -> f64 {
 }
 
 /// The clock of a game's own search (`seconds.own`; "The clock" in `src/solver/window.rs`): a node limit stops the head
-/// of the window before its search can complete (no seed and no ceiling make the search of 1000 on two threads take
-/// more than twice the 1,024 steps of a worker that the limit is looked at after), and the head keeps a checkpoint and
-/// a clock; a run with the same limits stops at the same game from the clock it was left with (which is never smaller);
-/// and a run with no node limit completes every game from the checkpoint and the clock, records the head's own search
-/// time over its invocations, and leaves no clock behind.
+/// of the window before its search can complete (no seed and no ceiling make the search of 998 on two threads take
+/// more than four times the 1,024 steps of a worker that the limit is looked at after), and the head keeps a checkpoint
+/// and a clock; a run with the same limits stops at the same game from the clock it was left with (which is never
+/// smaller); and a run with no node limit completes every game from the checkpoint and the clock, records the head's
+/// own search time over its invocations, and leaves no clock behind.
 #[test]
 #[cfg_attr(
     debug_assertions,
     ignore = "long: the quick check is a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it"
 )]
 fn a_stopped_game_keeps_its_clock_and_goes_on_from_it() {
-    a_stopped_game_goes_on_from_its_clock(1000, 1001);
+    a_stopped_game_goes_on_from_its_clock(998, 999, 2);
 }
 
-/// [`a_stopped_game_keeps_its_clock_and_goes_on_from_it`] for the game 1000 alone.
+/// [`a_stopped_game_keeps_its_clock_and_goes_on_from_it`] for the game 999 alone, on one thread: its search of 2,708
+/// steps is stopped after about 1,024 and again after about 2,048 (the same steps every time, which two threads do not
+/// give), and ends in the third run.
 #[test]
 fn a_lone_stopped_game_keeps_its_clock_and_goes_on_from_it() {
-    a_stopped_game_goes_on_from_its_clock(1000, 1000);
+    a_stopped_game_goes_on_from_its_clock(999, 999, 1);
 }
 
-/// The head `lo` of the range `lo..=hi` is stopped by a node limit, and the range goes on from its clock.
-fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32) {
+/// The head `lo` of the range `lo..=hi` is stopped by a node limit on `threads` threads, and the range goes on from its
+/// clock.
+fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32, threads: usize) {
     let dir = TempDir::new("window-clock");
     let results = dir.join("r.jsonl");
     let checkpoints = dir.join("ckpt");
@@ -270,7 +273,7 @@ fn a_stopped_game_goes_on_from_its_clock(lo: u32, hi: u32) {
         force_search: true,
         use_prev: true,
         window: 4,
-        ..options(2)
+        ..options(threads)
     };
     stopping.tactics.seed_incumbent = false;
     stopping.tactics.prev_cap = false;

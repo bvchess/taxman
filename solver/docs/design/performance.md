@@ -17,7 +17,7 @@ load on the machine moves wall times by up to 3×.  The probe measures it:
   * Fixture F4: the GF(2) bound's kernels at the nodes of F1 (the bound from scratch; with its weight split and forced
     members; without each member of its heaviest set's conflict, solved, and as strong branching reads them, certified
     or solved);
-  * Fixture F3: a checkpoint of the proofs of 992 (14,841 nodes) and 1215 (3,704), made by this build's default search
+  * Fixture F3: a checkpoint of the proofs of 992 (11,441 nodes) and 1215 (3,704), made by this build's default search
     (`perf make-window 992 1024`, `perf make-window 1215 1024`: stopped by a node limit of 1,024, which the engine
     reaches after 2,047 nodes), resumed on one thread for 50,000 steps: the search itself, with the tactics its
     checkpoint records (the defaults; `--tactic` changes them), which finishes both searches, fingerprinted by its
@@ -25,7 +25,7 @@ load on the machine moves wall times by up to 3×.  The probe measures it:
     the window is costed by the steps it took).  Game 936 has no window: its proof takes 449 nodes, fewer than the
     1,024 steps after which the engine looks at a node limit, so no point exists to stop it at.
 
-  The probe's fingerprint is aff672d2dccda0dc: it combines those of every kernel and of both windows, so a change of
+  The probe's fingerprint is dc66a29d865d44d3: it combines those of every kernel and of both windows, so a change of
   the tree moves it by the windows' and an exact optimization leaves it alone.  A window records the header of the
   build that made it, so a change of the header's format makes the windows again (`perf make-window` with the arguments
   above), and the fingerprint with them.  It takes about 5 s in all (more when the machine is busy).  For whole

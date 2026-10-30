@@ -135,10 +135,13 @@ use std::time::{Duration, Instant};
 pub const NOGOOD_PERIOD: u64 = 50_000;
 
 /// With the tactic `conflict_branching`, a check chooses the conflict it branches on only where its gap, the GF(2) bound
-/// less the need, is at least this (below it the search's own conflict is kept): the best of 0, 200, 300 and 400 on
-/// the whole game 4050 and two units of 4548 and 4875 (solver/notebook/search/
+/// less the need, is at least this (below it the search's own conflict is kept), unless a caller sets another gate
+/// (`solve --gate`, and the gate trial).  On units of the games 4991, 4992 and 4995 a gate of 1,200 took 0.90 to 0.92
+/// of the CPU of conflict branching off, and a gate of 300 took 2.03 of it on those of 4991 (solver/notebook/search/
+/// the-root-gap-and-the-size-of-a-game-2026-10/README.md, "settings checks"); 300, the gate before, was the best of 0,
+/// 200, 300 and 400 on the whole game 4050 and two units of 4548 and 4875 (solver/notebook/search/
 /// where-the-search-of-4875-spends-and-which-conflict-to-branch-on-2026-10/README.md).
-pub const CONFLICT_BRANCHING_GAP: u64 = 300;
+pub const CONFLICT_BRANCHING_GAP: u64 = 1200;
 
 /// The widest gate a caller may give conflict branching in place of [`CONFLICT_BRANCHING_GAP`]: `solve --gate` and the
 /// gates of `solve --gate-trial` take whole numbers from 0 to this.  Any gate keeps the search exact: below it a check

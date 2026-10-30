@@ -115,13 +115,32 @@ fn guard_checkpoints(opts: &SolveOptions) -> Result<Option<engine::DirLock>, Cli
 
 /// The gates of `--gate-trial`: whole numbers from 0 to [`MAX_GATE`], separated by commas.
 fn trial_gates(list: &str) -> Result<Vec<u64>, CliError> {
-    let bad = || CliError::Usage(format!("--gate-trial takes gates from 0 to {MAX_GATE} separated by commas: {list}"));
+    let bad = || {
+        CliError::Usage(format!("--gate-trial takes gates from 0 to {MAX_GATE} separated by commas, or none: {list}"))
+    };
     let gates: Vec<u64> =
         list.split(',').map(|gate| gate.trim().parse().map_err(|_| bad())).collect::<Result<_, _>>()?;
     if gates.is_empty() || gates.iter().any(|&gate| gate > MAX_GATE) {
         return Err(bad());
     }
     Ok(gates)
+}
+
+/// The gate trial that `--gate-trial` and `--gate-trial-plan` ask for: the trial of the default gates
+/// ([`gate_trial::GATES`]) where neither says, that of the gates `--gate-trial` lists, and none where it says `none`
+/// (a search with the one gate it starts with).
+fn run_gate_trial(args: &Args) -> Result<Option<gate_trial::Plan>, CliError> {
+    let spec = args.value("--gate-trial-plan");
+    let gates = match args.value("--gate-trial") {
+        Some("none") if spec.is_some() => {
+            return Err(CliError::Usage("--gate-trial-plan sets the trial, and --gate-trial none is no trial".into()))
+        }
+        Some("none") => return Ok(None),
+        Some(gates) => trial_gates(gates)?,
+        None => gate_trial::GATES.to_vec(),
+    };
+    let plan = gate_trial::Plan::of(gates).with(spec.unwrap_or_default());
+    plan.map(Some).map_err(|e| CliError::Usage(format!("--gate-trial-plan: {e}")))
 }
 
 /// The gate of `--gate`, a whole number from 0 to [`MAX_GATE`], if it is given: the gap from which conflict branching
@@ -200,13 +219,7 @@ pub fn solve(args: &[String]) -> CliResult {
         opts.tactics.search.carried_nogoods = true;
     }
     opts.gate = run_gate(&args, &opts)?;
-    if let Some(gates) = args.value("--gate-trial") {
-        let plan = gate_trial::Plan::of(trial_gates(gates)?);
-        let spec = args.value("--gate-trial-plan").unwrap_or_default();
-        opts.gate_trial = Some(plan.with(spec).map_err(|e| CliError::Usage(format!("--gate-trial-plan: {e}")))?);
-    } else if args.value("--gate-trial-plan").is_some() {
-        return Err(CliError::Usage("--gate-trial-plan sets the trial of --gate-trial: give it too".into()));
-    }
+    opts.gate_trial = run_gate_trial(&args)?;
     search_options(&args, &mut opts)?;
     let out = args.value("--out").map(Path::new);
     let show = args.has("--show");

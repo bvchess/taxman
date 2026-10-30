@@ -456,8 +456,8 @@ them.
   ([design/engine.md](../docs/design/engine.md#the-window-games-in-flight)).
 * **A finder beside a long search.**  `--finder-after NODES` starts a thread of its own, beside the workers, once a game's
   search has taken NODES steps (over all its invocations; default 1000000, and 0 starts none), which looks for a better
-  game than the incumbent and offers it to the search; `--finder-seconds S` is its budget (default 60).  It changes no answer, and it is not part of a
-  checkpoint: a checkpoint resumes with any finder or none.  The line records what it did (`engine.finder`, [the
+  game than the incumbent and offers it to the search; `--finder-seconds S` is its budget (default 900).  It changes no
+  answer, and it is not part of a checkpoint: a checkpoint resumes with any finder or none.  The line records what it did (`engine.finder`, [the
   reference](../docs/REFERENCE.md#a-results-line---out-schema-5)); [the design](../docs/design/finder.md) says
   how it works.
 * **A result is recorded before its checkpoint is deleted**, so a crash never loses a finished game.  At worst the

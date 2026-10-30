@@ -46,7 +46,10 @@ solver/tools/cloud/spot-watch.sh
 four games in flight at once (`WINDOW`), a checkpoint every 300 s and a progress line every 60 s.  The top of the script
 documents its variables, all optional: `THREADS`, `WINDOW`, `CHECKPOINT_INTERVAL`, `PROGRESS`, `EXTRA_ARGS`,
 `MAX_FAILS`, `S3_DEST`, `SAVE_EVERY`, and the [cost guardrails](launch.md#cost-guardrails) (`DEADLINE_HOURS`,
-`BUDGET_HOURS`, `RUN_UNTIL`, `POWEROFF`).
+`BUDGET_HOURS`, `RUN_UNTIL`, `POWEROFF`).  The search itself needs no flag: the solver's defaults are the chain's
+policy, a gate of 1,200 with the gate trial, `price_reuse` and `warm_start` on, and a finder of 900 seconds
+([tactics.md](../design/tactics.md)), so `EXTRA_ARGS` holds only what depends on the machine and the run
+(`--background`, `--carried-dir`, `--profile`).
 
 On a machine shared with other work, leave `THREADS` unset (one worker per hardware thread) and give
 `EXTRA_ARGS="--background"`.  The workers then run under the idle scheduling policy, so that any other process, even

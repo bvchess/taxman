@@ -63,10 +63,11 @@ fn every_tactic_gives_the_same_scores_at(games: std::ops::RangeInclusive<u32>) {
             "conflict_branching=off",
             "conflict_look=off",
             "near_repeat=off",
-            "price_reuse=on",
-            "conflict_look=off,price_reuse=on",
+            "price_reuse=off",
+            "conflict_look=off,price_reuse=off",
             "carried_nogoods=on",
-            "conflict_branching=off,warm_start=on",
+            "conflict_branching=off,warm_start=off",
+            "price_reuse=off,warm_start=off",
             "fix_forced=off,nogoods=off,symmetry=off",
         ]
         .into_iter()

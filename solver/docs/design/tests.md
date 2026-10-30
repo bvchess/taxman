@@ -84,7 +84,9 @@ every second line of the Java fixtures), and the comment on each says what the w
     pairs (without forced members or nogoods; forgetting every step; two threads), the GF(2) bound without the rule on
     one thread, two, and forgetting every step, 5 of conflict branching (at every check, whatever its gap, on one
     thread and two; off; and with the look at the last child of the search's own conflict, on one thread and two), 1
-    without the near-repeat cut, 4 of the reuse of prices, 4 of carried nogoods, and 2 of the warm start;
+    without the near-repeat cut, 4 of the reuse of prices (conflict branching at every check without it, and under three
+    other schedules of it), 4 of carried nogoods, and 2 without the warm start (one of them without the reuse of prices
+    too); the others have both, as the default does;
   * the near-repeat cut in every search of the harness on real games, by one of the four games before (the latest whose
     optimum the handicapped incumbent reaches), and the games 404, 430 and 436, whose trees it changes, under every
     configuration with the cut and without it; on those three, a cut whose bound the incumbent never reaches cuts
@@ -118,14 +120,16 @@ every second line of the Java fixtures), and the comment on each says what the w
   assertion on answers sees it (a mutant that ignored the result of `Nogoods::ruled_out` takes 27 to 67% more nodes).
   With one thread the tree is deterministic, so the test asserts the exact node count of a fixed game under fixed
   tactics: n = 480 to 1133, every tactic off or changed in turn, and the tree of game 800 with the searchers
-  forgetting their nogoods every 200 steps.  The table
-  `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the committed
-  game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes the cut
-  cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off` are the
-  default's trees before the rule of symmetric pairs.  The table `EXTENDED` does the same for the
-  extended problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default
-  engine's on the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself and
-  reproduce every row of the default table, node for node.
+  forgetting their nogoods every 200 steps.  The default gate, 1,200, is above every gap of these games, so the table
+  `GATED` has the trees under the gates that make conflict branching act (the games 760 and 1133 under a gate of 0, 1000
+  under 300), with the look and the reuse of prices off in turn, and the game 775 with and without the warm start.  The
+  table `NEAR_REPEATS` counts the trees of the games 768, 1083 and 1101, solved as the solver solves them from the
+  committed game of n − 1, with the near-repeat cut and without it, and checks that the line of each counts the nodes
+  the cut cut (`stats.near_repeat_cut`) if it was armed, and has no such key if it was not.  The rows `symmetry=off`
+  are the default's trees before the rule of symmetric pairs.  The table `EXTENDED` does the same for the extended
+  problem with nothing open, Π⁺(∅), without the claims of `unzip`, whose search must also be the default engine's on
+  the same problem, node for node; with the claims, Π⁺(∅) must pose the default problem itself and reproduce every row
+  of the default table, node for node.
 
   **A change that alters the tree on purpose fails them.**  Run `cargo test --release --test tripwires -- --nocapture`
   (the quick tests check only the rows of trees of 250 nodes or fewer): it prints the rows as observed, in the layout of
@@ -140,8 +144,9 @@ every second line of the Java fixtures), and the comment on each says what the w
   * the GF(2) bound's free blocks: the intersection against brute force with one-sided elements, every promotion set of
     the games to 120 independent and under the bound, and random paths to 1300 matching the levels built afresh at every
     node;
-  * the soundness harness in extended mode on every game 2..=300 under eight configurations, and a game resumed every
-    1,000 nodes;
+  * the soundness harness in extended mode on every game 2..=300 under six configurations (the default tactics of
+    extended mode, on one thread and two, forgetting every step, without forced members, without nogoods, and with
+    conflict branching at every check), and a game resumed every 1,000 nodes;
   * the header's digest of the one-sided candidates, and the refusals of what extended mode cannot take (tactics, block
     words, another problem's checkpoint).
 * **Certificates** (`tests/certify.rs`):
@@ -209,11 +214,13 @@ every second line of the Java fixtures), and the comment on each says what the w
   * the policy: claims served oldest first, a lone ready search takes every free thread, a busy one doubles, idle
     workers go back only to another claim and after the last grant has settled, the oldest search reclaims from the
     youngest first and suspends them if need be, and a suspended search claims one thread.
-* **The gate** (`tests/solver.rs`, `tests/soundness.rs` and the unit tests of `src/search/branching.rs`): the run's
-  `--gate` reaches the searchers of game 780, which takes the steps of conflict branching off under a gate wider than
-  every gap and other steps under a gate of 0, and ends with the score of the table either way; three gates (0, 100 and
-  4,000) give each of the small games one answer and some of them other trees; a gate set after the generation it was
-  decided from is refused.
+* **The gate** (`tests/solver.rs`, `tests/soundness.rs`, `tests/cli.rs` and the unit tests of
+  `src/search/branching.rs`): the run's `--gate` reaches the searchers of game 780, which takes the steps of conflict
+  branching off under a gate wider than every gap and other steps under a gate of 0, and ends with the score of the
+  table either way; three gates (0, 100 and 4,000) give each of the small games one answer and some of them other
+  trees; a gate set after the generation it was decided from is refused.  The gate trial is on by default, and a test
+  that needs the gate to stay says `--gate-trial none`; `tests/cli.rs` checks that a line records the default trial's
+  gates (1000, 800 and 600) and none with `none`, and refuses a plan with `none`.
 * **The cloud scripts** have tests of their own that need no cloud: the scripts that run the chain unattended
   (`solver/tools/cloud/test/run.sh`: the date and the ledger through `chain.sh`, the lock of `run.sh`, and `status.sh`
   on a chain on another machine, against stand-ins for the aws CLI and ssh), and the build cache

@@ -160,7 +160,8 @@ pub struct SolveOptions {
     /// its flag does not say).  It is no tactic and no part of what a checkpoint records: a checkpoint resumes with any
     /// finder or none, and the finder changes no answer, only how soon the incumbent is good.
     pub finder_after: u64,
-    /// The finder thread's budget, from the moment it starts (it ends sooner if the game's search does).
+    /// The finder thread's budget, from the moment it starts (it ends sooner if the game's search does); by default
+    /// [`finder::BUDGET`].
     pub finder_budget: Duration,
     /// The directory of the searches' profiles (`--profile`): each game's search keeps one, `nNNNN.profile.jsonl`, at
     /// the depth `profile_depth` (`--profile-depth`; [`search::SearchProfile`]).  A profile observes a search and
@@ -175,12 +176,13 @@ pub struct SolveOptions {
     /// The gate each game's search starts with (`--gate`), in place of [`search::CONFLICT_BRANCHING_GAP`], from 0 to
     /// [`search::MAX_GATE`]: the gap from which conflict branching chooses the conflict.  The gate trial starts from it
     /// ([`search::gate_trial`]).  It changes no answer and is no tactic and no part of a checkpoint, which resumes with
-    /// any gate.  None by default.
+    /// any gate.  None by default: the search's own gate.
     pub gate: Option<u64>,
     /// The gate trial (`--gate-trial`): each game's search with conflict branching on tries these gates on a sample
     /// of its own units once it has taken the plan's steps, and branches with the one that took the least CPU
     /// ([`search::gate_trial`]).  It changes only the gate, which changes no answer, and is no tactic and no part of a
-    /// checkpoint.  None by default.
+    /// checkpoint.  It needs a checkpoint, so a search without one runs no trial.  By default the trial of the gates
+    /// [`search::gate_trial::GATES`]; `None` (`--gate-trial none`) is no trial, and a search with a fixed gate.
     pub gate_trial: Option<search::gate_trial::Plan>,
 }
 
@@ -203,12 +205,12 @@ impl Default for SolveOptions {
             known: KnownSources::default(),
             window: 4,
             finder_after: 0,
-            finder_budget: Duration::from_secs(60),
+            finder_budget: finder::BUDGET,
             profile: None,
             profile_depth: search::PROFILE_DEPTH,
             carried_dir: None,
             gate: None,
-            gate_trial: None,
+            gate_trial: Some(gate_trial::Plan::default()),
         }
     }
 }

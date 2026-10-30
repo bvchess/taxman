@@ -220,9 +220,9 @@ notebook's dated entries map onto these in the notebook's ["Terms changed"](../s
   heaviest set where that certifies it and solved where not.
 * **conflict branching**: how a node chooses the conflict it branches on, before strong branching chooses the member:
   of the conflicts within its heaviest set, the one whose members cost the bound most to leave out, so that every child
-  falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 300 or
-  more chooses so; otherwise it branches on the smallest conflict the search knows ([solver/docs/design/search.md,
-  "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
+  falls furthest below the node's gap.  With the tactic `conflict_branching`, on by default, a node whose gap is 1,200
+  (the gate) or more chooses so; otherwise it branches on the smallest conflict the search knows
+  ([solver/docs/design/search.md, "Conflict branching"](../solver/docs/design/search.md#conflict-branching)).
 * **look**: with the tactic `conflict_look`, on by default, a node that conflict branching would send to another
   conflict first looks at the last child of the search's own conflict, and branches on the search's own conflict if
   that child is cut on sight ([solver/docs/design/search.md,

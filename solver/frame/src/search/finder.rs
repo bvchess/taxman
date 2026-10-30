@@ -17,14 +17,14 @@
 //! gets a finder, and one that ends first never pays for one.
 //!
 //! The flag `--finder-after` is the number of steps, over every run of a search, after which the search starts one
-//! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget; both are
-//! `SolveOptions`, no tactics); [`Plan`] carries the two, and the seeds of the search, if it has any.  The thread
-//! ([`beside`]) runs *rounds* of LNS, each with a random seed of its own ([`Plan::random`] plus the round's number)
-//! for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after another, if there are
-//! any, the others from the search's incumbent as it is when the round starts, and adopt a better incumbent that the
-//! search finds meanwhile.  A game better than the search's incumbent is offered to the search at once
-//! ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends when
-//! its budget is spent or the search ends, whichever comes first.
+//! finder thread ([`AFTER`] when `solve` is not told, 0 for none; `--finder-seconds` is its budget, [`BUDGET`] when
+//! `solve` is not told; both are `SolveOptions`, no tactics); [`Plan`] carries the two, and the seeds of the search, if
+//! it has any.  The thread ([`beside`]) runs *rounds* of LNS, each with a random seed of its own ([`Plan::random`]
+//! plus the round's number) for [`ROUND`] at most: the odd rounds start from the survivors of the seeds, one seed after
+//! another, if there are any, the others from the search's incumbent as it is when the round starts, and adopt a better
+//! incumbent that the search finds meanwhile.  A game better than the search's incumbent is offered to the search at
+//! once ([`offer_found`]), through the control, the way a worker's improvement reaches the incumbent; the thread ends
+//! when its budget is spent or the search ends, whichever comes first.
 //!
 //! The finder only offers sets.  A set it offers becomes the incumbent after the check that a checkpoint's incumbent
 //! passes on resuming (a set of candidates that can be promoted from the root, worth what it claims), and the search
@@ -177,6 +177,10 @@ pub const ROUND: Duration = Duration::from_secs(15);
 /// The steps after which `solve` starts a finder beside a search when `--finder-after` does not say: a few seconds of
 /// a search on many threads, so that a search far below its final best gets one early.
 pub const AFTER: u64 = 1_000_000;
+
+/// How long a finder runs, from the moment it starts, when `--finder-seconds` does not say: the chain's re-run gave
+/// each 900 seconds.
+pub const BUDGET: Duration = Duration::from_secs(900);
 
 /// How often the thread looks at the search's steps while it waits to start, and for the search's end.
 const POLL: Duration = Duration::from_millis(20);

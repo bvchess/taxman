@@ -157,7 +157,7 @@ need = best + 1 − sum(promoted)                   # the loop goes on while the
                                                    -> end the loop (cut)
      I* can be promoted                            -> offer promoted ∪ I* as incumbent; end the loop
      otherwise: a conflict K ⊆ I* (the nogood table's smallest, else computed and learned); where value − need is
-         at least 300, the one conflict branching chooses instead ("Conflict branching", below)
+         at least 1200, the one conflict branching chooses instead ("Conflict branching", below)
 3. if K ⊆ F: end the loop (every completion beating the incumbent promotes all of K, which cannot be)
 4. if F is empty: the bound without each member of K, read off the exchange graph of I* or solved (exact strong
    branching); a member without which it is below need joins F; n = the member without which it is lowest
@@ -203,8 +203,9 @@ search knows often has a member whose price is a few points, and the child that 
 gap, so the subtree hardly shrinks.  A conflict whose members all have high prices makes every child's gap fall, and is
 often a set of forced members, which closes the node at step 3.
 
-*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (300; the *gate*,
-which the run's `--gate` may set from 0 to `MAX_GATE`, 4,000), the check weighs:
+*The choice.*  At step 2, where the gap, the bound less `need`, is at least `CONFLICT_BRANCHING_GAP` (1,200; the *gate*,
+which the run's `--gate` may set from 0 to `MAX_GATE`, 4,000, and the [gate trial](gate-trial.md) may change), the
+check weighs:
 
 * `K`, the conflict the search found;
 * every conflict the nogood table knows within `I*` (`Nogoods::all_within`);
@@ -217,8 +218,10 @@ lightest.  Prices come off the exchange graph of `I*`, as strong branching reads
 for the members that a failing frame's conflict can hold (`FrameGraph::conflict_members`); the others take the weight
 split's estimate.  A child that inherits its parent's heaviest set takes most of its prices from its parent's pricing
 with no search ([gf2-bound.md](gf2-bound.md)), and the tactic `price_reuse` keeps prices from check to check
-([price-reuse.md](price-reuse.md)).  Below the gap of 300 the search's own `K` is kept, since a small
-subtree does not repay the pricing.
+([price-reuse.md](price-reuse.md)).  Below the gate the search's own `K` is kept, since a small subtree does not repay
+the pricing.  On units of the games 4991, 4992 and 4995, a gate of 1,200 took 0.90 to 0.92 of the CPU of conflict
+branching off, and a gate of 300 took 2.03 of it on those of 4991 ([the settings
+checks](../../notebook/search/the-root-gap-and-the-size-of-a-game-2026-10/README.md#2026-10-27-settings-checks-on-games-4991-4992-and-4995)).
 
 *Why it is exact.*  It changes only which conflict a node branches on, and the second fact of [the default
 step's](#the-default-step) exactness holds for any conflict.  Each conflict made here is one: with its members alone

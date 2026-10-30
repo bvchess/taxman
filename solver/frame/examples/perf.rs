@@ -33,7 +33,7 @@
 //!   and augmentations, which measure work rather than the tree.  The checkpoint is read-only.  The windows are of this
 //!   build's default search, `make-window 992 1024` and `make-window 1215 1024`: the proof, seeded with an optimal
 //!   set, stopped by a node limit of 1,024, which the engine reaches after 2,047 nodes, the earliest point it stops
-//!   at; the proofs take 14,841 and 3,704 nodes in all, so the windows are the rest of them.  Game 936, whose proof
+//!   at; the proofs take 11,441 and 3,704 nodes in all, so the windows are the rest of them.  Game 936, whose proof
 //!   takes 449 nodes, has none (the search ends before the engine looks at a node limit), and 992 has no nodes.
 //!   `--tactic` changes the window's tactics (the search tactics only), and `make-window` takes `--tactic` as the
 //!   probe does, on top of the defaults.  A game in `--fixtures` with a window and no nodes (a copy of a chain's

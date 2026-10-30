@@ -38,7 +38,7 @@ commands:
                                from the game of n-1, and offers it to the search (default {finder_after}; 0: none).
                                It changes no answer and is no part of a checkpoint, which resumes with any finder or
                                none
-      --finder-seconds S       the finder thread's budget, from the moment it starts (default 60)
+      --finder-seconds S       the finder thread's budget, from the moment it starts (default {finder_seconds})
       --out FILE               append each result as a JSON line; games already completed in FILE are skipped
       --checkpoint-dir DIR     keep a resumable checkpoint nNNNN.ckpt per game in DIR
       --checkpoint-interval S  seconds between checkpoints (default 60)
@@ -62,7 +62,8 @@ commands:
                                checkpoint; refused with conflict_branching off
       --gate-trial GATES       once a game's search has taken {trial_after} steps, try each of the gates GATES (comma
                                separated, each from 0 to {max_gate}) and the search's own on a sample of its units,
-                               and branch with the one that took the least CPU.  It needs --checkpoint-dir
+                               and branch with the one that took the least CPU (default {trial_gates}; none: no
+                               trial, and a search that keeps its gate).  It runs only with --checkpoint-dir
       --gate-trial-plan SPEC   the trial's numbers, NAME=VALUE separated by commas: after ({trial_after}), units
                                ({trial_units}), steps ({trial_steps}, the most of each solve), threads
                                ({trial_threads}) and least_gap ({trial_least_gap})
@@ -119,12 +120,15 @@ commands:
 /// [`USAGE`] with the tactics' names and values, which the solver defines.
 fn usage() -> String {
     let rows: Vec<String> = Tactics::names().chunks(4).map(|row| row.join(", ")).collect();
+    let gates = gate_trial::GATES.map(|gate| gate.to_string()).join(",");
     USAGE
         .replace("{tactics}", &rows.join(&format!(",\n{:31}", "")))
         .replace("{finder_after}", &finder::AFTER.to_string())
+        .replace("{finder_seconds}", &finder::BUDGET.as_secs().to_string())
         .replace("{profile_depth}", &PROFILE_DEPTH.to_string())
         .replace("{gate}", &CONFLICT_BRANCHING_GAP.to_string())
         .replace("{max_gate}", &MAX_GATE.to_string())
+        .replace("{trial_gates}", &gates)
         .replace("{trial_after}", &gate_trial::AFTER.to_string())
         .replace("{trial_units}", &gate_trial::UNITS.to_string())
         .replace("{trial_steps}", &gate_trial::STEPS.to_string())

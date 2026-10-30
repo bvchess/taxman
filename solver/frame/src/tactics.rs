@@ -151,7 +151,7 @@ mod tests {
             ]
         );
         let values: Vec<&str> = t.settings().iter().map(|s| on_off(s.1)).collect();
-        let expected = ["on", "on", "on", "on", "on", "on", "on", "on", "on", "off", "off", "off", "on", "on"];
+        let expected = ["on", "on", "on", "on", "on", "on", "on", "on", "on", "on", "off", "on", "on", "on"];
         assert_eq!(values, expected);
         // The values of the search tactics are those of `SearchTactics::default()`, not copies of them.
         assert_eq!(t.search, SearchTactics::default());
