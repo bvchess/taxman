@@ -93,9 +93,9 @@ puts an answer at risk.
 7. **A fast way to bring the chain's results home**, as a recipe in [the runbook's guide to the chain](runbook/chain.md).
    Bringing home 49 games on 2026-10-23 took over an hour: a fresh debug build of the ledger, a rebase, and a wait loop
    that never ended.
-8. **Quick-check limits for a busy machine.**  On a machine shared with the chain, about ten tests exceed their 2 s CPU
-   limit on master itself.  Scale the limits by a calibration workload's slowdown, capped near 4 times, from a
-   baseline taken without the chain ([testing.md](design/testing.md)).  The limits are the project owner's decision.
+8. **Quick-check limits for a busy machine.**  Settled: on 2026-10-29 the project owner raised the per-test limit to 3 s
+   of CPU and judges the quick check by its total time ([testing.md](design/testing.md)).  The tests that were over the
+   old limit on the chain's machine were made cheaper, so no scaling by a calibration workload is needed.
 9. **One way for agents to build and test on the chain's machine.**  A script that applies the machine's rules (nice 19,
    four jobs, the shared target directories, the quick check, named release tests only), allowed by the agents'
    permissions, and a check when an agent finishes that stops it while its waiting loops or background jobs still run.

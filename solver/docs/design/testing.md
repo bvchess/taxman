@@ -29,7 +29,7 @@ the second waits for the first's lock (a file in the system's temporary director
 ends, however it ends) before it builds anything, says so, and counts that wait in the same 10 minutes.
 
 **It fails**, naming the tests that are over, if the tests take more than 15 s (the target is 10 s; the build and the
-wait are not counted) or if one test uses more than 2 s of CPU (CPU, not seconds on the clock, which grow several times
+wait are not counted) or if one test uses more than 3 s of CPU (CPU, not seconds on the clock, which grow several times
 over when every CPU is busy).  The limits and the thresholds of the wait are the constants at the top of the script, and
 raising a limit needs the project owner's approval: a test that goes over is made smaller or long, as below, never
 allowed more.

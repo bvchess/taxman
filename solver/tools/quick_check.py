@@ -42,7 +42,7 @@ from typing import Callable, Dict, List, NamedTuple, Optional
 
 TOTAL_TARGET = 10.0  # seconds the tests should take, on a laptop of ten cores
 TOTAL_LIMIT = 15.0  # seconds of the tests after which the check fails
-TEST_LIMIT = 2.0  # seconds of CPU one test may use in a non-release run
+TEST_LIMIT = 3.0  # seconds of CPU one test may use in a non-release run
 
 BUSY_LIMIT = 0.25  # the share of the CPUs that other work may use for the machine to be quiet enough for the limits
 BUSY_SAMPLE = 2.0  # seconds one sample of the machine's use of its CPUs takes
