@@ -123,6 +123,12 @@ def on_theorem_b(rows):
     return sum(1 for r in searches if r.get("fix_low")), len(searches)
 
 
+def thread_secs(r):
+    """What a search of `exact` cost: its threads' seconds added up (`thread_secs`), or its `secs` in a line written
+    before a search could run on several threads, when they were the same."""
+    return r.get("thread_secs", r["secs"])
+
+
 def exact(paths):
     """The proofs of optimal scores (`exact_proofs`); a later file's line for a game replaces an earlier file's."""
     rows = {r["n"]: r for r in lines(paths) if not r.get("fix_upper")}  # fix_upper lines are measurements
@@ -141,12 +147,12 @@ def exact(paths):
         open_ = [n for n in range(first_gap, max(rows) + 1) if not proven.get(n)]
         print(f"beyond it, proven: {compact_ranges(beyond)}; not (yet): {compact_ranges(open_)}")
     searched = [r for r in rows.values() if r["search"] in ("proven", "budget")]
-    print(f"searches: {len(searched)}, total {sum(r['secs'] for r in searched) / 3600:.1f} h, "
+    print(f"searches: {len(searched)}, total {sum(thread_secs(r) for r in searched) / 3600:.1f} thread-hours, "
           f"most nodes {max((r['nodes'], r['n']) for r in searched)}")
     last = max(searched, key=lambda r: r['n'])
     print(f"Franklín–Moniot-bound gap at the largest searched n ({last['n']}): {last['fm_bound'] - last['score']}")
-    big = sorted(searched, key=lambda r: -r["secs"])[:5]
-    print("slowest: " + ", ".join(f"n={r['n']} {r['secs']:.0f}s {r['nodes']} nodes" for r in big))
+    big = sorted(searched, key=lambda r: -thread_secs(r))[:5]
+    print("dearest: " + ", ".join(f"n={r['n']} {thread_secs(r):.0f} thread-s {r['nodes']} nodes" for r in big))
     resumed = [r for r in searched if r.get("parity") and r.get("matching_nodes")]
     if resumed:
         print("resumed with the parity bound: " + ", ".join(
@@ -155,17 +161,18 @@ def exact(paths):
 
 def exact_cost(args):
     """cost [--band N] FILE...: the cost curve of the searches made with the parity bound from scratch (no nodes
-    without it), by band of n (50 wide unless N says): how many, nodes and seconds, milliseconds a node (total seconds
-    over total nodes), the root's parity gap; and the least-squares slopes of log10 nodes and seconds.  Lines with
-    `fix_upper` (measurements of the frame model's problem) are ignored.  A search from the roles of F4
-    (`fix_low` 1) takes about half the time a node of the plain root's: do not mix them in one table."""
+    without it), by band of n (50 wide unless N says): how many, nodes and seconds (the threads' seconds,
+    `thread_secs`), milliseconds a node (total seconds over total nodes), the root's parity gap; and the least-squares
+    slopes of log10 nodes and seconds.  Lines with `fix_upper` (measurements of the frame model's problem) are ignored.
+    A search from the roles of F4 (`fix_low` 1) takes about half the time a node of the plain root's: do not mix them
+    in one table."""
     import math
     import statistics
     band, paths = (int(args[1]), args[2:]) if args[:1] == ["--band"] else (50, args)
-    rows = sorted((r for r in lines(paths) if r.get("parity") and r["search"] == "proven"
+    rows = sorted(({**r, "secs": thread_secs(r)} for r in lines(paths) if r.get("parity") and r["search"] == "proven"
                    and not r.get("matching_nodes") and not r.get("fix_upper")), key=lambda r: r["n"])
     hours = sum(r['secs'] for r in rows) / 3600
-    print(f"searches with the parity bound from scratch: {len(rows)}, total {hours:.2f} h")
+    print(f"searches with the parity bound from scratch: {len(rows)}, total {hours:.2f} thread-hours")
     print(f"{'n':>11} {'games':>5} {'gap':>6} {'median nodes':>12} {'max nodes':>10} {'median s':>9} {'max s':>8} "
           f"{'total nodes':>12} {'total s':>8} {'ms/node':>8}")
     for lo in range(rows[0]["n"] // band * band, rows[-1]["n"] + 1, band):

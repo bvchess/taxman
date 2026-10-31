@@ -772,6 +772,60 @@ pub struct Prover<'a> {
     optimizing: bool,
     /// The counters of [`watch`](Self::watch), if it is on.
     pub watch: Option<Watch>,
+    /// The nodes of the current path that are running their children, outermost first.
+    frames: Vec<Frame>,
+    /// The other threads searching the same game, if any (see [`team`](Self::team)).
+    team: Option<&'a dyn Team>,
+    /// How many nogoods of the table have been traded with the team (those after it were learned since).
+    traded: usize,
+}
+
+/// A thread's part in a search that several threads share (see [`Prover::team`]).  Before each child and each unit,
+/// the prover asks whether to stop, and gives away work when an idle thread waits for it.
+pub trait Team {
+    /// Whether the search must stop now: another thread ended it (a set beating the target, the budget).
+    fn halted(&self) -> bool;
+    /// Whether an idle thread waits for work from this prover.
+    fn asked(&self) -> bool;
+    /// Takes the unit given away when asked: the largest open child of the shallowest node that has one (None: no
+    /// node has an open child).
+    fn give(&self, unit: Option<Vec<Role>>);
+    /// The estimated tree of the unit the prover would give now (0 for none), for the idle threads to choose by.
+    fn offer(&self, size: f64);
+    /// Takes the nogoods learned since the last trade, and returns those to add (called every 256 nodes and when the
+    /// thread leaves).
+    fn trade(&self, learned: &[Vec<u32>]) -> Vec<Vec<u32>>;
+}
+
+/// A node running its children, on [`Prover::frames`]: the roles its children derive from, its decisions (child j
+/// gives the numbers of the first j decisions their roles and the j-th the other role), each child's estimated tree,
+/// and which children are taken (run, being run, or given away).
+struct Frame {
+    roles: Vec<Role>,
+    decisions: Vec<(u32, Role)>,
+    sizes: Vec<f64>,
+    taken: Vec<bool>,
+}
+
+impl Frame {
+    /// The roles of child j.
+    fn child(&self, j: usize) -> Vec<Role> {
+        let mut child = self.roles.clone();
+        self.decisions[..j].iter().for_each(|&(d, role)| child[d as usize] = role);
+        let (d, role) = self.decisions[j];
+        child[d as usize] = if role == Role::Pick { Role::Barred } else { Role::Pick };
+        child
+    }
+
+    /// The children not taken, in order.
+    fn open(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.taken.len()).filter(|&j| !self.taken[j])
+    }
+
+    /// The open child with the largest estimated tree (the first of them).
+    fn largest(&self) -> Option<usize> {
+        self.open().min_by(|&a, &b| self.sizes[b].total_cmp(&self.sizes[a]))
+    }
 }
 
 /// The Lagrangian matching: weights scaled by `scale`, picks penalized by the multipliers of their *active*
@@ -826,6 +880,7 @@ impl Lag {
 /// bound's certificate (a child starts its parity solve from it) with the state its solve left, which a child puts
 /// back to derive its start from (a parent with one child leaves none: the child finds the state still there).
 type Snapshot = (Vec<u32>, Vec<i64>);
+#[derive(Clone, Copy)]
 struct Base<'b> {
     roles: &'b [Role],
     plain: &'b Snapshot,
@@ -858,7 +913,38 @@ impl<'a> Prover<'a> {
             limit: 1,
             optimizing: false,
             watch: None,
+            frames: Vec::new(),
+            team: None,
+            traded: 0,
         }
+    }
+
+    /// Joins a search that several threads share, starting from the team's `nogoods`.  Before each child and each
+    /// unit the prover stops if the team says so; when an idle thread asks, it gives away the largest open child of
+    /// its shallowest node that has one, which it then does not run (by the estimated tree of its node's gap with the
+    /// child's member barred, the parity bound's [`without`](crate::parity::Bound::without), as the branching weighs
+    /// it); and it tells the team the size of that child.  Every 256 nodes it trades nogoods with the team
+    /// ([`trade`](Self::trade)).
+    pub fn team(mut self, team: &'a dyn Team, nogoods: Vec<Vec<u32>>) -> Self {
+        self.team = Some(team);
+        self.nogoods = nogoods;
+        self.traded = self.nogoods.len();
+        self
+    }
+
+    /// Hands the team the nogoods learned since the last trade, and adds those it returns, as far as the table has
+    /// room.
+    pub fn trade(&mut self) {
+        let Some(team) = self.team else { return };
+        let fresh = team.trade(self.nogoods.get(self.traded..).unwrap_or_default());
+        let room = self.max_nogoods.saturating_sub(self.nogoods.len());
+        self.nogoods.extend(fresh.into_iter().take(room));
+        self.traded = self.nogoods.len();
+    }
+
+    /// The most nogoods the table keeps.
+    pub fn max_nogoods(&self) -> usize {
+        self.max_nogoods
     }
 
     /// Turns on the counters of [`Watch`], which change nothing in the search: `branch` and `barred` flag numbers
@@ -1349,52 +1435,108 @@ impl<'a> Prover<'a> {
             return Verdict::Proven;
         }
         self.stats[3] += decisions.len() as u64;
-        let (base_roles, snapshot) = (roles.clone(), self.bound.snapshot());
+        let snapshot = self.bound.snapshot();
         let lag_snapshot = self.lag.as_ref().map(|l| l.m.snapshot());
         let saved = match (&self.parity, &warm) {
             (Some(meet), Some(warm)) if decisions.len() > 1 && self.parity_warm => meet.save(warm),
             _ => None,
         };
-        let child = |j: usize, roles: &[Role]| {
-            let mut child = roles.to_vec();
-            decisions[..j].iter().for_each(|&(d, role)| child[d as usize] = role);
-            let (d, role) = decisions[j];
-            child[d as usize] = if role == Role::Pick { Role::Barred } else { Role::Pick };
-            child
+        // Each child's estimated tree, for a team's idle threads: the node's gap, or with the child's member barred
+        // the parity bound's (as the branching above weighs a member), 10^(gap / POINTS_PER_DECADE).
+        let gap = best as i64 - self.target as i64;
+        let sizes = decisions
+            .iter()
+            .map(|&(c, role)| {
+                let barred = without.iter().find(|&&(x, _)| x == c && role == Role::Pick);
+                let gap = barred.map_or(gap, |&(_, v)| gap.min(v - self.target as i64));
+                10f64.powf(gap as f64 / POINTS_PER_DECADE)
+            })
+            .collect();
+        let taken = vec![false; decisions.len()];
+        let base = Base {
+            roles: &roles,
+            plain: &snapshot,
+            lag: lag_snapshot.as_ref(),
+            parity: warm.as_ref(),
+            saved: saved.as_ref(),
         };
-        let branch = &decisions;
-        for j in 0..branch.len() {
-            if self.pause_due() {
-                // Leave this child and the rest as open units.
-                (j..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
+        self.frames.push(Frame { roles: roles.clone(), decisions, sizes, taken });
+        let verdict = self.children(base);
+        self.frames.pop();
+        verdict
+    }
+
+    /// Runs the children of the node on top of [`frames`](Self::frames) in order, leaving out those given away (they
+    /// are another thread's units).  On a pause, the children not run are left as open units.
+    fn children(&mut self, base: Base) -> Verdict {
+        loop {
+            let pause = self.poll();
+            let frame = self.frames.last_mut().expect("the node's frame");
+            let Some(j) = frame.open().next() else { return Verdict::Proven };
+            if pause {
+                self.leave_open();
                 return Verdict::Paused;
             }
-            let base = Base {
-                roles: &base_roles,
-                plain: &snapshot,
-                lag: lag_snapshot.as_ref(),
-                parity: warm.as_ref(),
-                saved: saved.as_ref(),
-            };
-            match self.node(child(j, &base_roles), Some(base)) {
+            frame.taken[j] = true;
+            let child = frame.child(j);
+            match self.node(child, Some(base)) {
                 Verdict::Proven => {}
                 Verdict::Paused => {
-                    (j + 1..branch.len()).for_each(|k| self.pending.push(child(k, &base_roles)));
+                    self.leave_open();
                     return Verdict::Paused;
                 }
                 other => return other,
             }
         }
-        Verdict::Proven
+    }
+
+    /// On a pause: the open children of the node on top become open units, in order.
+    fn leave_open(&mut self) {
+        let frame = self.frames.last_mut().expect("the node's frame");
+        for j in 0..frame.taken.len() {
+            if !frame.taken[j] {
+                frame.taken[j] = true;
+                self.pending.push(frame.child(j));
+            }
+        }
+    }
+
+    /// Before each child and each unit: whether to pause.  With a team, it stops when the team says so, gives away a
+    /// unit when an idle thread asks, and offers the next one.
+    fn poll(&mut self) -> bool {
+        if let Some(team) = self.team {
+            if team.halted() {
+                self.paused = true;
+            } else if team.asked() {
+                let unit = self.give_away();
+                team.give(unit);
+            }
+            team.offer(self.offer());
+        }
+        self.pause_due()
+    }
+
+    /// Takes the open child that [`offer`](Self::offer) sizes away from its node, as a unit.
+    fn give_away(&mut self) -> Option<Vec<Role>> {
+        let frame = self.frames.iter_mut().find(|f| f.open().next().is_some())?;
+        let j = frame.largest()?;
+        frame.taken[j] = true;
+        Some(frame.child(j))
+    }
+
+    /// The estimated tree of the largest open child of the shallowest node that has one (0 if none has).
+    fn offer(&self) -> f64 {
+        self.frames.iter().find_map(|f| f.largest().map(|j| f.sizes[j])).unwrap_or(0.0)
     }
 
     /// Whether the pause deadline has passed (the clock is read every 256 nodes, the first time 256 nodes into
-    /// a run, so that every run makes progress).
+    /// a run, so that every run makes progress).  With a team, nogoods are traded then too.
     fn pause_due(&mut self) -> bool {
         match self.pause_at {
             Some(at) if self.nodes >= self.next_check => {
                 self.next_check = self.nodes + 256;
                 self.paused = self.paused || std::time::Instant::now() >= at;
+                self.trade();
                 self.paused
             }
             _ => self.paused,
@@ -1407,7 +1549,7 @@ impl<'a> Prover<'a> {
     pub fn run_units(&mut self, mut units: Vec<Vec<Role>>) -> Verdict {
         self.next_check = self.nodes + 256;
         while let Some(unit) = units.pop() {
-            if self.pause_due() {
+            if self.poll() {
                 units.push(unit);
                 self.pending = units;
                 return Verdict::Paused;

@@ -3,8 +3,10 @@
 Part of the [runbook](../RUNBOOK.md).
 
 `prover.sh A B` proves opt(n) = V(n), the score that `results/optimal.jsonl.gz` records, for every n from A to B, on the
-whole board.  It runs the prover's `exact` over the range in passes, one game a thread, and it is a small job next to
-the chain.  [The prover's proofs](../../noframe/docs/proofs.md) holds the proofs made so far and their cost.
+whole board.  It runs the prover's `exact` over the range in passes on every CPU, and it is a small job next to the
+chain.  It runs on EC2 ([Run](#run)) or on a machine of your own ([On a machine of your
+own](#on-a-machine-of-your-own)).  [The prover's proofs](../../noframe/docs/proofs.md) holds the proofs made so far and
+their cost.
 
 **A run searches from the roles of the bottom-layers theorem.**  `exact` starts there by default (`--fix-low 1`), and
 the search is still a proof, because every optimal set obeys the roles (the bottom-layers theorem
@@ -17,34 +19,38 @@ roles, `ckpt/exact_N.ckpt` from the plain root.
 
 ## How `exact` uses the CPUs
 
-A game's search runs on one thread, so the wall time of a run is at least that of its dearest game, and a big machine
-idles at the end.
+Every thread stays busy until the last game is proven: a game's search spreads over the threads that have no game of
+their own to start.
 
-* **One game a thread.**  `exact` hands the games of the range to its threads one at a time.  The CPUs stay busy while
-  games are left, and the node counts do not depend on the number of threads ([an
-  entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
-  measured 12 games at 1 to 8 threads).
-* **Passes.**  A search still running when a pass ends (`--seconds`) pauses: it saves its open subtrees and learned
-  conflicts to its checkpoint, and the next pass resumes it on the same tree, so its node count is that of a run with no
-  pause.  `exact` writes checkpoints only then, and it has no signal handler, so a kill or a SIGTERM sends the searches
-  of the pass in progress back to their last checkpoints.  `prover.sh` therefore runs `exact` in passes of
-  `PASS_SECONDS` (default 300) until every game has a line.  An interruption costs at most one pass of the games in
-  flight, and a restart about a second.
+* **A game a thread, then several threads a game.**  `exact` hands the games of the range to its threads one at a
+  time.  When fewer games are left than threads, a thread with nothing to do helps a search still running: it takes the
+  largest open subtree that another thread of that game holds, and searches it.  A subtree that moves starts cold, its
+  first node solving its bounds from scratch, so subtrees move only to an idle thread.  The game's line then counts
+  its threads: `nodes` adds them up, `secs` is its wall time, `thread_secs` its threads' seconds added up, and
+  `threads` the most threads it ran on at once.  A search on one thread takes the same nodes as before.  One on several
+  threads takes more or fewer, since each thread keeps nogoods of its own, and how many depends on the timing.  [The
+  prover's proofs](../../noframe/docs/proofs.md#a-game-on-several-threads) has the speedup measured.
+* **Passes.**  A search still running when a pass ends (`--seconds`) pauses: it saves the open subtrees of all its
+  threads, and its learned conflicts, to its checkpoint, and the next pass resumes it on any number of threads.  `exact`
+  writes checkpoints only then, and it has no signal handler, so a kill or a SIGTERM sends the searches of the pass in
+  progress back to their last checkpoints.  `prover.sh` therefore runs `exact` in passes of `PASS_SECONDS` until every
+  game has a line.  The end of a pass costs a little: every open subtree restarts cold in the next pass, and every game
+  in flight is set up again.  So the default, 3600 s, suits a machine that nothing interrupts, and 300 s suits spot,
+  where an interruption costs at most one pass of every thread.
 * **The dearest games first.**  The games go in the order of the nodes that the solver's search of each took in the
   committed chain (`summarize.py order`), so that the long games start at once.  The order is made once and kept in
   `$TAXMAN_WORK/prover-order_A_B.txt`.  A game that repeats the search of a game settled at its ceiling records no
-  nodes, so it goes late, and may be among the last to finish.
-* **The tail.**  The last games run alone, and most of the machine idles; the log says so ("N games are left for T
-  threads").  With 16 vCPUs the idle CPUs cost cents an hour, so let them finish.  To finish the tail of a bigger
-  machine for less, stop the run, start a smaller instance, restore the state there (`save.sh --restore`, [Surviving a
-  spot interruption](launch.md#surviving-a-spot-interruption)) and run `prover.sh A B` again: `THREADS` may differ
-  between runs.
+  nodes, so it goes late.
+* **The log.**  `exact` writes a line on stderr (`prover.err`) for each game it proves after a search, with its nodes,
+  the most threads it ran on, and the subtrees that moved between threads (`units moved`), and one for each search a
+  pass pauses, with its open subtrees.
 
 ## What it costs
 
-A run costs the thread-hours of its searches, spread over the vCPUs, unless its dearest game takes longer, and a tail
-in which most of the machine idles.  Many games need no search: those at their ceiling and those that meet the prime
-formula.
+A run costs the thread-hours of its searches, spread over the vCPUs, the last searches included: a search on up to 4
+threads took about the thread-hours of one thread ([the prover's
+proofs](../../noframe/docs/proofs.md#a-game-on-several-threads)).  Many games need no search: those at their ceiling
+and those that meet the prime formula or the semiprime formula.
 
 For the estimate that the account's owner approves, price the range from the cost by bands of 100 in n in [the
 prover's proofs](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine): the thread-hours, halved for the roles where
@@ -63,7 +69,8 @@ grows with n: from the plain root on Graviton4 it was 2.0 to 2.6 ms through 1899
 ## Which instance
 
 **Use a `c8g.4xlarge` (16 vCPUs) at spot**, or on demand if spot has no capacity.  A `c8g.2xlarge` (8 vCPUs) takes
-twice as long for the same price, and nothing larger buys time, since the dearest games set it.  The calibration
+twice as long for the same price.  A larger instance shortens the run for about the same price, since a game's search
+spreads over the threads, though nobody has measured a game on more than 4 threads.  The calibration
 settled the family: a Graviton4 core does a unit of work for 12 to 15 % less than a Graviton3 core.  Nobody has measured
 `c9g`.  The `c8g.4xlarge` cost $0.24 to $0.31 an hour at spot in four zones of us-east-1 on 2026-10-14.  A gp3 root
 volume of 20 GB is enough: the prover's build is under 2 GB, the output a few hundred KB and the checkpoints a few MB.
@@ -106,11 +113,12 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    CPU, `secs` over `nodes`.  From the plain root these searches took 2.44 ms a node on a `c8g.4xlarge`; from the roles
    expect about half, an estimate from the measurement over 2..999, not a measurement on this machine.
 
-3. **The run,** in tmux, with `spot-watch.sh` beside it.  `PREFIX` is the run's own prefix of the bucket
-   (`prover-A-B`), one a run, since a save deletes from it the checkpoints that the machine lacks:
+3. **The run,** in tmux, with `spot-watch.sh` beside it, in passes of 300 s, since a spot interruption loses the pass
+   in progress.  `PREFIX` is the run's own prefix of the bucket (`prover-A-B`), one a run, since a save deletes from it
+   the checkpoints that the machine lacks:
 
    ```
-   cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=HOURS POWEROFF=always \
+   cd ~/taxman && tmux new-session -d -s pv "DEADLINE_HOURS=HOURS POWEROFF=always PASS_SECONDS=300 \
        S3_DEST=s3://taxman-013764204840-us-east-1/PREFIX solver/tools/cloud/prover.sh A B"
    tmux new-session -d -s sw solver/tools/cloud/spot-watch.sh              # on spot: stops the run
    ```
@@ -122,9 +130,9 @@ SSH](launch.md#steps-through-ssm-or-ssh)), the first as root and the others as `
    D=s3://taxman-013764204840-us-east-1/PREFIX`.
 
 4. **The first minutes.**  `prover.sh` prints the machine, makes the order, and logs `pass 1: 0 of N games done`.  In
-   `~/taxman-work/logs/prover.err`, the lines `exact: n=N not finished: paused after N nodes, U open units` give the
-   nodes of a long game.  The seconds of a pass over the nodes of one pass give the milliseconds a node, to compare with
-   the estimate ([What it costs](#what-it-costs)); the late games cost more.
+   `~/taxman-work/logs/prover.err`, the lines `exact: n=N not finished: paused after N nodes, U open units, M units
+   moved` give the nodes of a long game.  The seconds of a pass over the nodes of one pass give the milliseconds a node,
+   to compare with the estimate ([What it costs](#what-it-costs)); the late games cost more.
 
 **`BASELINE`, from A = 1302 on.**  The check at the end needs every n in 2..A − 1 proven, from one file: `BASELINE`,
 whose default holds the proofs of 2..1300.  For a later range, join the committed files of the proofs that cover 2..A −
@@ -150,9 +158,53 @@ The guardrails are those of [launch.md](launch.md#cost-guardrails), with these d
 * **`DEADLINE_HOURS`** stops the run after that many hours, and `prover.sh` exits with status 3.  The stop is a SIGTERM,
   so the searches of the pass in progress go back to their last checkpoints ([How `exact` uses the
   CPUs](#how-exact-uses-the-cpus)).
-* **`SAVE_EVERY`** defaults to `PASS_SECONDS` (300 s).  A save takes about 80 s at the lowest priority ([Surviving a
-  spot interruption](launch.md#surviving-a-spot-interruption)).
+* **`SAVE_EVERY`** defaults to `PASS_SECONDS` (300 s in the command above).  A save takes about 80 s at the lowest
+  priority ([Surviving a spot interruption](launch.md#surviving-a-spot-interruption)).
 * **`THREADS`** defaults to every vCPU.
+
+## On a machine of your own
+
+On a machine that nothing interrupts, `prover.sh` runs as on EC2 without the parts for the cloud: no `S3_DEST`, no
+`POWEROFF` and no `spot-watch.sh`, in passes of the default 3600 s, on every CPU.  Prove a range already proven first,
+as a calibration: the cost of a node and the wall time on this machine then compare with the committed proofs, and the
+check at its end tests the build and the scripts on a whole range.
+
+1. **Build** `exact` for this machine's CPU, in a clean checkout at the commit to run, where `prover.sh` takes it from
+   (`EXACT_BIN`):
+
+   ```
+   RUSTFLAGS="-C target-cpu=native" cargo build --release --bin exact --manifest-path solver/noframe/Cargo.toml
+   ```
+
+2. **Rehearse** as [Run](#run), step 2, says, which takes a few minutes.
+
+3. **The calibration**, 1301-2175, whose check needs no `BASELINE`.  `TAXMAN_WORK` holds the results, the checkpoints
+   and the logs, on a disk that survives a reboot (`W` below); `OUT` names a file other than the committed one of the
+   range.  The settings go in tmux's command, since a tmux server already running keeps its own environment:
+
+   ```
+   W=~/prover-work
+   tmux new-session -d -s pv \
+       "TAXMAN_WORK=$W OUT=$W/results/exact_threads_1301_2175.jsonl solver/tools/cloud/prover.sh 1301 2175"
+   ```
+
+   It ends with `OK: opt(n) is proven equal to the recorded score for every n in 2..2175`.  Compare `summarize.py cost
+   --band 100` of its file with the table of [the prover's
+   proofs](../../noframe/docs/proofs.md#to-2175-on-a-cloud-machine), which searched from the plain root ([What it
+   costs](#what-it-costs)).
+
+4. **A new range,** 2176-2530 for instance, with the `BASELINE` of [Run](#run) that covers 2..2175:
+
+   ```
+   cat solver/noframe/data/exact_parity_2_1300.jsonl solver/noframe/data/exact_parity_1301_2175.jsonl \
+       > $W/baseline_2_2175.jsonl
+   tmux new-session -d -s pv \
+       "TAXMAN_WORK=$W BASELINE=$W/baseline_2_2175.jsonl solver/tools/cloud/prover.sh 2176 2530"
+   ```
+
+On a machine shared with other work, set `THREADS` below the number of CPUs and start the script under `nice -n 19`.
+Watch and stop the run with the commands for the instance in [Watch, stop, resume](#watch-stop-resume), with `$W` for
+`~/taxman-work`, and commit its file as [Bring the data home, verify, commit](#bring-the-data-home-verify-commit) says.
 
 ## Watch, stop, resume
 

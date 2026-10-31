@@ -5,6 +5,8 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use taxman_gzip::Members;
 
 /// A JSON object written field by field.
@@ -135,6 +137,56 @@ pub fn done(lines: &[String], key: &str) -> HashSet<u64> {
     lines.iter().filter_map(|l| field_u64(l, key)).collect()
 }
 
+/// The lines of a campaign, appended and synced as its items end, with progress notes on stderr.
+pub struct Ledger {
+    name: String,
+    started: Instant,
+    /// The file, the lines written, and when the last note was printed.
+    file: Mutex<(Appender, usize, Instant)>,
+}
+
+impl Ledger {
+    /// Opens `out`, and returns the items of `items` that it does not record yet (by their `"n"` field).
+    pub fn open(name: &str, items: &[u64], out: &Path) -> (Ledger, Vec<u64>) {
+        let (file, lines) = Appender::open(out).expect("open the output file");
+        let finished = done(&lines, "n");
+        let todo: Vec<u64> = items.iter().copied().filter(|n| !finished.contains(n)).collect();
+        eprintln!("{name}: {} to do ({} already in {})", todo.len(), finished.len(), out.display());
+        let now = Instant::now();
+        (Ledger { name: name.to_owned(), started: now, file: Mutex::new((file, 0, now)) }, todo)
+    }
+
+    /// The end of item `n`: its line, appended and synced (None for an item not finished, which the next run retries),
+    /// and a note, printed when it is `Some` or every 20 seconds.
+    pub fn report(&self, n: u64, line: Option<String>, note: Option<String>) {
+        let name = &self.name;
+        let Some(line) = line else {
+            eprintln!("{name}: n={n} not finished: {}", note.unwrap_or_default());
+            return;
+        };
+        let mut file = self.file.lock().expect("the ledger");
+        let (appender, count, last) = &mut *file;
+        appender.append(&line).expect("append a result");
+        *count += 1;
+        if note.is_some() || last.elapsed() > Duration::from_secs(20) {
+            let secs = self.started.elapsed().as_secs_f64();
+            eprintln!("{name}: n={n} {} ({count} done, {secs:.0}s)", note.unwrap_or_default());
+            *last = Instant::now();
+        }
+    }
+
+    /// When every thread is done.
+    pub fn close(&self) {
+        let count = self.file.lock().expect("the ledger").1;
+        eprintln!("{}: {count} written in {:.0}s", self.name, self.started.elapsed().as_secs_f64());
+    }
+
+    /// When the campaign stops starting items: `seconds` after it opened.
+    pub fn deadline(&self, seconds: f64) -> Instant {
+        self.started + Duration::from_secs_f64(seconds.min(1e9))
+    }
+}
+
 /// Runs `work` on every item of `items` not yet recorded (by its `"n"` field) in `out`, on `threads` threads,
 /// appending each line as it finishes; starts no new item after `seconds`.  `work` returns the line (None for
 /// an item it could not finish, which is retried by the next run) and a
@@ -144,19 +196,12 @@ where
     F: Fn(u64) -> (Option<String>, Option<String>) + Sync,
 {
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::mpsc;
-    use std::time::{Duration, Instant};
-    let (mut file, lines) = Appender::open(out).expect("open the output file");
-    let finished = done(&lines, "n");
-    let todo: Vec<u64> = items.iter().copied().filter(|n| !finished.contains(n)).collect();
-    eprintln!("{name}: {} to do ({} already in {})", todo.len(), finished.len(), out.display());
+    let (ledger, todo) = Ledger::open(name, items, out);
     let next = AtomicUsize::new(0);
-    let started = Instant::now();
-    let deadline = started + Duration::from_secs_f64(seconds.min(1e9));
-    let (tx, rx) = mpsc::channel::<(u64, Option<String>, Option<String>)>();
+    let deadline = ledger.deadline(seconds);
     std::thread::scope(|scope| {
         for _ in 0..threads {
-            let (tx, todo, next, work) = (tx.clone(), &todo, &next, &work);
+            let (todo, next, work, ledger) = (&todo, &next, &work, &ledger);
             std::thread::Builder::new()
                 .stack_size(256 << 20)
                 .spawn_scoped(scope, move || loop {
@@ -165,30 +210,12 @@ where
                     }
                     let Some(&n) = todo.get(next.fetch_add(1, Ordering::Relaxed)) else { return };
                     let (line, note) = work(n);
-                    if tx.send((n, line, note)).is_err() {
-                        return;
-                    }
+                    ledger.report(n, line, note);
                 })
                 .expect("spawn a worker");
         }
-        drop(tx);
-        let mut count = 0usize;
-        let mut last = Instant::now();
-        for (n, line, note) in rx {
-            let Some(line) = line else {
-                eprintln!("{name}: n={n} not finished: {}", note.unwrap_or_default());
-                continue;
-            };
-            file.append(&line).expect("append a result");
-            count += 1;
-            if note.is_some() || last.elapsed() > Duration::from_secs(20) {
-                let secs = started.elapsed().as_secs_f64();
-                eprintln!("{name}: n={n} {} ({count} done, {secs:.0}s)", note.unwrap_or_default());
-                last = Instant::now();
-            }
-        }
-        eprintln!("{name}: {count} written in {:.0}s", started.elapsed().as_secs_f64());
     });
+    ledger.close();
 }
 
 /// The committed chain, the file `results/optimal.jsonl.gz` of the games that the frame solver proved: one result line

@@ -6,17 +6,18 @@
 #   OUT=FILE solver/tools/cloud/prover.sh --list N1,N2,...   a measurement on exactly those games (list mode, below)
 #
 # It runs `exact` of the prover (solver/noframe/docs/proofs.md), which knows nothing of the solver's frame
-# model, over the range.  `exact` runs one game per thread (a game's search is one thread), so the games are spread over
-# the CPUs; it runs for PASS_SECONDS, then pauses every search still going, saving its open subtrees and learned
-# conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them.  A game may
-# take any number of passes.  The games go dearest first, by the nodes the solver's search of each took
-# (results/optimal.jsonl.gz; `exact` takes one to three times as many), so that a long game starts early instead of
-# last.  The searches start from the roles of F4 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
+# model, over the range.  `exact` starts one game per thread, and when fewer games are left than threads, the idle
+# threads help the searches still running (solver/noframe/src/team.rs), so the CPUs stay busy to the end.  It runs for
+# PASS_SECONDS, then pauses every search still going, saving the open subtrees of all its threads and its learned
+# conflicts to a checkpoint ($CKPT/exact_N_low.ckpt), and this script runs it again, which resumes them on all the
+# threads.  A game may take any number of passes.  The games go dearest first, by the nodes the solver's search of each
+# took (results/optimal.jsonl.gz), so that a long game starts early instead of last.  The searches start from the roles
+# of F4 (`exact`'s default; EXTRA_ARGS='--fix-low 0' for the plain root).
 #
 # Safe to run again at any time, after a crash, a reboot, a spot interruption or a SIGTERM: finished games are in the
 # output file (one line each, appended and synced), unfinished ones in their checkpoints.  `exact` has no stop handler,
 # so a stop or a kill loses the work of the pass in progress (at most PASS_SECONDS of each thread) and nothing else.
-# THREADS may differ between runs (a smaller machine for the last games).  A second prover.sh is refused.
+# THREADS may differ between runs.  A second prover.sh is refused.
 #
 # What it does with `exact`'s exit status:
 #   0        a pass ended (the pause, or all games done): go on, or finish when every game of the range has its line
@@ -39,7 +40,8 @@
 #
 # Environment (all optional, but OUT in list mode):
 #   THREADS         threads, default every CPU
-#   PASS_SECONDS    the length of a pass, default 300: the work lost to a kill, against the small cost of a restart
+#   PASS_SECONDS    the length of a pass, default 3600, for a machine that nothing interrupts: each pass restarts every
+#                   open subtree cold, and a stop or a kill loses the pass in progress.  300 on spot.
 #   OUT             the output file (required in list mode)
 #   STRICT          the recorded optima, default results/optimal.jsonl.gz (committed)
 #   BASELINE        the proofs of the smaller games the check builds on (default: the prover's
@@ -121,7 +123,7 @@ else
     has_game "$to" || die "$STRICT has no game $to (it holds the recorded optima to prove)"
 fi
 THREADS="${THREADS:-$(ncpu)}"
-PASS_SECONDS="${PASS_SECONDS:-300}"
+PASS_SECONDS="${PASS_SECONDS:-3600}"
 MAX_FAILS="${MAX_FAILS:-5}"
 SAVE_EVERY="${SAVE_EVERY:-$PASS_SECONDS}"
 # shellcheck source=run.sh
@@ -167,10 +169,6 @@ while :; do
     pass=$((pass + 1))
     paused="$(find "$CKPT" -maxdepth 1 -name 'exact_*.ckpt' 2>/dev/null | wc -l | tr -d ' ')"
     log "pass $pass: $done_now of $total games done, $paused searches paused in $CKPT"
-    if [ "$((total - done_now))" -lt "$THREADS" ] && [ "$THREADS" -gt 1 ]; then
-        log "note: $((total - done_now)) games are left for $THREADS threads, and a search is one thread: most of the" \
-            "machine idles.  A smaller instance finishes them for less (stop, run this again there: THREADS may differ)"
-    fi
 
     lines_before="$done_now"
     run_child "$LOGS/prover.out" "$LOGS/prover.err" "$EXACT_BIN" --list "$list" --threads "$THREADS" \

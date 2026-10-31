@@ -71,6 +71,11 @@ The search:
   at 990, so `exact` uses it only without the parity bound.
 * **Pausing.**  A search still running at the end of a run saves its open subtrees and nogoods, and resumes in the
   next run, depth first.  So a game can take any number of ten-minute runs.
+* **Threads.**  A game's search can run on several threads (`src/team.rs`), each searching open subtrees depth first
+  with a bound and a nogood table of its own.  A thread with nothing to do asks the thread that holds the largest open
+  subtree, by the expected tree of its gap, which gives it away and never searches it.  A pause saves the open subtrees
+  of every thread in the game's one checkpoint.  The game is proven only once its threads have proven every subtree
+  it ever had ([A game on several threads](#a-game-on-several-threads)).
 
 The target is the recorded score V(n).  The search proves that no playable set beats it, or, from the roles of F4, none
 that obeys them, which is as good.  The recorded game replays by the rules to V(n), so opt(n) = V(n).
@@ -271,6 +276,34 @@ The run took 1.5 times the nodes projected before it, just above the projected r
 inside it.  [The notebook's
 entry](https://github.com/bvchess/taxman-notebook/blob/main/the-model-free-proofs-of-1301-2175-cost-and-the-cloud-run-2026-10/README.md)
 has the run's account, the projection game by game, and what the run says about the projection's model.
+
+## A game on several threads
+
+On four threads, a game's search ran about four times as fast as on one, on the two games measured.  Its tree is not
+one thread's, since each thread keeps nogoods of its own: 1540 took 118,246 nodes on one thread, and 138,021 and
+146,688 on two and four.  On one thread the search is the one-thread search of before, node for node (12,771 nodes at
+1548, 118,246 at 1540).  `exact` from the roles of F4, 1540 to its end and 1475 for five minutes:
+
+| game | threads | nodes | seconds | thread-seconds | nodes a second |
+|---|---|---|---|---|---|
+| 1540 | 1 | 118,246 | 309 | 309 | 382 |
+| 1540 | 2 | 138,021 | 146 | 291 | 946 |
+| 1540 | 4 | 146,688 | 73 | 290 | 2,001 |
+| 1475 | 1 | 105,472 | 301 | 301 | 351 |
+| 1475 | 4 | 473,528 | 301 | 1,200 | 1,574 |
+
+*Details.*  The runs were release builds at nice 19, on a machine whose other threads ran other work at idle priority,
+where two runs of one binary on one game differed by up to 20% (1548 on one thread: 20.3 and 24.4 s).
+
+* **Subtrees moved.**  Four threads moved 84 subtrees of 1540 from one thread to another, and 12 of 1475 in five
+  minutes.  A pause left 234 open subtrees of 1475 on four threads, against 90 on one.  A run that resumes them
+  restarts each cold, and that costs little: four threads resumed 1475 at 1,321 nodes a second over their first
+  minute.
+* **Nogoods.**  A thread that joins a game starts with no nogoods, and the game's first thread of a run with the
+  checkpoint's, the union of its threads' tables.  When every thread started from those 14,509 nogoods, the resumed
+  1475 ran 637 nodes a second, since a node scans every nogood its thread holds.  Taking the other threads' nogoods
+  every 10 seconds (`--share 10`) did not pay at 1540: 89.7 s and 143,729 nodes, against 84.3 s and 149,864 without,
+  in a build where a joining thread started from the game's nogoods.
 
 ## The upper part, game by game
 

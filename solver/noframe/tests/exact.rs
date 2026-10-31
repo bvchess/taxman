@@ -40,13 +40,15 @@ fn lines_of(tag: &str, args: &[&str]) -> BTreeMap<u64, String> {
 
 /// The default starts from the roles of F4 (docs/theory/frame-model.md) and says so on every line; `--fix-low 0` is the
 /// plain root and says so; the games searched and their verdicts are the same, and a game that was searched has its
-/// `fixed_bound` (the parity bound at the roles) at least the score.
+/// `fixed_bound` (the parity bound at the roles) at least the score.  Every line counts its threads.
 #[test]
 fn every_line_records_whether_the_roles_of_theorem_b_were_used() {
     let by_default = lines_of("default", &[]);
     let plain = lines_of("plain", &["--fix-low", "0"]);
     let mut searched = 0;
     for (n, line) in &by_default {
+        assert!(matches!(field_u64(line, "threads"), Some(1 | 2)), "n={n}: {line}");
+        assert!(field_u64(line, "thread_secs").is_some(), "n={n}: {line}");
         assert_eq!(field_u64(line, "fix_low"), Some(1), "n={n}: {line}");
         let bound = field_u64(line, "fixed_bound").unwrap_or_else(|| panic!("n={n}: no fixed_bound: {line}"));
         assert!(bound >= field_u64(line, "score").unwrap(), "n={n}: the bound at the roles is below the score");
