@@ -31,7 +31,12 @@ bounds, and every exact method in it is tested against brute force.  The theorem
 * [the parity vectors](../../docs/theory/parity-bound.md#the-parity-vectors) of [the parity bound
   (W1)](../../docs/theory/parity-bound.md#the-parity-bound);
 * [the bottom-layers theorem (F4)](../../docs/theory/frame-model.md#the-bottom-layers-theorem), the bottom layers of
-  every optimal set, in the proofs that start from its roles, which is the default of `exact`.
+  every optimal set, in the proofs that start from its roles, which is the default of `exact`;
+* [the semiprime formula (J3)](../../docs/theory/arrival.md#the-semiprime-formula), which proves an odd number with
+  two prime factors from the game before it with no search.  It rests on F4, [the layer theorem
+  (F3)](../../docs/theory/frame-model.md#the-layer-theorem), [the two-factor proposition
+  (P11)](../../docs/theory/playability.md#the-two-factor-proposition) and part (b) of [the greedy
+  algorithm](../../docs/theory/primer/greedy.md#the-greedy-algorithm).
 
 proofs.md lists what each proof rests on.  This document says *pick* for a
 [move](../../docs/GLOSSARY.md#the-game), *forced picks* for the numbers fixed in at a node (the frame solver's [forced

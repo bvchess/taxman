@@ -11,14 +11,14 @@
 //! upper part is not U\*, by a search whose root is split on the largest upper number where the set and U\*
 //! disagree.  The two lists partition the full one (`all`, the default).  Derivations are made only for `all`.
 //!
-//! A game whose V(n) is at its ceiling or meets the prime formula gets its sets from those of n − 1
-//! ([`derive_optimal_sets`]; the line says `"source":"chain"` or `"prime"`, and rests on V(n − 1) being the true
-//! optimum, proven on the whole board to 989); every other game, and every game with `--derive 0`, is searched: the
-//! branch and bound of `game.rs` in enumeration mode with target V(n) − 1 lists every playable set beating it (one
-//! beating V(n) would refute the recorded optimum and stops the run), up to `--limit` sets (default unlimited) within
-//! `--budget` nodes.  The predecessors a derivation needs come from earlier lines of the output file, or are
-//! worked out on the spot.  Threads working on neighboring games would work out the same predecessors, so a
-//! long range is best run in two passes: `--searched-only 1` (only the games that need a search, in parallel),
+//! A game whose V(n) is at its ceiling or meets the prime or the semiprime formula gets its sets from those of n − 1
+//! ([`derive_optimal_sets`]; the line says `"source":"chain"`, `"prime"` or `"semiprime"`, and rests on V(n − 1) being
+//! the true optimum, proven on the whole board to 989); every other game, and every game with `--derive 0`, is
+//! searched: the branch and bound of `game.rs` in enumeration mode with target V(n) − 1 lists every playable set
+//! beating it (one beating V(n) would refute the recorded optimum and stops the run), up to `--limit` sets (default
+//! unlimited) within `--budget` nodes.  The predecessors a derivation needs come from earlier lines of the output
+//! file, or are worked out on the spot.  Threads working on neighboring games would work out the same predecessors,
+//! so a long range is best run in two passes: `--searched-only 1` (only the games that need a search, in parallel),
 //! then the whole range (the derivations, instantly, from the first pass's lines).
 //!
 //! The line records how the enumeration ended ("complete", "limit" or "budget"), how many sets it found, how many

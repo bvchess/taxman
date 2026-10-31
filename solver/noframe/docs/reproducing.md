@@ -25,7 +25,8 @@ cargo run --release --example paritycheck 2 1300    # one below each recorded sc
 bash tools/adversary_campaign.sh                                                          # data/adversary/
 ./target/release/optsets --from 2 --to 989 --searched-only 1 --threads 3 --seconds 540 --budget 4000000 \
     --out OUT.jsonl                                     # the games that need a search; rerun until done
-./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the games at their ceiling and the primes, derived
+./target/release/optsets --from 2 --to 989 --out OUT.jsonl     # then the games at their ceiling, the primes and the
+                                    # semiprime games (J3), derived
 ./target/release/optsets --list 798,799,800 --upper fixed --threads 1 --seconds 540 --out FIXED.jsonl
 ./target/release/moves --from 2 --to 1300 --seconds 540 --out OUT.jsonl         # one thread; ~7 minutes
 EXTRA_ARGS='--fix-low 0' ../tools/cloud/prover.sh 1301 2175   # `exact` over a range in resumable passes, all CPUs,
@@ -33,7 +34,9 @@ EXTRA_ARGS='--fix-low 0' ../tools/cloud/prover.sh 1301 2175   # `exact` over a r
                                     # searches start from the roles of the bottom-layers theorem)
 tools/summarize.py check 1301 2175 data/exact_parity_2_1300.jsonl data/exact_parity_1301_2175.jsonl
                                     # every n in 2..2175 proven, scores recorded, and how many proofs rest on it
-./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min)
+./target/release/exact --from 2 --to 2175 --budget 1 --out PRE.jsonl    # no search, only the roles' checks (4 min);
+                                    # each line's "relation" says whether the game needs a search (none) or rests on
+                                    # the game before it (chain, prime, semiprime)
 ./target/release/upper --from 1301 --to 2175 --out data/upper_1301_2175.jsonl          # one thread, 5 minutes
 ./target/release/upper --from 2176 --to 3314 --out data/upper_2176_3314.jsonl          # 21 minutes
 ./target/release/upper --from 3315 --to 3440 --out data/upper_3315_3440.jsonl          # 5 minutes

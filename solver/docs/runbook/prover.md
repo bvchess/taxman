@@ -205,7 +205,7 @@ OUT=solver/noframe/data/exact_parity_A_B.jsonl solver/tools/cloud/prover.sh --ve
 The check (`summarize.py check A B`, which `prover.sh` also ran at the end) passes only if two things hold:
 
 * every n in 2..B is proven: each n of A..B has a line, and with `BASELINE` each is proven by a bound, a search run to
-  the end, or the ceiling or the prime formula from a proven predecessor;
+  the end, or the ceiling, the prime formula or the semiprime formula from a proven predecessor;
 * every line's score is the score that `results/optimal.jsonl.gz` records.
 
 It then exits with status 0 and prints `OK: opt(n) is proven equal to the recorded score for every n in 2..B`;

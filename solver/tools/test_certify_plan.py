@@ -290,9 +290,11 @@ class Bases(Case):
             self.assertNotIn(f"board {LO + 2}", err)
 
     def test_relation_words(self):
-        bounds = [upper(LO, needs=0, relation="prime"), upper(LO + 1, needs=0, relation="chain"), upper(LO + 2)]
+        bounds = [upper(LO, needs=0, relation="prime"), upper(LO + 1, needs=0, relation="chain"), upper(LO + 2),
+                  upper(LO + 3, needs=0, relation="semiprime")]
         games, _c = self.planned([], bounds)
-        self.assertEqual([games[n]["relation"] for n in (LO, LO + 1, LO + 2)], ["prime", "ceiling", "none"])
+        self.assertEqual([games[n]["relation"] for n in (LO, LO + 1, LO + 2, LO + 3)],
+                         ["prime", "ceiling", "none", "semiprime"])
 
 
 class Shares(Case):
@@ -660,6 +662,9 @@ class Report(Case):
             elif n % 10 == 1:
                 uppers.append(upper(n, needs=0, relation="prime"))
                 results.append(completed(n, proof="prime_formula", nodes=0))
+            elif n % 10 == 2:
+                uppers.append(upper(n, needs=0, relation="semiprime"))
+                results.append(completed(n, proof="cap", nodes=0))
             elif n % 10 == 5:
                 uppers.append(upper(n))
                 results.append(completed(n, proof="same_search", nodes=0, repeat_of=n - 1))
@@ -670,20 +675,21 @@ class Report(Case):
         self.assertEqual(code, 0, err)
         rows = {row[0]: row for row in table_rows(out, "## By band of 100 boards")}
         self.assertEqual(list(rows), ["3300-3330", "3300-3314", "3315-3330", "all 3300-3330"])
-        # boards, need a certificate, repeats, shared, searched, prime, ceiling, expected thread-hours
+        # boards, need a certificate, repeats, shared, searched, prime, ceiling, semiprime, expected thread-hours
         for label, lo, hi in [("3300-3330", 3300, 3330), ("3300-3314", 3300, 3314), ("3315-3330", 3315, 3330),
                               ("all 3300-3330", 3300, 3330)]:
             span = range(lo, hi + 1)
-            counts = [int(cell.replace(",", "")) for cell in rows[label][1:8]]
+            counts = [int(cell.replace(",", "")) for cell in rows[label][1:9]]
             expected = [len(span),
-                        sum(n % 10 not in (0, 1) for n in span),
+                        sum(n % 10 not in (0, 1, 2) for n in span),
                         sum(n % 10 == 5 for n in span),
                         0,
-                        sum(n % 10 in (2, 3, 4, 6, 7, 8, 9) for n in span),
+                        sum(n % 10 in (3, 4, 6, 7, 8, 9) for n in span),
                         sum(n % 10 == 1 for n in span),
-                        sum(n % 10 == 0 for n in span)]
+                        sum(n % 10 == 0 for n in span),
+                        sum(n % 10 == 2 for n in span)]
             self.assertEqual(counts, expected, label)
-        hours = {label: float(row[8].replace(",", "")) for label, row in rows.items()}
+        hours = {label: float(row[9].replace(",", "")) for label, row in rows.items()}
         self.assertAlmostEqual(hours["3300-3314"] + hours["3315-3330"], hours["all 3300-3330"], places=1)
 
     def test_the_first_band_is_labeled_by_the_part_of_it_planned(self):

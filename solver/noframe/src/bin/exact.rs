@@ -8,11 +8,13 @@
 //!
 //! Per game: the recorded game is replayed by the rules (a lower bound, opt(n) >= V(n)); the Franklín–Moniot bound and
 //! the parity bound (W1, docs/theory/parity-bound.md; `parity.rs`) are computed at the root; the
-//! ceiling opt(n) <= n + opt(n−1) and, for a prime n, the prime formula opt(n) <= n + opt(n−1) − p are noted; and
-//! unless one of them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether any playable
-//! set beats V(n), with the parity bound at every node (`--parity 0`: the Franklín–Moniot bound alone, as the searches
-//! of `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked out by
-//! `tools/summarize.py exact` from the file.
+//! ceiling opt(n) <= n + opt(n−1), for a prime n the prime formula opt(n) <= n + opt(n−1) − p, and for an odd n with
+//! two prime factors that closes a cycle with U\*_2(n − 1) the semiprime formula opt(n) = opt(n−1) + n − x (J3,
+//! docs/theory/arrival.md; `semiprime.rs`), are noted (the line's `relation` is `chain`, `prime`, `semiprime` or
+//! `none`); and unless one of them already gives V(n) (or `--all`), the branch and bound of `game.rs` decides whether
+//! any playable set beats V(n), with the parity bound at every node (`--parity 0`: the Franklín–Moniot bound alone,
+//! as the searches of `data/exact_2_1231.jsonl` ran).  Which games end up proven, given their predecessors, is worked
+//! out by `tools/summarize.py exact` from the file.
 //!
 //! The roles of F4 (`--fix-low 1`, the default; `--fix-low 0` starts from the plain root, as the committed files
 //! `data/exact_*.jsonl` were made): the search starts from the roles `upper::low_roles` writes down, "B" below, the

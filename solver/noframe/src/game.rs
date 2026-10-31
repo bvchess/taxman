@@ -1,6 +1,7 @@
 //! The full game on the whole board: an exact upper bound on opt(n) that uses only proven facts.
 //!
-//! Nothing here knows about frames, greedy, `unzip` or promotions.  It rests on:
+//! The search here knows nothing about frames, greedy, `unzip` or promotions (only [`relation`] reaches greedy's U\*,
+//! through [`crate::semiprime`]).  It rests on:
 //!
 //! * **The playability theorem with peel** (P2 and P4, docs/theory/playability.md): a set S of picks can all be played
 //!   iff dismantling the reduction instance whose members are S, each listing its maximal factors outside S, removes
@@ -30,6 +31,7 @@ use std::collections::BinaryHeap;
 
 use crate::parity::{Meet, Outcome, Parity, Warm};
 use crate::primes::{is_prime, maximal_factors};
+use crate::semiprime;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Role {
@@ -1306,7 +1308,10 @@ pub enum Relation {
     Chain,
     /// n is prime and V(n) = n + V(n − 1) − p, p the largest prime below n: the prime formula (the data's `prime`).
     Prime,
-    /// Neither.
+    /// n is odd with two prime factors, closes a cycle with U\*_2(n − 1), and V(n) = V(n − 1) + n − x, x the smallest
+    /// member of the cycle other than n: the semiprime formula (J3, docs/theory/arrival.md; the data's `semiprime`).
+    Semiprime,
+    /// None of them.
     None,
 }
 
@@ -1315,19 +1320,37 @@ impl Relation {
         match self {
             Relation::Chain => "chain",
             Relation::Prime => "prime",
+            Relation::Semiprime => "semiprime",
             Relation::None => "none",
         }
     }
 }
 
-/// Which relation V(n) = `score` meets, given V(n − 1) = `prev`.
+/// Which relation V(n) = `score` meets, given V(n − 1) = `prev` (0 where game n − 1 is not recorded, which leaves the
+/// semiprime formula nothing to rest on).
+///
+/// The semiprime formula proves opt(n) = V(n − 1) + n − x if V(n − 1) is optimal, and the recorded game of n shows
+/// opt(n) ≥ V(n).  So a score above the formula contradicts a theorem or the recorded V(n − 1), and one below it means
+/// that the recorded game of n is not optimal; either panics, naming n.
 pub fn relation(n: u64, score: u64, prev: u64, spf: &[u32]) -> Relation {
     if score == n + prev {
-        Relation::Chain
-    } else if n > 2 && is_prime(n, spf) && score == n + prev - prime_below(n, spf) {
-        Relation::Prime
-    } else {
-        Relation::None
+        return Relation::Chain;
+    }
+    if n > 2 && is_prime(n, spf) && score == n + prev - prime_below(n, spf) {
+        return Relation::Prime;
+    }
+    let Some(x) = semiprime::exchange(n, spf).filter(|_| prev > 0) else { return Relation::None };
+    let formula = prev + n - u64::from(x);
+    match score.cmp(&formula) {
+        std::cmp::Ordering::Equal => Relation::Semiprime,
+        std::cmp::Ordering::Greater => panic!(
+            "n={n}: V(n) = {score} is above V(n − 1) + n − x = {formula} (V(n − 1) = {prev}, x = {x}), which is \
+             opt(n) by J3 if V(n − 1) is optimal: the recorded scores contradict a theorem"
+        ),
+        std::cmp::Ordering::Less => panic!(
+            "n={n}: V(n) = {score} is below V(n − 1) + n − x = {formula} (V(n − 1) = {prev}, x = {x}), which is \
+             opt(n) by J3 if V(n − 1) is optimal: the recorded game of n is not optimal"
+        ),
     }
 }
 
@@ -1356,6 +1379,8 @@ pub fn the_prime_of_every_optimal_set(set: &[u32], n: u32, spf: &[u32]) -> Resul
 ///   pays with 1 as n did) and worth opt(n − 1).  Conversely every optimal T of n − 1 holds p (it holds the
 ///   largest prime <= n − 1, [`the_prime_of_every_optimal_set`]) and T − p + n is playable and worth opt(n).
 ///   So T ↦ T − p + n is a bijection: n has exactly as many optimal sets as n − 1.
+/// * **Semiprime** (`Relation::Semiprime`, opt(n) = opt(n − 1) + n − x): the exchange of x for n, T ↦ T − x + n, is a
+///   bijection from the optimal sets of n − 1 onto those of n (J3, part 3, [`semiprime`]).
 ///
 /// `board` is game n's; `prev` must be every optimal set of n − 1 (for n = 2, the empty set).
 pub fn derive_optimal_sets(board: &Board, relation: Relation, prev: &[Vec<u32>], spf: &[u32]) -> Vec<Vec<u32>> {
@@ -1369,12 +1394,17 @@ pub fn derive_optimal_sets(board: &Board, relation: Relation, prev: &[Vec<u32>],
                 assert!(t.contains(&p), "n={n}: an optimal set of n − 1 without {p}");
                 t.iter().copied().filter(|&c| c != p).chain([n]).collect()
             }
+            Relation::Semiprime => {
+                let x = semiprime::exchange(u64::from(n), spf).expect("a semiprime game closes a cycle");
+                assert!(t.contains(&x), "n={n}: an optimal set of n − 1 without {x}");
+                t.iter().copied().filter(|&c| c != x).chain([n]).collect()
+            }
             Relation::None => panic!("n={n}: no relation to derive from"),
         };
         let mut pick = vec![false; n as usize + 1];
         set.iter().for_each(|&c| pick[c as usize] = true);
         let playable = board.playable(&pick);
-        assert!(playable || relation == Relation::Chain, "n={n}: a prime swap is always playable");
+        assert!(playable || relation == Relation::Chain, "n={n}: a prime or semiprime exchange is always playable");
         if playable {
             sets.push(set);
         }
@@ -1626,9 +1656,10 @@ mod tests {
         }
     }
 
-    /// Where V(n) is at its ceiling or meets the prime formula, the optimal sets derived from those of n − 1 are the
-    /// ones enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every game to 260
-    /// (the committed chain's scores; the optimal set is unique in all of them but 2..260 still exercises both rules).
+    /// Where V(n) is at its ceiling or meets the prime or the semiprime formula, the optimal sets derived from those of
+    /// n − 1 are the ones enumerated directly; and every optimal set holds the largest prime <= n and no other.  Every
+    /// game to 260 (the committed chain's scores; the optimal set is unique in all of them but 2..260 still exercises
+    /// the three rules).
     #[test]
     fn derived_optimal_sets_are_the_enumerated_ones() {
         let known = recorded_games_to(&[committed_chain()], 300);
@@ -1645,7 +1676,7 @@ mod tests {
             sets.sort();
             sets
         };
-        let (mut derived, mut by_prime) = (0, 0);
+        let (mut derived, mut by_prime, mut by_semiprime) = (0, 0, 0);
         let mut prev = all(1);
         for n in 2..=260u64 {
             let sets = all(n);
@@ -1661,10 +1692,11 @@ mod tests {
                 assert_eq!(got, sets, "n={n} {rel:?}");
                 derived += 1;
                 by_prime += usize::from(rel == Relation::Prime);
+                by_semiprime += usize::from(rel == Relation::Semiprime);
             }
             prev = sets;
         }
-        assert!(derived > 100 && by_prime > 40, "{derived} {by_prime}");
+        assert!(derived > 100 && by_prime > 40 && by_semiprime > 10, "{derived} {by_prime} {by_semiprime}");
     }
 
     /// The first game with two optimal sets: 424 has one, 425 has two, which differ by {110, 132, 168} exchanged for

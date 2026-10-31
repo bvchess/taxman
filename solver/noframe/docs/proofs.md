@@ -12,6 +12,9 @@ from proven facts only:
 * opt(n) ≤ n + opt(n − 1);
 * the prime formula's upper bound: a game playing a prime n plays it first, and swapping it for the largest prime
   below n gives a game of n − 1;
+* [the semiprime formula (J3)](../../../docs/theory/arrival.md#the-semiprime-formula), for an odd n with two prime
+  factors (relation `semiprime`, [below](#the-semiprime-formula-needs-no-search)): opt(n) = opt(n − 1) + n − x, where x
+  is the smallest number other than n in the cycle that n closes with the numbers of layer 2 in U\*(n − 1);
 * [the bottom-layers theorem (F4)](../../../docs/theory/frame-model.md#the-bottom-layers-theorem), in a search that
   starts from its roles (the default of `exact`; `--fix-low 0` starts from the plain root).  Every optimal set holds the
   largest prime and no other, and holds exactly U\*_2 among the sources of layer 2.  On a board whose frames of layer 2
@@ -71,6 +74,56 @@ roles, and the roles' parity bound is at least its score; `exact --budget 1` che
 search.  The frames of layer 2 are closed on every board from 187 on, and on most below it.  The roles bar the numbers
 of layer 2 up to n/2 where the frames are closed, and leave them free on the 80 boards of 2..1300 where they are not,
 all of them at most 186 (`upper::tests`).
+
+## The semiprime formula needs no search
+
+An odd game n with two prime factors, counted with multiplicity, is proven from the game before it, with no search, when
+V(n) = V(n − 1) + n − x and V(n − 1) is proven.  [The semiprime formula
+(J3)](../../../docs/theory/arrival.md#the-semiprime-formula) says that opt(n) = opt(n − 1) + n − x where n closes a
+cycle with the numbers of layer 2 in U\*(n − 1), and x is the smallest number of the cycle other than n.  The prover
+needs only the bound from above: opt(n) ≤ opt(n − 1) + n − x = V(n), and the recorded game, which replays by the rules,
+gives opt(n) ≥ V(n).
+
+The cycle lies in a graph with the primes up to n/2 and one ground vertex as its vertices, where pq is the edge p–q and
+p² the edge p–ground.  The numbers of layer 2 in U\*(n − 1) form a forest in it, and n, as one more edge, closes a cycle
+when the forest already joins its ends; x is the smallest number on that path.  Game 39 = 3·13 has U\*(38) with the
+numbers of layer 2 {21, 22, 25, 26, 33, 34, 35, 38}, and its edge 3–13 closes the cycle 3–11–2–13 with 33, 22 and 26.
+So x = 22, and V(39) = V(38) + 39 − 22 = 503.
+
+The prover uses it as one more relation, beside `chain` and `prime`:
+
+* `src/semiprime.rs` finds x from the board's own U\*(n − 1), descending greedy (`src/peel.rs`), not from the recorded
+  game.  `relation` in `src/game.rs` asks for it only for an odd n with two prime factors whose score is not at its
+  ceiling, and names the game `semiprime` when V(n) = V(n − 1) + n − x.
+* A score off the formula stops the program, naming n.  Above it, the recorded scores contradict a theorem; below it,
+  the recorded game of n is not optimal.  Where V(n − 1) is not recorded, the relation is `none`.
+* `exact` does not search a `semiprime` game (unless `--all 1`) and writes `"relation":"semiprime"`.  `upper` writes
+  `"needs":0` for it, and `optsets` derives its optimal sets from those of n − 1 by exchanging x for n (part 3 of J3).
+* `tools/summarize.py` counts the game as proven when n − 1 is, in `exact` and `check`, so that
+  `../tools/cloud/prover.sh --verify` agrees; `order` puts it with the games that need no search, last.
+
+The hypothesis of J3 holds for every odd n from 189 on with two prime factors.  Below that, some such games close no
+cycle, such as 21 and 187; they meet another relation or are searched.
+
+The tests check the formula against the prover's search from nothing on every odd n to 300 with two prime factors: the
+relation is `semiprime` exactly where n closes a cycle, and then opt(n) − opt(n − 1) = n − x.  A rule that takes the
+largest number of the path for x instead of the smallest is caught on every such game, so that the test can see the
+failure it guards against.  On the committed chain to 1300, every such n that closes a cycle meets the formula.
+
+*Details.*  `exact --from 1301 --to 2175 --budget 1` stops every search at once, so it only classifies.  It gives, for
+the 875 games the cloud run proved:
+
+| relation | games |
+|---|---|
+| `chain` | 270 |
+| `prime` | 115 |
+| `semiprime` | 176 |
+| `none`, which needs a search | 314 |
+
+The cloud run (`data/exact_parity_1301_2175.jsonl`) was made before the formula and searched 490 of these games, the 314
+and the 176.  Those 176 took 84.0 of its 226.0 thread-hours.  Its file is a record and stays as it was; the lines of the
+176 say `"relation":"none"`.  Put together with the 561 lines of the classification that rest on a relation, it passes
+`tools/summarize.py check 1301 2175`, which counts the 176 as proven by `semiprime`.
 
 ## With the Franklín–Moniot bound (to 989)
 
@@ -219,8 +272,9 @@ bound which of those members every set beating the recorded score V must play.
   and obeys F4 then plays u, so if opt(n) > V, every optimal set plays every certified member.
 * The members it does not certify are *open*, with the bound's margin over V.
 
-Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula, whose
-lines say `"needs":1`.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
+Only the games that rest on the frame model need it: those neither at the ceiling nor given by the prime formula or the
+semiprime formula, whose lines say `"needs":1`.  The four files below were made before the semiprime formula, so their
+lines for the games it proves say `"needs":1` and `"relation":"none"`.  Certified members can be fixed in a search that leaves the open ones optional, the integrated
 search of the theory track, which the certificates of U carry out
 ([solver/docs/design/certificates.md](../../docs/design/certificates.md)).  That is why the files are kept: U\* less a
 game's open members is that search's fixed set.

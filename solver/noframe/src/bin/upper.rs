@@ -6,15 +6,15 @@
 //!     upper --from A --to B [--list ...] [--threads K] [--seconds S] [--optimal FILE] [--results FILE]...
 //!           --out FILE
 //!
-//! Every line has the game (`n`, its recorded `score`), its `relation` to the game before (`chain`, `prime` or
-//! `none`; `src/game.rs`) and `needs`, 1 if the relation is `none`: a game at its ceiling or meeting the prime
-//! formula rests on n − 1, not on the frame model, and has nothing more.  For a game that needs it the line gives
-//! the parity bound at the roles of F4 (`root`) and its `gap` over the score, whether the root's heaviest set
-//! holds all of U\*_{≥3} (`root_has_upper`), the number of members of U\*_{≥3} (`members`), how many the bound
-//! certifies (`certified`), and the `open` ones as triples [u, Ω(u), margin], ascending in u, the margin being the
-//! bound with u barred minus the score (null if the bound could not be certified).  Per game the recorded game is
-//! replayed by the rules, its moves above n/2 are checked to be U\* and the whole game to obey the roles of F4
-//! (checks of the data).
+//! Every line has the game (`n`, its recorded `score`), its `relation` to the game before (`chain`, `prime`,
+//! `semiprime` or `none`; `src/game.rs`) and `needs`, 1 if the relation is `none`: a game at its ceiling or meeting
+//! the prime or the semiprime formula rests on n − 1, not on the frame model, and has nothing more.  For a game that
+//! needs it the line gives the parity bound at the roles of F4 (`root`) and its `gap` over the score, whether the
+//! root's heaviest set holds all of U\*_{≥3} (`root_has_upper`), the number of members of U\*_{≥3} (`members`), how
+//! many the bound certifies (`certified`), and the `open` ones as triples [u, Ω(u), margin], ascending in u, the
+//! margin being the bound with u barred minus the score (null if the bound could not be certified).  Per game the
+//! recorded game is replayed by the rules, its moves above n/2 are checked to be U\* and the whole game to obey the
+//! roles of F4 (checks of the data).
 //!
 //! The roles are those of every optimal set (the bottom-layers theorem, F4, docs/theory/frame-model.md; `upper.rs`).  A
 //! member u is certified when the bound with u barred as well is at most the score V (or the roles cannot be met): then

@@ -15,8 +15,9 @@ take several files read them in order):
               repeat repeats) and known.source (where a known game rests: bounds, the bounds store; strict, the
               committed chain; or optimal, the table of optimal games).
   --upper     the prover's barred bounds.  Fields: n, score, relation (prime; chain, which is a score at its ceiling
-              n + score(n-1); none), needs (1 if the game needs a certificate), open (where it needs one: a list of
-              [u, omega, margin], so |O| is its length).  A board in two files must have equal lines, but for the
+              n + score(n-1); semiprime, a score that meets the semiprime formula of docs/theory/arrival.md; none),
+              needs (1 if the game needs a certificate), open (where it needs one: a list of [u, omega, margin], so
+              |O| is its length).  A board in two files must have equal lines, but for the
               timing `secs`.  The score of a board must be the results' score.  Every board of the range needs a line.
   --problems  (optional) one line per game that needs a certificate, made by the example `extended problems` (removed;
               it builds at commit 3ca11bf): n, score, open (|O|, a count), rejected (|R|), frames, two_sided, one_sided,
@@ -34,7 +35,7 @@ costs --overhead times that.  The report prints each era's c, its nodes and its 
 time, so the window's inflation is visible.  Every board of the range must fall in an era.
 
 Per game, for every board of the range (plan.jsonl has one line each, null where a field does not apply):
-  relation    prime, ceiling (upper's chain) or none; needs, open (|O|) from upper; rejected (|R|) from problems
+  relation    prime, ceiling (upper's chain), semiprime or none; needs, open (|O|) from upper; rejected (|R|) from problems
   proof       the results' proof of a game that needs a certificate, and for a searched game (exhausted) chain_nodes,
               chain_seconds (seconds.search) and chain_threads; for a repeat (same_search) m, the game it repeats,
               source, the game that m comes down to when same_search is followed to a proof that is not one, and its
@@ -108,7 +109,7 @@ SPOTLIGHT = (3424, 3425, 3440)  # boards the report names
 # diagnosis of the wall"): log10 nodes = a + b G / n^p, plus the window.
 GAP_INTERCEPT, GAP_SLOPE, GAP_POWER, WINDOW_DECADES = 2.30, 0.0479, 0.3, 0.06
 PROOFS = {"trivial", "exhausted", "cap", "prime_formula", "same_search", "known"}
-RELATIONS = {"prime": "prime", "chain": "ceiling", "none": "none"}  # upper's word -> the plan's
+RELATIONS = {"prime": "prime", "chain": "ceiling", "semiprime": "semiprime", "none": "none"}  # upper's word -> plan's
 INT = int
 NUMBER = (int, float)
 KIND_NAMES = {INT: "an integer", NUMBER: "a number", str: "a string", list: "a list", dict: "an object"}
@@ -616,6 +617,7 @@ def tally(games):
         sum(g["proof"] == "exhausted" for g in needing),
         sum(g["relation"] == "prime" for g in games),
         sum(g["relation"] == "ceiling" for g in games),
+        sum(g["relation"] == "semiprime" for g in games),
         hours_text(sum_hours(games)),
     ]
 
@@ -668,7 +670,7 @@ def section_inputs(plan):
 def section_bands(plan):
     """The table by band of 100 boards and the totals of the two parts and of all."""
     games = plan.games
-    heads = ["boards", "games", "need a certificate", "repeats", "shared", "searched", "prime", "ceiling",
+    heads = ["boards", "games", "need a certificate", "repeats", "shared", "searched", "prime", "ceiling", "semiprime",
              "expected thread-hours"]
     rows = []
     for start in range(plan.lo - plan.lo % BAND, plan.hi + 1, BAND):
@@ -678,7 +680,7 @@ def section_bands(plan):
     for part in [first, second] if first and second else []:  # one part alone would repeat the total of all
         rows.append([f"**{part[0]['n']}-{part[-1]['n']}**"] + [f"**{cell}**" for cell in tally(part)])
     rows.append([f"**all {plan.lo}-{plan.hi}**"] + [f"**{cell}**" for cell in tally(games)])
-    return ["## By band of 100 boards", ""] + table(heads, rows, "l" + "r" * 8) + [
+    return ["## By band of 100 boards", ""] + table(heads, rows, "l" + "r" * 9) + [
         "",
         "Repeats, shared and searched count games that need a certificate; a shared game is usually a repeat too.",
         "",

@@ -84,9 +84,10 @@ def star(paths):
 def exact_proofs(rows):
     """Which games are proven optimal without the frame model: n is proven when its Franklín–Moniot bound or its
     parity bound equals the recorded score, or the search proved it (if it used the segment cuts, only when every
-    smaller game is proven), or its score is at its ceiling (`chain`) or meets the prime formula (`prime`) and n - 1
-    is proven.  Returns (proven, how, first_gap): whether each n in 1..max(rows) is proven, how the proven ones were
-    (counts by kind), and the first n that is not (None if all are).
+    smaller game is proven), or its score is at its ceiling (`chain`), meets the prime formula (`prime`) or meets the
+    semiprime formula (`semiprime`, J3 of docs/theory/arrival.md) and n - 1 is proven.  Returns (proven, how,
+    first_gap): whether each n in 1..max(rows) is proven, how the proven ones were (counts by kind), and the first n
+    that is not (None if all are).
 
     Only `"search":"proven"` counts as a proof.  A line with `"search":"upper_fixed"` (`exact --fix-upper 1`, the
     frame model's problem with the whole upper part fixed to U*) is a measurement and never a proof.  A search with
@@ -105,7 +106,7 @@ def exact_proofs(rows):
                 ok, kind = True, "parity bound"
             elif r["search"] == "proven" and (not r.get("segments") or all(proven.get(m) for m in range(2, n))):
                 ok, kind = True, "search"
-            elif r["relation"] in ("chain", "prime") and proven.get(n - 1):
+            elif r["relation"] in ("chain", "prime", "semiprime") and proven.get(n - 1):
                 ok, kind = True, r["relation"]
         proven[n] = ok
         if ok:
@@ -304,6 +305,37 @@ def previous_prime(n):
     while prime_factors(p) != [p]:
         p -= 1
     return p
+
+
+def semiprime_exchange(n):
+    """x of the semiprime formula (J3, docs/theory/arrival.md) at an odd n with two prime factors, or None if n is not
+    such a number or closes no cycle with U*_2(n - 1), the numbers of layer 2 in U*(n - 1).  The graph has the primes
+    up to n / 2 and the ground, 0, for vertices; pq is the edge p-q and p^2 the edge p-0.  U*(n - 1) is read from the
+    recorded game of n - 1, which plays it above (n - 1) / 2 (`recorded_ustar` in src/upper.rs checks that for every
+    game the prover proves); x is the smallest edge on the path between the ends of n."""
+    def ends(m):
+        factors = prime_factors(m)
+        return (factors[0], factors[1] if factors[0] != factors[1] else 0) if len(factors) == 2 else None
+
+    if n % 2 == 0 or ends(n) is None:
+        return None
+    edges_at = {}
+    for m in recorded_moves(n - 1):
+        if m > (n - 1) // 2 and ends(m) is not None:
+            a, b = ends(m)
+            edges_at.setdefault(a, []).append((b, m))
+            edges_at.setdefault(b, []).append((a, m))
+    start, goal = ends(n)
+    reached, stack = {start}, [(start, [])]
+    while stack:
+        vertex, path = stack.pop()
+        if vertex == goal:
+            return min(path)
+        for other, m in edges_at.get(vertex, []):
+            if other not in reached:
+                reached.add(other)
+                stack.append((other, path + [m]))
+    return None
 
 
 def factorized(m):
@@ -513,8 +545,8 @@ def exact_order(args):
     repeated search) times 10^((n - 1300)/1000): over 34 games of 1302-2124 `exact` took 0.13 to 13 times as many
     nodes (the geometric mean 0.97 at 1300-1500 and 3.8 at 1800-2124, the scatter 0.28 decades), because the parity
     bound is the weaker bound and its gap grows faster than the solver's.  It is a guide to the order, not an estimate.
-    Games at their ceiling (`chain`) or meeting the prime formula (`prime`), which `exact` does not search, go
-    last."""
+    Games at their ceiling (`chain`) or meeting the prime formula (`prime`) or the semiprime formula (`semiprime`),
+    which `exact` does not search, go last."""
     lo, hi = int(args[0]), int(args[1])
     rows = recorded_games()
 
@@ -527,7 +559,10 @@ def exact_order(args):
     def searched(n):
         score, prev = rows[n]["score"], rows[n - 1]["score"]
         prime = n > 2 and prime_factors(n) == [n] and score == n + prev - previous_prime(n)
-        return score != n + prev and not prime
+        if score == n + prev or prime:
+            return False
+        x = semiprime_exchange(n)
+        return x is None or score != prev + n - x
 
     cost = {n: solver_nodes(n) * 10 ** ((n - 1300) / 1000) if searched(n) else -1 for n in range(lo, hi + 1)}
     print(",".join(str(n) for n in sorted(cost, key=lambda n: (-cost[n], -n))))
