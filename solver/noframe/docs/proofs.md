@@ -54,6 +54,12 @@ The search:
   * Its gap is about a tenth of the Franklín–Moniot bound's: 130 points against 1,200 at n = 1000-1300.
 * **Branching.**  If the bound's picks are playable, they are a game worth the bound.  Otherwise a minimal unplayable
   subset, found by a deletion filter with peel, must lose a member, and the children partition on which.
+  * The node learns, as nogoods, conflicts of its set that share no free member with one another, up to four: the
+    nogoods inside the set first, then the conflicts of what is left of the set.  The filter leaves out free members
+    before forced ones, so a conflict holds as many forced members as it can and has fewer children.
+  * It branches on the conflict with the smallest expected tree.  Each child bars one free member, whose bound with it
+    barred the parity solve gives, and a search grows tenfold per 210 points of its gap, so a conflict weighs the sum
+    of 10^(g / 210) over its free members, g the bound with the member barred less the target.
 * **Forced picks, cuts and nogoods.**  A pick is forced when barring it alone already brings the bound to the target,
   which the dual shows.  The *conflict-packing cut* takes the nogoods that the matching violates and whose members lie
   far apart in the graph: each must be broken, so their dual costs add.  Every minimal unplayable set found is a

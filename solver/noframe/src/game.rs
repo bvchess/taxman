@@ -144,7 +144,9 @@ impl Board {
     }
 
     /// Shrinks an unplayable set of picks to an inclusion-minimal unplayable subset (every proper subset of it is
-    /// playable), trying first the members its dismantling removes.
+    /// playable), trying to leave out first the members its dismantling removes, then the ones it strands (the
+    /// largest first), and the members flagged in `hold` after the others, so that the result holds as many of
+    /// them as it can.
     ///
     /// Each trial drops one member c from the current set S, which is unplayable, and keeps it out if S − c is still
     /// unplayable.  It dismantles only the residual R of S: dropping c removes a member and adds c to the lists of its
@@ -152,17 +154,17 @@ impl Board {
     /// is what dismantling R − c leaves with c no longer a pick (the residual does not depend on the order of the
     /// removals: a member that can be removed stays removable).  If c is outside R and a maximal factor of no member
     /// of R, that is R itself.
-    pub fn minimal_unplayable(&self, pick: &[bool]) -> Vec<u32> {
+    pub fn minimal_unplayable(&self, pick: &[bool], hold: &[bool]) -> Vec<u32> {
         // The residual R of the current set, flagged and listed.
         let mut residual = self.residual(pick);
         let mut set = pick.to_vec();
-        let order: Vec<u32> = (2..=self.n)
+        let (held, loose): (Vec<u32>, Vec<u32>) = (2..=self.n)
             .filter(|&c| pick[c as usize] && !residual[c as usize])
             .chain((2..=self.n).rev().filter(|&c| residual[c as usize]))
-            .collect();
+            .partition(|&c| hold[c as usize]);
         let mut members: Vec<u32> = (2..=self.n).filter(|&c| residual[c as usize]).collect();
         let mut degree = vec![0u32; self.n as usize + 1];
-        for c in order {
+        for c in loose.into_iter().chain(held) {
             let cu = c as usize;
             let inside = residual[cu];
             set[cu] = false;
@@ -261,6 +263,11 @@ pub struct MatchingBound {
 const NONE: u32 = u32::MAX;
 const BIG: i64 = 1 << 40;
 const INF: i64 = i64::MAX / 4;
+/// The most conflicts that a node learns from its set (see [`Prover::learn_conflicts`]).
+const LEARNED: usize = 4;
+/// The growth of a search with its node's gap, the bound less the target: tenfold per this many points (measured over
+/// the proofs of 1301-2175, solver/noframe/docs/proofs.md, "To 2175, on a cloud machine").
+const POINTS_PER_DECADE: f64 = 210.0;
 
 impl MatchingBound {
     pub fn new(board: &Board) -> Self {
@@ -903,7 +910,7 @@ impl<'a> Prover<'a> {
     /// holds it) and every number outside its heaviest set whose forcing alone brings it to the target (no playable
     /// set that beats the target holds it, [`Meet::forcing_cut`]), and forces every member whose barring alone
     /// brings it to the target (by the split); and the node branches on a minimal unplayable subset of its heaviest
-    /// set instead of the matching's picks.
+    /// set instead of the matching's picks, the one with the smallest expected tree among those it knows or learns.
     pub fn with_parity(mut self) -> Self {
         self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));
         self
@@ -1026,6 +1033,43 @@ impl<'a> Prover<'a> {
     pub fn run(&mut self) -> Verdict {
         let roles = self.root_roles();
         self.run_units(vec![roles])
+    }
+
+    /// Learns the conflicts of the unplayable `source` that no two share a free member: first the nogoods inside it,
+    /// the ones with the fewest free members first, then the conflicts of what is left of the set once their free
+    /// members are out, as many as it holds (up to [`LEARNED`]).  Each is a nogood, found once and used by every
+    /// node whose set holds it; and the node then has several to choose its branching from.  Returns the conflicts
+    /// found now, whether or not the table had room for them.
+    fn learn_conflicts(&mut self, source: &[bool], roles: &[Role]) -> Vec<Vec<u32>> {
+        let free_of =
+            |k: &[u32]| -> Vec<u32> { k.iter().copied().filter(|&c| roles[c as usize] == Role::Free).collect() };
+        let mut known: Vec<(usize, usize)> = (0..self.nogoods.len())
+            .filter(|&i| self.nogoods[i].iter().all(|&c| source[c as usize]))
+            .map(|i| (free_of(&self.nogoods[i]).len(), i))
+            .collect();
+        known.sort_unstable();
+        let mut rest = source.to_vec();
+        let mut learned = 0;
+        for (_, i) in known {
+            let free = free_of(&self.nogoods[i]);
+            if free.iter().all(|&c| rest[c as usize]) {
+                free.iter().for_each(|&c| rest[c as usize] = false);
+                learned += 1;
+            }
+        }
+        let held: Vec<bool> = roles.iter().map(|&r| r == Role::Pick).collect();
+        let mut found = Vec::new();
+        while learned < LEARNED && !self.board.playable(&rest) {
+            let k = self.board.minimal_unplayable(&rest, &held);
+            // A nogood inside `rest` would have been taken above, so this one is new.
+            free_of(&k).iter().for_each(|&c| rest[c as usize] = false);
+            learned += 1;
+            if self.nogoods.len() < self.max_nogoods {
+                self.nogoods.push(k.clone());
+            }
+            found.push(k);
+        }
+        found
     }
 
     /// Nogood propagation: false if some nogood is entirely forced; bars the last free member of a nogood whose
@@ -1154,6 +1198,7 @@ impl<'a> Prover<'a> {
         // bound's heaviest set when that bound is on (else the matching's picks), and its weight.  The parity solves
         // start from the last certificate: the parent's, then the node's own.
         let mut warm: Option<Warm> = None;
+        let mut without: Vec<(u32, i64)> = Vec::new();
         let parent_warm = base.as_ref().and_then(|b| b.parity).filter(|_| self.parity_warm);
         let parent_saved = base.as_ref().and_then(|b| b.saved).filter(|_| self.parity_warm);
         let (value, picks, best, source) = loop {
@@ -1214,6 +1259,7 @@ impl<'a> Prover<'a> {
                                 let mut set = vec![false; n as usize + 1];
                                 b.set.iter().for_each(|&c| set[c as usize] = true);
                                 parity_set = Some((b.value as u64, set));
+                                without = b.without;
                             }
                             warm = Some(b.warm);
                         }
@@ -1241,9 +1287,8 @@ impl<'a> Prover<'a> {
                 lag_solved = Some(l.solve(board, Some((&old, s)), &roles));
             }
         };
-        // Branch on the violated conflict with the fewest free members (measured: better than the one dearest to
-        // break, which doubles the tree at n = 600).  A known one also shows the picks unplayable without a peel.
-        // (Branching on the Lagrangian matching's picks instead was measured: 13% more nodes at n = 793.)
+        // Branch on a violated conflict.  A known one also shows the picks unplayable without a peel.  (Branching
+        // on the Lagrangian matching's picks instead was measured: 13% more nodes at n = 793.)
         //
         // The children are given by a list of decisions (number, role): child j gives the numbers of the first j
         // their roles and the j-th the other role (forced and barred swapped).  For a conflict every decision is
@@ -1252,47 +1297,46 @@ impl<'a> Prover<'a> {
         let free_of = |k: &[u32]| -> Vec<(u32, Role)> {
             k.iter().filter(|&&c| roles[c as usize] == Role::Free).map(|&c| (c, Role::Pick)).collect()
         };
-        let known = self
-            .nogoods
-            .iter()
-            .filter(|k| k.iter().all(|&c| source[c as usize]))
-            .min_by_key(|k| k.iter().filter(|&&c| roles[c as usize] == Role::Free).count());
-        let decisions = match known {
-            Some(k) => {
-                self.stats[1] += 1;
-                free_of(k)
+        let in_set = |k: &Vec<u32>| k.iter().all(|&c| source[c as usize]);
+        let known = self.nogoods.iter().any(in_set);
+        let decisions = if known || !self.board.playable(source) {
+            self.stats[usize::from(known)] += 1;
+            let found = self.learn_conflicts(source, &roles);
+            // The conflict with the smallest expected tree.  Each child bars one free member of it, and a node
+            // whose bound exceeds the target by g points has a tree of about 10^(g / POINTS_PER_DECADE) nodes, so
+            // a conflict weighs the sum, over its free members, of that for the bound with the member barred
+            // (the parity bound's `without`); the cheapest members to leave out count most.  (Without the parity
+            // bound the members have no price, each weighs 1, and the conflict with the fewest free members wins.)
+            let mut gap = vec![0i64; n as usize + 1];
+            without.iter().for_each(|&(c, v)| gap[c as usize] = v - self.target as i64);
+            let weight = |k: &&Vec<u32>| -> f64 {
+                let free = k.iter().filter(|&&c| roles[c as usize] == Role::Free);
+                free.map(|&c| 10f64.powf(gap[c as usize] as f64 / POINTS_PER_DECADE)).sum()
+            };
+            let k =
+                self.nogoods.iter().filter(|k| in_set(k)).chain(&found).min_by(|a, b| weight(a).total_cmp(&weight(b)));
+            free_of(k.expect("a conflict of the set"))
+        } else {
+            let set: Vec<u32> = (2..=n).filter(|&c| source[c as usize]).collect();
+            if self.optimizing {
+                // The node's heaviest completion (its weight is the bound): the target rises to it, which
+                // closes the node.
+                self.target = best;
+                self.found.push(set);
+                return Verdict::Proven;
             }
-            None if self.board.playable(source) => {
-                let set: Vec<u32> = (2..=n).filter(|&c| source[c as usize]).collect();
-                if self.optimizing {
-                    // The node's heaviest completion (its weight is the bound): the target rises to it, which
-                    // closes the node.
-                    self.target = best;
-                    self.found.push(set);
-                    return Verdict::Proven;
-                }
-                self.found.push(set.clone());
-                if self.found.len() >= self.limit {
-                    return Verdict::Beaten(set);
-                }
-                // Enumerating: every other set of this node disagrees with the picks on a free number; the
-                // numbers outside the picks first, largest first, then the picks, largest first.
-                let free = || (2..=n).rev().filter(|&c| roles[c as usize] == Role::Free);
-                free()
-                    .filter(|&c| !source[c as usize])
-                    .map(|c| (c, Role::Barred))
-                    .chain(free().filter(|&c| source[c as usize]).map(|c| (c, Role::Pick)))
-                    .collect()
+            self.found.push(set.clone());
+            if self.found.len() >= self.limit {
+                return Verdict::Beaten(set);
             }
-            None => {
-                self.stats[0] += 1;
-                let k = self.board.minimal_unplayable(source);
-                let decisions = free_of(&k);
-                if self.nogoods.len() < self.max_nogoods {
-                    self.nogoods.push(k);
-                }
-                decisions
-            }
+            // Enumerating: every other set of this node disagrees with the picks on a free number; the
+            // numbers outside the picks first, largest first, then the picks, largest first.
+            let free = || (2..=n).rev().filter(|&c| roles[c as usize] == Role::Free);
+            free()
+                .filter(|&c| !source[c as usize])
+                .map(|c| (c, Role::Barred))
+                .chain(free().filter(|&c| source[c as usize]).map(|c| (c, Role::Pick)))
+                .collect()
         };
         if let Some(w) = self.watch.as_mut() {
             w.branching += u64::from(decisions.iter().any(|&(c, _)| w.branch[c as usize]));
@@ -1634,7 +1678,8 @@ mod tests {
     }
 
     /// The deletion filter that dismantles only the current residual gives the subset of the plain one, which peels
-    /// the whole set at each trial: on random sets of picks of boards 30..=400, each with its residual nonempty.
+    /// the whole set at each trial: on random sets of picks of boards 30..=400, each with its residual nonempty, and
+    /// with random members held back to the end of the order.
     #[test]
     fn minimal_unplayable_sets_against_the_plain_deletion_filter() {
         let spf = smallest_prime_factors(400);
@@ -1655,19 +1700,20 @@ mod tests {
                     continue;
                 }
                 let residual = board.residual(&pick);
+                let hold: Vec<bool> = (0..=n).map(|_| below(3) == 0).collect();
                 let mut set = pick.clone();
-                let order: Vec<u32> = (2..=n)
+                let (held, loose): (Vec<u32>, Vec<u32>) = (2..=n)
                     .filter(|&c| pick[c as usize] && !residual[c as usize])
                     .chain((2..=n).rev().filter(|&c| residual[c as usize]))
-                    .collect();
-                for c in order {
+                    .partition(|&c| hold[c as usize]);
+                for c in loose.into_iter().chain(held) {
                     set[c as usize] = false;
                     if board.playable(&set) {
                         set[c as usize] = true;
                     }
                 }
                 let plain: Vec<u32> = (2..=n).filter(|&c| set[c as usize]).collect();
-                assert_eq!(board.minimal_unplayable(&pick), plain, "n={n} {pick:?}");
+                assert_eq!(board.minimal_unplayable(&pick, &hold), plain, "n={n} {pick:?} {hold:?}");
                 checked += 1;
             }
         }
