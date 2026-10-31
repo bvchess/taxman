@@ -33,10 +33,13 @@
 //! one kind never resumes another's: the checkpoint is `exact_N_low.ckpt`, `exact_N.ckpt` (`--fix-low 0`) or
 //! `exact_N_upper.ckpt`.  Without the parity bound, a search that outlasts a 20-second warm-up, or resumes, goes on
 //! with the Lagrangian bound fitted to the nogoods learned so far (`--lagrangian 0` turns that off, `--lagrangian 1`
-//! turns it on with the parity bound too).  `--segments 1` turns on the segment cuts, which make a game's proof rest
-//! on the smaller games' bounds (recorded as `"segments":1`); they are off by default, so that each search stands
-//! alone.  A proof's `"matching_nodes"` are its nodes searched without the parity bound (a search resumed from a
-//! checkpoint of such a run); its `"nodes"` count all of them.
+//! turns it on with the parity bound too).  Only a search that will turn it on pauses for the warm-up; any other runs
+//! to its end or to `--seconds`, so that its tree does not depend on the clock (a pause restarts the open subtrees
+//! without their parents' bounds, and a solve from scratch can pick another of two heaviest sets that tie).
+//! `--segments 1` turns on the segment cuts, which make a game's proof rest on the smaller games' bounds (recorded as
+//! `"segments":1`); they are off by default, so that each search stands alone.  A proof's `"matching_nodes"` are its
+//! nodes searched without the parity bound (a search resumed from a checkpoint of such a run); its `"nodes"` count all
+//! of them.
 //!
 //! What the sources of layer 3 and up cost (study E6): `--fix-upper 1` (it needs `--fix-low 1`) also fixes the whole
 //! upper part to U\*, every source in it forced and every other barred, "D" below, which is the frame model's problem
@@ -256,8 +259,10 @@ fn main() {
             let (branch, barred) = watched(n as u32, &spf, &ustar);
             prover = prover.watch(branch, barred);
             // A search that outlasts a short warm-up (or resumes from a checkpoint) goes on with the Lagrangian
-            // bound fitted to the nogoods learned so far.
-            let warmup = (Instant::now() + Duration::from_secs(20)).min(pause_at);
+            // bound fitted to the nogoods learned so far.  Without that bound there is no warm-up: a pause restarts
+            // the open units without their parents' matchings and certificates, so the search runs to its end or
+            // to the deadline.
+            let warmup = if lagrangian { (Instant::now() + Duration::from_secs(20)).min(pause_at) } else { pause_at };
             let first = match Checkpoint::load(&ckpt) {
                 Some(cp) => {
                     assert_eq!(cp.target, *score, "n={n}: the checkpoint is for another target");
@@ -275,7 +280,7 @@ fn main() {
                 None => {
                     prover.take_units(warmup);
                     match prover.run_units(vec![unit]) {
-                        Verdict::Paused => Err(prover.take_units(pause_at)),
+                        Verdict::Paused if lagrangian => Err(prover.take_units(pause_at)),
                         other => Ok(other),
                     }
                 }
