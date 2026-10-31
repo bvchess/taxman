@@ -145,20 +145,89 @@ impl Board {
 
     /// Shrinks an unplayable set of picks to an inclusion-minimal unplayable subset (every proper subset of it is
     /// playable), trying first the members its dismantling removes.
+    ///
+    /// Each trial drops one member c from the current set S, which is unplayable, and keeps it out if S − c is still
+    /// unplayable.  It dismantles only the residual R of S: dropping c removes a member and adds c to the lists of its
+    /// maximal composites, so every removal in a dismantling of S stays possible in S − c, and the residual of S − c
+    /// is what dismantling R − c leaves with c no longer a pick (the residual does not depend on the order of the
+    /// removals: a member that can be removed stays removable).  If c is outside R and a maximal factor of no member
+    /// of R, that is R itself.
     pub fn minimal_unplayable(&self, pick: &[bool]) -> Vec<u32> {
-        let residual = self.residual(pick);
+        // The residual R of the current set, flagged and listed.
+        let mut residual = self.residual(pick);
         let mut set = pick.to_vec();
         let order: Vec<u32> = (2..=self.n)
             .filter(|&c| pick[c as usize] && !residual[c as usize])
             .chain((2..=self.n).rev().filter(|&c| residual[c as usize]))
             .collect();
+        let mut members: Vec<u32> = (2..=self.n).filter(|&c| residual[c as usize]).collect();
+        let mut degree = vec![0u32; self.n as usize + 1];
         for c in order {
-            set[c as usize] = false;
-            if self.playable(&set) {
-                set[c as usize] = true;
+            let cu = c as usize;
+            let inside = residual[cu];
+            set[cu] = false;
+            if !inside && self.mc[cu].iter().all(|&m| !residual[m as usize]) {
+                continue;
+            }
+            if inside {
+                members.retain(|&m| m != c);
+                residual[cu] = false;
+            }
+            let rest = self.dismantle(&members, &set, &mut residual, &mut degree);
+            if rest.is_empty() {
+                // S − c is playable: c stays, and so does R.
+                set[cu] = true;
+                members.iter().for_each(|&m| residual[m as usize] = true);
+                if inside {
+                    residual[cu] = true;
+                    members.push(c);
+                }
+            } else {
+                members = rest;
             }
         }
         (2..=self.n).filter(|&c| set[c as usize]).collect()
+    }
+
+    /// Dismantles the picks `members` (each flagged in `alive` and in `pick`), each listing its maximal factors that
+    /// are not picks; returns the residual, the members left (still flagged), and unflags the others.  `degree` is
+    /// all zero on entry and on return.
+    fn dismantle(&self, members: &[u32], pick: &[bool], alive: &mut [bool], degree: &mut [u32]) -> Vec<u32> {
+        for &c in members {
+            for &f in &self.mf[c as usize] {
+                if !pick[f as usize] {
+                    degree[f as usize] += 1;
+                }
+            }
+        }
+        let mut queue: Vec<u32> = members
+            .iter()
+            .copied()
+            .filter(|&c| self.mf[c as usize].iter().any(|&f| !pick[f as usize] && degree[f as usize] == 1))
+            .collect();
+        while let Some(c) = queue.pop() {
+            if !alive[c as usize] {
+                continue;
+            }
+            alive[c as usize] = false;
+            for &f in &self.mf[c as usize] {
+                if pick[f as usize] {
+                    continue;
+                }
+                let d = &mut degree[f as usize];
+                *d -= 1;
+                if *d == 1 {
+                    let other = self.mc[f as usize].iter().find(|&&m| alive[m as usize]);
+                    queue.push(*other.expect("a factor of degree 1 has a live lister"));
+                }
+            }
+        }
+        for &c in members {
+            for &f in &self.mf[c as usize] {
+                degree[f as usize] = 0;
+            }
+        }
+        members.iter().copied().filter(|&c| alive[c as usize]).collect()
     }
 }
 
@@ -184,6 +253,9 @@ pub struct MatchingBound {
     total: i64,
     /// BIG times the number of forced picks at the last solve.
     offset: i64,
+    /// Test aid: [`solve`](Self::solve)'s searches run to the end instead of stopping at the cheapest path.
+    #[cfg(test)]
+    full: bool,
 }
 
 const NONE: u32 = u32::MAX;
@@ -211,6 +283,8 @@ impl MatchingBound {
             dual: vec![0; size],
             total: 0,
             offset: 0,
+            #[cfg(test)]
+            full: false,
         }
     }
 
@@ -260,16 +334,29 @@ impl MatchingBound {
                 self.dist[v] = INF;
                 self.prev[v] = NONE;
             }
-            heap.clear();
+            // The sources at once, heapified (the keys are distinct, so the order of the pops is the same).
+            let mut sources = std::mem::take(&mut heap).into_vec();
+            sources.clear();
             for v in 1..=n {
                 if board.even[v] && self.mate[v] == NONE {
                     self.dist[v] = -self.pot[v];
-                    heap.push(Reverse((self.dist[v], v as u32)));
+                    sources.push(Reverse((self.dist[v], v as u32)));
                 }
             }
+            heap = BinaryHeap::from(sources);
             let mut dist_t = INF;
             let mut last = NONE;
             while let Some(Reverse((d, u))) = heap.pop() {
+                // Every vertex left is at least as far as the cheapest path found to t, so nothing below changes:
+                // no path to t is cheaper (the arcs to t cost at least 0), no vertex nearer than it is left, and
+                // the potentials and the dual take the distances only up to it.
+                #[cfg(test)]
+                let stop = !self.full;
+                #[cfg(not(test))]
+                let stop = true;
+                if stop && d >= dist_t {
+                    break;
+                }
                 let u = u as usize;
                 if d > self.dist[u] {
                     continue;
@@ -1524,6 +1611,47 @@ mod tests {
         }
     }
 
+    /// The deletion filter that dismantles only the current residual gives the subset of the plain one, which peels
+    /// the whole set at each trial: on random sets of picks of boards 30..=400, each with its residual nonempty.
+    #[test]
+    fn minimal_unplayable_sets_against_the_plain_deletion_filter() {
+        let spf = smallest_prime_factors(400);
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        let mut below = |m: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % m
+        };
+        let mut checked = 0;
+        for n in (30..=400u32).step_by(37) {
+            let board = Board::new(n, &spf);
+            for _ in 0..150 {
+                let density = 2 + below(6);
+                let pick: Vec<bool> = (0..=n).map(|c| c >= 2 && below(density) == 0).collect();
+                if board.playable(&pick) {
+                    continue;
+                }
+                let residual = board.residual(&pick);
+                let mut set = pick.clone();
+                let order: Vec<u32> = (2..=n)
+                    .filter(|&c| pick[c as usize] && !residual[c as usize])
+                    .chain((2..=n).rev().filter(|&c| residual[c as usize]))
+                    .collect();
+                for c in order {
+                    set[c as usize] = false;
+                    if board.playable(&set) {
+                        set[c as usize] = true;
+                    }
+                }
+                let plain: Vec<u32> = (2..=n).filter(|&c| set[c as usize]).collect();
+                assert_eq!(board.minimal_unplayable(&pick), plain, "n={n} {pick:?}");
+                checked += 1;
+            }
+        }
+        assert!(checked > 100, "{checked} unplayable sets");
+    }
+
     /// The known optima of 1..=20, by brute force and by the prover on both sides of the value.
     #[test]
     fn small_games() {
@@ -1731,6 +1859,40 @@ mod tests {
         assert_eq!((gone, new), (vec![110, 132, 168], vec![98, 150, 162]));
         let above = |set: &[u32]| -> Vec<u32> { set.iter().copied().filter(|&c| 2 * c > 425).collect() };
         assert_eq!(above(first), above(second));
+    }
+
+    /// A solve that stops each search at the cheapest path to t gives the matching and the dual of one that searches
+    /// on to the end, on random roles of boards up to 400.
+    #[test]
+    fn the_cheapest_path_found_ends_the_search() {
+        let spf = smallest_prime_factors(400);
+        let mut state = 0x3C6E_F372_FE94_F82Bu64;
+        let mut next = |below: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % below
+        };
+        let mut solved = 0;
+        for _ in 0..80 {
+            let n = 10 + next(390) as u32;
+            let board = Board::new(n, &spf);
+            let roles: Vec<Role> = (0..=n)
+                .map(|c| match (c < 2, next(40)) {
+                    (true, _) | (false, 0..=3) => Role::Barred,
+                    (false, 4) => Role::Pick,
+                    _ => Role::Free,
+                })
+                .collect();
+            let mut stopping = MatchingBound::new(&board);
+            let mut full = MatchingBound::new(&board);
+            full.full = true;
+            let got = stopping.solve(&board, &roles);
+            assert_eq!(got, full.solve(&board, &roles), "n={n}");
+            assert_eq!(stopping.snapshot(), full.snapshot(), "n={n}");
+            solved += usize::from(got.is_some());
+        }
+        assert!(solved > 20, "{solved} feasible");
     }
 
     /// Re-optimizing from a snapshot gives the same value as solving from scratch, along random chains of role
