@@ -42,7 +42,9 @@ The search:
     takes the elimination over GF(2) and the circuits that its parent's solve left, less what its own roles change,
     rather than building them again; they are the same, so the solve and its bound are too.
   * It is reported only with a weight split that satisfies the local optimality conditions of both parities, checked
-    explicitly, so the bound rests on the theorem and weak duality, not on the algorithm.
+    explicitly, so the bound rests on the theorem and weak duality, not on the algorithm.  The check reduces every
+    circuit, and confirms every number it bars as dependent, afresh against the elimination, not trusting the circuits
+    the search kept or took from the parent.
   * It cuts the node, bars the free numbers that depend on the forced picks, and forces the members whose barring alone
     brings it to the target.  The node branches on its heaviest set's conflicts instead of the matching's.
   * Its gap is about a tenth of the Franklín–Moniot bound's: 130 points against 1,200 at n = 1000-1300.

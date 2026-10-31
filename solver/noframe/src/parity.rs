@@ -50,8 +50,8 @@
 //! rows carry the members they sum: reducing a sparse vector takes one row per coordinate of it.  A circuit is its
 //! element's unique expression in the set (with the forced elements), so it is reduced again only where an exchange
 //! can change it, and a solve from a parent's certificate takes the rows and circuits that the parent's solve left,
-//! less what the new roles remove, instead of building them ([`Meet::save`]); either way they are the circuits a
-//! reduction gives.
+//! less what the new roles remove, instead of building them ([`Meet::save`]).  The check of the certificate does not
+//! rely on those rules: it reduces every circuit afresh first.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -424,6 +424,9 @@ pub struct Meet {
     /// What the last exchange changed, if the circuits are those of the set before it: the members that left, and in
     /// which classes an element independent of the old set entered.
     exchanged: Option<(Vec<usize>, [bool; 2])>,
+    /// Test aid: the circuits kept or derived are checked against a reduction (on unless a test spoils them).
+    #[cfg(test)]
+    check: bool,
     pub stats: MeetStats,
 }
 
@@ -507,6 +510,8 @@ impl Meet {
             held: 0,
             held_roles: Vec::new(),
             exchanged: None,
+            #[cfg(test)]
+            check: true,
             stats: MeetStats::default(),
         }
     }
@@ -586,7 +591,7 @@ impl Meet {
         };
         let from_held = derived.is_some();
         self.stats.derived += u64::from(from_held);
-        let Some((forced_weight, forced, loops)) = derived.or_else(|| self.setup(roles)) else {
+        let Some((mut forced_weight, mut forced, mut loops)) = derived.or_else(|| self.setup(roles)) else {
             return Outcome::Infeasible;
         };
         if let Some(warm) = warm {
@@ -613,7 +618,9 @@ impl Meet {
             }
             self.stats.fallbacks += 1;
             self.stats.foreign[1] += u64::from(foreign && self.stats.fallbacks > before);
-            self.setup(roles).expect("the forced elements were independent a moment ago");
+            // Built afresh, the loops among them (a derived start's are not trusted here either).
+            (forced_weight, forced, loops) =
+                self.setup(roles).expect("the forced elements were independent a moment ago");
         }
         self.start_prefix();
         loop {
@@ -1006,6 +1013,9 @@ impl Meet {
     /// Test aid: the circuits kept or derived are those a reduction gives.
     #[cfg(test)]
     fn check_circuits(&mut self) {
+        if !self.check {
+            return;
+        }
         for i in 0..self.cands.len() {
             let y = self.cands[i] as usize;
             if self.in_set[y] {
@@ -1340,6 +1350,9 @@ impl Meet {
     /// from a source joined to each y with I + y independent in class 0 (cost −w(y)) and to each member x (cost
     /// w(x)), over the circuit arcs, checked against conditions (1)-(3) of the module comment in both classes.
     /// (The distances are the largest potentials meeting the arcs, so if any split satisfies (1)-(3) these do.)
+    /// The check takes the circuits from a reduction of every candidate outside the set against the rows, made here,
+    /// and confirms each loop by one (it depends on the rows of the forced elements alone): the bound rests on those
+    /// reductions, not on the rules by which the search kept or derived its circuits.
     fn finish(&mut self, forced_weight: i64, forced: &[u32], loops: &[u32]) -> Option<Bound> {
         let w = self.pair.weight.clone();
         let pi_s = match self.split_ready.take() {
@@ -1369,6 +1382,17 @@ impl Meet {
             // A reduced distance is the true one plus π_s − π(e).
             let sigma = self.dist[e].0 - pi_s + self.pot[e];
             w1[e] = if self.in_set[e] { sigma } else { sigma + w[e] };
+        }
+        self.exchanged = None;
+        self.circuits();
+        for &l in loops {
+            let l = l as usize;
+            let alone = |meet: &mut Meet, q: usize| {
+                !meet.reduce(q, l) && meet.cbuf[..meet.rref[q].words].iter().all(|&b| b == 0)
+            };
+            if !(alone(self, 0) || alone(self, 1)) {
+                return None;
+            }
         }
         let w2 = |e: usize, w1: &[i64]| w[e] - w1[e];
         let mut best = [vec![0i64; len], vec![0i64; len]];
@@ -1722,6 +1746,67 @@ mod tests {
             words = words.max(meet.rref[0].words);
         }
         assert!(words >= 3, "the bits took {words} words at most");
+    }
+
+    /// The check of a certificate reduces its circuits afresh, so a wrong circuit in the state a solve derives its
+    /// start from does not reach a bound: with one circuit of the put-back state spoiled (a member dropped or added,
+    /// or the element made independent), each child's bound still equals enumeration, and so do its bounds without a
+    /// member, or the solve falls back.
+    #[test]
+    fn a_wrong_circuit_in_the_derived_start_does_not_reach_the_bound() {
+        let mut rng = Rng(0x3C6E_F372_FE94_F82B);
+        let (mut spoiled, mut caught) = (0u64, 0u64);
+        for round in 0..600 {
+            let len = 4 + rng.below(8) as usize;
+            let dims = [1 + rng.below(7) as usize, 1 + rng.below(7) as usize];
+            let pair = random_pair(&mut rng, len, dims, if round % 3 == 0 { 4 } else { 100 });
+            let mut meet = Meet::new(pair.clone());
+            meet.check = false;
+            let roles: Vec<Role> =
+                (0..len).map(|_| if rng.below(6) == 0 { Role::Barred } else { Role::Free }).collect();
+            let Outcome::Bound(parent) = meet.solve(&roles) else { continue };
+            let saved = meet.save(&parent.warm).expect("the workspace holds the state of its last solve");
+            for _ in 0..3 {
+                let child = child_roles(&mut rng, &roles, &parent);
+                meet.restore(&saved);
+                let outside: Vec<(usize, usize)> = (0..2)
+                    .flat_map(|q| meet.cands.iter().map(move |&e| (q, e as usize)))
+                    .filter(|&(q, e)| !meet.in_set[e] && !meet.indep[q][e])
+                    .collect();
+                if outside.is_empty() {
+                    continue;
+                }
+                let (q, e) = outside[rng.below(outside.len() as u64) as usize];
+                let members: Vec<u32> = meet.cands.iter().copied().filter(|&x| meet.in_set[x as usize]).collect();
+                match rng.below(3) {
+                    0 => meet.indep[q][e] = true,
+                    1 if meet.circ[q][e].len() > 1 => {
+                        meet.circ[q][e].pop();
+                    }
+                    _ => match members.iter().find(|x| !meet.circ[q][e].contains(x)) {
+                        Some(&x) => meet.circ[q][e].push(x),
+                        None => meet.indep[q][e] = true,
+                    },
+                }
+                spoiled += 1;
+                let before = meet.stats.fallbacks;
+                let got = meet.solve_from(&child, Some(&parent.warm));
+                caught += meet.stats.fallbacks - before;
+                let value = match &got {
+                    Outcome::Bound(b) => Some(b.value),
+                    _ => None,
+                };
+                assert_eq!(value, brute(&pair, &child), "child {child:?} of {roles:?}, spoiled ({q}, {e})");
+                let Outcome::Bound(b) = got else { continue };
+                for &(x, bound) in &b.without {
+                    let mut barred = child.clone();
+                    barred[x as usize] = Role::Barred;
+                    assert!(bound >= brute(&pair, &barred).unwrap_or(i64::MIN), "barring {x}");
+                }
+            }
+        }
+        assert!(spoiled > 1000 && caught * 10 > spoiled, "{caught} of {spoiled} spoiled starts fell back");
+        eprintln!("{caught} of {spoiled} spoiled starts fell back");
     }
 
     /// A solve that derives its start from the state its parent's solve left (put back by `restore` where a sibling's
