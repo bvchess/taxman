@@ -47,6 +47,10 @@ The search:
     the search kept or took from the parent.
   * It cuts the node, bars the free numbers that depend on the forced picks, and forces the members whose barring alone
     brings it to the target.  The node branches on its heaviest set's conflicts instead of the matching's.
+  * It also bars a number outside its heaviest set whose forcing alone brings it to the target: no playable set that
+    beats the target holds that number.  The same weight split bounds the forced number by one exchange in each
+    parity, the number's weight less the lightest member of its circuit in the set (`Meet::forcing_cut`), so the
+    test costs no further solve.
   * Its gap is about a tenth of the Franklín–Moniot bound's: 130 points against 1,200 at n = 1000-1300.
 * **Branching.**  If the bound's picks are playable, they are a game worth the bound.  Otherwise a minimal unplayable
   subset, found by a deletion filter with peel, must lose a member, and the children partition on which.

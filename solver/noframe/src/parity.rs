@@ -36,7 +36,9 @@
 //! independent set avoiding x is S − x plus the heaviest y with S − x + y independent if that weighs more than 0
 //! (the exchange from a heaviest set, docs/theory/parity-bound.md, "Computing and checking the bound"), so
 //! w1(x) − max(0, max w1(y) over the y whose circuit holds x) comes off the first maximum, and likewise in B
-//! ([`Bound::without`]).
+//! ([`Bound::without`]).  With one element y outside S forced, the heaviest independent set that holds y is S + y
+//! less the least member of y's circuit, so the maximum changes by w1(y) less that member's weight, and likewise in
+//! B ([`Meet::forcing_cut`]).
 //!
 //! The set itself comes from the shortest augmenting path algorithm (Lawler; Schrijver, *Combinatorial
 //! Optimization*, Theorem 41.7): from a set I that is heaviest among the sets of its size, the exchange graph has
@@ -833,6 +835,42 @@ impl Meet {
         Some((forced_weight, forced, loops))
     }
 
+    /// After a solve that gave `bound`: the free candidates y outside its set S such that no set independent in both
+    /// classes that holds y, the forced elements and no barred one weighs more than `target`.  Such a y can be barred
+    /// (no playable set of the node that beats the target holds it).
+    ///
+    /// With the certificate's split w = w1 + w2, the weight of a set T independent in both classes is w1(T) + w2(T),
+    /// and in one class the heaviest independent set that holds y is S with y added and, if S + y is dependent, the
+    /// least member of its circuit dropped (the heaviest basis through an element of a matroid is the heaviest basis
+    /// exchanged with it; the independent sets of any size are the bases of the matroid padded with dummies of weight
+    /// 0, in which S + y independent drops a dummy, and the members of S weigh at least 0).  So the weight of T is at
+    /// most `bound.value` plus, for each class q, wq(y) less the least wq over y's circuit in S (nothing if S + y is
+    /// independent); y is returned when that is at most `target`.
+    pub fn forcing_cut(&self, bound: &Bound, target: i64) -> Vec<u32> {
+        let w = &self.pair.weight;
+        let mut w1 = vec![0i64; w.len()];
+        for &(e, v) in &bound.warm.w1 {
+            w1[e as usize] = v;
+        }
+        let mut cut = Vec::new();
+        for &y in self.cands.iter().filter(|&&y| !self.in_set[y as usize]) {
+            let y = y as usize;
+            let mut forcing = bound.value;
+            for q in 0..2 {
+                let wq = |e: usize| if q == 0 { w1[e] } else { w[e] - w1[e] };
+                forcing += wq(y);
+                if !self.indep[q][y] {
+                    let least = self.circ[q][y].iter().map(|&x| wq(x as usize)).min();
+                    forcing -= least.expect("a circuit has members");
+                }
+            }
+            if forcing <= target {
+                cut.push(y as u32);
+            }
+        }
+        cut
+    }
+
     /// Clears the rows, adds the forced elements (untracked), and sorts the free ones into candidates (by weight,
     /// heaviest first) and `loops` (those that depend on the forced ones).  None if the forced elements are dependent.
     fn setup(&mut self, roles: &[Role]) -> Option<(i64, Vec<u32>, Vec<u32>)> {
@@ -1501,6 +1539,21 @@ mod tests {
         best
     }
 
+    /// Forcing a free candidate outside the bound's set never costs less than `forcing_cut` says: it does not
+    /// return a candidate for a target below the heaviest set that holds it.  Of the candidates, the first and the
+    /// last (each costs an enumeration).
+    fn check_forcing(pair: &Pair, roles: &[Role], meet: &Meet, b: &Bound) {
+        let outside: Vec<usize> = (0..pair.len())
+            .filter(|&y| roles[y] == Role::Free && !b.set.contains(&(y as u32)) && !b.loops.contains(&(y as u32)))
+            .collect();
+        for &y in outside.first().into_iter().chain(outside.last().filter(|_| outside.len() > 1)) {
+            let mut forced = roles.to_vec();
+            forced[y] = Role::Pick;
+            let truth = brute(pair, &forced).unwrap_or(i64::MIN);
+            assert!(!meet.forcing_cut(b, truth.saturating_sub(1)).contains(&(y as u32)), "forcing {y}");
+        }
+    }
+
     fn check(pair: &Pair, roles: &[Role], meet: &mut Meet) {
         let want = brute(pair, roles);
         let got = match meet.solve(roles) {
@@ -1533,6 +1586,7 @@ mod tests {
             let truth = brute(pair, &barred).unwrap_or(i64::MIN);
             assert!(bound >= truth, "barring {x}: {bound} < {truth}");
         }
+        check_forcing(pair, roles, meet, &b);
     }
 
     /// The certified intersection against enumeration on random pairs of small families of vectors (sparse vectors,
@@ -1641,6 +1695,7 @@ mod tests {
                         barred[x as usize] = Role::Barred;
                         assert!(bound >= brute(&pair, &barred).unwrap_or(i64::MIN), "barring {x}");
                     }
+                    check_forcing(&pair, &child, &meet, &b);
                 }
                 warm += meet.stats.warm - before.warm;
                 fallbacks += meet.stats.fallbacks - before.fallbacks;

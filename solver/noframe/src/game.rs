@@ -900,8 +900,10 @@ impl<'a> Prover<'a> {
     /// after the matching bound: the heaviest set independent at both parities together with the node's forced picks,
     /// leaving out its barred numbers, certified by a weight split.  It cuts the node when it is at most the target;
     /// it bars every free number that depends on the forced picks at one of the parities (no playable set of the node
-    /// holds it) and forces every member whose barring alone brings it to the target (by the split); and the
-    /// node branches on a minimal unplayable subset of its heaviest set instead of the matching's picks.
+    /// holds it) and every number outside its heaviest set whose forcing alone brings it to the target (no playable
+    /// set that beats the target holds it, [`Meet::forcing_cut`]), and forces every member whose barring alone
+    /// brings it to the target (by the split); and the node branches on a minimal unplayable subset of its heaviest
+    /// set instead of the matching's picks.
     pub fn with_parity(mut self) -> Self {
         self.parity = Some(Meet::new(Parity::pair(self.board, &self.weights)));
         self
@@ -1183,7 +1185,8 @@ impl<'a> Prover<'a> {
                 newly.extend(more);
             }
             // The parity bound, once the matching forces nothing more: it cuts, bars the numbers dependent on the
-            // forced ones, and forces the members whose barring alone brings it down to the target.
+            // forced ones and those whose forcing alone brings it down to the target, and forces the members whose
+            // barring alone does.
             let mut barred: Vec<u32> = Vec::new();
             let mut parity_set = None;
             if newly.is_empty() {
@@ -1203,7 +1206,9 @@ impl<'a> Prover<'a> {
                                 self.stats[6] += 1;
                                 return Verdict::Proven;
                             }
+                            let cut = meet.forcing_cut(&b, self.target as i64);
                             barred = b.loops;
+                            barred.extend(cut);
                             newly.extend(b.without.iter().filter(|&&(_, v)| v <= self.target as i64).map(|&(x, _)| x));
                             if newly.is_empty() && barred.is_empty() {
                                 let mut set = vec![false; n as usize + 1];
@@ -1590,11 +1595,11 @@ mod tests {
 
     /// A search paused every few hundred nodes and resumed from its open units and nogoods reaches the verdict of
     /// an uninterrupted one, on both sides of opt(n) (opt(300) = 28691, opt(432) = 59259 and, with the parity
-    /// bound, opt(600) = 112623).
+    /// bound, opt(930) = 272754).
     #[test]
     fn paused_searches_resume_to_the_same_verdict() {
-        let spf = smallest_prime_factors(600);
-        for (n, opt, parity) in [(300u32, 28691u64, false), (432, 59259, false), (600, 112623, true)] {
+        let spf = smallest_prime_factors(930);
+        for (n, opt, parity) in [(300u32, 28691u64, false), (432, 59259, false), (930, 272754, true)] {
             let board = Board::new(n, &spf);
             let fresh = |target| {
                 let p = Prover::new(&board, target, u64::MAX);
