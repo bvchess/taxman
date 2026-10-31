@@ -89,7 +89,7 @@ fn main() {
         );
     }
     let mut sizes = std::collections::BTreeMap::new();
-    for k in &prover.nogoods {
+    for k in prover.nogoods.iter() {
         *sizes.entry(k.len()).or_insert(0) += 1;
     }
     println!("  conflict sizes: {sizes:?}");

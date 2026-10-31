@@ -63,7 +63,11 @@ The search:
 * **Forced picks, cuts and nogoods.**  A pick is forced when barring it alone already brings the bound to the target,
   which the dual shows.  The *conflict-packing cut* takes the nogoods that the matching violates and whose members lie
   far apart in the graph: each must be broken, so their dual costs add.  Every minimal unplayable set found is a
-  nogood, propagated and reused.
+  nogood, propagated and reused.  A long search holds tens of thousands of them, so a node reads only what it changes
+  of the table (`src/nogoods.rs`).  Each nogood watches two members that are not forced, as a SAT solver's clause
+  does, and a node looks at the nogoods that watch the numbers it forces.  The table also keeps, for each nogood, how
+  many members lie outside the last set asked about, so the nogoods inside a set come from the few numbers that left or
+  entered it.
 * **A Lagrangian bound over the nogoods.**  A playable set picks at most |K| − 1 members of each nogood K.  So a second
   matching, with each pick's weight lowered by the multipliers of the unbroken nogoods holding it, bounds the search
   too; the multipliers are fitted by subgradient steps at the search's root, then fixed.  It runs alongside the first,

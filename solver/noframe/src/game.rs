@@ -29,6 +29,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
+use crate::nogoods::{Nogoods, Set};
 use crate::parity::{Meet, Outcome, Parity, Saved, Warm};
 use crate::primes::{is_prime, maximal_factors};
 use crate::semiprime;
@@ -753,7 +754,7 @@ pub struct Prover<'a> {
     target: u64,
     /// For each m < n, an upper bound on the weight of a playable set of the board 1..=m (empty: no segment cuts).
     smaller: Vec<i64>,
-    pub nogoods: Vec<Vec<u32>>,
+    pub nogoods: Nogoods,
     max_nogoods: usize,
     pub nodes: u64,
     /// Diagnostics: [new conflicts, known conflicts, forced picks, children, cut by bound, cut by the Lagrangian,
@@ -783,7 +784,8 @@ pub struct Prover<'a> {
 /// A thread's part in a search that several threads share (see [`Prover::team`]).  Before each child and each unit,
 /// the prover asks whether to stop, and gives away work when an idle thread waits for it.
 pub trait Team {
-    /// Whether the search must stop now: another thread ended it (a set beating the target, the budget).
+    /// Whether the search must stop now: another thread ended it (a set beating the target, the budget) or failed, or
+    /// a stop signal came ([`stop`](crate::stop)).
     fn halted(&self) -> bool;
     /// Whether an idle thread waits for work from this prover.
     fn asked(&self) -> bool;
@@ -887,6 +889,8 @@ struct Base<'b> {
     lag: Option<&'b Snapshot>,
     parity: Option<&'b Warm>,
     saved: Option<&'b Saved>,
+    /// How many nogoods the parent had when it was propagated.
+    checked: usize,
 }
 
 impl<'a> Prover<'a> {
@@ -900,7 +904,7 @@ impl<'a> Prover<'a> {
             weights: (0..=i64::from(board.n)).collect(),
             target,
             smaller: Vec::new(),
-            nogoods: Vec::new(),
+            nogoods: Nogoods::default(),
             max_nogoods: 20_000,
             nodes: 0,
             stats: [0; 8],
@@ -927,7 +931,7 @@ impl<'a> Prover<'a> {
     /// ([`trade`](Self::trade)).
     pub fn team(mut self, team: &'a dyn Team, nogoods: Vec<Vec<u32>>) -> Self {
         self.team = Some(team);
-        self.nogoods = nogoods;
+        self.nogoods = nogoods.into();
         self.traded = self.nogoods.len();
         self
     }
@@ -936,7 +940,7 @@ impl<'a> Prover<'a> {
     /// room.
     pub fn trade(&mut self) {
         let Some(team) = self.team else { return };
-        let fresh = team.trade(self.nogoods.get(self.traded..).unwrap_or_default());
+        let fresh = team.trade(&self.nogoods.since(self.traded));
         let room = self.max_nogoods.saturating_sub(self.nogoods.len());
         self.nogoods.extend(fresh.into_iter().take(room));
         self.traded = self.nogoods.len();
@@ -1062,7 +1066,7 @@ impl<'a> Prover<'a> {
             return None;
         }
         let roles = self.root_roles();
-        let ks = self.nogoods.clone();
+        let ks = self.nogoods.to_vec();
         let mut m = MatchingBound::new(self.board);
         m.set_weights(&self.weights.iter().map(|w| w * SCALE).collect::<Vec<_>>());
         let set = |m: &mut MatchingBound, mu: &[i64]| -> i64 {
@@ -1121,23 +1125,20 @@ impl<'a> Prover<'a> {
         self.run_units(vec![roles])
     }
 
-    /// Learns the conflicts of the unplayable `source` that no two share a free member: first the nogoods inside it,
-    /// the ones with the fewest free members first, then the conflicts of what is left of the set once their free
-    /// members are out, as many as it holds (up to [`LEARNED`]).  Each is a nogood, found once and used by every
-    /// node whose set holds it; and the node then has several to choose its branching from.  Returns the conflicts
-    /// found now, whether or not the table had room for them.
-    fn learn_conflicts(&mut self, source: &[bool], roles: &[Role]) -> Vec<Vec<u32>> {
+    /// Learns the conflicts of the unplayable `source` that no two share a free member: first the nogoods inside it
+    /// (`inside` holds their ids), the ones with the fewest free members first, then the conflicts of what is left of
+    /// the set once their free members are out, as many as it holds (up to [`LEARNED`]).  Each is a nogood, found
+    /// once and used by every node whose set holds it; and the node then has several to choose its branching from.
+    /// Returns the conflicts found now, whether or not the table had room for them.
+    fn learn_conflicts(&mut self, source: &[bool], roles: &[Role], inside: &[usize]) -> Vec<Vec<u32>> {
         let free_of =
             |k: &[u32]| -> Vec<u32> { k.iter().copied().filter(|&c| roles[c as usize] == Role::Free).collect() };
-        let mut known: Vec<(usize, usize)> = (0..self.nogoods.len())
-            .filter(|&i| self.nogoods[i].iter().all(|&c| source[c as usize]))
-            .map(|i| (free_of(&self.nogoods[i]).len(), i))
-            .collect();
+        let mut known: Vec<(usize, usize)> = inside.iter().map(|&i| (free_of(self.nogoods.get(i)).len(), i)).collect();
         known.sort_unstable();
         let mut rest = source.to_vec();
         let mut learned = 0;
         for (_, i) in known {
-            let free = free_of(&self.nogoods[i]);
+            let free = free_of(self.nogoods.get(i));
             if free.iter().all(|&c| rest[c as usize]) {
                 free.iter().for_each(|&c| rest[c as usize] = false);
                 learned += 1;
@@ -1151,7 +1152,7 @@ impl<'a> Prover<'a> {
             free_of(&k).iter().for_each(|&c| rest[c as usize] = false);
             learned += 1;
             if self.nogoods.len() < self.max_nogoods {
-                self.nogoods.push(k.clone());
+                self.nogoods.push(&k, roles);
             }
             found.push(k);
         }
@@ -1159,44 +1160,64 @@ impl<'a> Prover<'a> {
     }
 
     /// Nogood propagation: false if some nogood is entirely forced; bars the last free member of a nogood whose
-    /// other members are all forced.
-    fn propagate(&self, roles: &mut [Role]) -> bool {
+    /// other members are all forced.  `since` is the parent node's roles, which were at the fixpoint of the first
+    /// `checked` nogoods, and which `roles` extend; without it every nogood is examined.
+    fn propagate(&mut self, roles: &mut [Role], since: Option<(&[Role], usize)>) -> bool {
+        #[cfg(debug_assertions)]
+        let (before, expected) = (roles.to_vec(), self.propagate_by_scan(roles));
+        let result = self.propagate_watched(roles, since);
+        #[cfg(debug_assertions)]
+        {
+            let (verdict, fixpoint) = expected;
+            assert_eq!(result, verdict, "propagation by the watches and by the scan disagree on {before:?}");
+            assert!(!result || *roles == *fixpoint, "propagation by the watches and by the scan reach other roles");
+        }
+        result
+    }
+
+    fn propagate_watched(&mut self, roles: &mut [Role], since: Option<(&[Role], usize)>) -> bool {
+        let picked_since = |old: &[Role], roles: &[Role]| -> Vec<u32> {
+            (0..roles.len() as u32)
+                .filter(|&c| roles[c as usize] == Role::Pick && old[c as usize] != Role::Pick)
+                .collect()
+        };
+        let (mut trail, checked) = match since {
+            Some((old, checked)) => (picked_since(old, roles), checked),
+            None => (Vec::new(), 0),
+        };
+        let mut fresh = checked..self.nogoods.len();
         loop {
-            let mut changed = false;
-            for nogood in &self.nogoods {
-                let mut free = NONE;
-                let mut free_count = 0;
-                let mut barred = false;
-                for &c in nogood {
-                    match roles[c as usize] {
-                        Role::Barred => {
-                            barred = true;
-                            break;
-                        }
-                        Role::Free => {
-                            free = c;
-                            free_count += 1;
-                        }
-                        Role::Pick => {}
-                    }
-                }
-                if barred {
-                    continue;
-                }
-                match free_count {
-                    0 => return false,
-                    1 => {
-                        roles[free as usize] = Role::Barred;
-                        changed = true;
-                    }
-                    _ => {}
-                }
+            if !self.nogoods.propagate(roles, &trail, fresh.clone()) {
+                return false;
             }
+            fresh = self.nogoods.len()..self.nogoods.len();
+            if self.smaller.is_empty() {
+                return true;
+            }
+            let before = roles.to_vec();
+            let mut changed = false;
             if !self.segments(roles, &mut changed) {
                 return false;
             }
             if !changed {
                 return true;
+            }
+            trail = picked_since(&before, roles);
+        }
+    }
+
+    /// What [`propagate`](Self::propagate) must reach, by reading every nogood until nothing changes: the verdict
+    /// and the roles (the specification that the watches in [`Nogoods`] are checked against in debug builds).
+    #[cfg(debug_assertions)]
+    fn propagate_by_scan(&self, roles: &[Role]) -> (bool, Vec<Role>) {
+        let mut roles = roles.to_vec();
+        loop {
+            let mut changed = false;
+            if !self.nogoods.scan(&mut roles, &mut changed) || !self.segments(&mut roles, &mut changed) {
+                return (false, roles);
+            }
+            if !changed {
+                return (true, roles);
             }
         }
     }
@@ -1206,14 +1227,13 @@ impl<'a> Prover<'a> {
     /// [`bound_barring`](MatchingBound::bound_barring)(c).  Conflicts whose free members and their payments are
     /// pairwise apart (no shared or adjacent vertices) can have their duals lowered together, so the bound with
     /// one member of each left out is at most value − Σ min drop.  True if that cuts the node.
-    fn packing_cut(&self, roles: &[Role], picks: &[bool], value: u64) -> bool {
+    fn packing_cut(&mut self, roles: &[Role], picks: &[bool], value: u64) -> bool {
         let gap = value as i64 - self.target as i64;
         let mut costed: Vec<(i64, usize)> = Vec::new();
-        for (i, k) in self.nogoods.iter().enumerate() {
-            if !k.iter().all(|&c| picks[c as usize]) {
-                continue;
-            }
-            let cost = k
+        for i in self.nogoods.inside(Set::Matching, picks) {
+            let cost = self
+                .nogoods
+                .get(i)
                 .iter()
                 .filter(|&&c| roles[c as usize] == Role::Free)
                 .map(|&c| value as i64 - self.bound.bound_barring(roles, c))
@@ -1230,7 +1250,7 @@ impl<'a> Prover<'a> {
         let mut total = 0i64;
         for (cost, i) in costed {
             let mut vertices: Vec<u32> = Vec::new();
-            for &c in self.nogoods[i].iter().filter(|&&c| roles[c as usize] == Role::Free) {
+            for &c in self.nogoods.get(i).iter().filter(|&&c| roles[c as usize] == Role::Free) {
                 vertices.push(c);
                 let m = self.bound.mate_of(c);
                 if m != NONE {
@@ -1265,7 +1285,7 @@ impl<'a> Prover<'a> {
             w.barring +=
                 u64::from(w.barred.iter().zip(&roles).any(|(&flagged, &role)| flagged && role == Role::Barred));
         }
-        if !self.propagate(&mut roles) {
+        if !self.propagate(&mut roles, base.as_ref().map(|b| (b.roles, b.checked))) {
             return Verdict::Proven;
         }
         let forced: Vec<bool> = roles.iter().map(|&r| r == Role::Pick).collect();
@@ -1361,7 +1381,7 @@ impl<'a> Prover<'a> {
             self.stats[2] += newly.len() as u64;
             newly.iter().for_each(|&c| roles[c as usize] = Role::Pick);
             barred.iter().for_each(|&c| roles[c as usize] = Role::Barred);
-            if !self.propagate(&mut roles) {
+            if !self.propagate(&mut roles, Some((&old, self.nogoods.len()))) {
                 return Verdict::Proven;
             }
             let forced: Vec<bool> = roles.iter().map(|&r| r == Role::Pick).collect();
@@ -1373,6 +1393,9 @@ impl<'a> Prover<'a> {
                 lag_solved = Some(l.solve(board, Some((&old, s)), &roles));
             }
         };
+        // The roles are at the fixpoint of the nogoods known so far: the children, which extend them, need to look
+        // only at the nogoods learned from here on.
+        let checked = self.nogoods.len();
         // Branch on a violated conflict.  A known one also shows the picks unplayable without a peel.  (Branching
         // on the Lagrangian matching's picks instead was measured: 13% more nodes at n = 793.)
         //
@@ -1383,11 +1406,11 @@ impl<'a> Prover<'a> {
         let free_of = |k: &[u32]| -> Vec<(u32, Role)> {
             k.iter().filter(|&&c| roles[c as usize] == Role::Free).map(|&c| (c, Role::Pick)).collect()
         };
-        let in_set = |k: &Vec<u32>| k.iter().all(|&c| source[c as usize]);
-        let known = self.nogoods.iter().any(in_set);
+        let inside = self.nogoods.inside(Set::Branching, source);
+        let known = !inside.is_empty();
         let decisions = if known || !self.board.playable(source) {
             self.stats[usize::from(known)] += 1;
-            let found = self.learn_conflicts(source, &roles);
+            let found = self.learn_conflicts(source, &roles, &inside);
             // The conflict with the smallest expected tree.  Each child bars one free member of it, and a node
             // whose bound exceeds the target by g points has a tree of about 10^(g / POINTS_PER_DECADE) nodes, so
             // a conflict weighs the sum, over its free members, of that for the bound with the member barred
@@ -1395,13 +1418,17 @@ impl<'a> Prover<'a> {
             // bound the members have no price, each weighs 1, and the conflict with the fewest free members wins.)
             let mut gap = vec![0i64; n as usize + 1];
             without.iter().for_each(|&(c, v)| gap[c as usize] = v - self.target as i64);
-            let weight = |k: &&Vec<u32>| -> f64 {
+            let weight = |k: &[u32]| -> f64 {
                 let free = k.iter().filter(|&&c| roles[c as usize] == Role::Free);
                 free.map(|&c| 10f64.powf(gap[c as usize] as f64 / POINTS_PER_DECADE)).sum()
             };
-            let k =
-                self.nogoods.iter().filter(|k| in_set(k)).chain(&found).min_by(|a, b| weight(a).total_cmp(&weight(b)));
-            free_of(k.expect("a conflict of the set"))
+            // The nogoods inside the set in the order of the table, then those just learned; the first of the
+            // lightest.
+            let candidates = inside.iter().map(|&i| self.nogoods.get(i)).chain(found.iter().map(Vec::as_slice));
+            let k = candidates
+                .map(|k| (weight(k), k))
+                .reduce(|best, k| if k.0.total_cmp(&best.0).is_lt() { k } else { best });
+            free_of(k.expect("a conflict of the set").1)
         } else {
             let set: Vec<u32> = (2..=n).filter(|&c| source[c as usize]).collect();
             if self.optimizing {
@@ -1459,6 +1486,7 @@ impl<'a> Prover<'a> {
             lag: lag_snapshot.as_ref(),
             parity: warm.as_ref(),
             saved: saved.as_ref(),
+            checked,
         };
         self.frames.push(Frame { roles: roles.clone(), decisions, sizes, taken });
         let verdict = self.children(base);
@@ -1797,7 +1825,7 @@ mod tests {
             };
             for target in [opt, opt - 1] {
                 let straight = fresh(target).run();
-                let (mut units, mut nogoods, mut pauses) = (None::<Vec<Vec<Role>>>, Vec::new(), 0);
+                let (mut units, mut nogoods, mut pauses) = (None::<Vec<Vec<Role>>>, Nogoods::default(), 0);
                 let resumed = loop {
                     let mut p = fresh(target).pause_at(std::time::Instant::now());
                     p.nogoods = std::mem::take(&mut nogoods);

@@ -25,6 +25,8 @@
 //! * [`star`]: the per-threshold check of conjecture (★) on one instance.
 //! * [`game`]: the full game on the whole board: replay, peel, and an exact branch and bound.
 //! * [`moves`]: the longest games (the most moves), against the optimal game's moves.
+//! * [`nogoods`]: the search's table of nogoods (unplayable sets), kept so that a node reads only the nogoods its
+//!   changes touch.
 //! * [`parity`]: the parity vectors, two families of vectors over GF(2) in each of which every playable set is
 //!   independent, and the certified heaviest set independent at both parities (weighted matroid intersection), a
 //!   bound on opt(n).
@@ -45,6 +47,7 @@ pub mod instance;
 pub mod jsonl;
 pub mod maxcard;
 pub mod moves;
+pub mod nogoods;
 pub mod parity;
 pub mod peel;
 pub mod plus1;
